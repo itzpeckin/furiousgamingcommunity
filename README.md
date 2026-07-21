@@ -1,39 +1,36 @@
-# Franchise HQ — Milestone 1B
+# Franchise HQ — Milestone 1 Complete
 
-Milestone 1B expands the responsive design-system shell into a fully interactive mock Madden league website.
+This package combines Milestones 1A, 1B, 1C, and 1D into one static interactive prototype.
 
 ## Included
 
-- Responsive League Home dashboard
-- Complete 32-team directory with filters
-- Team profile pages with roster, depth chart, schedule, stats, and salary-cap views
-- Searchable mock player database containing more than 1,000 generated roster records
-- Detailed player profile pages with ratings, contracts, season stats, and game logs
-- Division, conference, league, and playoff-picture standings
-- Passing, rushing, receiving, defensive, and team statistical leaderboards
-- Nine weeks of interactive mock schedule and game-result data
-- League-news hub with category filters and article previews
-- Global quick search using `Ctrl/Cmd + K`
-- Commissioner, Team Owner, and Trade Committee role previews
-- Accent-color and interface-density controls
-- Responsive desktop, tablet, and mobile layouts
-- Placeholder pages for Trade Center, Trade Block, and Commissioner tools
+- Responsive desktop and mobile design system
+- League home, teams, player profiles, standings, stats, schedule, and news
+- Mock Discord account login and role switching
+- Creator-only private trade calculator workspace
+- Saved private drafts
+- Two-owner private negotiation room with chat and versioned revisions
+- Hidden trade-committee review with five mock voters
+- Public League News announcements only for approved trades
+- Commissioner-authored private rejection DMs
+- Functional trade block and owner availability controls
+- Commissioner workflow dashboard and audit trail
+- Browser-saved mock trades, messages, votes, and block changes
 
-## Open it
-
-Double-click `index.html`, or upload all four files to the root of a GitHub repository configured for GitHub Pages.
-
-No installation, build process, package manager, or server is required.
-
-## Update an existing GitHub repository
-
-Upload these files and allow GitHub to replace the prior Milestone 1A versions:
+## Files
 
 - `index.html`
 - `styles.css`
 - `app.js`
-- `README.md`
+- `trade-module.js`
 
-## Current boundaries
+## Recommended test
 
-All league information is mock data generated in the browser. Madden Companion exports, Discord login, private trade workflows, database storage, and the trade-calculation engine are intentionally postponed to later milestones.
+1. Sign in as the Dallas owner.
+2. Open Trade Center and Trade #104.
+3. Switch to the Green Bay owner and accept or counter.
+4. Switch through committee identities and vote.
+5. For approval, the final trade appears in League News.
+6. For rejection, switch to Commissioner and send the individual private DMs.
+
+All data is mock data stored in browser localStorage. No Discord or Madden account is contacted.

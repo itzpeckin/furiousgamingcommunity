@@ -657,9 +657,11 @@
   }
 
   function renderNews() {
-    const categories=['All',...new Set(newsArticles.map(a=>a.category))];
-    const filtered=newsArticles.filter(a=>state.newsCategory==='All'||a.category===state.newsCategory);
-    const featured=filtered.find(a=>a.featured)||filtered[0]||newsArticles[0];
+    const dynamicNews = window.FGC_TRADE?.getApprovedNews?.() || [];
+    const allNews = [...dynamicNews, ...newsArticles];
+    const categories=['All',...new Set(allNews.map(a=>a.category))];
+    const filtered=allNews.filter(a=>state.newsCategory==='All'||a.category===state.newsCategory);
+    const featured=filtered.find(a=>a.featured)||filtered[0]||allNews[0];
     const rest=filtered.filter(a=>a.id!==featured.id);
     pageContent.innerHTML = `
       <div class="page-heading"><div><span class="eyebrow">Stories, announcements, and activity</span><h1>League News</h1><p>Approved trades, game recaps, power rankings, awards, commissioner updates, and automated league stories.</p></div><div class="heading-actions"><button class="button button--primary" data-demo-toast="The commissioner news editor will be connected after authentication and database setup."><svg><use href="#icon-news"></use></svg>Create post</button></div></div>
@@ -711,7 +713,7 @@
   }
 
   function openNewsDetail(newsId) {
-    const article=newsArticles.find(item=>item.id===newsId);
+    const article=[...(window.FGC_TRADE?.getApprovedNews?.() || []), ...newsArticles].find(item=>item.id===newsId);
     if (!article) return;
     openDetail(`<div class="modal-hero"><div><span class="pill pill--accent">${escapeHtml(article.category)}</span><h2>${escapeHtml(article.title)}</h2><div class="news-meta"><span>${escapeHtml(article.author)}</span><span>•</span><span>${escapeHtml(article.time)}</span><span>•</span><span>${escapeHtml(article.read)}</span></div></div></div><div class="modal-body"><p><strong>${escapeHtml(article.excerpt)}</strong></p><p>This is a mock long-form news story showing how commissioner articles, automated recaps, trade announcements, weekly awards, and analysis can be presented inside the finished league site.</p><p>When the Madden export is connected, game results and statistical changes can provide structured facts for automatically generated stories. Commissioners will still control what becomes public and can edit the final wording before publication.</p><div class="modal-summary-grid"><div><span>Category</span><strong>${escapeHtml(article.category)}</strong></div><div><span>Visibility</span><strong>League Public</strong></div><div><span>Source</span><strong>Mock Data</strong></div></div><div class="heading-actions" style="justify-content:flex-start"><button class="button button--primary" data-close-detail>Back to news</button><button class="button button--ghost" data-demo-toast="Discord cross-posting will be connected when the Discord bot is built."><svg><use href="#icon-external"></use></svg>Preview Discord post</button></div></div>`);
   }
@@ -750,14 +752,16 @@
       case 'stats': renderStats(); break;
       case 'schedule': renderSchedule(); break;
       case 'news': renderNews(); break;
+      case 'trade-center': window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : renderRoadmap(base); break;
+      case 'trade-block': window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : renderRoadmap(base); break;
       case 'design-system': renderDesignSystem(); break;
       case 'commissioner':
-        if (state.role!=='commissioner') { showToast('Commissioner access required','Switch the prototype role to Commissioner to preview this area.'); setRoute('home'); return; }
-        renderRoadmap(base); break;
+        if (state.role!=='commissioner') { showToast('Commissioner access required','Switch to the Commissioner mock account to preview this area.'); setRoute('home'); return; }
+        window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base); break;
       default: renderRoadmap(base);
     }
     const pageTitle=id ? (base==='teams'?teamById(id)?.fullName:playerById(id)?.name) : pageNames[base];
-    document.title=`${pageTitle||'Franchise HQ'} — Milestone 1B`;
+    document.title=`${pageTitle||'Franchise HQ'} — Milestone 1 Complete`;
     mainContent.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:'smooth'});
   }
@@ -926,6 +930,13 @@
   });
 
   window.addEventListener('hashchange',()=>renderRoute());
+
+  window.FGC_APP = {
+    teams, players, schedule, newsArticles, state, pageContent,
+    teamById, playerById, teamStyle, renderTeamMark, renderPlayerIdentity,
+    devClass, formatMoney, escapeHtml, setRoute, renderRoute, showToast,
+    openDetail, closeDetail, applyRole, closeProfileMenu
+  };
 
   applyAccent(state.accent,false);
   applyDensity(state.density);

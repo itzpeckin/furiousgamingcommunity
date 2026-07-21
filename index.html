@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0e14" />
-  <meta name="description" content="Interactive mock Madden connected-franchise league website prototype." />
-  <title>Franchise HQ — Milestone 1B</title>
+  <meta name="description" content="Interactive Madden connected-franchise league prototype with private trade workflow, role-based mock login, committee review, and browser-saved demo data." />
+  <title>Franchise HQ — Milestone 1 Complete</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-density="comfortable">
@@ -62,7 +62,7 @@
           <span class="status-dot status-dot--warning"></span>
           <div><strong>Mock data mode</strong><span>Real Madden sync arrives in Milestone 3</span></div>
         </div>
-        <span class="version-label">Prototype · M1B v1.0</span>
+        <span class="version-label">Prototype · Milestone 1 Complete</span>
       </div>
     </aside>
 
@@ -78,15 +78,15 @@
           <div class="live-chip"><span class="status-dot status-dot--live"></span>Week 8 Live</div>
           <button class="icon-button notification-button" data-demo-toast="You have two mock trade notifications and one league announcement." aria-label="Notifications"><svg><use href="#icon-bell"></use></svg><span class="notification-dot"></span></button>
           <button class="profile-button" data-profile-button aria-haspopup="menu" aria-expanded="false">
-            <span class="avatar">JM</span>
-            <span class="profile-copy"><strong>Justin</strong><small data-current-role>Commissioner</small></span>
+            <span class="avatar" data-current-avatar>JM</span>
+            <span class="profile-copy"><strong data-current-user>Justin</strong><small data-current-role>Commissioner</small></span>
             <svg><use href="#icon-chevron"></use></svg>
           </button>
           <div class="profile-menu" data-profile-menu role="menu">
-            <div class="profile-menu__header"><span class="eyebrow">Prototype role</span><strong>Preview permissions</strong></div>
-            <button data-role="commissioner" role="menuitem"><span class="menu-icon"><svg><use href="#icon-sliders"></use></svg></span><span><strong>Commissioner</strong><small>Full prototype access</small></span><svg class="check-icon"><use href="#icon-check"></use></svg></button>
-            <button data-role="owner" role="menuitem"><span class="menu-icon"><svg><use href="#icon-shield"></use></svg></span><span><strong>Team Owner</strong><small>League and trade tools</small></span><svg class="check-icon"><use href="#icon-check"></use></svg></button>
-            <button data-role="committee" role="menuitem"><span class="menu-icon"><svg><use href="#icon-gavel"></use></svg></span><span><strong>Trade Committee</strong><small>League and review tools</small></span><svg class="check-icon"><use href="#icon-check"></use></svg></button>
+            <div class="profile-menu__header"><span class="eyebrow">Mock Discord identity</span><strong data-profile-menu-user>Justin · Commissioner</strong></div>
+            <button data-open-login role="menuitem"><span class="menu-icon"><svg><use href="#icon-user"></use></svg></span><span><strong>Switch mock account</strong><small>Test owner, committee, and commissioner views</small></span><svg class="check-icon"><use href="#icon-arrow"></use></svg></button>
+            <button data-route="trade-center" role="menuitem"><span class="menu-icon"><svg><use href="#icon-swap"></use></svg></span><span><strong>Open Trade Center</strong><small>Continue private trade workflows</small></span><svg class="check-icon"><use href="#icon-arrow"></use></svg></button>
+            <button data-reset-demo role="menuitem"><span class="menu-icon"><svg><use href="#icon-activity"></use></svg></span><span><strong>Reset prototype data</strong><small>Restore seeded trades and conversations</small></span><svg class="check-icon"><use href="#icon-close"></use></svg></button>
           </div>
         </div>
       </header>
@@ -133,6 +133,20 @@
   </aside>
   <div class="panel-overlay" data-panel-overlay></div>
 
+
+  <div class="mock-login" data-mock-login aria-hidden="true">
+    <div class="mock-login__backdrop"></div>
+    <section class="mock-login__dialog" role="dialog" aria-modal="true" aria-labelledby="mock-login-title">
+      <div class="mock-login__brand">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 3 42 13v22L24 45 6 35V13L24 3Z" fill="currentColor" opacity=".16"/><path d="M16 15h18v6H22v5h10v6H22v8h-6V15Z" fill="currentColor"/></svg></span>
+        <div><span class="eyebrow">Milestone 1 interactive prototype</span><h1 id="mock-login-title">Continue with Discord</h1><p>Choose a mock league identity to test private offers, owner negotiations, hidden committee review, and commissioner decisions.</p></div>
+      </div>
+      <div class="mock-login__notice"><svg><use href="#icon-info"></use></svg><span>This is a local prototype. No real Discord account is contacted and all changes stay in this browser.</span></div>
+      <div class="mock-account-grid" data-mock-account-grid></div>
+      <div class="mock-login__footer"><span>Use <strong>Switch mock account</strong> from the profile menu at any time.</span><button class="button button--ghost" data-close-login>Return to site</button></div>
+    </section>
+  </div>
+
   <div class="toast-region" aria-live="polite" aria-atomic="true" data-toast-region></div>
 
   <svg class="svg-sprite" aria-hidden="true">
@@ -171,5 +185,6 @@
   </svg>
 
   <script src="app.js"></script>
+  <script src="trade-module.js"></script>
 </body>
 </html>
