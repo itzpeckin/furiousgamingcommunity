@@ -4,16 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0e14" />
-  <title>Franchise HQ — Milestone 1A</title>
+  <meta name="description" content="Interactive mock Madden connected-franchise league website prototype." />
+  <title>Franchise HQ — Milestone 1B</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body data-density="comfortable">
   <div class="app-shell" data-app-shell>
     <div class="mobile-overlay" data-mobile-overlay></div>
 
     <aside class="sidebar" data-sidebar aria-label="Primary navigation">
       <div class="brand-row">
-        <a class="brand" href="#home" aria-label="Franchise HQ home">
+        <a class="brand" href="#home" data-route="home" aria-label="Franchise HQ home">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 48 48" role="img">
               <path d="M24 3 42 13v22L24 45 6 35V13L24 3Z" fill="currentColor" opacity=".16"/>
@@ -21,348 +22,78 @@
             </svg>
           </span>
           <span class="brand-copy">
-            <strong data-brand-name>Franchise HQ</strong>
+            <strong>Franchise HQ</strong>
             <small>Connected League Platform</small>
           </span>
         </a>
-        <button class="icon-button sidebar-close" data-close-sidebar aria-label="Close menu">
-          <svg><use href="#icon-close"></use></svg>
-        </button>
+        <button class="icon-button sidebar-close" data-close-sidebar aria-label="Close menu"><svg><use href="#icon-close"></use></svg></button>
       </div>
 
-      <div class="league-card">
-        <div class="league-card__logo" aria-hidden="true">32</div>
-        <div>
+      <button class="league-card" data-demo-toast="League switching will be connected when multi-league support is added.">
+        <span class="league-card__logo" aria-hidden="true">FGC</span>
+        <span class="league-card__copy">
           <span class="eyebrow">Active league</span>
-          <strong data-league-name>Sunday Night Madden</strong>
-          <span class="league-card__meta">Season 4 · Week 8</span>
-        </div>
-        <button class="icon-button icon-button--small" aria-label="Change league" title="League switching arrives in a later milestone">
-          <svg><use href="#icon-chevron"></use></svg>
-        </button>
-      </div>
+          <strong>Furious Gaming Community</strong>
+          <span class="league-card__meta">Season 4 · Week 8 · Mock Data</span>
+        </span>
+        <svg class="league-card__chevron"><use href="#icon-chevron"></use></svg>
+      </button>
 
       <nav class="nav-list" data-nav-list>
-        <a class="nav-item is-active" href="#home" data-view="home">
-          <svg><use href="#icon-home"></use></svg><span>League Home</span>
-        </a>
-        <a class="nav-item" href="#teams" data-view="teams">
-          <svg><use href="#icon-shield"></use></svg><span>Teams</span>
-        </a>
-        <a class="nav-item" href="#players" data-view="players">
-          <svg><use href="#icon-users"></use></svg><span>Players</span>
-        </a>
-        <a class="nav-item" href="#standings" data-view="standings">
-          <svg><use href="#icon-table"></use></svg><span>Standings</span>
-        </a>
-        <a class="nav-item" href="#stats" data-view="stats">
-          <svg><use href="#icon-chart"></use></svg><span>Stats & Leaders</span>
-        </a>
-        <a class="nav-item" href="#schedule" data-view="schedule">
-          <svg><use href="#icon-calendar"></use></svg><span>Schedule</span>
-        </a>
-        <a class="nav-item" href="#news" data-view="news">
-          <svg><use href="#icon-news"></use></svg><span>League News</span>
-        </a>
+        <a class="nav-item" href="#home" data-route="home"><svg><use href="#icon-home"></use></svg><span>League Home</span></a>
+        <a class="nav-item" href="#teams" data-route="teams"><svg><use href="#icon-shield"></use></svg><span>Teams</span></a>
+        <a class="nav-item" href="#players" data-route="players"><svg><use href="#icon-users"></use></svg><span>Players</span></a>
+        <a class="nav-item" href="#standings" data-route="standings"><svg><use href="#icon-table"></use></svg><span>Standings</span></a>
+        <a class="nav-item" href="#stats" data-route="stats"><svg><use href="#icon-chart"></use></svg><span>Stats & Leaders</span></a>
+        <a class="nav-item" href="#schedule" data-route="schedule"><svg><use href="#icon-calendar"></use></svg><span>Schedule</span></a>
+        <a class="nav-item" href="#news" data-route="news"><svg><use href="#icon-news"></use></svg><span>League News</span><span class="nav-badge nav-badge--quiet">6</span></a>
 
         <div class="nav-divider"><span>Transactions</span></div>
-
-        <a class="nav-item nav-item--featured" href="#trade-center" data-view="trade-center">
-          <svg><use href="#icon-swap"></use></svg><span>Trade Center</span>
-          <span class="nav-badge">2</span>
-        </a>
-        <a class="nav-item" href="#trade-block" data-view="trade-block">
-          <svg><use href="#icon-tag"></use></svg><span>Trade Block</span>
-        </a>
+        <a class="nav-item nav-item--featured" href="#trade-center" data-route="trade-center"><svg><use href="#icon-swap"></use></svg><span>Trade Center</span><span class="nav-badge">2</span></a>
+        <a class="nav-item" href="#trade-block" data-route="trade-block"><svg><use href="#icon-tag"></use></svg><span>Trade Block</span></a>
 
         <div class="nav-divider"><span>League tools</span></div>
-
-        <a class="nav-item" href="#commissioner" data-view="commissioner" data-role-link="commissioner">
-          <svg><use href="#icon-sliders"></use></svg><span>Commissioner</span>
-        </a>
-        <a class="nav-item" href="#design-system" data-view="design-system">
-          <svg><use href="#icon-palette"></use></svg><span>Design System</span>
-        </a>
+        <a class="nav-item" href="#commissioner" data-route="commissioner" data-role-link="commissioner"><svg><use href="#icon-sliders"></use></svg><span>Commissioner</span></a>
+        <a class="nav-item" href="#design-system" data-route="design-system"><svg><use href="#icon-palette"></use></svg><span>Design System</span></a>
       </nav>
 
       <div class="sidebar-footer">
         <div class="sync-status">
           <span class="status-dot status-dot--warning"></span>
-          <div>
-            <strong>Mock data mode</strong>
-            <span>Real Madden sync arrives in Milestone 3</span>
-          </div>
+          <div><strong>Mock data mode</strong><span>Real Madden sync arrives in Milestone 3</span></div>
         </div>
-        <span class="version-label">Prototype · M1A v1.0</span>
+        <span class="version-label">Prototype · M1B v1.0</span>
       </div>
     </aside>
 
     <div class="workspace">
       <header class="topbar">
         <div class="topbar__left">
-          <button class="icon-button mobile-menu-button" data-open-sidebar aria-label="Open menu">
-            <svg><use href="#icon-menu"></use></svg>
-          </button>
+          <button class="icon-button mobile-menu-button" data-open-sidebar aria-label="Open menu"><svg><use href="#icon-menu"></use></svg></button>
           <button class="command-search" data-open-command aria-label="Open quick search">
-            <svg><use href="#icon-search"></use></svg>
-            <span>Search players, teams, news...</span>
-            <kbd>⌘ K</kbd>
+            <svg><use href="#icon-search"></use></svg><span>Search players, teams, news...</span><kbd>Ctrl K</kbd>
           </button>
         </div>
-
         <div class="topbar__right">
-          <div class="live-chip" title="Mock league status">
-            <span class="status-dot status-dot--live"></span>
-            Week 8 Live
-          </div>
-          <button class="icon-button notification-button" aria-label="Notifications">
-            <svg><use href="#icon-bell"></use></svg>
-            <span class="notification-dot"></span>
-          </button>
+          <div class="live-chip"><span class="status-dot status-dot--live"></span>Week 8 Live</div>
+          <button class="icon-button notification-button" data-demo-toast="You have two mock trade notifications and one league announcement." aria-label="Notifications"><svg><use href="#icon-bell"></use></svg><span class="notification-dot"></span></button>
           <button class="profile-button" data-profile-button aria-haspopup="menu" aria-expanded="false">
             <span class="avatar">JM</span>
-            <span class="profile-copy">
-              <strong>Justin</strong>
-              <small data-current-role>Commissioner</small>
-            </span>
+            <span class="profile-copy"><strong>Justin</strong><small data-current-role>Commissioner</small></span>
             <svg><use href="#icon-chevron"></use></svg>
           </button>
           <div class="profile-menu" data-profile-menu role="menu">
-            <div class="profile-menu__header">
-              <span class="eyebrow">Prototype role</span>
-              <strong>Preview permissions</strong>
-            </div>
-            <button data-role="commissioner" role="menuitem">
-              <span class="menu-icon"><svg><use href="#icon-sliders"></use></svg></span>
-              <span><strong>Commissioner</strong><small>Full prototype access</small></span>
-              <svg class="check-icon"><use href="#icon-check"></use></svg>
-            </button>
-            <button data-role="owner" role="menuitem">
-              <span class="menu-icon"><svg><use href="#icon-shield"></use></svg></span>
-              <span><strong>Team Owner</strong><small>League and trade tools</small></span>
-              <svg class="check-icon"><use href="#icon-check"></use></svg>
-            </button>
-            <button data-role="committee" role="menuitem">
-              <span class="menu-icon"><svg><use href="#icon-gavel"></use></svg></span>
-              <span><strong>Trade Committee</strong><small>Review queue access</small></span>
-              <svg class="check-icon"><use href="#icon-check"></use></svg>
-            </button>
+            <div class="profile-menu__header"><span class="eyebrow">Prototype role</span><strong>Preview permissions</strong></div>
+            <button data-role="commissioner" role="menuitem"><span class="menu-icon"><svg><use href="#icon-sliders"></use></svg></span><span><strong>Commissioner</strong><small>Full prototype access</small></span><svg class="check-icon"><use href="#icon-check"></use></svg></button>
+            <button data-role="owner" role="menuitem"><span class="menu-icon"><svg><use href="#icon-shield"></use></svg></span><span><strong>Team Owner</strong><small>League and trade tools</small></span><svg class="check-icon"><use href="#icon-check"></use></svg></button>
+            <button data-role="committee" role="menuitem"><span class="menu-icon"><svg><use href="#icon-gavel"></use></svg></span><span><strong>Trade Committee</strong><small>League and review tools</small></span><svg class="check-icon"><use href="#icon-check"></use></svg></button>
           </div>
         </div>
       </header>
 
-      <main class="main-content" id="main-content" tabindex="-1">
-        <section class="view is-active" data-view-panel="home" aria-labelledby="home-title">
-          <div class="page-heading">
-            <div>
-              <span class="eyebrow">Tuesday · July 21, 2026</span>
-              <h1 id="home-title">League Command Center</h1>
-              <p>The responsive foundation for standings, player data, news, Discord workflows, and private trade tools.</p>
-            </div>
-            <div class="heading-actions">
-              <button class="button button--ghost" data-open-style-panel>
-                <svg><use href="#icon-palette"></use></svg>Customize preview
-              </button>
-              <button class="button button--primary" data-demo-toast="Trade Center opens in Milestone 1C">
-                <svg><use href="#icon-swap"></use></svg>Start a trade
-              </button>
-            </div>
-          </div>
-
-          <div class="hero-grid">
-            <article class="hero-card">
-              <div class="hero-card__glow"></div>
-              <div class="hero-card__content">
-                <span class="pill pill--accent">Week 8 spotlight</span>
-                <h2>Cowboys and Eagles meet with the division lead on the line.</h2>
-                <p>Preview the matchup, compare team trends, and follow league activity from one central home.</p>
-                <div class="matchup-row">
-                  <div class="team-lockup">
-                    <span class="team-badge team-badge--dal">DAL</span>
-                    <div><strong>Dallas</strong><span>6–1</span></div>
-                  </div>
-                  <div class="versus-lockup"><span>THU</span><strong>8:20 PM</strong></div>
-                  <div class="team-lockup team-lockup--reverse">
-                    <div><strong>Philadelphia</strong><span>5–2</span></div>
-                    <span class="team-badge team-badge--phi">PHI</span>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article class="quick-actions-card card">
-              <div class="card-header">
-                <div><span class="eyebrow">Shortcuts</span><h3>Quick actions</h3></div>
-                <span class="pill pill--neutral">Role aware</span>
-              </div>
-              <div class="quick-action-grid">
-                <button data-nav-target="players"><span><svg><use href="#icon-search"></use></svg></span><strong>Find a player</strong><small>Search the mock database</small></button>
-                <button data-nav-target="trade-center"><span><svg><use href="#icon-swap"></use></svg></span><strong>Trade center</strong><small>Private offers and drafts</small></button>
-                <button data-nav-target="standings"><span><svg><use href="#icon-table"></use></svg></span><strong>Standings</strong><small>Division and playoff views</small></button>
-                <button data-nav-target="news"><span><svg><use href="#icon-news"></use></svg></span><strong>Post news</strong><small>Commissioner announcement</small></button>
-              </div>
-            </article>
-          </div>
-
-          <div class="metric-grid">
-            <article class="metric-card card">
-              <div class="metric-card__top"><span class="metric-icon"><svg><use href="#icon-shield"></use></svg></span><span class="trend trend--up">+2</span></div>
-              <span class="metric-label">Active teams</span><strong class="metric-value">32</strong><small>All owners assigned</small>
-            </article>
-            <article class="metric-card card">
-              <div class="metric-card__top"><span class="metric-icon"><svg><use href="#icon-users"></use></svg></span><span class="trend trend--up">98%</span></div>
-              <span class="metric-label">Rostered players</span><strong class="metric-value">1,696</strong><small>Mock league database</small>
-            </article>
-            <article class="metric-card card">
-              <div class="metric-card__top"><span class="metric-icon"><svg><use href="#icon-swap"></use></svg></span><span class="trend trend--neutral">2 open</span></div>
-              <span class="metric-label">Trade activity</span><strong class="metric-value">14</strong><small>Approved this season</small>
-            </article>
-            <article class="metric-card card">
-              <div class="metric-card__top"><span class="metric-icon"><svg><use href="#icon-chart"></use></svg></span><span class="trend trend--up">Week 8</span></div>
-              <span class="metric-label">Games completed</span><strong class="metric-value">109</strong><small>Across the league</small>
-            </article>
-          </div>
-
-          <div class="content-grid content-grid--wide">
-            <article class="card standings-preview">
-              <div class="card-header">
-                <div><span class="eyebrow">Playoff picture</span><h3>Conference leaders</h3></div>
-                <button class="text-button" data-nav-target="standings">Full standings <svg><use href="#icon-arrow"></use></svg></button>
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <thead><tr><th>Seed</th><th>Team</th><th>Record</th><th>PF</th><th>Streak</th></tr></thead>
-                  <tbody>
-                    <tr><td><span class="seed">1</span></td><td><div class="table-team"><span class="mini-team mini-team--kc">KC</span><div><strong>Chiefs</strong><small>West</small></div></div></td><td><strong>7–0</strong></td><td>224</td><td><span class="streak streak--win">W7</span></td></tr>
-                    <tr><td><span class="seed">2</span></td><td><div class="table-team"><span class="mini-team mini-team--buf">BUF</span><div><strong>Bills</strong><small>East</small></div></div></td><td><strong>6–1</strong></td><td>211</td><td><span class="streak streak--win">W4</span></td></tr>
-                    <tr><td><span class="seed">3</span></td><td><div class="table-team"><span class="mini-team mini-team--dal">DAL</span><div><strong>Cowboys</strong><small>East</small></div></div></td><td><strong>6–1</strong></td><td>205</td><td><span class="streak streak--win">W3</span></td></tr>
-                    <tr><td><span class="seed">4</span></td><td><div class="table-team"><span class="mini-team mini-team--sf">SF</span><div><strong>49ers</strong><small>West</small></div></div></td><td><strong>5–2</strong></td><td>198</td><td><span class="streak streak--loss">L1</span></td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </article>
-
-            <article class="card activity-card">
-              <div class="card-header">
-                <div><span class="eyebrow">Live feed</span><h3>League activity</h3></div>
-                <button class="icon-button icon-button--small" aria-label="Filter activity"><svg><use href="#icon-filter"></use></svg></button>
-              </div>
-              <div class="activity-list">
-                <div class="activity-item">
-                  <span class="activity-icon activity-icon--trade"><svg><use href="#icon-swap"></use></svg></span>
-                  <div><strong>Trade approved</strong><p>Miami acquires CB Jalen Ramsey from Las Vegas.</p><span>12 minutes ago</span></div>
-                </div>
-                <div class="activity-item">
-                  <span class="activity-icon activity-icon--score"><svg><use href="#icon-trophy"></use></svg></span>
-                  <div><strong>Final score</strong><p>Baltimore defeats Cincinnati, 31–24.</p><span>43 minutes ago</span></div>
-                </div>
-                <div class="activity-item">
-                  <span class="activity-icon activity-icon--news"><svg><use href="#icon-news"></use></svg></span>
-                  <div><strong>Commissioner update</strong><p>Week 8 advance is scheduled for Thursday.</p><span>2 hours ago</span></div>
-                </div>
-                <div class="activity-item">
-                  <span class="activity-icon activity-icon--player"><svg><use href="#icon-users"></use></svg></span>
-                  <div><strong>Trade block updated</strong><p>Seattle added two veteran defenders.</p><span>4 hours ago</span></div>
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section class="view" data-view-panel="design-system" aria-labelledby="design-system-title">
-          <div class="page-heading">
-            <div>
-              <span class="eyebrow">Milestone 1A</span>
-              <h1 id="design-system-title">Design System</h1>
-              <p>Reusable visual rules and interface components for every future page.</p>
-            </div>
-            <button class="button button--primary" data-open-style-panel><svg><use href="#icon-palette"></use></svg>Preview accents</button>
-          </div>
-
-          <div class="design-section">
-            <div class="section-heading"><div><span class="section-number">01</span><h2>Foundation</h2></div><p>Dark stadium-inspired surfaces with bright, accessible interaction states.</p></div>
-            <div class="foundation-grid">
-              <article class="card palette-card">
-                <div class="card-header"><div><span class="eyebrow">Color</span><h3>Core palette</h3></div></div>
-                <div class="swatch-grid">
-                  <div><span class="swatch swatch--canvas"></span><strong>Canvas</strong><small>#0B0E14</small></div>
-                  <div><span class="swatch swatch--surface"></span><strong>Surface</strong><small>#131821</small></div>
-                  <div><span class="swatch swatch--surface2"></span><strong>Raised</strong><small>#1A202B</small></div>
-                  <div><span class="swatch swatch--accent"></span><strong>Accent</strong><small data-accent-hex>#4F8CFF</small></div>
-                  <div><span class="swatch swatch--success"></span><strong>Success</strong><small>#39D98A</small></div>
-                  <div><span class="swatch swatch--danger"></span><strong>Danger</strong><small>#FF5C6C</small></div>
-                </div>
-              </article>
-              <article class="card typography-card">
-                <div class="card-header"><div><span class="eyebrow">Type</span><h3>Typography</h3></div></div>
-                <div class="type-sample type-sample--display">League Command Center</div>
-                <div class="type-sample type-sample--heading">Trade Committee Review</div>
-                <div class="type-sample type-sample--body">Built for fast scanning, dense sports information, and clear transaction decisions.</div>
-                <div class="type-meta"><span>System Sans</span><span>700 / 600 / 400</span><span>Responsive scale</span></div>
-              </article>
-            </div>
-          </div>
-
-          <div class="design-section">
-            <div class="section-heading"><div><span class="section-number">02</span><h2>Components</h2></div><p>Buttons, statuses, form controls, and cards ready for later workflows.</p></div>
-            <article class="card component-card">
-              <div class="component-row">
-                <div class="component-label"><strong>Buttons</strong><small>Primary, secondary, and quiet actions</small></div>
-                <div class="component-demo">
-                  <button class="button button--primary">Primary action</button>
-                  <button class="button button--secondary">Secondary</button>
-                  <button class="button button--ghost">Ghost action</button>
-                  <button class="icon-button"><svg><use href="#icon-more"></use></svg></button>
-                </div>
-              </div>
-              <div class="component-row">
-                <div class="component-label"><strong>Status labels</strong><small>Clear workflow and health indicators</small></div>
-                <div class="component-demo">
-                  <span class="pill pill--success">Approved</span>
-                  <span class="pill pill--warning">Pending review</span>
-                  <span class="pill pill--danger">Rejected</span>
-                  <span class="pill pill--accent">Private draft</span>
-                  <span class="pill pill--neutral">Mock data</span>
-                </div>
-              </div>
-              <div class="component-row">
-                <div class="component-label"><strong>Inputs</strong><small>Search, selection, and data entry</small></div>
-                <div class="component-demo component-demo--forms">
-                  <label class="field"><span>Player search</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input value="Micah Parsons" aria-label="Player search example" /></div></label>
-                  <label class="field"><span>Position</span><select aria-label="Position example"><option>All positions</option><option>QB</option><option>WR</option></select></label>
-                </div>
-              </div>
-            </article>
-          </div>
-
-          <div class="design-section">
-            <div class="section-heading"><div><span class="section-number">03</span><h2>Responsive shell</h2></div><p>One information architecture adapted for desktop, tablet, and mobile.</p></div>
-            <div class="responsive-grid">
-              <article class="device-card card"><div class="device device--desktop"><span></span><div><aside></aside><main><i></i><i></i><i></i></main></div></div><strong>Desktop</strong><small>Persistent navigation and multi-column dashboards</small></article>
-              <article class="device-card card"><div class="device device--tablet"><span></span><div><aside></aside><main><i></i><i></i></main></div></div><strong>Tablet</strong><small>Compact sidebar and simplified information density</small></article>
-              <article class="device-card card"><div class="device device--mobile"><span></span><div><main><i></i><i></i><i></i></main></div></div><strong>Mobile</strong><small>Drawer navigation and stacked touch-friendly cards</small></article>
-            </div>
-          </div>
-        </section>
-
-        <section class="view" data-view-panel="placeholder" aria-labelledby="placeholder-title">
-          <div class="page-heading">
-            <div>
-              <span class="eyebrow" data-placeholder-eyebrow>Milestone roadmap</span>
-              <h1 id="placeholder-title" data-placeholder-title>Coming next</h1>
-              <p data-placeholder-copy>This shell is ready for the next functional page.</p>
-            </div>
-          </div>
-          <article class="empty-state card">
-            <span class="empty-state__icon"><svg data-placeholder-icon><use href="#icon-construction"></use></svg></span>
-            <h2 data-placeholder-card-title>Page shell complete</h2>
-            <p data-placeholder-card-copy>The responsive navigation, top bar, layout grid, permissions preview, and component styling are already connected.</p>
-            <div class="empty-state__actions">
-              <button class="button button--primary" data-nav-target="home">Return home</button>
-              <button class="button button--ghost" data-nav-target="design-system">View design system</button>
-            </div>
-          </article>
-        </section>
+      <main class="main-content" id="main-content" tabindex="-1" aria-live="polite">
+        <div class="page-loading" data-page-loading><span></span><span></span><span></span></div>
+        <div data-page-content></div>
       </main>
     </div>
   </div>
@@ -370,30 +101,24 @@
   <div class="command-modal" data-command-modal aria-hidden="true">
     <div class="command-backdrop" data-close-command></div>
     <div class="command-dialog" role="dialog" aria-modal="true" aria-labelledby="command-title">
-      <div class="command-input-row">
-        <svg><use href="#icon-search"></use></svg>
-        <input id="command-title" data-command-input placeholder="Search the prototype..." autocomplete="off" />
-        <kbd>ESC</kbd>
-      </div>
-      <div class="command-results" data-command-results>
-        <span class="command-group-label">Quick navigation</span>
-        <button data-command-target="players"><span class="menu-icon"><svg><use href="#icon-users"></use></svg></span><span><strong>Players</strong><small>Search player profiles and ratings</small></span><kbd>P</kbd></button>
-        <button data-command-target="standings"><span class="menu-icon"><svg><use href="#icon-table"></use></svg></span><span><strong>Standings</strong><small>Conference and division tables</small></span><kbd>S</kbd></button>
-        <button data-command-target="trade-center"><span class="menu-icon"><svg><use href="#icon-swap"></use></svg></span><span><strong>Trade Center</strong><small>Private drafts, offers, and reviews</small></span><kbd>T</kbd></button>
-        <button data-command-target="design-system"><span class="menu-icon"><svg><use href="#icon-palette"></use></svg></span><span><strong>Design System</strong><small>Colors, components, and responsive rules</small></span><kbd>D</kbd></button>
-      </div>
+      <div class="command-input-row"><svg><use href="#icon-search"></use></svg><input id="command-title" data-command-input placeholder="Search teams, players, pages, and news..." autocomplete="off" /><kbd>ESC</kbd></div>
+      <div class="command-results" data-command-results></div>
+    </div>
+  </div>
+
+  <div class="detail-modal" data-detail-modal aria-hidden="true">
+    <div class="detail-backdrop" data-close-detail></div>
+    <div class="detail-dialog" role="dialog" aria-modal="true">
+      <button class="icon-button detail-close" data-close-detail aria-label="Close details"><svg><use href="#icon-close"></use></svg></button>
+      <div data-detail-content></div>
     </div>
   </div>
 
   <aside class="style-panel" data-style-panel aria-label="Prototype appearance settings">
-    <div class="style-panel__header">
-      <div><span class="eyebrow">Prototype controls</span><h2>Appearance</h2></div>
-      <button class="icon-button" data-close-style-panel aria-label="Close appearance panel"><svg><use href="#icon-close"></use></svg></button>
-    </div>
+    <div class="style-panel__header"><div><span class="eyebrow">Prototype controls</span><h2>Appearance</h2></div><button class="icon-button" data-close-style-panel aria-label="Close appearance panel"><svg><use href="#icon-close"></use></svg></button></div>
     <div class="style-panel__section">
-      <strong>Accent color</strong>
-      <p>Preview a direction before league branding is finalized.</p>
-      <div class="accent-options" data-accent-options>
+      <strong>Accent color</strong><p>Preview a direction before league branding is finalized.</p>
+      <div class="accent-options">
         <button class="accent-option is-active" data-accent="blue" style="--choice:#4f8cff"><span></span>Electric blue</button>
         <button class="accent-option" data-accent="red" style="--choice:#ff5b5f"><span></span>League red</button>
         <button class="accent-option" data-accent="green" style="--choice:#32d583"><span></span>Field green</button>
@@ -401,17 +126,10 @@
       </div>
     </div>
     <div class="style-panel__section">
-      <strong>Interface density</strong>
-      <p>Comfortable is the default for the initial prototype.</p>
-      <div class="segmented-control" data-density-control>
-        <button data-density="compact">Compact</button>
-        <button class="is-active" data-density="comfortable">Comfortable</button>
-      </div>
+      <strong>Interface density</strong><p>Choose how tightly information is displayed.</p>
+      <div class="segmented-control"><button data-density="compact">Compact</button><button class="is-active" data-density="comfortable">Comfortable</button></div>
     </div>
-    <div class="style-panel__section style-panel__note">
-      <span class="menu-icon"><svg><use href="#icon-info"></use></svg></span>
-      <p>Brand name, logo, league colors, and final imagery remain intentionally replaceable.</p>
-    </div>
+    <div class="style-panel__section style-panel__note"><span class="menu-icon"><svg><use href="#icon-info"></use></svg></span><p>Branding and colors remain intentionally replaceable until the final design pass.</p></div>
   </aside>
   <div class="panel-overlay" data-panel-overlay></div>
 
@@ -442,6 +160,14 @@
     <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></symbol>
     <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></symbol>
     <symbol id="icon-construction" viewBox="0 0 24 24"><path d="m14 6 4 4M8 12l8-8 4 4-8 8M4 20l6-6m-4 0 4 4"/></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="icon-location" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-5 3.6-8 8-8s8 3 8 8"/></symbol>
+    <symbol id="icon-dollar" viewBox="0 0 24 24"><path d="M12 2v20m5-16H9a4 4 0 0 0 0 8h6a4 4 0 0 1 0 8H7"/></symbol>
+    <symbol id="icon-activity" viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6"/></symbol>
+    <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="icon-external" viewBox="0 0 24 24"><path d="M14 4h6v6m0-6-9 9M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></symbol>
   </svg>
 
   <script src="app.js"></script>
