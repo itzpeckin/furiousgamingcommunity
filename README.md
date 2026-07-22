@@ -1,23 +1,39 @@
-# Franchise HQ — TC-007 Trade History
+# Franchise HQ — TC-008 Trade Block + History/Review Enhancements
 
-TC-007 adds the permanent, permission-aware transaction archive and strengthens TC-006 with automatic committee conflict-of-interest recusal.
+## Included
 
-## Committee conflict protection
-- Every committee account is mapped to the franchise it represents.
-- A committee member cannot vote on any trade involving that franchise.
-- The member remains able to review the submitted package, but the entire ballot panel is visibly grayed out.
-- Approve, Reject, and Abstain are disabled and cannot be triggered through the click handler.
-- The member appears as `Recused` in the confidential committee roster.
-- Review progress and pending counts use only eligible committee members.
-- The three-vote approval/rejection threshold remains unchanged.
+- Trade Block listings for players and draft picks.
+- Owners can publish a desired return for every listing.
+- Other owners can ask a private question or start a proposal directly from a listing.
+- Withdrawn, declined, rejected, and expired negotiations are visible only to the two involved franchises. Commissioner and committee roles do not override that privacy.
+- Commissioners are now eligible reviewers alongside Trade Committee members.
+- Any reviewer whose franchise is involved is automatically recused and fully locked out of voting.
+- Approval still requires three approvals; rejection still requires three rejections.
+- Approved trades publicly show reviewer names, roles, decisions, recusals, and comments.
+- Approved trades include a Trade Replay showing every immutable version, added assets, removed assets, proposer, note, and final result.
 
-## TC-007 Trade History
-- Dedicated permanent Trade History workspace inside Trade Center.
-- Search by trade number, team, player, or draft pick.
-- Filter by final result and franchise.
-- Approved transactions are visible league-wide.
-- Rejected, declined, withdrawn, and expired negotiations remain visible only to involved owners, committee, and commissioner roles.
-- History cards show final package terms, result, submitted version, version count, and committee result when public.
-- Opening a record preserves existing privacy rules for messages, superseded versions, calculations, and ballots.
+## Deployment
 
-Replace all six project files, commit, and allow Cloudflare to deploy. Hard-refresh once after deployment.
+Replace these six files in the existing GitHub repository:
+
+- `index.html`
+- `styles.css`
+- `app.js`
+- `trade-module.js`
+- `dev-mode.js`
+- `README.md`
+
+Cloudflare will deploy automatically after the commit.
+
+Suggested commit message:
+
+`Build TC-008 trade block, commissioner review, privacy, and replay`
+
+## Suggested acceptance test
+
+1. Open an approved trade and confirm reviewer names, votes, comments, and recusals are visible.
+2. Open Trade Replay and step through every version.
+3. Switch to a commissioner and confirm an uninvolved commissioner can vote.
+4. Open a trade involving Dallas as the commissioner and confirm the review panel is grayed out and locked.
+5. Withdraw or decline a trade, then switch to an uninvolved commissioner or committee member and confirm it is absent from History.
+6. List a player and a pick on the Trade Block, add desired-return notes, ask a question, and launch a proposal.
