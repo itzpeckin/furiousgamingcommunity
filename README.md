@@ -1,11 +1,9 @@
-# Franchise HQ — TC-009 AI Trade Suggestions
+# Franchise HQ — TC-009.2 Trade Block Clarity Hotfix
 
-This build includes:
-
-- **MY TEAM** is automatically sorted to the first position on the Teams page and clearly tagged.
-- Trade Block text search now filters by player name, position, team name, abbreviation, and owner without losing focus.
-- The accepted 3/4 review-board and 1/4 ballot layout is retained with substantially tighter spacing.
-- A new private **AI Suggestions** tab generates roster-need and valuation-driven trade starting points.
-- Suggested packages can be opened directly in the existing Trade Builder for review and editing.
-
-Replace all six project files and hard-refresh after Cloudflare deploys.
+Includes:
+- Full-width Trade Block marketplace
+- All Teams / My Team scope filter
+- Full-width Manage Trade Block panel
+- Age, development trait, and overall in roster management
+- Correct own-team and opponent-team trade proposal actions
+- TC-009 AI Suggestions retained
