@@ -856,11 +856,13 @@
     const routeTarget=event.target.closest('[data-route]');
     if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
 
+    const interactiveTarget=event.target.closest('button, a, input, select, textarea, label, [role="button"]');
+
     const teamTarget=event.target.closest('[data-team-id]');
-    if (teamTarget) { setRoute(`teams/${teamTarget.dataset.teamId}`); return; }
+    if (teamTarget && !interactiveTarget) { setRoute(`teams/${teamTarget.dataset.teamId}`); return; }
 
     const playerTarget=event.target.closest('[data-player-id]');
-    if (playerTarget) { setRoute(`players/${playerTarget.dataset.playerId}`); return; }
+    if (playerTarget && !interactiveTarget) { setRoute(`players/${playerTarget.dataset.playerId}`); return; }
 
     const gameTarget=event.target.closest('[data-game-id]');
     if (gameTarget) { openGameDetail(gameTarget.dataset.gameId); return; }
