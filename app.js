@@ -443,10 +443,21 @@
     return renderRosterTable(roster);
   }
 
+  function renderRosterPlayerActions(player, account) {
+    const ownPlayer = account?.teamId === player.teamId;
+    const active = ownPlayer ? window.FGC_TRADE?.onBlock?.(player) : window.FGC_TRADE?.isWatched?.(player.id);
+    const starLabel = ownPlayer
+      ? (active ? 'Remove from Trade Block' : 'Add to Trade Block')
+      : (active ? 'Remove from Watch List' : 'Add to Watch List');
+    return {
+      star: `<button type="button" class="roster-star ${active?'is-active':''}" data-player-action="star" data-player-id-action="${player.id}" aria-pressed="${active?'true':'false'}" aria-label="${starLabel}" title="${starLabel}"><svg><use href="#icon-star"></use></svg></button>`,
+      trade: `<button type="button" class="roster-trade-button" data-player-action="trade" data-player-id-action="${player.id}">Trade</button>`
+    };
+  }
+
   function renderRosterTable(roster) {
     const account = window.FGC_TRADE?.getCurrentAccount?.();
-    const ownsRoster = account?.teamId && roster.some(player => player.teamId === account.teamId);
-    return `<article class="card"><div class="card-header"><div><span class="eyebrow">53-player mock roster</span><h3>Active roster</h3></div><span class="pill pill--neutral">${roster.length} records</span></div><div class="table-wrap"><table class="team-roster-table"><thead><tr><th class="quick-star-col"><span class="sr-only">Quick action</span></th><th>Player</th><th>OVR</th><th>Age</th><th>Development</th><th>Contract</th><th>Cap Hit</th><th>Status</th></tr></thead><tbody>${roster.map(player => { const ownPlayer = account?.teamId===player.teamId; const active = ownPlayer ? window.FGC_TRADE?.onBlock?.(player) : window.FGC_TRADE?.isWatched?.(player.id); return `<tr class="clickable-row" data-player-id="${player.id}"><td class="quick-star-col"><button class="roster-star ${active?'is-active':''}" ${ownPlayer?`data-toggle-player-block="${player.id}"`:`data-watch-player="${player.id}"`} aria-label="${ownPlayer?(active?'Remove from Trade Block':'Add to Trade Block'):(active?'Remove from Watch List':'Add to Watch List')}" title="${ownPlayer?(active?'Remove from Trade Block':'Add to Trade Block'):(active?'Remove from Watch List':'Add to Watch List')}"><svg><use href="#icon-star"></use></svg></button></td><td><div class="roster-player-cell">${renderPlayerIdentity(player,false)}<button class="roster-trade-button" data-add-player-trade="${player.id}">Trade</button></div></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span></td><td>${player.age}</td><td><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span></td><td>${player.years} year${player.years===1?'':'s'}</td><td>${formatMoney(player.capHit)}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${player.injury}</span></td></tr>` }).join('')}</tbody></table></div></article>`;
+    return `<article class="card"><div class="card-header"><div><span class="eyebrow">53-player mock roster</span><h3>Active roster</h3></div><span class="pill pill--neutral">${roster.length} records</span></div><div class="table-wrap" data-roster-scroll><table class="team-roster-table"><thead><tr><th class="quick-star-col"><span class="sr-only">Quick action</span></th><th>Player</th><th>OVR</th><th>Age</th><th>Development</th><th>Contract</th><th>Cap Hit</th><th>Status</th></tr></thead><tbody>${roster.map(player => { const actions=renderRosterPlayerActions(player,account); return `<tr class="clickable-row roster-player-row" data-player-id="${player.id}" data-roster-player-row="${player.id}"><td class="quick-star-col">${actions.star}</td><td><div class="roster-player-cell">${renderPlayerIdentity(player,false)}${actions.trade}</div></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span></td><td>${player.age}</td><td><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span></td><td>${player.years} year${player.years===1?'':'s'}</td><td>${formatMoney(player.capHit)}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${player.injury}</span></td></tr>` }).join('')}</tbody></table></div></article>`;
   }
 
   function renderDepthChart(roster) {
