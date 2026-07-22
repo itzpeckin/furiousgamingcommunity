@@ -1,31 +1,16 @@
-# Franchise HQ — TC-010 League Activity Feed
+# Franchise HQ — TC-010.1 League Activity Feed Fix
 
-This is one integrated release containing TC-010 and the final TC-009 cosmetic correction.
+This build fixes the blank League Home / League Activity page.
 
-## TC-010 included
-- League Activity Feed as the Franchise HQ home experience
-- Filters: All, Transactions, Games, News, My Franchise
-- Approved trade activity
-- Trade Block additions
-- Final scores
-- Commissioner announcements
-- League advance notices
-- Player milestones
-- Power snapshot
-- Trending players
-- Upcoming games and league events
-- Direct navigation from activity cards to games, players, teams, news, and Trade Center
+Cause corrected:
+- The activity snapshot referenced a nonexistent trade-version helper, which stopped the home page render when seeded approved trades were loaded.
 
-## TC-009 final correction
-- Trade Block management drawer, cards, fields, header, body, and footer now use fully opaque backgrounds.
+Included:
+- Working TC-010 League Activity Feed
+- Final opaque TC-009 Trade Block drawer styling
+- Existing Trade Center and Team Page behavior preserved
 
-Replace all six files:
-- index.html
-- styles.css
-- app.js
-- trade-module.js
-- dev-mode.js
-- README.md
+Replace all six files together.
 
 Suggested commit:
-`Build TC-010 activity feed and finalize TC-009 drawer`
+`Fix TC-010 League Activity Feed rendering`

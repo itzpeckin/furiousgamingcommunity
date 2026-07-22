@@ -307,7 +307,7 @@ function getApprovedNews(){return negotiations().filter(t=>t.status==='approved'
 function getActivitySnapshot(){
  const approvedTrades=negotiations().filter(t=>t.status==='approved').map(t=>{
    const A=teamById(t.teamAId),B=teamById(t.teamBId);
-   const v=version(t);
+   const v=ver(t);
    const assetName=a=>a.type==='player'?(playerById(a.id)?.name||'Player'):`${a.year} R${a.round}`;
    return{
      id:t.id,teamAId:t.teamAId,teamBId:t.teamBId,teamAName:A.fullName,teamBName:B.fullName,
