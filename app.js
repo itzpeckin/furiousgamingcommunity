@@ -419,13 +419,14 @@
       </section>
 
       <div class="league-home-main">
-        <section class="featured-game card" data-game-id="${featured.id}" style="--away:${away.primary};--home:${home.primary}">
+        <div class="league-home-primary">
+          <section class="featured-game card" data-game-id="${featured.id}" style="--away:${away.primary};--home:${home.primary}">
           <div class="featured-game-label">
             <span>Game of the Week</span>
             <small>${featured.day} · ${featured.time} · ${featured.network} · ${featured.stadium}</small>
           </div>
 
-          <div class="featured-split">
+          <div class="featured-split featured-split--clickable" aria-label="Open Game Center">
             <div class="featured-half featured-half--away">
               <div class="featured-half-hero">
                 ${renderTeamMark(away,'featured-team-logo')}
@@ -447,14 +448,7 @@
                 </div>
               </div>
             </div>
-
-            <div class="featured-center-rail">
-              <span class="featured-week">Week ${currentWeek.week}</span>
-              <strong>${away.abbr}<span>VS</span>${home.abbr}</strong>
-              <button type="button" class="button button--primary" data-game-id="${featured.id}">Open Game Center</button>
-            </div>
-
-            <div class="featured-half featured-half--home">
+<div class="featured-half featured-half--home">
               <div class="featured-half-hero featured-half-hero--home">
                 <div class="featured-half-copy">
                   <span class="eyebrow">${home.city}</span>
@@ -477,17 +471,17 @@
             </div>
           </div>
         </section>
+          <section class="home-news-section">
+            <div class="section-heading"><div><span class="section-number">01</span><h2>League News</h2></div><button class="text-button" data-route="news">View all news <svg><use href="#icon-arrow"></use></svg></button></div>
+            <div class="home-news-grid home-news-grid--compact">${recentNews.map(article=>renderNewsCard(article)).join('')}</div>
+          </section>
+        </div>
 
         <aside class="league-home-standings">
           ${renderConferenceSnapshot('AFC')}
           ${renderConferenceSnapshot('NFC')}
         </aside>
       </div>
-
-      <section class="home-news-section">
-        <div class="section-heading"><div><span class="section-number">01</span><h2>League News</h2></div><button class="text-button" data-route="news">View all news <svg><use href="#icon-arrow"></use></svg></button></div>
-        <div class="home-news-grid home-news-grid--compact">${recentNews.map(article=>renderNewsCard(article)).join('')}</div>
-      </section>
 
       <section class="home-section home-leaders-section">
         <div class="section-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
@@ -1009,7 +1003,7 @@
     return `<div class="game-center-roster">
       <div class="game-center-roster-head">${renderTeamMark(team,'team-logo')}<span><strong>${team.fullName}</strong><small>${team.record} · ${team.ovr} OVR</small></span></div>
       <div class="game-center-player-list">
-        ${gameRosterRows(team.id).map(player=>`<button type="button" data-player-id="${player.id}">
+        ${gameRosterRows(team.id).map(player=>`<button type="button" data-open-player-card="${player.id}">
           <span class="gc-position">${player.position}</span>
           <span><strong>${escapeHtml(player.name)}</strong><small>${compactSeasonStats(player)}</small></span>
           <span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span>
@@ -1019,26 +1013,148 @@
     </div>`;
   }
 
+  function gameStatValue(player, game, metric, low, high) {
+    const base=seededNumber(`${game.id}-${player.id}-${metric}`,low,high);
+    return Math.max(0,base);
+  }
+
+  function gameStatRows(team, game, category) {
+    const roster=players.filter(p=>p.teamId===team.id);
+    if(category==='passing'){
+      return roster.filter(p=>p.position==='QB').slice(0,2).map(p=>({
+        player:p, values:[
+          `${gameStatValue(p,game,'cmp',14,31)}/${gameStatValue(p,game,'att',25,43)}`,
+          gameStatValue(p,game,'passyd',145,385),
+          gameStatValue(p,game,'passtd',0,4),
+          gameStatValue(p,game,'passint',0,2)
+        ]
+      }));
+    }
+    if(category==='rushing'){
+      return roster.filter(p=>['RB','FB','QB'].includes(p.position)).slice(0,4).map(p=>({
+        player:p, values:[
+          gameStatValue(p,game,'car',2,22),
+          gameStatValue(p,game,'rushyd',8,142),
+          gameStatValue(p,game,'rushtd',0,2),
+          Number((gameStatValue(p,game,'rushavg',20,72)/10).toFixed(1))
+        ]
+      })).sort((a,b)=>b.values[1]-a.values[1]);
+    }
+    if(category==='receiving'){
+      return roster.filter(p=>['WR','TE','RB'].includes(p.position)).slice(0,6).map(p=>({
+        player:p, values:[
+          gameStatValue(p,game,'rec',1,10),
+          gameStatValue(p,game,'recyd',8,138),
+          gameStatValue(p,game,'rectd',0,2),
+          gameStatValue(p,game,'targets',2,13)
+        ]
+      })).sort((a,b)=>b.values[1]-a.values[1]);
+    }
+    if(category==='defense'){
+      return roster.filter(p=>defensePositions.includes(p.position)).slice(0,7).map(p=>({
+        player:p, values:[
+          gameStatValue(p,game,'tkl',1,12),
+          Number((gameStatValue(p,game,'sack',0,20)/10).toFixed(1)),
+          gameStatValue(p,game,'defint',0,1),
+          gameStatValue(p,game,'tfl',0,4)
+        ]
+      })).sort((a,b)=>b.values[0]-a.values[0]);
+    }
+    return roster.filter(p=>specialPositions.includes(p.position)).map(p=>({
+      player:p,
+      values:p.position==='K'
+        ? [`${gameStatValue(p,game,'fgm',0,4)}/${gameStatValue(p,game,'fga',1,4)}`,`${gameStatValue(p,game,'xpm',1,5)}/${gameStatValue(p,game,'xpa',1,5)}`,gameStatValue(p,game,'longfg',31,58),'—']
+        : [gameStatValue(p,game,'punts',2,7),Number((gameStatValue(p,game,'puntavg',390,512)/10).toFixed(1)),gameStatValue(p,game,'inside20',0,4),'—']
+    }));
+  }
+
+  function renderGameStatTable(team, game, category, labels) {
+    const rows=gameStatRows(team,game,category);
+    return `<div class="game-stat-team">
+      <div class="game-stat-team-head">${renderTeamMark(team,'team-logo')}<strong>${team.abbr}</strong></div>
+      <div class="game-stat-table">
+        <div class="game-stat-row game-stat-row--head"><span>Player</span>${labels.map(x=>`<span>${x}</span>`).join('')}</div>
+        ${rows.map(row=>`<button type="button" class="game-stat-row" data-open-player-card="${row.player.id}">
+          <span><strong>${escapeHtml(row.player.name)}</strong><small>${row.player.position}</small></span>
+          ${row.values.map(v=>`<span>${v}</span>`).join('')}
+        </button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  function renderCompletedGameStats(away,home,game) {
+    const groups=[
+      ['Passing','passing',['C/A','YDS','TD','INT']],
+      ['Rushing','rushing',['CAR','YDS','TD','AVG']],
+      ['Receiving','receiving',['REC','YDS','TD','TGT']],
+      ['Defense','defense',['TKL','SCK','INT','TFL']],
+      ['Special Teams','special',['FG/P','XP/AVG','LONG/I20','—']]
+    ];
+    return `<div class="completed-game-stats">
+      ${groups.map(([title,key,labels])=>`<section class="game-stat-section">
+        <div class="game-stat-section-title"><span class="eyebrow">Box score</span><h3>${title}</h3></div>
+        <div class="game-stat-pair">${renderGameStatTable(away,game,key,labels)}${renderGameStatTable(home,game,key,labels)}</div>
+      </section>`).join('')}
+    </div>`;
+  }
+
+  function gameCenterSwitcher(activeGameId) {
+    const currentWeek=schedule.find(w=>w.games.some(g=>g.id===activeGameId)) || schedule.find(w=>w.week===8);
+    return `<div class="game-center-switcher">
+      ${currentWeek.games.map(g=>{
+        const a=teamById(g.awayId),h=teamById(g.homeId);
+        return `<button type="button" data-game-center-switch="${g.id}" class="${g.id===activeGameId?'is-active':''}">
+          <span>${a.abbr} <b>at</b> ${h.abbr}</span>
+          <small>${g.status==='final'?`${g.awayScore}-${g.homeScore}`:`${g.day} · ${g.time}`}</small>
+        </button>`;
+      }).join('')}
+    </div>`;
+  }
+
   function openGameDetail(gameId) {
     const game=schedule.flatMap(week=>week.games).find(item=>item.id===gameId);
     if (!game) return;
     const away=teamById(game.awayId),home=teamById(game.homeId);
     const isFinal=game.status==='final',isLive=game.status==='live';
+
     openDetail(`
-      <div class="modal-hero game-center-hero"><div><span class="pill ${isLive?'pill--danger':isFinal?'pill--neutral':'pill--accent'}">${isLive?'Live':isFinal?'Final':`Week ${game.week}`}</span><h2>${away.fullName} at ${home.fullName}</h2><div class="news-meta"><span>${game.day} · ${game.time}</span><span>•</span><span>${game.network}</span><span>•</span><span>${game.stadium}</span></div></div></div>
-      <div class="modal-body game-center-body">
-        <div class="game-center-scoreline">
-          <div>${renderTeamMark(away,'featured-team-logo')}<strong>${away.abbr}</strong><small>${away.record}</small></div>
-          <span>${isFinal||isLive?`${game.awayScore} – ${game.homeScore}`:'VS'}</span>
-          <div>${renderTeamMark(home,'featured-team-logo')}<strong>${home.abbr}</strong><small>${home.record}</small></div>
+      <div class="game-center-shell" style="--game-away:${away.primary};--game-home:${home.primary}">
+        <header class="game-center-topbar">
+          <div><span class="eyebrow">${isFinal?'Final':isLive?'Live':`Week ${game.week}`}</span><h2>Game Center</h2></div>
+          <button type="button" class="icon-button game-center-close" data-close-detail aria-label="Close Game Center"><svg><use href="#icon-close"></use></svg></button>
+        </header>
+
+        ${gameCenterSwitcher(game.id)}
+
+        <div class="game-center-matchup">
+          <div class="game-center-team game-center-team--away">
+            ${renderTeamMark(away,'featured-team-logo')}
+            <span>${away.city}</span><strong>${away.name}</strong><small>${away.record} · ${escapeHtml(away.owner)}</small>
+          </div>
+          <div class="game-center-score">
+            <span>${game.day} · ${game.time}</span>
+            <strong>${isFinal||isLive?`${game.awayScore}<b>–</b>${game.homeScore}`:'VS'}</strong>
+            <small>${game.network} · ${game.stadium}</small>
+          </div>
+          <div class="game-center-team game-center-team--home">
+            ${renderTeamMark(home,'featured-team-logo')}
+            <span>${home.city}</span><strong>${home.name}</strong><small>${home.record} · ${escapeHtml(home.owner)}</small>
+          </div>
         </div>
-        <div class="game-center-comparison">
-          <div><span>Overall</span><strong>${away.ovr}</strong><strong>${home.ovr}</strong></div>
-          <div><span>Offense</span><strong>${away.off}</strong><strong>${home.off}</strong></div>
-          <div><span>Defense</span><strong>${away.def}</strong><strong>${home.def}</strong></div>
-          <div><span>Points / Game</span><strong>${(away.pf/7).toFixed(1)}</strong><strong>${(home.pf/7).toFixed(1)}</strong></div>
+
+        <div class="game-center-body">
+          <div class="game-center-comparison">
+            <div><span>Overall</span><strong>${away.ovr}</strong><strong>${home.ovr}</strong></div>
+            <div><span>Offense</span><strong>${away.off}</strong><strong>${home.off}</strong></div>
+            <div><span>Defense</span><strong>${away.def}</strong><strong>${home.def}</strong></div>
+            <div><span>Points / Game</span><strong>${(away.pf/7).toFixed(1)}</strong><strong>${(home.pf/7).toFixed(1)}</strong></div>
+          </div>
+
+          ${isFinal ? renderCompletedGameStats(away,home,game) : `
+            <div class="game-center-section-heading"><span class="eyebrow">Pregame</span><h3>Full Rosters & Current-Year Stats</h3></div>
+            <div class="game-center-rosters">${renderGameRoster(away)}${renderGameRoster(home)}</div>
+          `}
         </div>
-        <div class="game-center-rosters">${renderGameRoster(away)}${renderGameRoster(home)}</div>
       </div>`);
   }
 
@@ -1177,6 +1293,15 @@
   }
 
   document.addEventListener('click', event => {
+    const closeDetailTarget=event.target.closest('[data-close-detail]');
+    if (closeDetailTarget) { event.preventDefault(); event.stopPropagation(); closeDetail(); return; }
+
+    const gameCenterSwitch=event.target.closest('[data-game-center-switch]');
+    if (gameCenterSwitch) { event.preventDefault(); openGameDetail(gameCenterSwitch.dataset.gameCenterSwitch); return; }
+
+    const openPlayerCard=event.target.closest('[data-open-player-card]');
+    if (openPlayerCard) { event.preventDefault(); setRoute(`players/${openPlayerCard.dataset.openPlayerCard}`); closeDetail(); return; }
+
     const routeTarget=event.target.closest('[data-route]');
     if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
 
@@ -1186,7 +1311,7 @@
     if (teamTarget && !interactiveTarget) { setRoute(`teams/${teamTarget.dataset.teamId}`); return; }
 
     const playerTarget=event.target.closest('[data-player-id]');
-    if (playerTarget && !interactiveTarget) { setRoute(`players/${playerTarget.dataset.playerId}`); return; }
+    if (playerTarget) { event.preventDefault(); setRoute(`players/${playerTarget.dataset.playerId}`); return; }
 
     const gameTarget=event.target.closest('[data-game-id]');
     if (gameTarget) { openGameDetail(gameTarget.dataset.gameId); return; }
@@ -1259,6 +1384,23 @@
     }
     if (!profileMenu.contains(event.target)&&!profileButton.contains(event.target)) closeProfileMenu();
   });
+
+
+  document.addEventListener('pointerdown', event => {
+    const openButton=event.target.closest('[data-open-sidebar]');
+    if(openButton){
+      event.preventDefault();
+      event.stopPropagation();
+      openSidebar();
+      return;
+    }
+    const closeButton=event.target.closest('[data-close-sidebar], [data-mobile-overlay]');
+    if(closeButton){
+      event.preventDefault();
+      event.stopPropagation();
+      closeSidebar();
+    }
+  }, true);
 
   document.addEventListener('input', event => {
     if (event.target.matches('[data-team-search]')) { state.teamSearch=event.target.value; refreshTeamGrid(); }
