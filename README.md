@@ -1,34 +1,21 @@
 # Furious Gaming Community — Franchise HQ
 
-## Sprint TC-003: Draft Pick Engine
+## Sprint TC-003 Revision — Draft Pick Engine 1.1
 
-This release combines the validated TC-002 package engine with the first working draft-pick valuation model.
+This release keeps TC-001 and TC-002 intact and revises TC-003 based on commissioner testing.
 
-### TC-002 correction
+### Changes
 
-- The Best Player Premium now compares every player across both sides of the transaction.
-- Only the package containing the single most valuable player can receive the premium.
-- A one-player package no longer earns a premium merely because that player represents 100% of its own side.
-- Package concentration and best-player value are treated as separate ideas.
+- Draft-pick cards now use one compact two-box row instead of the large player-card layout.
+- Public/owner-facing pick cards no longer display labels such as Middle, Top 10, Top 5, or Top 3.
+- Seasons 1–3 use private projected draft slots entered by the commissioner and Trade Committee.
+- Season 4 and beyond automatically uses historical draft-position averages.
+- Future pick retention is now:
+  - 2027: 100%
+  - 2028: 65%
+  - 2029: 40%
+- Draft Pick Engine version updated to 1.1.
 
-### TC-003 features
+### Internal projection editor
 
-- Draft picks from 2027, 2028, and 2029 receive transparent values.
-- Each value includes round base value, future-year discount, and projected owner finish.
-- Owner projection tiers: Strong contender, Playoff, Middle, Likely Top 10, Likely Top 5, and Likely Top 3.
-- Picks owned by teams projected to finish poorly receive higher value.
-- Clicking a draft pick opens a large pick-value card showing its complete calculation.
-- The trade builder and submitted trade calculations use the same pick model.
-- Model labels: LVE 1.1, Package Engine 1.1, Draft Pick Engine 1.0.
-
-### Validation
-
-1. Open Trade #104 and expand package adjustments.
-2. Confirm only the side with the highest-valued player receives Best Player Premium.
-3. Click a draft pick in the trade package.
-4. Confirm the pick card shows round base, owner projection, future discount, and total value.
-5. Build a trade with 2027 and 2029 picks from the same team and confirm the 2029 pick is discounted.
-6. Compare first-round picks owned by teams with different projection tiers.
-7. Confirm player cards and DEV-001 account switching still work.
-
-Mock projections are intentionally configurable placeholders until real owner history and franchise standings are imported.
+Commissioner and committee views include a private Draft Pick Projections panel. Owners never see the projected slot or an insulting classification; they only see the resulting pick value and a neutral note that an internal projection was applied.
