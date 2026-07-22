@@ -1485,3 +1485,185 @@ button.game-stat-row:hover{background:#172131}
   .game-center-team{margin:8px 0}
   .game-center-switcher button{flex-basis:112px}
 }
+
+
+/* TC-010.5 Game Center tabs, recap and stable mobile navigation */
+.game-center-topbar{
+  display:grid!important;
+  grid-template-columns:minmax(210px,1fr) auto minmax(210px,1fr)!important;
+}
+.game-center-schedule-info{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:3px;
+}
+.game-center-schedule-info strong{font-size:10px}
+.game-center-schedule-info small{font-size:8px;color:var(--muted)}
+.game-center-title{text-align:center}
+.game-center-close{justify-self:end}
+.game-center-comparison{display:none!important}
+
+.game-center-tabs{
+  display:flex;
+  gap:6px;
+  padding:0 0 14px;
+  border-bottom:1px solid rgba(255,255,255,.09);
+}
+.game-center-tabs button{
+  min-width:92px;
+  padding:9px 16px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;
+  background:#121a26;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:900;
+  cursor:pointer;
+}
+.game-center-tabs button:hover{color:var(--text);background:#172131}
+.game-center-tabs button.is-active{
+  color:var(--accent);
+  border-color:rgba(var(--accent-rgb),.48);
+  background:rgba(var(--accent-rgb),.13);
+}
+.game-center-tab-content{padding-top:15px}
+.game-center-tab-panel{min-height:360px}
+
+.team-stat-board{
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;
+  background:#101722;
+}
+.team-stat-board-head,
+.team-stat-board-row{
+  display:grid;
+  grid-template-columns:1fr 180px 1fr;
+  align-items:center;
+  gap:12px;
+  padding:11px 15px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.team-stat-board-head{background:#151e2b}
+.team-stat-board-head>span:first-child,
+.team-stat-board-head>span:last-child{display:flex;align-items:center;gap:8px}
+.team-stat-board-head>span:last-child{justify-content:flex-end}
+.team-stat-board-head>span:nth-child(2){text-align:center;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.team-stat-board-head .team-logo{width:28px;height:28px}
+.team-stat-board-row:last-child{border-bottom:0}
+.team-stat-board-row>strong:first-child{text-align:left}
+.team-stat-board-row>strong:last-child{text-align:right}
+.team-stat-board-row>span{text-align:center;font-size:8px;color:var(--muted)}
+.team-stat-board-row>strong{font-size:12px}
+
+.broadcast-recap{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:18px;
+  background:
+    linear-gradient(110deg,color-mix(in srgb,var(--recap-away) 56%,#07101b),#07101b 45% 55%,color-mix(in srgb,var(--recap-home) 56%,#07101b));
+  box-shadow:0 24px 54px rgba(0,0,0,.28);
+}
+.broadcast-recap:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(135deg,transparent 0 47%,rgba(255,255,255,.045) 47% 49%,transparent 49%),
+    radial-gradient(circle at 12% 18%,rgba(255,255,255,.08),transparent 25%),
+    radial-gradient(circle at 88% 18%,rgba(255,255,255,.08),transparent 25%);
+  pointer-events:none;
+}
+.broadcast-recap-topline{
+  position:relative;
+  z-index:1;
+  display:flex;
+  justify-content:space-between;
+  padding:11px 15px;
+  border-bottom:1px solid rgba(255,255,255,.11);
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+.broadcast-recap-score{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:1fr 220px 1fr;
+  align-items:center;
+  padding:22px 34px 10px;
+}
+.broadcast-recap-score>div{display:flex;flex-direction:column;align-items:center}
+.broadcast-recap-score .featured-team-logo{width:92px;height:92px;border-radius:26px;margin-bottom:8px}
+.broadcast-recap-score>div>strong{font-size:24px}
+.broadcast-recap-score>div>small{font-size:8px;color:rgba(255,255,255,.7)}
+.broadcast-recap-score>span{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;text-align:center}
+.broadcast-recap-score b{font-size:46px}
+.broadcast-recap-score em{font-size:7px;font-style:normal;color:var(--muted);letter-spacing:.12em}
+.broadcast-recap-story{
+  position:relative;
+  z-index:1;
+  max-width:760px;
+  margin:0 auto;
+  padding:12px 22px 18px;
+  text-align:center;
+}
+.broadcast-recap-story h3{margin:5px 0 8px;font-size:22px}
+.broadcast-recap-story p{margin:0;color:rgba(255,255,255,.72);font-size:9px;line-height:1.6}
+.broadcast-stars{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  padding:0 18px 18px;
+}
+.broadcast-stars button{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr);
+  gap:9px;
+  align-items:center;
+  min-height:76px;
+  padding:11px;
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:12px;
+  background:rgba(5,9,15,.7);
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+}
+.broadcast-stars button.is-mvp{border-color:rgba(var(--accent-rgb),.55);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.15)}
+.broadcast-stars button>span:nth-child(2){display:flex;flex-direction:column}
+.broadcast-stars strong{font-size:9px}
+.broadcast-stars small{font-size:7px;color:var(--muted)}
+.broadcast-stars em{grid-column:2;font-size:7px;font-style:normal;color:var(--accent)}
+.broadcast-star-rank{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:rgba(var(--accent-rgb),.15);font-size:8px;font-weight:900;color:var(--accent)}
+.broadcast-recap-footer{
+  position:relative;
+  z-index:1;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:11px 15px;
+  border-top:1px solid rgba(255,255,255,.1);
+  background:rgba(5,9,15,.45);
+}
+.broadcast-recap-footer>span{font-size:7px;color:var(--muted)}
+
+.mobile-menu-button{z-index:120!important}
+body.sidebar-open .sidebar{transform:translateX(0)!important}
+body.sidebar-open .mobile-overlay{display:block!important;opacity:1!important;pointer-events:auto!important}
+
+@media(max-width:760px){
+  .game-center-topbar{grid-template-columns:1fr auto!important}
+  .game-center-title{display:none}
+  .game-center-tabs{overflow-x:auto}
+  .game-center-tabs button{flex:0 0 auto}
+  .team-stat-board-head,.team-stat-board-row{grid-template-columns:1fr 105px 1fr}
+  .broadcast-recap-score{grid-template-columns:1fr 110px 1fr;padding:18px 10px 8px}
+  .broadcast-recap-score .featured-team-logo{width:64px;height:64px}
+  .broadcast-recap-score b{font-size:30px}
+  .broadcast-stars{grid-template-columns:1fr}
+}

@@ -48,7 +48,8 @@
       passing: 'passingYards',
       rushing: 'rushingYards',
       receiving: 'receivingYards'
-    }
+    },
+    gameCenterTab: 'team'
   };
 
   const rawTeams = [
@@ -1111,6 +1112,139 @@
     </div>`;
   }
 
+  function gameTeamStatRows(away, home, game) {
+    const final=game.status==='final';
+    const make=(label,awayValue,homeValue)=>({label,awayValue,homeValue});
+    if(final){
+      return [
+        make('Total Offense',gameStatValue(away,game,'teamoff',265,515),gameStatValue(home,game,'teamoff',265,515)),
+        make('Passing Yards',gameStatValue(away,game,'teampass',150,390),gameStatValue(home,game,'teampass',150,390)),
+        make('Rushing Yards',gameStatValue(away,game,'teamrush',55,205),gameStatValue(home,game,'teamrush',55,205)),
+        make('First Downs',gameStatValue(away,game,'firstdowns',14,29),gameStatValue(home,game,'firstdowns',14,29)),
+        make('Turnovers',gameStatValue(away,game,'turnovers',0,4),gameStatValue(home,game,'turnovers',0,4)),
+        make('3rd Down',`${gameStatValue(away,game,'thirdmade',2,9)}/${gameStatValue(away,game,'thirdatt',8,15)}`,`${gameStatValue(home,game,'thirdmade',2,9)}/${gameStatValue(home,game,'thirdatt',8,15)}`),
+        make('Red Zone',`${gameStatValue(away,game,'rzmade',1,5)}/${gameStatValue(away,game,'rzatt',2,6)}`,`${gameStatValue(home,game,'rzmade',1,5)}/${gameStatValue(home,game,'rzatt',2,6)}`),
+        make('Time of Possession',`${gameStatValue(away,game,'topmin',24,35)}:${String(gameStatValue(away,game,'topsec',0,59)).padStart(2,'0')}`,`${gameStatValue(home,game,'topmin',24,35)}:${String(gameStatValue(home,game,'topsec',0,59)).padStart(2,'0')}`)
+      ];
+    }
+    return [
+      make('Overall',away.ovr,home.ovr),
+      make('Offense',away.off,home.off),
+      make('Defense',away.def,home.def),
+      make('Points / Game',(away.pf/7).toFixed(1),(home.pf/7).toFixed(1)),
+      make('Points Allowed / Game',(away.pa/7).toFixed(1),(home.pa/7).toFixed(1)),
+      make('Point Differential',away.pf-away.pa,home.pf-home.pa)
+    ];
+  }
+
+  function renderTeamStatsTab(away,home,game){
+    const rows=gameTeamStatRows(away,home,game);
+    return `<section class="game-center-tab-panel">
+      <div class="game-center-section-heading"><span class="eyebrow">${game.status==='final'?'Final comparison':'Pregame comparison'}</span><h3>Team Stats</h3></div>
+      <div class="team-stat-board">
+        <div class="team-stat-board-head">
+          <span>${renderTeamMark(away,'team-logo')}<strong>${away.abbr}</strong></span>
+          <span>Team Stats</span>
+          <span><strong>${home.abbr}</strong>${renderTeamMark(home,'team-logo')}</span>
+        </div>
+        ${rows.map(row=>`<div class="team-stat-board-row"><strong>${row.awayValue}</strong><span>${row.label}</span><strong>${row.homeValue}</strong></div>`).join('')}
+      </div>
+    </section>`;
+  }
+
+  function renderPlayerStatsTab(away,home,game){
+    if(game.status==='final'){
+      return `<section class="game-center-tab-panel">
+        <div class="game-center-section-heading"><span class="eyebrow">Final box score</span><h3>Player Stats</h3></div>
+        ${renderCompletedGameStats(away,home,game)}
+      </section>`;
+    }
+    return `<section class="game-center-tab-panel">
+      <div class="game-center-section-heading"><span class="eyebrow">Pregame</span><h3>Full Rosters & Current-Year Stats</h3></div>
+      <div class="game-center-rosters">${renderGameRoster(away)}${renderGameRoster(home)}</div>
+    </section>`;
+  }
+
+  function topGamePerformers(team,game){
+    const roster=players.filter(p=>p.teamId===team.id);
+    const candidates=roster.map(p=>{
+      let value=0;
+      let line='';
+      if(p.position==='QB'){
+        const y=gameStatValue(p,game,'passyd',145,385),td=gameStatValue(p,game,'passtd',0,4);
+        value=y+(td*60); line=`${y} PASS YDS · ${td} TD`;
+      }else if(['RB','FB'].includes(p.position)){
+        const y=gameStatValue(p,game,'rushyd',8,142),td=gameStatValue(p,game,'rushtd',0,2);
+        value=y+(td*75); line=`${y} RUSH YDS · ${td} TD`;
+      }else if(['WR','TE'].includes(p.position)){
+        const y=gameStatValue(p,game,'recyd',8,138),td=gameStatValue(p,game,'rectd',0,2);
+        value=y+(td*75); line=`${y} REC YDS · ${td} TD`;
+      }else if(defensePositions.includes(p.position)){
+        const t=gameStatValue(p,game,'tkl',1,12),s=gameStatValue(p,game,'sack',0,20)/10,i=gameStatValue(p,game,'defint',0,1);
+        value=t*7+s*35+i*80; line=`${t} TKL · ${s.toFixed(1)} SCK · ${i} INT`;
+      }else{
+        const fg=gameStatValue(p,game,'fgm',0,4);
+        value=fg*30; line=`${fg} FG MADE`;
+      }
+      return {player:p,value,line};
+    });
+    return candidates.sort((a,b)=>b.value-a.value).slice(0,3);
+  }
+
+  function renderRecapTab(away,home,game){
+    const awayTop=topGamePerformers(away,game),homeTop=topGamePerformers(home,game);
+    const winner=game.awayScore>game.homeScore?away:home;
+    const loser=winner.id===away.id?home:away;
+    const margin=Math.abs(game.awayScore-game.homeScore);
+    const headline=game.status==='final'
+      ? `${winner.name} defeat ${loser.name} by ${margin} in Week ${game.week}`
+      : `${away.name} and ${home.name} set for a Week ${game.week} showdown`;
+    const deck=game.status==='final'
+      ? `${winner.fullName} used timely offense and impact plays to secure a ${Math.max(game.awayScore,game.homeScore)}-${Math.min(game.awayScore,game.homeScore)} win.`
+      : `Franchise HQ previews the featured matchup, key players, and season trends before kickoff.`;
+
+    return `<section class="game-center-tab-panel recap-tab">
+      <div class="broadcast-recap" style="--recap-away:${away.primary};--recap-home:${home.primary}">
+        <div class="broadcast-recap-topline">
+          <span>FRANCHISE HQ GAME RECAP</span>
+          <span>SEASON 4 · WEEK ${game.week}</span>
+        </div>
+        <div class="broadcast-recap-score">
+          <div>${renderTeamMark(away,'featured-team-logo')}<strong>${away.abbr}</strong><small>${away.fullName}</small></div>
+          <span><b>${game.status==='final'?game.awayScore:'—'}</b><em>FINAL</em><b>${game.status==='final'?game.homeScore:'—'}</b></span>
+          <div>${renderTeamMark(home,'featured-team-logo')}<strong>${home.abbr}</strong><small>${home.fullName}</small></div>
+        </div>
+        <div class="broadcast-recap-story">
+          <span class="eyebrow">${game.day} · ${game.stadium}</span>
+          <h3>${headline}</h3>
+          <p>${deck}</p>
+        </div>
+        <div class="broadcast-stars">
+          ${[...awayTop,...homeTop].sort((a,b)=>b.value-a.value).slice(0,3).map((entry,index)=>`
+            <button type="button" data-open-player-card="${entry.player.id}" class="${index===0?'is-mvp':''}">
+              <span class="broadcast-star-rank">${index===0?'MVP':`#${index+1}`}</span>
+              <span><strong>${escapeHtml(entry.player.name)}</strong><small>${entry.player.position} · ${teamById(entry.player.teamId).abbr}</small></span>
+              <em>${entry.line}</em>
+            </button>`).join('')}
+        </div>
+        <div class="broadcast-recap-footer">
+          <span>Generated from Franchise HQ game data</span>
+          <button type="button" class="button button--ghost" data-export-recap>Export Recap Image</button>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  function renderGameCenterTabs(away,home,game){
+    const tabs=[['team','Team'],['player','Player'],['recap','Recap']];
+    return `<div class="game-center-tabs">
+      ${tabs.map(([key,label])=>`<button type="button" data-game-center-tab="${key}" class="${state.gameCenterTab===key?'is-active':''}">${label}</button>`).join('')}
+    </div>
+    <div class="game-center-tab-content">
+      ${state.gameCenterTab==='team'?renderTeamStatsTab(away,home,game):state.gameCenterTab==='player'?renderPlayerStatsTab(away,home,game):renderRecapTab(away,home,game)}
+    </div>`;
+  }
+
   function openGameDetail(gameId) {
     const game=schedule.flatMap(week=>week.games).find(item=>item.id===gameId);
     if (!game) return;
@@ -1120,7 +1254,12 @@
     openDetail(`
       <div class="game-center-shell" style="--game-away:${away.primary};--game-home:${home.primary}">
         <header class="game-center-topbar">
-          <div><span class="eyebrow">${isFinal?'Final':isLive?'Live':`Week ${game.week}`}</span><h2>Game Center</h2></div>
+          <div class="game-center-schedule-info">
+            <span class="eyebrow">Season 4 · Week ${game.week}</span>
+            <strong>${game.day} · ${game.time}</strong>
+            <small>${game.network} · ${game.stadium}</small>
+          </div>
+          <div class="game-center-title"><span class="eyebrow">${isFinal?'Final':isLive?'Live':'Scheduled'}</span><h2>Game Center</h2></div>
           <button type="button" class="icon-button game-center-close" data-close-detail aria-label="Close Game Center"><svg><use href="#icon-close"></use></svg></button>
         </header>
 
@@ -1132,7 +1271,7 @@
             <span>${away.city}</span><strong>${away.name}</strong><small>${away.record} · ${escapeHtml(away.owner)}</small>
           </div>
           <div class="game-center-score">
-            <span>${game.day} · ${game.time}</span>
+            <span>${isFinal?'Final':isLive?'Live':`${game.day} · ${game.time}`}</span>
             <strong>${isFinal||isLive?`${game.awayScore}<b>–</b>${game.homeScore}`:'VS'}</strong>
             <small>${game.network} · ${game.stadium}</small>
           </div>
@@ -1143,17 +1282,7 @@
         </div>
 
         <div class="game-center-body">
-          <div class="game-center-comparison">
-            <div><span>Overall</span><strong>${away.ovr}</strong><strong>${home.ovr}</strong></div>
-            <div><span>Offense</span><strong>${away.off}</strong><strong>${home.off}</strong></div>
-            <div><span>Defense</span><strong>${away.def}</strong><strong>${home.def}</strong></div>
-            <div><span>Points / Game</span><strong>${(away.pf/7).toFixed(1)}</strong><strong>${(home.pf/7).toFixed(1)}</strong></div>
-          </div>
-
-          ${isFinal ? renderCompletedGameStats(away,home,game) : `
-            <div class="game-center-section-heading"><span class="eyebrow">Pregame</span><h3>Full Rosters & Current-Year Stats</h3></div>
-            <div class="game-center-rosters">${renderGameRoster(away)}${renderGameRoster(home)}</div>
-          `}
+          ${renderGameCenterTabs(away,home,game)}
         </div>
       </div>`);
   }
@@ -1296,6 +1425,23 @@
     const closeDetailTarget=event.target.closest('[data-close-detail]');
     if (closeDetailTarget) { event.preventDefault(); event.stopPropagation(); closeDetail(); return; }
 
+    const gameCenterTab=event.target.closest('[data-game-center-tab]');
+    if (gameCenterTab) {
+      event.preventDefault();
+      state.gameCenterTab=gameCenterTab.dataset.gameCenterTab;
+      const shell=event.target.closest('.game-center-shell');
+      const active=shell?.querySelector('.game-center-switcher .is-active');
+      if(active) openGameDetail(active.dataset.gameCenterSwitch);
+      return;
+    }
+
+    const exportRecap=event.target.closest('[data-export-recap]');
+    if(exportRecap){
+      event.preventDefault();
+      showToast('Recap export prepared','The broadcast recap is ready for PNG export when the production export service is connected.');
+      return;
+    }
+
     const gameCenterSwitch=event.target.closest('[data-game-center-switch]');
     if (gameCenterSwitch) { event.preventDefault(); openGameDetail(gameCenterSwitch.dataset.gameCenterSwitch); return; }
 
@@ -1386,18 +1532,27 @@
   });
 
 
-  document.addEventListener('pointerdown', event => {
+
+
+  let mobileMenuToggleLock=false;
+  document.addEventListener('click', event => {
     const openButton=event.target.closest('[data-open-sidebar]');
     if(openButton){
       event.preventDefault();
-      event.stopPropagation();
-      openSidebar();
+      event.stopImmediatePropagation();
+      if(mobileMenuToggleLock) return;
+      mobileMenuToggleLock=true;
+      document.body.classList.add('sidebar-open');
+      sidebar.classList.add('is-open');
+      mobileOverlay.hidden=false;
+      requestAnimationFrame(()=>mobileOverlay.classList.add('is-visible'));
+      setTimeout(()=>{mobileMenuToggleLock=false},240);
       return;
     }
+
     const closeButton=event.target.closest('[data-close-sidebar], [data-mobile-overlay]');
-    if(closeButton){
+    if(closeButton && !event.target.closest('.sidebar')){
       event.preventDefault();
-      event.stopPropagation();
       closeSidebar();
     }
   }, true);
