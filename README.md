@@ -37,3 +37,11 @@ Suggested commit message:
 4. Open a trade involving Dallas as the commissioner and confirm the review panel is grayed out and locked.
 5. Withdraw or decline a trade, then switch to an uninvolved commissioner or committee member and confirm it is absent from History.
 6. List a player and a pick on the Trade Block, add desired-return notes, ask a question, and launch a proposal.
+
+
+## TC-009 Hotfix
+- Restores the full live Committee + Commissioner status board during active review.
+- Makes complete Trade History cards clickable and repairs Trade Replay event routing.
+- Implements persistent player watchlists.
+- Sends Add to Trade directly into a pre-populated active builder.
+- Adds direct player-profile Trade Block controls and clearer Manage My Block instructions.
