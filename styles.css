@@ -902,3 +902,8 @@ body[data-density="compact"] .metric-card { min-height: 126px; padding: 14px; }
 .profile-menu__header strong[data-profile-menu-user] small{font-size:11px;color:var(--muted);font-weight:500}
 .asset-new-tag{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:22px;padding:0 8px;border-radius:999px;background:rgba(var(--accent-rgb),.18);border:1px solid rgba(var(--accent-rgb),.52);color:var(--accent);font-size:10px;font-weight:900;letter-spacing:.08em;box-shadow:0 0 18px rgba(var(--accent-rgb),.12)}
 .trade-asset:has(.asset-new-tag){border-color:rgba(var(--accent-rgb),.46);background:linear-gradient(90deg,rgba(var(--accent-rgb),.10),rgba(var(--accent-rgb),.025))}
+
+/* TC-005.1 profile menu hotfix */
+.topbar__right{position:relative}
+.profile-menu{z-index:120;background:#111722!important;box-shadow:0 20px 55px rgba(0,0,0,.55)!important}
+.profile-menu.is-open{display:block!important}

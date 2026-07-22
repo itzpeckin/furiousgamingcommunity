@@ -21,3 +21,13 @@ Negotiation Engine 1.0 with persistent offer states, messages, immutable version
 - Notification dropdown now uses an opaque, high-contrast background.
 - Developer Mode moved into the player-name profile menu; the separate sliders button was removed.
 - Profile menu displays player name first and franchise second, with `[C]` or `[TC]` role tags.
+
+
+## TC-005.1 Profile Menu Hotfix
+- Restored reliable click handling for the top-right profile identity and caret.
+- Switch Identity and all former slide-menu controls are available from the profile dropdown.
+- Added solid menu layering and stacking so the dropdown remains visible above page content.
+
+## TC-005.1 Hotfix 2
+- Fixed Withdraw for all identities representing the same franchise, including commissioner and owner aliases.
+- Added a direct profile-caret handler so the profile menu and Switch Identity control open reliably.
