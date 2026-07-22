@@ -391,15 +391,20 @@
     const grid = document.querySelector('[data-team-grid]');
     if (!grid) return;
     const term = state.teamSearch.trim().toLowerCase();
+    const ownedTeamId = window.FGC_TRADE?.getCurrentAccount?.()?.teamId || null;
     const filtered = teams.filter(team => {
       const matchesTerm = !term || `${team.fullName} ${team.abbr} ${team.owner}`.toLowerCase().includes(term);
       return matchesTerm && (state.teamConference === 'All' || team.conference === state.teamConference) && (state.teamDivision === 'All' || team.division === state.teamDivision);
-    }).sort((a,b) => a.conference.localeCompare(b.conference) || a.division.localeCompare(b.division) || sortStandings(a,b));
+    }).sort((a,b) => {
+      if (ownedTeamId && a.id === ownedTeamId && b.id !== ownedTeamId) return -1;
+      if (ownedTeamId && b.id === ownedTeamId && a.id !== ownedTeamId) return 1;
+      return a.conference.localeCompare(b.conference) || a.division.localeCompare(b.division) || sortStandings(a,b);
+    });
     document.querySelector('[data-team-count]').textContent = `${filtered.length} of 32 teams`;
     grid.innerHTML = filtered.length ? filtered.map(team => `
       <article class="team-card card" style="${teamStyle(team)}" data-team-id="${team.id}">
         <div class="team-card__top">${renderTeamMark(team,'team-logo')}<div class="team-card__record"><strong>${team.record}</strong><small>#${team.divisionRank} ${team.division}</small></div></div>
-        <h3>${team.fullName}</h3><span class="team-card__owner">${escapeHtml(team.owner)} · ${team.conference} ${team.division}</span>
+        <h3>${team.fullName}${ownedTeamId===team.id?'<span class="my-team-tag">MY TEAM</span>':''}</h3><span class="team-card__owner">${escapeHtml(team.owner)} · ${team.conference} ${team.division}</span>
         <div class="team-card__metrics"><span><strong>${team.ovr}</strong><small>Overall</small></span><span><strong>${team.off}</strong><small>Offense</small></span><span><strong>${team.def}</strong><small>Defense</small></span></div>
         <div class="team-card__footer"><span>${formatMoney(team.cap)} cap space</span><span>${team.streak}</span></div>
       </article>`).join('') : `<article class="card roadmap-state" style="grid-column:1/-1"><div class="roadmap-state__inner"><div class="roadmap-icon"><svg><use href="#icon-search"></use></svg></div><h2>No teams found</h2><p>Try clearing a filter or searching for another city, nickname, abbreviation, or owner.</p></div></article>`;
