@@ -1,19 +1,12 @@
-# Franchise HQ — TC-005.2 Negotiation Foundation
+# Franchise HQ — TC-005.2 Negotiation Foundation Hotfix 1
 
-This build replaces the trade-as-version workflow with a stable negotiation model.
+This build fixes the withdrawal lookup failure by making the negotiation detail page retain its active negotiation ID and by resolving withdrawals from three independent sources:
 
-## Foundation changes
+1. The Withdraw button's stable negotiation ID.
+2. The negotiation currently loaded in the detail view.
+3. The Trade Center route in the browser URL.
 
-- Every negotiation has one permanent `negotiationId`.
-- Every offer and counteroffer is stored as an immutable child version with its own `versionId`.
-- Counteroffers append a version to the existing negotiation instead of creating or locating a separate trade record.
-- The active version owns the action state:
-  - current proposer: Revise / Withdraw
-  - receiving owner: Accept / Counter / Decline
-- Commissioner identity is normalized to the commissioner-owned franchise for owner actions.
-- Withdraw now resolves the permanent negotiation ID directly from the button and closes that negotiation.
-- Existing TC-005.1 data is migrated automatically from the legacy local-storage structure on first load.
-- Green `NEW` tags and per-side removed-asset notes remain included.
+The resolver also supports migrated legacy IDs and version IDs. Withdrawal still requires the logged-in franchise to own the current proposal version.
 
 ## Replace these files
 
@@ -24,16 +17,4 @@ This build replaces the trade-as-version workflow with a stable negotiation mode
 - dev-mode.js
 - README.md
 
-## Recommended test
-
-1. Deploy the six files and hard refresh once.
-2. Open Trade #104 as Green Bay. Green Bay owns Version 2 and should see Revise / Withdraw.
-3. Withdraw it and confirm the negotiation moves to History with status Withdrawn.
-4. Reset demo data from Commissioner HQ.
-5. Open Trade #104 as Dallas and submit a counter.
-6. Switch to Green Bay and verify the new version is under the same Trade #104.
-7. Confirm newly added assets show a green NEW tag and removed assets are listed below the correct team side.
-
-Suggested commit message:
-
-`Build TC-005.2 negotiation foundation`
+After deployment, hard-refresh the browser once and reopen the negotiation from Trade Center.
