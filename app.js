@@ -41,7 +41,8 @@
     scheduleWeek: 8,
     scheduleTeam: 'All',
     newsCategory: 'All',
-    teamTab: 'roster'
+    teamTab: 'roster',
+    activityFilter: 'all'
   };
 
   const rawTeams = [
@@ -282,80 +283,139 @@
   }
 
   function renderHome() {
-    const ranked = [...teams].sort(sortStandings);
-    const topQb = [...players].filter(p => p.position === 'QB').sort((a,b) => b.stats.passingYards - a.stats.passingYards)[0];
-    const topRush = [...players].filter(p => ['RB','FB'].includes(p.position)).sort((a,b) => b.stats.rushingYards - a.stats.rushingYards)[0];
-    const topRec = [...players].filter(p => ['WR','TE'].includes(p.position)).sort((a,b) => b.stats.receivingYards - a.stats.receivingYards)[0];
-    const featuredGame = schedule[7].games[0];
-    const away = teamById(featuredGame.awayId);
-    const home = teamById(featuredGame.homeId);
-    const recentGames = schedule[7].games.filter(g => g.status === 'final').slice(0,4);
+    const account = window.FGC_TRADE?.getCurrentAccount?.();
+    const myTeamId = account?.teamId || null;
+    const snapshot = window.FGC_TRADE?.getActivitySnapshot?.() || { approvedTrades:[], blockPlayers:[], blockPicks:[] };
+    const filters = [
+      ['all','All'],['transactions','Transactions'],['games','Games'],['news','News'],['my-franchise','My Franchise']
+    ];
+
+    const finalGames = schedule
+      .flatMap(week => week.games.map(game => ({...game, week:week.week})))
+      .filter(game => game.status === 'final')
+      .slice(-8)
+      .reverse();
+
+    const activity = [];
+
+    snapshot.approvedTrades.forEach((trade,index) => {
+      activity.push({
+        id:`trade-${trade.id}`, type:'transactions', kind:'Approved trade', icon:'icon-swap',
+        title:`${trade.teamAName} and ${trade.teamBName} complete an approved trade`,
+        copy:trade.summary || 'The committee review is complete and the transaction is now public.',
+        time:trade.time || `${index+1} day ago`, teamIds:[trade.teamAId,trade.teamBId],
+        route:`trade-center/history`, accent:'success'
+      });
+    });
+
+    snapshot.blockPlayers.slice(0,6).forEach((listing,index) => {
+      activity.push({
+        id:`block-${listing.playerId}`, type:'transactions', kind:'Trade Block', icon:'icon-tag',
+        title:`${listing.playerName} added to the Trade Block`,
+        copy:`${listing.position} · ${listing.overall} OVR · ${listing.dev} development · ${listing.teamAbbr}`,
+        time:index < 2 ? `${18 + index*11} minutes ago` : `${index} hours ago`,
+        teamIds:[listing.teamId], playerId:listing.playerId, accent:'warning'
+      });
+    });
+
+    finalGames.slice(0,5).forEach((game,index) => {
+      const away=teamById(game.awayId), home=teamById(game.homeId);
+      const winner=game.awayScore>game.homeScore?away:home;
+      activity.push({
+        id:`game-${game.id}`, type:'games', kind:'Final score', icon:'icon-trophy',
+        title:`${winner.fullName} earn a Week ${game.week} victory`,
+        copy:`${away.abbr} ${game.awayScore} · ${home.abbr} ${game.homeScore}`,
+        time:index===0?'34 minutes ago':`${index+1} hours ago`,
+        teamIds:[game.awayId,game.homeId], gameId:game.id, accent:'score'
+      });
+    });
+
+    newsArticles.filter(article=>['Commissioner','Awards','Power Rankings','Analysis'].includes(article.category)).slice(0,5).forEach(article => {
+      activity.push({
+        id:`news-${article.id}`, type:'news', kind:article.category, icon:article.category==='Commissioner'?'icon-gavel':'icon-news',
+        title:article.title, copy:article.excerpt, time:article.time,
+        teamIds:[], newsId:article.id, accent:article.category==='Commissioner'?'accent':'neutral'
+      });
+    });
+
+    const milestonePlayers = [...players].filter(p=>p.overall>=91).slice(0,3);
+    milestonePlayers.forEach((player,index)=>{
+      const team=teamById(player.teamId);
+      activity.push({
+        id:`milestone-${player.id}`, type:'news', kind:'Player milestone', icon:'icon-star',
+        title:`${player.name} reaches a new franchise milestone`,
+        copy:`${team.abbr} · ${player.position} · ${player.overall} OVR · ${player.dev}`,
+        time:`${index+2} days ago`, teamIds:[player.teamId], playerId:player.id, accent:'player'
+      });
+    });
+
+    const advanceArticle = newsArticles.find(article=>article.category==='Commissioner');
+    if(advanceArticle){
+      activity.unshift({
+        id:'league-advance', type:'news', kind:'League advance', icon:'icon-clock',
+        title:'Week 8 advance scheduled for Thursday night',
+        copy:'Complete remaining games and submit results before the commissioner advance window.',
+        time:'2 hours ago', teamIds:[], newsId:advanceArticle.id, accent:'accent'
+      });
+    }
+
+    const filtered = activity.filter(item => {
+      if(state.activityFilter==='all') return true;
+      if(state.activityFilter==='my-franchise') return myTeamId && item.teamIds.includes(myTeamId);
+      return item.type===state.activityFilter;
+    });
+
+    const ranked=[...teams].sort(sortStandings);
+    const trending=[...players].sort((a,b)=>(b.overall+b.stats.touchdowns)-(a.overall+a.stats.touchdowns)).slice(0,5);
+    const currentWeek=schedule.find(w=>w.week===8);
+    const upcoming=(currentWeek?.games||[]).filter(g=>g.status!=='final').slice(0,3);
 
     pageContent.innerHTML = `
-      <div class="page-heading">
-        <div><span class="eyebrow">Season 4 · Week 8</span><h1>League Command Center</h1><p>Your complete view of the league—results, standings, player performance, news, and transactions.</p></div>
-        <div class="heading-actions"><button class="button button--ghost" data-open-style-panel><svg><use href="#icon-palette"></use></svg>Customize preview</button><button class="button button--primary" data-route="trade-center"><svg><use href="#icon-swap"></use></svg>Start a trade</button></div>
+      <div class="page-heading activity-heading">
+        <div><span class="eyebrow">TC-010 · League Activity Feed</span><h1>League Activity</h1><p>The live heartbeat of Franchise HQ—transactions, games, announcements, milestones, and the activity that matters to your franchise.</p></div>
+        <div class="heading-actions"><button class="button button--ghost" data-route="news"><svg><use href="#icon-news"></use></svg>League News</button><button class="button button--primary" data-route="trade-center"><svg><use href="#icon-swap"></use></svg>Start a Trade</button></div>
       </div>
 
-      <div class="hero-grid">
-        <article class="hero-card">
-          <div class="hero-card__content">
-            <span class="pill pill--accent">Week 8 spotlight</span>
-            <h2>${away.name} and ${home.name} meet with playoff positioning on the line.</h2>
-            <p>This league-home experience is now powered by connected mock data. Open teams, players, standings, games, and news to explore the full Milestone 1B prototype.</p>
-            <div class="matchup-row" data-game-id="${featuredGame.id}">
-              <div class="team-lockup">${renderTeamMark(away,'team-badge')}<div><strong>${away.fullName}</strong><span>${away.record} · ${away.conference} ${away.division}</span></div></div>
-              <div class="versus-lockup"><span>${featuredGame.day}</span><strong>${featuredGame.time}</strong></div>
-              <div class="team-lockup team-lockup--reverse"><div><strong>${home.fullName}</strong><span>${home.record} · ${home.conference} ${home.division}</span></div>${renderTeamMark(home,'team-badge')}</div>
+      <div class="activity-filter-bar">
+        <div class="segmented-tabs">${filters.map(([key,label])=>`<button type="button" data-activity-filter="${key}" class="${state.activityFilter===key?'is-active':''}">${label}</button>`).join('')}</div>
+        <span class="result-count">${filtered.length} updates</span>
+      </div>
+
+      <div class="league-feed-layout">
+        <section class="league-feed">
+          ${filtered.length ? filtered.map(item=>`
+            <article class="league-feed-item ${item.accent?`league-feed-item--${item.accent}`:''}" ${item.playerId?`data-player-id="${item.playerId}"`:item.gameId?`data-game-id="${item.gameId}"`:item.newsId?`data-news-id="${item.newsId}"`:item.route?`data-route="${item.route}"`:''}>
+              <span class="league-feed-icon"><svg><use href="#${item.icon}"></use></svg></span>
+              <div class="league-feed-content">
+                <div class="league-feed-meta"><span>${escapeHtml(item.kind)}</span><time>${escapeHtml(item.time)}</time></div>
+                <h3>${escapeHtml(item.title)}</h3>
+                <p>${escapeHtml(item.copy)}</p>
+                ${item.teamIds.length?`<div class="league-feed-teams">${item.teamIds.map(id=>renderTeamMark(teamById(id))).join('')}</div>`:''}
+              </div>
+              <svg class="league-feed-arrow"><use href="#icon-arrow"></use></svg>
+            </article>`).join('') : `
+            <article class="empty-state card"><span class="empty-icon"><svg><use href="#icon-activity"></use></svg></span><h2>No franchise activity yet</h2><p>Your team-specific feed will populate when your franchise appears in games, transactions, Trade Block listings, or league news.</p></article>`}
+        </section>
+
+        <aside class="league-feed-sidebar">
+          <article class="card feed-side-card">
+            <div class="card-header"><div><span class="eyebrow">League leaders</span><h3>Power snapshot</h3></div><button class="text-button" data-route="standings">Full standings <svg><use href="#icon-arrow"></use></svg></button></div>
+            <div class="power-snapshot">${ranked.slice(0,5).map((team,index)=>`<button data-team-id="${team.id}"><span class="power-rank">${index+1}</span>${renderTeamMark(team)}<span><strong>${team.fullName}</strong><small>${team.record} · ${team.pf-team.pa>=0?'+':''}${team.pf-team.pa} point diff</small></span></button>`).join('')}</div>
+          </article>
+
+          <article class="card feed-side-card">
+            <div class="card-header"><div><span class="eyebrow">Most active</span><h3>Trending players</h3></div><button class="text-button" data-route="players">All players <svg><use href="#icon-arrow"></use></svg></button></div>
+            <div class="trending-player-list">${trending.map((player,index)=>`<button data-player-id="${player.id}"><span class="trend-number">${index+1}</span>${renderPlayerIdentity(player)}<span class="trend-score">${player.overall}</span></button>`).join('')}</div>
+          </article>
+
+          <article class="card feed-side-card">
+            <div class="card-header"><div><span class="eyebrow">Week 8</span><h3>Upcoming events</h3></div><button class="text-button" data-route="schedule">Schedule <svg><use href="#icon-arrow"></use></svg></button></div>
+            <div class="upcoming-event-list">
+              ${upcoming.map(game=>{const away=teamById(game.awayId),home=teamById(game.homeId);return`<button data-game-id="${game.id}"><span class="upcoming-date">${game.day}<strong>${game.time}</strong></span><span>${away.abbr} at ${home.abbr}<small>${game.network} · ${game.stadium}</small></span></button>`}).join('')}
+              <div class="upcoming-league-event"><span class="league-feed-icon"><svg><use href="#icon-clock"></use></svg></span><span><strong>League advance</strong><small>Thursday · 10:00 PM</small></span></div>
             </div>
-          </div>
-        </article>
-
-        <article class="quick-actions-card card">
-          <div class="card-header"><div><span class="eyebrow">Shortcuts</span><h3>Quick actions</h3></div><span class="pill pill--neutral">Interactive</span></div>
-          <div class="quick-action-grid">
-            <button data-route="players"><span><svg><use href="#icon-search"></use></svg></span><strong>Find a player</strong><small>Search ratings and profiles</small></button>
-            <button data-route="teams"><span><svg><use href="#icon-shield"></use></svg></span><strong>Browse teams</strong><small>Rosters, cap, and results</small></button>
-            <button data-route="standings"><span><svg><use href="#icon-table"></use></svg></span><strong>Playoff race</strong><small>Division and conference views</small></button>
-            <button data-route="news"><span><svg><use href="#icon-news"></use></svg></span><strong>League news</strong><small>Stories and announcements</small></button>
-          </div>
-        </article>
-      </div>
-
-      <div class="metric-grid">
-        <article class="metric-card card"><div class="metric-card__top"><span class="metric-icon"><svg><use href="#icon-shield"></use></svg></span><span class="trend trend--up">All assigned</span></div><span class="metric-label">Active teams</span><strong class="metric-value">32</strong><small>32 connected owners</small></article>
-        <article class="metric-card card"><div class="metric-card__top"><span class="metric-icon"><svg><use href="#icon-users"></use></svg></span><span class="trend trend--up">Mock</span></div><span class="metric-label">Player database</span><strong class="metric-value">${players.length.toLocaleString()}</strong><small>Searchable roster records</small></article>
-        <article class="metric-card card"><div class="metric-card__top"><span class="metric-icon"><svg><use href="#icon-swap"></use></svg></span><span class="trend trend--neutral">2 open</span></div><span class="metric-label">Season trades</span><strong class="metric-value">14</strong><small>Committee-approved deals</small></article>
-        <article class="metric-card card"><div class="metric-card__top"><span class="metric-icon"><svg><use href="#icon-chart"></use></svg></span><span class="trend trend--up">Week 8</span></div><span class="metric-label">Games completed</span><strong class="metric-value">117</strong><small>Across the mock season</small></article>
-      </div>
-
-      <div class="content-grid">
-        <article class="card">
-          <div class="card-header"><div><span class="eyebrow">Playoff picture</span><h3>League leaders</h3></div><button class="text-button" data-route="standings">Full standings <svg><use href="#icon-arrow"></use></svg></button></div>
-          <div class="table-wrap"><table><thead><tr><th>Seed</th><th>Team</th><th>Record</th><th>PF</th><th>Diff</th><th>Streak</th></tr></thead><tbody>
-            ${ranked.slice(0,6).map((team,index) => `<tr class="clickable-row" data-team-id="${team.id}"><td><span class="seed">${index+1}</span></td><td><div class="table-team">${renderTeamMark(team)}<div><strong>${team.fullName}</strong><small>${team.conference} ${team.division}</small></div></div></td><td><strong>${team.record}</strong></td><td>${team.pf}</td><td class="${team.pf-team.pa >= 0 ? 'streak--win':'streak--loss'}">${team.pf-team.pa >= 0 ? '+' : ''}${team.pf-team.pa}</td><td><span class="streak ${team.streak.startsWith('W')?'streak--win':'streak--loss'}">${team.streak}</span></td></tr>`).join('')}
-          </tbody></table></div>
-        </article>
-
-        <article class="card">
-          <div class="card-header"><div><span class="eyebrow">Stat leaders</span><h3>Players setting the pace</h3></div><button class="text-button" data-route="stats">All leaders <svg><use href="#icon-arrow"></use></svg></button></div>
-          <div class="activity-list">
-            ${leaderActivity(topQb,'Passing yards',topQb.stats.passingYards.toLocaleString())}
-            ${leaderActivity(topRush,'Rushing yards',topRush.stats.rushingYards.toLocaleString())}
-            ${leaderActivity(topRec,'Receiving yards',topRec.stats.receivingYards.toLocaleString())}
-          </div>
-        </article>
-      </div>
-
-      <div class="content-grid content-grid--equal" style="margin-top:18px">
-        <article class="card">
-          <div class="card-header"><div><span class="eyebrow">Around the league</span><h3>Recent finals</h3></div><button class="text-button" data-route="schedule">Full schedule <svg><use href="#icon-arrow"></use></svg></button></div>
-          <div class="activity-list">${recentGames.map(game => gameActivity(game)).join('')}</div>
-        </article>
-        <article class="card">
-          <div class="card-header"><div><span class="eyebrow">Latest stories</span><h3>League news</h3></div><button class="text-button" data-route="news">News hub <svg><use href="#icon-arrow"></use></svg></button></div>
-          <div class="activity-list">${newsArticles.slice(0,4).map(article => newsActivity(article)).join('')}</div>
-        </article>
+          </article>
+        </aside>
       </div>`;
   }
 
@@ -892,6 +952,9 @@
 
     const teamTab=event.target.closest('[data-team-tab]');
     if (teamTab) { state.teamTab=teamTab.dataset.teamTab; renderRoute(location.hash.slice(1)); return; }
+
+    const activityFilter=event.target.closest('[data-activity-filter]');
+    if (activityFilter) { state.activityFilter=activityFilter.dataset.activityFilter; renderHome(); return; }
 
     const standingsView=event.target.closest('[data-standings-view]');
     if (standingsView) { state.standingsView=standingsView.dataset.standingsView; renderStandings(); return; }
