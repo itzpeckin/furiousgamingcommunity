@@ -747,6 +747,12 @@
     switch(base) {
       case 'home': renderHome(); break;
       case 'teams': id?renderTeamDetail(id):renderTeams(); break;
+      case 'my-team': {
+        const account=window.FGC_TRADE?.getCurrentAccount?.();
+        if(account?.teamId) renderTeamDetail(account.teamId);
+        else { showToast('My Team unavailable','Switch to an owner or commissioner identity with an assigned franchise.'); setRoute('teams'); }
+        break;
+      }
       case 'players': id?renderPlayerProfile(id):renderPlayers(); break;
       case 'standings': renderStandings(); break;
       case 'stats': renderStats(); break;
@@ -760,7 +766,7 @@
         window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base); break;
       default: renderRoadmap(base);
     }
-    const pageTitle=id ? (base==='teams'?teamById(id)?.fullName:playerById(id)?.name) : pageNames[base];
+    const pageTitle=base==='my-team' ? (teamById(window.FGC_TRADE?.getCurrentAccount?.()?.teamId)?.fullName||'My Team') : id ? (base==='teams'?teamById(id)?.fullName:playerById(id)?.name) : pageNames[base];
     document.title=`${pageTitle||'Franchise HQ'} — Milestone 1 Complete`;
     mainContent.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:'smooth'});

@@ -989,3 +989,14 @@ body[data-density="compact"] .metric-card { min-height: 126px; padding: 14px; }
 
 /* TC-009 hotfix: committee status, clickable history, trade-block guidance */
 .committee-roster{margin-top:18px}.committee-roster-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;padding:0 18px 16px}.committee-member-status{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.025)}.committee-member-status.is-recused{opacity:.55;filter:grayscale(.8)}.committee-member-status__name{display:flex;flex-direction:column;min-width:0;flex:1}.committee-member-status__name strong,.committee-member-status__name small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.committee-member-status__name small{color:var(--muted);margin-top:2px}.committee-roster-note{margin:0 18px 18px;color:var(--muted);font-size:12px}.history-trade-card.is-clickable{cursor:pointer;transition:transform .16s ease,border-color .16s ease,background .16s ease}.history-trade-card.is-clickable:hover,.history-trade-card.is-clickable:focus-visible{transform:translateY(-2px);border-color:rgba(var(--accent-rgb),.55);background:rgba(var(--accent-rgb),.04);outline:none}.trade-block-help{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;margin-bottom:14px}.trade-block-help strong{white-space:nowrap}.trade-block-help span{color:var(--muted)}.manage-block{scroll-margin-top:90px}.manage-block-section{max-height:520px;overflow:auto;padding-right:4px}
+
+/* TC-009.1 usability hotfix */
+.nav-item--my-team[hidden]{display:none!important}
+.committee-review-workspace{display:grid;grid-template-columns:minmax(0,3fr) minmax(280px,1fr);gap:18px;align-items:start;margin-top:18px}
+.committee-review-workspace .committee-roster{margin-top:0}
+.committee-review-workspace__ballot .committee-ballot{position:sticky;top:88px;margin:0}
+.committee-roster-grid{display:flex;flex-direction:column;gap:0;padding:0 18px 12px}
+.committee-member-status{border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:13px 4px}
+.committee-member-status:last-child{border-bottom:0}
+.committee-member-status .pill{min-width:96px;justify-content:center}
+@media(max-width:900px){.committee-review-workspace{grid-template-columns:1fr}.committee-review-workspace__ballot .committee-ballot{position:static}}
