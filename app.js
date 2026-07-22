@@ -42,7 +42,13 @@
     scheduleTeam: 'All',
     newsCategory: 'All',
     teamTab: 'roster',
-    activityFilter: 'all'
+    activityFilter: 'all',
+    featuredGameId: null,
+    homeLeaderMetrics: {
+      passing: 'passingYards',
+      rushing: 'rushingYards',
+      receiving: 'receivingYards'
+    }
   };
 
   const rawTeams = [
@@ -135,7 +141,7 @@
   const schedule = buildSchedule();
   const newsArticles = buildNews();
   const pageNames = {
-    home: 'League Home', teams: 'Teams', players: 'Players', standings: 'Standings', stats: 'Stats & Leaders',
+    home: 'League Home', 'league-activity': 'League Activity', teams: 'Teams', players: 'Players', standings: 'Standings', stats: 'Stats & Leaders',
     schedule: 'Schedule', news: 'League News', 'trade-center': 'Trade Center', 'trade-block': 'Trade Block',
     commissioner: 'Commissioner Dashboard', 'design-system': 'Design System'
   };
@@ -282,7 +288,191 @@
     return `dev-badge--${dev.toLowerCase().replace(/[^a-z]/g,'')}`;
   }
 
-  function renderHome() {
+
+  function gameForTeamWeek(teamId, weekNumber) {
+    return schedule.find(w=>w.week===weekNumber)?.games.find(g=>g.homeId===teamId||g.awayId===teamId) || null;
+  }
+
+  function opponentForGame(game, teamId) {
+    if (!game) return null;
+    return teamById(game.homeId===teamId ? game.awayId : game.homeId);
+  }
+
+  function previousGameCopy(teamId, weekNumber) {
+    const game=gameForTeamWeek(teamId, Math.max(1,weekNumber-1));
+    if (!game) return 'No previous result';
+    const opponent=opponentForGame(game,teamId);
+    if (game.status!=='final') return `vs ${opponent.abbr} · Scheduled`;
+    const teamScore=game.homeId===teamId?game.homeScore:game.awayScore;
+    const oppScore=game.homeId===teamId?game.awayScore:game.homeScore;
+    return `${teamScore>oppScore?'W':'L'} ${teamScore}-${oppScore} vs ${opponent.abbr}`;
+  }
+
+  function topUnitPlayers(teamId, unit) {
+    const positions=unit==='offense'?offensePositions:defensePositions;
+    return players.filter(p=>p.teamId===teamId&&positions.includes(p.position))
+      .sort((a,b)=>b.overall-a.overall||a.name.localeCompare(b.name)).slice(0,3);
+  }
+
+  function renderFeaturedPlayerRow(player) {
+    return `<button type="button" class="featured-player-row" data-player-id="${player.id}">
+      <span><strong>${escapeHtml(player.name)}</strong><small>${player.position}</small></span>
+      <span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span>
+      <span class="dev-badge ${devClass(player.dev)}">${player.dev}</span>
+    </button>`;
+  }
+
+  function renderConferenceSnapshot(conference) {
+    const ranked=teams.filter(t=>t.conference===conference).sort(sortStandings).slice(0,10);
+    return `<article class="card home-standings-card">
+      <div class="card-header"><div><span class="eyebrow">Playoff picture</span><h3>${conference} Standings</h3></div><button class="text-button" data-route="standings">View all <svg><use href="#icon-arrow"></use></svg></button></div>
+      <div class="home-standings-list">
+        ${ranked.map((team,index)=>`<button type="button" data-team-id="${team.id}" class="${index===7?'wildcard-cutline':''}">
+          <span class="seed">${index+1}</span>${renderTeamMark(team)}
+          <span><strong>${team.fullName}</strong><small>${index<4?'Division leader':index<7?'Wild card':'In the hunt'}</small></span>
+          <strong>${team.record}</strong>
+        </button>`).join('')}
+      </div>
+    </article>`;
+  }
+
+  function leaderMetricConfig(category) {
+    const metric=state.homeLeaderMetrics[category];
+    const configs={
+      passing:{
+        positions:['QB'],
+        tabs:[['passingYards','Yards'],['passingTD','TDs']]
+      },
+      rushing:{
+        positions:['RB','FB','QB'],
+        tabs:[['rushingYards','Yards'],['rushingTD','TDs']]
+      },
+      receiving:{
+        positions:['WR','TE','RB'],
+        tabs:[['receivingYards','Yards'],['receptions','Receptions'],['receivingTD','TDs']]
+      }
+    };
+    return {...configs[category],metric};
+  }
+
+  function renderHomeLeaderCard(category,title) {
+    const cfg=leaderMetricConfig(category);
+    const eligible=players.filter(p=>cfg.positions.includes(p.position)&&p.stats[cfg.metric]!==undefined)
+      .sort((a,b)=>Number(b.stats[cfg.metric]||0)-Number(a.stats[cfg.metric]||0)).slice(0,5);
+    return `<article class="card home-leader-card">
+      <div class="card-header"><div><span class="eyebrow">League leaders</span><h3>${title}</h3></div></div>
+      <div class="mini-toggle">${cfg.tabs.map(([key,label])=>`<button type="button" data-home-leader-category="${category}" data-home-leader-metric="${key}" class="${cfg.metric===key?'is-active':''}">${label}</button>`).join('')}</div>
+      <div class="home-leader-list">${eligible.map((player,index)=>`<button type="button" data-player-id="${player.id}">
+        <span class="leader-rank">${index+1}</span>${renderPlayerIdentity(player)}
+        <strong>${formatStatValue(cfg.metric,player.stats[cfg.metric])}</strong>
+      </button>`).join('')}</div>
+    </article>`;
+  }
+
+  function renderFixedLeaderCard(title, metric, positions) {
+    const eligible=players.filter(p=>positions.includes(p.position)&&p.stats[metric]!==undefined)
+      .sort((a,b)=>Number(b.stats[metric]||0)-Number(a.stats[metric]||0)).slice(0,5);
+    return `<article class="card home-leader-card">
+      <div class="card-header"><div><span class="eyebrow">Defense</span><h3>${title}</h3></div></div>
+      <div class="home-leader-list home-leader-list--fixed">${eligible.map((player,index)=>`<button type="button" data-player-id="${player.id}">
+        <span class="leader-rank">${index+1}</span>${renderPlayerIdentity(player)}
+        <strong>${formatStatValue(metric,player.stats[metric])}</strong>
+      </button>`).join('')}</div>
+    </article>`;
+  }
+
+  function renderLeagueHome() {
+    const currentWeek=schedule.find(w=>w.week===8)||schedule[0];
+    const availableGames=currentWeek.games;
+    if(!state.featuredGameId||!availableGames.some(g=>g.id===state.featuredGameId)){
+      const ranked=[...availableGames].sort((a,b)=>{
+        const ar=teamById(a.awayId).wins+teamById(a.homeId).wins;
+        const br=teamById(b.awayId).wins+teamById(b.homeId).wins;
+        return br-ar;
+      });
+      state.featuredGameId=ranked[0]?.id;
+    }
+    const featured=availableGames.find(g=>g.id===state.featuredGameId)||availableGames[0];
+    const away=teamById(featured.awayId),home=teamById(featured.homeId);
+    const awayOff=topUnitPlayers(away.id,'offense'),homeOff=topUnitPlayers(home.id,'offense');
+    const awayDef=topUnitPlayers(away.id,'defense'),homeDef=topUnitPlayers(home.id,'defense');
+    const recentNews=newsArticles.slice(0,3);
+
+    pageContent.innerHTML=`
+      <div class="page-heading league-home-heading">
+        <div><span class="eyebrow">Season 4 · Week ${currentWeek.week}</span><h1>League Home</h1><p>Your weekly franchise command center for matchups, standings, news, and league leaders.</p></div>
+        <div class="heading-actions"><button class="button button--ghost" data-route="league-activity"><svg><use href="#icon-activity"></use></svg>League Activity</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div>
+      </div>
+
+      <section class="week-ribbon-wrap">
+        <div class="week-ribbon">
+          ${availableGames.map(game=>{
+            const a=teamById(game.awayId),h=teamById(game.homeId),done=game.status==='final';
+            return `<button type="button" class="week-matchup-card ${game.id===featured.id?'is-active':''}" data-feature-game="${game.id}">
+              <span class="week-matchup-time">${game.day} · ${done?'Final':game.time}</span>
+              <span class="week-matchup-team">${renderTeamMark(a)}<strong>${a.abbr}</strong><small>${done?game.awayScore:a.record}</small></span>
+              <span class="week-matchup-team">${renderTeamMark(h)}<strong>${h.abbr}</strong><small>${done?game.homeScore:h.record}</small></span>
+              <span class="week-matchup-network">${game.network}</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </section>
+
+      <div class="league-home-main">
+        <section class="featured-game card" data-game-id="${featured.id}" style="--away:${away.primary};--home:${home.primary}">
+          <div class="featured-game-label"><span>Game of the Week</span><small>${featured.day} · ${featured.time} · ${featured.network}</small></div>
+          <div class="featured-game-scoreboard">
+            <div class="featured-team">
+              ${renderTeamMark(away,'featured-team-logo')}
+              <span class="eyebrow">${away.city}</span><h2>${away.name}</h2>
+              <p>${away.record} · Owner: ${escapeHtml(away.owner)}</p>
+              <div class="previous-result"><span>Previous game</span><strong>${previousGameCopy(away.id,currentWeek.week)}</strong></div>
+            </div>
+            <div class="featured-versus">
+              <strong>${away.abbr} <span>vs</span> ${home.abbr}</strong>
+              <small>${featured.stadium}</small>
+              <button type="button" class="button button--primary" data-game-id="${featured.id}">Open Game Center</button>
+            </div>
+            <div class="featured-team featured-team--home">
+              ${renderTeamMark(home,'featured-team-logo')}
+              <span class="eyebrow">${home.city}</span><h2>${home.name}</h2>
+              <p>${home.record} · Owner: ${escapeHtml(home.owner)}</p>
+              <div class="previous-result"><span>Previous game</span><strong>${previousGameCopy(home.id,currentWeek.week)}</strong></div>
+            </div>
+          </div>
+          <div class="featured-game-units">
+            <div class="featured-unit"><span class="eyebrow">${away.abbr} Top Offense</span>${awayOff.map(renderFeaturedPlayerRow).join('')}</div>
+            <div class="featured-unit"><span class="eyebrow">${home.abbr} Top Offense</span>${homeOff.map(renderFeaturedPlayerRow).join('')}</div>
+            <div class="featured-unit"><span class="eyebrow">${away.abbr} Top Defense</span>${awayDef.map(renderFeaturedPlayerRow).join('')}</div>
+            <div class="featured-unit"><span class="eyebrow">${home.abbr} Top Defense</span>${homeDef.map(renderFeaturedPlayerRow).join('')}</div>
+          </div>
+        </section>
+
+        <aside class="league-home-standings">
+          ${renderConferenceSnapshot('AFC')}
+          ${renderConferenceSnapshot('NFC')}
+        </aside>
+      </div>
+
+      <section class="home-section">
+        <div class="section-heading"><div><span class="section-number">01</span><h2>League News</h2></div><button class="text-button" data-route="news">View all news <svg><use href="#icon-arrow"></use></svg></button></div>
+        <div class="home-news-grid">${recentNews.map(article=>renderNewsCard(article)).join('')}</div>
+      </section>
+
+      <section class="home-section">
+        <div class="section-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
+        <div class="home-leaders-grid">
+          ${renderHomeLeaderCard('passing','Passing')}
+          ${renderHomeLeaderCard('rushing','Rushing')}
+          ${renderHomeLeaderCard('receiving','Receiving')}
+          ${renderFixedLeaderCard('Tackles','tackles',defensePositions)}
+          ${renderFixedLeaderCard('Sacks','sacks',defensePositions)}
+          ${renderFixedLeaderCard('Interceptions','interceptions',defensePositions)}
+        </div>
+      </section>`;
+  }
+
+  function renderActivity() {
     const account = window.FGC_TRADE?.getCurrentAccount?.();
     const myTeamId = account?.teamId || null;
     const snapshot = window.FGC_TRADE?.getActivitySnapshot?.() || { approvedTrades:[], blockPlayers:[], blockPicks:[] };
@@ -372,7 +562,7 @@
 
     pageContent.innerHTML = `
       <div class="page-heading activity-heading">
-        <div><span class="eyebrow">TC-010 · League Activity Feed</span><h1>League Activity</h1><p>The live heartbeat of Franchise HQ—transactions, games, announcements, milestones, and the activity that matters to your franchise.</p></div>
+        <div><span class="eyebrow">TC-010 · League Activity</span><h1>League Activity</h1><p>The live heartbeat of Franchise HQ—transactions, games, announcements, milestones, and the activity that matters to your franchise.</p></div>
         <div class="heading-actions"><button class="button button--ghost" data-route="news"><svg><use href="#icon-news"></use></svg>League News</button><button class="button button--primary" data-route="trade-center"><svg><use href="#icon-swap"></use></svg>Start a Trade</button></div>
       </div>
 
@@ -768,25 +958,57 @@
     pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">${data.eyebrow}</span><h1>${data.title}</h1><p>${data.copy}</p></div></div><article class="roadmap-state card"><div class="roadmap-state__inner"><div class="roadmap-icon"><svg><use href="#${data.icon}"></use></svg></div><h2>${data.title} is next in the build plan</h2><p>${data.copy}</p><div class="roadmap-list">${data.items.map(item=>`<span><svg><use href="#icon-check"></use></svg>${item}</span>`).join('')}</div><div class="heading-actions" style="justify-content:center"><button class="button button--primary" data-route="home">Return home</button><button class="button button--ghost" data-route="design-system">View design system</button></div></div></article>`;
   }
 
+  function gameRosterRows(teamId) {
+    return players.filter(p=>p.teamId===teamId).sort((a,b)=>{
+      const unitOrder=p=>offensePositions.includes(p.position)?0:defensePositions.includes(p.position)?1:2;
+      return unitOrder(a)-unitOrder(b)||b.overall-a.overall||a.position.localeCompare(b.position);
+    });
+  }
+
+  function compactSeasonStats(player) {
+    const s=player.stats;
+    if(player.position==='QB') return `${s.passingYards.toLocaleString()} YDS · ${s.passingTD} TD · ${s.interceptions} INT`;
+    if(['RB','FB'].includes(player.position)) return `${s.rushingYards.toLocaleString()} RUSH · ${s.rushingTD} TD`;
+    if(['WR','TE'].includes(player.position)) return `${s.receptions} REC · ${s.receivingYards.toLocaleString()} YDS`;
+    if(defensePositions.includes(player.position)) return `${s.tackles} TKL · ${Number(s.sacks).toFixed(1)} SCK · ${s.interceptions} INT`;
+    if(player.position==='K') return `${s.fgm}/${s.fga} FG`;
+    return `${s.punts||0} PUNTS · ${Number(s.average||0).toFixed(1)} AVG`;
+  }
+
+  function renderGameRoster(team) {
+    return `<div class="game-center-roster">
+      <div class="game-center-roster-head">${renderTeamMark(team,'team-logo')}<span><strong>${team.fullName}</strong><small>${team.record} · ${team.ovr} OVR</small></span></div>
+      <div class="game-center-player-list">
+        ${gameRosterRows(team.id).map(player=>`<button type="button" data-player-id="${player.id}">
+          <span class="gc-position">${player.position}</span>
+          <span><strong>${escapeHtml(player.name)}</strong><small>${compactSeasonStats(player)}</small></span>
+          <span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span>
+          <span class="dev-badge ${devClass(player.dev)}">${player.dev}</span>
+        </button>`).join('')}
+      </div>
+    </div>`;
+  }
+
   function openGameDetail(gameId) {
     const game=schedule.flatMap(week=>week.games).find(item=>item.id===gameId);
     if (!game) return;
-    const away=teamById(game.awayId); const home=teamById(game.homeId);
-    const isFinal=game.status==='final'; const isLive=game.status==='live';
-    const awayTop=players.filter(p=>p.teamId===away.id).sort((a,b)=>b.overall-a.overall)[0];
-    const homeTop=players.filter(p=>p.teamId===home.id).sort((a,b)=>b.overall-a.overall)[0];
+    const away=teamById(game.awayId),home=teamById(game.homeId);
+    const isFinal=game.status==='final',isLive=game.status==='live';
     openDetail(`
-      <div class="modal-hero"><div><span class="pill ${isLive?'pill--danger':isFinal?'pill--neutral':'pill--accent'}">${isLive?'Live':isFinal?'Final':`Week ${game.week}`}</span><h2>${away.fullName} at ${home.fullName}</h2><div class="news-meta"><span>${game.day} · ${game.time}</span><span>•</span><span>${game.network}</span><span>•</span><span>${game.stadium}</span></div></div></div>
-      <div class="modal-body">
-        <div class="game-card__body" style="padding:8px 0 22px">
-          <div class="game-team">${renderTeamMark(away,'team-logo')}<div><strong>${away.fullName}</strong><span>${away.record}</span></div></div>
-          ${isFinal||isLive?`<div class="game-score"><strong>${game.awayScore}</strong><span>–</span><strong>${game.homeScore}</strong></div>`:`<div class="game-time"><strong>${game.time}</strong><span>Kickoff</span></div>`}
-          <div class="game-team game-team--away"><div><strong>${home.fullName}</strong><span>${home.record}</span></div>${renderTeamMark(home,'team-logo')}</div>
+      <div class="modal-hero game-center-hero"><div><span class="pill ${isLive?'pill--danger':isFinal?'pill--neutral':'pill--accent'}">${isLive?'Live':isFinal?'Final':`Week ${game.week}`}</span><h2>${away.fullName} at ${home.fullName}</h2><div class="news-meta"><span>${game.day} · ${game.time}</span><span>•</span><span>${game.network}</span><span>•</span><span>${game.stadium}</span></div></div></div>
+      <div class="modal-body game-center-body">
+        <div class="game-center-scoreline">
+          <div>${renderTeamMark(away,'featured-team-logo')}<strong>${away.abbr}</strong><small>${away.record}</small></div>
+          <span>${isFinal||isLive?`${game.awayScore} – ${game.homeScore}`:'VS'}</span>
+          <div>${renderTeamMark(home,'featured-team-logo')}<strong>${home.abbr}</strong><small>${home.record}</small></div>
         </div>
-        <p>${escapeHtml(game.headline)} ${isFinal?'The mock game summary shows how completed box scores will appear after Madden exports are connected.':'The matchup preview combines team ratings, records, leaders, and schedule context.'}</p>
-        <div class="modal-summary-grid"><div><span>Team Rating</span><strong>${away.ovr} – ${home.ovr}</strong></div><div><span>Points / Game</span><strong>${(away.pf/7).toFixed(1)} – ${(home.pf/7).toFixed(1)}</strong></div><div><span>Point Differential</span><strong>${away.pf-away.pa>=0?'+':''}${away.pf-away.pa} / ${home.pf-home.pa>=0?'+':''}${home.pf-home.pa}</strong></div></div>
-        <div class="content-grid content-grid--equal"><article class="card card--flat"><div class="card-header"><div><span class="eyebrow">${away.abbr} impact player</span><h3>${escapeHtml(awayTop.name)}</h3></div><span class="rating-chip rating-chip--elite">${awayTop.overall}</span></div><div class="card-body"><span class="dev-badge ${devClass(awayTop.dev)}">${awayTop.position} · ${awayTop.dev}</span></div></article><article class="card card--flat"><div class="card-header"><div><span class="eyebrow">${home.abbr} impact player</span><h3>${escapeHtml(homeTop.name)}</h3></div><span class="rating-chip rating-chip--elite">${homeTop.overall}</span></div><div class="card-body"><span class="dev-badge ${devClass(homeTop.dev)}">${homeTop.position} · ${homeTop.dev}</span></div></article></div>
-        <div class="heading-actions" style="justify-content:flex-start;margin-top:20px"><button class="button button--ghost" data-modal-team="${away.id}">View ${away.abbr}</button><button class="button button--ghost" data-modal-team="${home.id}">View ${home.abbr}</button></div>
+        <div class="game-center-comparison">
+          <div><span>Overall</span><strong>${away.ovr}</strong><strong>${home.ovr}</strong></div>
+          <div><span>Offense</span><strong>${away.off}</strong><strong>${home.off}</strong></div>
+          <div><span>Defense</span><strong>${away.def}</strong><strong>${home.def}</strong></div>
+          <div><span>Points / Game</span><strong>${(away.pf/7).toFixed(1)}</strong><strong>${(home.pf/7).toFixed(1)}</strong></div>
+        </div>
+        <div class="game-center-rosters">${renderGameRoster(away)}${renderGameRoster(home)}</div>
       </div>`);
   }
 
@@ -823,7 +1045,8 @@
     document.querySelectorAll('.nav-item[data-route]').forEach(item=>item.classList.toggle('is-active',item.dataset.route===base));
     pageContent.innerHTML='';
     switch(base) {
-      case 'home': renderHome(); break;
+      case 'home': renderLeagueHome(); break;
+      case 'league-activity': renderActivity(); break;
       case 'teams': id?renderTeamDetail(id):renderTeams(); break;
       case 'my-team': {
         const account=window.FGC_TRADE?.getCurrentAccount?.();
@@ -953,8 +1176,18 @@
     const teamTab=event.target.closest('[data-team-tab]');
     if (teamTab) { state.teamTab=teamTab.dataset.teamTab; renderRoute(location.hash.slice(1)); return; }
 
+    const featureGame=event.target.closest('[data-feature-game]');
+    if (featureGame) { state.featuredGameId=featureGame.dataset.featureGame; renderLeagueHome(); return; }
+
+    const homeLeaderToggle=event.target.closest('[data-home-leader-metric]');
+    if (homeLeaderToggle) {
+      state.homeLeaderMetrics[homeLeaderToggle.dataset.homeLeaderCategory]=homeLeaderToggle.dataset.homeLeaderMetric;
+      renderLeagueHome();
+      return;
+    }
+
     const activityFilter=event.target.closest('[data-activity-filter]');
-    if (activityFilter) { state.activityFilter=activityFilter.dataset.activityFilter; renderHome(); return; }
+    if (activityFilter) { state.activityFilter=activityFilter.dataset.activityFilter; renderActivity(); return; }
 
     const standingsView=event.target.closest('[data-standings-view]');
     if (standingsView) { state.standingsView=standingsView.dataset.standingsView; renderStandings(); return; }
