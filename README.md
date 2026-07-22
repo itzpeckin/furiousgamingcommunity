@@ -1,33 +1,22 @@
-# Franchise HQ — Sprint TC-005
+# Franchise HQ — TC-005.1 Hotfix 3
 
-Negotiation Engine 1.0 with persistent offer states, messages, immutable versions, activity history, notifications, viewed tracking, withdraw/decline/counter/accept actions, and committee handoff.
+This stabilization build fixes the active-proposal withdrawal action and improves counteroffer change visibility.
 
-## TC-005 corrective pass
-- Fixed individual asset removal while building revisions and counteroffers.
-- Fixed withdrawal permissions for commissioner accounts that also own a team.
-- Moved trade notifications out of Trade Center and into the top-right bell menu.
-- Updated profile identity to show the owned franchise rather than a generic role.
-- Added `[C]` and `[TC]` identity markers, with commissioner precedence.
-- Removed the misleading profile caret while keeping the profile menu clickable.
+## Fixes
 
-## TC-005.1 — Negotiation UX Polish
+- The current proposer can now withdraw and close an active negotiation from any matching franchise identity, including the commissioner identity for that franchise.
+- Withdrawal uses a dedicated click handler so the action cannot be swallowed by other Trade Center controls.
+- Unauthorized withdrawal attempts now display a clear explanation instead of silently doing nothing.
+- The `NEW` badge is now bright green and the entire added asset row receives a green highlight.
+- When the reviewing owner opens a counteroffer, each team package shows a `REMOVED` note listing assets that were present in the previous version but are absent from the current version.
+- Withdrawing closes the negotiation while preserving versions, messages, notifications, and activity history.
 
-- Corrects active-proposal ownership when a commissioner acts on behalf of their team.
-- The current proposer sees only **Revise** and **Withdraw**.
-- The current recipient sees only **Accept**, **Counter**, and **Decline**.
-- Every counter transfers control of the active proposal to the countering owner.
-- Withdraw closes the negotiation while preserving its audit trail.
-- Newly added assets in a counteroffer are highlighted directly in the current package with a **NEW** tag for the reviewing owner.
-- Notification dropdown now uses an opaque, high-contrast background.
-- Developer Mode moved into the player-name profile menu; the separate sliders button was removed.
-- Profile menu displays player name first and franchise second, with `[C]` or `[TC]` role tags.
+## Acceptance test
 
-
-## TC-005.1 Profile Menu Hotfix
-- Restored reliable click handling for the top-right profile identity and caret.
-- Switch Identity and all former slide-menu controls are available from the profile dropdown.
-- Added solid menu layering and stacking so the dropdown remains visible above page content.
-
-## TC-005.1 Hotfix 2
-- Fixed Withdraw for all identities representing the same franchise, including commissioner and owner aliases.
-- Added a direct profile-caret handler so the profile menu and Switch Identity control open reliably.
+1. Submit an offer as Owner A.
+2. Confirm Owner A can use **Withdraw and close negotiation**.
+3. Submit another offer, switch to Owner B, and send a counteroffer.
+4. Confirm Owner B can withdraw the latest counteroffer.
+5. Switch to Owner A and confirm Owner A cannot withdraw Owner B's active counteroffer.
+6. Confirm Owner A sees green `NEW` tags on added assets.
+7. Confirm a `REMOVED` note appears beneath the appropriate team package when an asset was removed from the preceding version.

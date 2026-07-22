@@ -907,3 +907,42 @@ body[data-density="compact"] .metric-card { min-height: 126px; padding: 14px; }
 .topbar__right{position:relative}
 .profile-menu{z-index:120;background:#111722!important;box-shadow:0 20px 55px rgba(0,0,0,.55)!important}
 .profile-menu.is-open{display:block!important}
+
+/* TC-005.1 Hotfix 3: negotiation change indicators */
+.asset-new-tag{
+  background:#1f9d55;
+  border-color:#42d782;
+  color:#ffffff;
+  box-shadow:0 0 0 2px rgba(66,215,130,.12),0 0 20px rgba(31,157,85,.28);
+}
+.trade-asset:has(.asset-new-tag){
+  border-color:rgba(66,215,130,.72);
+  background:linear-gradient(90deg,rgba(31,157,85,.20),rgba(31,157,85,.045));
+}
+.removed-assets-note{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin-top:10px;
+  padding:11px 12px;
+  border:1px solid rgba(255,107,107,.34);
+  border-radius:10px;
+  background:rgba(255,107,107,.075);
+  color:var(--text-2);
+  font-size:10px;
+  line-height:1.45;
+}
+.removed-assets-note__label{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  min-height:21px;
+  padding:0 7px;
+  border-radius:999px;
+  background:rgba(255,107,107,.18);
+  border:1px solid rgba(255,107,107,.52);
+  color:#ffb0b0;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
