@@ -949,3 +949,25 @@ body[data-density="compact"] .metric-card { min-height: 126px; padding: 14px; }
 
 /* TC-006 Committee Review */
 .committee-review-summary{margin-bottom:18px}.committee-review-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.committee-review-metrics>div,.commissioner-review-status span{padding:14px;border:1px solid var(--border-color);border-radius:12px;background:rgba(255,255,255,.025);display:flex;flex-direction:column;gap:4px}.committee-review-metrics span,.committee-review-metrics small,.commissioner-review-status span{color:var(--text-muted);font-size:12px}.committee-review-metrics strong{font-size:18px}.committee-review-guidance{margin-top:14px;padding:13px 15px;border-left:3px solid var(--accent);background:rgba(88,101,242,.08);border-radius:8px;display:flex;gap:10px;align-items:flex-start}.committee-review-guidance span{color:var(--text-muted);font-size:13px;line-height:1.5}.committee-tally{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 16px}.committee-tally span{padding:10px;border-radius:10px;background:rgba(255,255,255,.035);text-align:center;color:var(--text-muted);font-size:12px}.committee-tally b{display:block;font-size:20px;color:var(--text-primary)}.committee-tally .tally-approve b{color:#4ade80}.committee-tally .tally-reject b{color:#fb7185}.committee-tally .tally-abstain b{color:#facc15}.committee-member-row.is-current-member{outline:1px solid rgba(88,101,242,.55);background:rgba(88,101,242,.08)}.committee-privacy-note{display:flex;gap:8px;align-items:center;margin:14px 0 0;color:var(--text-muted);font-size:12px}.committee-privacy-note svg{width:16px;height:16px}.committee-vote-buttons{grid-template-columns:repeat(3,1fr)}.committee-vote-buttons .is-selected{box-shadow:0 0 0 2px rgba(255,255,255,.22) inset,0 0 0 1px currentColor}.vote-rule{display:block;margin-top:12px;color:var(--text-muted);line-height:1.45}.commissioner-review-status{display:grid;gap:10px}.commissioner-review-status span{display:flex;flex-direction:row;justify-content:space-between;align-items:center}.commissioner-review-status b{color:var(--text-primary);font-size:17px}@media(max-width:900px){.committee-review-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.committee-tally{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.committee-review-metrics{grid-template-columns:1fr}.committee-vote-buttons{grid-template-columns:1fr}}
+
+/* TC-007 Trade History + committee conflict controls */
+.committee-member-row.is-recused{opacity:.48;filter:grayscale(1);background:rgba(255,255,255,.025)}
+.committee-vote-panel.is-recused{background:linear-gradient(180deg,rgba(120,126,140,.08),rgba(25,29,38,.92));border-color:rgba(145,151,164,.24)}
+.committee-conflict-lock{text-align:center;padding:18px 4px;color:var(--text-muted)}
+.committee-conflict-lock .committee-lock{margin:0 auto 14px;display:grid;place-items:center}
+.committee-conflict-lock h3{margin:0 0 8px;color:var(--text-primary)}
+.committee-conflict-lock p{margin:0 auto 18px;max-width:34rem}
+.committee-vote-buttons.is-disabled button{opacity:.35;filter:grayscale(1);cursor:not-allowed;pointer-events:none}
+.history-filter-bar{align-items:end}
+.history-privacy-note{display:flex;align-items:center;gap:14px;padding:16px 18px;margin-bottom:16px}
+.history-privacy-note>svg{width:22px;height:22px;flex:0 0 auto}
+.history-privacy-note div{display:grid;gap:3px}.history-privacy-note span{color:var(--text-muted);font-size:.9rem}
+.history-trade-list{display:grid;gap:14px}
+.history-trade-card{padding:0;overflow:hidden;cursor:pointer;transition:transform .18s ease,border-color .18s ease}
+.history-trade-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.18)}
+.history-trade-card__header,.history-trade-card__footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;background:rgba(255,255,255,.025)}
+.history-trade-card__header>div{display:flex;align-items:center;gap:10px}.history-trade-card__header>span,.history-trade-card__footer{color:var(--text-muted);font-size:.82rem}
+.history-matchup{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;padding:18px 16px}
+.history-matchup>div{display:flex;align-items:center;gap:12px;min-width:0}.history-matchup>div:last-child{text-align:right;justify-content:flex-end}
+.history-matchup>div:last-child span{align-items:flex-end}.history-matchup span{display:grid;gap:3px;min-width:0}.history-matchup small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted);max-width:34vw}
+@media(max-width:760px){.history-filter-bar{align-items:stretch}.history-matchup{grid-template-columns:1fr}.history-matchup .trade-swap{transform:rotate(90deg);margin:auto}.history-matchup>div:last-child{text-align:left;justify-content:flex-start}.history-matchup>div:last-child span{align-items:start}.history-matchup small{max-width:70vw}.history-trade-card__footer{align-items:flex-start;flex-direction:column}}
