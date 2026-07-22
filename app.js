@@ -420,31 +420,61 @@
 
       <div class="league-home-main">
         <section class="featured-game card" data-game-id="${featured.id}" style="--away:${away.primary};--home:${home.primary}">
-          <div class="featured-game-label"><span>Game of the Week</span><small>${featured.day} · ${featured.time} · ${featured.network}</small></div>
-          <div class="featured-game-scoreboard">
-            <div class="featured-team">
-              ${renderTeamMark(away,'featured-team-logo')}
-              <span class="eyebrow">${away.city}</span><h2>${away.name}</h2>
-              <p>${away.record} · Owner: ${escapeHtml(away.owner)}</p>
-              <div class="previous-result"><span>Previous game</span><strong>${previousGameCopy(away.id,currentWeek.week)}</strong></div>
+          <div class="featured-game-label">
+            <span>Game of the Week</span>
+            <small>${featured.day} · ${featured.time} · ${featured.network} · ${featured.stadium}</small>
+          </div>
+
+          <div class="featured-split">
+            <div class="featured-half featured-half--away">
+              <div class="featured-half-hero">
+                ${renderTeamMark(away,'featured-team-logo')}
+                <div class="featured-half-copy">
+                  <span class="eyebrow">${away.city}</span>
+                  <h2>${away.name}</h2>
+                  <p>${away.record} · Owner: ${escapeHtml(away.owner)}</p>
+                  <div class="previous-result"><span>Previous game</span><strong>${previousGameCopy(away.id,currentWeek.week)}</strong></div>
+                </div>
+              </div>
+              <div class="featured-unit-stack">
+                <div class="featured-unit">
+                  <span class="eyebrow">Top Offense</span>
+                  ${awayOff.map(renderFeaturedPlayerRow).join('')}
+                </div>
+                <div class="featured-unit">
+                  <span class="eyebrow">Top Defense</span>
+                  ${awayDef.map(renderFeaturedPlayerRow).join('')}
+                </div>
+              </div>
             </div>
-            <div class="featured-versus">
-              <strong>${away.abbr} <span>vs</span> ${home.abbr}</strong>
-              <small>${featured.stadium}</small>
+
+            <div class="featured-center-rail">
+              <span class="featured-week">Week ${currentWeek.week}</span>
+              <strong>${away.abbr}<span>VS</span>${home.abbr}</strong>
               <button type="button" class="button button--primary" data-game-id="${featured.id}">Open Game Center</button>
             </div>
-            <div class="featured-team featured-team--home">
-              ${renderTeamMark(home,'featured-team-logo')}
-              <span class="eyebrow">${home.city}</span><h2>${home.name}</h2>
-              <p>${home.record} · Owner: ${escapeHtml(home.owner)}</p>
-              <div class="previous-result"><span>Previous game</span><strong>${previousGameCopy(home.id,currentWeek.week)}</strong></div>
+
+            <div class="featured-half featured-half--home">
+              <div class="featured-half-hero featured-half-hero--home">
+                <div class="featured-half-copy">
+                  <span class="eyebrow">${home.city}</span>
+                  <h2>${home.name}</h2>
+                  <p>${home.record} · Owner: ${escapeHtml(home.owner)}</p>
+                  <div class="previous-result"><span>Previous game</span><strong>${previousGameCopy(home.id,currentWeek.week)}</strong></div>
+                </div>
+                ${renderTeamMark(home,'featured-team-logo')}
+              </div>
+              <div class="featured-unit-stack">
+                <div class="featured-unit">
+                  <span class="eyebrow">Top Offense</span>
+                  ${homeOff.map(renderFeaturedPlayerRow).join('')}
+                </div>
+                <div class="featured-unit">
+                  <span class="eyebrow">Top Defense</span>
+                  ${homeDef.map(renderFeaturedPlayerRow).join('')}
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="featured-game-units">
-            <div class="featured-unit"><span class="eyebrow">${away.abbr} Top Offense</span>${awayOff.map(renderFeaturedPlayerRow).join('')}</div>
-            <div class="featured-unit"><span class="eyebrow">${home.abbr} Top Offense</span>${homeOff.map(renderFeaturedPlayerRow).join('')}</div>
-            <div class="featured-unit"><span class="eyebrow">${away.abbr} Top Defense</span>${awayDef.map(renderFeaturedPlayerRow).join('')}</div>
-            <div class="featured-unit"><span class="eyebrow">${home.abbr} Top Defense</span>${homeDef.map(renderFeaturedPlayerRow).join('')}</div>
           </div>
         </section>
 
@@ -454,14 +484,14 @@
         </aside>
       </div>
 
-      <section class="home-section">
+      <section class="home-news-section">
         <div class="section-heading"><div><span class="section-number">01</span><h2>League News</h2></div><button class="text-button" data-route="news">View all news <svg><use href="#icon-arrow"></use></svg></button></div>
-        <div class="home-news-grid">${recentNews.map(article=>renderNewsCard(article)).join('')}</div>
+        <div class="home-news-grid home-news-grid--compact">${recentNews.map(article=>renderNewsCard(article)).join('')}</div>
       </section>
 
-      <section class="home-section">
+      <section class="home-section home-leaders-section">
         <div class="section-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
-        <div class="home-leaders-grid">
+        <div class="home-leaders-grid home-leaders-grid--single-row">
           ${renderHomeLeaderCard('passing','Passing')}
           ${renderHomeLeaderCard('rushing','Rushing')}
           ${renderHomeLeaderCard('receiving','Receiving')}
