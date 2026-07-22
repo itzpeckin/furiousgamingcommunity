@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0e14" />
   <meta name="description" content="Interactive Madden connected-franchise league prototype with private trade workflow, role-based mock login, committee review, and browser-saved demo data." />
-  <title>Franchise HQ — Milestone 1 Complete</title>
+  <title>Furious Gaming Community — Franchise HQ DEV-001</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-density="comfortable">
@@ -22,8 +22,8 @@
             </svg>
           </span>
           <span class="brand-copy">
-            <strong>Franchise HQ</strong>
-            <small>Connected League Platform</small>
+            <strong>Furious Gaming Community</strong>
+            <small>Franchise HQ</small>
           </span>
         </a>
         <button class="icon-button sidebar-close" data-close-sidebar aria-label="Close menu"><svg><use href="#icon-close"></use></svg></button>
@@ -62,7 +62,7 @@
           <span class="status-dot status-dot--warning"></span>
           <div><strong>Mock data mode</strong><span>Real Madden sync arrives in Milestone 3</span></div>
         </div>
-        <span class="version-label">Prototype · Milestone 1 Complete</span>
+        <span class="version-label">v0.2.0-dev · DEV-001</span>
       </div>
     </aside>
 
@@ -77,6 +77,7 @@
         <div class="topbar__right">
           <div class="live-chip"><span class="status-dot status-dot--live"></span>Week 8 Live</div>
           <button class="icon-button notification-button" data-demo-toast="You have two mock trade notifications and one league announcement." aria-label="Notifications"><svg><use href="#icon-bell"></use></svg><span class="notification-dot"></span></button>
+          <button class="icon-button dev-launch" data-open-dev aria-label="Open developer mode" title="Developer Mode"><svg><use href="#icon-sliders"></use></svg></button>
           <button class="profile-button" data-profile-button aria-haspopup="menu" aria-expanded="false">
             <span class="avatar" data-current-avatar>JM</span>
             <span class="profile-copy"><strong data-current-user>Justin</strong><small data-current-role>Commissioner</small></span>
@@ -149,6 +150,25 @@
 
   <div class="toast-region" aria-live="polite" aria-atomic="true" data-toast-region></div>
 
+
+  <div class="dev-modal" data-dev-modal aria-hidden="true">
+    <div class="dev-backdrop" data-close-dev></div>
+    <section class="dev-dialog" role="dialog" aria-modal="true" aria-labelledby="dev-title">
+      <header class="dev-header">
+        <div><span class="eyebrow">Commissioner testing tools</span><h2 id="dev-title">Developer Mode</h2><p>Test roles, prototype data, routes, and feature states without editing files.</p></div>
+        <button class="icon-button" data-close-dev aria-label="Close developer mode"><svg><use href="#icon-close"></use></svg></button>
+      </header>
+      <div class="dev-grid">
+        <section class="dev-card"><span class="eyebrow">Identity</span><h3>View As</h3><label class="field"><span>Active account</span><select data-dev-account></select></label><p class="dev-help">Changes permissions immediately and remains selected after refresh.</p></section>
+        <section class="dev-card"><span class="eyebrow">Application</span><h3>Prototype State</h3><label class="dev-toggle"><span><strong>Commissioner Mode</strong><small>Jump directly to the commissioner account.</small></span><input type="checkbox" data-dev-commissioner></label><label class="dev-toggle"><span><strong>Mock Data</strong><small>Live Madden sync is not connected yet.</small></span><input type="checkbox" checked disabled></label></section>
+        <section class="dev-card"><span class="eyebrow">Navigation</span><h3>Quick Routes</h3><div class="dev-actions"><button class="button button--secondary" data-dev-route="home">League Home</button><button class="button button--secondary" data-dev-route="players">Players</button><button class="button button--secondary" data-dev-route="trade-center">Trade Center</button><button class="button button--secondary" data-dev-route="commissioner">Commissioner</button></div></section>
+        <section class="dev-card"><span class="eyebrow">Testing</span><h3>Demo Controls</h3><div class="dev-actions dev-actions--stack"><button class="button button--secondary" data-dev-open-login>Open Account Switcher</button><button class="button button--secondary" data-dev-seed>Restore Seeded Trades</button><button class="button button--danger" data-dev-clear>Clear Browser Data</button></div></section>
+        <section class="dev-card dev-card--wide"><span class="eyebrow">Build information</span><h3>Current Release</h3><div class="dev-info"><div><span>Version</span><strong>0.2.0-dev</strong></div><div><span>Sprint</span><strong>DEV-001</strong></div><div><span>Data source</span><strong>Mock Madden data</strong></div><div><span>Storage</span><strong>Browser localStorage</strong></div></div></section>
+      </div>
+      <footer class="dev-footer"><span>Developer Mode is visible only in this prototype build.</span><button class="button button--primary" data-close-dev>Done</button></footer>
+    </section>
+  </div>
+
   <svg class="svg-sprite" aria-hidden="true">
     <symbol id="icon-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8Z"/></symbol>
     <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.8 3.2 8 7.5 9.5 4.3-1.5 7.5-4.7 7.5-9.5V6L12 3Z"/></symbol>
@@ -186,5 +206,6 @@
 
   <script src="app.js"></script>
   <script src="trade-module.js"></script>
+  <script src="dev-mode.js"></script>
 </body>
 </html>

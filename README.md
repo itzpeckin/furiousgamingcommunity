@@ -1,26 +1,27 @@
-# Franchise HQ — Milestone 2A, Module 1
+# Furious Gaming Community — Franchise HQ
 
-This package adds the first working League Valuation Engine (LVE 1.0) to the complete Milestone 1 prototype.
+## Sprint DEV-001 — Developer Mode
 
-## Added
-- Fixed always-visible **View As** control in the top-right header.
-- Trade calculations are visible to both negotiating owners.
-- The accepted calculation is visible to the hidden Trade Committee and commissioner.
-- Calculations remain hidden from every uninvolved owner and are not posted publicly.
-- Player values now explain Overall, Age, Development, Contract, Production, Position Scarcity, Elite Premium, and Risk.
-- Dynasty-leaning position-specific age curves.
-- High quarterback premium and league-defined positional hierarchy.
-- Medium-high contract and rookie-control importance.
-- Injured players are removed from trade selectors and blocked from submission.
-- 2027, 2028, and 2029 draft picks are available.
-- Model version displayed as LVE 1.0.
+Version: `0.2.0-dev`
 
-## Upload
-Replace the current repository files with:
-- index.html
-- styles.css
-- app.js
-- trade-module.js
-- README.md
+### Included
+- Persistent View As account switching
+- Commissioner Mode toggle
+- Quick route testing
+- Seeded demo reset
+- Browser data clearing
+- Build/version information
+- Existing Trade Center, player pages, standings, schedule, and valuation engine
+- Clickable valuation breakdowns using native expandable details
 
-The prototype stores trade state and the selected mock identity in localStorage.
+### Deploy
+Replace the matching files in the root of the GitHub repository. Cloudflare will deploy automatically after the commit.
+
+### Acceptance test
+1. Click the sliders icon in the upper-right.
+2. Switch from Peckin to Green Bay Owner.
+3. Confirm the profile changes immediately.
+4. Refresh and confirm Green Bay remains active.
+5. Open Trade Center and Trade #104.
+6. Expand a player in the League Valuation Engine panel.
+7. Return to Developer Mode and restore Commissioner.
