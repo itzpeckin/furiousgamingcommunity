@@ -62,7 +62,7 @@
           <span class="status-dot status-dot--warning"></span>
           <div><strong>Mock data mode</strong><span>Real Madden sync arrives in Milestone 3</span></div>
         </div>
-        <span class="version-label">v0.7.0-dev · TC-005</span>
+        <span class="version-label">v0.7.1-dev · TC-005 Fix</span>
       </div>
     </aside>
 
@@ -76,12 +76,11 @@
         </div>
         <div class="topbar__right">
           <div class="live-chip"><span class="status-dot status-dot--live"></span>Week 8 Live</div>
-          <button class="icon-button notification-button" data-demo-toast="You have two mock trade notifications and one league announcement." aria-label="Notifications"><svg><use href="#icon-bell"></use></svg><span class="notification-dot"></span></button>
+          <div class="notification-shell"><button class="icon-button notification-button" data-open-notifications aria-label="Notifications" aria-haspopup="true"><svg><use href="#icon-bell"></use></svg><span class="notification-dot" hidden></span></button><div class="notification-menu" data-notification-menu></div></div>
           <button class="icon-button dev-launch" data-open-dev aria-label="Open developer mode" title="Developer Mode"><svg><use href="#icon-sliders"></use></svg></button>
           <button class="profile-button" data-profile-button aria-haspopup="menu" aria-expanded="false">
             <span class="avatar" data-current-avatar>JM</span>
             <span class="profile-copy"><strong data-current-user>Justin</strong><small data-current-role>Commissioner</small></span>
-            <svg><use href="#icon-chevron"></use></svg>
           </button>
           <div class="profile-menu" data-profile-menu role="menu">
             <div class="profile-menu__header"><span class="eyebrow">Mock Discord identity</span><strong data-profile-menu-user>Justin · Commissioner</strong></div>
