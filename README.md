@@ -1,62 +1,69 @@
-# Franchise HQ — TC-011.2 Design System & Typography Refresh
+# Franchise HQ — TC-011.3 Commissioner HQ
 
-This sprint standardizes readability and spacing across the full Franchise HQ application before Commissioner HQ development begins.
+Epic 2 introduces the commissioner-facing league operations workspace.
 
-## Typography system
+## Commissioner HQ
 
-The application now uses a consistent platform-wide type scale:
+Four protected tabs are included:
 
-- Micro labels: 10px
-- Secondary text: 11–12px
-- Standard body text: 14px
-- Primary row and player names: 14–16px
-- Card titles: 16–18px
-- Section headings: 18–22px
-- Page and hero titles: 24–30px
+### Overview
+- Current season and week
+- Last Madden franchise import
+- Team assignment coverage
+- League-rule status
+- Primary Advance Week workflow
+- Latest import validation health
 
-The previous 6px–8px text has been eliminated from the primary application experience.
+### Import Franchise
+- Export-based four-step workflow
+- JSON, CSV, or ZIP file selection
+- Prototype validation checklist
+- Publish & Advance action
+- Madden remains the source of truth
 
-## Spacing system
+The action is intentionally named **Advance Week**, but it advances Franchise HQ by importing and publishing the newest Madden franchise export. It does not attempt to control Madden directly.
 
-Updated globally:
+### Teams & Owners
+- All 32 franchises
+- Owner assignment status
+- User/CPU control selector
+- Search by team or owner
+- Management action placeholders for the future authentication layer
 
-- Card padding
-- Table and roster row heights
-- Button height and hit areas
-- Input fields
-- Tabs
-- Navigation
-- Modals
-- Drawers
-- Mobile menu
+### League Rules
+- League structure
+- Roster management
+- Progression
+- Gameplay
+- Save-draft interaction placeholder
+
+Schedule editing, force wins/losses, rescheduling, and general transaction approval were intentionally excluded.
+
+## Player Card behavior
+
+Player clicks now open a closeable Player Card overlay rather than navigating away from the current screen.
+
+This preserves context from:
+- Team pages
+- Player database
 - Game Center
-- Recap Studio
-- Trade Center
-- Team and player pages
 - League Home
+- Stats and leader pages
+- Trade pages
+- Command search
 
-## Readability improvements
+When a Player Card is opened over Game Center, closing it restores the Game Center instead of returning to another page.
 
-- Larger sidebar and navigation labels
-- More readable standings and schedule cards
-- Larger team, player, and transaction rows
-- Improved modal and drawer typography
-- Better mobile hit targets
-- Larger Game Center tabs and player statistics
-- More readable generated recap text and top-performer cards
+## League Home cosmetic update
 
-## Discord direction
-
-The generated story remains available in the current recap model, but the long-term publishing workflow is now defined as:
-
-Imported game result
-→ generated recap and media
-→ Franchise HQ Discord integration
-→ automatic post to a selected league channel
-
-The Discord connection is intentionally deferred to a dedicated integration sprint.
+The weekly schedule ribbon now has:
+- Slightly transparent container background
+- Defined border
+- Inner depth
+- Stronger schedule-card surfaces
+- Existing hover highlight
 
 Replace all six files together.
 
 Suggested commit:
-`Apply TC-011.2 typography and design system refresh`
+`Build TC-011.3 Commissioner HQ and context-preserving player cards`

@@ -2358,3 +2358,256 @@ table td{
     min-height:auto!important;
   }
 }
+
+
+/* TC-011.3 — League schedule readability */
+.weekly-ribbon{
+  padding:12px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:16px!important;
+  background:rgba(14,22,34,.72)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 12px 30px rgba(0,0,0,.12)!important;
+  backdrop-filter:blur(10px);
+}
+.weekly-ribbon .schedule-card{
+  background:rgba(22,32,47,.72)!important;
+  border-color:rgba(255,255,255,.09)!important;
+}
+.weekly-ribbon .schedule-card:hover{
+  background:rgba(var(--accent-rgb),.11)!important;
+  border-color:rgba(var(--accent-rgb),.42)!important;
+}
+
+/* Context-preserving Player Card */
+.detail-modal.is-player-card-open .detail-dialog{
+  width:min(960px,94vw)!important;
+  max-height:92vh!important;
+}
+.player-card-modal{
+  overflow:auto;
+  max-height:90vh;
+  background:#0b121d;
+}
+.player-card-modal__header{
+  position:sticky;
+  top:0;
+  z-index:3;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 18px;
+  border-bottom:1px solid rgba(255,255,255,.09);
+  background:rgba(11,18,29,.94);
+  backdrop-filter:blur(14px);
+}
+.player-card-modal__team{display:flex;align-items:center;gap:10px}
+.player-card-modal__team>span{display:flex;flex-direction:column}
+.player-card-modal__team strong{font-size:14px}
+.player-card-modal__team small{font-size:12px;color:var(--muted)}
+.player-card-modal__hero{
+  display:grid;
+  grid-template-columns:110px minmax(0,1fr) 110px;
+  align-items:center;
+  gap:20px;
+  padding:26px;
+  background:
+    radial-gradient(circle at 12% 30%,color-mix(in srgb,var(--team) 45%,transparent),transparent 34%),
+    linear-gradient(135deg,color-mix(in srgb,var(--team) 35%,#101827),#101827 55%,color-mix(in srgb,var(--team2) 28%,#101827));
+}
+.player-card-modal__portrait{
+  display:grid;
+  place-items:center;
+  width:100px;height:100px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:24px;
+  background:rgba(5,10,17,.55);
+  font-size:30px;
+  font-weight:900;
+}
+.player-card-modal__hero h2{margin:4px 0 7px;font-size:30px!important}
+.player-card-modal__hero p{margin:0;color:rgba(255,255,255,.72)}
+.player-card-modal__badges{display:flex;gap:7px;margin-top:12px}
+.player-card-modal__ovr{text-align:center}
+.player-card-modal__ovr strong{display:block;font-size:50px;line-height:1}
+.player-card-modal__ovr span{font-size:11px;color:var(--muted)}
+.player-card-modal__summary{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  padding:16px 18px 0;
+}
+.player-card-modal__grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  padding:16px 18px;
+}
+.player-card-modal__section{
+  padding:16px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;
+  background:#101824;
+}
+.player-card-modal__footer{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:14px 18px;
+  border-top:1px solid rgba(255,255,255,.09);
+  background:#0f1723;
+}
+.player-card-modal__footer>div{display:flex;gap:8px}
+
+/* TC-011.3 — Commissioner HQ */
+.commissioner-tabs{
+  display:flex;
+  gap:8px;
+  margin-bottom:16px;
+  padding:7px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;
+  background:rgba(15,23,35,.78);
+}
+.commissioner-tabs button{
+  min-height:42px;
+  padding:10px 16px;
+  border:1px solid transparent;
+  border-radius:10px;
+  background:transparent;
+  color:var(--muted);
+  font-weight:800;
+  cursor:pointer;
+}
+.commissioner-tabs button.is-active{
+  border-color:rgba(var(--accent-rgb),.42);
+  background:rgba(var(--accent-rgb),.12);
+  color:var(--accent);
+}
+.commissioner-metrics{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:14px;
+}
+.commissioner-primary-grid{
+  display:grid;
+  grid-template-columns:1.35fr .85fr;
+  gap:14px;
+}
+.commissioner-import-card,
+.commissioner-health-card,
+.commissioner-workspace{
+  padding:20px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:16px;
+  background:#101824;
+}
+.commissioner-import-card{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:18px;
+  align-items:center;
+  background:
+    radial-gradient(circle at 12% 20%,rgba(var(--accent-rgb),.11),transparent 40%),
+    #101824;
+}
+.commissioner-import-card h2{margin:5px 0 8px}
+.commissioner-import-card p{max-width:700px;margin:0;color:var(--muted)}
+.commissioner-import-card .button{grid-column:1/-1;justify-self:start}
+.commissioner-import-status{display:flex;flex-direction:column;align-items:flex-end}
+.status-dot{width:11px;height:11px;border-radius:50%;background:var(--accent);box-shadow:0 0 16px rgba(var(--accent-rgb),.55);margin-bottom:7px}
+.commissioner-check-list{display:grid;gap:8px}
+.commissioner-check-list>div{
+  display:grid;
+  grid-template-columns:25px minmax(0,1fr) auto;
+  align-items:center;
+  min-height:42px;
+  padding:8px 10px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;
+  background:rgba(255,255,255,.025);
+}
+.commissioner-check{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:rgba(var(--accent-rgb),.14);color:var(--accent);font-weight:900}
+.commissioner-check.is-muted{background:rgba(255,255,255,.06);color:var(--muted)}
+.commissioner-check-list small{color:var(--muted)}
+.commissioner-secondary-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.commissioner-tool-card{
+  display:grid;
+  grid-template-columns:54px minmax(0,1fr) auto;
+  align-items:center;
+  gap:13px;
+  padding:17px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;
+  background:#101824;
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+}
+.commissioner-tool-card:hover{border-color:rgba(var(--accent-rgb),.38);background:#131e2c}
+.commissioner-tool-icon{display:grid;place-items:center;width:50px;height:50px;border-radius:13px;background:rgba(var(--accent-rgb),.13);color:var(--accent);font-weight:900}
+.commissioner-tool-card>span:nth-child(2){display:flex;flex-direction:column}
+.commissioner-tool-card small{color:var(--muted)}
+.commissioner-section-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+.commissioner-section-heading h2{margin:4px 0 7px}
+.commissioner-section-heading p{max-width:760px;margin:0;color:var(--muted)}
+.commissioner-import-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.commissioner-step{display:flex;gap:10px;min-height:104px;padding:13px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:#0d1520}
+.commissioner-step>span{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.07);font-weight:900}
+.commissioner-step>div{display:flex;flex-direction:column;gap:5px}
+.commissioner-step small{color:var(--muted)}
+.commissioner-step.is-complete>span,.commissioner-step.is-active>span{background:rgba(var(--accent-rgb),.15);color:var(--accent)}
+.commissioner-step.is-active{border-color:rgba(var(--accent-rgb),.42)}
+.commissioner-dropzone{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:220px;
+  margin-bottom:16px;
+  padding:26px;
+  border:1px dashed rgba(var(--accent-rgb),.48);
+  border-radius:16px;
+  background:rgba(var(--accent-rgb),.055);
+  cursor:pointer;
+  text-align:center;
+}
+.commissioner-upload-icon{display:grid;place-items:center;width:52px;height:52px;margin-bottom:12px;border-radius:15px;background:rgba(var(--accent-rgb),.14);color:var(--accent);font-size:28px}
+.commissioner-dropzone small,.commissioner-dropzone em{color:var(--muted)}
+.commissioner-dropzone em{margin-top:12px;font-style:normal}
+.commissioner-publish-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;padding:12px;border-radius:12px;background:rgba(var(--accent-rgb),.08)}
+.commissioner-publish-bar>span{display:flex;flex-direction:column}
+.commissioner-team-table{overflow:hidden;border:1px solid rgba(255,255,255,.09);border-radius:14px}
+.commissioner-team-row{display:grid;grid-template-columns:1.4fr 1fr 150px 110px 80px;align-items:center;gap:12px;min-height:58px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
+.commissioner-team-row:last-child{border-bottom:0}
+.commissioner-team-row>span:first-child,.commissioner-team-row>span:nth-child(2){display:flex;align-items:center;gap:9px}
+.commissioner-team-row>span:nth-child(2){flex-direction:column;align-items:flex-start;gap:1px}
+.commissioner-team-row--head{min-height:42px;background:#151e2b;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase}
+.commissioner-team-row select{min-height:38px!important}
+.commissioner-search input{min-width:250px}
+.commissioner-rule-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.commissioner-rule-card{padding:17px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:#0e1622}
+.commissioner-rule-card .settings-list label{display:grid;grid-template-columns:1fr 180px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.commissioner-rule-card .settings-list label:last-child{border-bottom:0}
+
+@media(max-width:900px){
+  .player-card-modal__grid,.commissioner-primary-grid,.commissioner-secondary-grid,.commissioner-rule-grid{grid-template-columns:1fr}
+  .commissioner-metrics{grid-template-columns:1fr 1fr}
+  .commissioner-import-flow{grid-template-columns:1fr 1fr}
+  .commissioner-team-table{overflow-x:auto}
+  .commissioner-team-row{min-width:780px}
+}
+@media(max-width:620px){
+  .player-card-modal__hero{grid-template-columns:72px minmax(0,1fr);padding:18px}
+  .player-card-modal__portrait{width:68px;height:68px;border-radius:18px;font-size:22px}
+  .player-card-modal__ovr{grid-column:1/-1;display:flex;align-items:baseline;justify-content:center;gap:7px}
+  .player-card-modal__ovr strong{font-size:38px}
+  .player-card-modal__summary{grid-template-columns:1fr}
+  .player-card-modal__footer{align-items:stretch;flex-direction:column}
+  .player-card-modal__footer>div{display:grid}
+  .commissioner-metrics,.commissioner-import-flow{grid-template-columns:1fr}
+  .commissioner-tabs{overflow-x:auto}
+  .commissioner-tabs button{flex:0 0 auto}
+  .commissioner-section-heading{flex-direction:column}
+}
