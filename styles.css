@@ -1747,3 +1747,614 @@ body.sidebar-open .mobile-overlay{display:block!important;opacity:1!important;po
   .recap-format-picker{align-items:flex-start;flex-direction:column}
   .recap-story-panel{grid-template-columns:1fr}
 }
+
+
+/* =========================================================
+   TC-011.2 — Franchise HQ Design System & Typography Refresh
+   ========================================================= */
+
+:root{
+  --fh-font-2xs:10px;
+  --fh-font-xs:11px;
+  --fh-font-sm:12px;
+  --fh-font-md:14px;
+  --fh-font-lg:16px;
+  --fh-font-xl:18px;
+  --fh-font-2xl:22px;
+  --fh-font-3xl:28px;
+  --fh-line-tight:1.2;
+  --fh-line-normal:1.45;
+  --fh-space-1:6px;
+  --fh-space-2:10px;
+  --fh-space-3:14px;
+  --fh-space-4:18px;
+  --fh-space-5:24px;
+  --fh-radius-sm:10px;
+  --fh-radius-md:14px;
+  --fh-radius-lg:18px;
+}
+
+html{font-size:16px}
+body{
+  font-size:var(--fh-font-md)!important;
+  line-height:var(--fh-line-normal)!important;
+  letter-spacing:0!important;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* Core text scale */
+h1{font-size:var(--fh-font-3xl)!important;line-height:1.08!important}
+h2{font-size:var(--fh-font-2xl)!important;line-height:1.12!important}
+h3{font-size:var(--fh-font-xl)!important;line-height:1.18!important}
+h4{font-size:var(--fh-font-lg)!important;line-height:1.25!important}
+p,li,td,th,label,input,select,textarea,button{
+  font-size:var(--fh-font-md)!important;
+}
+small,.muted,.helper-text,.caption,.subtext{
+  font-size:var(--fh-font-sm)!important;
+  line-height:1.4!important;
+}
+.eyebrow,
+.section-number,
+.badge,
+.status-badge,
+.dev-badge,
+.rating-chip,
+.nav-kicker,
+.field-label,
+.table-kicker,
+.meta-label{
+  font-size:var(--fh-font-2xs)!important;
+  line-height:1.2!important;
+  letter-spacing:.08em!important;
+}
+
+/* Navigation */
+.sidebar{
+  width:250px!important;
+}
+.sidebar__brand strong,
+.brand-lockup strong{
+  font-size:var(--fh-font-lg)!important;
+}
+.sidebar__brand small,
+.brand-lockup small{
+  font-size:var(--fh-font-xs)!important;
+}
+.sidebar-nav a,
+.sidebar-nav button,
+.nav-item{
+  min-height:44px!important;
+  padding:11px 13px!important;
+  font-size:var(--fh-font-md)!important;
+}
+.sidebar-nav svg,
+.nav-item svg{
+  width:18px!important;
+  height:18px!important;
+}
+.topbar{
+  min-height:66px!important;
+  padding:10px 18px!important;
+}
+.topbar button,
+.topbar .button,
+.mobile-menu-button{
+  min-height:42px!important;
+}
+.command-search input{
+  min-height:42px!important;
+  font-size:var(--fh-font-md)!important;
+}
+
+/* Page structure */
+.page-shell,
+.page-content,
+.main-content{
+  padding:var(--fh-space-4)!important;
+}
+.page-header{
+  margin-bottom:var(--fh-space-4)!important;
+}
+.page-header h1,
+.page-header h2{
+  margin-bottom:6px!important;
+}
+.page-header p{
+  font-size:var(--fh-font-md)!important;
+}
+
+/* Cards and surfaces */
+.card,
+.panel,
+.surface,
+.metric-card,
+.content-card,
+.team-card,
+.player-card,
+.news-card,
+.standings-card,
+.featured-game,
+.trade-card{
+  border-radius:var(--fh-radius-md)!important;
+}
+.card,
+.panel,
+.surface,
+.content-card,
+.team-card,
+.player-card,
+.trade-card{
+  padding:var(--fh-space-4)!important;
+}
+.metric-card{
+  padding:14px 16px!important;
+  min-height:92px!important;
+}
+.metric-card span,
+.metric-card small{
+  font-size:var(--fh-font-sm)!important;
+}
+.metric-card strong,
+.metric-card .metric-value{
+  font-size:var(--fh-font-2xl)!important;
+  line-height:1.05!important;
+}
+
+/* Buttons and controls */
+.button,
+button.button,
+.icon-button,
+.text-button,
+.segmented-control button,
+.tab-button{
+  min-height:40px!important;
+  padding:9px 14px!important;
+  border-radius:var(--fh-radius-sm)!important;
+  font-size:var(--fh-font-sm)!important;
+  font-weight:800!important;
+}
+.icon-button{
+  min-width:40px!important;
+  padding:9px!important;
+}
+input,
+select,
+textarea{
+  min-height:42px!important;
+  padding:10px 12px!important;
+  border-radius:10px!important;
+}
+textarea{min-height:110px!important}
+select{padding-right:34px!important}
+
+/* Tables and lists */
+table th{
+  font-size:var(--fh-font-xs)!important;
+  padding:11px 12px!important;
+}
+table td{
+  font-size:var(--fh-font-sm)!important;
+  padding:12px!important;
+}
+.data-row,
+.list-row,
+.roster-row,
+.transaction-row,
+.standings-row{
+  min-height:46px!important;
+  padding:10px 12px!important;
+}
+.data-row strong,
+.list-row strong,
+.roster-row strong,
+.transaction-row strong{
+  font-size:var(--fh-font-md)!important;
+}
+.data-row small,
+.list-row small,
+.roster-row small,
+.transaction-row small{
+  font-size:var(--fh-font-sm)!important;
+}
+
+/* Tabs */
+.tabs,
+.game-center-tabs,
+.segmented-control{
+  gap:8px!important;
+}
+.tabs button,
+.game-center-tabs button,
+.segmented-control button{
+  min-height:42px!important;
+  min-width:96px!important;
+  padding:10px 16px!important;
+  font-size:var(--fh-font-sm)!important;
+}
+
+/* League Home */
+.section-heading{
+  margin-bottom:12px!important;
+}
+.section-heading h2{
+  font-size:var(--fh-font-xl)!important;
+}
+.weekly-ribbon{
+  gap:10px!important;
+}
+.schedule-card{
+  min-height:118px!important;
+  padding:12px!important;
+}
+.schedule-card strong{
+  font-size:var(--fh-font-md)!important;
+}
+.schedule-card small{
+  font-size:var(--fh-font-xs)!important;
+}
+.featured-half{
+  padding:22px!important;
+}
+.featured-half .featured-team-name,
+.featured-half h3{
+  font-size:var(--fh-font-xl)!important;
+}
+.featured-half .featured-team-record{
+  font-size:var(--fh-font-sm)!important;
+}
+.featured-stat-box{
+  padding:12px 14px!important;
+}
+.featured-stat-box span{
+  font-size:var(--fh-font-xs)!important;
+}
+.featured-stat-box strong{
+  font-size:var(--fh-font-md)!important;
+}
+.home-news-grid--compact .news-card{
+  min-height:156px!important;
+  max-height:none!important;
+  padding:16px!important;
+}
+.news-card h3,
+.news-card h4{
+  font-size:var(--fh-font-lg)!important;
+}
+.news-card p,
+.news-card small{
+  font-size:var(--fh-font-sm)!important;
+}
+.standings-card{
+  padding:16px!important;
+}
+.standings-card h3{
+  font-size:var(--fh-font-lg)!important;
+}
+.standings-row{
+  grid-template-columns:28px minmax(0,1fr) auto!important;
+}
+.standings-row strong,
+.standings-row span{
+  font-size:var(--fh-font-sm)!important;
+}
+.home-leader-card{
+  min-height:110px!important;
+  padding:14px!important;
+}
+.home-leader-card strong{
+  font-size:var(--fh-font-md)!important;
+}
+.home-leader-card small{
+  font-size:var(--fh-font-sm)!important;
+}
+
+/* Team and player pages */
+.team-hero,
+.player-hero{
+  padding:24px!important;
+}
+.team-hero h1,
+.player-hero h1{
+  font-size:30px!important;
+}
+.team-hero-meta,
+.player-hero-meta{
+  font-size:var(--fh-font-sm)!important;
+}
+.player-row,
+.depth-row{
+  min-height:52px!important;
+  padding:11px 12px!important;
+}
+.player-row strong,
+.depth-row strong{
+  font-size:var(--fh-font-md)!important;
+}
+.player-row small,
+.depth-row small{
+  font-size:var(--fh-font-sm)!important;
+}
+
+/* Trade Center */
+.trade-builder,
+.trade-panel,
+.trade-offer-card,
+.trade-history-card{
+  padding:18px!important;
+}
+.trade-builder h2,
+.trade-panel h2{
+  font-size:var(--fh-font-xl)!important;
+}
+.trade-asset-row,
+.trade-package-row{
+  min-height:50px!important;
+  padding:11px 12px!important;
+}
+.trade-asset-row strong,
+.trade-package-row strong{
+  font-size:var(--fh-font-md)!important;
+}
+.trade-asset-row small,
+.trade-package-row small{
+  font-size:var(--fh-font-sm)!important;
+}
+
+/* Modals and drawers */
+.detail-dialog,
+.modal,
+.drawer,
+.side-drawer{
+  font-size:var(--fh-font-md)!important;
+}
+.modal-header,
+.drawer-header,
+.detail-header{
+  padding:16px 18px!important;
+}
+.modal-body,
+.drawer-body,
+.detail-body{
+  padding:18px!important;
+}
+.modal h2,
+.drawer h2,
+.detail-dialog h2{
+  font-size:var(--fh-font-2xl)!important;
+}
+
+/* Game Center */
+.game-center-topbar{
+  padding:16px 20px!important;
+}
+.game-center-schedule-info strong{
+  font-size:var(--fh-font-md)!important;
+}
+.game-center-schedule-info small{
+  font-size:var(--fh-font-sm)!important;
+}
+.game-center-title h2{
+  font-size:var(--fh-font-xl)!important;
+}
+.game-center-switcher button{
+  flex-basis:152px!important;
+  min-height:58px!important;
+  padding:11px 12px!important;
+}
+.game-center-switcher span{
+  font-size:var(--fh-font-sm)!important;
+}
+.game-center-switcher small{
+  font-size:var(--fh-font-xs)!important;
+}
+.game-center-team>span{
+  font-size:var(--fh-font-xs)!important;
+}
+.game-center-team>strong{
+  font-size:30px!important;
+}
+.game-center-team>small{
+  font-size:var(--fh-font-sm)!important;
+}
+.game-center-score>span,
+.game-center-score>small{
+  font-size:var(--fh-font-sm)!important;
+}
+.game-center-tabs button{
+  min-height:44px!important;
+  font-size:var(--fh-font-sm)!important;
+}
+.game-center-section-heading h3{
+  font-size:var(--fh-font-xl)!important;
+}
+.team-stat-board-head{
+  padding:13px 16px!important;
+}
+.team-stat-board-head>span:nth-child(2){
+  font-size:var(--fh-font-xs)!important;
+}
+.team-stat-board-row{
+  min-height:48px!important;
+  padding:12px 16px!important;
+}
+.team-stat-board-row>span{
+  font-size:var(--fh-font-sm)!important;
+}
+.team-stat-board-row>strong{
+  font-size:var(--fh-font-lg)!important;
+}
+.game-center-roster-head{
+  padding:13px 14px!important;
+}
+.game-center-roster-head strong{
+  font-size:var(--fh-font-lg)!important;
+}
+.game-center-roster-head small{
+  font-size:var(--fh-font-sm)!important;
+}
+.game-center-player-list button{
+  min-height:54px!important;
+  padding:11px 12px!important;
+}
+.game-center-player-list strong{
+  font-size:var(--fh-font-md)!important;
+}
+.game-center-player-list small{
+  font-size:var(--fh-font-sm)!important;
+}
+.gc-position{
+  font-size:var(--fh-font-xs)!important;
+}
+.game-stat-section-title{
+  padding:14px 16px!important;
+}
+.game-stat-section-title h3{
+  font-size:var(--fh-font-lg)!important;
+}
+.game-stat-team-head{
+  padding:11px 13px!important;
+}
+.game-stat-team-head strong{
+  font-size:var(--fh-font-sm)!important;
+}
+.game-stat-row{
+  min-height:44px!important;
+  padding:10px 12px!important;
+}
+.game-stat-row strong{
+  font-size:var(--fh-font-sm)!important;
+}
+.game-stat-row small{
+  font-size:var(--fh-font-xs)!important;
+}
+.game-stat-row>span:not(:first-child){
+  font-size:var(--fh-font-sm)!important;
+}
+.game-stat-row--head span{
+  font-size:var(--fh-font-xs)!important;
+}
+
+/* Recap Studio */
+.recap-studio-toolbar h3{
+  font-size:var(--fh-font-xl)!important;
+}
+.recap-studio-toolbar p{
+  font-size:var(--fh-font-md)!important;
+}
+.recap-format-picker>span{
+  font-size:var(--fh-font-xs)!important;
+}
+.recap-format-picker strong{
+  font-size:var(--fh-font-sm)!important;
+}
+.recap-format-picker small{
+  font-size:var(--fh-font-xs)!important;
+}
+.recap-availability-note strong{
+  font-size:var(--fh-font-md)!important;
+}
+.recap-availability-note span{
+  font-size:var(--fh-font-sm)!important;
+}
+.broadcast-recap-topline{
+  font-size:var(--fh-font-xs)!important;
+}
+.broadcast-recap-score>div>small{
+  font-size:var(--fh-font-sm)!important;
+}
+.broadcast-recap-story h3{
+  font-size:24px!important;
+}
+.broadcast-recap-story p{
+  font-size:var(--fh-font-md)!important;
+  line-height:1.55!important;
+}
+.broadcast-stars strong{
+  font-size:var(--fh-font-md)!important;
+}
+.broadcast-stars small,
+.broadcast-stars em{
+  font-size:var(--fh-font-sm)!important;
+}
+.broadcast-star-rank{
+  font-size:var(--fh-font-xs)!important;
+}
+.broadcast-recap-footer>span{
+  font-size:var(--fh-font-xs)!important;
+}
+.recap-story-panel h4{
+  font-size:var(--fh-font-md)!important;
+}
+.recap-story-panel p{
+  font-size:var(--fh-font-sm)!important;
+}
+
+/* Toasts and microcopy */
+.toast strong{
+  font-size:var(--fh-font-md)!important;
+}
+.toast span{
+  font-size:var(--fh-font-sm)!important;
+}
+
+/* Mobile adjustments */
+@media(max-width:900px){
+  .page-shell,
+  .page-content,
+  .main-content{
+    padding:14px!important;
+  }
+  .card,
+  .panel,
+  .surface,
+  .content-card,
+  .team-card,
+  .player-card,
+  .trade-card{
+    padding:14px!important;
+  }
+  .sidebar{
+    width:min(290px,86vw)!important;
+  }
+  .topbar{
+    min-height:62px!important;
+    padding:9px 12px!important;
+  }
+  .league-home-main{
+    gap:14px!important;
+  }
+}
+
+@media(max-width:620px){
+  body{
+    font-size:13px!important;
+  }
+  h1{font-size:24px!important}
+  h2{font-size:20px!important}
+  h3{font-size:17px!important}
+  .page-shell,
+  .page-content,
+  .main-content{
+    padding:12px!important;
+  }
+  .game-center-topbar{
+    padding:13px 14px!important;
+  }
+  .game-center-team>strong{
+    font-size:22px!important;
+  }
+  .game-center-score>strong{
+    font-size:30px!important;
+  }
+  .broadcast-recap-story h3{
+    font-size:20px!important;
+  }
+  .broadcast-recap-story p{
+    font-size:13px!important;
+  }
+  .home-news-grid--compact .news-card{
+    min-height:auto!important;
+  }
+}

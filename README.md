@@ -1,57 +1,62 @@
-# Franchise HQ — TC-011.1 Broadcast Recap Generator
+# Franchise HQ — TC-011.2 Design System & Typography Refresh
 
-Epic 1 begins with the first export-based Game Center intelligence feature.
+This sprint standardizes readability and spacing across the full Franchise HQ application before Commissioner HQ development begins.
 
-## Accepted scope
+## Typography system
 
-### Automated broadcast recap
-For every completed game, Franchise HQ now uses the imported final score and box-score data to generate:
+The application now uses a consistent platform-wide type scale:
 
-- Broadcast-style recap graphic
-- Game headline
-- Full recap paragraph
-- Social caption
-- Ranked top-three performers
-- Game MVP designation
+- Micro labels: 10px
+- Secondary text: 11–12px
+- Standard body text: 14px
+- Primary row and player names: 14–16px
+- Card titles: 16–18px
+- Section headings: 18–22px
+- Page and hero titles: 24–30px
 
-### Export formats
+The previous 6px–8px text has been eliminated from the primary application experience.
 
-- Broadcast: 1600 × 900, 16:9
-- Social: 1200 × 1200, 1:1
-- Story: 1080 × 1920, 9:16
+## Spacing system
 
-The Download PNG button performs a real browser-side Canvas export. It does not require a paid screenshot service, external image API, or server process.
+Updated globally:
 
-### Story Engine
+- Card padding
+- Table and roster row heights
+- Button height and hit areas
+- Input fields
+- Tabs
+- Navigation
+- Modals
+- Drawers
+- Mobile menu
+- Game Center
+- Recap Studio
+- Trade Center
+- Team and player pages
+- League Home
 
-The story generator evaluates:
+## Readability improvements
 
-- Winning team
-- Final score
-- Margin of victory
-- Close-game and blowout thresholds
-- Top statistical performer
-- Week, date, time, and stadium
+- Larger sidebar and navigation labels
+- More readable standings and schedule cards
+- Larger team, player, and transaction rows
+- Improved modal and drawer typography
+- Better mobile hit targets
+- Larger Game Center tabs and player statistics
+- More readable generated recap text and top-performer cards
 
-It then generates the headline, recap paragraph, social caption, and MVP presentation.
+## Discord direction
 
-### Pregame behavior
+The generated story remains available in the current recap model, but the long-term publishing workflow is now defined as:
 
-Upcoming games retain a generated preview, but PNG recap export remains disabled until the final result is imported.
+Imported game result
+→ generated recap and media
+→ Franchise HQ Discord integration
+→ automatic post to a selected league channel
 
-## Technical direction
-
-This export-based approach fits Franchise HQ's integration model:
-
-Madden export
-→ structured team/player game data
-→ Franchise HQ ranking and story engine
-→ reusable broadcast design
-→ downloadable PNG
-
-No live drive tracker or real-time Madden connection is required.
+The Discord connection is intentionally deferred to a dedicated integration sprint.
 
 Replace all six files together.
 
 Suggested commit:
-`Build TC-011.1 broadcast recap generator and story engine`
+`Apply TC-011.2 typography and design system refresh`
