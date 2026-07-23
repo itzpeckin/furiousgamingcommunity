@@ -21,3 +21,12 @@ modal.addEventListener('change',e=>{
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('is-open'))close();if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='d'){e.preventDefault();open();}});
 })();
+
+
+/* TC-011.3.1 — Developer Mode account assumption */
+document.addEventListener('click',event=>{
+  const trigger=event.target.closest('[data-dev-assume-user]');
+  if(!trigger) return;
+  event.preventDefault();
+  window.FHQ_ASSUME_USER?.(trigger.dataset.devAssumeUser);
+});

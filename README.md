@@ -1,69 +1,39 @@
-# Franchise HQ — TC-011.3 Commissioner HQ
+# Franchise HQ — TC-011.3.1 Navigation, League Home & Player Page Polish
 
-Epic 2 introduces the commissioner-facing league operations workspace.
+## User assumption
+- Restores the top-right profile interaction.
+- Prevents route clicks from swallowing profile-menu interactions.
+- Adds a resilient account-assumption bridge for testing.
+- Keeps Developer Mode account switching available.
 
-## Commissioner HQ
+## Commissioner HQ navigation
+- Commissioner HQ is positioned at the top of the left navigation.
+- It is visible only when the assumed/authenticated account has the Commissioner role.
+- Team owners do not see an empty or disabled Commissioner entry.
 
-Four protected tabs are included:
+## League Home
+- Removes the Full Leaderboard button.
+- Enlarges leader cards, player names, and stat values.
+- Reduces unused whitespace below the schedule ribbon.
+- Pulls the lower content upward.
+- Aligns Stat Leaders and League News more tightly with the standings area.
+- Enlarges news cards to maintain visual balance.
 
-### Overview
-- Current season and week
-- Last Madden franchise import
-- Team assignment coverage
-- League-rule status
-- Primary Advance Week workflow
-- Latest import validation health
+## Player Profiles
+Player profiles are once again presented as a full-page experience.
 
-### Import Franchise
-- Export-based four-step workflow
-- JSON, CSV, or ZIP file selection
-- Prototype validation checklist
-- Publish & Advance action
-- Madden remains the source of truth
+The profile now preserves the page from which it was opened and displays both:
+- A contextual back action such as `← Team Page`, `← Trade Center`, or `← League Home`
+- An X close button
 
-The action is intentionally named **Advance Week**, but it advances Franchise HQ by importing and publishing the newest Madden franchise export. It does not attempt to control Madden directly.
+Closing the profile restores:
+- The previous route
+- The previous scroll position
+- The previous page context
 
-### Teams & Owners
-- All 32 franchises
-- Owner assignment status
-- User/CPU control selector
-- Search by team or owner
-- Management action placeholders for the future authentication layer
-
-### League Rules
-- League structure
-- Roster management
-- Progression
-- Gameplay
-- Save-draft interaction placeholder
-
-Schedule editing, force wins/losses, rescheduling, and general transaction approval were intentionally excluded.
-
-## Player Card behavior
-
-Player clicks now open a closeable Player Card overlay rather than navigating away from the current screen.
-
-This preserves context from:
-- Team pages
-- Player database
-- Game Center
-- League Home
-- Stats and leader pages
-- Trade pages
-- Command search
-
-When a Player Card is opened over Game Center, closing it restores the Game Center instead of returning to another page.
-
-## League Home cosmetic update
-
-The weekly schedule ribbon now has:
-- Slightly transparent container background
-- Defined border
-- Inner depth
-- Stronger schedule-card surfaces
-- Existing hover highlight
+Player profiles can be opened from Team pages, Trade Center, League Home, Game Center, leaderboards, search, and the Player Database without losing the original location.
 
 Replace all six files together.
 
 Suggested commit:
-`Build TC-011.3 Commissioner HQ and context-preserving player cards`
+`Apply TC-011.3.1 navigation home and player page polish`

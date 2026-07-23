@@ -1536,60 +1536,81 @@
   }
 
   const detailHistory = [];
+  const playerPageHistory = [];
 
-  function playerCardMarkup(player){
+  function getCurrentContextLabel(){
+    const hash=(location.hash||'').replace(/^#\/?/,'');
+    if(hash.startsWith('teams/')) return 'Team Page';
+    if(hash.startsWith('trade')) return 'Trade Center';
+    if(hash.startsWith('players')) return 'Player Database';
+    if(hash.startsWith('standings')) return 'Standings';
+    if(hash.startsWith('schedule')) return 'Schedule';
+    if(hash.startsWith('commissioner')) return 'Commissioner HQ';
+    if(hash.startsWith('league-home')||hash==='') return 'League Home';
+    return 'Previous Page';
+  }
+
+  function playerCardMarkup(player,contextLabel){
     const team=teamById(player.teamId);
     const ratings=Object.entries(player.ratings).sort((a,b)=>b[1]-a[1]).slice(0,8);
     const stats=renderPlayerStatBoxes(player);
     const owned=window.FGC_TRADE?.getCurrentAccount?.()?.teamId===player.teamId;
-    return `<div class="player-card-modal" style="${teamStyle(team)}">
-      <header class="player-card-modal__header">
-        <div class="player-card-modal__team">${renderTeamMark(team,'team-logo')}<span><strong>${team.fullName}</strong><small>${team.record} · ${escapeHtml(team.owner)}</small></span></div>
-        <button type="button" class="icon-button" data-close-player-card aria-label="Close player card"><svg><use href="#icon-close"></use></svg></button>
+    return `<div class="player-page-overlay" style="${teamStyle(team)}">
+      <header class="player-page-overlay__topbar">
+        <button type="button" class="player-page-back" data-close-player-page aria-label="Return to ${escapeHtml(contextLabel)}">← ${escapeHtml(contextLabel)}</button>
+        <div class="player-page-context"><span class="eyebrow">Player Profile</span><strong>${escapeHtml(player.name)}</strong></div>
+        <button type="button" class="icon-button player-page-close" data-close-player-page aria-label="Close player page"><svg><use href="#icon-close"></use></svg></button>
       </header>
-      <section class="player-card-modal__hero">
-        <div class="player-card-modal__portrait">${player.initials}</div>
-        <div><span class="eyebrow">#${player.number} · ${player.position}</span><h2>${escapeHtml(player.name)}</h2><p>${player.height} · ${player.weight} lbs · Age ${player.age} · ${escapeHtml(player.college)}</p><div class="player-card-modal__badges"><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span><span class="pill pill--neutral">${player.injury}</span></div></div>
-        <div class="player-card-modal__ovr"><strong>${player.overall}</strong><span>OVR</span></div>
-      </section>
-      <div class="player-card-modal__summary">
-        ${summaryTile('Contract',`${player.years} yrs`,formatMoney(player.salary))}
-        ${summaryTile('Cap Hit',formatMoney(player.capHit),'Current season')}
-        ${summaryTile('Trade Status',player.tradeBlock?'On Block':'Unavailable',player.injury)}
-      </div>
-      <div class="player-card-modal__grid">
-        <section class="player-card-modal__section"><div class="card-header"><div><span class="eyebrow">Season production</span><h3>2026 Statistics</h3></div></div><div class="stat-box-grid">${stats}</div></section>
-        <section class="player-card-modal__section"><div class="card-header"><div><span class="eyebrow">Madden attributes</span><h3>Core Ratings</h3></div></div><div class="rating-bars">${ratings.map(([label,value])=>`<div class="rating-row"><span>${label}</span><div class="rating-track"><div class="rating-fill" style="width:${value}%"></div></div><strong>${value}</strong></div>`).join('')}</div></section>
-      </div>
-      <footer class="player-card-modal__footer">
-        <button type="button" class="button button--ghost" data-close-player-card>Close</button>
-        <div>${owned?`<button type="button" class="button button--ghost" data-toggle-player-block="${player.id}">${window.FGC_TRADE?.onBlock?.(player)?'Remove from Trade Block':'Add to Trade Block'}</button>`:`<button type="button" class="button button--ghost" data-watch-player="${player.id}">${window.FGC_TRADE?.isWatched?.(player.id)?'Watching':'Watch Player'}</button><button type="button" class="button button--primary" data-add-player-trade="${player.id}">Add to Trade</button>`}</div>
-      </footer>
+      <main class="player-page-overlay__body">
+        <section class="player-page-hero">
+          <div class="player-page-portrait">${player.initials}</div>
+          <div class="player-page-identity"><span class="eyebrow">#${player.number} · ${player.position}</span><h1>${escapeHtml(player.name)}</h1><p>${team.fullName} · ${player.height} · ${player.weight} lbs · Age ${player.age} · ${escapeHtml(player.college)}</p><div class="player-card-modal__badges"><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span><span class="pill pill--neutral">${player.injury}</span></div></div>
+          <div class="player-page-rating"><strong>${player.overall}</strong><span>OVR</span></div>
+        </section>
+        <section class="player-page-team-strip">${renderTeamMark(team,'team-logo')}<span><strong>${team.fullName}</strong><small>${team.record} · ${escapeHtml(team.owner)}</small></span></section>
+        <div class="player-page-summary">
+          ${summaryTile('Contract',`${player.years} yrs`,formatMoney(player.salary))}
+          ${summaryTile('Cap Hit',formatMoney(player.capHit),'Current season')}
+          ${summaryTile('Trade Status',player.tradeBlock?'On Block':'Unavailable',player.injury)}
+        </div>
+        <div class="player-page-grid">
+          <section class="player-page-section"><div class="card-header"><div><span class="eyebrow">Season production</span><h2>2026 Statistics</h2></div></div><div class="stat-box-grid">${stats}</div></section>
+          <section class="player-page-section"><div class="card-header"><div><span class="eyebrow">Madden attributes</span><h2>Core Ratings</h2></div></div><div class="rating-bars">${ratings.map(([label,value])=>`<div class="rating-row"><span>${label}</span><div class="rating-track"><div class="rating-fill" style="width:${value}%"></div></div><strong>${value}</strong></div>`).join('')}</div></section>
+        </div>
+        <footer class="player-page-actions">
+          <button type="button" class="button button--ghost" data-close-player-page>← ${escapeHtml(contextLabel)}</button>
+          <div>${owned?`<button type="button" class="button button--ghost" data-toggle-player-block="${player.id}">${window.FGC_TRADE?.onBlock?.(player)?'Remove from Trade Block':'Add to Trade Block'}</button>`:`<button type="button" class="button button--ghost" data-watch-player="${player.id}">${window.FGC_TRADE?.isWatched?.(player.id)?'Watching':'Watch Player'}</button><button type="button" class="button button--primary" data-add-player-trade="${player.id}">Add to Trade</button>`}</div>
+        </footer>
+      </main>
     </div>`;
   }
 
   function openPlayerCard(playerId){
     const player=playerById(playerId);
     if(!player) return;
-    if(detailModal.classList.contains('is-open')){
-      detailHistory.push(detailContent.innerHTML);
+    const contextLabel=getCurrentContextLabel();
+    playerPageHistory.push({hash:location.hash,scrollY:window.scrollY,contextLabel});
+    let shell=document.querySelector('[data-player-page-shell]');
+    if(!shell){
+      shell=document.createElement('div');
+      shell.dataset.playerPageShell='';
+      document.body.appendChild(shell);
     }
-    detailContent.innerHTML=playerCardMarkup(player);
-    detailModal.classList.add('is-open','is-player-card-open');
-    detailModal.setAttribute('aria-hidden','false');
+    shell.innerHTML=playerCardMarkup(player,contextLabel);
+    shell.classList.add('is-open');
+    shell.setAttribute('aria-hidden','false');
     body.style.overflow='hidden';
   }
 
   function closePlayerCard(){
-    detailModal.classList.remove('is-player-card-open');
-    const previous=detailHistory.pop();
+    const shell=document.querySelector('[data-player-page-shell]');
+    shell?.classList.remove('is-open');
+    shell?.setAttribute('aria-hidden','true');
+    const previous=playerPageHistory.pop();
+    body.style.overflow='';
     if(previous){
-      detailContent.innerHTML=previous;
-      detailModal.classList.add('is-open');
-      detailModal.setAttribute('aria-hidden','false');
-      body.style.overflow='hidden';
-    }else{
-      closeDetail();
+      if(location.hash!==previous.hash) location.hash=previous.hash;
+      requestAnimationFrame(()=>window.scrollTo(0,previous.scrollY||0));
     }
   }
 
@@ -1775,12 +1796,13 @@
     const gameCenterSwitch=event.target.closest('[data-game-center-switch]');
     if (gameCenterSwitch) { event.preventDefault(); openGameDetail(gameCenterSwitch.dataset.gameCenterSwitch); return; }
 
-    const closePlayerCardButton=event.target.closest('[data-close-player-card]');
-    if(closePlayerCardButton){event.preventDefault();closePlayerCard();return;}
+    const closePlayerPageButton=event.target.closest('[data-close-player-page]');
+    if(closePlayerPageButton){event.preventDefault();closePlayerCard();return;}
 
     const openPlayerCardButton=event.target.closest('[data-open-player-card]');
     if (openPlayerCardButton) { event.preventDefault(); openPlayerCard(openPlayerCardButton.dataset.openPlayerCard); return; }
 
+    if(event.target.closest('[data-profile-menu],[data-user-menu]')) return;
     const routeTarget=event.target.closest('[data-route]');
     if (routeTarget) {
       event.preventDefault();
@@ -1937,3 +1959,18 @@
   applyRole(state.role,false);
   renderRoute();
 })();
+
+
+/* TC-011.3.1 — resilient user-assumption bridge */
+window.FHQ_ASSUME_USER=function(accountId){
+  try{
+    if(window.FGC_TRADE?.assumeAccount) window.FGC_TRADE.assumeAccount(accountId);
+    else if(window.assumeUser) window.assumeUser(accountId);
+    else localStorage.setItem('fhq-assumed-account',accountId);
+    window.dispatchEvent(new CustomEvent('fhq:user-assumed',{detail:{accountId}}));
+    location.hash='#league-home';
+    location.reload();
+  }catch(error){
+    console.error('Unable to assume user',error);
+  }
+};
