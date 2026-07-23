@@ -146,7 +146,7 @@
   const pageNames = {
     home: 'League Home', 'league-activity': 'League Activity', teams: 'Teams', players: 'Players', standings: 'Standings', stats: 'Stats & Leaders',
     schedule: 'Schedule', news: 'League News', 'trade-center': 'Trade Center', 'trade-block': 'Trade Block',
-    commissioner: 'Commissioner Dashboard', 'design-system': 'Design System'
+    commissioner: 'Commissioner HQ', 'design-system': 'Design System'
   };
 
   function firstNames() {
@@ -487,7 +487,7 @@
       </div>
 
       <section class="home-section home-leaders-section">
-        <div class="section-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div></div>
+        <div class="section-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
         <div class="home-leaders-grid home-leaders-grid--single-row">
           ${renderHomeLeaderCard('passing','Passing')}
           ${renderHomeLeaderCard('rushing','Rushing')}
@@ -802,30 +802,6 @@
     }).join('') || `<tr><td colspan="8"><div class="roadmap-state"><div class="roadmap-state__inner"><h2>No matching players</h2><p>Change the search or filters to see more results.</p></div></div></td></tr>`;
   }
 
-  let playerReturnContext = null;
-  function playerContextLabel(route){
-    if(!route || route==='home') return 'League Home';
-    if(route.startsWith('teams/')) return 'Team Page';
-    if(route.startsWith('trade-center')) return 'Trade Center';
-    if(route.startsWith('commissioner')) return 'Commissioner HQ';
-    if(route.startsWith('schedule')) return 'Schedule';
-    if(route.startsWith('standings')) return 'Standings';
-    if(route.startsWith('stats')) return 'Stats';
-    if(route.startsWith('players')) return 'Player Database';
-    return 'Previous Page';
-  }
-  function openPlayerPage(playerId){
-    const route=(location.hash||'#home').slice(1)||'home';
-    if(!route.startsWith('players/')) playerReturnContext={route,label:playerContextLabel(route),scrollY:window.scrollY};
-    setRoute(`players/${playerId}`);
-  }
-  function closePlayerPage(){
-    const prior=playerReturnContext||{route:'players',label:'Player Database',scrollY:0};
-    playerReturnContext=null;
-    setRoute(prior.route);
-    requestAnimationFrame(()=>window.scrollTo(0,prior.scrollY||0));
-  }
-
   function renderPlayerProfile(playerId) {
     const player = playerById(playerId);
     if (!player) { setRoute('players'); return; }
@@ -834,7 +810,7 @@
     const similar = players.filter(p=>p.id!==player.id&&p.position===player.position).sort((a,b)=>Math.abs(a.overall-player.overall)-Math.abs(b.overall-player.overall)).slice(0,4);
     const gameLog = Array.from({length:7},(_,i)=>createGameLogRow(player,i+1));
     pageContent.innerHTML = `
-      <div class="page-heading player-page-heading"><div><button class="text-button player-context-back" data-close-player-page><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>${escapeHtml(playerReturnContext?.label||'Player Database')}</button></div><div class="heading-actions"><button class="button button--ghost" data-watch-player="${player.id}"><svg><use href="#icon-star"></use></svg>${window.FGC_TRADE?.isWatched?.(player.id)?'Watching':'Watch player'}</button>${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===player.teamId?`<button class="button button--primary" data-toggle-player-block="${player.id}"><svg><use href="#icon-tag"></use></svg>${window.FGC_TRADE?.onBlock?.(player)?'Remove from Trade Block':'Add to Trade Block'}</button>`:`<button class="button button--primary" data-add-player-trade="${player.id}"><svg><use href="#icon-swap"></use></svg>Add to trade</button>`}<button type="button" class="icon-button player-page-x" data-close-player-page aria-label="Close player profile"><svg><use href="#icon-close"></use></svg></button></div></div>
+      <div class="page-heading"><div><button class="text-button" data-route="players"><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>Player database</button></div><div class="heading-actions"><button class="button button--ghost" data-watch-player="${player.id}"><svg><use href="#icon-star"></use></svg>${window.FGC_TRADE?.isWatched?.(player.id)?'Watching':'Watch player'}</button>${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===player.teamId?`<button class="button button--primary" data-toggle-player-block="${player.id}"><svg><use href="#icon-tag"></use></svg>${window.FGC_TRADE?.onBlock?.(player)?'Remove from Trade Block':'Add to Trade Block'}</button>`:`<button class="button button--primary" data-add-player-trade="${player.id}"><svg><use href="#icon-swap"></use></svg>Add to trade</button>`}</div></div>
       <section class="player-profile-hero" style="${teamStyle(team)}" data-number="${player.number}">
         <div class="player-profile-portrait">${player.initials}</div>
         <div class="player-profile-copy"><span class="eyebrow">${team.fullName} · #${player.number}</span><h1>${escapeHtml(player.name)}</h1><div class="player-profile-meta"><span class="pill pill--accent">${player.position}</span><span>${player.height} · ${player.weight} lbs</span><span>Age ${player.age}</span><span>${escapeHtml(player.college)}</span><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span></div></div>
@@ -1004,7 +980,7 @@
     const data = {
       'trade-center': { title:'Private Trade Center', eyebrow:'Milestone 1C', icon:'icon-swap', copy:'Saved drafts, owner-to-owner negotiation rooms, revisions, acceptance, committee review, and final decisions will be built after the league-view experience.', items:['Private draft builder','Owner negotiation room','Versioned revisions','Committee submission','Approval announcements','Rejection feedback'] },
       'trade-block': { title:'Trade Block', eyebrow:'Milestone 1C', icon:'icon-tag', copy:'Owners will advertise available players, team needs, preferred return types, and contact options without exposing private trade calculations.', items:['Player availability','Team needs','Position filters','Owner contact','Watchlist alerts','Add to trade'] },
-      commissioner: { title:'Commissioner Dashboard', eyebrow:'Future operations milestone', icon:'icon-sliders', copy:'League member assignments, committee roles, Madden export health, calculator settings, news controls, and audit records will live here.', items:['Discord assignments','Export status','Trade rules','Committee settings','News editor','Audit log'] }
+      commissioner: { title:'Commissioner HQ', eyebrow:'Future operations milestone', icon:'icon-sliders', copy:'League member assignments, committee roles, Madden export health, calculator settings, news controls, and audit records will live here.', items:['Discord assignments','Export status','Trade rules','Committee settings','News editor','Audit log'] }
     }[route] || { title:'Coming Soon',eyebrow:'Project roadmap',icon:'icon-construction',copy:'This area is prepared for a later milestone.',items:[] };
     pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">${data.eyebrow}</span><h1>${data.title}</h1><p>${data.copy}</p></div></div><article class="roadmap-state card"><div class="roadmap-state__inner"><div class="roadmap-icon"><svg><use href="#${data.icon}"></use></svg></div><h2>${data.title} is next in the build plan</h2><p>${data.copy}</p><div class="roadmap-list">${data.items.map(item=>`<span><svg><use href="#icon-check"></use></svg>${item}</span>`).join('')}</div><div class="heading-actions" style="justify-content:center"><button class="button button--primary" data-route="home">Return home</button><button class="button button--ghost" data-route="design-system">View design system</button></div></div></article>`;
   }
@@ -1559,64 +1535,6 @@
       </div>`);
   }
 
-  const detailHistory = [];
-
-  function playerCardMarkup(player){
-    const team=teamById(player.teamId);
-    const ratings=Object.entries(player.ratings).sort((a,b)=>b[1]-a[1]).slice(0,8);
-    const stats=renderPlayerStatBoxes(player);
-    const owned=window.FGC_TRADE?.getCurrentAccount?.()?.teamId===player.teamId;
-    return `<div class="player-card-modal" style="${teamStyle(team)}">
-      <header class="player-card-modal__header">
-        <div class="player-card-modal__team">${renderTeamMark(team,'team-logo')}<span><strong>${team.fullName}</strong><small>${team.record} · ${escapeHtml(team.owner)}</small></span></div>
-        <button type="button" class="icon-button" data-close-player-card aria-label="Close player card"><svg><use href="#icon-close"></use></svg></button>
-      </header>
-      <section class="player-card-modal__hero">
-        <div class="player-card-modal__portrait">${player.initials}</div>
-        <div><span class="eyebrow">#${player.number} · ${player.position}</span><h2>${escapeHtml(player.name)}</h2><p>${player.height} · ${player.weight} lbs · Age ${player.age} · ${escapeHtml(player.college)}</p><div class="player-card-modal__badges"><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span><span class="pill pill--neutral">${player.injury}</span></div></div>
-        <div class="player-card-modal__ovr"><strong>${player.overall}</strong><span>OVR</span></div>
-      </section>
-      <div class="player-card-modal__summary">
-        ${summaryTile('Contract',`${player.years} yrs`,formatMoney(player.salary))}
-        ${summaryTile('Cap Hit',formatMoney(player.capHit),'Current season')}
-        ${summaryTile('Trade Status',player.tradeBlock?'On Block':'Unavailable',player.injury)}
-      </div>
-      <div class="player-card-modal__grid">
-        <section class="player-card-modal__section"><div class="card-header"><div><span class="eyebrow">Season production</span><h3>2026 Statistics</h3></div></div><div class="stat-box-grid">${stats}</div></section>
-        <section class="player-card-modal__section"><div class="card-header"><div><span class="eyebrow">Madden attributes</span><h3>Core Ratings</h3></div></div><div class="rating-bars">${ratings.map(([label,value])=>`<div class="rating-row"><span>${label}</span><div class="rating-track"><div class="rating-fill" style="width:${value}%"></div></div><strong>${value}</strong></div>`).join('')}</div></section>
-      </div>
-      <footer class="player-card-modal__footer">
-        <button type="button" class="button button--ghost" data-close-player-card>Close</button>
-        <div>${owned?`<button type="button" class="button button--ghost" data-toggle-player-block="${player.id}">${window.FGC_TRADE?.onBlock?.(player)?'Remove from Trade Block':'Add to Trade Block'}</button>`:`<button type="button" class="button button--ghost" data-watch-player="${player.id}">${window.FGC_TRADE?.isWatched?.(player.id)?'Watching':'Watch Player'}</button><button type="button" class="button button--primary" data-add-player-trade="${player.id}">Add to Trade</button>`}</div>
-      </footer>
-    </div>`;
-  }
-
-  function openPlayerCard(playerId){
-    const player=playerById(playerId);
-    if(!player) return;
-    if(detailModal.classList.contains('is-open')){
-      detailHistory.push(detailContent.innerHTML);
-    }
-    detailContent.innerHTML=playerCardMarkup(player);
-    detailModal.classList.add('is-open','is-player-card-open');
-    detailModal.setAttribute('aria-hidden','false');
-    body.style.overflow='hidden';
-  }
-
-  function closePlayerCard(){
-    detailModal.classList.remove('is-player-card-open');
-    const previous=detailHistory.pop();
-    if(previous){
-      detailContent.innerHTML=previous;
-      detailModal.classList.add('is-open');
-      detailModal.setAttribute('aria-hidden','false');
-      body.style.overflow='hidden';
-    }else{
-      closeDetail();
-    }
-  }
-
   function openNewsDetail(newsId) {
     const article=[...(window.FGC_TRADE?.getApprovedNews?.() || []), ...newsArticles].find(item=>item.id===newsId);
     if (!article) return;
@@ -1631,8 +1549,7 @@
   }
 
   function closeDetail() {
-    detailHistory.length=0;
-    detailModal.classList.remove('is-open','is-player-card-open');
+    detailModal.classList.remove('is-open');
     detailModal.setAttribute('aria-hidden','true');
     detailContent.innerHTML='';
     unlockBody();
@@ -1669,7 +1586,7 @@
       case 'trade-block': window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : renderRoadmap(base); break;
       case 'design-system': renderDesignSystem(); break;
       case 'commissioner':
-        if (state.role!=='commissioner') { showToast('Commissioner access required','Switch to the Commissioner mock account to preview this area.'); setRoute('home'); return; }
+        if (state.role!=='commissioner') { showToast('Commissioner access required','Switch to the Commissioner account to access Commissioner HQ.'); setRoute('home'); return; }
         window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base); break;
       default: renderRoadmap(base);
     }
@@ -1799,23 +1716,11 @@
     const gameCenterSwitch=event.target.closest('[data-game-center-switch]');
     if (gameCenterSwitch) { event.preventDefault(); openGameDetail(gameCenterSwitch.dataset.gameCenterSwitch); return; }
 
-    const closePlayerCardButton=event.target.closest('[data-close-player-card]');
-    if(closePlayerCardButton){event.preventDefault();closePlayerCard();return;}
-
-    const openPlayerCardButton=event.target.closest('[data-open-player-card]');
-    if (openPlayerCardButton) { event.preventDefault(); openPlayerPage(openPlayerCardButton.dataset.openPlayerCard); return; }
-
-    const closePlayerPageButton=event.target.closest('[data-close-player-page]');
-    if(closePlayerPageButton){event.preventDefault();closePlayerPage();return;}
+    const openPlayerCard=event.target.closest('[data-open-player-card]');
+    if (openPlayerCard) { event.preventDefault(); setRoute(`players/${openPlayerCard.dataset.openPlayerCard}`); closeDetail(); return; }
 
     const routeTarget=event.target.closest('[data-route]');
-    if (routeTarget) {
-      event.preventDefault();
-      const route=routeTarget.dataset.route;
-      if(route.startsWith('players/')) openPlayerPage(route.split('/')[1]);
-      else setRoute(route);
-      return;
-    }
+    if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
 
     const interactiveTarget=event.target.closest('button, a, input, select, textarea, label, [role="button"]');
 
@@ -1823,7 +1728,7 @@
     if (teamTarget && !interactiveTarget) { setRoute(`teams/${teamTarget.dataset.teamId}`); return; }
 
     const playerTarget=event.target.closest('[data-player-id]');
-    if (playerTarget) { event.preventDefault(); openPlayerPage(playerTarget.dataset.playerId); return; }
+    if (playerTarget) { event.preventDefault(); setRoute(`players/${playerTarget.dataset.playerId}`); return; }
 
     const gameTarget=event.target.closest('[data-game-id]');
     if (gameTarget) { openGameDetail(gameTarget.dataset.gameId); return; }
@@ -1832,13 +1737,7 @@
     if (newsTarget) { openNewsDetail(newsTarget.dataset.newsId); return; }
 
     const commandRoute=event.target.closest('[data-command-route]');
-    if (commandRoute) {
-      const route=commandRoute.dataset.commandRoute;
-      closeCommand();
-      if(route.startsWith('players/')) openPlayerPage(route.split('/')[1]);
-      else setRoute(route);
-      return;
-    }
+    if (commandRoute) { const route=commandRoute.dataset.commandRoute; closeCommand(); setRoute(route); return; }
 
     const commandNews=event.target.closest('[data-command-news]');
     if (commandNews) { const id=commandNews.dataset.commandNews; closeCommand(); openNewsDetail(id); return; }
