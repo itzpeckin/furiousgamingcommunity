@@ -2533,3 +2533,62 @@ table td{
   .commissioner-team-row > span:nth-child(2) { display: none; }
   .commissioner-page-heading { align-items: flex-start; }
 }
+
+
+/* TC-011.3.1 — Unified contextual player cards */
+.value-card-context {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 72px 8px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(11, 14, 20, .94);
+  backdrop-filter: blur(16px);
+}
+.value-card-context > button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.value-card-context > button:hover {
+  border-color: rgba(var(--accent-rgb), .42);
+  color: var(--text);
+}
+.value-card-context > button svg {
+  width: 16px;
+  height: 16px;
+  transform: rotate(180deg);
+}
+.value-card-context > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.value-card-close {
+  top: 9px;
+  margin-top: 9px;
+}
+@media (max-width: 620px) {
+  .value-card-context {
+    min-height: 56px;
+    padding-left: 10px;
+    padding-right: 62px;
+  }
+  .value-card-context > span { display: none; }
+}

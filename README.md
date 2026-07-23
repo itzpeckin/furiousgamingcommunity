@@ -1,55 +1,28 @@
-# Franchise HQ — TC-011.3 Commissioner HQ
+# Franchise HQ — TC-011.3.1 Unified Player Cards
 
-This build starts from the user-provided TC-011.2 files and preserves the existing Developer Mode and Trade Center.
+Built from the accepted TC-011.3 Commissioner HQ baseline.
 
-## Verified baseline functionality
+## Preserved
 
-- Top-right profile menu remains active.
-- Developer Mode can switch between Commissioner, owners, and Trade Committee accounts.
-- Account changes continue to update role-based navigation and persist after refresh.
-- Trade Center remains connected to the accepted trade module, including seeded negotiations, account permissions, committee review, history, Trade Block, and notifications.
+- Developer Mode and identity switching.
+- Trade Center and accepted trade workflows.
+- Commissioner HQ and commissioner-only navigation.
 
-## TC-011.3 Commissioner HQ
+## Player Card changes
 
-Commissioner HQ is now:
+The Trade Center player valuation card is now the single player-card experience throughout Franchise HQ.
 
-- The first item in the left navigation.
-- Visible only to the Commissioner account.
-- Protected from owner and committee accounts.
-- Available from the profile menu and Developer Mode quick routes.
+Clicking a player opens the card over the current screen without changing routes. This applies to Teams, My Team, Player Database, League Home, League Activity, Stats & Leaders, Game Center, Schedule, Trade Center, Trade Block, Command Search, and Commissioner HQ.
 
-### Overview
+The card includes:
 
-- Season and week status.
-- League health.
-- Assigned-franchise count.
-- Trade committee and commissioner queues.
-- Quick access to commissioner workflows.
-
-### Import Franchise
-
-Prototype workflow:
-
-1. Export Madden.
-2. Upload JSON, CSV, or ZIP.
-3. Validate teams, players, schedule, standings, and statistics.
-4. Publish and advance Franchise HQ.
-
-### Teams & Owners
-
-- Displays all 32 franchises.
-- Search by team or owner.
-- User/CPU control selector.
-- Owner-editing placeholder for future authenticated assignments.
-
-### League Rules
-
-- Madden-imported rule summary.
-- Franchise HQ-specific rule controls.
-- Existing draft-pick projection administration remains available.
+- A contextual close action such as `← Teams`, `← Trade Center`, or `← Game Center`.
+- An X button in the top-right corner.
+- Closing either control reveals the exact page or modal underneath.
+- Existing filters, tabs, negotiations, and scroll position remain intact.
 
 Replace all six files together.
 
 Suggested commit:
 
-`Apply TC-011.3 Commissioner HQ`
+`Apply TC-011.3.1 unified contextual player cards`

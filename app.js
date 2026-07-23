@@ -1717,7 +1717,11 @@
     if (gameCenterSwitch) { event.preventDefault(); openGameDetail(gameCenterSwitch.dataset.gameCenterSwitch); return; }
 
     const openPlayerCard=event.target.closest('[data-open-player-card]');
-    if (openPlayerCard) { event.preventDefault(); setRoute(`players/${openPlayerCard.dataset.openPlayerCard}`); closeDetail(); return; }
+    if (openPlayerCard) {
+      event.preventDefault();
+      window.FGC_TRADE?.openValueCard?.(openPlayerCard.dataset.openPlayerCard);
+      return;
+    }
 
     const routeTarget=event.target.closest('[data-route]');
     if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
@@ -1728,7 +1732,11 @@
     if (teamTarget && !interactiveTarget) { setRoute(`teams/${teamTarget.dataset.teamId}`); return; }
 
     const playerTarget=event.target.closest('[data-player-id]');
-    if (playerTarget) { event.preventDefault(); setRoute(`players/${playerTarget.dataset.playerId}`); return; }
+    if (playerTarget) {
+      event.preventDefault();
+      window.FGC_TRADE?.openValueCard?.(playerTarget.dataset.playerId);
+      return;
+    }
 
     const gameTarget=event.target.closest('[data-game-id]');
     if (gameTarget) { openGameDetail(gameTarget.dataset.gameId); return; }
@@ -1737,7 +1745,16 @@
     if (newsTarget) { openNewsDetail(newsTarget.dataset.newsId); return; }
 
     const commandRoute=event.target.closest('[data-command-route]');
-    if (commandRoute) { const route=commandRoute.dataset.commandRoute; closeCommand(); setRoute(route); return; }
+    if (commandRoute) {
+      const route=commandRoute.dataset.commandRoute;
+      closeCommand();
+      if (route.startsWith('players/')) {
+        window.FGC_TRADE?.openValueCard?.(route.split('/')[1]);
+      } else {
+        setRoute(route);
+      }
+      return;
+    }
 
     const commandNews=event.target.closest('[data-command-news]');
     if (commandNews) { const id=commandNews.dataset.commandNews; closeCommand(); openNewsDetail(id); return; }
