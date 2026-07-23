@@ -1,30 +1,57 @@
-# Franchise HQ — TC-010.5 Game Center Tabs, Recap & Mobile Stability
+# Franchise HQ — TC-011.1 Broadcast Recap Generator
 
-## Game Center
-- Removed the Overall / ratings comparison section between the score and game content.
-- Added three Game Center tabs:
-  - Team: game-level team statistics for completed games and matchup comparison for scheduled games.
-  - Player: completed-game player box scores or pregame full rosters and current-year stats.
-  - Recap: broadcast-style game recap presentation with score, headline, summary and the top three performers.
-- Added season, week, date, time, network and stadium information to the upper-left Game Center header.
-- Game switching remains available inside Game Center.
-- Player entries continue to open the existing player experience.
+Epic 1 begins with the first export-based Game Center intelligence feature.
 
-## Recap approach
-The recap is generated from structured Franchise HQ data rather than relying on a manual image:
-1. Import the final score and player/team box-score data.
-2. Rank game performers using configurable performance weights.
-3. Fill a reusable broadcast template with team colors, marks, score, headline and top performers.
-4. In production, export the recap DOM element to PNG using a browser renderer such as html-to-image or a server-side screenshot worker.
+## Accepted scope
 
-This build includes the full on-screen recap design and an export action placeholder for the production PNG service.
+### Automated broadcast recap
+For every completed game, Franchise HQ now uses the imported final score and box-score data to generate:
 
-## Mobile
-- Removed the conflicting pointer-down navigation listener.
-- Added one guarded click handler for opening the sidebar.
-- Added a short toggle lock and persistent open-state class so the menu no longer opens and immediately disappears.
+- Broadcast-style recap graphic
+- Game headline
+- Full recap paragraph
+- Social caption
+- Ranked top-three performers
+- Game MVP designation
+
+### Export formats
+
+- Broadcast: 1600 × 900, 16:9
+- Social: 1200 × 1200, 1:1
+- Story: 1080 × 1920, 9:16
+
+The Download PNG button performs a real browser-side Canvas export. It does not require a paid screenshot service, external image API, or server process.
+
+### Story Engine
+
+The story generator evaluates:
+
+- Winning team
+- Final score
+- Margin of victory
+- Close-game and blowout thresholds
+- Top statistical performer
+- Week, date, time, and stadium
+
+It then generates the headline, recap paragraph, social caption, and MVP presentation.
+
+### Pregame behavior
+
+Upcoming games retain a generated preview, but PNG recap export remains disabled until the final result is imported.
+
+## Technical direction
+
+This export-based approach fits Franchise HQ's integration model:
+
+Madden export
+→ structured team/player game data
+→ Franchise HQ ranking and story engine
+→ reusable broadcast design
+→ downloadable PNG
+
+No live drive tracker or real-time Madden connection is required.
 
 Replace all six files together.
 
 Suggested commit:
-`Add TC-010 Game Center tabs, broadcast recap, and mobile menu stability`
+`Build TC-011.1 broadcast recap generator and story engine`

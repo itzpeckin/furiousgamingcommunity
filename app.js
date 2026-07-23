@@ -49,7 +49,9 @@
       rushing: 'rushingYards',
       receiving: 'receivingYards'
     },
-    gameCenterTab: 'team'
+    gameCenterTab: 'team',
+    recapFormat: 'landscape',
+    recapStyle: 'broadcast'
   };
 
   const rawTeams = [
@@ -1191,36 +1193,92 @@
     return candidates.sort((a,b)=>b.value-a.value).slice(0,3);
   }
 
-  function renderRecapTab(away,home,game){
-    const awayTop=topGamePerformers(away,game),homeTop=topGamePerformers(home,game);
-    const winner=game.awayScore>game.homeScore?away:home;
-    const loser=winner.id===away.id?home:away;
-    const margin=Math.abs(game.awayScore-game.homeScore);
-    const headline=game.status==='final'
-      ? `${winner.name} defeat ${loser.name} by ${margin} in Week ${game.week}`
-      : `${away.name} and ${home.name} set for a Week ${game.week} showdown`;
-    const deck=game.status==='final'
-      ? `${winner.fullName} used timely offense and impact plays to secure a ${Math.max(game.awayScore,game.homeScore)}-${Math.min(game.awayScore,game.homeScore)} win.`
-      : `Franchise HQ previews the featured matchup, key players, and season trends before kickoff.`;
+  function recapStoryData(away,home,game){
+    const awayTop=topGamePerformers(away,game);
+    const homeTop=topGamePerformers(home,game);
+    const allTop=[...awayTop,...homeTop].sort((a,b)=>b.value-a.value).slice(0,3);
+    const isFinal=game.status==='final';
+    const winner=isFinal?(game.awayScore>game.homeScore?away:home):null;
+    const loser=isFinal?(winner.id===away.id?home:away):null;
+    const winnerScore=isFinal?Math.max(game.awayScore,game.homeScore):null;
+    const loserScore=isFinal?Math.min(game.awayScore,game.homeScore):null;
+    const margin=isFinal?winnerScore-loserScore:0;
+    const mvp=allTop[0];
 
+    const closeGame=isFinal&&margin<=7;
+    const decisive=isFinal&&margin>=17;
+    const headline=isFinal
+      ? closeGame
+        ? `${winner.name} survive ${loser.name} in a Week ${game.week} thriller`
+        : decisive
+          ? `${winner.name} roll past ${loser.name}, ${winnerScore}-${loserScore}`
+          : `${winner.name} defeat ${loser.name} in Week ${game.week}`
+      : `${away.name} and ${home.name} meet in a Week ${game.week} showcase`;
+
+    const story=isFinal
+      ? `${winner.fullName} secured a ${winnerScore}-${loserScore} victory at ${game.stadium}. ${mvp.player.name} led the way with ${mvp.line.toLowerCase()}, while the ${winner.name} delivered the defining plays in a ${closeGame?'tightly contested finish':decisive?'commanding performance':'complete team win'}.`
+      : `${away.fullName} and ${home.fullName} are scheduled for ${game.day} at ${game.time}. The matchup features two rosters looking to strengthen their position in the Season 4 standings.`;
+
+    const social=isFinal
+      ? `${winner.abbr} ${winnerScore}, ${loser.abbr} ${loserScore} | ${mvp.player.name}: ${mvp.line} | Season 4, Week ${game.week}`
+      : `${away.abbr} vs ${home.abbr} | ${game.day}, ${game.time} | Season 4, Week ${game.week}`;
+
+    return {awayTop,homeTop,allTop,isFinal,winner,loser,winnerScore,loserScore,margin,mvp,headline,story,social};
+  }
+
+  function recapFormatDetails(format){
+    return {
+      landscape:{label:'Broadcast',ratio:'16:9',width:1600,height:900},
+      square:{label:'Social',ratio:'1:1',width:1200,height:1200},
+      story:{label:'Story',ratio:'9:16',width:1080,height:1920}
+    }[format] || {label:'Broadcast',ratio:'16:9',width:1600,height:900};
+  }
+
+  function renderRecapTab(away,home,game){
+    const recap=recapStoryData(away,home,game);
+    const formats=['landscape','square','story'];
     return `<section class="game-center-tab-panel recap-tab">
-      <div class="broadcast-recap" style="--recap-away:${away.primary};--recap-home:${home.primary}">
+      <div class="recap-studio-toolbar">
+        <div>
+          <span class="eyebrow">TC-011.1 · Broadcast Recap Generator</span>
+          <h3>Recap Studio</h3>
+          <p>Automatically transforms the final score and box score into a broadcast-ready league graphic.</p>
+        </div>
+        <div class="recap-studio-actions">
+          <button type="button" class="button button--ghost" data-copy-recap="${game.id}">Copy Story</button>
+          <button type="button" class="button button--primary" data-export-recap="${game.id}" ${recap.isFinal?'':'disabled'}>Download PNG</button>
+        </div>
+      </div>
+
+      <div class="recap-format-picker">
+        <span>Output format</span>
+        <div>${formats.map(format=>{
+          const details=recapFormatDetails(format);
+          return `<button type="button" data-recap-format="${format}" class="${state.recapFormat===format?'is-active':''}">
+            <strong>${details.label}</strong><small>${details.ratio}</small>
+          </button>`;
+        }).join('')}</div>
+      </div>
+
+      ${!recap.isFinal?`<div class="recap-availability-note"><strong>Pregame preview active</strong><span>The final broadcast graphic and player rankings unlock after the game result is imported.</span></div>`:''}
+
+      <div class="broadcast-recap broadcast-recap--${state.recapFormat}" data-recap-capture="${game.id}" style="--recap-away:${away.primary};--recap-home:${home.primary}">
         <div class="broadcast-recap-topline">
-          <span>FRANCHISE HQ GAME RECAP</span>
+          <span>FRANCHISE HQ ${recap.isFinal?'GAME RECAP':'GAME PREVIEW'}</span>
           <span>SEASON 4 · WEEK ${game.week}</span>
         </div>
         <div class="broadcast-recap-score">
           <div>${renderTeamMark(away,'featured-team-logo')}<strong>${away.abbr}</strong><small>${away.fullName}</small></div>
-          <span><b>${game.status==='final'?game.awayScore:'—'}</b><em>FINAL</em><b>${game.status==='final'?game.homeScore:'—'}</b></span>
+          <span><b>${recap.isFinal?game.awayScore:'—'}</b><em>${recap.isFinal?'FINAL':'VS'}</em><b>${recap.isFinal?game.homeScore:'—'}</b></span>
           <div>${renderTeamMark(home,'featured-team-logo')}<strong>${home.abbr}</strong><small>${home.fullName}</small></div>
         </div>
         <div class="broadcast-recap-story">
-          <span class="eyebrow">${game.day} · ${game.stadium}</span>
-          <h3>${headline}</h3>
-          <p>${deck}</p>
+          <span class="eyebrow">${game.day} · ${game.time} · ${game.stadium}</span>
+          <h3>${recap.headline}</h3>
+          <p>${recap.story}</p>
         </div>
         <div class="broadcast-stars">
-          ${[...awayTop,...homeTop].sort((a,b)=>b.value-a.value).slice(0,3).map((entry,index)=>`
+          ${recap.allTop.map((entry,index)=>`
             <button type="button" data-open-player-card="${entry.player.id}" class="${index===0?'is-mvp':''}">
               <span class="broadcast-star-rank">${index===0?'MVP':`#${index+1}`}</span>
               <span><strong>${escapeHtml(entry.player.name)}</strong><small>${entry.player.position} · ${teamById(entry.player.teamId).abbr}</small></span>
@@ -1228,11 +1286,201 @@
             </button>`).join('')}
         </div>
         <div class="broadcast-recap-footer">
-          <span>Generated from Franchise HQ game data</span>
-          <button type="button" class="button button--ghost" data-export-recap>Export Recap Image</button>
+          <span>Generated from imported Franchise HQ game data</span>
+          <span>FURIOUS GAMING COMMUNITY</span>
         </div>
       </div>
+
+      <div class="recap-story-panel">
+        <div><span class="eyebrow">Generated headline</span><h4>${recap.headline}</h4></div>
+        <div><span class="eyebrow">Generated game story</span><p>${recap.story}</p></div>
+        <div><span class="eyebrow">Social caption</span><p>${recap.social}</p></div>
+      </div>
     </section>`;
+  }
+
+  function canvasRoundRect(ctx,x,y,w,h,r){
+    const radius=Math.min(r,w/2,h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+radius,y);
+    ctx.arcTo(x+w,y,x+w,y+h,radius);
+    ctx.arcTo(x+w,y+h,x,y+h,radius);
+    ctx.arcTo(x,y+h,x,y,radius);
+    ctx.arcTo(x,y,x+w,y,radius);
+    ctx.closePath();
+  }
+
+  function drawWrappedText(ctx,text,x,y,maxWidth,lineHeight,maxLines){
+    const words=String(text).split(/\s+/);
+    const lines=[];
+    let current='';
+    words.forEach(word=>{
+      const next=current?`${current} ${word}`:word;
+      if(ctx.measureText(next).width>maxWidth&&current){
+        lines.push(current);
+        current=word;
+      }else current=next;
+    });
+    if(current) lines.push(current);
+    const shown=lines.slice(0,maxLines);
+    shown.forEach((line,index)=>ctx.fillText(line,x,y+(index*lineHeight)));
+    return shown.length*lineHeight;
+  }
+
+  function hexToRgb(hex){
+    const clean=String(hex||'#263449').replace('#','');
+    const value=parseInt(clean.length===3?clean.split('').map(x=>x+x).join(''):clean,16);
+    return {r:(value>>16)&255,g:(value>>8)&255,b:value&255};
+  }
+
+  function mixColor(hex,amount=.35){
+    const {r,g,b}=hexToRgb(hex);
+    return `rgb(${Math.round(r*amount)},${Math.round(g*amount)},${Math.round(b*amount)})`;
+  }
+
+  function downloadRecapPng(gameId){
+    const game=schedule.flatMap(week=>week.games).find(item=>item.id===gameId);
+    if(!game||game.status!=='final'){
+      showToast('Final result required','Import the completed game before exporting its broadcast recap.');
+      return;
+    }
+    const away=teamById(game.awayId),home=teamById(game.homeId);
+    const recap=recapStoryData(away,home,game);
+    const format=recapFormatDetails(state.recapFormat);
+    const canvas=document.createElement('canvas');
+    canvas.width=format.width;
+    canvas.height=format.height;
+    const ctx=canvas.getContext('2d');
+    const W=canvas.width,H=canvas.height;
+    const pad=Math.round(W*.055);
+    const portrait=H>W;
+
+    const bg=ctx.createLinearGradient(0,0,W,0);
+    bg.addColorStop(0,mixColor(away.primary,.52));
+    bg.addColorStop(.47,'#08101b');
+    bg.addColorStop(.53,'#08101b');
+    bg.addColorStop(1,mixColor(home.primary,.52));
+    ctx.fillStyle=bg;
+    ctx.fillRect(0,0,W,H);
+
+    ctx.globalAlpha=.16;
+    ctx.fillStyle='#ffffff';
+    for(let i=-H;i<W+H;i+=90){
+      ctx.save();
+      ctx.translate(i,0);
+      ctx.rotate(-.45);
+      ctx.fillRect(0,0,3,H*1.5);
+      ctx.restore();
+    }
+    ctx.globalAlpha=1;
+
+    ctx.fillStyle='rgba(5,10,18,.78)';
+    ctx.fillRect(0,0,W,Math.round(H*.09));
+    ctx.fillRect(0,H-Math.round(H*.07),W,Math.round(H*.07));
+
+    ctx.fillStyle='#ffffff';
+    ctx.font=`900 ${Math.round(W*.018)}px Arial`;
+    ctx.textAlign='left';
+    ctx.fillText('FRANCHISE HQ GAME RECAP',pad,Math.round(H*.057));
+    ctx.textAlign='right';
+    ctx.fillText(`SEASON 4 · WEEK ${game.week}`,W-pad,Math.round(H*.057));
+
+    const logoY=portrait?Math.round(H*.22):Math.round(H*.25);
+    const logoSize=portrait?Math.round(W*.25):Math.round(W*.13);
+    const leftX=portrait?Math.round(W*.26):Math.round(W*.22);
+    const rightX=portrait?Math.round(W*.74):Math.round(W*.78);
+
+    [[away,leftX],[home,rightX]].forEach(([team,x])=>{
+      ctx.fillStyle='rgba(4,8,14,.62)';
+      canvasRoundRect(ctx,x-logoSize/2,logoY-logoSize/2,logoSize,logoSize,logoSize*.22);
+      ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.28)';
+      ctx.lineWidth=Math.max(2,W*.002);
+      ctx.stroke();
+      ctx.fillStyle='#fff';
+      ctx.font=`900 ${Math.round(logoSize*.25)}px Arial`;
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText(team.abbr,x,logoY);
+      ctx.textBaseline='alphabetic';
+      ctx.font=`900 ${Math.round(W*.032)}px Arial`;
+      ctx.fillText(team.abbr,x,logoY+logoSize*.76);
+      ctx.font=`600 ${Math.round(W*.012)}px Arial`;
+      ctx.fillStyle='rgba(255,255,255,.72)';
+      ctx.fillText(team.fullName.toUpperCase(),x,logoY+logoSize*.94);
+    });
+
+    ctx.textAlign='center';
+    ctx.fillStyle='#fff';
+    ctx.font=`900 ${Math.round(portrait?W*.13:W*.072)}px Arial`;
+    const scoreY=logoY+Math.round(logoSize*.05);
+    ctx.fillText(`${game.awayScore}  –  ${game.homeScore}`,W/2,scoreY);
+    ctx.font=`900 ${Math.round(W*.013)}px Arial`;
+    ctx.fillStyle='#9aa8bb';
+    ctx.fillText('FINAL',W/2,scoreY+Math.round(H*.055));
+
+    const storyTop=portrait?Math.round(H*.42):Math.round(H*.48);
+    ctx.fillStyle='rgba(4,8,14,.72)';
+    canvasRoundRect(ctx,pad,storyTop,W-pad*2,portrait?Math.round(H*.22):Math.round(H*.20),Math.round(W*.016));
+    ctx.fill();
+
+    ctx.fillStyle='#53e6c1';
+    ctx.font=`900 ${Math.round(W*.012)}px Arial`;
+    ctx.textAlign='center';
+    ctx.fillText(`${game.day.toUpperCase()} · ${game.time.toUpperCase()} · ${game.stadium.toUpperCase()}`,W/2,storyTop+Math.round(H*.038));
+
+    ctx.fillStyle='#fff';
+    ctx.font=`900 ${Math.round(portrait?W*.052:W*.035)}px Arial`;
+    const headlineY=storyTop+Math.round(H*.09);
+    drawWrappedText(ctx,recap.headline,W/2,headlineY,W-pad*3,Math.round(H*.045),2);
+
+    ctx.fillStyle='rgba(255,255,255,.75)';
+    ctx.font=`500 ${Math.round(W*.014)}px Arial`;
+    const storyY=headlineY+Math.round(H*.1);
+    drawWrappedText(ctx,recap.story,W/2,storyY,W-pad*3,Math.round(H*.028),portrait?5:3);
+
+    const starsY=portrait?Math.round(H*.69):Math.round(H*.72);
+    const starGap=Math.round(W*.018);
+    const starW=portrait?W-pad*2:Math.round((W-pad*2-starGap*2)/3);
+    const starH=portrait?Math.round(H*.075):Math.round(H*.14);
+
+    recap.allTop.forEach((entry,index)=>{
+      const x=portrait?pad:pad+index*(starW+starGap);
+      const y=portrait?starsY+index*(starH+Math.round(H*.012)):starsY;
+      ctx.fillStyle=index===0?'rgba(83,230,193,.16)':'rgba(4,8,14,.72)';
+      canvasRoundRect(ctx,x,y,starW,starH,Math.round(W*.012));
+      ctx.fill();
+      ctx.strokeStyle=index===0?'rgba(83,230,193,.7)':'rgba(255,255,255,.14)';
+      ctx.lineWidth=Math.max(2,W*.0015);
+      ctx.stroke();
+
+      ctx.textAlign='left';
+      ctx.fillStyle=index===0?'#53e6c1':'#9aa8bb';
+      ctx.font=`900 ${Math.round(W*.011)}px Arial`;
+      ctx.fillText(index===0?'GAME MVP':`TOP PERFORMER #${index+1}`,x+Math.round(W*.014),y+Math.round(starH*.28));
+      ctx.fillStyle='#fff';
+      ctx.font=`900 ${Math.round(W*.018)}px Arial`;
+      ctx.fillText(entry.player.name,x+Math.round(W*.014),y+Math.round(starH*.53));
+      ctx.fillStyle='#53e6c1';
+      ctx.font=`700 ${Math.round(W*.011)}px Arial`;
+      ctx.fillText(entry.line,x+Math.round(W*.014),y+Math.round(starH*.78));
+    });
+
+    ctx.fillStyle='#fff';
+    ctx.font=`800 ${Math.round(W*.012)}px Arial`;
+    ctx.textAlign='left';
+    ctx.fillText('FURIOUS GAMING COMMUNITY',pad,H-Math.round(H*.025));
+    ctx.textAlign='right';
+    ctx.fillStyle='#9aa8bb';
+    ctx.fillText(`${format.label.toUpperCase()} · GENERATED BY FRANCHISE HQ`,W-pad,H-Math.round(H*.025));
+
+    const link=document.createElement('a');
+    link.download=`franchise-hq-week-${game.week}-${away.abbr}-${home.abbr}-${state.recapFormat}.png`;
+    link.href=canvas.toDataURL('image/png',1);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast('Broadcast recap downloaded',`${format.label} PNG exported at ${format.width} × ${format.height}.`);
   }
 
   function renderGameCenterTabs(away,home,game){
@@ -1435,10 +1683,33 @@
       return;
     }
 
+    const recapFormat=event.target.closest('[data-recap-format]');
+    if(recapFormat){
+      event.preventDefault();
+      state.recapFormat=recapFormat.dataset.recapFormat;
+      const shell=event.target.closest('.game-center-shell');
+      const active=shell?.querySelector('.game-center-switcher .is-active');
+      if(active) openGameDetail(active.dataset.gameCenterSwitch);
+      return;
+    }
+
     const exportRecap=event.target.closest('[data-export-recap]');
     if(exportRecap){
       event.preventDefault();
-      showToast('Recap export prepared','The broadcast recap is ready for PNG export when the production export service is connected.');
+      downloadRecapPng(exportRecap.dataset.exportRecap);
+      return;
+    }
+
+    const copyRecap=event.target.closest('[data-copy-recap]');
+    if(copyRecap){
+      event.preventDefault();
+      const game=schedule.flatMap(week=>week.games).find(item=>item.id===copyRecap.dataset.copyRecap);
+      if(game){
+        const away=teamById(game.awayId),home=teamById(game.homeId);
+        const recap=recapStoryData(away,home,game);
+        const text=`${recap.headline}\n\n${recap.story}\n\n${recap.social}`;
+        navigator.clipboard?.writeText(text).then(()=>showToast('Recap copied','Headline, game story, and social caption copied to your clipboard.')).catch(()=>showToast('Copy unavailable','Your browser blocked clipboard access.'));
+      }
       return;
     }
 
