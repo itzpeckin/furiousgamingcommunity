@@ -474,7 +474,10 @@
             </div>
           </div>
         </section>
-
+          <section class="home-news-section">
+            <div class="section-heading"><div><span class="section-number">01</span><h2>League News</h2></div><button class="text-button" data-route="news">View all news <svg><use href="#icon-arrow"></use></svg></button></div>
+            <div class="home-news-grid home-news-grid--compact">${recentNews.map(article=>renderNewsCard(article)).join('')}</div>
+          </section>
         </div>
 
         <aside class="league-home-standings">
@@ -483,23 +486,17 @@
         </aside>
       </div>
 
-      <div class="league-home-lower-grid">
-        <section class="home-section home-leaders-section">
-          <div class="section-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div></div>
-          <div class="home-leaders-grid home-leaders-grid--single-row">
-            ${renderHomeLeaderCard('passing','Passing')}
-            ${renderHomeLeaderCard('rushing','Rushing')}
-            ${renderHomeLeaderCard('receiving','Receiving')}
-            ${renderFixedLeaderCard('Tackles','tackles',defensePositions)}
-            ${renderFixedLeaderCard('Sacks','sacks',defensePositions)}
-            ${renderFixedLeaderCard('Interceptions','interceptions',defensePositions)}
-          </div>
-        </section>
-        <section class="home-news-section">
-          <div class="section-heading"><div><span class="section-number">01</span><h2>League News</h2></div><button class="text-button" data-route="news">View all news <svg><use href="#icon-arrow"></use></svg></button></div>
-          <div class="home-news-grid home-news-grid--compact">${recentNews.map(article=>renderNewsCard(article)).join('')}</div>
-        </section>
-      </div>`;
+      <section class="home-section home-leaders-section">
+        <div class="section-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div></div>
+        <div class="home-leaders-grid home-leaders-grid--single-row">
+          ${renderHomeLeaderCard('passing','Passing')}
+          ${renderHomeLeaderCard('rushing','Rushing')}
+          ${renderHomeLeaderCard('receiving','Receiving')}
+          ${renderFixedLeaderCard('Tackles','tackles',defensePositions)}
+          ${renderFixedLeaderCard('Sacks','sacks',defensePositions)}
+          ${renderFixedLeaderCard('Interceptions','interceptions',defensePositions)}
+        </div>
+      </section>`;
   }
 
   function renderActivity() {
@@ -806,7 +803,7 @@
   }
 
   let playerReturnContext = null;
-  function currentPageLabel(route){
+  function playerContextLabel(route){
     if(!route || route==='home') return 'League Home';
     if(route.startsWith('teams/')) return 'Team Page';
     if(route.startsWith('trade-center')) return 'Trade Center';
@@ -819,14 +816,14 @@
   }
   function openPlayerPage(playerId){
     const route=(location.hash||'#home').slice(1)||'home';
-    if(!route.startsWith('players/')) playerReturnContext={route,label:currentPageLabel(route),scrollY:window.scrollY};
+    if(!route.startsWith('players/')) playerReturnContext={route,label:playerContextLabel(route),scrollY:window.scrollY};
     setRoute(`players/${playerId}`);
   }
   function closePlayerPage(){
-    const target=playerReturnContext||{route:'players',label:'Player Database',scrollY:0};
+    const prior=playerReturnContext||{route:'players',label:'Player Database',scrollY:0};
     playerReturnContext=null;
-    setRoute(target.route);
-    requestAnimationFrame(()=>window.scrollTo(0,target.scrollY||0));
+    setRoute(prior.route);
+    requestAnimationFrame(()=>window.scrollTo(0,prior.scrollY||0));
   }
 
   function renderPlayerProfile(playerId) {
@@ -1563,6 +1560,62 @@
   }
 
   const detailHistory = [];
+
+  function playerCardMarkup(player){
+    const team=teamById(player.teamId);
+    const ratings=Object.entries(player.ratings).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const stats=renderPlayerStatBoxes(player);
+    const owned=window.FGC_TRADE?.getCurrentAccount?.()?.teamId===player.teamId;
+    return `<div class="player-card-modal" style="${teamStyle(team)}">
+      <header class="player-card-modal__header">
+        <div class="player-card-modal__team">${renderTeamMark(team,'team-logo')}<span><strong>${team.fullName}</strong><small>${team.record} · ${escapeHtml(team.owner)}</small></span></div>
+        <button type="button" class="icon-button" data-close-player-card aria-label="Close player card"><svg><use href="#icon-close"></use></svg></button>
+      </header>
+      <section class="player-card-modal__hero">
+        <div class="player-card-modal__portrait">${player.initials}</div>
+        <div><span class="eyebrow">#${player.number} · ${player.position}</span><h2>${escapeHtml(player.name)}</h2><p>${player.height} · ${player.weight} lbs · Age ${player.age} · ${escapeHtml(player.college)}</p><div class="player-card-modal__badges"><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span><span class="pill pill--neutral">${player.injury}</span></div></div>
+        <div class="player-card-modal__ovr"><strong>${player.overall}</strong><span>OVR</span></div>
+      </section>
+      <div class="player-card-modal__summary">
+        ${summaryTile('Contract',`${player.years} yrs`,formatMoney(player.salary))}
+        ${summaryTile('Cap Hit',formatMoney(player.capHit),'Current season')}
+        ${summaryTile('Trade Status',player.tradeBlock?'On Block':'Unavailable',player.injury)}
+      </div>
+      <div class="player-card-modal__grid">
+        <section class="player-card-modal__section"><div class="card-header"><div><span class="eyebrow">Season production</span><h3>2026 Statistics</h3></div></div><div class="stat-box-grid">${stats}</div></section>
+        <section class="player-card-modal__section"><div class="card-header"><div><span class="eyebrow">Madden attributes</span><h3>Core Ratings</h3></div></div><div class="rating-bars">${ratings.map(([label,value])=>`<div class="rating-row"><span>${label}</span><div class="rating-track"><div class="rating-fill" style="width:${value}%"></div></div><strong>${value}</strong></div>`).join('')}</div></section>
+      </div>
+      <footer class="player-card-modal__footer">
+        <button type="button" class="button button--ghost" data-close-player-card>Close</button>
+        <div>${owned?`<button type="button" class="button button--ghost" data-toggle-player-block="${player.id}">${window.FGC_TRADE?.onBlock?.(player)?'Remove from Trade Block':'Add to Trade Block'}</button>`:`<button type="button" class="button button--ghost" data-watch-player="${player.id}">${window.FGC_TRADE?.isWatched?.(player.id)?'Watching':'Watch Player'}</button><button type="button" class="button button--primary" data-add-player-trade="${player.id}">Add to Trade</button>`}</div>
+      </footer>
+    </div>`;
+  }
+
+  function openPlayerCard(playerId){
+    const player=playerById(playerId);
+    if(!player) return;
+    if(detailModal.classList.contains('is-open')){
+      detailHistory.push(detailContent.innerHTML);
+    }
+    detailContent.innerHTML=playerCardMarkup(player);
+    detailModal.classList.add('is-open','is-player-card-open');
+    detailModal.setAttribute('aria-hidden','false');
+    body.style.overflow='hidden';
+  }
+
+  function closePlayerCard(){
+    detailModal.classList.remove('is-player-card-open');
+    const previous=detailHistory.pop();
+    if(previous){
+      detailContent.innerHTML=previous;
+      detailModal.classList.add('is-open');
+      detailModal.setAttribute('aria-hidden','false');
+      body.style.overflow='hidden';
+    }else{
+      closeDetail();
+    }
+  }
 
   function openNewsDetail(newsId) {
     const article=[...(window.FGC_TRADE?.getApprovedNews?.() || []), ...newsArticles].find(item=>item.id===newsId);
