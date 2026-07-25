@@ -319,26 +319,6 @@
     }
   }
 
-  function watchForPrototypeProfileChanges() {
-    const profileArea = document.querySelector('.topbar__right');
-
-    if (!profileArea) {
-      return;
-    }
-
-    const observer = new MutationObserver(() => {
-      if (!isRendering) {
-        renderAuthenticatedAccount();
-      }
-    });
-
-    observer.observe(profileArea, {
-      childList: true,
-      subtree: true,
-      characterData: true
-    });
-  }
-
   function initialize() {
     document.addEventListener(
       'click',
@@ -356,7 +336,6 @@
       renderSimulationIdentity
     );
 
-    watchForPrototypeProfileChanges();
     renderAuthenticatedAccount();
   }
 
