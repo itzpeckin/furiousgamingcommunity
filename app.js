@@ -1,2 +1,0 @@
-import{json,requireCommissioner,requireBindings,LEAGUE_ID}from'./_shared.js';
-export async function onRequestPost({request,env}){const auth=requireCommissioner(request,env);if(auth)return auth;const binding=requireBindings(env);if(binding)return binding;try{const now=new Date().toISOString();await env.DB.prepare('UPDATE discord_connections SET connected=0,channel_id=NULL,channel_name=NULL,updated_at=? WHERE league_id=?').bind(now,LEAGUE_ID).run();return json({connected:false})}catch(e){return json({error:e.message},500)}}
