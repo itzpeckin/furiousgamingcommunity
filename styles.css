@@ -2758,3 +2758,133 @@ table td{
   .ownership-modal-grid { grid-template-columns:1fr; }
   .ownership-discord-section { align-items:flex-start; flex-direction:column; }
 }
+/* =========================================================
+   PHASE 3E — AUTHENTICATED ACCOUNT + SIMULATION IDENTITY
+   ========================================================= */
+
+.avatar.avatar--image {
+  overflow: hidden;
+  padding: 0;
+  background: var(--surface-2);
+}
+
+.avatar.avatar--image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.account-menu-header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px 13px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.account-menu-header__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+}
+
+.account-menu-header__copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.account-menu-header__copy strong,
+.account-menu-header__copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-header__copy strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.account-menu-header__copy small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.profile-menu__section {
+  display: grid;
+  gap: 3px;
+  padding-top: 7px;
+}
+
+.profile-menu__section + .profile-menu__section {
+  margin-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.profile-menu__section-label {
+  padding: 3px 10px 5px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.simulation-identity {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin: 0 4px 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.simulation-identity__status {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(
+    in srgb,
+    var(--accent) 16%,
+    transparent
+  );
+}
+
+.simulation-identity__copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.simulation-identity__copy strong,
+.simulation-identity__copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulation-identity__copy strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.simulation-identity__copy small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.profile-menu button.profile-menu__danger strong {
+  color: var(--danger);
+}
+
+.profile-menu button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
