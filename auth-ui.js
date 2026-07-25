@@ -339,10 +339,16 @@
     renderAuthenticatedAccount();
   }
 
-  window.FranchiseHQ.accountUI = Object.freeze({
+  const accountUIService = {
     render: renderAuthenticatedAccount,
     renderSimulation: renderSimulationIdentity
-  });
+  };
+
+  if (window.FranchiseHQ.defineService) {
+    window.FranchiseHQ.defineService('accountUI', accountUIService, { replace: true });
+  } else {
+    window.FranchiseHQ.accountUI = Object.freeze(accountUIService);
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initialize);

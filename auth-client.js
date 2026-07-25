@@ -214,7 +214,7 @@
     return leagueState.activeLeague;
   }
 
-  window.FranchiseHQ.auth = Object.freeze({
+  const authService = {
     refresh,
     login,
     logout,
@@ -230,12 +230,20 @@
     getDisplayName,
     getRoleTag,
     getAvatarUrl
-  });
+  };
 
-  window.FranchiseHQ.league = Object.freeze({
+  const leagueService = {
     setActiveLeague,
     getActiveLeague
-  });
+  };
+
+  if (window.FranchiseHQ.defineService) {
+    window.FranchiseHQ.defineService('auth', authService, { replace: true });
+    window.FranchiseHQ.defineService('league', leagueService, { replace: true });
+  } else {
+    window.FranchiseHQ.auth = Object.freeze(authService);
+    window.FranchiseHQ.league = Object.freeze(leagueService);
+  }
 
   refresh();
 })();
