@@ -1562,15 +1562,22 @@
   }
 
   function commissionerAccessState() {
-    const auth=window.FranchiseHQ?.auth;
-    const snapshot=auth?.getSnapshot?.();
+    const platform=window.FranchiseHQ;
+    const auth=platform?.auth;
+    const permissions=platform?.permissions;
+
+    // On a hard refresh, app.js loads before auth-client.js and
+    // platform/permissions.js. Treat that brief period as unresolved instead
+    // of falling back to the simulated role and redirecting the real
+    // commissioner away from Commissioner HQ.
+    if (!auth?.getSnapshot || typeof permissions?.canOpenCommissionerHQ!=='function') {
+      return null;
+    }
+
+    const snapshot=auth.getSnapshot();
     if (snapshot?.status==='loading') return null;
 
-    const permissionCheck=window.FranchiseHQ?.permissions?.canOpenCommissionerHQ;
-    if (typeof permissionCheck==='function') return permissionCheck()===true;
-
-    // Compatibility fallback used only while the new platform services load.
-    return state.role==='commissioner';
+    return permissions.canOpenCommissionerHQ()===true;
   }
 
   function syncCommissionerAccess() {
