@@ -396,7 +396,9 @@ function renderCommissionerRules(){
  </div>
  ${renderProjectionEditor()}`}
 function renderCommissioner(){
- if(me().role!=='commissioner')return;
+ // Authorization is enforced by app.js through FranchiseHQ.permissions.
+ // The simulated trade account only controls workflow perspective and must
+ // never hide Commissioner HQ for an authenticated commissioner.
  const tab=commissionerTab();
  pageContent.innerHTML=`<div class="page-heading commissioner-page-heading"><div><span class="eyebrow">Protected league operations</span><h1>Commissioner HQ</h1><p>Import franchise data, manage teams and owners, and control Franchise HQ league settings.</p></div><button class="button button--ghost" data-reset-demo>Reset demo data</button></div>
  <nav class="commissioner-tabs" aria-label="Commissioner HQ sections">
