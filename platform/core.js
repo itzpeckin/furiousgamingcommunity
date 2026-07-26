@@ -9,8 +9,8 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '3.5.0-epic3',
-    build: 'centralized-simulation-service'
+    version: '3.5.0-epic3.1',
+    build: 'commissioner-refresh-gate-hotfix'
   });
 
   function defineService(name, service, options = {}) {
