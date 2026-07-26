@@ -1561,6 +1561,33 @@
     else location.hash=route;
   }
 
+  function commissionerAccessState() {
+    const auth=window.FranchiseHQ?.auth;
+    const snapshot=auth?.getSnapshot?.();
+    if (snapshot?.status==='loading') return null;
+
+    const permissionCheck=window.FranchiseHQ?.permissions?.canOpenCommissionerHQ;
+    if (typeof permissionCheck==='function') return permissionCheck()===true;
+
+    // Compatibility fallback used only while the new platform services load.
+    return state.role==='commissioner';
+  }
+
+  function syncCommissionerAccess() {
+    const access=commissionerAccessState();
+    if (access===null) return;
+
+    document.querySelectorAll('[data-role-link="commissioner"]').forEach(link=>{
+      link.hidden=!access;
+      link.setAttribute('aria-hidden',String(!access));
+    });
+
+    if (!access && routeBase(location.hash.slice(1))==='commissioner') {
+      showToast('Commissioner access required','Your authenticated league membership does not include Commissioner capabilities.');
+      setRoute('home');
+    }
+  }
+
   function renderRoute(routeInput=location.hash.slice(1)||'home') {
     const route=routeInput||'home';
     const [base,id]=route.split('/');
@@ -1585,9 +1612,20 @@
       case 'trade-center': window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : renderRoadmap(base); break;
       case 'trade-block': window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : renderRoadmap(base); break;
       case 'design-system': renderDesignSystem(); break;
-      case 'commissioner':
-        if (state.role!=='commissioner') { showToast('Commissioner access required','Switch to the Commissioner account to access Commissioner HQ.'); setRoute('home'); return; }
-        window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base); break;
+      case 'commissioner': {
+        const access=commissionerAccessState();
+        if (access===null) {
+          pageContent.innerHTML='<section class="empty-state"><strong>Checking Commissioner access…</strong><p>Franchise HQ is validating your authenticated league membership.</p></section>';
+          break;
+        }
+        if (!access) {
+          showToast('Commissioner access required','Your authenticated league membership does not include Commissioner capabilities.');
+          setRoute('home');
+          return;
+        }
+        window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base);
+        break;
+      }
       default: renderRoadmap(base);
     }
     const pageTitle=base==='my-team' ? (teamById(window.FGC_TRADE?.getCurrentAccount?.()?.teamId)?.fullName||'My Team') : id ? (base==='teams'?teamById(id)?.fullName:playerById(id)?.name) : pageNames[base];
@@ -1598,7 +1636,7 @@
 
   function buildCommandResults(query='') {
     const term=query.trim().toLowerCase();
-    const pageItems=Object.entries(pageNames).filter(([key])=>key!=='commissioner'||state.role==='commissioner').map(([route,label])=>({type:'Page',label,detail:'Open league page',route,icon:pageIcon(route)}));
+    const pageItems=Object.entries(pageNames).filter(([key])=>key!=='commissioner'||commissionerAccessState()===true).map(([route,label])=>({type:'Page',label,detail:'Open league page',route,icon:pageIcon(route)}));
     const teamItems=teams.map(team=>({type:'Team',label:team.fullName,detail:`${team.abbr} · ${team.record} · ${team.owner}`,route:`teams/${team.id}`,abbr:team.abbr,team}));
     const playerItems=players.filter(player=>player.overall>=82).map(player=>({type:'Player',label:player.name,detail:`${player.position} · ${player.teamAbbr} · ${player.overall} OVR`,route:`players/${player.id}`,player}));
     const newsItems=newsArticles.map(article=>({type:'News',label:article.title,detail:`${article.category} · ${article.time}`,newsId:article.id,icon:'icon-news'}));
@@ -1657,11 +1695,10 @@
     state.role=labels[role]?role:'commissioner';
     document.querySelector('[data-current-role]').textContent=labels[state.role];
     document.querySelectorAll('[data-role]').forEach(button=>button.classList.toggle('is-selected',button.dataset.role===state.role));
-    document.querySelectorAll('[data-role-link="commissioner"]').forEach(link=>{link.hidden=state.role!=='commissioner';});
+    syncCommissionerAccess();
     localStorage.setItem('m1b-role',state.role);
     closeProfileMenu();
-    if (notify) showToast(`${labels[state.role]} preview active`,state.role==='commissioner'?'All prototype navigation is visible.':'Commissioner-only navigation is hidden.');
-    if (state.role!=='commissioner'&&routeBase(location.hash.slice(1))==='commissioner') setRoute('home');
+    if (notify) showToast(`${labels[state.role]} preview active`,'Simulation changes the workflow perspective only. Authenticated permissions remain unchanged.');
   }
 
   function showToast(title,copy) {
@@ -1866,13 +1903,19 @@
     if (event.key==='Escape') { closeCommand(); closeDetail(); closeStylePanel(); closeSidebar(); closeProfileMenu(); }
   });
 
+  window.addEventListener('franchisehq:auth-changed', event=>{
+    syncCommissionerAccess();
+    if (event.detail?.status==='ready' && routeBase(location.hash.slice(1))==='commissioner') renderRoute('commissioner');
+  });
+
   window.addEventListener('hashchange',()=>renderRoute());
 
   window.FGC_APP = {
     teams, players, schedule, newsArticles, state, pageContent,
     teamById, playerById, teamStyle, renderTeamMark, renderPlayerIdentity,
     devClass, formatMoney, escapeHtml, setRoute, renderRoute, showToast,
-    openDetail, closeDetail, applyRole, closeProfileMenu
+    openDetail, closeDetail, applyRole, closeProfileMenu,
+    commissionerAccessState, syncCommissionerAccess
   };
 
   applyAccent(state.accent,false);
