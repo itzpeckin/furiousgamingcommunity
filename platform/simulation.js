@@ -6,50 +6,121 @@
     throw new Error('platform/core.js must load before platform/simulation.js.');
   }
 
-  function getPerspective() {
-    return window.FGC_TRADE?.getCurrentAccount?.() || null;
+  const ROLE_KEY = 'franchisehq-simulation-role';
+  const LEGACY_ROLE_KEY = 'm1b-role';
+  const ACCOUNT_KEY = 'franchisehq-simulation-account';
+  const VALID_ROLES = new Set(['commissioner', 'owner', 'committee', 'guest']);
+
+  function normalizeRole(role) {
+    return VALID_ROLES.has(role) ? role : 'commissioner';
+  }
+
+  function initialRole() {
+    const current = localStorage.getItem(ROLE_KEY);
+    if (current) return normalizeRole(current);
+
+    const legacy = localStorage.getItem(LEGACY_ROLE_KEY);
+    const migrated = normalizeRole(legacy);
+    localStorage.setItem(ROLE_KEY, migrated);
+    return migrated;
+  }
+
+  let role = initialRole();
+  let accountId = localStorage.getItem(ACCOUNT_KEY) || null;
+
+  function getAccount() {
+    const current = window.FGC_TRADE?.getCurrentAccount?.() || null;
+    if (current) return current;
+    if (!accountId) return null;
+    return window.FGC_TRADE?.accounts?.find?.((account) => account.id === accountId) || null;
   }
 
   function getTeam() {
-    const perspective = getPerspective();
-    if (!perspective?.teamId) return null;
-    return window.FGC_APP?.teamById?.(perspective.teamId) || null;
+    const account = getAccount();
+    if (!account?.teamId) return null;
+    return window.FGC_APP?.teamById?.(account.teamId) || null;
   }
 
-  function setPerspective(accountId) {
-    if (!window.FGC_TRADE?.setUser) {
-      return { ok: false, error: 'The prototype simulation adapter is not ready.' };
+  function emitChange(source = 'simulation') {
+    const detail = snapshot();
+    HQ.events?.emit?.('simulation-changed', { ...detail, source });
+    window.dispatchEvent(new CustomEvent('franchisehq:simulation-changed', {
+      detail: { ...detail, source }
+    }));
+    return detail;
+  }
+
+  function setRole(nextRole, options = {}) {
+    const normalized = normalizeRole(nextRole);
+    const changed = normalized !== role;
+    role = normalized;
+    localStorage.setItem(ROLE_KEY, role);
+
+    // Keep the old key synchronized during the compatibility period.
+    localStorage.setItem(LEGACY_ROLE_KEY, role);
+
+    return options.silent || !changed
+      ? snapshot()
+      : emitChange(options.source || 'role-selector');
+  }
+
+  function setAccount(nextAccountId, options = {}) {
+    accountId = nextAccountId || null;
+    if (accountId) localStorage.setItem(ACCOUNT_KEY, accountId);
+    else localStorage.removeItem(ACCOUNT_KEY);
+
+    const account = getAccount();
+    if (options.syncRole !== false && account?.role) {
+      role = normalizeRole(account.role);
+      localStorage.setItem(ROLE_KEY, role);
+      localStorage.setItem(LEGACY_ROLE_KEY, role);
     }
 
-    window.FGC_TRADE.setUser(accountId);
-    const detail = { perspective: getPerspective(), team: getTeam() };
-    HQ.events?.emit?.('simulation-changed', detail);
-    return { ok: true, ...detail };
+    return options.silent
+      ? snapshot()
+      : emitChange(options.source || 'account-selector');
   }
 
-  function isActive() {
-    return Boolean(getPerspective());
+  function setPerspective(nextAccountId, options = {}) {
+    if (!window.FGC_TRADE?.setUser) {
+      return { ok: false, error: 'The prototype account adapter is not ready.' };
+    }
+
+    window.FGC_TRADE.setUser(nextAccountId, {
+      source: options.source || 'simulation-service'
+    });
+
+    return { ok: true, ...snapshot() };
   }
 
   function getRole() {
-    return getPerspective()?.role || null;
+    return role;
+  }
+
+  function isActive() {
+    return Boolean(getAccount() || role);
   }
 
   function snapshot() {
     return Object.freeze({
       active: isActive(),
-      perspective: getPerspective(),
-      team: getTeam(),
-      role: getRole()
+      role,
+      accountId: getAccount()?.id || accountId,
+      perspective: getAccount(),
+      team: getTeam()
     });
   }
 
   HQ.defineService('simulation', {
-    getPerspective,
-    getTeam,
-    setPerspective,
-    isActive,
+    roles: Object.freeze(Array.from(VALID_ROLES)),
     getRole,
+    setRole,
+    getAccount,
+    setAccount,
+    getPerspective: getAccount,
+    setPerspective,
+    getTeam,
+    isActive,
     getSnapshot: snapshot
   });
 })();
