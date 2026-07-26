@@ -2,70 +2,77 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService) {
-    throw new Error('platform/core.js must load before platform/permissions.js.');
-  }
+  if (!HQ?.defineService) throw new Error('platform/core.js must load before platform/permissions.js.');
 
   const POLICIES = Object.freeze({
     OPEN_COMMISSIONER_HQ: 'openCommissionerHQ',
     IMPORT_LEAGUE: 'importLeague',
     EDIT_LEAGUE_SETTINGS: 'editLeagueSettings',
     MANAGE_TEAMS: 'manageTeams',
+    CREATE_TRADE: 'createTrade',
+    MANAGE_TRADE_BLOCK: 'manageTradeBlock',
     REVIEW_TRADES: 'reviewTrades',
-    VOTE_ON_TRADES: 'voteOnTrades',
-    CREATE_TRADE: 'createTrade'
+    VOTE_ON_TRADES: 'voteOnTrades'
   });
 
-  function membership() {
-    return HQ.auth?.getMembership?.() || null;
-  }
+  const PLATFORM_POLICIES = new Set([
+    POLICIES.OPEN_COMMISSIONER_HQ,
+    POLICIES.IMPORT_LEAGUE,
+    POLICIES.EDIT_LEAGUE_SETTINGS,
+    POLICIES.MANAGE_TEAMS
+  ]);
 
+  function authMembership() { return HQ.auth?.getMembership?.() || null; }
+  function authRole() { return HQ.auth?.getRole?.() || null; }
   function isActiveMember() {
-    const current = membership();
-    return Boolean(HQ.auth?.isAuthenticated?.() && current?.active !== false);
+    const membership = authMembership();
+    return Boolean(HQ.auth?.isAuthenticated?.() && membership?.active !== false);
+  }
+  function isCommissioner() { return isActiveMember() && authRole() === 'commissioner'; }
+
+  function perspective(context = {}) {
+    return context.perspective || HQ.simulation?.getPerspective?.() || HQ.simulation?.getSnapshot?.()?.perspective || null;
+  }
+  function perspectiveRole(context = {}) {
+    return context.role || perspective(context)?.role || HQ.simulation?.getRole?.() || 'guest';
+  }
+  function perspectiveTeamId(context = {}) {
+    return context.teamId || perspective(context)?.teamId || HQ.simulation?.getTeam?.()?.id || null;
   }
 
-  function role() {
-    return HQ.auth?.getRole?.() || null;
-  }
+  function evaluate(permission, context = {}) {
+    if (PLATFORM_POLICIES.has(permission)) return isCommissioner();
 
-  function isCommissioner() {
-    return isActiveMember() && role() === 'commissioner';
-  }
-
-  function isCommittee() {
-    return isActiveMember() && ['commissioner', 'trade_committee'].includes(role());
-  }
-
-  function evaluate(permission) {
+    const role = perspectiveRole(context);
+    const teamId = perspectiveTeamId(context);
     switch (permission) {
-      case POLICIES.OPEN_COMMISSIONER_HQ:
-      case POLICIES.IMPORT_LEAGUE:
-      case POLICIES.EDIT_LEAGUE_SETTINGS:
-      case POLICIES.MANAGE_TEAMS:
-        return isCommissioner();
+      case POLICIES.CREATE_TRADE:
+      case POLICIES.MANAGE_TRADE_BLOCK:
+        return Boolean(teamId && ['owner', 'commissioner'].includes(role));
       case POLICIES.REVIEW_TRADES:
       case POLICIES.VOTE_ON_TRADES:
-        return isCommittee();
-      case POLICIES.CREATE_TRADE:
-        return isActiveMember();
+        return ['committee', 'commissioner'].includes(role);
       default:
         return false;
     }
   }
 
-  function explain(permission) {
-    const allowed = evaluate(permission);
+  function explain(permission, context = {}) {
+    const platformPolicy = PLATFORM_POLICIES.has(permission);
+    const allowed = evaluate(permission, context);
     return {
       allowed,
       permission,
+      scope: platformPolicy ? 'authenticated-platform' : 'simulated-workflow',
       authenticated: HQ.auth?.isAuthenticated?.() === true,
       activeMembership: isActiveMember(),
-      role: role(),
+      authenticatedRole: authRole(),
+      simulationRole: perspectiveRole(context),
+      simulationTeamId: perspectiveTeamId(context),
       league: HQ.league?.getActiveLeague?.() || null,
-      reason: allowed
-        ? 'allowed'
-        : 'The authenticated league membership does not grant this capability.'
+      reason: allowed ? 'allowed' : platformPolicy
+        ? 'The authenticated league membership does not grant this capability.'
+        : 'The active simulation perspective does not grant this workflow capability.'
     };
   }
 
@@ -73,12 +80,14 @@
     POLICIES,
     can: evaluate,
     explain,
+    isCommissioner,
     canOpenCommissionerHQ: () => evaluate(POLICIES.OPEN_COMMISSIONER_HQ),
     canImportLeague: () => evaluate(POLICIES.IMPORT_LEAGUE),
     canEditLeagueSettings: () => evaluate(POLICIES.EDIT_LEAGUE_SETTINGS),
     canManageTeams: () => evaluate(POLICIES.MANAGE_TEAMS),
-    canReviewTrades: () => evaluate(POLICIES.REVIEW_TRADES),
-    canVoteOnTrades: () => evaluate(POLICIES.VOTE_ON_TRADES),
-    canCreateTrade: () => evaluate(POLICIES.CREATE_TRADE)
+    canCreateTrade: (context) => evaluate(POLICIES.CREATE_TRADE, context),
+    canManageTradeBlock: (context) => evaluate(POLICIES.MANAGE_TRADE_BLOCK, context),
+    canReviewTrades: (context) => evaluate(POLICIES.REVIEW_TRADES, context),
+    canVoteOnTrades: (context) => evaluate(POLICIES.VOTE_ON_TRADES, context)
   });
 })();
