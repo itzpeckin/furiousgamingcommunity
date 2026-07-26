@@ -9,7 +9,7 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '3.5.0-epic5',
+    version: '3.5.1-epic5.1',
     build: 'central-navigation-service'
   });
 
