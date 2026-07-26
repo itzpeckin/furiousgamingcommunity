@@ -13,7 +13,7 @@ document.addEventListener('click',e=>{
  const r=e.target.closest('[data-dev-route]');if(r){close();app.setRoute(r.dataset.devRoute);return;}
  if(e.target.closest('[data-dev-open-login]')){close();getTrade()?.openLogin();return;}
  if(e.target.closest('[data-dev-seed]')){if(confirm('Restore the original seeded trade data?')){getTrade()?.resetDemo();app.showToast('Seed data restored','Trades, votes, and demo conversations were reset.');populate();}return;}
- if(e.target.closest('[data-dev-clear]')){if(confirm('Clear all Franchise HQ browser data and reload?')){Object.keys(localStorage).filter(k=>k.startsWith('fgc-')||k.startsWith('m1b-')).forEach(k=>localStorage.removeItem(k));location.reload();}return;}
+ if(e.target.closest('[data-dev-clear]')){if(confirm('Clear all Franchise HQ browser data and reload?')){window.FranchiseHQ?.store?.clearFranchiseHQ?.({source:'developer-mode'});location.reload();}return;}
 });
 modal.addEventListener('change',e=>{
  if(e.target.matches('[data-dev-account]')){getTrade()?.setUser(e.target.value);populate();return;}

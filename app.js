@@ -25,9 +25,9 @@
   };
 
   const state = {
-    role: window.FranchiseHQ?.simulation?.getRole?.() || localStorage.getItem('m1b-role') || 'commissioner',
-    accent: localStorage.getItem('m1b-accent') || 'blue',
-    density: localStorage.getItem('m1b-density') || 'comfortable',
+    role: window.FranchiseHQ?.simulation?.getRole?.() || window.FranchiseHQ?.store?.getString?.('m1b-role', 'commissioner') || 'commissioner',
+    accent: window.FranchiseHQ?.store?.getString?.('m1b-accent', 'blue') || 'blue',
+    density: window.FranchiseHQ?.store?.getString?.('m1b-density', 'comfortable') || 'comfortable',
     teamSearch: '',
     teamConference: 'All',
     teamDivision: 'All',
@@ -1691,14 +1691,14 @@
     const accent=accents[name]||accents.blue; state.accent=name in accents?name:'blue';
     document.documentElement.style.setProperty('--accent',accent.hex); document.documentElement.style.setProperty('--accent-rgb',accent.rgb);
     document.querySelectorAll('[data-accent]').forEach(button=>button.classList.toggle('is-active',button.dataset.accent===state.accent));
-    localStorage.setItem('m1b-accent',state.accent);
+    window.FranchiseHQ?.store?.setString?.('m1b-accent',state.accent,{source:'appearance'});
     if (notify) showToast(`${accent.label} applied`,'Your appearance preference is saved in this browser.');
   }
 
   function applyDensity(density) {
     state.density=density==='compact'?'compact':'comfortable'; body.dataset.density=state.density;
     document.querySelectorAll('[data-density]').forEach(button=>button.classList.toggle('is-active',button.dataset.density===state.density));
-    localStorage.setItem('m1b-density',state.density);
+    window.FranchiseHQ?.store?.setString?.('m1b-density',state.density,{source:'appearance'});
   }
 
   function applyRole(role,notify=false) {
