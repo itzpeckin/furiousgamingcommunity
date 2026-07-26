@@ -3,6 +3,11 @@
 
   window.FranchiseHQ = window.FranchiseHQ || {};
 
+  const api = window.FranchiseHQ.api;
+  if (!api) {
+    throw new Error('platform/api.js must load before auth-client.js.');
+  }
+
   const authState = {
     status: 'loading',
     authenticated: false,
@@ -55,21 +60,7 @@
     notifyAuthChanged();
 
     try {
-      const response = await fetch('/api/auth/me', {
-        method: 'GET',
-        credentials: 'same-origin',
-        headers: {
-          Accept: 'application/json'
-        }
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok || payload.ok === false) {
-        throw new Error(
-          payload.error || 'Unable to load the authenticated user.'
-        );
-      }
+      const payload = await api.endpoints.auth.me();
 
       applyAuthResponse(payload);
       notifyAuthChanged();
@@ -89,24 +80,12 @@
   }
 
   function login() {
-    window.location.assign('/api/auth/discord/login');
+    window.location.assign(api.buildUrl('/api/auth/discord/login'));
   }
 
   async function logout() {
     try {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          Accept: 'application/json'
-        }
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok || payload.ok === false) {
-        throw new Error(payload.error || 'Unable to log out.');
-      }
+      await api.endpoints.auth.logout();
 
       resetAuthState();
       notifyAuthChanged();
