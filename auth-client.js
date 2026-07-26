@@ -12,10 +12,6 @@
     error: null
   };
 
-  const leagueState = {
-    activeLeague: null
-  };
-
   function notifyAuthChanged() {
     window.dispatchEvent(
       new CustomEvent('franchisehq:auth-changed', {
@@ -198,23 +194,8 @@
     return authState.user?.avatarUrl || null;
   }
 
-  function setActiveLeague(league) {
-    leagueState.activeLeague = league || null;
 
-    window.dispatchEvent(
-      new CustomEvent('franchisehq:league-changed', {
-        detail: {
-          activeLeague: leagueState.activeLeague
-        }
-      })
-    );
-  }
-
-  function getActiveLeague() {
-    return leagueState.activeLeague;
-  }
-
-  const authService = {
+  window.FranchiseHQ.auth = Object.freeze({
     refresh,
     login,
     logout,
@@ -230,20 +211,7 @@
     getDisplayName,
     getRoleTag,
     getAvatarUrl
-  };
-
-  const leagueService = {
-    setActiveLeague,
-    getActiveLeague
-  };
-
-  if (window.FranchiseHQ.defineService) {
-    window.FranchiseHQ.defineService('auth', authService, { replace: true });
-    window.FranchiseHQ.defineService('league', leagueService, { replace: true });
-  } else {
-    window.FranchiseHQ.auth = Object.freeze(authService);
-    window.FranchiseHQ.league = Object.freeze(leagueService);
-  }
+  });
 
   refresh();
 })();
