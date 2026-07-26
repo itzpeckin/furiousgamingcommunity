@@ -2,6 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
+  const dataStore = HQ?.store;
   if (!HQ?.defineService) {
     throw new Error('platform/core.js must load before platform/simulation.js.');
   }
@@ -16,17 +17,17 @@
   }
 
   function initialRole() {
-    const current = localStorage.getItem(ROLE_KEY);
+    const current = dataStore?.getString?.(ROLE_KEY, null);
     if (current) return normalizeRole(current);
 
-    const legacy = localStorage.getItem(LEGACY_ROLE_KEY);
+    const legacy = dataStore?.getString?.(LEGACY_ROLE_KEY, null);
     const migrated = normalizeRole(legacy);
-    localStorage.setItem(ROLE_KEY, migrated);
+    dataStore?.setString?.(ROLE_KEY, migrated, { source: 'simulation-migration' });
     return migrated;
   }
 
   let role = initialRole();
-  let accountId = localStorage.getItem(ACCOUNT_KEY) || null;
+  let accountId = dataStore?.getString?.(ACCOUNT_KEY, null) || null;
 
   function getAccount() {
     const current = window.FGC_TRADE?.getCurrentAccount?.() || null;
@@ -54,10 +55,10 @@
     const normalized = normalizeRole(nextRole);
     const changed = normalized !== role;
     role = normalized;
-    localStorage.setItem(ROLE_KEY, role);
+    dataStore?.setString?.(ROLE_KEY, role, { source: 'simulation' });
 
     // Keep the old key synchronized during the compatibility period.
-    localStorage.setItem(LEGACY_ROLE_KEY, role);
+    dataStore?.setString?.(LEGACY_ROLE_KEY, role, { source: 'simulation-legacy' });
 
     return options.silent || !changed
       ? snapshot()
@@ -66,14 +67,14 @@
 
   function setAccount(nextAccountId, options = {}) {
     accountId = nextAccountId || null;
-    if (accountId) localStorage.setItem(ACCOUNT_KEY, accountId);
-    else localStorage.removeItem(ACCOUNT_KEY);
+    if (accountId) dataStore?.setString?.(ACCOUNT_KEY, accountId, { source: 'simulation-account' });
+    else dataStore?.remove?.(ACCOUNT_KEY, { source: 'simulation-account' });
 
     const account = getAccount();
     if (options.syncRole !== false && account?.role) {
       role = normalizeRole(account.role);
-      localStorage.setItem(ROLE_KEY, role);
-      localStorage.setItem(LEGACY_ROLE_KEY, role);
+      dataStore?.setString?.(ROLE_KEY, role, { source: 'simulation' });
+      dataStore?.setString?.(LEGACY_ROLE_KEY, role, { source: 'simulation-legacy' });
     }
 
     return options.silent

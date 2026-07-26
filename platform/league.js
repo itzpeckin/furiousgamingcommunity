@@ -2,6 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
+  const dataStore = HQ?.store;
 
   if (!HQ?.defineService) {
     throw new Error('FranchiseHQ core must load before platform/league.js.');
@@ -86,10 +87,10 @@
   function persistActiveLeague(league) {
     try {
       if (!league?.id) {
-        localStorage.removeItem(STORAGE_KEY);
+        dataStore?.remove?.(STORAGE_KEY, { source: 'league' });
         return;
       }
-      localStorage.setItem(STORAGE_KEY, league.id);
+      dataStore?.setString?.(STORAGE_KEY, league.id, { source: 'league' });
     } catch (error) {
       console.warn('Unable to persist the active Franchise HQ league.', error);
     }
@@ -97,7 +98,7 @@
 
   function preferredLeagueId() {
     try {
-      return localStorage.getItem(STORAGE_KEY);
+      return dataStore?.getString?.(STORAGE_KEY, null) || null;
     } catch {
       return null;
     }
