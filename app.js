@@ -25,7 +25,7 @@
   };
 
   const state = {
-    role: localStorage.getItem('m1b-role') || 'commissioner',
+    role: window.FranchiseHQ?.simulation?.getRole?.() || localStorage.getItem('m1b-role') || 'commissioner',
     accent: localStorage.getItem('m1b-accent') || 'blue',
     density: localStorage.getItem('m1b-density') || 'comfortable',
     teamSearch: '',
@@ -1691,14 +1691,19 @@
   }
 
   function applyRole(role,notify=false) {
-    const labels={commissioner:'Commissioner',owner:'Team Owner',committee:'Trade Committee'};
-    state.role=labels[role]?role:'commissioner';
-    document.querySelector('[data-current-role]').textContent=labels[state.role];
+    const labels={commissioner:'Commissioner',owner:'Team Owner',committee:'Trade Committee',guest:'Guest'};
+    const simulation=window.FranchiseHQ?.simulation;
+    const result=simulation?.setRole?.(role,{silent:true,source:'app-role-selector'});
+    state.role=result?.role || (labels[role]?role:'commissioner');
+    const currentRole=document.querySelector('[data-current-role]');
+    if(currentRole) currentRole.textContent=labels[state.role]||labels.commissioner;
     document.querySelectorAll('[data-role]').forEach(button=>button.classList.toggle('is-selected',button.dataset.role===state.role));
     syncCommissionerAccess();
-    localStorage.setItem('m1b-role',state.role);
     closeProfileMenu();
-    if (notify) showToast(`${labels[state.role]} preview active`,'Simulation changes the workflow perspective only. Authenticated permissions remain unchanged.');
+    if (notify) {
+      simulation?.setRole?.(state.role,{source:'app-role-selector'});
+      showToast(`${labels[state.role]||labels.commissioner} preview active`,'Simulation changes the workflow perspective only. Authenticated permissions remain unchanged.');
+    }
   }
 
   function showToast(title,copy) {
@@ -1920,6 +1925,10 @@
 
   applyAccent(state.accent,false);
   applyDensity(state.density);
-  applyRole(state.role,false);
+  window.addEventListener('franchisehq:simulation-changed',event=>{
+    const nextRole=event.detail?.role;
+    if(nextRole && nextRole!==state.role) applyRole(nextRole,false);
+  });
+  applyRole(window.FranchiseHQ?.simulation?.getRole?.() || state.role,false);
   renderRoute();
 })();
