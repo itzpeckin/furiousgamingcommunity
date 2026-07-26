@@ -9,8 +9,8 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '3.5.1-epic5.1',
-    build: 'central-navigation-service'
+    version: '3.5.0-epic6',
+    build: 'league-context-service'
   });
 
   function defineService(name, service, options = {}) {
