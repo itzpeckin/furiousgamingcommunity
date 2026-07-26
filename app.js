@@ -1555,10 +1555,14 @@
     unlockBody();
   }
 
-  function setRoute(route) {
-    const hash=`#${route}`;
-    if (location.hash===hash) renderRoute(route);
-    else location.hash=route;
+  function setRoute(route, options={}) {
+    const navigation=window.FranchiseHQ?.navigation;
+    if (navigation?.go) return navigation.go(route,{source:options.source||'legacy-app',replace:options.replace===true});
+    const normalized=String(route||'home').replace(/^#\/?/,'').replace(/^\//,'')||'home';
+    const hash=`#${normalized}`;
+    if (location.hash===hash) renderRoute(normalized);
+    else location.hash=normalized;
+    return normalized;
   }
 
   function commissionerAccessState() {
@@ -1920,7 +1924,6 @@
     if (event.detail?.status==='ready' && routeBase(location.hash.slice(1))==='commissioner') renderRoute('commissioner');
   });
 
-  window.addEventListener('hashchange',()=>renderRoute());
 
   window.FGC_APP = {
     teams, players, schedule, newsArticles, state, pageContent,
@@ -1929,6 +1932,8 @@
     openDetail, closeDetail, applyRole, closeProfileMenu,
     commissionerAccessState, syncCommissionerAccess
   };
+
+  window.FranchiseHQ?.navigation?.start?.({renderInitial:false});
 
   applyAccent(state.accent,false);
   applyDensity(state.density);
