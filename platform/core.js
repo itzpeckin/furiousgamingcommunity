@@ -11,11 +11,11 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '4.9',
+    version: '4.10',
     release: 4,
-    epic: 9,
+    epic: 10,
     patch: 0,
-    build: 'platform-consistency-lifecycle'
+    build: 'domain-data-services'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
@@ -29,7 +29,13 @@
     'league',
     'permissions',
     'ui',
-    'accountUI'
+    'accountUI',
+    'data',
+    'teams',
+    'players',
+    'schedule',
+    'standings',
+    'news'
   ]);
 
   const REQUIRED_CHECKPOINTS = Object.freeze([
