@@ -44,10 +44,13 @@
 
   function emitChange(source = 'simulation') {
     const detail = snapshot();
-    HQ.events?.emit?.('simulation-changed', { ...detail, source });
-    window.dispatchEvent(new CustomEvent('franchisehq:simulation-changed', {
-      detail: { ...detail, source }
-    }));
+    if (HQ.events?.emit) {
+      HQ.events.emit('simulation-changed', { ...detail, source });
+    } else {
+      window.dispatchEvent(new CustomEvent('franchisehq:simulation-changed', {
+        detail: { ...detail, source }
+      }));
+    }
     return detail;
   }
 

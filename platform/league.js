@@ -77,11 +77,11 @@
       source
     };
 
-    window.dispatchEvent(new CustomEvent('franchisehq:league-changed', {
-      detail
-    }));
-
-    HQ.events?.emit?.('league:changed', detail);
+    if (HQ.events?.emit) {
+      HQ.events.emit('league-changed', detail);
+    } else {
+      window.dispatchEvent(new CustomEvent('franchisehq:league-changed', { detail }));
+    }
   }
 
   function persistActiveLeague(league) {
@@ -273,9 +273,15 @@
     replace: true
   });
 
-  window.addEventListener('franchisehq:auth-changed', (event) => {
-    hydrateFromAuth(event.detail);
-  });
+  if (HQ.events?.on) {
+    HQ.events.on('auth-changed', (event) => {
+      hydrateFromAuth(event.detail);
+    });
+  } else {
+    window.addEventListener('franchisehq:auth-changed', (event) => {
+      hydrateFromAuth(event.detail);
+    });
+  }
 
   if (HQ.auth?.getSnapshot) {
     hydrateFromAuth(HQ.auth.getSnapshot());

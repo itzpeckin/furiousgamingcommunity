@@ -84,7 +84,10 @@
   }
 
   function emit(name, detail) {
-    HQ.events?.emit?.(name, detail);
+    if (HQ.events?.emit) {
+      HQ.events.emit(name, detail);
+      return;
+    }
     window.dispatchEvent(new CustomEvent(`franchisehq:${name}`, { detail }));
   }
 
