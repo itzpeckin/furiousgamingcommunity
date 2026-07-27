@@ -85,7 +85,9 @@
   }
 
   function getSimulationAccount() {
-    return window.FGC_TRADE?.getCurrentAccount?.() || null;
+    return FranchiseHQ.ui?.getSimulationAccount?.() ||
+      FranchiseHQ.simulation?.getPerspective?.() ||
+      null;
   }
 
   function getSimulationTeam(account) {
@@ -93,7 +95,9 @@
       return null;
     }
 
-    return window.FGC_APP?.teamById?.(account.teamId) || null;
+    return FranchiseHQ.ui?.getSimulationTeam?.() ||
+      FranchiseHQ.ui?.getTeam?.(account.teamId) ||
+      null;
   }
 
   function setText(element, value) {
@@ -255,7 +259,7 @@
     }
 
     if (!result.ok) {
-      window.FGC_APP?.showToast?.(
+      FranchiseHQ.ui?.toast?.(
         'Logout failed',
         result.error || 'Your account could not be logged out.'
       );
@@ -265,7 +269,7 @@
 
     renderAuthenticatedAccount();
 
-    window.FGC_APP?.showToast?.(
+    FranchiseHQ.ui?.toast?.(
       'Signed out',
       'Your Discord session has been securely ended.'
     );
@@ -306,7 +310,7 @@
         .querySelector('[data-profile-button]')
         ?.setAttribute('aria-expanded', 'false');
 
-      window.FGC_TRADE?.openLogin?.();
+      FranchiseHQ.ui?.openSimulationSelector?.({ source: 'authenticated-profile' });
       return;
     }
 
@@ -326,17 +330,19 @@
       true
     );
 
-    window.addEventListener(
-      'franchisehq:auth-changed',
+    FranchiseHQ.events?.on?.(
+      'auth-changed',
       renderAuthenticatedAccount
     );
 
-    window.addEventListener(
-      'franchisehq:simulation-changed',
+    FranchiseHQ.events?.on?.(
+      'simulation-changed',
       renderSimulationIdentity
     );
 
     renderAuthenticatedAccount();
+    FranchiseHQ.lifecycle?.markCheckpoint?.('ui:initialized', true);
+    FranchiseHQ.lifecycle?.start?.();
   }
 
   const accountUIService = {

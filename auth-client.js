@@ -1,9 +1,12 @@
 (() => {
   'use strict';
 
-  window.FranchiseHQ = window.FranchiseHQ || {};
+  const HQ = window.FranchiseHQ;
+  if (!HQ?.defineService) {
+    throw new Error('platform/core.js must load before auth-client.js.');
+  }
 
-  const api = window.FranchiseHQ.api;
+  const api = HQ.api;
   if (!api) {
     throw new Error('platform/api.js must load before auth-client.js.');
   }
@@ -17,23 +20,21 @@
     error: null
   };
 
-  function notifyAuthChanged() {
-    window.dispatchEvent(
-      new CustomEvent('franchisehq:auth-changed', {
-        detail: getSnapshot()
-      })
-    );
-  }
-
   function getSnapshot() {
-    return {
+    return Object.freeze({
       status: authState.status,
       authenticated: authState.authenticated,
       user: authState.user,
       membership: authState.membership,
       session: authState.session,
       error: authState.error
-    };
+    });
+  }
+
+  function notifyAuthChanged(source = 'auth-client') {
+    const detail = { ...getSnapshot(), source };
+    HQ.events?.emit?.('auth-changed', detail);
+    return detail;
   }
 
   function resetAuthState() {
@@ -57,24 +58,28 @@
   async function refresh() {
     authState.status = 'loading';
     authState.error = null;
-    notifyAuthChanged();
+    notifyAuthChanged('refresh-started');
 
     try {
       const payload = await api.endpoints.auth.me();
-
       applyAuthResponse(payload);
-      notifyAuthChanged();
-
+      notifyAuthChanged('refresh-succeeded');
+      HQ.lifecycle?.markCheckpoint?.('auth:resolved', {
+        authenticated: authState.authenticated,
+        status: authState.status
+      });
       return getSnapshot();
     } catch (error) {
       resetAuthState();
       authState.status = 'error';
-      authState.error =
-        error instanceof Error ? error.message : String(error);
-
+      authState.error = error instanceof Error ? error.message : String(error);
       console.error('Franchise HQ authentication failed:', error);
-      notifyAuthChanged();
-
+      notifyAuthChanged('refresh-failed');
+      HQ.lifecycle?.markCheckpoint?.('auth:resolved', {
+        authenticated: false,
+        status: authState.status,
+        error: authState.error
+      });
       return getSnapshot();
     }
   }
@@ -86,16 +91,11 @@
   async function logout() {
     try {
       await api.endpoints.auth.logout();
-
       resetAuthState();
-      notifyAuthChanged();
-
-      return {
-        ok: true
-      };
+      notifyAuthChanged('logout');
+      return { ok: true };
     } catch (error) {
       console.error('Franchise HQ logout failed:', error);
-
       return {
         ok: false,
         error: error instanceof Error ? error.message : String(error)
@@ -121,7 +121,6 @@
 
   function hasRole(...allowedRoles) {
     const role = getRole();
-
     return Boolean(
       authState.authenticated &&
       authState.membership?.active &&
@@ -143,29 +142,17 @@
   }
 
   function getDisplayName() {
-    if (!authState.user) {
-      return 'Guest';
-    }
-
-    return (
-      authState.user.displayName ||
+    if (!authState.user) return 'Guest';
+    return authState.user.displayName ||
       authState.user.discordGlobalName ||
       authState.user.discordUsername ||
-      'Franchise HQ User'
-    );
+      'Franchise HQ User';
   }
 
   function getRoleTag() {
     const role = getRole();
-
-    if (role === 'commissioner') {
-      return '[C]';
-    }
-
-    if (role === 'trade_committee') {
-      return '[TC]';
-    }
-
+    if (role === 'commissioner') return '[C]';
+    if (role === 'trade_committee') return '[TC]';
     return '';
   }
 
@@ -173,8 +160,7 @@
     return authState.user?.avatarUrl || null;
   }
 
-
-  window.FranchiseHQ.auth = Object.freeze({
+  const authService = HQ.defineService('auth', {
     refresh,
     login,
     logout,
@@ -190,7 +176,7 @@
     getDisplayName,
     getRoleTag,
     getAvatarUrl
-  });
+  }, { replace: true });
 
   refresh();
 })();

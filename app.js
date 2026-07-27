@@ -1933,6 +1933,11 @@
     commissionerAccessState, syncCommissionerAccess
   };
 
+  window.FranchiseHQ?.ui?.registerAdapter?.('legacy-app', {
+    showToast,
+    getTeam: teamById
+  });
+
   window.FranchiseHQ?.navigation?.start?.({renderInitial:false});
 
   applyAccent(state.accent,false);
