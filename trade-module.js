@@ -1,7 +1,13 @@
 (() => {
 'use strict';
 const app=window.FGC_APP;if(!app)return;
-const {teams,players,state,pageContent,teamById,playerById,teamStyle,renderTeamMark,renderPlayerIdentity,formatMoney,escapeHtml,setRoute,renderRoute,showToast,applyRole,closeProfileMenu}=app;
+const teamService=window.FranchiseHQ?.teams;
+const playerService=window.FranchiseHQ?.players;
+const teams=teamService?.getAll?.()||app.teams;
+const players=playerService?.getAll?.()||app.players;
+const teamById=(id)=>teamService?.getById?.(id)||app.teamById(id);
+const playerById=(id)=>playerService?.getById?.(id)||app.playerById(id);
+const {state,pageContent,teamStyle,renderTeamMark,renderPlayerIdentity,formatMoney,escapeHtml,setRoute,renderRoute,showToast,applyRole,closeProfileMenu}=app;
 const KEY='fgc-negotiations-v3',LEGACY_KEY='fgc-m1-trades-v2',USER='fgc-m1-user-v2';
 const commissioner={id:'commissioner',name:'Justin',handle:'Peckin',initials:'JM',role:'commissioner',teamId:'dal'};
 const owners=teams.map(t=>({id:`owner-${t.id}`,name:t.owner,handle:t.owner,initials:t.owner.replace(/[^A-Za-z]/g,'').slice(0,2).toUpperCase()||t.abbr,role:'owner',teamId:t.id}));
