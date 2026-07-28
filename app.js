@@ -25,9 +25,9 @@
   };
 
   const state = {
-    role: localStorage.getItem('m1b-role') || 'commissioner',
-    accent: localStorage.getItem('m1b-accent') || 'blue',
-    density: localStorage.getItem('m1b-density') || 'comfortable',
+    role: window.FranchiseHQ?.simulation?.getRole?.() || window.FranchiseHQ?.store?.getString?.('m1b-role', 'commissioner') || 'commissioner',
+    accent: window.FranchiseHQ?.store?.getString?.('m1b-accent', 'blue') || 'blue',
+    density: window.FranchiseHQ?.store?.getString?.('m1b-density', 'comfortable') || 'comfortable',
     teamSearch: '',
     teamConference: 'All',
     teamDivision: 'All',
@@ -146,7 +146,7 @@
   const pageNames = {
     home: 'League Home', 'league-activity': 'League Activity', teams: 'Teams', players: 'Players', standings: 'Standings', stats: 'Stats & Leaders',
     schedule: 'Schedule', news: 'League News', 'trade-center': 'Trade Center', 'trade-block': 'Trade Block',
-    commissioner: 'Commissioner Dashboard', 'design-system': 'Design System'
+    commissioner: 'Commissioner HQ', 'design-system': 'Design System'
   };
 
   function firstNames() {
@@ -330,7 +330,7 @@
     return `<article class="card home-standings-card">
       <div class="card-header"><div><span class="eyebrow">Playoff picture</span><h3>${conference} Standings</h3></div><button class="text-button" data-route="standings">View all <svg><use href="#icon-arrow"></use></svg></button></div>
       <div class="home-standings-list">
-        ${ranked.map((team,index)=>`<button type="button" data-team-id="${team.id}" class="${index===7?'wildcard-cutline':''}">
+        ${ranked.map((team,index)=>`<button type="button" data-team-id="${team.id}" data-route="teams/${team.id}" class="${index===7?'wildcard-cutline':''}">
           <span class="seed">${index+1}</span>${renderTeamMark(team)}
           <span><strong>${team.fullName}</strong><small>${index<4?'Division leader':index<7?'Wild card':'In the hunt'}</small></span>
           <strong>${team.record}</strong>
@@ -980,7 +980,7 @@
     const data = {
       'trade-center': { title:'Private Trade Center', eyebrow:'Milestone 1C', icon:'icon-swap', copy:'Saved drafts, owner-to-owner negotiation rooms, revisions, acceptance, committee review, and final decisions will be built after the league-view experience.', items:['Private draft builder','Owner negotiation room','Versioned revisions','Committee submission','Approval announcements','Rejection feedback'] },
       'trade-block': { title:'Trade Block', eyebrow:'Milestone 1C', icon:'icon-tag', copy:'Owners will advertise available players, team needs, preferred return types, and contact options without exposing private trade calculations.', items:['Player availability','Team needs','Position filters','Owner contact','Watchlist alerts','Add to trade'] },
-      commissioner: { title:'Commissioner Dashboard', eyebrow:'Future operations milestone', icon:'icon-sliders', copy:'League member assignments, committee roles, Madden export health, calculator settings, news controls, and audit records will live here.', items:['Discord assignments','Export status','Trade rules','Committee settings','News editor','Audit log'] }
+      commissioner: { title:'Commissioner HQ', eyebrow:'Future operations milestone', icon:'icon-sliders', copy:'League member assignments, committee roles, Madden export health, calculator settings, news controls, and audit records will live here.', items:['Discord assignments','Export status','Trade rules','Committee settings','News editor','Audit log'] }
     }[route] || { title:'Coming Soon',eyebrow:'Project roadmap',icon:'icon-construction',copy:'This area is prepared for a later milestone.',items:[] };
     pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">${data.eyebrow}</span><h1>${data.title}</h1><p>${data.copy}</p></div></div><article class="roadmap-state card"><div class="roadmap-state__inner"><div class="roadmap-icon"><svg><use href="#${data.icon}"></use></svg></div><h2>${data.title} is next in the build plan</h2><p>${data.copy}</p><div class="roadmap-list">${data.items.map(item=>`<span><svg><use href="#icon-check"></use></svg>${item}</span>`).join('')}</div><div class="heading-actions" style="justify-content:center"><button class="button button--primary" data-route="home">Return home</button><button class="button button--ghost" data-route="design-system">View design system</button></div></div></article>`;
   }
@@ -1555,10 +1555,48 @@
     unlockBody();
   }
 
-  function setRoute(route) {
-    const hash=`#${route}`;
-    if (location.hash===hash) renderRoute(route);
-    else location.hash=route;
+  function setRoute(route, options={}) {
+    const navigation=window.FranchiseHQ?.navigation;
+    if (navigation?.go) return navigation.go(route,{source:options.source||'legacy-app',replace:options.replace===true});
+    const normalized=String(route||'home').replace(/^#\/?/,'').replace(/^\//,'')||'home';
+    const hash=`#${normalized}`;
+    if (location.hash===hash) renderRoute(normalized);
+    else location.hash=normalized;
+    return normalized;
+  }
+
+  function commissionerAccessState() {
+    const platform=window.FranchiseHQ;
+    const auth=platform?.auth;
+    const permissions=platform?.permissions;
+
+    // On a hard refresh, app.js loads before auth-client.js and
+    // platform/permissions.js. Treat that brief period as unresolved instead
+    // of falling back to the simulated role and redirecting the real
+    // commissioner away from Commissioner HQ.
+    if (!auth?.getSnapshot || typeof permissions?.canOpenCommissionerHQ!=='function') {
+      return null;
+    }
+
+    const snapshot=auth.getSnapshot();
+    if (snapshot?.status==='loading') return null;
+
+    return permissions.canOpenCommissionerHQ()===true;
+  }
+
+  function syncCommissionerAccess() {
+    const access=commissionerAccessState();
+    if (access===null) return;
+
+    document.querySelectorAll('[data-role-link="commissioner"]').forEach(link=>{
+      link.hidden=!access;
+      link.setAttribute('aria-hidden',String(!access));
+    });
+
+    if (!access && routeBase(location.hash.slice(1))==='commissioner') {
+      showToast('Commissioner access required','Your authenticated league membership does not include Commissioner capabilities.');
+      setRoute('home');
+    }
   }
 
   function renderRoute(routeInput=location.hash.slice(1)||'home') {
@@ -1572,7 +1610,12 @@
       case 'league-activity': renderActivity(); break;
       case 'teams': id?renderTeamDetail(id):renderTeams(); break;
       case 'my-team': {
-        const account=window.FGC_TRADE?.getCurrentAccount?.();
+        const tradeService=window.FGC_TRADE;
+        if (!tradeService?.getCurrentAccount) {
+          pageContent.innerHTML='<section class="empty-state"><strong>Loading My Team…</strong><p>Franchise HQ is restoring your selected identity and assigned franchise.</p></section>';
+          break;
+        }
+        const account=tradeService.getCurrentAccount();
         if(account?.teamId) renderTeamDetail(account.teamId);
         else { showToast('My Team unavailable','Switch to an owner or commissioner identity with an assigned franchise.'); setRoute('teams'); }
         break;
@@ -1582,23 +1625,43 @@
       case 'stats': renderStats(); break;
       case 'schedule': renderSchedule(); break;
       case 'news': renderNews(); break;
-      case 'trade-center': window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : renderRoadmap(base); break;
-      case 'trade-block': window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : renderRoadmap(base); break;
+      case 'trade-center': window.FranchiseHQ?.trade?.renderTradeCenter ? window.FranchiseHQ.trade.renderTradeCenter(id) : window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : renderRoadmap(base); break;
+      case 'trade-block': window.FranchiseHQ?.trade?.renderTradeBlock ? window.FranchiseHQ.trade.renderTradeBlock() : window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : renderRoadmap(base); break;
       case 'design-system': renderDesignSystem(); break;
-      case 'commissioner':
-        if (state.role!=='commissioner') { showToast('Commissioner access required','Switch to the Commissioner mock account to preview this area.'); setRoute('home'); return; }
-        window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base); break;
+      case 'commissioner': {
+        const access=commissionerAccessState();
+        if (access===null) {
+          pageContent.innerHTML='<section class="empty-state"><strong>Checking Commissioner access…</strong><p>Franchise HQ is validating your authenticated league membership.</p></section>';
+          break;
+        }
+        if (!access) {
+          showToast('Commissioner access required','Your authenticated league membership does not include Commissioner capabilities.');
+          setRoute('home');
+          return;
+        }
+        window.FranchiseHQ?.trade?.renderCommissioner ? window.FranchiseHQ.trade.renderCommissioner() : window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base);
+        break;
+      }
       default: renderRoadmap(base);
     }
-    const pageTitle=base==='my-team' ? (teamById(window.FGC_TRADE?.getCurrentAccount?.()?.teamId)?.fullName||'My Team') : id ? (base==='teams'?teamById(id)?.fullName:playerById(id)?.name) : pageNames[base];
-    document.title=`${pageTitle||'Franchise HQ'} — Milestone 1 Complete`;
     mainContent.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:'smooth'});
+    return { base, id, route };
+  }
+
+  function resolveRouteTitle(routeInput) {
+    const [base,id]=String(routeInput||'home').split('/');
+    const pageTitle=base==='my-team'
+      ? (teamById(window.FGC_TRADE?.getCurrentAccount?.()?.teamId)?.fullName||'My Team')
+      : id
+        ? (base==='teams'?teamById(id)?.fullName:playerById(id)?.name)
+        : pageNames[base];
+    return `${pageTitle||'Franchise HQ'} — Franchise HQ`;
   }
 
   function buildCommandResults(query='') {
     const term=query.trim().toLowerCase();
-    const pageItems=Object.entries(pageNames).filter(([key])=>key!=='commissioner'||state.role==='commissioner').map(([route,label])=>({type:'Page',label,detail:'Open league page',route,icon:pageIcon(route)}));
+    const pageItems=Object.entries(pageNames).filter(([key])=>key!=='commissioner'||commissionerAccessState()===true).map(([route,label])=>({type:'Page',label,detail:'Open league page',route,icon:pageIcon(route)}));
     const teamItems=teams.map(team=>({type:'Team',label:team.fullName,detail:`${team.abbr} · ${team.record} · ${team.owner}`,route:`teams/${team.id}`,abbr:team.abbr,team}));
     const playerItems=players.filter(player=>player.overall>=82).map(player=>({type:'Player',label:player.name,detail:`${player.position} · ${player.teamAbbr} · ${player.overall} OVR`,route:`players/${player.id}`,player}));
     const newsItems=newsArticles.map(article=>({type:'News',label:article.title,detail:`${article.category} · ${article.time}`,newsId:article.id,icon:'icon-news'}));
@@ -1631,8 +1694,28 @@
     unlockBody();
   }
 
-  function openSidebar() { sidebar.classList.add('is-open'); mobileOverlay.classList.add('is-open'); body.style.overflow='hidden'; }
-  function closeSidebar() { sidebar.classList.remove('is-open'); mobileOverlay.classList.remove('is-open'); unlockBody(); }
+  function openSidebar() {
+    if (window.FranchiseHQ?.sidebar?.open) return window.FranchiseHQ.sidebar.open();
+    if (!sidebar || !mobileOverlay) return false;
+    document.body.classList.add('sidebar-open');
+    sidebar.classList.add('is-open');
+    mobileOverlay.hidden=false;
+    mobileOverlay.classList.add('is-open');
+    requestAnimationFrame(()=>mobileOverlay.classList.add('is-visible'));
+    body.style.overflow='hidden';
+    return true;
+  }
+
+  function closeSidebar() {
+    if (window.FranchiseHQ?.sidebar?.close) return window.FranchiseHQ.sidebar.close();
+    if (!sidebar || !mobileOverlay) return false;
+    document.body.classList.remove('sidebar-open');
+    sidebar.classList.remove('is-open');
+    mobileOverlay.classList.remove('is-open','is-visible');
+    mobileOverlay.hidden=true;
+    unlockBody();
+    return true;
+  }
   function openStylePanel() { stylePanel.classList.add('is-open'); panelOverlay.classList.add('is-open'); body.style.overflow='hidden'; }
   function closeStylePanel() { stylePanel.classList.remove('is-open'); panelOverlay.classList.remove('is-open'); unlockBody(); }
   function unlockBody() { if (![commandModal,detailModal,stylePanel,sidebar].some(el=>el?.classList.contains('is-open'))) body.style.overflow=''; }
@@ -1642,26 +1725,30 @@
     const accent=accents[name]||accents.blue; state.accent=name in accents?name:'blue';
     document.documentElement.style.setProperty('--accent',accent.hex); document.documentElement.style.setProperty('--accent-rgb',accent.rgb);
     document.querySelectorAll('[data-accent]').forEach(button=>button.classList.toggle('is-active',button.dataset.accent===state.accent));
-    localStorage.setItem('m1b-accent',state.accent);
+    window.FranchiseHQ?.store?.setString?.('m1b-accent',state.accent,{source:'appearance'});
     if (notify) showToast(`${accent.label} applied`,'Your appearance preference is saved in this browser.');
   }
 
   function applyDensity(density) {
     state.density=density==='compact'?'compact':'comfortable'; body.dataset.density=state.density;
     document.querySelectorAll('[data-density]').forEach(button=>button.classList.toggle('is-active',button.dataset.density===state.density));
-    localStorage.setItem('m1b-density',state.density);
+    window.FranchiseHQ?.store?.setString?.('m1b-density',state.density,{source:'appearance'});
   }
 
   function applyRole(role,notify=false) {
-    const labels={commissioner:'Commissioner',owner:'Team Owner',committee:'Trade Committee'};
-    state.role=labels[role]?role:'commissioner';
-    document.querySelector('[data-current-role]').textContent=labels[state.role];
+    const labels={commissioner:'Commissioner',owner:'Team Owner',committee:'Trade Committee',guest:'Guest'};
+    const simulation=window.FranchiseHQ?.simulation;
+    const result=simulation?.setRole?.(role,{silent:true,source:'app-role-selector'});
+    state.role=result?.role || (labels[role]?role:'commissioner');
+    const currentRole=document.querySelector('[data-current-role]');
+    if(currentRole) currentRole.textContent=labels[state.role]||labels.commissioner;
     document.querySelectorAll('[data-role]').forEach(button=>button.classList.toggle('is-selected',button.dataset.role===state.role));
-    document.querySelectorAll('[data-role-link="commissioner"]').forEach(link=>{link.hidden=state.role!=='commissioner';});
-    localStorage.setItem('m1b-role',state.role);
+    syncCommissionerAccess();
     closeProfileMenu();
-    if (notify) showToast(`${labels[state.role]} preview active`,state.role==='commissioner'?'All prototype navigation is visible.':'Commissioner-only navigation is hidden.');
-    if (state.role!=='commissioner'&&routeBase(location.hash.slice(1))==='commissioner') setRoute('home');
+    if (notify) {
+      simulation?.setRole?.(state.role,{source:'app-role-selector'});
+      showToast(`${labels[state.role]||labels.commissioner} preview active`,'Simulation changes the workflow perspective only. Authenticated permissions remain unchanged.');
+    }
   }
 
   function showToast(title,copy) {
@@ -1717,18 +1804,26 @@
     if (gameCenterSwitch) { event.preventDefault(); openGameDetail(gameCenterSwitch.dataset.gameCenterSwitch); return; }
 
     const openPlayerCard=event.target.closest('[data-open-player-card]');
-    if (openPlayerCard) { event.preventDefault(); setRoute(`players/${openPlayerCard.dataset.openPlayerCard}`); closeDetail(); return; }
+    if (openPlayerCard) {
+      event.preventDefault();
+      window.FGC_TRADE?.openValueCard?.(openPlayerCard.dataset.openPlayerCard);
+      return;
+    }
 
     const routeTarget=event.target.closest('[data-route]');
     if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
 
-    const teamTarget=event.target.closest('[data-team-id]');
-    if (teamTarget) { event.preventDefault(); setRoute(`teams/${teamTarget.dataset.teamId}`); return; }
-
     const interactiveTarget=event.target.closest('button, a, input, select, textarea, label, [role="button"]');
 
+    const teamTarget=event.target.closest('[data-team-id]');
+    if (teamTarget && !interactiveTarget) { setRoute(`teams/${teamTarget.dataset.teamId}`); return; }
+
     const playerTarget=event.target.closest('[data-player-id]');
-    if (playerTarget) { event.preventDefault(); setRoute(`players/${playerTarget.dataset.playerId}`); return; }
+    if (playerTarget) {
+      event.preventDefault();
+      window.FGC_TRADE?.openValueCard?.(playerTarget.dataset.playerId);
+      return;
+    }
 
     const gameTarget=event.target.closest('[data-game-id]');
     if (gameTarget) { openGameDetail(gameTarget.dataset.gameId); return; }
@@ -1737,7 +1832,16 @@
     if (newsTarget) { openNewsDetail(newsTarget.dataset.newsId); return; }
 
     const commandRoute=event.target.closest('[data-command-route]');
-    if (commandRoute) { const route=commandRoute.dataset.commandRoute; closeCommand(); setRoute(route); return; }
+    if (commandRoute) {
+      const route=commandRoute.dataset.commandRoute;
+      closeCommand();
+      if (route.startsWith('players/')) {
+        window.FGC_TRADE?.openValueCard?.(route.split('/')[1]);
+      } else {
+        setRoute(route);
+      }
+      return;
+    }
 
     const commandNews=event.target.closest('[data-command-news]');
     if (commandNews) { const id=commandNews.dataset.commandNews; closeCommand(); openNewsDetail(id); return; }
@@ -1788,8 +1892,6 @@
     if (event.target.closest('[data-open-sidebar]')) { openSidebar(); return; }
     if (event.target.closest('[data-close-sidebar]')||event.target.closest('[data-mobile-overlay]')) { closeSidebar(); return; }
     if (event.target.closest('[data-open-command]')) { openCommand(); return; }
-    if (event.target.closest('[data-command-input]')) { event.stopPropagation(); commandInput.focus(); return; }
-    if (event.target.closest('.command-dialog')) { event.stopPropagation(); return; }
     if (event.target.closest('[data-close-command]')) { closeCommand(); return; }
     if (event.target.closest('[data-open-style-panel]')) { openStylePanel(); return; }
     if (event.target.closest('[data-close-style-panel]')||event.target.closest('[data-panel-overlay]')) { closeStylePanel(); return; }
@@ -1815,10 +1917,7 @@
       event.stopImmediatePropagation();
       if(mobileMenuToggleLock) return;
       mobileMenuToggleLock=true;
-      document.body.classList.add('sidebar-open');
-      sidebar.classList.add('is-open');
-      mobileOverlay.hidden=false;
-      requestAnimationFrame(()=>mobileOverlay.classList.add('is-visible'));
+      openSidebar();
       setTimeout(()=>{mobileMenuToggleLock=false},240);
       return;
     }
@@ -1851,17 +1950,51 @@
     if (event.key==='Escape') { closeCommand(); closeDetail(); closeStylePanel(); closeSidebar(); closeProfileMenu(); }
   });
 
-  window.addEventListener('hashchange',()=>renderRoute());
+
+  // 4.21.2: guarantee the active route mounts after hard refresh / bfcache restore.
+  window.addEventListener('pageshow', () => {
+    const route=String(location.hash||'#home').replace(/^#\/?/,'')||'home';
+    if (pageContent && !pageContent.children.length) renderRoute(route);
+  });
+
+  window.addEventListener('franchisehq:auth-changed', event=>{
+    syncCommissionerAccess();
+    if (event.detail?.status==='ready' && routeBase(location.hash.slice(1))==='commissioner') renderRoute('commissioner');
+  });
+
+  window.addEventListener('franchisehq:trade-ready', ()=>{
+    if (routeBase(location.hash.slice(1))==='my-team') renderRoute('my-team');
+  });
+
+  window.FranchiseHQ?.sidebar?.init?.({ sidebar, overlay: mobileOverlay });
 
   window.FGC_APP = {
     teams, players, schedule, newsArticles, state, pageContent,
     teamById, playerById, teamStyle, renderTeamMark, renderPlayerIdentity,
     devClass, formatMoney, escapeHtml, setRoute, renderRoute, showToast,
-    openDetail, closeDetail, applyRole, closeProfileMenu
+    openDetail, closeDetail, applyRole, closeProfileMenu,
+    commissionerAccessState, syncCommissionerAccess
   };
+
+  window.FranchiseHQ?.ui?.registerAdapter?.('legacy-app', {
+    showToast,
+    getTeam: teamById
+  });
+
+  window.FranchiseHQ?.appRouter?.configure?.({
+    renderer: renderRoute,
+    titleResolver: resolveRouteTitle,
+    afterRender: () => window.FranchiseHQ?.sidebar?.restore?.()
+  });
+
+  window.FranchiseHQ?.navigation?.start?.({renderInitial:false});
 
   applyAccent(state.accent,false);
   applyDensity(state.density);
-  applyRole(state.role,false);
-  renderRoute();
+  window.addEventListener('franchisehq:simulation-changed',event=>{
+    const nextRole=event.detail?.role;
+    if(nextRole && nextRole!==state.role) applyRole(nextRole,false);
+  });
+  applyRole(window.FranchiseHQ?.simulation?.getRole?.() || state.role,false);
+  window.FranchiseHQ?.appRouter?.render?.(location.hash.slice(1)||'home',{source:'startup'}) || renderRoute();
 })();

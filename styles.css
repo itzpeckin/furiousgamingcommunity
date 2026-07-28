@@ -2360,7 +2360,538 @@ table td{
 }
 
 
-/* Version 4.21.1 — Platform Stabilization */
+/* TC-011.3 — Commissioner HQ */
+.nav-item--commissioner {
+  order: -100;
+  margin-bottom: 8px;
+  border: 1px solid rgba(var(--accent-rgb), .28);
+  background: rgba(var(--accent-rgb), .08);
+  color: var(--text-2);
+}
+.nav-item--commissioner[hidden] { display: none !important; }
+
+.commissioner-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 6px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.commissioner-tabs button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.commissioner-tabs button.is-active {
+  background: rgba(var(--accent-rgb), .14);
+  color: var(--text);
+}
+.commissioner-tabs svg { width: 17px; height: 17px; }
+
+.commissioner-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, .7fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.commissioner-command-card,
+.commissioner-health-card,
+.commissioner-import-card,
+.commissioner-teams-card { padding: 22px; }
+.commissioner-primary-actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 22px; }
+.commissioner-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.commissioner-status-row:last-child { border-bottom: 0; }
+.commissioner-status-row > span { color: var(--text-2); font-size: 13px; }
+
+.commissioner-tool-list { display: grid; gap: 8px; }
+.commissioner-tool-list button {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  gap: 11px;
+  padding: 11px;
+  border: 1px solid var(--line-soft);
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.commissioner-tool-list button > svg { color: var(--accent); }
+.commissioner-tool-list button > span { display: grid; }
+.commissioner-tool-list small { color: var(--muted); }
+
+.commissioner-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 22px 0;
+}
+.commissioner-stepper > div {
+  min-height: 132px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface-2);
+}
+.commissioner-stepper > div > span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--muted);
+  font-weight: 850;
+}
+.commissioner-stepper > div.is-active { border-color: rgba(var(--accent-rgb), .38); }
+.commissioner-stepper > div.is-active > span { background: var(--accent); color: #fff; }
+.commissioner-stepper strong { margin-top: 6px; font-size: 13px; }
+.commissioner-stepper small { color: var(--muted); }
+
+.commissioner-upload-zone {
+  min-height: 190px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 28px;
+  border: 1px dashed rgba(var(--accent-rgb), .45);
+  border-radius: 16px;
+  background: rgba(var(--accent-rgb), .06);
+  text-align: center;
+  cursor: pointer;
+}
+.commissioner-upload-zone svg { width: 34px; height: 34px; color: var(--accent); }
+.commissioner-upload-zone span { color: var(--muted); font-size: 12px; }
+.commissioner-validation { margin-top: 16px; padding: 0 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-2); }
+.commissioner-import-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 16px; }
+
+.commissioner-team-search { width: min(300px, 100%); }
+.commissioner-team-table { display: grid; margin-top: 18px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.commissioner-team-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.3fr) minmax(210px, 1fr) 130px 110px;
+  align-items: center;
+  gap: 14px;
+  min-height: 66px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.commissioner-team-row:last-child { border-bottom: 0; }
+.commissioner-team-row > span { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.commissioner-team-row > span > span { display: grid; min-width: 0; }
+.commissioner-team-row strong { font-size: 12px; }
+.commissioner-team-row small { color: var(--muted); font-size: 10px; }
+
+.commissioner-rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.commissioner-rules-grid > .card { padding: 22px; }
+.commissioner-rule-toggles label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 62px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.commissioner-rule-toggles label > span { display: grid; }
+.commissioner-rule-toggles small { color: var(--muted); }
+
+@media (max-width: 1000px) {
+  .commissioner-overview-grid,
+  .commissioner-rules-grid { grid-template-columns: 1fr; }
+  .commissioner-stepper { grid-template-columns: repeat(2, 1fr); }
+  .commissioner-team-row { grid-template-columns: minmax(220px, 1fr) minmax(180px, .8fr) 110px; }
+  .commissioner-team-row > button { display: none; }
+}
+@media (max-width: 700px) {
+  .commissioner-stepper { grid-template-columns: 1fr; }
+  .commissioner-team-row { grid-template-columns: 1fr 95px; }
+  .commissioner-team-row > span:nth-child(2) { display: none; }
+  .commissioner-page-heading { align-items: flex-start; }
+}
+
+
+/* TC-011.3.1 — Unified contextual player cards */
+.value-card-context {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 72px 8px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(11, 14, 20, .94);
+  backdrop-filter: blur(16px);
+}
+.value-card-context > button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.value-card-context > button:hover {
+  border-color: rgba(var(--accent-rgb), .42);
+  color: var(--text);
+}
+.value-card-context > button svg {
+  width: 16px;
+  height: 16px;
+  transform: rotate(180deg);
+}
+.value-card-context > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.value-card-close {
+  top: 9px;
+  margin-top: 9px;
+}
+@media (max-width: 620px) {
+  .value-card-context {
+    min-height: 56px;
+    padding-left: 10px;
+    padding-right: 62px;
+  }
+  .value-card-context > span { display: none; }
+}
+
+/* TC-011.4 Commissioner Operations */
+.commissioner-ops-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px;margin-bottom:16px}.commissioner-ops-hero h2{margin:4px 0 6px}.commissioner-ops-hero p{margin:0;color:var(--muted)}.commissioner-ops-progress{min-width:140px;display:grid;justify-items:center;padding:16px;border:1px solid rgba(var(--accent-rgb),.28);border-radius:14px;background:rgba(var(--accent-rgb),.08)}.commissioner-ops-progress strong{font-size:28px;line-height:1}.commissioner-ops-progress span{margin-top:5px;color:var(--muted);font-size:10px}.commissioner-operations-card{padding:22px}.commissioner-checklist{display:grid;gap:8px;margin-top:16px}.commissioner-checklist label{min-height:58px;display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line-soft);border-radius:11px;background:var(--surface-2)}.commissioner-checklist label>span{display:grid}.commissioner-checklist label strong{font-size:12px}.commissioner-checklist label small{color:var(--muted);font-size:10px}.commissioner-operations-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.commissioner-activity-log{display:grid}.commissioner-activity-log>div{min-height:58px;display:grid;grid-template-columns:10px 1fr;align-items:center;gap:12px;border-bottom:1px solid var(--line-soft)}.commissioner-activity-log>div>span:last-child{display:grid}.commissioner-activity-log strong{font-size:12px}.commissioner-activity-log small{color:var(--muted);font-size:10px}.activity-dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}.activity-dot--publish{background:var(--success)}.activity-dot--validate{background:var(--accent)}.activity-dot--upload{background:var(--info)}.activity-dot--generate{background:var(--warning)}.commissioner-import-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,.65fr);gap:16px}.commissioner-stepper>div.is-complete{border-color:rgba(57,217,138,.35)}.commissioner-stepper>div.is-complete>span{background:var(--success);color:#07150f}.commissioner-validation-header{display:flex;align-items:center;justify-content:space-between;padding:14px 0 4px}.commissioner-warning-list{display:grid;gap:8px;margin:14px 0}.commissioner-warning-list>div{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:11px;border:1px solid rgba(245,185,66,.28);border-radius:10px;background:rgba(245,185,66,.07)}.commissioner-warning-list>div.is-blocking{border-color:rgba(255,92,108,.3);background:rgba(255,92,108,.08)}.commissioner-warning-list>div>span{display:grid}.commissioner-warning-list strong{font-size:12px}.commissioner-warning-list small{color:var(--muted)}.commissioner-import-history{padding:20px;align-self:start}.commissioner-history-list{display:grid;gap:10px}.commissioner-history-list article{display:grid;gap:4px;padding:13px;border:1px solid var(--line-soft);border-radius:11px;background:var(--surface-2)}.commissioner-history-list article .pill{width:max-content}.commissioner-history-list article strong{font-size:12px}.commissioner-history-list article small,.commissioner-history-list article time{color:var(--muted);font-size:10px}.commissioner-history-list article p{margin:2px 0;color:var(--text-2);font-size:11px}.commissioner-confirm-modal{position:fixed;inset:0;z-index:220;display:none;place-items:center;padding:20px}.commissioner-confirm-modal.is-open{display:grid}.commissioner-confirm-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(5px)}.commissioner-confirm-dialog{position:relative;width:min(560px,100%);padding:24px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow)}.commissioner-confirm-dialog h2{margin:5px 0 8px}.commissioner-confirm-dialog p{margin:0;color:var(--muted)}.commissioner-confirm-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:20px 0}.commissioner-confirm-summary span{display:grid;padding:12px;border:1px solid var(--line-soft);border-radius:10px;background:var(--surface-2)}.commissioner-confirm-summary small{color:var(--muted)}.commissioner-confirm-summary strong{margin-top:3px;font-size:12px;overflow-wrap:anywhere}.commissioner-confirm-actions{display:flex;justify-content:flex-end;gap:8px}@media(max-width:1000px){.commissioner-import-layout{grid-template-columns:1fr}}@media(max-width:700px){.commissioner-ops-hero{align-items:flex-start;flex-direction:column}.commissioner-confirm-summary{grid-template-columns:1fr}}
+
+
+/* TC-011.5 — League Identity & Ownership */
+.ownership-summary-grid {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.ownership-table-head {
+  display:grid;
+  grid-template-columns:minmax(240px,1.25fr) minmax(190px,1fr) 110px 150px 130px 96px;
+  gap:14px;
+  padding:9px 14px;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:850;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.ownership-team-table { margin-top:0; }
+.ownership-team-row {
+  grid-template-columns:minmax(240px,1.25fr) minmax(190px,1fr) 110px 150px 130px 96px;
+}
+.discord-status {
+  min-height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:0 10px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--surface-2);
+  color:var(--muted);
+  font-size:10px;
+  font-weight:800;
+  cursor:pointer;
+}
+.discord-status span {
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--muted);
+}
+.discord-status--connected {
+  border-color:rgba(57,217,138,.3);
+  color:var(--success);
+  background:rgba(57,217,138,.07);
+}
+.discord-status--connected span { background:var(--success); }
+
+.ownership-modal {
+  position:fixed;
+  inset:0;
+  z-index:240;
+  display:none;
+  place-items:center;
+  padding:20px;
+}
+.ownership-modal.is-open { display:grid; }
+.ownership-backdrop {
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(6px);
+}
+.ownership-dialog {
+  position:relative;
+  width:min(900px,100%);
+  max-height:min(88vh,900px);
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:var(--surface);
+  box-shadow:var(--shadow);
+}
+.ownership-close {
+  position:absolute;
+  top:14px;
+  right:14px;
+  z-index:4;
+}
+.ownership-modal-header {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:24px 72px 20px 24px;
+  border-bottom:1px solid var(--line-soft);
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--team) 22%,transparent),transparent 58%),
+    var(--surface-2);
+}
+.ownership-modal-header > div { display:grid; }
+.ownership-modal-header h2 { margin:4px 0 2px; }
+.ownership-modal-header p { margin:0; color:var(--muted); }
+
+.ownership-modal-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  padding:18px;
+}
+.ownership-section {
+  padding:18px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--surface-2);
+}
+.ownership-section h3 { margin:4px 0 14px; }
+.ownership-color-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.ownership-color-grid input[type="color"] {
+  width:100%;
+  height:44px;
+  padding:4px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--surface);
+}
+.ownership-discord-section {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  margin:0 18px 16px;
+}
+.ownership-discord-section h3 { margin-bottom:4px; }
+.ownership-discord-section p { margin:0; color:var(--muted); }
+.ownership-history {
+  display:grid;
+  gap:8px;
+}
+.ownership-history > div {
+  display:grid;
+  gap:3px;
+  padding:10px 0;
+  border-bottom:1px solid var(--line-soft);
+}
+.ownership-history > div:last-child { border-bottom:0; }
+.ownership-history strong { font-size:12px; }
+.ownership-history small { color:var(--muted); font-size:10px; }
+
+@media(max-width:1150px){
+  .ownership-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ownership-table-head { display:none; }
+  .ownership-team-row {
+    grid-template-columns:minmax(220px,1fr) minmax(170px,.8fr) 110px 130px 90px;
+  }
+  .ownership-team-row > .discord-status { display:none; }
+}
+@media(max-width:760px){
+  .ownership-summary-grid { grid-template-columns:1fr 1fr; }
+  .ownership-team-row { grid-template-columns:1fr 92px; }
+  .ownership-team-row > span:nth-child(2),
+  .ownership-team-row > select,
+  .ownership-team-row > .discord-status { display:none; }
+  .ownership-modal-grid { grid-template-columns:1fr; }
+  .ownership-discord-section { align-items:flex-start; flex-direction:column; }
+}
+/* =========================================================
+   PHASE 3E — AUTHENTICATED ACCOUNT + SIMULATION IDENTITY
+   ========================================================= */
+
+.avatar.avatar--image {
+  overflow: hidden;
+  padding: 0;
+  background: var(--surface-2);
+}
+
+.avatar.avatar--image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.account-menu-header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px 13px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.account-menu-header__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+}
+
+.account-menu-header__copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.account-menu-header__copy strong,
+.account-menu-header__copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-header__copy strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.account-menu-header__copy small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.profile-menu__section {
+  display: grid;
+  gap: 3px;
+  padding-top: 7px;
+}
+
+.profile-menu__section + .profile-menu__section {
+  margin-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.profile-menu__section-label {
+  padding: 3px 10px 5px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.simulation-identity {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin: 0 4px 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.simulation-identity__status {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(
+    in srgb,
+    var(--accent) 16%,
+    transparent
+  );
+}
+
+.simulation-identity__copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.simulation-identity__copy strong,
+.simulation-identity__copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulation-identity__copy strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.simulation-identity__copy small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.profile-menu button.profile-menu__danger strong {
+  color: var(--danger);
+}
+
+.profile-menu button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+
+/* Version 4.21.2 — Platform Stabilization Hotfix */
+
 .home-standings-list > button {
   min-height: 44px;
   padding: 8px 10px;
@@ -2422,3 +2953,10 @@ table td{
   .trade-status-banner { grid-template-columns: auto 1fr; }
   .trade-status-banner small { grid-column: 2; text-align: left; }
 }
+
+.command-modal { pointer-events: none; }
+.command-modal.is-open { pointer-events: auto; }
+.command-modal .command-backdrop { pointer-events: auto; }
+.command-modal .command-dialog { pointer-events: auto; }
+.profile-button, [data-profile-button] { flex: 0 0 auto; max-width: 220px; overflow: hidden; }
+.profile-button img, [data-profile-button] img { width: 42px; height: 42px; object-fit: cover; flex: 0 0 42px; }
