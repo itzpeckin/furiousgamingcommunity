@@ -10,23 +10,22 @@
 - [x] 4.16.1 — API response hardening
 - [x] 4.17 — Module Runtime and Validation Framework
 - [x] 4.18 — UI Infrastructure and Theme Foundation
+- [x] 4.19 — Storage, Configuration, Feature Flags and Platform Manifest
 
-## Version 4.19 acceptance criteria
+## Version 4.20 acceptance criteria
 
-- [ ] `FranchiseHQ.metadata.version` returns `4.19`.
+- [ ] `FranchiseHQ.metadata.version` returns `4.20`.
 - [ ] `FranchiseHQ.lifecycle.diagnostics()` reports `ready`.
-- [ ] `FranchiseHQ.contract.audit()` reports contract `1.5-draft`, release `4.19`, and compliance.
+- [ ] `FranchiseHQ.contract.audit()` reports contract `1.6-draft`, release `4.20`, and compliance.
 - [ ] `FranchiseHQ.manifest.diagnostics()` reports no missing scripts or declared services.
-- [ ] `FranchiseHQ.storage.diagnostics()` reports local and session storage availability.
-- [ ] Storage JSON round-trip succeeds.
-- [ ] Storage expiration removes expired values.
-- [ ] Configuration defaults and runtime overrides resolve correctly.
-- [ ] Feature flags evaluate defaults and runtime overrides correctly.
-- [ ] `platform.deployment-validation` is enabled.
+- [ ] `FranchiseHQ.security.diagnostics()` reports zero blocking errors.
+- [ ] Unsafe URL schemes are rejected.
+- [ ] Output encoding and secret redaction tests pass.
+- [ ] `FranchiseHQ.release.supportBundle()` returns a redacted diagnostic bundle.
 - [ ] `await FranchiseHQ.validate.run()` reports zero failures.
+- [ ] `await FranchiseHQ.release.preflight()` reports `ready: true`.
 - [ ] Existing authentication, navigation, Commissioner HQ, and Trade Center workflows remain functional.
 
 ## Remaining Platform Foundation roadmap
 
-- [ ] 4.20 — Security, testing and release hardening
 - [ ] 4.21 — Platform completion release

@@ -1,0 +1,23 @@
+Franchise HQ Version 4.20 Patch
+================================
+
+NEW FILES
+---------
+platform/security.js
+platform/release.js
+VERSION-4.20.md
+SECURITY-BASELINE.md
+TESTING-RELEASE-HARDENING.md
+DEPLOYMENT-MANIFEST-4.20.txt
+
+UPDATED FILES
+-------------
+platform/core.js
+platform/manifest.js
+platform/contract.js
+platform/runtime.js
+platform/validate.js
+index.html
+PLATFORM-COMPLETION-CHECKLIST.md
+
+TOTAL FILES TO DEPLOY: 13
