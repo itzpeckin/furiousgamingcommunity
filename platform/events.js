@@ -39,6 +39,7 @@
   }
 
   function emit(name, detail = null, options = {}) {
+    const originalName = String(name || '').trim().replace(/^franchisehq:/, '');
     const eventName = normalizeName(name);
     const payload = metadata(eventName, detail, options);
     const event = new CustomEvent(eventName, { detail });
@@ -49,6 +50,19 @@
       const windowEvent = new CustomEvent(eventName, { detail });
       Object.defineProperty(windowEvent, 'franchiseHQ', { value: payload, enumerable: true });
       window.dispatchEvent(windowEvent);
+
+      // During the 4.15 migration, older application code still listens for
+      // window events such as `franchisehq:auth-changed`. The canonical event
+      // is now `franchisehq:auth:changed`, so dispatch the legacy alias as well
+      // whenever a legacy hyphenated name was supplied by the caller.
+      if (!originalName.includes(':') && originalName.includes('-')) {
+        const legacyEventName = `franchisehq:${originalName}`;
+        if (legacyEventName !== eventName) {
+          const legacyWindowEvent = new CustomEvent(legacyEventName, { detail });
+          Object.defineProperty(legacyWindowEvent, 'franchiseHQ', { value: payload, enumerable: true });
+          window.dispatchEvent(legacyWindowEvent);
+        }
+      }
     }
 
     history.push(payload);

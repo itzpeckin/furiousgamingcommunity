@@ -192,7 +192,7 @@
   function describe() {
     return Object.freeze({
       version: '1.1-draft',
-      release: '4.15.1',
+      release: '4.15.2',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -225,7 +225,7 @@
 
     return Object.freeze({
       contractVersion: '1.1-draft',
-      release: '4.15.1',
+      release: '4.15.2',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),
