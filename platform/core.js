@@ -11,15 +11,16 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '4.20',
+    version: '4.21',
     release: 4,
-    epic: 20,
+    epic: 21,
     patch: 0,
-    build: 'security-testing-and-release-hardening'
+    build: 'platform-completion-baseline'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
     'lifecycle',
+    'platform',
     'manifest',
     'storage',
     'config',
@@ -303,6 +304,79 @@
   });
 
   window.FranchiseHQ = platform;
+
+
+  function safeDiagnostics(name) {
+    try {
+      const service = services.get(name);
+      if (!service) return Object.freeze({ name, available: false, healthy: false, diagnostics: null });
+      const diagnostics = typeof service.diagnostics === 'function'
+        ? service.diagnostics()
+        : null;
+      return Object.freeze({ name, available: true, healthy: true, diagnostics });
+    } catch (error) {
+      return Object.freeze({
+        name,
+        available: true,
+        healthy: false,
+        error: error instanceof Error ? error.message : String(error),
+        diagnostics: null
+      });
+    }
+  }
+
+  function platformHealth() {
+    const lifecycle = lifecycleSnapshot();
+    const serviceNames = Array.from(services.keys()).filter((name) => name !== 'platform');
+    const serviceReports = serviceNames.map(safeDiagnostics);
+    const manifest = services.get('manifest')?.diagnostics?.() || null;
+    const runtime = services.get('runtime')?.diagnostics?.() || null;
+    const validation = services.get('validate')?.getLastReport?.() || null;
+    const security = services.get('security')?.audit?.() || null;
+    const contract = services.get('contract')?.audit?.() || null;
+
+    const checks = Object.freeze({
+      lifecycleReady: lifecycle.status === 'ready',
+      requiredServicesLoaded: lifecycle.missingServices.length === 0,
+      requiredCheckpointsReached: lifecycle.missingCheckpoints.length === 0,
+      manifestCompliant: manifest ? manifest.compliant === true : false,
+      runtimeReady: runtime ? runtime.ready === true : false,
+      contractCompliant: contract ? contract.compliant === true : false,
+      securityCompliant: security ? security.compliant === true : false,
+      validationCompliant: validation ? validation.compliant === true : null
+    });
+
+    const blockingChecks = Object.entries(checks)
+      .filter(([name, value]) => name !== 'validationCompliant' || value !== null)
+      .filter(([, value]) => value !== true)
+      .map(([name]) => name);
+    const unhealthyServices = serviceReports.filter((entry) => !entry.healthy).map((entry) => entry.name);
+    const healthy = blockingChecks.length === 0 && unhealthyServices.length === 0;
+
+    return Object.freeze({
+      service: 'platform',
+      platformVersion: '1.0',
+      release: metadata.version,
+      overall: healthy ? 'healthy' : 'degraded',
+      healthy,
+      generatedAt: new Date().toISOString(),
+      checks,
+      failures: Object.freeze([...blockingChecks, ...unhealthyServices.map((name) => `service:${name}`)]),
+      services: Object.freeze(serviceReports),
+      lifecycle,
+      manifest,
+      runtime,
+      validation,
+      security,
+      contract
+    });
+  }
+
+  defineService('platform', {
+    version: '1.0',
+    health: platformHealth,
+    diagnostics: platformHealth
+  }, { freeze: true });
 
   window.dispatchEvent(new CustomEvent('franchisehq:core-ready', {
     detail: metadata

@@ -87,7 +87,7 @@
     const services = serviceInventory();
     return Object.freeze({
       service: 'manifest',
-      version: '1.1',
+      version: '1.2',
       release: HQ.metadata.version,
       entryCount: entries.size,
       entries: list(),
@@ -107,10 +107,18 @@
   });
 
   register({
+    id: 'platform',
+    service: 'platform',
+    script: 'platform/core.js',
+    version: '1.0',
+    capabilities: ['health-report', 'service-health', 'production-baseline']
+  });
+
+  register({
     id: 'manifest',
     service: 'manifest',
     script: 'platform/manifest.js',
-    version: '1.0',
+    version: '1.2',
     capabilities: ['service-metadata', 'script-inventory', 'deployment-validation']
   });
 })();

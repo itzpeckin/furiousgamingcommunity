@@ -116,7 +116,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'validate',
-      version: '1.2',
+      version: '1.3',
       suiteCount: suites.size,
       testCount: [...suites.values()].reduce((total, suite) => total + suite.tests.length, 0),
       suites: Object.freeze([...suites.values()].map((suite) => Object.freeze({
@@ -145,7 +145,7 @@
         id: 'release-metadata',
         name: 'Release metadata',
         run: ({ assert }) => {
-          assert(HQ.metadata.version === '4.20', `Expected release 4.20, received ${HQ.metadata.version}.`);
+          assert(HQ.metadata.version === '4.21', `Expected release 4.21, received ${HQ.metadata.version}.`);
           return { details: HQ.metadata };
         }
       },
@@ -163,8 +163,8 @@
         name: 'Platform contract audit',
         run: ({ assert }) => {
           const audit = HQ.contract.audit();
-          assert(audit.contractVersion === '1.6-draft', `Expected contract 1.6-draft, received ${audit.contractVersion}.`);
-          assert(audit.release === '4.20', `Expected contract release 4.20, received ${audit.release}.`);
+          assert(audit.contractVersion === '1.0', `Expected contract 1.0, received ${audit.contractVersion}.`);
+          assert(audit.release === '4.21', `Expected contract release 4.21, received ${audit.release}.`);
           assert(audit.compliant, 'Platform contract audit is not compliant.', audit);
           return { details: audit };
         }
@@ -469,7 +469,7 @@
         run: ({ assert }) => {
           assert(HQ.hasService('release'), 'Release service is not registered.');
           const diagnostics = HQ.release.diagnostics();
-          assert(diagnostics.build.version === '4.20', 'Release build metadata is incorrect.', diagnostics);
+          assert(diagnostics.build.version === '4.21', 'Release build metadata is incorrect.', diagnostics);
           return { details: diagnostics.build };
         }
       },
@@ -492,6 +492,62 @@
             assert(!audit.undeclaredRegisteredServices.includes(name), `Service "${name}" is not declared in the platform contract.`, audit);
           });
           return { details: { services: ['security', 'release'] } };
+        }
+      }
+    ]
+  });
+
+
+  register({
+    id: 'platform-certification',
+    name: 'Platform Completion and Certification',
+    tests: [
+      {
+        id: 'stable-contract',
+        name: 'Stable Platform Contract 1.0',
+        run: ({ assert }) => {
+          const audit = HQ.contract.audit();
+          assert(audit.contractVersion === '1.0', `Expected stable contract 1.0, received ${audit.contractVersion}.`, audit);
+          assert(audit.release === '4.21', `Expected release 4.21, received ${audit.release}.`, audit);
+          assert(audit.compliant, 'Platform contract is not compliant.', audit);
+          return { details: audit };
+        }
+      },
+      {
+        id: 'platform-health-service',
+        name: 'Consolidated Platform health report',
+        run: ({ assert }) => {
+          assert(HQ.hasService('platform'), 'Platform health service is not registered.');
+          const health = HQ.platform.health();
+          assert(health.overall === 'healthy', 'Platform health is degraded.', health);
+          return { details: health.checks };
+        }
+      },
+      {
+        id: 'runtime-dependency-certification',
+        name: 'Runtime dependency graph is compliant',
+        run: ({ assert }) => {
+          const audit = HQ.runtime.dependencyAudit();
+          assert(audit.compliant, 'Runtime dependency audit failed.', audit);
+          return { details: audit };
+        }
+      },
+      {
+        id: 'platform-manifest-complete',
+        name: 'Platform manifest is complete',
+        run: ({ assert }) => {
+          const diagnostics = HQ.manifest.diagnostics();
+          assert(diagnostics.compliant, 'Platform manifest is incomplete.', diagnostics);
+          assert(diagnostics.entries.some((entry) => entry.service === 'platform'), 'Platform health service is missing from the manifest.', diagnostics.entries);
+          return { details: diagnostics };
+        }
+      },
+      {
+        id: 'release-certification-capability',
+        name: 'Release certification capability available',
+        run: ({ assert }) => {
+          assert(typeof HQ.release.certify === 'function', 'release.certify is unavailable.');
+          return { details: HQ.release.diagnostics() };
         }
       }
     ]

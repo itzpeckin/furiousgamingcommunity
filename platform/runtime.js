@@ -302,6 +302,96 @@
     return Object.freeze([...modules.values()].map(snapshotRecord));
   }
 
+
+
+  function dependencyAudit() {
+    const moduleIds = new Set(modules.keys());
+    const serviceIds = new Set(HQ.listServices?.() || []);
+    const missingDependencies = [];
+    const graph = new Map();
+    const routeOwners = new Map();
+    const duplicateMetadata = [];
+
+    for (const record of modules.values()) {
+      const moduleDependencies = [];
+      for (const dependency of record.dependencies) {
+        if (dependency.startsWith('service:')) {
+          const serviceName = dependency.slice('service:'.length);
+          if (!serviceIds.has(serviceName)) {
+            missingDependencies.push({ moduleId: record.id, dependency });
+          }
+        } else {
+          moduleDependencies.push(dependency);
+          if (!moduleIds.has(dependency)) {
+            missingDependencies.push({ moduleId: record.id, dependency });
+          }
+        }
+      }
+      graph.set(record.id, moduleDependencies);
+
+      const routes = record.routes || [];
+      if (new Set(routes).size !== routes.length) {
+        duplicateMetadata.push({ moduleId: record.id, field: 'routes' });
+      }
+      const permissions = record.permissions || [];
+      if (new Set(permissions).size !== permissions.length) {
+        duplicateMetadata.push({ moduleId: record.id, field: 'permissions' });
+      }
+      if (record.id !== 'application-shell') {
+        for (const route of routes) {
+          const owners = routeOwners.get(route) || [];
+          owners.push(record.id);
+          routeOwners.set(route, owners);
+        }
+      }
+    }
+
+    const routeConflicts = [...routeOwners.entries()]
+      .filter(([, owners]) => owners.length > 1)
+      .map(([route, owners]) => ({ route, owners: Object.freeze([...owners]) }));
+
+    const cycles = [];
+    const visiting = new Set();
+    const visited = new Set();
+    function visit(id, trail = []) {
+      if (visiting.has(id)) {
+        const index = trail.indexOf(id);
+        cycles.push(Object.freeze([...trail.slice(index), id]));
+        return;
+      }
+      if (visited.has(id)) return;
+      visiting.add(id);
+      const nextTrail = [...trail, id];
+      for (const dependency of graph.get(id) || []) visit(dependency, nextTrail);
+      visiting.delete(id);
+      visited.add(id);
+    }
+    for (const id of moduleIds) visit(id);
+
+    const failedModules = [...modules.values()]
+      .filter((record) => record.state === 'failed')
+      .map((record) => ({ moduleId: record.id, error: record.error }));
+
+    const compliant = missingDependencies.length === 0 &&
+      routeConflicts.length === 0 &&
+      cycles.length === 0 &&
+      duplicateMetadata.length === 0 &&
+      failedModules.length === 0;
+
+    return Object.freeze({
+      service: 'runtime-dependency-audit',
+      version: '1.0',
+      release: HQ.metadata.version,
+      compliant,
+      moduleCount: modules.size,
+      missingDependencies: Object.freeze(missingDependencies),
+      routeConflicts: Object.freeze(routeConflicts),
+      cycles: Object.freeze(cycles),
+      duplicateMetadata: Object.freeze(duplicateMetadata),
+      failedModules: Object.freeze(failedModules)
+    });
+  }
+
   function diagnostics() {
     const snapshots = [...modules.values()].map((record) => {
       const snapshot = { ...snapshotRecord(record) };
@@ -320,7 +410,7 @@
     }, {});
     return Object.freeze({
       service: 'runtime',
-      version: '1.2',
+      version: '1.3',
       moduleCount: snapshots.length,
       ready: snapshots.length > 0 && snapshots.every((module) => module.state === 'ready'),
       counts: Object.freeze(counts),
@@ -339,6 +429,7 @@
     get,
     list,
     diagnostics,
+    dependencyAudit,
     states: VALID_STATES
   });
 
@@ -348,7 +439,7 @@
     version: HQ.metadata.version,
     routes: [],
     permissions: [],
-    dependencies: ['service:manifest', 'service:storage', 'service:config', 'service:features', 'service:security', 'service:release', 'service:contract', 'service:events', 'service:state', 'service:errors', 'service:api'],
+    dependencies: ['service:platform', 'service:manifest', 'service:storage', 'service:config', 'service:features', 'service:security', 'service:release', 'service:contract', 'service:events', 'service:state', 'service:errors', 'service:api'],
     diagnostics: () => ({ services: HQ.listServices?.().filter((name) => ['manifest', 'storage', 'config', 'features', 'security', 'release', 'contract', 'events', 'state', 'errors', 'api'].includes(name)) })
   });
 

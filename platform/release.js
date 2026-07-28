@@ -5,6 +5,7 @@
   if (!HQ?.defineService) throw new Error('platform/core.js must load before platform/release.js.');
 
   let lastPreflight = null;
+  let lastCertification = null;
 
   function buildInfo() {
     return Object.freeze({
@@ -51,12 +52,55 @@
     return lastPreflight;
   }
 
+
+
+  async function certify(options = {}) {
+    const started = performance.now();
+    const preflightResult = options.preflight || await preflight(options);
+    const contract = HQ.contract.audit();
+    const dependencies = HQ.runtime.dependencyAudit();
+    const health = HQ.platform.health();
+    const manifest = HQ.manifest.diagnostics();
+
+    const checks = Object.freeze({
+      preflightReady: preflightResult.ready === true,
+      stableContract: contract.contractVersion === '1.0' && contract.compliant === true,
+      dependenciesCompliant: dependencies.compliant === true,
+      platformHealthy: health.overall === 'healthy',
+      manifestCompliant: manifest.compliant === true,
+      releaseMatches: HQ.metadata.version === '4.21' && contract.release === '4.21'
+    });
+    const failures = Object.entries(checks)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name);
+
+    lastCertification = Object.freeze({
+      service: 'release-certification',
+      certificationVersion: '1.0',
+      platformVersion: '1.0',
+      release: HQ.metadata.version,
+      certified: failures.length === 0,
+      createdAt: new Date().toISOString(),
+      durationMs: Number((performance.now() - started).toFixed(2)),
+      checks,
+      failures: Object.freeze(failures),
+      warnings: Object.freeze([]),
+      preflight: preflightResult,
+      dependencyAudit: dependencies,
+      platformHealth: health
+    });
+    HQ.events?.emit?.('release:certification-completed', lastCertification);
+    return lastCertification;
+  }
+
   function supportBundle() {
     return HQ.security.redact({
       build: buildInfo(),
       lifecycle: HQ.lifecycle.diagnostics(),
       manifest: HQ.manifest.diagnostics(),
       runtime: HQ.runtime.diagnostics(),
+      dependencyAudit: HQ.runtime.dependencyAudit?.() || null,
+      platformHealth: HQ.platform?.health?.() || null,
       validation: HQ.validate.getLastReport(),
       security: HQ.security.audit(),
       api: HQ.api.diagnostics(),
@@ -84,27 +128,30 @@
   function diagnostics() {
     return Object.freeze({
       service: 'release',
-      version: '1.0',
+      version: '1.1',
       build: buildInfo(),
-      lastPreflight
+      lastPreflight,
+      lastCertification
     });
   }
 
   HQ.defineService('release', {
     buildInfo,
     preflight,
+    certify,
     supportBundle,
     downloadSupportBundle,
     diagnostics,
-    getLastPreflight: () => lastPreflight
+    getLastPreflight: () => lastPreflight,
+    getLastCertification: () => lastCertification
   });
 
   HQ.manifest?.register?.({
     id: 'release',
     service: 'release',
     script: 'platform/release.js',
-    version: '1.0',
-    capabilities: ['release-preflight', 'support-bundle', 'build-metadata'],
+    version: '1.1',
+    capabilities: ['release-preflight', 'release-certification', 'support-bundle', 'build-metadata'],
     dependencies: ['manifest', 'security', 'validate', 'runtime']
   });
 })();

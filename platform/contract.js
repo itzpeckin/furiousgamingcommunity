@@ -125,6 +125,7 @@
     applicationConfiguration: 'config',
     featureFlags: 'features',
     platformManifest: 'manifest',
+    platformHealth: 'platform',
     sharedApplicationState: 'state',
     tradeState: 'trade.state',
     tradeNegotiations: 'trade.negotiations'
@@ -132,6 +133,7 @@
 
   const serviceOwnership = Object.freeze({
     lifecycle: 'platform',
+    platform: 'platform',
     manifest: 'platform',
     storage: 'platform',
     config: 'platform',
@@ -208,8 +210,8 @@
 
   function describe() {
     return Object.freeze({
-      version: '1.6-draft',
-      release: '4.20',
+      version: '1.0',
+      release: '4.21',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -241,16 +243,16 @@
       .filter((name) => Boolean(window[name]));
 
     return Object.freeze({
-      contractVersion: '1.6-draft',
-      release: '4.20',
+      contractVersion: '1.0',
+      release: '4.21',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),
       legacyGlobals: Object.freeze(legacyGlobals),
       sourceOfTruthCount: Object.keys(sourcesOfTruth).length,
       forbiddenPatternCount: forbiddenPatterns.length,
-      compliant: undeclaredRegisteredServices.length === 0,
-      note: 'Legacy globals and legacy event-name callers remain tracked migration items and do not affect Platform compliance during the current migration phase.'
+      compliant: undeclaredRegisteredServices.length === 0 && declaredButMissingServices.length === 0,
+      note: 'Platform Contract 1.0 is the stable production baseline. Legacy globals remain compatibility adapters and are not authoritative sources of truth.'
     });
   }
 
