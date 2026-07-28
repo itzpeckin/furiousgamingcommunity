@@ -141,6 +141,7 @@
     appRouter: 'platform',
     sidebar: 'platform',
     ui: 'platform',
+    theme: 'platform',
     auth: 'identity',
     league: 'identity',
     permissions: 'identity',
@@ -197,8 +198,8 @@
 
   function describe() {
     return Object.freeze({
-      version: '1.3-draft',
-      release: '4.17',
+      version: '1.4-draft',
+      release: '4.18',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -230,8 +231,8 @@
       .filter((name) => Boolean(window[name]));
 
     return Object.freeze({
-      contractVersion: '1.3-draft',
-      release: '4.17',
+      contractVersion: '1.4-draft',
+      release: '4.18',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),

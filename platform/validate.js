@@ -145,7 +145,7 @@
         id: 'release-metadata',
         name: 'Release metadata',
         run: ({ assert }) => {
-          assert(HQ.metadata.version === '4.17', `Expected release 4.17, received ${HQ.metadata.version}.`);
+          assert(HQ.metadata.version === '4.18', `Expected release 4.18, received ${HQ.metadata.version}.`);
           return { details: HQ.metadata };
         }
       },
@@ -163,8 +163,8 @@
         name: 'Platform contract audit',
         run: ({ assert }) => {
           const audit = HQ.contract.audit();
-          assert(audit.contractVersion === '1.3-draft', `Expected contract 1.3-draft, received ${audit.contractVersion}.`);
-          assert(audit.release === '4.17', `Expected contract release 4.17, received ${audit.release}.`);
+          assert(audit.contractVersion === '1.4-draft', `Expected contract 1.4-draft, received ${audit.contractVersion}.`);
+          assert(audit.release === '4.18', `Expected contract release 4.18, received ${audit.release}.`);
           assert(audit.compliant, 'Platform contract audit is not compliant.', audit);
           return { details: audit };
         }
@@ -264,4 +264,60 @@
       }
     ]
   });
+
+  register({
+    id: 'ui-infrastructure',
+    name: 'UI Infrastructure',
+    tests: [
+      {
+        id: 'theme-service',
+        name: 'Theme service registered',
+        run: ({ assert }) => {
+          assert(HQ.hasService('theme'), 'Theme service is not registered.');
+          const diagnostics = HQ.theme.diagnostics();
+          assert(diagnostics.tokenCount > 0, 'Theme tokens are unavailable.', diagnostics);
+          assert(diagnostics.applied, 'Theme tokens have not been applied to the document.', diagnostics);
+          return { details: diagnostics };
+        }
+      },
+      {
+        id: 'ui-manager-capabilities',
+        name: 'UI manager capabilities',
+        run: ({ assert }) => {
+          const required = ['notify', 'loading', 'modal', 'empty', 'error'];
+          required.forEach((capability) => {
+            assert(HQ.ui?.[capability], `UI capability "${capability}" is missing.`);
+          });
+          const diagnostics = HQ.ui.diagnostics();
+          assert(diagnostics.version === '2.0', `Expected UI manager 2.0, received ${diagnostics.version}.`);
+          return { details: diagnostics };
+        }
+      },
+      {
+        id: 'ui-hosts',
+        name: 'Global UI hosts mounted',
+        run: ({ assert }) => {
+          const diagnostics = HQ.ui.diagnostics();
+          assert(diagnostics.hosts.toast, 'Toast host is not mounted.', diagnostics.hosts);
+          assert(diagnostics.hosts.loading, 'Loading host is not mounted.', diagnostics.hosts);
+          assert(diagnostics.hosts.modal, 'Modal host is not mounted.', diagnostics.hosts);
+          return { details: diagnostics.hosts };
+        }
+      },
+      {
+        id: 'loading-reference-count',
+        name: 'Loading reference counting',
+        run: ({ assert }) => {
+          const first = HQ.ui.loading.show({ message: 'Validation' });
+          const second = HQ.ui.loading.show({ message: 'Validation' });
+          assert(HQ.ui.loading.count() === 2, 'Loading count did not increment to two.');
+          HQ.ui.loading.hide(first);
+          HQ.ui.loading.hide(second);
+          assert(HQ.ui.loading.count() === 0, 'Loading count did not return to zero.');
+          return { details: { finalCount: HQ.ui.loading.count() } };
+        }
+      }
+    ]
+  });
+
 })();

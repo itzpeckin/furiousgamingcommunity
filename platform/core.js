@@ -11,11 +11,11 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '4.17',
+    version: '4.18',
     release: 4,
-    epic: 17,
+    epic: 18,
     patch: 0,
-    build: 'module-runtime-and-validation-framework'
+    build: 'ui-infrastructure-and-theme-foundation'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
@@ -27,6 +27,7 @@
     'api',
     'runtime',
     'validate',
+    'theme',
     'store',
     'simulation',
     'navigation',
