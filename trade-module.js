@@ -533,4 +533,11 @@ window.FranchiseHQ?.ui?.registerAdapter?.('legacy-trade', {
 })
 document.addEventListener('click',handleClick,true);document.addEventListener('input',handleInput,true);document.addEventListener('change',handleChange,true);
 window.FranchiseHQ?.simulation?.setAccount?.(userId,{silent:true,source:'trade-module-init',syncRole:true});profile();loginCards();ensureBlockManagerRoot();if(!userId)openLogin();renderRoute();
+
+
+  if (window.FranchiseHQ?.events?.emit) {
+    window.FranchiseHQ.events.emit('trade-ready', { version: '4.10.1' });
+  } else {
+    window.dispatchEvent(new CustomEvent('franchisehq:trade-ready', { detail: { version: '4.10.1' } }));
+  }
 })();

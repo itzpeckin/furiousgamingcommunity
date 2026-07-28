@@ -16,6 +16,9 @@
   const detailContent = document.querySelector('[data-detail-content]');
   const toastRegion = document.querySelector('[data-toast-region]');
   const body = document.body;
+  const SIDEBAR_SCROLL_KEY = 'franchisehq:ui:sidebar-scroll-top';
+  const initialSidebarScrollTop = Number(window.FranchiseHQ?.store?.getString?.(SIDEBAR_SCROLL_KEY, '0')) || 0;
+  let sidebarScrollSaveTimer = null;
 
   const accents = {
     blue: { hex: '#4f8cff', rgb: '79, 140, 255', label: 'Electric blue' },
@@ -1610,7 +1613,12 @@
       case 'league-activity': renderActivity(); break;
       case 'teams': id?renderTeamDetail(id):renderTeams(); break;
       case 'my-team': {
-        const account=window.FGC_TRADE?.getCurrentAccount?.();
+        const tradeService=window.FGC_TRADE;
+        if (!tradeService?.getCurrentAccount) {
+          pageContent.innerHTML='<section class="empty-state"><strong>Loading My Team…</strong><p>Franchise HQ is restoring your selected identity and assigned franchise.</p></section>';
+          break;
+        }
+        const account=tradeService.getCurrentAccount();
         if(account?.teamId) renderTeamDetail(account.teamId);
         else { showToast('My Team unavailable','Switch to an owner or commissioner identity with an assigned franchise.'); setRoute('teams'); }
         break;
@@ -1680,8 +1688,24 @@
     unlockBody();
   }
 
-  function openSidebar() { sidebar.classList.add('is-open'); mobileOverlay.classList.add('is-open'); body.style.overflow='hidden'; }
-  function closeSidebar() { sidebar.classList.remove('is-open'); mobileOverlay.classList.remove('is-open'); unlockBody(); }
+  function openSidebar() {
+    if (!sidebar || !mobileOverlay) return;
+    document.body.classList.add('sidebar-open');
+    sidebar.classList.add('is-open');
+    mobileOverlay.hidden=false;
+    mobileOverlay.classList.add('is-open');
+    requestAnimationFrame(()=>mobileOverlay.classList.add('is-visible'));
+    body.style.overflow='hidden';
+  }
+
+  function closeSidebar() {
+    if (!sidebar || !mobileOverlay) return;
+    document.body.classList.remove('sidebar-open');
+    sidebar.classList.remove('is-open');
+    mobileOverlay.classList.remove('is-open','is-visible');
+    mobileOverlay.hidden=true;
+    unlockBody();
+  }
   function openStylePanel() { stylePanel.classList.add('is-open'); panelOverlay.classList.add('is-open'); body.style.overflow='hidden'; }
   function closeStylePanel() { stylePanel.classList.remove('is-open'); panelOverlay.classList.remove('is-open'); unlockBody(); }
   function unlockBody() { if (![commandModal,detailModal,stylePanel,sidebar].some(el=>el?.classList.contains('is-open'))) body.style.overflow=''; }
@@ -1883,10 +1907,7 @@
       event.stopImmediatePropagation();
       if(mobileMenuToggleLock) return;
       mobileMenuToggleLock=true;
-      document.body.classList.add('sidebar-open');
-      sidebar.classList.add('is-open');
-      mobileOverlay.hidden=false;
-      requestAnimationFrame(()=>mobileOverlay.classList.add('is-visible'));
+      openSidebar();
       setTimeout(()=>{mobileMenuToggleLock=false},240);
       return;
     }
@@ -1924,6 +1945,23 @@
     if (event.detail?.status==='ready' && routeBase(location.hash.slice(1))==='commissioner') renderRoute('commissioner');
   });
 
+  window.addEventListener('franchisehq:trade-ready', ()=>{
+    if (routeBase(location.hash.slice(1))==='my-team') renderRoute('my-team');
+  });
+
+  if (sidebar) {
+    requestAnimationFrame(()=>{ sidebar.scrollTop=initialSidebarScrollTop; });
+    sidebar.addEventListener('scroll', ()=>{
+      clearTimeout(sidebarScrollSaveTimer);
+      sidebarScrollSaveTimer=setTimeout(()=>{
+        window.FranchiseHQ?.store?.setString?.(SIDEBAR_SCROLL_KEY, String(sidebar.scrollTop), {source:'sidebar-scroll'});
+      }, 100);
+    }, {passive:true});
+    window.addEventListener('pagehide', ()=>{
+      clearTimeout(sidebarScrollSaveTimer);
+      window.FranchiseHQ?.store?.setString?.(SIDEBAR_SCROLL_KEY, String(sidebar.scrollTop), {source:'pagehide'});
+    });
+  }
 
   window.FGC_APP = {
     teams, players, schedule, newsArticles, state, pageContent,
