@@ -166,3 +166,45 @@ The Platform must never depend on a feature module.
 ## Version 4.14 scope
 
 Version 4.14 formalizes the contract. It does not claim that all existing code already complies with the final Platform standard. Versions 4.15 through 4.21 will implement and enforce this specification.
+
+## Version 4.15 — State and Event Architecture
+
+### State boundaries
+
+Franchise HQ state is organized into registered namespaces. Cross-module context is owned by the Platform state service, while feature-specific information remains in a namespace owned by that feature.
+
+Initial namespaces:
+
+- `platform`: shared UI/application context
+- `identity`: active user, league, team, role, and permissions context
+- `league`: season, week, and league phase context
+- `dataCache`: shared domain-data cache boundaries
+- `trade`: Trade Center presentation and workflow state
+
+Modules access their namespace through `FranchiseHQ.state.api(namespace)` or a scoped adapter such as `FranchiseHQ.trade.state`. Modules must not mutate another module's namespace.
+
+### State lifecycle
+
+Every namespace declares:
+
+- defaults
+- owner
+- persistence policy
+- schema version
+- reset triggers
+- optional validation
+
+State supports hydration, replacement, patching, subscriptions, reset, and trigger-based reset. The Platform emits `state:changed` and a scoped `<namespace>:state-changed` event after each non-silent change.
+
+### Event contract
+
+Canonical events use `namespace:action` names, such as:
+
+- `route:rendered`
+- `identity:changed`
+- `league:changed`
+- `trade:offer-submitted`
+
+During migration, legacy `namespace-action` callers are normalized to the canonical format. Every emitted event exposes an ID, source, timestamp, optional correlation ID, and detail payload through event metadata while preserving the existing `event.detail` contract.
+
+Subscriptions return an unsubscribe function, prevent duplicate handler registration by default, and may declare an owner so all listeners for a module can be removed during unmount.

@@ -13,10 +13,10 @@ The Platform phase completes at Version 4.21 when the following baseline is vali
 
 ## 4.15 — State and Events
 
-- [ ] Define global versus module state boundaries
-- [ ] Standardize hydration and reset behavior
-- [ ] Standardize event names and payload metadata
-- [ ] Add listener cleanup and duplicate-listener diagnostics
+- [x] Define global versus module state boundaries
+- [x] Standardize hydration and reset behavior
+- [x] Standardize event names and payload metadata
+- [x] Add listener cleanup and duplicate-listener diagnostics
 
 ## 4.16 — API and Error Framework
 
