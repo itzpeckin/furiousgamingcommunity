@@ -117,6 +117,7 @@
     permissions: 'permissions',
     applicationEvents: 'events',
     APITransport: 'api',
+    errorHandling: 'errors',
     sharedStorage: 'store',
     sharedApplicationState: 'state',
     tradeState: 'trade.state',
@@ -128,6 +129,7 @@
     contract: 'platform',
     events: 'platform',
     state: 'platform',
+    errors: 'platform',
     api: 'platform',
     store: 'platform',
     simulation: 'leagueEngine',
@@ -191,8 +193,8 @@
 
   function describe() {
     return Object.freeze({
-      version: '1.1-draft',
-      release: '4.15.2',
+      version: '1.2-draft',
+      release: '4.16',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -225,7 +227,7 @@
 
     return Object.freeze({
       contractVersion: '1.1-draft',
-      release: '4.15.2',
+      release: '4.16',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),
