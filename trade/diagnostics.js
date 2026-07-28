@@ -41,10 +41,8 @@
     const tradeState = HQ.getService?.('trade.state')?.snapshot?.() || null;
     return Object.freeze({
       ...metrics,
-      // Deprecated compatibility alias. This is trade context, not the active app route.
-      lastRenderRoute: metrics.lastTradeContextRoute,
       currentApplicationRoute: currentApplicationRoute(),
-      moduleVersion: '4.13',
+      moduleVersion: '4.14',
       activeNegotiationId: tradeState?.activeNegotiationId || null,
       activeTradeId: tradeState?.activeTradeId || null,
       builderOpen: Boolean(tradeState?.builderOpen)
