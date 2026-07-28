@@ -1625,8 +1625,8 @@
       case 'stats': renderStats(); break;
       case 'schedule': renderSchedule(); break;
       case 'news': renderNews(); break;
-      case 'trade-center': window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : renderRoadmap(base); break;
-      case 'trade-block': window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : renderRoadmap(base); break;
+      case 'trade-center': window.FranchiseHQ?.trade?.renderTradeCenter ? window.FranchiseHQ.trade.renderTradeCenter(id) : window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : renderRoadmap(base); break;
+      case 'trade-block': window.FranchiseHQ?.trade?.renderTradeBlock ? window.FranchiseHQ.trade.renderTradeBlock() : window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : renderRoadmap(base); break;
       case 'design-system': renderDesignSystem(); break;
       case 'commissioner': {
         const access=commissionerAccessState();
@@ -1639,7 +1639,7 @@
           setRoute('home');
           return;
         }
-        window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base);
+        window.FranchiseHQ?.trade?.renderCommissioner ? window.FranchiseHQ.trade.renderCommissioner() : window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base);
         break;
       }
       default: renderRoadmap(base);
