@@ -7,7 +7,7 @@
   const metrics = {
     initialized: false,
     renderCount: 0,
-    lastRenderRoute: null,
+    lastTradeContextRoute: null,
     lastRenderDurationMs: null,
     lastRenderAt: null,
     legacyAdapterConnected: false
@@ -21,7 +21,7 @@
 
   function markRender(detail = {}) {
     metrics.renderCount += 1;
-    metrics.lastRenderRoute = detail.route || metrics.lastRenderRoute;
+    metrics.lastTradeContextRoute = detail.route || metrics.lastTradeContextRoute;
     metrics.lastRenderDurationMs = Number.isFinite(detail.durationMs) ? detail.durationMs : metrics.lastRenderDurationMs;
     metrics.lastRenderAt = new Date().toISOString();
     return snapshot();
@@ -32,11 +32,19 @@
     return snapshot();
   }
 
+  function currentApplicationRoute() {
+    return HQ.getService?.('appRouter')?.diagnostics?.()?.lastRender?.route ||
+      (location.hash.slice(1) || 'home').split('/')[0];
+  }
+
   function snapshot() {
     const tradeState = HQ.getService?.('trade.state')?.snapshot?.() || null;
     return Object.freeze({
       ...metrics,
-      moduleVersion: '4.12',
+      // Deprecated compatibility alias. This is trade context, not the active app route.
+      lastRenderRoute: metrics.lastTradeContextRoute,
+      currentApplicationRoute: currentApplicationRoute(),
+      moduleVersion: '4.13',
       activeNegotiationId: tradeState?.activeNegotiationId || null,
       activeTradeId: tradeState?.activeTradeId || null,
       builderOpen: Boolean(tradeState?.builderOpen)

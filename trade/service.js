@@ -12,7 +12,7 @@
     HQ.getService?.('trade.diagnostics')?.connectLegacyAdapter?.();
     HQ.getService?.('trade.state')?.patch?.({ initialized: true }, 'trade-legacy-attached');
     HQ.getService?.('trade.diagnostics')?.markInitialized?.({ legacyAdapterConnected: true });
-    HQ.getService?.('trade.events')?.emit?.('trade-platform-ready', { version: '4.12' });
+    HQ.getService?.('trade.events')?.emit?.('trade-platform-ready', { version: '4.13' });
     return service;
   }
 
@@ -40,7 +40,7 @@
   function diagnostics() {
     return HQ.getService?.('trade.diagnostics')?.snapshot?.() || {
       initialized: Boolean(legacy),
-      moduleVersion: '4.12'
+      moduleVersion: '4.13'
     };
   }
 
@@ -53,6 +53,7 @@
     diagnostics,
     get state() { return HQ.getService?.('trade.state'); },
     get events() { return HQ.getService?.('trade.events'); },
+    get negotiations() { return HQ.getService?.('trade.negotiations'); },
     get legacyConnected() { return Boolean(legacy); }
   };
 
