@@ -93,8 +93,10 @@
 
   function render(route, options = {}) {
     const target = normalizeRoute(route);
-    if (typeof window.FGC_APP?.renderRoute === 'function') {
-      window.FGC_APP.renderRoute(target);
+    if (typeof HQ.appRouter?.render === 'function') {
+      HQ.appRouter.render(target, options);
+    } else if (typeof window.FGC_APP?.renderRoute === 'function') {
+      window.FGC_APP.renderRoute(target, options);
     }
     if (options.emit !== false) {
       emit('navigation-rendered', {
