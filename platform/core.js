@@ -11,15 +11,19 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '4.18',
+    version: '4.19',
     release: 4,
-    epic: 18,
+    epic: 19,
     patch: 0,
-    build: 'ui-infrastructure-and-theme-foundation'
+    build: 'storage-configuration-feature-flags-and-manifest'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
     'lifecycle',
+    'manifest',
+    'storage',
+    'config',
+    'features',
     'contract',
     'events',
     'state',

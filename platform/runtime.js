@@ -320,7 +320,7 @@
     }, {});
     return Object.freeze({
       service: 'runtime',
-      version: '1.0',
+      version: '1.1',
       moduleCount: snapshots.length,
       ready: snapshots.length > 0 && snapshots.every((module) => module.state === 'ready'),
       counts: Object.freeze(counts),
@@ -348,8 +348,8 @@
     version: HQ.metadata.version,
     routes: [],
     permissions: [],
-    dependencies: ['service:contract', 'service:events', 'service:state', 'service:errors', 'service:api'],
-    diagnostics: () => ({ services: HQ.listServices?.().filter((name) => ['contract', 'events', 'state', 'errors', 'api'].includes(name)) })
+    dependencies: ['service:manifest', 'service:storage', 'service:config', 'service:features', 'service:contract', 'service:events', 'service:state', 'service:errors', 'service:api'],
+    diagnostics: () => ({ services: HQ.listServices?.().filter((name) => ['manifest', 'storage', 'config', 'features', 'contract', 'events', 'state', 'errors', 'api'].includes(name)) })
   });
 
   register({

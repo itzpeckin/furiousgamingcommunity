@@ -120,7 +120,11 @@
     errorHandling: 'errors',
     moduleRuntime: 'runtime',
     platformValidation: 'validate',
-    sharedStorage: 'store',
+    sharedStorage: 'storage',
+    legacySharedStore: 'store',
+    applicationConfiguration: 'config',
+    featureFlags: 'features',
+    platformManifest: 'manifest',
     sharedApplicationState: 'state',
     tradeState: 'trade.state',
     tradeNegotiations: 'trade.negotiations'
@@ -128,6 +132,10 @@
 
   const serviceOwnership = Object.freeze({
     lifecycle: 'platform',
+    manifest: 'platform',
+    storage: 'platform',
+    config: 'platform',
+    features: 'platform',
     contract: 'platform',
     events: 'platform',
     state: 'platform',
@@ -198,8 +206,8 @@
 
   function describe() {
     return Object.freeze({
-      version: '1.4-draft',
-      release: '4.18',
+      version: '1.5-draft',
+      release: '4.19',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -231,8 +239,8 @@
       .filter((name) => Boolean(window[name]));
 
     return Object.freeze({
-      contractVersion: '1.4-draft',
-      release: '4.18',
+      contractVersion: '1.5-draft',
+      release: '4.19',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),

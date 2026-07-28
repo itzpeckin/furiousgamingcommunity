@@ -116,7 +116,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'validate',
-      version: '1.0',
+      version: '1.1',
       suiteCount: suites.size,
       testCount: [...suites.values()].reduce((total, suite) => total + suite.tests.length, 0),
       suites: Object.freeze([...suites.values()].map((suite) => Object.freeze({
@@ -145,7 +145,7 @@
         id: 'release-metadata',
         name: 'Release metadata',
         run: ({ assert }) => {
-          assert(HQ.metadata.version === '4.18', `Expected release 4.18, received ${HQ.metadata.version}.`);
+          assert(HQ.metadata.version === '4.19', `Expected release 4.19, received ${HQ.metadata.version}.`);
           return { details: HQ.metadata };
         }
       },
@@ -163,8 +163,8 @@
         name: 'Platform contract audit',
         run: ({ assert }) => {
           const audit = HQ.contract.audit();
-          assert(audit.contractVersion === '1.4-draft', `Expected contract 1.4-draft, received ${audit.contractVersion}.`);
-          assert(audit.release === '4.18', `Expected contract release 4.18, received ${audit.release}.`);
+          assert(audit.contractVersion === '1.5-draft', `Expected contract 1.5-draft, received ${audit.contractVersion}.`);
+          assert(audit.release === '4.19', `Expected contract release 4.19, received ${audit.release}.`);
           assert(audit.compliant, 'Platform contract audit is not compliant.', audit);
           return { details: audit };
         }
@@ -315,6 +315,105 @@
           HQ.ui.loading.hide(second);
           assert(HQ.ui.loading.count() === 0, 'Loading count did not return to zero.');
           return { details: { finalCount: HQ.ui.loading.count() } };
+        }
+      }
+    ]
+  });
+
+
+  register({
+    id: 'storage-configuration',
+    name: 'Storage, Configuration and Feature Flags',
+    tests: [
+      {
+        id: 'deployment-manifest',
+        name: 'Deployment manifest scripts loaded',
+        run: ({ assert }) => {
+          const diagnostics = HQ.manifest.diagnostics();
+          assert(diagnostics.scripts.compliant, `Required platform scripts are missing: ${diagnostics.scripts.missing.join(', ')}`, diagnostics.scripts);
+          assert(diagnostics.services.compliant, `Manifest services are missing: ${diagnostics.services.missing.join(', ')}`, diagnostics.services);
+          return { details: diagnostics };
+        }
+      },
+      {
+        id: 'storage-service',
+        name: 'Storage service available',
+        run: ({ assert }) => {
+          const diagnostics = HQ.storage.diagnostics();
+          assert(diagnostics.localAvailable, 'Local storage is unavailable.', diagnostics);
+          assert(diagnostics.sessionAvailable, 'Session storage is unavailable.', diagnostics);
+          return { details: diagnostics };
+        }
+      },
+      {
+        id: 'storage-round-trip',
+        name: 'Storage JSON round trip',
+        run: ({ assert }) => {
+          const key = `validation.${Date.now()}`;
+          const value = { release: HQ.metadata.version, valid: true };
+          assert(HQ.storage.set(key, value), 'Storage write failed.');
+          const received = HQ.storage.get(key);
+          HQ.storage.remove(key);
+          assert(received?.release === value.release && received?.valid === true, 'Storage round trip returned an unexpected value.', received);
+          return { details: received };
+        }
+      },
+      {
+        id: 'storage-expiration',
+        name: 'Storage expiration metadata',
+        run: async ({ assert }) => {
+          const key = `validation.expiration.${Date.now()}`;
+          HQ.storage.set(key, 'expires', { ttlMs: 1 });
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          assert(HQ.storage.get(key, null) === null, 'Expired storage value was returned.');
+          return { details: { expired: true } };
+        }
+      },
+      {
+        id: 'configuration-precedence',
+        name: 'Configuration runtime override precedence',
+        run: ({ assert }) => {
+          const path = 'validation.runtimeOverride';
+          HQ.config.setOverride(path, 'active');
+          assert(HQ.config.get(path) === 'active', 'Runtime configuration override was not returned.');
+          HQ.config.clearOverride(path);
+          assert(HQ.config.get(path, null) === null, 'Runtime configuration override was not cleared.');
+          return { details: HQ.config.diagnostics() };
+        }
+      },
+      {
+        id: 'feature-flags',
+        name: 'Feature flag evaluation and override',
+        run: ({ assert }) => {
+          const key = 'validation.temporary-flag';
+          HQ.features.register(key, { defaultEnabled: false }, { replace: true });
+          assert(HQ.features.isEnabled(key) === false, 'Feature flag default state was not respected.');
+          HQ.features.enable(key);
+          assert(HQ.features.isEnabled(key) === true, 'Feature flag enable override failed.');
+          HQ.features.disable(key);
+          assert(HQ.features.isEnabled(key) === false, 'Feature flag disable override failed.');
+          HQ.features.clearOverride(key);
+          return { details: HQ.features.evaluate(key) };
+        }
+      },
+      {
+        id: 'platform-feature-default',
+        name: 'Deployment validation feature enabled',
+        run: ({ assert }) => {
+          const evaluation = HQ.features.evaluate('platform.deployment-validation');
+          assert(evaluation.enabled, 'Platform deployment validation feature is disabled.', evaluation);
+          return { details: evaluation };
+        }
+      },
+      {
+        id: 'new-services-declared',
+        name: 'New services declared by contract',
+        run: ({ assert }) => {
+          const audit = HQ.contract.audit();
+          ['manifest', 'storage', 'config', 'features'].forEach((name) => {
+            assert(!audit.undeclaredRegisteredServices.includes(name), `Service "${name}" is not declared in the platform contract.`, audit);
+          });
+          return { details: { services: ['manifest', 'storage', 'config', 'features'] } };
         }
       }
     ]
