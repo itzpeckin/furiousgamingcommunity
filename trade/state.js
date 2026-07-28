@@ -3,54 +3,55 @@
 
   const HQ = window.FranchiseHQ;
   if (!HQ?.defineService) throw new Error('platform/core.js must load before trade/state.js.');
+  if (!HQ.state?.register) throw new Error('platform/state.js must load before trade/state.js.');
 
-  const state = {
-    initialized: false,
-    activeNegotiationId: null,
-    activeTradeId: null,
-    builderOpen: false,
-    currentView: null,
-    filters: Object.create(null),
-    lastRenderAt: null
-  };
+  const namespace = HQ.state.register('trade', {
+    owner: 'featureModules.trade',
+    defaults: {
+      initialized: false,
+      activeNegotiationId: null,
+      activeTradeId: null,
+      builderOpen: false,
+      currentView: null,
+      filters: {},
+      lastRenderAt: null
+    },
+    resetOn: ['league-changed', 'identity-changed', 'session-ended']
+  });
 
   function snapshot() {
+    const state = namespace.snapshot();
     return Object.freeze({
-      initialized: state.initialized,
-      activeNegotiationId: state.activeNegotiationId,
-      activeTradeId: state.activeTradeId,
-      builderOpen: state.builderOpen,
-      currentView: state.currentView,
-      filters: Object.freeze({ ...state.filters }),
-      lastRenderAt: state.lastRenderAt
+      ...state,
+      filters: Object.freeze({ ...(state.filters || {}) })
     });
   }
 
-  function patch(next = {}, source = 'trade-state') {
-    Object.assign(state, next || {});
-    HQ.events?.emit?.('trade-state-changed', { source, state: snapshot() });
-    return snapshot();
+  function patch(next = {}, source = 'trade.state') {
+    return namespace.patch(next || {}, { source });
   }
 
-  function setFilter(name, value, source = 'trade-filter') {
-    state.filters[String(name)] = value;
-    return patch({}, source);
+  function setFilter(name, value, source = 'trade.filter') {
+    const state = namespace.snapshot();
+    return namespace.patch({
+      filters: { ...(state.filters || {}), [String(name)]: value }
+    }, { source });
   }
 
-  function reset(source = 'trade-state-reset') {
-    state.activeNegotiationId = null;
-    state.activeTradeId = null;
-    state.builderOpen = false;
-    state.currentView = null;
-    state.filters = Object.create(null);
-    state.lastRenderAt = null;
-    return patch({}, source);
+  function reset(source = 'trade.state.reset') {
+    return namespace.reset({ source });
+  }
+
+  function subscribe(handler, options = {}) {
+    return namespace.subscribe(handler, options);
   }
 
   HQ.defineService('trade.state', {
     snapshot,
     patch,
     setFilter,
-    reset
+    reset,
+    subscribe,
+    metadata: namespace.metadata
   });
 })();
