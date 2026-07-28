@@ -11,11 +11,11 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '4.12',
+    version: '4.13',
     release: 4,
-    epic: 12,
+    epic: 13,
     patch: 0,
-    build: 'trade-platform-foundation'
+    build: 'negotiation-service-extraction'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
@@ -41,6 +41,7 @@
     'trade.state',
     'trade.events',
     'trade.diagnostics',
+    'trade.negotiations',
     'trade'
   ]);
 
