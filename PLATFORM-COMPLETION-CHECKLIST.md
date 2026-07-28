@@ -11,21 +11,19 @@
 - [x] 4.17 — Module Runtime and Validation Framework
 - [x] 4.18 — UI Infrastructure and Theme Foundation
 - [x] 4.19 — Storage, Configuration, Feature Flags and Platform Manifest
+- [x] 4.20 — Security, Testing and Release Hardening
 
-## Version 4.20 acceptance criteria
+## Version 4.21 — Platform Completion Certification
 
-- [ ] `FranchiseHQ.metadata.version` returns `4.20`.
-- [ ] `FranchiseHQ.lifecycle.diagnostics()` reports `ready`.
-- [ ] `FranchiseHQ.contract.audit()` reports contract `1.6-draft`, release `4.20`, and compliance.
-- [ ] `FranchiseHQ.manifest.diagnostics()` reports no missing scripts or declared services.
-- [ ] `FranchiseHQ.security.diagnostics()` reports zero blocking errors.
-- [ ] Unsafe URL schemes are rejected.
-- [ ] Output encoding and secret redaction tests pass.
-- [ ] `FranchiseHQ.release.supportBundle()` returns a redacted diagnostic bundle.
-- [ ] `await FranchiseHQ.validate.run()` reports zero failures.
+- [ ] `FranchiseHQ.metadata.version` returns `4.21`.
+- [ ] `FranchiseHQ.lifecycle.diagnostics()` reports `status: "ready"`.
+- [ ] `FranchiseHQ.contract.audit()` reports Contract `1.0`, release `4.21`, and `compliant: true`.
+- [ ] `FranchiseHQ.manifest.diagnostics()` reports no missing scripts or services.
+- [ ] `FranchiseHQ.platform.health()` reports `overall: "healthy"`.
+- [ ] `FranchiseHQ.runtime.dependencyAudit()` reports `compliant: true`.
+- [ ] `await FranchiseHQ.validate.run()` completes with zero failures.
 - [ ] `await FranchiseHQ.release.preflight()` reports `ready: true`.
-- [ ] Existing authentication, navigation, Commissioner HQ, and Trade Center workflows remain functional.
+- [ ] `await FranchiseHQ.release.certify()` reports `certified: true` with empty failures and warnings.
+- [ ] Authentication, hard refresh, navigation, Commissioner HQ, My Team, Teams, Players, Schedule, Standings, League News, Trade Center, identity simulation, and logout all pass manual regression.
 
-## Remaining Platform Foundation roadmap
-
-- [ ] 4.21 — Platform completion release
+When every item above is complete, Franchise HQ Platform 1.0 is the approved production baseline for Phase 5 development.
