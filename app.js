@@ -16,9 +16,6 @@
   const detailContent = document.querySelector('[data-detail-content]');
   const toastRegion = document.querySelector('[data-toast-region]');
   const body = document.body;
-  const SIDEBAR_SCROLL_KEY = 'franchisehq:ui:sidebar-scroll-top';
-  const initialSidebarScrollTop = Number(window.FranchiseHQ?.store?.getString?.(SIDEBAR_SCROLL_KEY, '0')) || 0;
-  let sidebarScrollSaveTimer = null;
 
   const accents = {
     blue: { hex: '#4f8cff', rgb: '79, 140, 255', label: 'Electric blue' },
@@ -1647,10 +1644,19 @@
       }
       default: renderRoadmap(base);
     }
-    const pageTitle=base==='my-team' ? (teamById(window.FGC_TRADE?.getCurrentAccount?.()?.teamId)?.fullName||'My Team') : id ? (base==='teams'?teamById(id)?.fullName:playerById(id)?.name) : pageNames[base];
-    document.title=`${pageTitle||'Franchise HQ'} — Milestone 1 Complete`;
     mainContent.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:'smooth'});
+    return { base, id, route };
+  }
+
+  function resolveRouteTitle(routeInput) {
+    const [base,id]=String(routeInput||'home').split('/');
+    const pageTitle=base==='my-team'
+      ? (teamById(window.FGC_TRADE?.getCurrentAccount?.()?.teamId)?.fullName||'My Team')
+      : id
+        ? (base==='teams'?teamById(id)?.fullName:playerById(id)?.name)
+        : pageNames[base];
+    return `${pageTitle||'Franchise HQ'} — Franchise HQ`;
   }
 
   function buildCommandResults(query='') {
@@ -1689,22 +1695,26 @@
   }
 
   function openSidebar() {
-    if (!sidebar || !mobileOverlay) return;
+    if (window.FranchiseHQ?.sidebar?.open) return window.FranchiseHQ.sidebar.open();
+    if (!sidebar || !mobileOverlay) return false;
     document.body.classList.add('sidebar-open');
     sidebar.classList.add('is-open');
     mobileOverlay.hidden=false;
     mobileOverlay.classList.add('is-open');
     requestAnimationFrame(()=>mobileOverlay.classList.add('is-visible'));
     body.style.overflow='hidden';
+    return true;
   }
 
   function closeSidebar() {
-    if (!sidebar || !mobileOverlay) return;
+    if (window.FranchiseHQ?.sidebar?.close) return window.FranchiseHQ.sidebar.close();
+    if (!sidebar || !mobileOverlay) return false;
     document.body.classList.remove('sidebar-open');
     sidebar.classList.remove('is-open');
     mobileOverlay.classList.remove('is-open','is-visible');
     mobileOverlay.hidden=true;
     unlockBody();
+    return true;
   }
   function openStylePanel() { stylePanel.classList.add('is-open'); panelOverlay.classList.add('is-open'); body.style.overflow='hidden'; }
   function closeStylePanel() { stylePanel.classList.remove('is-open'); panelOverlay.classList.remove('is-open'); unlockBody(); }
@@ -1949,19 +1959,7 @@
     if (routeBase(location.hash.slice(1))==='my-team') renderRoute('my-team');
   });
 
-  if (sidebar) {
-    requestAnimationFrame(()=>{ sidebar.scrollTop=initialSidebarScrollTop; });
-    sidebar.addEventListener('scroll', ()=>{
-      clearTimeout(sidebarScrollSaveTimer);
-      sidebarScrollSaveTimer=setTimeout(()=>{
-        window.FranchiseHQ?.store?.setString?.(SIDEBAR_SCROLL_KEY, String(sidebar.scrollTop), {source:'sidebar-scroll'});
-      }, 100);
-    }, {passive:true});
-    window.addEventListener('pagehide', ()=>{
-      clearTimeout(sidebarScrollSaveTimer);
-      window.FranchiseHQ?.store?.setString?.(SIDEBAR_SCROLL_KEY, String(sidebar.scrollTop), {source:'pagehide'});
-    });
-  }
+  window.FranchiseHQ?.sidebar?.init?.({ sidebar, overlay: mobileOverlay });
 
   window.FGC_APP = {
     teams, players, schedule, newsArticles, state, pageContent,
@@ -1976,6 +1974,12 @@
     getTeam: teamById
   });
 
+  window.FranchiseHQ?.appRouter?.configure?.({
+    renderer: renderRoute,
+    titleResolver: resolveRouteTitle,
+    afterRender: () => window.FranchiseHQ?.sidebar?.restore?.()
+  });
+
   window.FranchiseHQ?.navigation?.start?.({renderInitial:false});
 
   applyAccent(state.accent,false);
@@ -1985,5 +1989,5 @@
     if(nextRole && nextRole!==state.role) applyRole(nextRole,false);
   });
   applyRole(window.FranchiseHQ?.simulation?.getRole?.() || state.role,false);
-  renderRoute();
+  window.FranchiseHQ?.appRouter?.render?.(location.hash.slice(1)||'home',{source:'startup'}) || renderRoute();
 })();
