@@ -194,7 +194,7 @@
   function describe() {
     return Object.freeze({
       version: '1.2-draft',
-      release: '4.16',
+      release: '4.16.1',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -226,8 +226,8 @@
       .filter((name) => Boolean(window[name]));
 
     return Object.freeze({
-      contractVersion: '1.1-draft',
-      release: '4.16',
+      contractVersion: '1.2-draft',
+      release: '4.16.1',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),
@@ -235,7 +235,7 @@
       sourceOfTruthCount: Object.keys(sourcesOfTruth).length,
       forbiddenPatternCount: forbiddenPatterns.length,
       compliant: undeclaredRegisteredServices.length === 0,
-      note: 'Legacy globals and legacy event-name callers are tracked migration concerns and do not fail the 4.15 contract audit.'
+      note: 'Legacy globals and legacy event-name callers remain tracked migration items and do not affect Platform compliance during the current migration phase.'
     });
   }
 

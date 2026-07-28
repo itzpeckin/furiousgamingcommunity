@@ -69,22 +69,56 @@
     return controller.signal;
   }
 
-  async function parseResponse(response) {
+  function expectsJson(url, options = {}) {
+    if (options.responseType === 'text' || options.responseType === 'blob') return false;
+    if (options.responseType === 'json') return true;
+    try {
+      return new URL(url, window.location.origin).pathname.startsWith('/api/');
+    } catch (_) {
+      return String(url || '').startsWith('/api/');
+    }
+  }
+
+  async function parseResponse(response, context = {}) {
     if (response.status === 204) return null;
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
+
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    const jsonExpected = expectsJson(context.url || response.url, context.options);
+    const isJson = contentType.includes('application/json') || contentType.includes('+json');
+
+    if (isJson) {
       try {
         return await response.json();
       } catch (error) {
         throw new ApiError('The server returned invalid JSON.', {
-          status: response.status,
+          status: response.status || 500,
           code: 'INVALID_JSON',
-          url: response.url,
+          url: context.url || response.url,
+          method: context.method || null,
+          requestId: context.requestId || null,
           cause: error
         });
       }
     }
+
+    if (context.options?.responseType === 'blob') return response.blob();
+
     const text = await response.text();
+    if (jsonExpected) {
+      const safePreview = text ? text.slice(0, 160).replace(/\s+/g, ' ').trim() : null;
+      throw new ApiError('The API returned an unexpected response format.', {
+        status: response.ok ? 500 : (response.status || 500),
+        code: 'INVALID_API_RESPONSE',
+        url: context.url || response.url,
+        method: context.method || null,
+        requestId: context.requestId || null,
+        payload: {
+          contentType: contentType || 'unknown',
+          preview: safePreview
+        }
+      });
+    }
+
     return text || null;
   }
 
@@ -147,7 +181,7 @@
             cache: options.cache || 'no-store'
           });
 
-          const payload = await parseResponse(response);
+          const payload = await parseResponse(response, { url, method, requestId, options });
           if (!response.ok || payload?.ok === false) {
             throw new ApiError(messageFromPayload(payload, response.status), {
               status: response.status,
@@ -234,7 +268,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'api',
-      version: '2.0',
+      version: '2.0.1',
       defaults: Object.freeze({ timeoutMs: DEFAULT_TIMEOUT_MS, retries: DEFAULT_RETRIES }),
       activeRequests: Object.freeze(Array.from(activeRequests.values()).map(({ controller, ...item }) => Object.freeze(item))),
       recentRequests: Object.freeze(requestHistory.slice(-20))
