@@ -27,7 +27,7 @@
   function normalizeNamespace(name) {
     const value = String(name || '').trim();
     if (!value) throw new TypeError('A state namespace is required.');
-    if (!/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/.test(value)) {
+    if (!/^[a-z][A-Za-z0-9]*(?:[.-][a-z][A-Za-z0-9]*)*$/.test(value)) {
       throw new TypeError(`Invalid state namespace "${value}".`);
     }
     return value;
