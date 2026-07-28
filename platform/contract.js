@@ -118,6 +118,8 @@
     applicationEvents: 'events',
     APITransport: 'api',
     errorHandling: 'errors',
+    moduleRuntime: 'runtime',
+    platformValidation: 'validate',
     sharedStorage: 'store',
     sharedApplicationState: 'state',
     tradeState: 'trade.state',
@@ -131,6 +133,8 @@
     state: 'platform',
     errors: 'platform',
     api: 'platform',
+    runtime: 'platform',
+    validate: 'platform',
     store: 'platform',
     simulation: 'leagueEngine',
     navigation: 'platform',
@@ -180,7 +184,7 @@
 
   const moduleContract = Object.freeze({
     requiredMetadata: freezeList(['id', 'name', 'version', 'routes', 'permissions']),
-    lifecycle: freezeList(['register', 'mount', 'unmount']),
+    lifecycle: freezeList(['register', 'initialize', 'start', 'ready', 'shutdown']),
     optionalCapabilities: freezeList(['state', 'events', 'diagnostics', 'commands', 'featureFlags']),
     rules: freezeList([
       'A module must declare every route it owns.',
@@ -193,8 +197,8 @@
 
   function describe() {
     return Object.freeze({
-      version: '1.2-draft',
-      release: '4.16.1',
+      version: '1.3-draft',
+      release: '4.17',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -226,8 +230,8 @@
       .filter((name) => Boolean(window[name]));
 
     return Object.freeze({
-      contractVersion: '1.2-draft',
-      release: '4.16.1',
+      contractVersion: '1.3-draft',
+      release: '4.17',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),
