@@ -11,11 +11,11 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '4.11',
+    version: '4.12',
     release: 4,
-    epic: 11,
+    epic: 12,
     patch: 0,
-    build: 'application-shell-modularization'
+    build: 'trade-platform-foundation'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
@@ -37,7 +37,11 @@
     'players',
     'schedule',
     'standings',
-    'news'
+    'news',
+    'trade.state',
+    'trade.events',
+    'trade.diagnostics',
+    'trade'
   ]);
 
   const REQUIRED_CHECKPOINTS = Object.freeze([
