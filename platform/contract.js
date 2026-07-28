@@ -118,6 +118,7 @@
     applicationEvents: 'events',
     APITransport: 'api',
     sharedStorage: 'store',
+    sharedApplicationState: 'state',
     tradeState: 'trade.state',
     tradeNegotiations: 'trade.negotiations'
   });
@@ -126,6 +127,7 @@
     lifecycle: 'platform',
     contract: 'platform',
     events: 'platform',
+    state: 'platform',
     api: 'platform',
     store: 'platform',
     simulation: 'leagueEngine',
@@ -152,10 +154,10 @@
 
   const conventions = Object.freeze({
     serviceNames: 'lower camelCase for platform services; dot notation only for sub-services owned by a module',
-    eventNames: 'namespace:past-tense-action, for example route:changed or trade:offer-submitted',
+    eventNames: 'namespace:past-tense-action, for example route:changed or trade:offer-submitted; legacy namespace-action callers are normalized during migration',
     routeNames: 'lowercase kebab-case, for example trade-center and my-team',
     diagnostics: 'diagnostic fields must describe their scope explicitly and must not impersonate platform-wide state',
-    state: 'global state contains cross-module context only; feature state remains inside its owning module',
+    state: 'cross-module context lives in registered platform state namespaces; feature state remains in a namespace owned by its module',
     dependencies: 'feature modules may depend on platform, identity, league engine, and data services; platform may not depend on feature modules',
     persistence: 'feature modules must use the shared store or API services rather than directly choosing a persistence mechanism',
     DOM: 'feature modules may render inside their assigned mount point but must not own the global application shell',
@@ -189,8 +191,8 @@
 
   function describe() {
     return Object.freeze({
-      version: '1.0-draft',
-      release: '4.14',
+      version: '1.1-draft',
+      release: '4.15',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -222,8 +224,8 @@
       .filter((name) => Boolean(window[name]));
 
     return Object.freeze({
-      contractVersion: '1.0-draft',
-      release: '4.14',
+      contractVersion: '1.1-draft',
+      release: '4.15',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),
@@ -231,7 +233,7 @@
       sourceOfTruthCount: Object.keys(sourcesOfTruth).length,
       forbiddenPatternCount: forbiddenPatterns.length,
       compliant: undeclaredRegisteredServices.length === 0,
-      note: 'Legacy globals are reported for migration tracking and do not fail the 4.14 contract audit.'
+      note: 'Legacy globals and legacy event-name callers are tracked migration concerns and do not fail the 4.15 contract audit.'
     });
   }
 

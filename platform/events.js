@@ -8,23 +8,52 @@
 
   const target = new EventTarget();
   const subscriptions = new Map();
+  const byEvent = new Map();
+  const history = [];
+  const MAX_HISTORY = 100;
 
   function normalizeName(name) {
-    const value = String(name || '').trim();
+    let value = String(name || '').trim().replace(/^franchisehq:/, '');
     if (!value) throw new TypeError('An event name is required.');
-    return value.startsWith('franchisehq:') ? value : `franchisehq:${value}`;
+    // 4.15 accepts legacy namespace-action names and normalizes them to the
+    // canonical namespace:action contract without breaking existing callers.
+    if (!value.includes(':') && value.includes('-')) {
+      const separator = value.indexOf('-');
+      value = `${value.slice(0, separator)}:${value.slice(separator + 1)}`;
+    }
+    if (!/^[a-z][a-z0-9.-]*:[a-z][a-z0-9-]*$/.test(value)) {
+      throw new TypeError(`Invalid Franchise HQ event name "${value}". Use namespace:past-tense-action.`);
+    }
+    return `franchisehq:${value}`;
+  }
+
+  function metadata(name, detail, options = {}) {
+    return Object.freeze({
+      id: options.id || (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+      name: name.replace(/^franchisehq:/, ''),
+      source: options.source || 'unknown',
+      timestamp: new Date().toISOString(),
+      correlationId: options.correlationId || null,
+      detail
+    });
   }
 
   function emit(name, detail = null, options = {}) {
     const eventName = normalizeName(name);
+    const payload = metadata(eventName, detail, options);
     const event = new CustomEvent(eventName, { detail });
+    Object.defineProperty(event, 'franchiseHQ', { value: payload, enumerable: true });
     target.dispatchEvent(event);
 
     if (options.window !== false) {
-      window.dispatchEvent(new CustomEvent(eventName, { detail }));
+      const windowEvent = new CustomEvent(eventName, { detail });
+      Object.defineProperty(windowEvent, 'franchiseHQ', { value: payload, enumerable: true });
+      window.dispatchEvent(windowEvent);
     }
 
-    return event;
+    history.push(payload);
+    if (history.length > MAX_HISTORY) history.shift();
+    return payload;
   }
 
   function on(name, handler, options = {}) {
@@ -33,34 +62,66 @@
     }
 
     const eventName = normalizeName(name);
-    target.addEventListener(eventName, handler, options);
+    const bucket = byEvent.get(eventName) || new Map();
+    if (options.preventDuplicate !== false && bucket.has(handler)) {
+      return bucket.get(handler).unsubscribe;
+    }
 
-    const token = Symbol(eventName);
-    subscriptions.set(token, { eventName, handler, options });
-    return () => off(token);
+    let token;
+    const wrapped = (event) => {
+      try { handler(event, event.franchiseHQ); }
+      catch (error) { console.error(`[FranchiseHQ.events] ${eventName}`, error); }
+      finally { if (options.once === true && token) off(token); }
+    };
+
+    target.addEventListener(eventName, wrapped);
+    token = Symbol(eventName);
+    const unsubscribe = () => off(token);
+    const subscription = {
+      token,
+      eventName,
+      handler,
+      wrapped,
+      once: options.once === true,
+      owner: options.owner || 'anonymous',
+      createdAt: new Date().toISOString(),
+      unsubscribe
+    };
+    subscriptions.set(token, subscription);
+    bucket.set(handler, subscription);
+    byEvent.set(eventName, bucket);
+    return unsubscribe;
   }
 
-  function once(name, handler) {
-    return on(name, handler, { once: true });
+  function once(name, handler, options = {}) {
+    return on(name, handler, { ...options, once: true });
   }
 
   function off(tokenOrName, handler) {
     if (typeof tokenOrName === 'symbol') {
       const subscription = subscriptions.get(tokenOrName);
       if (!subscription) return false;
-      target.removeEventListener(
-        subscription.eventName,
-        subscription.handler,
-        subscription.options
-      );
+      target.removeEventListener(subscription.eventName, subscription.wrapped);
       subscriptions.delete(tokenOrName);
+      const bucket = byEvent.get(subscription.eventName);
+      bucket?.delete(subscription.handler);
+      if (bucket && !bucket.size) byEvent.delete(subscription.eventName);
       return true;
     }
 
     const eventName = normalizeName(tokenOrName);
     if (typeof handler !== 'function') return false;
-    target.removeEventListener(eventName, handler);
-    return true;
+    const subscription = byEvent.get(eventName)?.get(handler);
+    return subscription ? off(subscription.token) : false;
+  }
+
+  function cleanupOwner(owner) {
+    const normalized = String(owner || '').trim();
+    let removed = 0;
+    [...subscriptions.values()].forEach((subscription) => {
+      if (subscription.owner === normalized && off(subscription.token)) removed += 1;
+    });
+    return removed;
   }
 
   function fromWindow(name, handler, options = {}) {
@@ -69,12 +130,34 @@
     return () => window.removeEventListener(eventName, handler, options);
   }
 
+  function diagnostics() {
+    const eventCounts = {};
+    byEvent.forEach((bucket, eventName) => {
+      eventCounts[eventName.replace(/^franchisehq:/, '')] = bucket.size;
+    });
+    const ownerCounts = {};
+    subscriptions.forEach((subscription) => {
+      ownerCounts[subscription.owner] = (ownerCounts[subscription.owner] || 0) + 1;
+    });
+    return Object.freeze({
+      service: 'events',
+      activeSubscriptionCount: subscriptions.size,
+      subscriptionsByEvent: Object.freeze(eventCounts),
+      subscriptionsByOwner: Object.freeze(ownerCounts),
+      recentEvents: Object.freeze(history.slice(-10)),
+      duplicatePrevention: true,
+      cleanupByOwner: true
+    });
+  }
+
   HQ.defineService('events', {
     emit,
     on,
     once,
     off,
+    cleanupOwner,
     fromWindow,
-    normalizeName
+    normalizeName,
+    diagnostics
   });
 })();
