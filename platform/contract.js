@@ -136,6 +136,8 @@
     storage: 'platform',
     config: 'platform',
     features: 'platform',
+    security: 'platform',
+    release: 'platform',
     contract: 'platform',
     events: 'platform',
     state: 'platform',
@@ -206,8 +208,8 @@
 
   function describe() {
     return Object.freeze({
-      version: '1.5-draft',
-      release: '4.19',
+      version: '1.6-draft',
+      release: '4.20',
       layers,
       sourcesOfTruth,
       serviceOwnership,
@@ -239,8 +241,8 @@
       .filter((name) => Boolean(window[name]));
 
     return Object.freeze({
-      contractVersion: '1.5-draft',
-      release: '4.19',
+      contractVersion: '1.6-draft',
+      release: '4.20',
       registeredServices: Object.freeze([...registered].sort()),
       undeclaredRegisteredServices: Object.freeze(undeclaredRegisteredServices),
       declaredButMissingServices: Object.freeze(declaredButMissingServices),

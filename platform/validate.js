@@ -116,7 +116,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'validate',
-      version: '1.1',
+      version: '1.2',
       suiteCount: suites.size,
       testCount: [...suites.values()].reduce((total, suite) => total + suite.tests.length, 0),
       suites: Object.freeze([...suites.values()].map((suite) => Object.freeze({
@@ -145,7 +145,7 @@
         id: 'release-metadata',
         name: 'Release metadata',
         run: ({ assert }) => {
-          assert(HQ.metadata.version === '4.19', `Expected release 4.19, received ${HQ.metadata.version}.`);
+          assert(HQ.metadata.version === '4.20', `Expected release 4.20, received ${HQ.metadata.version}.`);
           return { details: HQ.metadata };
         }
       },
@@ -163,8 +163,8 @@
         name: 'Platform contract audit',
         run: ({ assert }) => {
           const audit = HQ.contract.audit();
-          assert(audit.contractVersion === '1.5-draft', `Expected contract 1.5-draft, received ${audit.contractVersion}.`);
-          assert(audit.release === '4.19', `Expected contract release 4.19, received ${audit.release}.`);
+          assert(audit.contractVersion === '1.6-draft', `Expected contract 1.6-draft, received ${audit.contractVersion}.`);
+          assert(audit.release === '4.20', `Expected contract release 4.20, received ${audit.release}.`);
           assert(audit.compliant, 'Platform contract audit is not compliant.', audit);
           return { details: audit };
         }
@@ -414,6 +414,84 @@
             assert(!audit.undeclaredRegisteredServices.includes(name), `Service "${name}" is not declared in the platform contract.`, audit);
           });
           return { details: { services: ['manifest', 'storage', 'config', 'features'] } };
+        }
+      }
+    ]
+  });
+
+
+  register({
+    id: 'security-release',
+    name: 'Security, Testing and Release Hardening',
+    tests: [
+      {
+        id: 'security-service',
+        name: 'Security baseline service registered',
+        run: ({ assert }) => {
+          assert(HQ.hasService('security'), 'Security service is not registered.');
+          const diagnostics = HQ.security.diagnostics();
+          assert(diagnostics.compliant, 'Security audit contains blocking findings.', diagnostics);
+          return { details: diagnostics };
+        }
+      },
+      {
+        id: 'output-encoding',
+        name: 'Output encoding blocks HTML injection',
+        run: ({ assert }) => {
+          const encoded = HQ.security.escapeHTML('<img src=x onerror=alert(1)>');
+          assert(!encoded.includes('<img'), 'HTML was not escaped.', encoded);
+          assert(encoded.includes('&lt;img'), 'Escaped HTML output was unexpected.', encoded);
+          return { details: { encoded } };
+        }
+      },
+      {
+        id: 'unsafe-url-rejection',
+        name: 'Unsafe URL schemes rejected',
+        run: ({ assert }) => {
+          assert(HQ.security.isSafeUrl('javascript:alert(1)') === false, 'javascript: URL was accepted.');
+          assert(HQ.security.isSafeUrl('/teams') === true, 'Same-origin relative URL was rejected.');
+          return { details: { javascriptRejected: true, relativeAccepted: true } };
+        }
+      },
+      {
+        id: 'secret-redaction',
+        name: 'Sensitive diagnostics values redacted',
+        run: ({ assert }) => {
+          const redacted = HQ.security.redact({ token: 'secret', nested: { password: 'private', value: 1 } });
+          assert(redacted.token === '[REDACTED]', 'Token was not redacted.', redacted);
+          assert(redacted.nested.password === '[REDACTED]', 'Nested password was not redacted.', redacted);
+          return { details: redacted };
+        }
+      },
+      {
+        id: 'release-service',
+        name: 'Release service registered',
+        run: ({ assert }) => {
+          assert(HQ.hasService('release'), 'Release service is not registered.');
+          const diagnostics = HQ.release.diagnostics();
+          assert(diagnostics.build.version === '4.20', 'Release build metadata is incorrect.', diagnostics);
+          return { details: diagnostics.build };
+        }
+      },
+      {
+        id: 'support-bundle-redaction',
+        name: 'Support bundle generated without obvious secrets',
+        run: ({ assert }) => {
+          const bundle = HQ.release.supportBundle();
+          const serialized = JSON.stringify(bundle);
+          assert(!/"(?:token|password|secret)"\s*:\s*"(?!\[REDACTED\])/i.test(serialized), 'Support bundle contains an unredacted sensitive value.');
+          return { details: { bytes: serialized.length } };
+        }
+      },
+      {
+        id: 'new-services-declared-420',
+        name: 'Security and release services declared by contract',
+        run: ({ assert }) => {
+          const audit = HQ.contract.audit();
+          ['security', 'release'].forEach((name) => {
+            assert(!audit.undeclaredRegisteredServices.includes(name), `Service "${name}" is not declared in the platform contract.`, audit);
+          });
+          return { details: { services: ['security', 'release'] } };
         }
       }
     ]

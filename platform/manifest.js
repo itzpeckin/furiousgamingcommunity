@@ -11,6 +11,7 @@
     'platform/storage.js',
     'platform/config.js',
     'platform/features.js',
+    'platform/security.js',
     'platform/contract.js',
     'platform/events.js',
     'platform/state.js',
@@ -20,7 +21,8 @@
     'platform/errors.js',
     'platform/api.js',
     'platform/runtime.js',
-    'platform/validate.js'
+    'platform/validate.js',
+    'platform/release.js'
   ]);
 
   function normalizeList(value) {
@@ -85,7 +87,7 @@
     const services = serviceInventory();
     return Object.freeze({
       service: 'manifest',
-      version: '1.0',
+      version: '1.1',
       release: HQ.metadata.version,
       entryCount: entries.size,
       entries: list(),
