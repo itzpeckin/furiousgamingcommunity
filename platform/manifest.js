@@ -22,7 +22,15 @@
     'platform/api.js',
     'platform/runtime.js',
     'platform/validate.js',
-    'platform/release.js'
+    'platform/release.js',
+    'league-engine/schema.js',
+    'league-engine/entities.js',
+    'league-engine/repository.js',
+    'league-engine/selectors.js',
+    'league-engine/validate.js',
+    'league-engine/migrations.js',
+    'league-engine/adapters/mock-data.js',
+    'league-engine/index.js'
   ]);
 
   function normalizeList(value) {

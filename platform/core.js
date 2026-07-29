@@ -11,11 +11,11 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '4.21.4',
-    release: 4,
-    epic: 21,
+    version: '5.1',
+    release: 5,
+    epic: 1,
     patch: 0,
-    build: 'platform-completion-baseline'
+    build: 'madden-read-model-foundation'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
