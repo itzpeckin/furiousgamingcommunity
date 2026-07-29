@@ -35,6 +35,7 @@
     'league-engine/migrations.js',
     'league-engine/adapters/mock-data.js',
     'league-engine/import-service.js',
+    'league-engine/data-state.js',
     'league-engine/index.js'
   ]);
 
