@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0e14" />
-  <meta name="franchise-hq-platform-version" content="4.21.4" />
+  <meta name="franchise-hq-platform-version" content="5.2" />
   <meta name="description" content="Interactive Madden connected-franchise league prototype with private trade workflow, role-based mock login, committee review, and browser-saved demo data." />
   <title>Furious Gaming Community — Franchise HQ TC-011.5</title>
   <link rel="stylesheet" href="styles.css" />
@@ -66,7 +66,7 @@
           <span class="status-dot status-dot--warning"></span>
           <div><strong>Mock data mode</strong><span>Real Madden sync arrives in Milestone 3</span></div>
         </div>
-        <span class="version-label">v4.21.4 · Trade Center Consistency Hotfix</span>
+        <span class="version-label">v5.2 · Madden Import Contract & Validation</span>
       </div>
     </aside>
 
@@ -413,11 +413,16 @@
 <script src="platform/league.js"></script>
 <script src="league-engine/schema.js"></script>
 <script src="league-engine/entities.js"></script>
+<script src="league-engine/import-contract.js"></script>
+<script src="league-engine/validate.js"></script>
+<script src="league-engine/import-validator.js"></script>
+<script src="league-engine/import-quarantine.js"></script>
+<script src="league-engine/adapters/madden-json.js"></script>
 <script src="league-engine/repository.js"></script>
 <script src="league-engine/selectors.js"></script>
-<script src="league-engine/validate.js"></script>
 <script src="league-engine/migrations.js"></script>
 <script src="league-engine/adapters/mock-data.js"></script>
+<script src="league-engine/import-service.js"></script>
 <script src="league-engine/index.js"></script>
 <script src="platform/permissions.js"></script>
 <script src="trade-module.js"></script>
