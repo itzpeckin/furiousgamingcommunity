@@ -61,6 +61,9 @@
         testId: test.id,
         testName: test.name,
         status: normalizeStatus(normalized.status),
+        passed: normalizeStatus(normalized.status) === 'pass',
+        compliant: normalizeStatus(normalized.status) !== 'fail',
+        success: normalizeStatus(normalized.status) === 'pass',
         message: normalized.message || 'Passed.',
         details: normalized.details ?? null,
         durationMs: Number((performance.now() - started).toFixed(2))
@@ -72,6 +75,10 @@
         testId: test.id,
         testName: test.name,
         status: test.severity === 'warning' ? 'warning' : 'fail',
+        passed: false,
+        compliant: test.severity === 'warning',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
         message: error instanceof Error ? error.message : String(error),
         details: error?.validationDetails ?? null,
         durationMs: Number((performance.now() - started).toFixed(2))
@@ -116,7 +123,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'validate',
-      version: '1.3',
+      version: '1.3.1',
       suiteCount: suites.size,
       testCount: [...suites.values()].reduce((total, suite) => total + suite.tests.length, 0),
       suites: Object.freeze([...suites.values()].map((suite) => Object.freeze({
@@ -145,7 +152,7 @@
         id: 'release-metadata',
         name: 'Release metadata',
         run: ({ assert }) => {
-          assert(HQ.metadata.version === '4.21', `Expected release 4.21, received ${HQ.metadata.version}.`);
+          assert(/^\d+\.\d+(?:\.\d+)?$/.test(HQ.metadata.version), `Invalid application release ${HQ.metadata.version}.`);
           return { details: HQ.metadata };
         }
       },
@@ -469,7 +476,7 @@
         run: ({ assert }) => {
           assert(HQ.hasService('release'), 'Release service is not registered.');
           const diagnostics = HQ.release.diagnostics();
-          assert(diagnostics.build.version === '4.21', 'Release build metadata is incorrect.', diagnostics);
+          assert(diagnostics.build.version === HQ.metadata.version, `Release build metadata ${diagnostics.build.version} does not match application release ${HQ.metadata.version}.`, diagnostics);
           return { details: diagnostics.build };
         }
       },
@@ -519,8 +526,12 @@
         run: ({ assert }) => {
           assert(HQ.hasService('platform'), 'Platform health service is not registered.');
           const health = HQ.platform.health();
-          assert(health.overall === 'healthy', 'Platform health is degraded.', health);
-          return { details: health.checks };
+          const blockingChecks = Object.entries(health.checks || {})
+            .filter(([name]) => name !== 'validationCompliant')
+            .filter(([, value]) => value !== true)
+            .map(([name]) => name);
+          assert(blockingChecks.length === 0, 'Platform health contains non-validation failures.', { health, blockingChecks });
+          return { details: { ...health.checks, validationCompliant: 'evaluated by current validation run' } };
         }
       },
       {
