@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService || !HQ.leagueSchema || !HQ.leagueEntities || !HQ.leagueImportContract) throw new Error('League schema, entities, and import contract must load before Madden JSON adapter.');
+  if (!HQ?.defineModuleService || !HQ.leagueSchema || !HQ.leagueEntities || !HQ.leagueImportContract) throw new Error('League schema, entities, and import contract must load before Madden JSON adapter.');
 
   const arrays = HQ.leagueImportContract.collections;
   const singularTypes = { teams:'team', franchises:'franchise', owners:'owner', players:'player', rosters:'roster', games:'game', standings:'standing', stats:'stat', contracts:'contract', injuries:'injury', draftPicks:'draftPick' };
@@ -36,6 +36,6 @@
     return Object.freeze({ envelope, snapshot: toSnapshot(envelope) });
   }
 
-  const service = HQ.defineService('leagueMaddenJsonAdapter', { parse, from, toSnapshot });
-  HQ.manifest?.register?.({ id: 'league-madden-json-adapter', service: 'leagueMaddenJsonAdapter', script: 'league-engine/adapters/madden-json.js', version: '1.0.0', dependencies: ['leagueSchema','leagueEntities','leagueImportContract'], capabilities: ['json-parse', 'normalized-madden-import', 'provenance-mapping'] });
+  const service = HQ.defineModuleService('league', 'leagueMaddenJsonAdapter', { parse, from, toSnapshot });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-madden-json-adapter', service: 'leagueMaddenJsonAdapter', script: 'league-engine/adapters/madden-json.js', version: '1.0.0', dependencies: ['leagueSchema','leagueEntities','leagueImportContract'], capabilities: ['json-parse', 'normalized-madden-import', 'provenance-mapping'] });
 })();

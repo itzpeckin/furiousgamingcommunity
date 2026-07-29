@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService || !HQ.leagueSchema || !HQ.leagueEntities) throw new Error('League schema and entities must load before mock-data adapter.');
+  if (!HQ?.defineModuleService || !HQ.leagueSchema || !HQ.leagueEntities) throw new Error('League schema and entities must load before mock-data adapter.');
 
   function array(value) { return Array.isArray(value) ? value : []; }
   function normalizeCollection(type, values, source) {
@@ -29,6 +29,6 @@
     return snapshot;
   }
 
-  const service = HQ.defineService('leagueMockAdapter', { fromLegacy });
-  HQ.manifest?.register?.({ id: 'league-mock-adapter', service: 'leagueMockAdapter', script: 'league-engine/adapters/mock-data.js', version: '1.0.0', dependencies: ['leagueSchema','leagueEntities'], capabilities: ['legacy-normalization', 'prototype-only'] });
+  const service = HQ.defineModuleService('league', 'leagueMockAdapter', { fromLegacy });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-mock-adapter', service: 'leagueMockAdapter', script: 'league-engine/adapters/mock-data.js', version: '1.0.0', dependencies: ['leagueSchema','leagueEntities'], capabilities: ['legacy-normalization', 'prototype-only'] });
 })();
