@@ -56,6 +56,8 @@
       id,
       service: String(definition.service || id),
       script: String(definition.script || ''),
+      scope: definition.scope === 'module' ? 'module' : 'platform',
+      module: definition.scope === 'module' ? String(definition.module || '').trim() : null,
       version: String(definition.version || '0.0.0'),
       capabilities: normalizeList(definition.capabilities),
       dependencies: normalizeList(definition.dependencies),
@@ -85,13 +87,24 @@
 
   function serviceInventory() {
     const registeredServices = HQ.listServices?.() || [];
-    const declaredServices = [...entries.values()].map((entry) => entry.service);
-    const missing = declaredServices.filter((name) => !registeredServices.includes(name));
+    const platformEntries = [...entries.values()].filter((entry) => entry.scope !== 'module');
+    const moduleEntries = [...entries.values()].filter((entry) => entry.scope === 'module');
+    const declaredServices = platformEntries.map((entry) => entry.service);
+    const missingPlatform = declaredServices.filter((name) => !registeredServices.includes(name));
+    const missingModules = moduleEntries
+      .filter((entry) => !entry.module || !HQ.hasModuleService?.(entry.module, entry.service))
+      .map((entry) => `${entry.module || 'unknown'}.${entry.service}`);
     return Object.freeze({
       declared: Object.freeze(declaredServices),
       registered: Object.freeze(registeredServices),
-      missing: Object.freeze(missing),
-      compliant: missing.length === 0
+      moduleDeclared: Object.freeze(moduleEntries.map((entry) => `${entry.module}.${entry.service}`)),
+      moduleRegistered: Object.freeze(moduleEntries
+        .filter((entry) => entry.module && HQ.hasModuleService?.(entry.module, entry.service))
+        .map((entry) => `${entry.module}.${entry.service}`)),
+      missing: Object.freeze([...missingPlatform, ...missingModules]),
+      missingPlatform: Object.freeze(missingPlatform),
+      missingModules: Object.freeze(missingModules),
+      compliant: missingPlatform.length === 0 && missingModules.length === 0
     });
   }
 
@@ -100,7 +113,7 @@
     const services = serviceInventory();
     return Object.freeze({
       service: 'manifest',
-      version: '1.3',
+      version: '1.4',
       release: HQ.metadata.version,
       entryCount: entries.size,
       entries: list(),
@@ -131,7 +144,7 @@
     id: 'manifest',
     service: 'manifest',
     script: 'platform/manifest.js',
-    version: '1.3',
+    version: '1.4',
     capabilities: ['service-metadata', 'script-inventory', 'deployment-validation']
   });
 })();

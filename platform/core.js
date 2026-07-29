@@ -5,17 +5,23 @@
   const services = existing.__services instanceof Map
     ? existing.__services
     : new Map();
+  const moduleRegistries = existing.__moduleRegistries instanceof Map
+    ? existing.__moduleRegistries
+    : new Map();
+  const moduleFacades = existing.modules && typeof existing.modules === 'object'
+    ? existing.modules
+    : Object.create(null);
   const checkpoints = new Map();
   const lifecycleTarget = new EventTarget();
 
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '5.2.1',
+    version: '5.3.0',
     release: 5,
-    epic: 2,
-    patch: 1,
-    build: 'validation-framework-hotfix'
+    epic: 3,
+    patch: 0,
+    build: 'modular-service-architecture'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
@@ -129,6 +135,93 @@
 
   function listServices() {
     return Array.from(services.keys());
+  }
+
+  function ensureModule(moduleName) {
+    const id = String(moduleName || '').trim();
+    if (!/^[a-z][a-z0-9.-]*$/.test(id)) {
+      throw new TypeError(`Invalid Franchise HQ module name "${id}".`);
+    }
+
+    if (!moduleRegistries.has(id)) moduleRegistries.set(id, new Map());
+    if (!moduleFacades[id]) {
+      const facade = Object.create(null);
+      Object.defineProperties(facade, {
+        id: { enumerable: true, value: id },
+        get: { enumerable: false, value: (name) => getModuleService(id, name) },
+        has: { enumerable: false, value: (name) => hasModuleService(id, name) },
+        list: { enumerable: false, value: () => listModuleServices(id) },
+        diagnostics: {
+          enumerable: false,
+          value: () => Object.freeze({
+            module: id,
+            serviceCount: moduleRegistries.get(id)?.size || 0,
+            services: Object.freeze(listModuleServices(id)),
+            healthy: true
+          })
+        }
+      });
+      moduleFacades[id] = facade;
+    }
+    return moduleFacades[id];
+  }
+
+  function defineModuleService(moduleName, name, service, options = {}) {
+    const module = ensureModule(moduleName);
+    const serviceName = String(name || '').trim();
+    if (!serviceName) throw new TypeError('A module service name is required.');
+    if (!service || (typeof service !== 'object' && typeof service !== 'function')) {
+      throw new TypeError(`Module service "${moduleName}.${serviceName}" must be an object or function.`);
+    }
+
+    const registry = moduleRegistries.get(module.id);
+    if (registry.has(serviceName) && options.replace !== true) return registry.get(serviceName);
+    const value = options.freeze === false ? service : Object.freeze(service);
+    registry.set(serviceName, value);
+
+    Object.defineProperty(module, serviceName, {
+      configurable: true,
+      enumerable: true,
+      get: () => registry.get(serviceName)
+    });
+
+    // Compatibility alias: existing League Engine callers may continue using
+    // FranchiseHQ.leagueSchema without adding it to the Platform service registry.
+    const alias = options.alias === false ? null : String(options.alias || serviceName);
+    if (alias) {
+      const descriptor = Object.getOwnPropertyDescriptor(platform, alias);
+      if (!descriptor || descriptor.configurable === true) {
+        Object.defineProperty(platform, alias, {
+          configurable: true,
+          enumerable: false,
+          get: () => registry.get(serviceName)
+        });
+      }
+    }
+
+    emitLifecycle('module-service-registered', {
+      module: module.id,
+      name: serviceName,
+      services: listModuleServices(module.id)
+    });
+    return value;
+  }
+
+  function getModuleService(moduleName, name) {
+    return moduleRegistries.get(String(moduleName || ''))?.get(String(name || '')) || null;
+  }
+
+  function hasModuleService(moduleName, name) {
+    return moduleRegistries.get(String(moduleName || ''))?.has(String(name || '')) || false;
+  }
+
+  function listModuleServices(moduleName) {
+    const registry = moduleRegistries.get(String(moduleName || ''));
+    return registry ? Array.from(registry.keys()) : [];
+  }
+
+  function listModules() {
+    return Array.from(moduleRegistries.keys());
   }
 
   function ready(callback) {
@@ -286,6 +379,41 @@
       enumerable: false,
       value: listServices
     },
+    modules: {
+      configurable: false,
+      enumerable: true,
+      value: moduleFacades
+    },
+    ensureModule: {
+      configurable: false,
+      enumerable: false,
+      value: ensureModule
+    },
+    defineModuleService: {
+      configurable: false,
+      enumerable: false,
+      value: defineModuleService
+    },
+    getModuleService: {
+      configurable: false,
+      enumerable: false,
+      value: getModuleService
+    },
+    hasModuleService: {
+      configurable: false,
+      enumerable: false,
+      value: hasModuleService
+    },
+    listModuleServices: {
+      configurable: false,
+      enumerable: false,
+      value: listModuleServices
+    },
+    listModules: {
+      configurable: false,
+      enumerable: false,
+      value: listModules
+    },
     ready: {
       configurable: false,
       enumerable: false,
@@ -300,6 +428,11 @@
       configurable: false,
       enumerable: false,
       value: services
+    },
+    __moduleRegistries: {
+      configurable: false,
+      enumerable: false,
+      value: moduleRegistries
     }
   });
 
@@ -334,6 +467,9 @@
     const validation = services.get('validate')?.getLastReport?.() || null;
     const security = services.get('security')?.audit?.() || null;
     const contract = services.get('contract')?.audit?.() || null;
+    const modules = Object.freeze(Object.fromEntries(
+      listModules().map((name) => [name, moduleFacades[name]?.diagnostics?.() || null])
+    ));
 
     const checks = Object.freeze({
       lifecycleReady: lifecycle.status === 'ready',
@@ -368,7 +504,8 @@
       runtime,
       validation,
       security,
-      contract
+      contract,
+      modules
     });
   }
 
