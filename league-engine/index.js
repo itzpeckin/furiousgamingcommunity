@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  const required = ['leagueSchema','leagueEntities','leagueImportContract','leagueValidation','leagueImportValidator','leagueImportQuarantine','leagueMaddenJsonAdapter','leagueRepository','leagueSelectors','leagueMigrations','leagueMockAdapter','leagueImportService'];
+  const required = ['leagueSchema','leagueEntities','leagueImportContract','leagueValidation','leagueImportValidator','leagueImportQuarantine','leagueMaddenJsonAdapter','leagueRepository','leagueSelectors','leagueMigrations','leagueMockAdapter','leagueImportService','leagueDataState'];
   if (!HQ?.defineModuleService || required.some((name) => !HQ[name])) throw new Error('League Engine dependencies did not load correctly.');
 
   function ingestMock(raw, options = {}) {
@@ -15,7 +15,7 @@
     const repository = HQ.leagueRepository.diagnostics();
     const imports = HQ.leagueImportService.diagnostics();
     return Object.freeze({
-      service: 'leagueReadModel', version: '5.2', authority: 'madden', readOnly: true,
+      service: 'leagueReadModel', version: '5.4.0', authority: 'madden', readOnly: true,
       policy: 'Only a validated Madden import may replace official league state.',
       services: Object.freeze(services), repository, imports,
       compliant: Object.values(services).every(Boolean) && repository.readOnly === true && repository.guardedInstall === true && repository.authority === 'madden'
@@ -23,12 +23,13 @@
   }
 
   const service = HQ.defineModuleService('league', 'leagueReadModel', {
-    version: '5.2', authority: 'madden', readOnly: true,
+    version: '5.4.0', authority: 'madden', readOnly: true,
     previewImport: HQ.leagueImportService.preview,
     commitImport: HQ.leagueImportService.commit,
     ingest: HQ.leagueImportService.ingest,
     ingestMock,
-    get: HQ.leagueRepository.current,
+    get: HQ.leagueDataState.current,
+    dataState: HQ.leagueDataState,
     exportSnapshot: HQ.leagueRepository.exportSnapshot,
     selectors: HQ.leagueSelectors,
     validateSnapshot: HQ.leagueValidation.validate,
@@ -39,5 +40,5 @@
   });
 
   Object.defineProperty(HQ, 'maddenLeague', { configurable: true, enumerable: true, get: () => service });
-  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-read-model', service: 'leagueReadModel', script: 'league-engine/index.js', version: '5.2.0', dependencies: required, capabilities: ['madden-authoritative-state', 'immutable-read-model', 'validated-imports', 'failed-import-retention'] });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-read-model', service: 'leagueReadModel', script: 'league-engine/index.js', version: '5.4.0', dependencies: required, capabilities: ['madden-authoritative-state', 'immutable-read-model', 'validated-imports', 'failed-import-retention', 'empty-demo-live-state'] });
 })();
