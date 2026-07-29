@@ -2,7 +2,7 @@
   'use strict';
   const HQ = window.FranchiseHQ;
   const deps = ['leagueMaddenJsonAdapter','leagueImportValidator','leagueImportQuarantine','leagueRepository'];
-  if (!HQ?.defineService || deps.some((name) => !HQ[name])) throw new Error('League import dependencies did not load correctly.');
+  if (!HQ?.defineModuleService || deps.some((name) => !HQ[name])) throw new Error('League import dependencies did not load correctly.');
 
   const history = [];
   const clone = (value) => value == null ? value : structuredClone(value);
@@ -35,6 +35,6 @@
     return Object.freeze({ service: 'leagueImportService', version: '5.2', lastValidImportId: HQ.leagueRepository.current()?.source?.importId || null, successfulImports: history.length, quarantinedImports: HQ.leagueImportQuarantine.diagnostics().count, readOnlyOfficialState: true });
   }
 
-  const service = HQ.defineService('leagueImportService', { preview, commit, ingest, history: () => Object.freeze(history.map(clone)), diagnostics });
-  HQ.manifest?.register?.({ id: 'league-import-service', service: 'leagueImportService', script: 'league-engine/import-service.js', version: '5.2.0', dependencies: deps, capabilities: ['preview-before-publish', 'atomic-install', 'last-valid-retention', 'import-history'] });
+  const service = HQ.defineModuleService('league', 'leagueImportService', { preview, commit, ingest, history: () => Object.freeze(history.map(clone)), diagnostics });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-import-service', service: 'leagueImportService', script: 'league-engine/import-service.js', version: '5.2.0', dependencies: deps, capabilities: ['preview-before-publish', 'atomic-install', 'last-valid-retention', 'import-history'] });
 })();

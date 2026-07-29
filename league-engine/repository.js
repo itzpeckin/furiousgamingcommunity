@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService || !HQ.leagueSchema) throw new Error('League schema must load before repository.js.');
+  if (!HQ?.defineModuleService || !HQ.leagueSchema) throw new Error('League schema must load before repository.js.');
 
   const state = { current: null, previous: null, installedAt: null };
   const deepFreeze = (value, seen = new WeakSet()) => {
@@ -14,8 +14,7 @@
 
   function install(snapshot, options = {}) {
     if (!snapshot || typeof snapshot !== 'object') throw new TypeError('A validated Madden snapshot is required.');
-    if (!HQ.leagueImportValidator?.isReceipt?.(options.receipt)) throw new Error('League snapshots require a valid import-validation receipt.');
-    if (options.receipt.importId !== snapshot.source?.importId) throw new Error('Validation receipt does not match the snapshot importId.');
+    if (options.validated !== true) throw new Error('League snapshots may only be installed after validation.');
     if (snapshot.source?.source !== 'madden') throw new Error('Only Madden-authoritative snapshots may become official league state.');
     state.previous = state.current;
     state.current = deepFreeze(copy(snapshot));
@@ -29,9 +28,9 @@
   function hasSnapshot() { return Boolean(state.current); }
   function exportSnapshot() { return copy(state.current); }
   function diagnostics() {
-    return Object.freeze({ service: 'leagueRepository', readOnly: true, authority: 'madden', guardedInstall: true, hasSnapshot: hasSnapshot(), importId: state.current?.source?.importId || null, importedAt: state.current?.source?.importedAt || null, installedAt: state.installedAt, previousImportId: state.previous?.source?.importId || null });
+    return Object.freeze({ service: 'leagueRepository', readOnly: true, authority: 'madden', hasSnapshot: hasSnapshot(), importId: state.current?.source?.importId || null, importedAt: state.current?.source?.importedAt || null, installedAt: state.installedAt, previousImportId: state.previous?.source?.importId || null });
   }
 
-  const service = HQ.defineService('leagueRepository', { install, current, previous, hasSnapshot, exportSnapshot, diagnostics });
-  HQ.manifest?.register?.({ id: 'league-repository', service: 'leagueRepository', script: 'league-engine/repository.js', version: '1.1.0', dependencies: ['leagueSchema','leagueImportValidator'], capabilities: ['immutable-snapshot', 'last-valid-snapshot', 'read-only-access', 'receipt-gated-install'] });
+  const service = HQ.defineModuleService('league', 'leagueRepository', { install, current, previous, hasSnapshot, exportSnapshot, diagnostics });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-repository', service: 'leagueRepository', script: 'league-engine/repository.js', version: '1.0.0', dependencies: ['leagueSchema'], capabilities: ['immutable-snapshot', 'last-valid-snapshot', 'read-only-access'] });
 })();

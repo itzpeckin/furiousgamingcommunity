@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService || !HQ.leagueImportContract || !HQ.leagueValidation) throw new Error('Import contract and league validation must load before import-validator.js.');
+  if (!HQ?.defineModuleService || !HQ.leagueImportContract || !HQ.leagueValidation) throw new Error('Import contract and league validation must load before import-validator.js.');
 
   const receiptKey = Symbol('franchisehq.import.validation.receipt');
   const requiredForPublish = Object.freeze(['league', 'teams', 'players']);
@@ -55,6 +55,6 @@
 
   function isReceipt(value) { return Boolean(value?.[receiptKey] === true && value.valid === true); }
 
-  const service = HQ.defineService('leagueImportValidator', { validate, assert, isReceipt, requiredForPublish });
-  HQ.manifest?.register?.({ id: 'league-import-validator', service: 'leagueImportValidator', script: 'league-engine/import-validator.js', version: '1.0.0', dependencies: ['leagueImportContract','leagueValidation'], capabilities: ['publish-gate', 'availability-report', 'validation-receipts'] });
+  const service = HQ.defineModuleService('league', 'leagueImportValidator', { validate, assert, isReceipt, requiredForPublish });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-import-validator', service: 'leagueImportValidator', script: 'league-engine/import-validator.js', version: '1.0.0', dependencies: ['leagueImportContract','leagueValidation'], capabilities: ['publish-gate', 'availability-report', 'validation-receipts'] });
 })();

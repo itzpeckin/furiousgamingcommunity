@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService || !HQ.leagueSchema) throw new Error('league-engine/schema.js must load before import-contract.js.');
+  if (!HQ?.defineModuleService || !HQ.leagueSchema) throw new Error('league-engine/schema.js must load before import-contract.js.');
 
   const CONTRACT_VERSION = '1.0.0';
   const FORMAT = 'franchise-hq-madden-import';
@@ -38,7 +38,7 @@
     return Object.freeze({ valid: errors.length === 0, errors: Object.freeze(errors), format: FORMAT, contractVersion: CONTRACT_VERSION });
   }
 
-  const service = HQ.defineService('leagueImportContract', {
+  const service = HQ.defineModuleService('league', 'leagueImportContract', {
     version: CONTRACT_VERSION,
     format: FORMAT,
     acceptedChannels: ACCEPTED_CHANNELS,
@@ -46,5 +46,5 @@
     createEnvelope,
     inspect
   });
-  HQ.manifest?.register?.({ id: 'league-import-contract', service: 'leagueImportContract', script: 'league-engine/import-contract.js', version: CONTRACT_VERSION, dependencies: ['leagueSchema'], capabilities: ['import-envelope', 'versioned-contract', 'channel-validation'] });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-import-contract', service: 'leagueImportContract', script: 'league-engine/import-contract.js', version: CONTRACT_VERSION, dependencies: ['leagueSchema'], capabilities: ['import-envelope', 'versioned-contract', 'channel-validation'] });
 })();

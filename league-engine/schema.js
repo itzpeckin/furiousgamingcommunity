@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService) throw new Error('platform/core.js must load before league-engine/schema.js.');
+  if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before league-engine/schema.js.');
 
   const SCHEMA_VERSION = '1.0.0';
   const SOURCE = 'madden';
@@ -44,7 +44,7 @@
     };
   }
 
-  const service = HQ.defineService('leagueSchema', {
+  const service = HQ.defineModuleService('league', 'leagueSchema', {
     version: SCHEMA_VERSION,
     source: SOURCE,
     entityTypes: ENTITY_TYPES,
@@ -53,7 +53,7 @@
   });
 
   HQ.manifest?.register?.({
-    id: 'league-schema', service: 'leagueSchema', script: 'league-engine/schema.js', version: SCHEMA_VERSION,
+    scope: 'module', module: 'league', id: 'league-schema', service: 'leagueSchema', script: 'league-engine/schema.js', version: SCHEMA_VERSION,
     capabilities: ['read-only-schema', 'source-provenance', 'madden-authority']
   });
 })();

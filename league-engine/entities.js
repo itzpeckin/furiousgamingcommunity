@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService || !HQ.leagueSchema) throw new Error('league-engine/schema.js must load before entities.js.');
+  if (!HQ?.defineModuleService || !HQ.leagueSchema) throw new Error('league-engine/schema.js must load before entities.js.');
 
   const clone = (value) => value == null ? value : structuredClone(value);
   const cleanId = (value, label = 'entity') => {
@@ -21,6 +21,6 @@
     };
   }
 
-  const service = HQ.defineService('leagueEntities', { entity, cleanId, clone });
-  HQ.manifest?.register?.({ id: 'league-entities', service: 'leagueEntities', script: 'league-engine/entities.js', version: '1.0.0', dependencies: ['leagueSchema'], capabilities: ['stable-ids', 'entity-normalization'] });
+  const service = HQ.defineModuleService('league', 'leagueEntities', { entity, cleanId, clone });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-entities', service: 'leagueEntities', script: 'league-engine/entities.js', version: '1.0.0', dependencies: ['leagueSchema'], capabilities: ['stable-ids', 'entity-normalization'] });
 })();

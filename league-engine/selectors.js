@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService || !HQ.leagueRepository) throw new Error('league-engine/repository.js must load before selectors.js.');
+  if (!HQ?.defineModuleService || !HQ.leagueRepository) throw new Error('league-engine/repository.js must load before selectors.js.');
   const list = (name) => HQ.leagueRepository.current()?.[name] || [];
   const byId = (name, id) => list(name).find((item) => String(item.id) === String(id)) || null;
   const getLeague = () => HQ.leagueRepository.current()?.league || null;
@@ -14,6 +14,6 @@
   const getGamesByWeek = (week) => list('games').filter((item) => Number(item.week) === Number(week));
   const getStandings = () => list('standings');
   const getAvailability = (field) => HQ.leagueRepository.current()?.availability?.[field] ?? null;
-  const service = HQ.defineService('leagueSelectors', { getLeague, getTeam, getFranchise, getPlayer, getGame, getRoster, getTeamPlayers, getGamesByWeek, getStandings, getAvailability });
-  HQ.manifest?.register?.({ id: 'league-selectors', service: 'leagueSelectors', script: 'league-engine/selectors.js', version: '1.0.0', dependencies: ['leagueRepository'], capabilities: ['read-model-selectors', 'safe-missing-data'] });
+  const service = HQ.defineModuleService('league', 'leagueSelectors', { getLeague, getTeam, getFranchise, getPlayer, getGame, getRoster, getTeamPlayers, getGamesByWeek, getStandings, getAvailability });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-selectors', service: 'leagueSelectors', script: 'league-engine/selectors.js', version: '1.0.0', dependencies: ['leagueRepository'], capabilities: ['read-model-selectors', 'safe-missing-data'] });
 })();

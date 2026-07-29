@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineService || !HQ.leagueSchema) throw new Error('league-engine/schema.js must load before validate.js.');
+  if (!HQ?.defineModuleService || !HQ.leagueSchema) throw new Error('league-engine/schema.js must load before validate.js.');
 
   const arrays = ['teams','franchises','owners','players','rosters','games','standings','stats','contracts','injuries','draftPicks'];
   function validate(snapshot) {
@@ -39,6 +39,6 @@
     return result;
   }
 
-  const service = HQ.defineService('leagueValidation', { validate, assert });
-  HQ.manifest?.register?.({ id: 'league-validation', service: 'leagueValidation', script: 'league-engine/validate.js', version: '1.0.0', dependencies: ['leagueSchema'], capabilities: ['schema-validation', 'duplicate-detection', 'referential-warnings'] });
+  const service = HQ.defineModuleService('league', 'leagueValidation', { validate, assert });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-validation', service: 'leagueValidation', script: 'league-engine/validate.js', version: '1.0.0', dependencies: ['leagueSchema'], capabilities: ['schema-validation', 'duplicate-detection', 'referential-warnings'] });
 })();

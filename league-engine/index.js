@@ -2,7 +2,7 @@
   'use strict';
   const HQ = window.FranchiseHQ;
   const required = ['leagueSchema','leagueEntities','leagueImportContract','leagueValidation','leagueImportValidator','leagueImportQuarantine','leagueMaddenJsonAdapter','leagueRepository','leagueSelectors','leagueMigrations','leagueMockAdapter','leagueImportService'];
-  if (!HQ?.defineService || required.some((name) => !HQ[name])) throw new Error('League Engine dependencies did not load correctly.');
+  if (!HQ?.defineModuleService || required.some((name) => !HQ[name])) throw new Error('League Engine dependencies did not load correctly.');
 
   function ingestMock(raw, options = {}) {
     const legacy = HQ.leagueMockAdapter.fromLegacy(raw, options);
@@ -22,7 +22,7 @@
     });
   }
 
-  const service = HQ.defineService('leagueReadModel', {
+  const service = HQ.defineModuleService('league', 'leagueReadModel', {
     version: '5.2', authority: 'madden', readOnly: true,
     previewImport: HQ.leagueImportService.preview,
     commitImport: HQ.leagueImportService.commit,
@@ -39,5 +39,5 @@
   });
 
   Object.defineProperty(HQ, 'maddenLeague', { configurable: true, enumerable: true, get: () => service });
-  HQ.manifest?.register?.({ id: 'league-read-model', service: 'leagueReadModel', script: 'league-engine/index.js', version: '5.2.0', dependencies: required, capabilities: ['madden-authoritative-state', 'immutable-read-model', 'validated-imports', 'failed-import-retention'] });
+  HQ.manifest?.register?.({ scope: 'module', module: 'league', id: 'league-read-model', service: 'leagueReadModel', script: 'league-engine/index.js', version: '5.2.0', dependencies: required, capabilities: ['madden-authoritative-state', 'immutable-read-model', 'validated-imports', 'failed-import-retention'] });
 })();
