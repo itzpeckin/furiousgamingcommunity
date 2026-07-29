@@ -25,11 +25,16 @@
     'platform/release.js',
     'league-engine/schema.js',
     'league-engine/entities.js',
+    'league-engine/import-contract.js',
+    'league-engine/validate.js',
+    'league-engine/import-validator.js',
+    'league-engine/import-quarantine.js',
+    'league-engine/adapters/madden-json.js',
     'league-engine/repository.js',
     'league-engine/selectors.js',
-    'league-engine/validate.js',
     'league-engine/migrations.js',
     'league-engine/adapters/mock-data.js',
+    'league-engine/import-service.js',
     'league-engine/index.js'
   ]);
 
@@ -95,7 +100,7 @@
     const services = serviceInventory();
     return Object.freeze({
       service: 'manifest',
-      version: '1.2',
+      version: '1.3',
       release: HQ.metadata.version,
       entryCount: entries.size,
       entries: list(),
@@ -126,7 +131,7 @@
     id: 'manifest',
     service: 'manifest',
     script: 'platform/manifest.js',
-    version: '1.2',
+    version: '1.3',
     capabilities: ['service-metadata', 'script-inventory', 'deployment-validation']
   });
 })();
