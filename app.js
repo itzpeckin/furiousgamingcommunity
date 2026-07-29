@@ -1603,7 +1603,7 @@
     const route=routeInput||'home';
     const [base,id]=route.split('/');
     closeSidebar();
-    document.querySelectorAll('.nav-item[data-route]').forEach(item=>item.classList.toggle('is-active',item.dataset.route===base));
+    document.querySelectorAll('.nav-item[data-route]').forEach(item=>{const full=item.dataset.routeFull;item.classList.toggle('is-active',full?full===route:item.dataset.route===base&&!document.querySelector(`.nav-item[data-route-full=\"${CSS.escape(route)}\"]`));});
     pageContent.innerHTML='';
     switch(base) {
       case 'home': renderLeagueHome(); break;
@@ -1639,7 +1639,7 @@
           setRoute('home');
           return;
         }
-        window.FranchiseHQ?.trade?.renderCommissioner ? window.FranchiseHQ.trade.renderCommissioner() : window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base);
+        window.FranchiseHQ?.trade?.renderCommissioner ? window.FranchiseHQ.trade.renderCommissioner(id) : window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner(id) : renderRoadmap(base);
         break;
       }
       default: renderRoadmap(base);

@@ -2960,3 +2960,19 @@ table td{
 .command-modal .command-dialog { pointer-events: auto; }
 .profile-button, [data-profile-button] { flex: 0 0 auto; max-width: 220px; overflow: hidden; }
 .profile-button img, [data-profile-button] img { width: 42px; height: 42px; object-fit: cover; flex: 0 0 42px; }
+
+/* v5.4.1 · LD-001 Commissioner League Data page */
+.nav-divider--commissioner { margin-top: 0; }
+.league-data-page { display: grid; gap: 20px; }
+.league-data-intro { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 18px; padding: 24px; }
+.league-data-intro__icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.league-data-intro__icon svg { width: 25px; height: 25px; }
+.league-data-intro h2, .league-data-boundary h3 { margin: 4px 0 8px; }
+.league-data-intro p, .league-data-boundary p, .league-data-foundation-grid p { margin: 0; color: var(--text-muted); line-height: 1.65; }
+.league-data-foundation-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 20px; }
+.league-data-foundation-grid > .card, .league-data-boundary { padding: 22px; }
+@media (max-width: 760px) {
+  .league-data-intro { grid-template-columns: auto minmax(0,1fr); }
+  .league-data-intro > .pill { grid-column: 1 / -1; justify-self: start; }
+  .league-data-foundation-grid { grid-template-columns: 1fr; }
+}

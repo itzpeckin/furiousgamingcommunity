@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0e14" />
-  <meta name="franchise-hq-platform-version" content="5.2" />
+  <meta name="franchise-hq-platform-version" content="5.4.1" />
   <meta name="description" content="Interactive Madden connected-franchise league prototype with private trade workflow, role-based mock login, committee review, and browser-saved demo data." />
-  <title>Furious Gaming Community — Franchise HQ TC-011.5</title>
+  <title>Furious Gaming Community — Franchise HQ v5.4.1</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-density="comfortable">
@@ -41,7 +41,9 @@
       </button>
 
       <nav class="nav-list" data-nav-list>
-        <a class="nav-item nav-item--commissioner" href="#commissioner" data-route="commissioner" data-role-link="commissioner"><svg><use href="#icon-sliders"></use></svg><span>Commissioner HQ</span></a>
+        <div class="nav-divider nav-divider--commissioner"><span>Commissioner</span></div>
+        <a class="nav-item nav-item--commissioner" href="#commissioner" data-route="commissioner" data-role-link="commissioner"><svg><use href="#icon-sliders"></use></svg><span>Dashboard</span></a>
+        <a class="nav-item nav-item--commissioner" href="#commissioner/league-data" data-route="commissioner" data-route-full="commissioner/league-data" data-role-link="commissioner"><svg><use href="#icon-table"></use></svg><span>League Data</span><span class="nav-badge nav-badge--quiet">NEW</span></a>
         <a class="nav-item" href="#home" data-route="home"><svg><use href="#icon-home"></use></svg><span>League Home</span></a>
         <a class="nav-item" href="#league-activity" data-route="league-activity"><svg><use href="#icon-activity"></use></svg><span>League Activity</span></a>
         <a class="nav-item" href="#teams" data-route="teams"><svg><use href="#icon-shield"></use></svg><span>Teams</span></a>
@@ -66,7 +68,7 @@
           <span class="status-dot status-dot--warning"></span>
           <div><strong>Mock data mode</strong><span>Real Madden sync arrives in Milestone 3</span></div>
         </div>
-        <span class="version-label">v5.2.1 · Validation Framework Hotfix</span>
+        <span class="version-label">v5.4.1 · LD-001 League Data Page</span>
       </div>
     </aside>
 
@@ -380,8 +382,8 @@
     <symbol id="icon-external" viewBox="0 0 24 24"><path d="M14 4h6v6m0-6-9 9M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></symbol>
   </svg>
 
- <script src="platform/core.js?v=5.4.0"></script>
-<script src="platform/manifest.js?v=5.4.0"></script>
+ <script src="platform/core.js?v=5.4.1"></script>
+<script src="platform/manifest.js?v=5.4.1"></script>
 <script src="platform/storage.js"></script>
 <script src="platform/config.js"></script>
 <script src="platform/features.js"></script>
@@ -395,8 +397,8 @@
 <script src="platform/errors.js"></script>
 <script src="platform/api.js"></script>
 <script src="platform/runtime.js"></script>
-<script src="platform/validate.js?v=5.4.0"></script>
-<script src="platform/release.js?v=5.4.0"></script>
+<script src="platform/validate.js?v=5.4.1"></script>
+<script src="platform/release.js?v=5.4.1"></script>
 <script src="platform/store.js"></script>
 <script src="platform/simulation.js"></script>
 <script src="platform/navigation.js"></script>
@@ -411,20 +413,20 @@
 <script src="platform/domains.js"></script>
 <script src="auth-client.js"></script>
 <script src="platform/league.js"></script>
-<script src="league-engine/schema.js?v=5.4.0"></script>
-<script src="league-engine/entities.js?v=5.4.0"></script>
-<script src="league-engine/import-contract.js?v=5.4.0"></script>
-<script src="league-engine/validate.js?v=5.4.0"></script>
-<script src="league-engine/import-validator.js?v=5.4.0"></script>
-<script src="league-engine/import-quarantine.js?v=5.4.0"></script>
-<script src="league-engine/adapters/madden-json.js?v=5.4.0"></script>
-<script src="league-engine/repository.js?v=5.4.0"></script>
-<script src="league-engine/selectors.js?v=5.4.0"></script>
-<script src="league-engine/migrations.js?v=5.4.0"></script>
-<script src="league-engine/adapters/mock-data.js?v=5.4.0"></script>
-<script src="league-engine/import-service.js?v=5.4.0"></script>
-<script src="league-engine/data-state.js?v=5.4.0"></script>
-<script src="league-engine/index.js?v=5.4.0"></script>
+<script src="league-engine/schema.js?v=5.4.1"></script>
+<script src="league-engine/entities.js?v=5.4.1"></script>
+<script src="league-engine/import-contract.js?v=5.4.1"></script>
+<script src="league-engine/validate.js?v=5.4.1"></script>
+<script src="league-engine/import-validator.js?v=5.4.1"></script>
+<script src="league-engine/import-quarantine.js?v=5.4.1"></script>
+<script src="league-engine/adapters/madden-json.js?v=5.4.1"></script>
+<script src="league-engine/repository.js?v=5.4.1"></script>
+<script src="league-engine/selectors.js?v=5.4.1"></script>
+<script src="league-engine/migrations.js?v=5.4.1"></script>
+<script src="league-engine/adapters/mock-data.js?v=5.4.1"></script>
+<script src="league-engine/import-service.js?v=5.4.1"></script>
+<script src="league-engine/data-state.js?v=5.4.1"></script>
+<script src="league-engine/index.js?v=5.4.1"></script>
 <script src="platform/permissions.js"></script>
 <script src="trade-module.js"></script>
 <script src="auth-ui.js"></script>
