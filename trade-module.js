@@ -14,6 +14,51 @@ const owners=teams.map(t=>({id:`owner-${t.id}`,name:t.owner,handle:t.owner,initi
 const committee=[['committee-sarah','Sarah','NoFlyZone','SZ','phi'],['committee-marcus','Marcus','GridReview','MG','mia'],['committee-tasha','Tasha','Capologist','TC','bal'],['committee-devon','Devon','FilmRoom','DR','cin'],['committee-alex','Alex','FairPlay','AP','gb']].map(([id,name,handle,initials,ownerTeamId])=>({id,name,handle,initials,role:'committee',teamId:null,ownerTeamId}));
 const accounts=[commissioner,...owners,...committee];
 const featured=['commissioner','owner-dal','owner-gb','owner-kc','owner-phi','owner-mia',...committee.map(x=>x.id)];
+function initializeDevelopmentLeagueData(){
+ const leagueData=window.FranchiseHQ?.leagueData;
+ if(!leagueData?.status||!leagueData?.seedDemoFromLegacy)return;
+ const current=leagueData.status();
+ if(current.hasLiveSnapshot||current.hasDemoSnapshot)return;
+ const rosters=teams.map(team=>({
+   id:`roster-${team.id}`,
+   teamId:team.id,
+   playerIds:players.filter(player=>player.teamId===team.id).map(player=>player.id)
+ }));
+ const standings=teams.map(team=>({
+   id:`standing-${team.id}`,
+   teamId:team.id,
+   wins:Number(team.wins)||0,
+   losses:Number(team.losses)||0,
+   ties:Number(team.ties)||0,
+   pointsFor:Number(team.pointsFor)||0,
+   pointsAgainst:Number(team.pointsAgainst)||0
+ }));
+ const stats=players.map(player=>({
+   id:`stat-${player.id}`,
+   playerId:player.id,
+   teamId:player.teamId,
+   season:4,
+   passingYards:Number(player.passingYards)||0,
+   rushingYards:Number(player.rushingYards)||0,
+   receivingYards:Number(player.receivingYards)||0,
+   touchdowns:Number(player.touchdowns)||0
+ }));
+ leagueData.seedDemoFromLegacy({
+   league:{id:'franchise-hq-development',name:'Franchise HQ Development League',displayName:'Franchise HQ Development League'},
+   teams,
+   players,
+   rosters,
+   games:app.schedule||[],
+   standings,
+   stats,
+   accounts
+ },{
+   activate:true,
+   importId:'development-fixture',
+   rawSourceId:'franchise-hq-legacy-prototype'
+ });
+}
+initializeDevelopmentLeagueData();
 const dataStore=window.FranchiseHQ?.store;
 let userId=dataStore?.getString?.(USER,'')||'';
 const ui={tab:'active',builder:null,activeNegotiationId:null,blockSearch:'',blockPosition:'All',blockMine:false,blockManagerOpen:false,builderSearch:{A:'',B:''},builderType:{A:'all',B:'all'},builderPosition:{A:'All',B:'All'},versionView:{},historySearch:'',historyStatus:'all',historyTeam:'all',replayTradeId:null};
@@ -468,8 +513,8 @@ function renderCurrentDataSourceCard(state){
    </div>
    <div class="league-source-details" aria-label="Current source details">
      <div><span>League</span><strong>${escapeHtml(leagueName)}</strong></div>
-     <div><span>Authority</span><strong>${escapeHtml(state?.authority||'empty')}</strong></div>
-     <div><span>Last Import</span><strong>${escapeHtml(leagueDataDate(state?.importedAt))}</strong></div>
+     <div><span>Authority</span><strong>${escapeHtml(state?.activeMode==='live'?'Official Madden Import':state?.activeMode==='demo'?'Development / Mock':'No Active Source')}</strong></div>
+     <div><span>Last Import</span><strong>${escapeHtml(state?.activeMode==='live'?leagueDataDate(state?.importedAt):state?.activeMode==='demo'?'Not applicable — development data':'Never')}</strong></div>
      <div><span>Snapshot / Import ID</span><strong title="${escapeHtml(sourceId)}">${escapeHtml(sourceId)}</strong></div>
    </div>
    <div class="league-source-records">
@@ -497,10 +542,10 @@ function renderCommissionerLeagueData(){
    </div>
    ${renderCurrentDataSourceCard(state)}
    <div class="league-data-foundation-grid">
-     <article class="card"><div class="card-header"><div><span class="eyebrow">Release 5.4.2</span><h3>Current Source Visibility</h3></div><span class="pill pill--success">Registered</span></div><p>The active source, authority, import provenance, league identity, and record totals are read directly from the League Data State Manager.</p></article>
+     <article class="card"><div class="card-header"><div><span class="eyebrow">Release 5.4.2a</span><h3>Current Source Visibility</h3></div><span class="pill pill--success">Registered</span></div><p>The active source, authority, import provenance, league identity, and record totals are read directly from the League Data State Manager.</p></article>
      <article class="card"><div class="card-header"><div><span class="eyebrow">Next Release</span><h3>Data Source Selector</h3></div></div><p>Release 5.4.3 will allow commissioners to explicitly select Empty or Development Data while keeping unavailable live sources protected.</p></article>
    </div>
-   <article class="card league-data-boundary"><span class="eyebrow">Read-only boundary</span><h3>This page does not change the active source.</h3><p>Release 5.4.2 only reports the state already resolved by the League Data State Manager. No snapshot, roster record, import, or repository value can be modified here.</p></article>
+   <article class="card league-data-boundary"><span class="eyebrow">Read-only boundary</span><h3>This page does not change the active source.</h3><p>Release 5.4.2a only reports the state already resolved by the League Data State Manager. No snapshot, roster record, import, or repository value can be modified here.</p></article>
  </section>`
 }
 function renderCommissioner(section){
