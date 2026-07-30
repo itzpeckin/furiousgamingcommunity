@@ -1599,12 +1599,37 @@
     }
   }
 
+  function leagueDataIsEmpty() {
+    return window.FranchiseHQ?.leagueData?.status?.().isEmpty === true;
+  }
+
+  function renderLeagueDataEmpty(subject = 'league data') {
+    const message = window.FranchiseHQ?.leagueData?.emptyMessage?.(subject) || `No ${subject} is available.`;
+    pageContent.innerHTML = `<section class="empty-state league-data-empty-state"><strong>${escapeHtml(message)}</strong><p>The Commissioner has selected Empty State. Choose Development Data or publish a verified Madden Companion snapshot from Commissioner HQ to restore league content.</p><div class="heading-actions"><button class="button button--primary" data-route="commissioner/league-data">Open League Data</button></div></section>`;
+  }
+
   function renderRoute(routeInput=location.hash.slice(1)||'home') {
     const route=routeInput||'home';
     const [base,id]=route.split('/');
     closeSidebar();
-    document.querySelectorAll('.nav-item[data-route]').forEach(item=>{const full=item.dataset.routeFull;item.classList.toggle('is-active',full?full===route:item.dataset.route===base&&!document.querySelector(`.nav-item[data-route-full=\"${CSS.escape(route)}\"]`));});
+    document.querySelectorAll('.nav-item[data-route]').forEach(item=>item.classList.toggle('is-active',item.dataset.route===base));
     pageContent.innerHTML='';
+    const emptySubjects = {
+      home: 'league data',
+      'league-activity': 'league activity',
+      teams: 'teams',
+      'my-team': 'rosters',
+      players: 'players',
+      standings: 'standings',
+      stats: 'statistics',
+      schedule: 'schedule'
+    };
+    if (leagueDataIsEmpty() && Object.prototype.hasOwnProperty.call(emptySubjects, base)) {
+      renderLeagueDataEmpty(emptySubjects[base]);
+      mainContent.focus({preventScroll:true});
+      window.scrollTo({top:0,behavior:'smooth'});
+      return { base, id, route, empty: true };
+    }
     switch(base) {
       case 'home': renderLeagueHome(); break;
       case 'league-activity': renderActivity(); break;
@@ -1639,7 +1664,7 @@
           setRoute('home');
           return;
         }
-        window.FranchiseHQ?.trade?.renderCommissioner ? window.FranchiseHQ.trade.renderCommissioner(id) : window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner(id) : renderRoadmap(base);
+        window.FranchiseHQ?.trade?.renderCommissioner ? window.FranchiseHQ.trade.renderCommissioner() : window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base);
         break;
       }
       default: renderRoadmap(base);
@@ -1811,7 +1836,7 @@
     }
 
     const routeTarget=event.target.closest('[data-route]');
-    if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.routeFull || routeTarget.dataset.route); return; }
+    if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
 
     const interactiveTarget=event.target.closest('button, a, input, select, textarea, label, [role="button"]');
 
@@ -1959,7 +1984,7 @@
 
   window.addEventListener('franchisehq:auth-changed', event=>{
     syncCommissionerAccess();
-    if (event.detail?.status==='ready' && routeBase(location.hash.slice(1))==='commissioner') renderRoute(location.hash.slice(1)||'commissioner');
+    if (event.detail?.status==='ready' && routeBase(location.hash.slice(1))==='commissioner') renderRoute('commissioner');
   });
 
   window.addEventListener('franchisehq:trade-ready', ()=>{
