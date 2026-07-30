@@ -438,21 +438,69 @@ function renderCommissionerRules(){
  </div>
  ${renderProjectionEditor()}`}
 
-function renderCommissionerLeagueData(){
- const state=window.FranchiseHQ?.leagueData?.status?.()||null;
+function leagueDataModePresentation(state){
  const active=state?.activeMode||'empty';
- const label=active==='demo'?'Development Data':active==='live'?'Live Madden Data':'Empty';
+ if(active==='live')return{label:'Madden Companion',code:'LIVE',tone:'success',status:'Healthy',description:'Official Madden franchise data is active.'};
+ if(active==='demo')return{label:'Development Data',code:'DEVELOPMENT',tone:'warning',status:'Healthy',description:'Sample league data is active. This source is non-authoritative.'};
+ return{label:'Empty',code:'EMPTY',tone:'neutral',status:'Healthy',description:'No Madden franchise data has been imported.'};
+}
+function leagueDataDate(value){
+ if(!value)return'Never';
+ const date=new Date(value);
+ return Number.isNaN(date.getTime())?String(value):date.toLocaleString([], {year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+}
+function leagueDataCountTotal(counts={}){
+ return Object.values(counts).reduce((total,value)=>total+(Number(value)||0),0);
+}
+function leagueDataCountItem(label,value){
+ return`<div class="league-data-count"><span>${escapeHtml(label)}</span><strong>${Number(value)||0}</strong></div>`;
+}
+function renderCurrentDataSourceCard(state){
+ const view=leagueDataModePresentation(state);
+ const counts=state?.counts||{};
+ const total=leagueDataCountTotal(counts);
+ const sourceId=state?.importId||'None';
+ const leagueName=state?.leagueName||'No league loaded';
+ return`<article class="card league-source-card" data-current-data-source-card>
+   <div class="league-source-card__header">
+     <div><span class="eyebrow">Current Data Source</span><div class="league-source-title-row"><h3>${view.code}</h3><span class="pill pill--${view.tone}">${view.label}</span></div><p>${escapeHtml(view.description)}</p></div>
+     <div class="league-source-health"><span class="league-source-health__dot" aria-hidden="true"></span><div><small>Status</small><strong>${view.status}</strong></div></div>
+   </div>
+   <div class="league-source-details" aria-label="Current source details">
+     <div><span>League</span><strong>${escapeHtml(leagueName)}</strong></div>
+     <div><span>Authority</span><strong>${escapeHtml(state?.authority||'empty')}</strong></div>
+     <div><span>Last Import</span><strong>${escapeHtml(leagueDataDate(state?.importedAt))}</strong></div>
+     <div><span>Snapshot / Import ID</span><strong title="${escapeHtml(sourceId)}">${escapeHtml(sourceId)}</strong></div>
+   </div>
+   <div class="league-source-records">
+     <div class="league-source-records__heading"><div><span class="eyebrow">Records</span><h4>${total.toLocaleString()} total</h4></div><span class="league-source-readonly"><svg><use href="#icon-eye"></use></svg>Read only</span></div>
+     <div class="league-data-count-grid">
+       ${leagueDataCountItem('Teams',counts.teams)}
+       ${leagueDataCountItem('Players',counts.players)}
+       ${leagueDataCountItem('Rosters',counts.rosters)}
+       ${leagueDataCountItem('Games',counts.games)}
+       ${leagueDataCountItem('Standings',counts.standings)}
+       ${leagueDataCountItem('Statistics',counts.stats)}
+     </div>
+   </div>
+   ${state?.warning?`<div class="league-source-notice"><svg><use href="#icon-info"></use></svg><span>${escapeHtml(state.warning)}</span></div>`:''}
+ </article>`;
+}
+function renderCommissionerLeagueData(){
+ const state=window.FranchiseHQ?.leagueData?.status?.()||{activeMode:'empty',authority:'empty',counts:{},warning:'League Data State is unavailable.'};
+ const view=leagueDataModePresentation(state);
  return`<section class="league-data-page" data-league-data-page>
    <div class="league-data-intro card">
      <div class="league-data-intro__icon"><svg><use href="#icon-table"></use></svg></div>
-     <div><span class="eyebrow">League Data State Manager</span><h2>League Data</h2><p>This administration page is now registered and ready to host the commissioner controls delivered throughout the remaining 5.4.x releases.</p></div>
-     <span class="pill pill--${active==='live'?'success':active==='demo'?'warning':'neutral'}">${label}</span>
+     <div><span class="eyebrow">League Data State Manager</span><h2>League Data</h2><p>Review the source currently supplying League Engine data. Source controls will be introduced in the next 5.4.x release.</p></div>
+     <span class="pill pill--${view.tone}">${view.label}</span>
    </div>
+   ${renderCurrentDataSourceCard(state)}
    <div class="league-data-foundation-grid">
-     <article class="card"><div class="card-header"><div><span class="eyebrow">Release 5.4.1</span><h3>Administration Surface</h3></div><span class="pill pill--success">Registered</span></div><p>The dedicated Commissioner → League Data route is active, permission protected, refresh safe, and connected to the existing League Data State Manager.</p></article>
-     <article class="card"><div class="card-header"><div><span class="eyebrow">Coming in 5.4.x</span><h3>Planned Controls</h3></div></div><div class="roadmap-list"><span><svg><use href="#icon-check"></use></svg>Current data source card</span><span><svg><use href="#icon-check"></use></svg>Empty and Development Data selection</span><span><svg><use href="#icon-check"></use></svg>Persistent source preference</span><span><svg><use href="#icon-check"></use></svg>Status, validation, and diagnostics</span></div></article>
+     <article class="card"><div class="card-header"><div><span class="eyebrow">Release 5.4.2</span><h3>Current Source Visibility</h3></div><span class="pill pill--success">Registered</span></div><p>The active source, authority, import provenance, league identity, and record totals are read directly from the League Data State Manager.</p></article>
+     <article class="card"><div class="card-header"><div><span class="eyebrow">Next Release</span><h3>Data Source Selector</h3></div></div><p>Release 5.4.3 will allow commissioners to explicitly select Empty or Development Data while keeping unavailable live sources protected.</p></article>
    </div>
-   <article class="card league-data-boundary"><span class="eyebrow">Read-only foundation</span><h3>No league records are changed by this page.</h3><p>Release 5.4.1 establishes the administration location only. Data-source controls and persistence will be added incrementally in the following LD stories.</p></article>
+   <article class="card league-data-boundary"><span class="eyebrow">Read-only boundary</span><h3>This page does not change the active source.</h3><p>Release 5.4.2 only reports the state already resolved by the League Data State Manager. No snapshot, roster record, import, or repository value can be modified here.</p></article>
  </section>`
 }
 function renderCommissioner(section){
