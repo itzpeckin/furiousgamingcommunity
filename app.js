@@ -1607,14 +1607,14 @@
     const host = document.querySelector('[data-league-data-global-banner]');
     if (!host) return;
     const status = window.FranchiseHQ?.leagueData?.status?.();
-    if (!status || status.isLive) { host.innerHTML = ''; host.hidden = true; return; }
+    if (!status || status.isLive === true || status.activeMode === 'live') { host.innerHTML = ''; host.hidden = true; return; }
 
     const isEmpty = status.isEmpty === true;
-    const title = isEmpty ? 'Empty State is active' : 'Development Data is active';
+    const title = isEmpty ? 'No League Loaded' : 'Development Mode';
     const copy = isEmpty
-      ? 'No league records are currently exposed. League pages will remain empty until the Commissioner selects Development Data or publishes a verified Madden snapshot.'
-      : 'Franchise HQ is displaying non-authoritative mock league data for development and validation.';
-    const badge = isEmpty ? 'NO DATA' : 'DEVELOPMENT';
+      ? 'No league data is currently loaded.'
+      : 'You are viewing sample league data used for development and testing.';
+    const badge = isEmpty ? 'NO DATA' : 'SAMPLE DATA';
     const icon = isEmpty ? 'icon-info' : 'icon-settings';
     const canManage = commissionerAccessState() === true;
     host.hidden = false;
