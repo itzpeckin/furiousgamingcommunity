@@ -1811,7 +1811,7 @@
     }
 
     const routeTarget=event.target.closest('[data-route]');
-    if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
+    if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.routeFull || routeTarget.dataset.route); return; }
 
     const interactiveTarget=event.target.closest('button, a, input, select, textarea, label, [role="button"]');
 
@@ -1959,7 +1959,7 @@
 
   window.addEventListener('franchisehq:auth-changed', event=>{
     syncCommissionerAccess();
-    if (event.detail?.status==='ready' && routeBase(location.hash.slice(1))==='commissioner') renderRoute('commissioner');
+    if (event.detail?.status==='ready' && routeBase(location.hash.slice(1))==='commissioner') renderRoute(location.hash.slice(1)||'commissioner');
   });
 
   window.addEventListener('franchisehq:trade-ready', ()=>{
