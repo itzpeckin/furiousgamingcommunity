@@ -1603,6 +1603,28 @@
     return window.FranchiseHQ?.leagueData?.status?.().isEmpty === true;
   }
 
+  function renderGlobalLeagueDataBanner() {
+    const host = document.querySelector('[data-league-data-global-banner]');
+    if (!host) return;
+    const status = window.FranchiseHQ?.leagueData?.status?.();
+    if (!status || status.isLive) { host.innerHTML = ''; host.hidden = true; return; }
+
+    const isEmpty = status.isEmpty === true;
+    const title = isEmpty ? 'Empty State is active' : 'Development Data is active';
+    const copy = isEmpty
+      ? 'No league records are currently exposed. League pages will remain empty until the Commissioner selects Development Data or publishes a verified Madden snapshot.'
+      : 'Franchise HQ is displaying non-authoritative mock league data for development and validation.';
+    const badge = isEmpty ? 'NO DATA' : 'DEVELOPMENT';
+    const icon = isEmpty ? 'icon-info' : 'icon-settings';
+    const canManage = commissionerAccessState() === true;
+    host.hidden = false;
+    host.innerHTML = `<aside class="league-data-global-banner league-data-global-banner--${isEmpty?'empty':'development'}" role="status" aria-live="polite">
+      <span class="league-data-global-banner__icon"><svg><use href="#${icon}"></use></svg></span>
+      <div class="league-data-global-banner__copy"><span>${badge}</span><strong>${title}</strong><p>${copy}</p></div>
+      ${canManage?'<button class="button button--ghost button--small" data-route="commissioner/league-data">Manage source</button>':''}
+    </aside>`;
+  }
+
   function renderLeagueDataEmpty(subject = 'league data') {
     const message = window.FranchiseHQ?.leagueData?.emptyMessage?.(subject) || `No ${subject} is available.`;
     pageContent.innerHTML = `<section class="empty-state league-data-empty-state"><strong>${escapeHtml(message)}</strong><p>The Commissioner has selected Empty State. Choose Development Data or publish a verified Madden Companion snapshot from Commissioner HQ to restore league content.</p><div class="heading-actions"><button class="button button--primary" data-route="commissioner/league-data">Open League Data</button></div></section>`;
@@ -1614,6 +1636,7 @@
     closeSidebar();
     document.querySelectorAll('.nav-item[data-route]').forEach(item=>item.classList.toggle('is-active',item.dataset.route===base));
     pageContent.innerHTML='';
+    renderGlobalLeagueDataBanner();
     const emptySubjects = {
       home: 'league data',
       'league-activity': 'league activity',
@@ -2023,3 +2046,8 @@
   applyRole(window.FranchiseHQ?.simulation?.getRole?.() || state.role,false);
   window.FranchiseHQ?.appRouter?.render?.(location.hash.slice(1)||'home',{source:'startup'}) || renderRoute();
 })();
+
+  window.addEventListener('franchisehq:league-data-state-changed', () => {
+    renderGlobalLeagueDataBanner();
+  });
+
