@@ -9,7 +9,10 @@
   const MODES = Object.freeze(['auto', 'empty', 'demo', 'live']);
   const MODE_KEY = 'fgc-league-data-mode';
   const listeners = new Set();
-  const storedMode = String(HQ.store?.getString?.(MODE_KEY, 'auto') || 'auto').toLowerCase();
+  const nativeStoredMode = (() => {
+    try { return window.localStorage.getItem(MODE_KEY); } catch (_) { return null; }
+  })();
+  const storedMode = String(HQ.store?.getString?.(MODE_KEY, nativeStoredMode || 'auto') || nativeStoredMode || 'auto').toLowerCase();
   let requestedMode = MODES.includes(storedMode) ? storedMode : 'auto';
   let demoSnapshot = null;
   let lastTransitionAt = new Date().toISOString();
@@ -73,7 +76,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '5.4.3',
+      version: '5.4.3a',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -121,6 +124,7 @@
     if (!MODES.includes(normalized)) throw new TypeError(`Unsupported league data mode "${mode}".`);
     requestedMode = normalized;
     HQ.store?.setString?.(MODE_KEY, normalized, { source: 'league-data-source-selector' });
+    try { window.localStorage.setItem(MODE_KEY, normalized); } catch (_) {}
     return notify('mode-changed');
   }
 
@@ -201,7 +205,7 @@
   });
 
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '5.4.3',
+    version: '5.4.3a',
     modes: MODES,
     current,
     exportCurrent,
@@ -229,7 +233,7 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '5.4.3',
+    version: '5.4.3a',
     dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
     capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'import-status']
   });
