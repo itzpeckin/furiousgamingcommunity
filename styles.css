@@ -3126,3 +3126,56 @@ table td{
 .player-data-source-notice div > span { display: block; margin-bottom: 1px; color: currentColor; font-size: .64rem; font-weight: 800; letter-spacing: .1em; opacity: .9; }
 .player-data-source-notice strong { display: block; color: var(--text); font-size: .88rem; }
 .player-data-source-notice p { margin: 2px 0 0; color: var(--text-muted); font-size: .77rem; line-height: 1.38; }
+
+/* v5.4.11 — LD-011 Commissioner Dashboard Status Widget */
+[data-league-status-widget] { margin-bottom: 18px; }
+.commissioner-league-status-widget { padding: 18px; }
+.commissioner-league-status-widget__header { margin-bottom: 14px; }
+.commissioner-league-status-widget__grid {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 10px;
+}
+.commissioner-league-status-widget__grid > div {
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,.025);
+}
+.commissioner-league-status-widget__grid span,
+.commissioner-league-status-widget__footer small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: .69rem;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.commissioner-league-status-widget__grid strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: .9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commissioner-league-status-widget__footer {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.commissioner-league-status-widget__footer strong { display: block; color: var(--text); }
+@media (max-width: 900px) {
+  .commissioner-league-status-widget__grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 560px) {
+  .commissioner-league-status-widget__grid { grid-template-columns: 1fr; }
+  .commissioner-league-status-widget__footer { align-items: stretch; flex-direction: column; }
+  .commissioner-league-status-widget__footer .button { width: 100%; }
+}
