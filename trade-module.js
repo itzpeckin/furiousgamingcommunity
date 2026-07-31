@@ -570,7 +570,7 @@ function renderCommissionerLeagueData(){
    ${renderCurrentDataSourceCard(state)}
    ${renderLeagueDataSelector(state)}
    <div class="league-data-foundation-grid">
-     <article class="card"><div class="card-header"><div><span class="eyebrow">Release 5.4.4a</span><h3>Global Data Source Banner</h3></div><span class="pill pill--success">Registered</span></div><p>Every application page now identifies Development Data or Empty State before users interpret league content. Verified Madden data removes the banner automatically.</p></article>
+     <article class="card"><div class="card-header"><div><span class="eyebrow">Release 5.4.5</span><h3>Banner Comfort & Clarity</h3></div><span class="pill pill--success">Registered</span></div><p>Development and Empty State notices now use softer contrast and clearer hierarchy while remaining visible. Verified Madden data continues to remove the banner automatically.</p></article>
      <article class="card"><div class="card-header"><div><span class="eyebrow">Protected Source</span><h3>Madden Companion</h3></div><span class="pill pill--neutral">Import required</span></div><p>The official source remains unavailable until a verified Madden snapshot has been installed through the import pipeline.</p></article>
    </div>
    <article class="card league-data-boundary"><span class="eyebrow">Safe switching boundary</span><h3>Source selection never deletes a snapshot.</h3><p>Changing the active source only changes which read model is exposed. Development and future Madden snapshots remain intact and can be selected again when available.</p></article>
