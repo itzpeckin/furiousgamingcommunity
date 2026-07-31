@@ -34,7 +34,12 @@
     playerSearch: '',
     playerPosition: 'All',
     playerTeam: 'All',
-    playerMinOvr: 70,
+    playerStatus: 'All',
+    playerDev: 'All',
+    playerMinOvr: 60,
+    playerMaxOvr: 99,
+    playerMinAge: 20,
+    playerMaxAge: 45,
     playerSort: 'overall-desc',
     standingsView: 'division',
     statsCategory: 'passing',
@@ -687,10 +692,112 @@
       </article>`).join('') : `<article class="card roadmap-state" style="grid-column:1/-1"><div class="roadmap-state__inner"><div class="roadmap-icon"><svg><use href="#icon-search"></use></svg></div><h2>No teams found</h2><p>Try clearing a filter or searching for another city, nickname, abbreviation, or owner.</p></div></article>`;
   }
 
+  function rosterService() {
+    return window.FranchiseHQ?.modules?.league?.rosters || window.FranchiseHQ?.leagueRosters || null;
+  }
+
+  function rosterPlayerView(player) {
+    const raw = player?.raw || {};
+    const contract = player?.contract || {};
+    return {
+      ...player,
+      dev: player?.developmentTrait || raw.dev || raw.developmentTrait || 'Normal',
+      injury: player?.injuryStatus || raw.injury || 'Healthy',
+      years: Number(contract.yearsRemaining ?? contract.years ?? raw.years ?? raw.contractYears ?? 0) || 0,
+      salary: Number(contract.salary ?? contract.totalSalary ?? raw.salary ?? 0) || 0,
+      capHit: Number(contract.capHit ?? raw.capHit ?? raw.salary ?? 0) || 0,
+      depth: player?.depthOrder ?? raw.depth ?? null,
+      college: raw.college || raw.school || '—',
+      number: raw.number || raw.jerseyNumber || '—',
+      height: raw.height || '—',
+      weight: raw.weight || '—',
+      tradeBlock: Boolean(raw.tradeBlock),
+      initials: raw.initials || String(player?.name || '?').split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase(),
+      ratings: player?.ratings || raw.ratings || {}
+    };
+  }
+
+  function rosterTeamView(teamId) {
+    const legacy = teamById(teamId);
+    if (legacy) return legacy;
+    const current = window.FranchiseHQ?.leagueData?.current?.();
+    const team = (current?.teams || []).find(item => String(item.id) === String(teamId));
+    if (!team) return null;
+    const city = team.city || team.location || '';
+    const name = team.name || team.nickname || team.abbr || team.id;
+    return {
+      ...team,
+      id: String(team.id),
+      abbr: team.abbr || team.shortName || String(team.id).toUpperCase(),
+      fullName: team.fullName || [city, name].filter(Boolean).join(' ') || name,
+      record: team.record || '—',
+      primary: team.primary || '#27364f',
+      secondary: team.secondary || '#8fa4c4'
+    };
+  }
+
+  function rosterSourceLabel(provenance) {
+    if (provenance?.mode === 'live') return provenance.sourceType === 'madden-companion' ? 'Madden Companion' : 'Verified Madden snapshot';
+    if (provenance?.mode === 'demo') return 'Development Data';
+    return 'No league data';
+  }
+
+  function formatRosterContract(player) {
+    const view = rosterPlayerView(player);
+    if (!view.years && !view.salary && !view.capHit) return 'Not provided';
+    const years = view.years ? `${view.years} yr${view.years === 1 ? '' : 's'}` : 'Term unavailable';
+    const money = view.capHit ? formatMoney(view.capHit) : view.salary ? formatMoney(view.salary) : 'Cap unavailable';
+    return `${years} · ${money}`;
+  }
+
+  function renderRosterExperience(team, rosterModel) {
+    const groups = [
+      ['offense','Offense'], ['defense','Defense'], ['specialTeams','Special Teams'],
+      ['injuredReserve','Injured Reserve'], ['practiceSquad','Practice Squad / Other'], ['other','Other']
+    ];
+    const populated = groups.filter(([key]) => rosterModel.groups[key]?.length);
+    const provenance = rosterModel.provenance || {};
+    return `<div class="roster-experience">
+      <div class="roster-summary-strip">
+        ${summaryTile('Total Players',rosterModel.summary.total,'Current read model')}
+        ${summaryTile('Active',rosterModel.summary.active,'Available roster records')}
+        ${summaryTile('Injured Reserve',rosterModel.summary.injuredReserve,'Unavailable / reserved')}
+        ${summaryTile('Practice Squad',rosterModel.summary.practiceSquad,'Developmental players')}
+        ${summaryTile('Roster Health',rosterModel.health.healthy?'Healthy':`${rosterModel.health.errorCount} errors`,`${rosterModel.health.warningCount} warnings`)}
+        ${summaryTile('Data Source',rosterSourceLabel(provenance),provenance.snapshotId || 'No snapshot')}
+      </div>
+      ${populated.map(([key,label]) => renderRosterGroup(label, rosterModel.groups[key])).join('') || `<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>No roster records</h2><p>This team does not have any players in the active League Data snapshot.</p></div></article>`}
+      <article class="card roster-provenance-card"><div class="card-header"><div><span class="eyebrow">Snapshot provenance</span><h3>Roster source</h3></div><span class="pill ${provenance.authoritative?'pill--success':'pill--neutral'}">${provenance.authoritative?'Authoritative':'Non-authoritative'}</span></div><div class="roster-provenance-grid"><div><span>Source</span><strong>${escapeHtml(rosterSourceLabel(provenance))}</strong></div><div><span>Snapshot</span><strong>${escapeHtml(provenance.snapshotId || 'None')}</strong></div><div><span>Import</span><strong>${escapeHtml(provenance.importId || 'Not applicable')}</strong></div><div><span>Imported</span><strong>${escapeHtml(provenance.importedAt || 'Not applicable')}</strong></div></div></article>
+    </div>`;
+  }
+
+  function renderRosterGroup(label, groupPlayers) {
+    const account = window.FGC_TRADE?.getCurrentAccount?.();
+    return `<article class="card roster-group-card"><div class="card-header"><div><span class="eyebrow">Depth-ordered roster</span><h3>${label}</h3></div><span class="pill pill--neutral">${groupPlayers.length} player${groupPlayers.length===1?'':'s'}</span></div><div class="table-wrap"><table class="team-roster-table"><thead><tr><th>Depth</th><th>Player</th><th>Pos</th><th>OVR</th><th>Age</th><th>Development</th><th>Contract / Cap</th><th>Status</th></tr></thead><tbody>${groupPlayers.map((normalized,index)=>{const player=rosterPlayerView(normalized);const legacy=playerById(player.id);const actions=legacy?renderRosterPlayerActions(legacy,account):null;return `<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><span class="depth-order-chip">${player.depth ?? index+1}</span></td><td><div class="roster-player-cell"><div class="player-identity"><span class="player-avatar">${escapeHtml(player.initials)}</span><div><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.college)}${actions?` · ${actions.trade}`:''}</small></div></div></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`}).join('')}</tbody></table></div></article>`;
+  }
+
+  function renderRosterDepthChart(rosterModel) {
+    const positions = ['QB','RB','WR','TE','LT','LG','C','RG','RT','LE','RE','DT','LOLB','MLB','ROLB','CB','FS','SS','K','P'];
+    const rows = positions.map(position => [position, rosterModel.players.filter(player => player.position === position)]).filter(([,list]) => list.length);
+    return `<article class="card"><div class="card-header"><div><span class="eyebrow">League Data depth order</span><h3>Depth chart</h3></div><span class="pill pill--accent">${rosterSourceLabel(rosterModel.provenance)}</span></div><div class="card-body"><div class="depth-chart">${rows.map(([position,list])=>`<div class="depth-row"><span class="depth-position">${position}</span>${list.slice(0,4).map((normalized,index)=>{const player=rosterPlayerView(normalized);return `<button class="depth-player" data-roster-player-detail="${escapeHtml(player.id||'')}"><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span><div><strong>${escapeHtml(player.name)}</strong><small>Depth ${player.depth ?? index+1} · ${escapeHtml(player.dev)}</small></div></button>`}).join('')}</div>`).join('')}</div></div></article>`;
+  }
+
+  function openRosterPlayerDetail(playerId) {
+    const service = rosterService();
+    const normalized = service?.findPlayer?.(playerId);
+    if (!normalized) return;
+    const player = rosterPlayerView(normalized);
+    const team = rosterTeamView(player.teamId);
+    const provenance = player.provenance || {};
+    const ratings = Object.entries(player.ratings || {}).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,10);
+    openDetail(`<div class="modal-hero roster-detail-hero"><div class="roster-detail-avatar">${escapeHtml(player.initials)}</div><div><span class="eyebrow">${escapeHtml(team?.fullName || 'Free Agent')} · ${escapeHtml(player.position || '—')}</span><h2>${escapeHtml(player.name)}</h2><div class="player-profile-meta"><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'} OVR</span><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span><span>Age ${player.age ?? '—'}</span><span>${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></div></div></div><div class="modal-body"><div class="modal-summary-grid"><div><span>Contract</span><strong>${escapeHtml(formatRosterContract(player))}</strong></div><div><span>Injury</span><strong>${escapeHtml(player.injury)}</strong></div><div><span>Depth</span><strong>${player.depth ?? 'Not provided'}</strong></div><div><span>Source</span><strong>${escapeHtml(rosterSourceLabel(provenance))}</strong></div><div><span>Snapshot</span><strong>${escapeHtml(provenance.snapshotId || 'None')}</strong></div><div><span>Authority</span><strong>${provenance.authoritative?'Verified Madden':'Development / non-authoritative'}</strong></div></div>${ratings.length?`<div class="rating-bars roster-detail-ratings">${ratings.map(([label,value])=>`<div class="rating-row"><span>${escapeHtml(label)}</span><div class="rating-track"><div class="rating-fill" style="width:${Math.max(0,Math.min(100,Number(value)||0))}%"></div></div><strong>${escapeHtml(String(value))}</strong></div>`).join('')}</div>`:`<div class="roster-detail-empty">No detailed ratings were provided by this snapshot.</div>`}<div class="heading-actions" style="justify-content:flex-start"><button class="button button--primary" data-close-detail>Close</button>${player.teamId?`<button class="button button--ghost" data-modal-team="${escapeHtml(player.teamId)}">View Team</button>`:''}</div></div>`);
+  }
+
   function renderTeamDetail(teamId) {
     const team = teamById(teamId);
     if (!team) { setRoute('teams'); return; }
-    const roster = players.filter(player => player.teamId === team.id).sort((a,b) => positionOrder(a.position) - positionOrder(b.position) || b.overall - a.overall);
+    const rosterModel = rosterService()?.getTeamRoster?.(team.id);
+    const roster = rosterModel?.players?.map(rosterPlayerView) || [];
     const teamGames = schedule.flatMap(week => week.games).filter(game => game.homeId === team.id || game.awayId === team.id);
     const leaders = [...roster].sort((a,b) => b.overall - a.overall).slice(0,5);
 
@@ -705,19 +812,20 @@
       <div class="subnav" data-team-tabs>
         ${['roster','depth','schedule','stats','cap'].map(tab => `<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab === 'depth' ? 'Depth Chart' : titleCase(tab)}</button>`).join('')}
       </div>
-      <div data-team-tab-content>${renderTeamTab(team, roster, teamGames, leaders)}</div>`;
+      <div data-team-tab-content>${renderTeamTab(team, rosterModel, roster, teamGames, leaders)}</div>`;
   }
 
   function summaryTile(label, value, detail) { return `<article class="summary-tile card"><span>${label}</span><strong>${value}</strong><small>${detail}</small></article>`; }
   function titleCase(value) { return value.replace(/\b\w/g, letter => letter.toUpperCase()); }
   function positionOrder(position) { return positionBlueprint.findIndex(([pos]) => pos === position); }
 
-  function renderTeamTab(team, roster, teamGames, leaders) {
-    if (state.teamTab === 'depth') return renderDepthChart(roster);
+  function renderTeamTab(team, rosterModel, roster, teamGames, leaders) {
+    if (!rosterModel) return `<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>Roster service unavailable</h2><p>The Roster Read Model has not loaded.</p></div></article>`;
+    if (state.teamTab === 'depth') return renderRosterDepthChart(rosterModel);
     if (state.teamTab === 'schedule') return renderTeamSchedule(team, teamGames);
     if (state.teamTab === 'stats') return renderTeamStats(team, leaders);
     if (state.teamTab === 'cap') return renderTeamCap(team, roster);
-    return renderRosterTable(roster);
+    return renderRosterExperience(team, rosterModel);
   }
 
   function renderRosterPlayerActions(player, account) {
@@ -765,41 +873,59 @@
   }
 
   function renderPlayers() {
+    const sourceTeams = (window.FranchiseHQ?.leagueData?.current?.()?.teams || []).map(team => rosterTeamView(team.id)).filter(Boolean);
+    const positions = [...new Set((rosterService()?.searchPlayers?.('') || []).map(player => player.position).filter(Boolean))].sort();
     pageContent.innerHTML = `
-      <div class="page-heading"><div><span class="eyebrow">Mock Madden database</span><h1>Players</h1><p>Search the full mock league by player, team, position, rating, development trait, contract, and availability.</p></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Saved player watchlists will be connected with user accounts later."><svg><use href="#icon-star"></use></svg>My watchlist</button></div></div>
-      <div class="filter-bar">
-        <label class="field field--grow"><span>Player search</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-player-search value="${escapeHtml(state.playerSearch)}" placeholder="Search name, team, or college..." /></div></label>
-        <label class="field"><span>Position</span><select data-player-position>${['All',...positionBlueprint.map(([pos])=>pos)].map(pos=>`<option ${state.playerPosition===pos?'selected':''}>${pos}</option>`).join('')}</select></label>
-        <label class="field"><span>Team</span><select data-player-team><option ${state.playerTeam==='All'?'selected':''}>All</option>${teams.map(team=>`<option value="${team.id}" ${state.playerTeam===team.id?'selected':''}>${team.abbr}</option>`).join('')}</select></label>
-        <label class="field"><span>Min OVR</span><select data-player-ovr>${[60,70,75,80,85,90].map(ovr=>`<option value="${ovr}" ${state.playerMinOvr===ovr?'selected':''}>${ovr}+</option>`).join('')}</select></label>
-        <label class="field"><span>Sort</span><select data-player-sort><option value="overall-desc" ${state.playerSort==='overall-desc'?'selected':''}>Overall: High to Low</option><option value="age-asc" ${state.playerSort==='age-asc'?'selected':''}>Age: Youngest</option><option value="salary-desc" ${state.playerSort==='salary-desc'?'selected':''}>Cap Hit: Highest</option><option value="name-asc" ${state.playerSort==='name-asc'?'selected':''}>Name: A–Z</option></select></label>
+      <div class="page-heading"><div><span class="eyebrow">League Data roster directory</span><h1>Players</h1><p>Search the active roster snapshot by name, ID, team, position, status, development trait, age, and overall rating.</p></div><div class="heading-actions"><button class="button button--ghost" data-player-clear-filters><svg><use href="#icon-refresh"></use></svg>Clear filters</button></div></div>
+      <div class="roster-directory-summary" data-player-directory-summary></div>
+      <div class="filter-bar roster-filter-bar">
+        <label class="field field--grow"><span>Player search</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-player-search value="${escapeHtml(state.playerSearch)}" placeholder="Search player name, ID, team, or position..." /></div></label>
+        <label class="field"><span>Position</span><select data-player-position><option value="All">All</option>${positions.map(pos=>`<option value="${pos}" ${state.playerPosition===pos?'selected':''}>${pos}</option>`).join('')}</select></label>
+        <label class="field"><span>Team</span><select data-player-team><option value="All">All teams</option><option value="__free_agents__" ${state.playerTeam==='__free_agents__'?'selected':''}>Free Agents / Unassigned</option>${sourceTeams.map(team=>`<option value="${escapeHtml(team.id)}" ${state.playerTeam===team.id?'selected':''}>${escapeHtml(team.abbr)} — ${escapeHtml(team.fullName)}</option>`).join('')}</select></label>
+        <label class="field"><span>Status</span><select data-player-status>${['All','active','injured-reserve','practice-squad','free-agent','unassigned','other'].map(value=>`<option value="${value}" ${state.playerStatus===value?'selected':''}>${value==='All'?'All statuses':titleCase(value.replace(/-/g,' '))}</option>`).join('')}</select></label>
+        <label class="field"><span>Development</span><select data-player-dev>${['All','Normal','Star','Superstar','X-Factor'].map(value=>`<option value="${value}" ${state.playerDev===value?'selected':''}>${value==='All'?'All traits':value}</option>`).join('')}</select></label>
+        <label class="field"><span>OVR</span><div class="range-pair"><input type="number" min="0" max="99" data-player-min-ovr value="${state.playerMinOvr}" aria-label="Minimum overall"><span>to</span><input type="number" min="0" max="99" data-player-max-ovr value="${state.playerMaxOvr}" aria-label="Maximum overall"></div></label>
+        <label class="field"><span>Age</span><div class="range-pair"><input type="number" min="18" max="60" data-player-min-age value="${state.playerMinAge}" aria-label="Minimum age"><span>to</span><input type="number" min="18" max="60" data-player-max-age value="${state.playerMaxAge}" aria-label="Maximum age"></div></label>
+        <label class="field"><span>Sort</span><select data-player-sort><option value="overall-desc" ${state.playerSort==='overall-desc'?'selected':''}>Overall: High to Low</option><option value="age-asc" ${state.playerSort==='age-asc'?'selected':''}>Age: Youngest</option><option value="depth-asc" ${state.playerSort==='depth-asc'?'selected':''}>Depth Order</option><option value="name-asc" ${state.playerSort==='name-asc'?'selected':''}>Name: A–Z</option></select></label>
         <span class="result-count" data-player-count></span>
       </div>
-      <article class="card"><div class="table-wrap"><table><thead><tr><th>Player</th><th>OVR</th><th>Age</th><th>Development</th><th>Team</th><th>Contract</th><th>Cap Hit</th><th>Trade</th></tr></thead><tbody data-player-table></tbody></table></div></article>`;
+      <article class="card"><div class="table-wrap"><table class="player-directory-table"><thead><tr><th>Player</th><th>OVR</th><th>Age</th><th>Development</th><th>Team</th><th>Status</th><th>Contract / Cap</th><th>Source</th></tr></thead><tbody data-player-table></tbody></table></div></article>`;
     refreshPlayerTable();
   }
 
   function refreshPlayerTable() {
     const tbody = document.querySelector('[data-player-table]');
     if (!tbody) return;
-    const term = state.playerSearch.trim().toLowerCase();
-    let filtered = players.filter(player => {
-      const team = teamById(player.teamId);
-      const matchTerm = !term || `${player.name} ${team.fullName} ${team.abbr} ${player.college}`.toLowerCase().includes(term);
-      return matchTerm && (state.playerPosition==='All'||player.position===state.playerPosition) && (state.playerTeam==='All'||player.teamId===state.playerTeam) && player.overall>=state.playerMinOvr;
+    const service = rosterService();
+    let filtered = service?.searchPlayers?.({ query: state.playerSearch }) || [];
+    filtered = filtered.filter(normalized => {
+      const player = rosterPlayerView(normalized);
+      if (state.playerPosition !== 'All' && player.position !== state.playerPosition) return false;
+      if (state.playerTeam === '__free_agents__' && !['free-agent','unassigned'].includes(player.rosterStatus)) return false;
+      if (state.playerTeam !== 'All' && state.playerTeam !== '__free_agents__' && player.teamId !== state.playerTeam) return false;
+      if (state.playerStatus !== 'All' && player.rosterStatus !== state.playerStatus) return false;
+      if (state.playerDev !== 'All' && player.dev !== state.playerDev) return false;
+      if ((player.overall ?? 0) < state.playerMinOvr || (player.overall ?? 0) > state.playerMaxOvr) return false;
+      if (player.age != null && (player.age < state.playerMinAge || player.age > state.playerMaxAge)) return false;
+      return true;
     });
     const sorters = {
-      'overall-desc': (a,b)=>b.overall-a.overall||a.name.localeCompare(b.name),
-      'age-asc': (a,b)=>a.age-b.age||b.overall-a.overall,
-      'salary-desc': (a,b)=>b.capHit-a.capHit,
+      'overall-desc': (a,b)=>(b.overall??-1)-(a.overall??-1)||a.name.localeCompare(b.name),
+      'age-asc': (a,b)=>(a.age??999)-(b.age??999)||(b.overall??-1)-(a.overall??-1),
+      'depth-asc': (a,b)=>(a.depthOrder??999)-(b.depthOrder??999)||(b.overall??-1)-(a.overall??-1),
       'name-asc': (a,b)=>a.name.localeCompare(b.name)
     };
-    filtered.sort(sorters[state.playerSort]);
-    document.querySelector('[data-player-count]').textContent = `${filtered.length.toLocaleString()} players`;
-    tbody.innerHTML = filtered.slice(0,180).map(player => {
-      const team = teamById(player.teamId);
-      return `<tr class="clickable-row" data-player-id="${player.id}"><td>${renderPlayerIdentity(player)}</td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span></td><td>${player.age}</td><td><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span></td><td><div class="table-team">${renderTeamMark(team)}<div><strong>${team.abbr}</strong><small>${team.record}</small></div></div></td><td>${player.years} yr · ${formatMoney(player.salary)}</td><td>${formatMoney(player.capHit)}</td><td>${player.tradeBlock?'<span class="pill pill--warning">On block</span>':'<span class="pill pill--neutral">Unavailable</span>'}</td></tr>`;
-    }).join('') || `<tr><td colspan="8"><div class="roadmap-state"><div class="roadmap-state__inner"><h2>No matching players</h2><p>Change the search or filters to see more results.</p></div></div></td></tr>`;
+    filtered.sort(sorters[state.playerSort] || sorters['overall-desc']);
+    const diagnostics = service?.diagnostics?.() || {};
+    const summary = document.querySelector('[data-player-directory-summary]');
+    if (summary) summary.innerHTML = `<article><span>Players</span><strong>${diagnostics.playerCount ?? 0}</strong></article><article><span>Teams</span><strong>${diagnostics.teamCount ?? 0}</strong></article><article><span>Free Agents</span><strong>${diagnostics.freeAgentCount ?? 0}</strong></article><article><span>Roster Health</span><strong>${diagnostics.healthy?'Healthy':`${diagnostics.errorCount||0} errors`}</strong></article><article><span>Source</span><strong>${escapeHtml(rosterSourceLabel(diagnostics.provenance))}</strong></article>`;
+    document.querySelector('[data-player-count]').textContent = `${filtered.length.toLocaleString()} result${filtered.length===1?'':'s'}`;
+    tbody.innerHTML = filtered.slice(0,300).map(normalized => {
+      const player = rosterPlayerView(normalized);
+      const team = rosterTeamView(player.teamId);
+      const provenance = player.provenance || {};
+      return `<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="player-identity"><span class="player-avatar">${escapeHtml(player.initials)}</span><div><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position||'—')} · ID ${escapeHtml(player.id||'missing')}</small></div></div></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(team.abbr)}</strong><small>${escapeHtml(team.fullName)}</small></div></div>`:'<span class="pill pill--warning">Free Agent</span>'}</td><td><span class="pill ${player.rosterStatus==='active'?'pill--success':player.rosterStatus==='injured-reserve'?'pill--warning':'pill--neutral'}">${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="source-chip ${provenance.authoritative?'is-live':'is-development'}">${escapeHtml(rosterSourceLabel(provenance))}</span></td></tr>`;
+    }).join('') || `<tr><td colspan="8"><div class="roadmap-state"><div class="roadmap-state__inner"><h2>No matching players</h2><p>Change or clear the roster filters to see more records from the active snapshot.</p></div></div></td></tr>`;
   }
 
   function renderPlayerProfile(playerId) {
@@ -1847,6 +1973,21 @@
       return;
     }
 
+    const rosterPlayerTarget=event.target.closest('[data-roster-player-detail]');
+    if (rosterPlayerTarget) {
+      event.preventDefault();
+      openRosterPlayerDetail(rosterPlayerTarget.dataset.rosterPlayerDetail);
+      return;
+    }
+
+    const clearPlayerFilters=event.target.closest('[data-player-clear-filters]');
+    if (clearPlayerFilters) {
+      state.playerSearch=''; state.playerPosition='All'; state.playerTeam='All'; state.playerStatus='All'; state.playerDev='All';
+      state.playerMinOvr=60; state.playerMaxOvr=99; state.playerMinAge=20; state.playerMaxAge=45; state.playerSort='overall-desc';
+      renderPlayers();
+      return;
+    }
+
     const routeTarget=event.target.closest('[data-route]');
     if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
 
@@ -1969,6 +2110,10 @@
   document.addEventListener('input', event => {
     if (event.target.matches('[data-team-search]')) { state.teamSearch=event.target.value; refreshTeamGrid(); }
     if (event.target.matches('[data-player-search]')) { state.playerSearch=event.target.value; refreshPlayerTable(); }
+    if (event.target.matches('[data-player-min-ovr]')) { state.playerMinOvr=Number(event.target.value)||0; refreshPlayerTable(); }
+    if (event.target.matches('[data-player-max-ovr]')) { state.playerMaxOvr=Number(event.target.value)||99; refreshPlayerTable(); }
+    if (event.target.matches('[data-player-min-age]')) { state.playerMinAge=Number(event.target.value)||18; refreshPlayerTable(); }
+    if (event.target.matches('[data-player-max-age]')) { state.playerMaxAge=Number(event.target.value)||60; refreshPlayerTable(); }
     if (event.target.matches('[data-command-input]')) buildCommandResults(event.target.value);
   });
 
@@ -1977,7 +2122,8 @@
     if (event.target.matches('[data-team-division]')) { state.teamDivision=event.target.value; refreshTeamGrid(); }
     if (event.target.matches('[data-player-position]')) { state.playerPosition=event.target.value; refreshPlayerTable(); }
     if (event.target.matches('[data-player-team]')) { state.playerTeam=event.target.value; refreshPlayerTable(); }
-    if (event.target.matches('[data-player-ovr]')) { state.playerMinOvr=Number(event.target.value); refreshPlayerTable(); }
+    if (event.target.matches('[data-player-status]')) { state.playerStatus=event.target.value; refreshPlayerTable(); }
+    if (event.target.matches('[data-player-dev]')) { state.playerDev=event.target.value; refreshPlayerTable(); }
     if (event.target.matches('[data-player-sort]')) { state.playerSort=event.target.value; refreshPlayerTable(); }
     if (event.target.matches('[data-schedule-team]')) { state.scheduleTeam=event.target.value; renderSchedule(); }
   });
@@ -2010,7 +2156,8 @@
     teamById, playerById, teamStyle, renderTeamMark, renderPlayerIdentity,
     devClass, formatMoney, escapeHtml, setRoute, renderRoute, showToast,
     openDetail, closeDetail, applyRole, closeProfileMenu,
-    commissionerAccessState, syncCommissionerAccess, renderGlobalLeagueDataBanner
+    commissionerAccessState, syncCommissionerAccess, renderGlobalLeagueDataBanner,
+    rosterService, rosterPlayerView, renderRosterExperience, openRosterPlayerDetail
   };
 
   window.FranchiseHQ?.ui?.registerAdapter?.('legacy-app', {
