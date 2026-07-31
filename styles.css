@@ -3179,3 +3179,17 @@ table td{
   .commissioner-league-status-widget__footer { align-items: stretch; flex-direction: column; }
   .commissioner-league-status-widget__footer .button { width: 100%; }
 }
+
+/* v5.4.12 League Data Foundation Completion */
+.commissioner-tabs button .commissioner-tab-status{margin-left:auto;font-size:.66rem;white-space:nowrap}
+.league-import-status-card,.league-foundation-certification{margin-top:18px}
+.league-import-status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.league-import-status-grid>div{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-soft)}
+.league-import-status-grid span{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+.league-import-status-grid strong{display:block;margin-top:5px}
+.league-import-status-note{margin:10px 0 0;color:var(--text-muted);font-size:.86rem}
+.league-certification-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
+.league-certification-checks span{padding:9px 10px;border-radius:10px;background:var(--surface-soft);font-size:.82rem;text-transform:capitalize}
+.league-certification-checks .is-pass{color:var(--success)}
+.league-certification-checks .is-fail{color:var(--danger)}
+@media(max-width:720px){.commissioner-tabs button .commissioner-tab-status{display:none}.league-import-status-grid,.league-certification-checks{grid-template-columns:1fr}}
