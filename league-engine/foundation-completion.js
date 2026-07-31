@@ -80,7 +80,7 @@
     return Object.freeze({
       certified: failedChecks.length === 0,
       epic: '5.4',
-      version: '5.4.12',
+      version: '5.4.12a',
       readiness: failedChecks.length === 0 ? 'Roster Engine Ready' : 'Action Required',
       activeMode: state.activeMode || 'unknown',
       checks,
@@ -95,7 +95,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'leagueDataFoundation',
-      version: '5.4.12',
+      version: '5.4.12a',
       badge: badgeModel(),
       importStatus: importStatus(),
       foundation: foundationStatus(),
@@ -105,7 +105,7 @@
   }
 
   const service = HQ.defineModuleService('league', 'foundation', {
-    version: '5.4.12',
+    version: '5.4.12a',
     badgeModel,
     importStatus,
     foundationStatus,
@@ -115,7 +115,7 @@
   HQ.validate.register({
     id: 'league-data-foundation',
     name: 'League Data Foundation 5.4 Certification',
-    version: '5.4.12',
+    version: '5.4.12a',
     tests: [
       { id: 'valid-league-mode', name: 'Valid League Data mode', run: ({ assert }) => { const s=HQ.leagueData.getStatus(); assert(['empty','demo','live'].includes(s.activeMode), 'Active League Data mode is invalid.', s); return { details: s.activeMode }; } },
       { id: 'persistent-mode-storage', name: 'Persistent mode storage available', run: ({ assert }) => { const p=HQ.leagueData.getStatus().persistence; assert(p?.available===true, 'League Data persistence is unavailable.', p); return { details: p }; } },
@@ -131,7 +131,7 @@
 
   HQ.manifest?.register?.({
     scope: 'module', module: 'league', id: 'league-data-foundation', service: 'foundation',
-    script: 'league-engine/foundation-completion.js', version: '5.4.12',
+    script: 'league-engine/foundation-completion.js', version: '5.4.12a',
     dependencies: ['leagueDataState','leagueDataBanner','emptyState','statusWidget'],
     capabilities: ['navigation-status','import-status','validation','diagnostics','foundation-certification']
   });

@@ -80,10 +80,22 @@
     return model ? inlineMarkup(model) : '';
   }
 
-  FranchiseHQ.leagueDataBanner = Object.freeze({
+  const bannerService = Object.freeze({
+    version: '5.4.12a',
     activeSource,
     presentation,
     renderGlobal,
     renderInline
   });
+
+  if (typeof FranchiseHQ.defineModuleService === 'function') {
+    FranchiseHQ.defineModuleService(
+      'league',
+      'leagueDataBanner',
+      bannerService,
+      { alias: 'leagueDataBanner', replace: true }
+    );
+  } else {
+    FranchiseHQ.leagueDataBanner = bannerService;
+  }
 })(window);
