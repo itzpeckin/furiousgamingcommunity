@@ -1611,8 +1611,12 @@
   }
 
   function renderLeagueDataEmpty(subject = 'league data') {
+    const emptyState = window.FranchiseHQ?.leagueEmptyState;
+    if (emptyState?.render?.(pageContent, subject, { showAction: commissionerAccessState() === true })) return true;
+
     const message = window.FranchiseHQ?.leagueData?.emptyMessage?.(subject) || `No ${subject} is available.`;
-    pageContent.innerHTML = `<section class="empty-state league-data-empty-state"><strong>${escapeHtml(message)}</strong><p>The Commissioner has selected Empty State. Choose Development Data or publish a verified Madden Companion snapshot from Commissioner HQ to restore league content.</p><div class="heading-actions"><button class="button button--primary" data-route="commissioner/league-data">Open League Data</button></div></section>`;
+    pageContent.innerHTML = `<section class="empty-state league-data-empty-state"><strong>${escapeHtml(message)}</strong><p>Choose Development Data or publish a verified Madden Companion snapshot to restore league content.</p></section>`;
+    return false;
   }
 
   function renderRoute(routeInput=location.hash.slice(1)||'home') {
