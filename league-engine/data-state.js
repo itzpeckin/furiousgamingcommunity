@@ -7,17 +7,62 @@
   }
 
   const MODES = Object.freeze(['auto', 'empty', 'demo', 'live']);
-  const MODE_KEY = 'fgc-league-data-mode';
+  const STORAGE_KEY = 'league.data.mode';
+  const LEGACY_MODE_KEY = 'fgc-league-data-mode';
   const listeners = new Set();
-  const nativeStoredMode = (() => {
-    try { return window.localStorage.getItem(MODE_KEY); } catch (_) { return null; }
-  })();
-  // Startup is deliberately limited to commissioner-facing modes.
-  // `auto` remains available as an internal compatibility mode, but an old
-  // saved `auto` value must not silently activate development data.
-  const STARTUP_MODES = Object.freeze(['empty', 'demo', 'live']);
-  const storedMode = String(HQ.store?.getString?.(MODE_KEY, nativeStoredMode || 'empty') || nativeStoredMode || 'empty').toLowerCase();
-  let requestedMode = STARTUP_MODES.includes(storedMode) ? storedMode : 'empty';
+  const PERSISTED_MODES = Object.freeze(['empty', 'demo', 'live']);
+
+  function normalizePersistedMode(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return PERSISTED_MODES.includes(normalized) ? normalized : null;
+  }
+
+  function readLegacyMode() {
+    const storeValue = HQ.store?.getString?.(LEGACY_MODE_KEY, null);
+    if (storeValue != null) return storeValue;
+    try { return window.localStorage.getItem(LEGACY_MODE_KEY); } catch (_) { return null; }
+  }
+
+  function readPersistedMode() {
+    let storageAvailable = false;
+    let rawValue = null;
+    let source = 'none';
+
+    try {
+      storageAvailable = HQ.storage?.diagnostics?.().localAvailable === true;
+      if (storageAvailable) {
+        rawValue = HQ.storage.get(STORAGE_KEY, null);
+        source = rawValue == null ? 'none' : 'platform-storage';
+      }
+    } catch (_) {
+      storageAvailable = false;
+    }
+
+    const normalized = normalizePersistedMode(rawValue);
+    if (normalized) return { mode: normalized, source, storageAvailable, migrated: false };
+
+    const legacyMode = normalizePersistedMode(readLegacyMode());
+    if (legacyMode) {
+      let migrated = false;
+      if (storageAvailable) {
+        try { migrated = HQ.storage.set(STORAGE_KEY, legacyMode) === true; } catch (_) {}
+      }
+      return { mode: legacyMode, source: 'legacy-storage', storageAvailable, migrated };
+    }
+
+    return { mode: 'empty', source: rawValue == null ? 'default' : 'invalid-value', storageAvailable, migrated: false };
+  }
+
+  const startupPreference = readPersistedMode();
+  let requestedMode = startupPreference.mode;
+  let persistenceState = {
+    key: STORAGE_KEY,
+    available: startupPreference.storageAvailable,
+    restoredFrom: startupPreference.source,
+    migratedLegacyValue: startupPreference.migrated,
+    lastWriteSucceeded: null,
+    lastPersistedMode: PERSISTED_MODES.includes(startupPreference.mode) ? startupPreference.mode : null
+  };
   let demoSnapshot = null;
   let lastTransitionAt = new Date().toISOString();
 
@@ -80,7 +125,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '5.4.5',
+      version: '5.4.6',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -101,7 +146,8 @@
         : activeMode === 'demo'
           ? 'Displaying non-authoritative demo data.'
           : null,
-      lastTransitionAt
+      lastTransitionAt,
+      persistence: Object.freeze({ ...persistenceState })
     });
   }
 
@@ -123,12 +169,30 @@
     return clone(current());
   }
 
+  function persistMode(mode) {
+    if (!PERSISTED_MODES.includes(mode)) return false;
+    let succeeded = false;
+    try {
+      succeeded = HQ.storage?.set?.(STORAGE_KEY, mode) === true;
+    } catch (_) {
+      succeeded = false;
+    }
+    persistenceState = {
+      ...persistenceState,
+      available: HQ.storage?.diagnostics?.().localAvailable === true,
+      lastWriteSucceeded: succeeded,
+      lastPersistedMode: succeeded ? mode : persistenceState.lastPersistedMode
+    };
+    return succeeded;
+  }
+
   function setMode(mode) {
     const normalized = String(mode || '').toLowerCase();
     if (!MODES.includes(normalized)) throw new TypeError(`Unsupported league data mode "${mode}".`);
     requestedMode = normalized;
-    HQ.store?.setString?.(MODE_KEY, normalized, { source: 'league-data-source-selector' });
-    try { window.localStorage.setItem(MODE_KEY, normalized); } catch (_) {}
+    // Only commissioner-facing modes are persisted. `auto` remains an
+    // internal compatibility mode and is deliberately session-only.
+    if (PERSISTED_MODES.includes(normalized)) persistMode(normalized);
     return notify('mode-changed');
   }
 
@@ -198,6 +262,10 @@
     return Object.freeze({
       ...state,
       modes: MODES,
+      persistedModes: PERSISTED_MODES,
+      storageKey: STORAGE_KEY,
+      persistence: Object.freeze({ ...persistenceState }),
+      storage: HQ.storage?.diagnostics?.() || null,
       subscriberCount: listeners.size,
       repository: HQ.leagueRepository.diagnostics(),
       compliant: state.readOnly === true && (!state.isLive || state.authority === 'madden')
@@ -209,7 +277,7 @@
   });
 
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '5.4.5',
+    version: '5.4.6',
     modes: MODES,
     current,
     exportCurrent,
@@ -237,7 +305,7 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '5.4.5',
+    version: '5.4.6',
     dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
     capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'import-status']
   });
