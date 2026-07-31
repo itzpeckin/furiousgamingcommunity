@@ -41,6 +41,14 @@
     const normalized = normalizePersistedMode(rawValue);
     if (normalized) return { mode: normalized, source, storageAvailable, migrated: false };
 
+    // A present-but-invalid value in the new platform key is authoritative as
+    // a failed preference. Resolve safely to Empty instead of falling back to
+    // an older legacy preference. Legacy migration is allowed only when the
+    // new key is genuinely missing.
+    if (rawValue != null) {
+      return { mode: 'empty', source: 'invalid-value', storageAvailable, migrated: false };
+    }
+
     const legacyMode = normalizePersistedMode(readLegacyMode());
     if (legacyMode) {
       let migrated = false;
@@ -50,7 +58,7 @@
       return { mode: legacyMode, source: 'legacy-storage', storageAvailable, migrated };
     }
 
-    return { mode: 'empty', source: rawValue == null ? 'default' : 'invalid-value', storageAvailable, migrated: false };
+    return { mode: 'empty', source: 'default', storageAvailable, migrated: false };
   }
 
   const startupPreference = readPersistedMode();
@@ -125,7 +133,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '5.4.6',
+      version: '5.4.6a',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -277,7 +285,7 @@
   });
 
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '5.4.6',
+    version: '5.4.6a',
     modes: MODES,
     current,
     exportCurrent,
@@ -305,7 +313,7 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '5.4.6',
+    version: '5.4.6a',
     dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
     capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'import-status']
   });
