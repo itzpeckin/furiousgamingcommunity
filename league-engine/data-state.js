@@ -133,7 +133,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '5.4.6a',
+      version: '5.4.7',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -265,6 +265,59 @@
     });
   }
 
+
+  // LD-007 public convenience API. These helpers intentionally derive from
+  // status() and current() so the League Data State Manager remains the only
+  // source of truth for mode, authority and source metadata.
+  function getMode() {
+    return status().activeMode;
+  }
+
+  function getStatus() {
+    return status();
+  }
+
+  function isDevelopment() {
+    return status().isDemo === true;
+  }
+
+  function isEmpty() {
+    return status().isEmpty === true;
+  }
+
+  function isLive() {
+    return status().isLive === true;
+  }
+
+  function canLoadLeague() {
+    return status().hasAnyData === true;
+  }
+
+  function currentSource() {
+    const state = status();
+    const snapshot = current();
+    const source = snapshot?.source || {};
+    return Object.freeze({
+      mode: state.activeMode,
+      requestedMode: state.requestedMode,
+      authority: state.authority,
+      sourceType: state.isLive
+        ? (source.type || source.sourceType || 'madden')
+        : state.isDemo
+          ? 'development'
+          : 'none',
+      source: source.source || null,
+      importId: state.importId,
+      importedAt: state.importedAt,
+      snapshotId: source.snapshotId || source.importId || state.importId || null,
+      leagueId: state.leagueId,
+      leagueName: state.leagueName,
+      authoritative: state.isLive === true,
+      available: state.hasAnyData === true,
+      counts: state.counts
+    });
+  }
+
   function diagnostics() {
     const state = status();
     return Object.freeze({
@@ -285,11 +338,18 @@
   });
 
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '5.4.6a',
+    version: '5.4.7',
     modes: MODES,
     current,
     exportCurrent,
     status,
+    getMode,
+    getStatus,
+    isDevelopment,
+    isEmpty,
+    isLive,
+    canLoadLeague,
+    currentSource,
     viewState,
     setMode,
     setDemoSnapshot,
@@ -313,8 +373,8 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '5.4.6a',
+    version: '5.4.7',
     dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
-    capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'import-status']
+    capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'public-api-compatibility', 'source-metadata', 'import-status']
   });
 })();
