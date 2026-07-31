@@ -133,7 +133,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '5.4.7',
+      version: '5.4.8',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -159,13 +159,77 @@
     });
   }
 
+  let previousEventStatus = status();
+
+  function sourceMetadata(state = status()) {
+    const snapshot = sourceFor(state.activeMode);
+    const source = snapshot?.source || {};
+    return Object.freeze({
+      mode: state.activeMode,
+      authority: state.authority,
+      sourceType: state.isLive
+        ? (source.type || source.sourceType || 'madden')
+        : state.isDemo
+          ? 'development'
+          : 'none',
+      importId: state.importId,
+      importedAt: state.importedAt,
+      snapshotId: source.snapshotId || source.importId || state.importId || null,
+      leagueId: state.leagueId,
+      leagueName: state.leagueName,
+      authoritative: state.isLive === true,
+      available: state.hasAnyData === true,
+      counts: state.counts
+    });
+  }
+
+  function dataSignature(state) {
+    return JSON.stringify({
+      activeMode: state.activeMode,
+      importId: state.importId,
+      importedAt: state.importedAt,
+      leagueId: state.leagueId,
+      counts: state.counts
+    });
+  }
+
+  function emitNormalizedEvent(name, payload) {
+    HQ.events?.emit?.(name, payload, { source: 'leagueDataState' });
+    window.dispatchEvent(new CustomEvent(`franchisehq:${name}`, { detail: payload }));
+  }
+
   function notify(reason) {
+    const previous = previousEventStatus;
     lastTransitionAt = new Date().toISOString();
-    const detail = Object.freeze({ reason, ...status() });
+    const next = status();
+    const detail = Object.freeze({ reason, ...next });
+    const eventPayload = Object.freeze({
+      reason,
+      previousMode: previous.activeMode,
+      requestedMode: next.requestedMode,
+      activeMode: next.activeMode,
+      source: sourceMetadata(next),
+      status: next,
+      timestamp: lastTransitionAt
+    });
+
     listeners.forEach((listener) => {
       try { listener(detail); } catch (error) { console.error('[FranchiseHQ] league data-state subscriber failed', error); }
     });
+
+    // Preserve the v5.4.0 browser event for existing consumers.
     window.dispatchEvent(new CustomEvent('franchisehq:league-data-state-changed', { detail }));
+
+    // Emit normalized module events only for the transitions they describe.
+    if (previous.requestedMode !== next.requestedMode || previous.activeMode !== next.activeMode) {
+      emitNormalizedEvent('league:modeChanged', eventPayload);
+    }
+    if (dataSignature(previous) !== dataSignature(next)) {
+      emitNormalizedEvent('league:dataChanged', eventPayload);
+    }
+    emitNormalizedEvent('league:stateChanged', eventPayload);
+
+    previousEventStatus = next;
     return detail;
   }
 
@@ -298,23 +362,9 @@
     const snapshot = current();
     const source = snapshot?.source || {};
     return Object.freeze({
-      mode: state.activeMode,
+      ...sourceMetadata(state),
       requestedMode: state.requestedMode,
-      authority: state.authority,
-      sourceType: state.isLive
-        ? (source.type || source.sourceType || 'madden')
-        : state.isDemo
-          ? 'development'
-          : 'none',
-      source: source.source || null,
-      importId: state.importId,
-      importedAt: state.importedAt,
-      snapshotId: source.snapshotId || source.importId || state.importId || null,
-      leagueId: state.leagueId,
-      leagueName: state.leagueName,
-      authoritative: state.isLive === true,
-      available: state.hasAnyData === true,
-      counts: state.counts
+      source: source.source || null
     });
   }
 
@@ -338,7 +388,7 @@
   });
 
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '5.4.7',
+    version: '5.4.8',
     modes: MODES,
     current,
     exportCurrent,
@@ -373,8 +423,8 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '5.4.7',
+    version: '5.4.8',
     dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
-    capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'public-api-compatibility', 'source-metadata', 'import-status']
+    capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'public-api-compatibility', 'source-metadata', 'normalized-events', 'event-compatibility', 'import-status']
   });
 })();
