@@ -2021,7 +2021,7 @@
     teamById, playerById, teamStyle, renderTeamMark, renderPlayerIdentity,
     devClass, formatMoney, escapeHtml, setRoute, renderRoute, showToast,
     openDetail, closeDetail, applyRole, closeProfileMenu,
-    commissionerAccessState, syncCommissionerAccess
+    commissionerAccessState, syncCommissionerAccess, renderGlobalLeagueDataBanner
   };
 
   window.FranchiseHQ?.ui?.registerAdapter?.('legacy-app', {
@@ -2048,6 +2048,6 @@
 })();
 
   window.addEventListener('franchisehq:league-data-state-changed', () => {
-    renderGlobalLeagueDataBanner();
+    window.FGC_APP?.renderGlobalLeagueDataBanner?.();
   });
 

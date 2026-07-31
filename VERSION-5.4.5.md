@@ -35,3 +35,7 @@ The previously validated banner contrast refinement remains part of the v5.4.5 r
 ## Corrected release package
 
 The corrected package also includes `app.js`. This restores the declared `renderGlobalLeagueDataBanner()` function required by the League Data subscription callback. No banner design changes are introduced by this correction.
+
+
+## Scope Hotfix
+Corrected the global League Data banner event listener so it calls the renderer through the exported `window.FGC_APP` API instead of referencing an IIFE-scoped function from global scope.

@@ -16,3 +16,7 @@ Required outcomes:
 ## Preliminary console check
 
 Before continuing the startup-mode tests, refresh the application and confirm that the console no longer reports `renderGlobalLeagueDataBanner is not defined`.
+
+
+## Scope Hotfix Check
+After deployment, confirm the console no longer reports `renderGlobalLeagueDataBanner is not defined` when Development Data initializes or the League Data mode changes.
