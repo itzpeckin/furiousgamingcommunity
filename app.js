@@ -754,6 +754,16 @@
     return `${years} · ${money}`;
   }
 
+  function schoolAbbreviation(value) {
+    const school = String(value || '').trim();
+    if (!school || school === '—') return '—';
+    if (/^[A-Z0-9&.-]{2,6}$/.test(school)) return school;
+    const ignored = new Set(['of','the','at','and']);
+    const parts = school.replace(/[^A-Za-z0-9 ]+/g,' ').split(/\s+/).filter(Boolean);
+    const initials = parts.filter(part => !ignored.has(part.toLowerCase())).map(part => part[0]).join('').toUpperCase();
+    return initials.slice(0,5) || school.slice(0,5).toUpperCase();
+  }
+
   function rosterGroupForPlayer(player) {
     const status = String(player.rosterStatus || '').toLowerCase();
     if (status === 'injured-reserve') return 'Injured Reserve';
@@ -766,7 +776,7 @@
   }
 
   function renderRosterExperience(team, rosterModel) {
-    const allPlayers = rosterModel.players.map(rosterPlayerView);
+    const allPlayers = rosterModel.players.map(rosterPlayerView).sort((a,b) => (Number(b.overall)||0) - (Number(a.overall)||0) || String(a.name).localeCompare(String(b.name)));
     const positions = [...new Set(allPlayers.map(player => player.position).filter(Boolean))].sort();
     const devTraits = [...new Set(allPlayers.map(player => player.dev).filter(Boolean))].sort();
     const filtered = allPlayers.filter(player => {
@@ -775,22 +785,39 @@
       if (state.rosterDev !== 'All' && player.dev !== state.rosterDev) return false;
       return true;
     });
-    const account = window.FGC_TRADE?.getCurrentAccount?.();
     return `<div class="roster-experience roster-experience--clean">
       <div class="filter-bar roster-table-filters">
         <label class="field"><span>Roster Group</span><select data-roster-group><option value="All">Full Roster</option>${['Offense','Defense','Special Teams','Injured Reserve','Practice Squad / Other','Other'].map(value=>`<option value="${value}" ${state.rosterGroup===value?'selected':''}>${value}</option>`).join('')}</select></label>
         <label class="field"><span>Position</span><select data-roster-position><option value="All">All Positions</option>${positions.map(value=>`<option value="${escapeHtml(value)}" ${state.rosterPosition===value?'selected':''}>${escapeHtml(value)}</option>`).join('')}</select></label>
         <label class="field"><span>Development</span><select data-roster-dev><option value="All">All Traits</option>${devTraits.map(value=>`<option value="${escapeHtml(value)}" ${state.rosterDev===value?'selected':''}>${escapeHtml(value)}</option>`).join('')}</select></label>
-        <span class="result-count">${filtered.length} player${filtered.length===1?'':'s'}</span>
+        <span class="result-count">${filtered.length} player${filtered.length===1?'':'s'} · sorted by OVR</span>
       </div>
-      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>Depth</th><th>Player</th><th>Pos</th><th>OVR</th><th>Age</th><th>Development</th><th>Contract / Cap</th><th>Status</th></tr></thead><tbody>${filtered.map((player,index)=>{const legacy=playerById(player.id);const actions=legacy?renderRosterPlayerActions(legacy,account):null;return `<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><span class="depth-order-chip">${player.depth ?? index+1}</span></td><td><div class="roster-player-name"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.college || '')}${actions?` · ${actions.trade}`:''}</small></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`}).join('') || `<tr><td colspan="8"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
+      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Age</th><th>Development</th><th>Contract / Cap</th><th>Status</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="7"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
     </div>`;
   }
 
   function renderRosterDepthChart(rosterModel) {
-    const positions = ['LT','LG','C','RG','RT','TE','WR','RB','QB','FB','LE','RE','DT','LOLB','MLB','ROLB','CB','FS','SS','K','P'];
-    const rows = positions.map(position => [position, rosterModel.players.filter(player => player.position === position)]).filter(([,list]) => list.length);
-    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Click a player tile to select it. Click the selected tile again to open the full player card.</p></div></div><div class="card-body"><div class="madden-depth-board">${rows.map(([position,list])=>`<section class="madden-depth-row"><div class="madden-position-label">${position}</div><div class="madden-depth-tiles">${list.slice(0,5).map((normalized,index)=>{const player=rosterPlayerView(normalized);return `<button class="madden-player-tile ${state.depthSelectedPlayer===player.id?'is-selected':''}" data-depth-player-id="${escapeHtml(player.id||'')}"><span class="madden-player-ovr">${player.overall ?? '—'}</span><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.dev)} · ${index===0?'Starter':`Depth ${player.depth ?? index+1}`}</small></button>`}).join('')}</div></section>`).join('')}</div></div></article>`;
+    const players = rosterModel.players.map(rosterPlayerView).sort((a,b)=>(Number(a.depth)||99)-(Number(b.depth)||99)||(Number(b.overall)||0)-(Number(a.overall)||0));
+    const byPosition = position => players.filter(player => player.position === position);
+    const split = (list, parity) => list.filter((_,index)=>index % 2 === parity);
+    const stackMarkup = (label, list, area) => {
+      if (!list.length) return `<div class="formation-position formation-position--empty" style="grid-area:${area}"><span>${label}</span></div>`;
+      const ordered = [...list];
+      const selectedIndex = ordered.findIndex(player => player.id === state.depthSelectedPlayer);
+      if (selectedIndex > 0) ordered.unshift(...ordered.splice(selectedIndex,1));
+      return `<section class="formation-position" style="grid-area:${area}"><span class="formation-position__label">${label}</span><div class="formation-stack" style="--stack-count:${Math.min(ordered.length,4)}">${ordered.slice(0,4).map((player,index)=>`<button class="formation-player-card ${state.depthSelectedPlayer===player.id?'is-selected':''}" style="--stack-index:${index};z-index:${10-index}" data-depth-player-id="${escapeHtml(player.id||'')}"><span class="formation-player-card__ovr">${player.overall ?? '—'}</span><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.dev)} · ${index===0?'Starter':`Depth ${player.depth ?? index+1}`}</small></button>`).join('')}</div></section>`;
+    };
+    const wr = byPosition('WR');
+    const cb = byPosition('CB');
+    const dt = byPosition('DT');
+    const safeties = [...byPosition('FS'), ...byPosition('SS')].sort((a,b)=>(Number(a.depth)||99)-(Number(b.depth)||99)||(Number(b.overall)||0)-(Number(a.overall)||0));
+    const offense = [
+      stackMarkup('WR1', split(wr,0), 'wr1'), stackMarkup('LT',byPosition('LT'),'lt'), stackMarkup('LG',byPosition('LG'),'lg'), stackMarkup('C',byPosition('C'),'c'), stackMarkup('RG',byPosition('RG'),'rg'), stackMarkup('RT',byPosition('RT'),'rt'), stackMarkup('TE',byPosition('TE'),'te'), stackMarkup('WR2',split(wr,1),'wr2'), stackMarkup('QB',byPosition('QB'),'qb'), stackMarkup('RB',byPosition('RB'),'rb'), stackMarkup('FB',byPosition('FB'),'fb')
+    ].join('');
+    const defense = [
+      stackMarkup('S',safeties,'s'), stackMarkup('LOLB',byPosition('LOLB'),'lolb'), stackMarkup('ILB',byPosition('MLB'),'mlb'), stackMarkup('ROLB',byPosition('ROLB'),'rolb'), stackMarkup('CB1',split(cb,0),'cb1'), stackMarkup('EDGE',byPosition('LE'),'le'), stackMarkup('DT1',split(dt,0),'dt1'), stackMarkup('DT2',split(dt,1),'dt2'), stackMarkup('EDGE',byPosition('RE'),'re'), stackMarkup('CB2',split(cb,1),'cb2')
+    ].join('');
+    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Click a stacked backup to bring it forward. Click the front card again to open the full player card.</p></div></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div></div></article>`;
   }
 
   function openRosterPlayerDetail(playerId) {
@@ -902,7 +929,7 @@
         <label class="field"><span>Sort</span><select data-player-sort><option value="overall-desc" ${state.playerSort==='overall-desc'?'selected':''}>Overall: High to Low</option><option value="age-asc" ${state.playerSort==='age-asc'?'selected':''}>Age: Youngest</option><option value="depth-asc" ${state.playerSort==='depth-asc'?'selected':''}>Depth Order</option><option value="name-asc" ${state.playerSort==='name-asc'?'selected':''}>Name: A–Z</option></select></label>
         <span class="result-count" data-player-count></span>
       </div>
-      <article class="card"><div class="table-wrap"><table class="player-directory-table"><thead><tr><th>Player</th><th>OVR</th><th>Age</th><th>Development</th><th>Team</th><th>Status</th><th>Contract / Cap</th></tr></thead><tbody data-player-table></tbody></table></div></article>`;
+      <article class="card"><div class="table-wrap"><table class="player-directory-table"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Age</th><th>Development</th><th>Team</th><th>Status</th><th>Contract / Cap</th></tr></thead><tbody data-player-table></tbody></table></div></article>`;
     refreshPlayerTable();
   }
 
@@ -933,7 +960,7 @@
     tbody.innerHTML = filtered.slice(0,300).map(normalized => {
       const player = rosterPlayerView(normalized);
       const team = rosterTeamView(player.teamId);
-      return `<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-name"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position||'—')}</small></div></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(team.abbr)}</strong><small>${escapeHtml(team.fullName)}</small></div></div>`:'<span class="pill pill--warning">Free Agent</span>'}</td><td><span class="pill ${player.rosterStatus==='active'?'pill--success':player.rosterStatus==='injured-reserve'?'pill--warning':'pill--neutral'}">${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td><td>${escapeHtml(formatRosterContract(player))}</td></tr>`;
+      return `<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-name roster-player-name--single"><strong>${escapeHtml(player.name)}</strong></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(team.abbr)}</strong><small>${escapeHtml(team.fullName)}</small></div></div>`:'<span class="pill pill--warning">Free Agent</span>'}</td><td><span class="pill ${player.rosterStatus==='active'?'pill--success':player.rosterStatus==='injured-reserve'?'pill--warning':'pill--neutral'}">${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td><td>${escapeHtml(formatRosterContract(player))}</td></tr>`;
     }).join('') || `<tr><td colspan="7"><div class="roadmap-state"><div class="roadmap-state__inner"><h2>No matching players</h2><p>Change or clear the roster filters to see more records from the active snapshot.</p></div></div></td></tr>`;
   }
 
@@ -1981,6 +2008,9 @@
       window.FGC_TRADE?.openValueCard?.(openPlayerCard.dataset.openPlayerCard);
       return;
     }
+
+    const rosterTradeTarget=event.target.closest('[data-add-player-trade]');
+    if (rosterTradeTarget) return;
 
     const depthPlayerTarget=event.target.closest('[data-depth-player-id]');
     if (depthPlayerTarget) {

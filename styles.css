@@ -3226,3 +3226,33 @@ table td{
 .player-directory-table .roster-player-name{min-width:160px}
 @media(max-width:760px){.roster-table-filters{display:grid;grid-template-columns:1fr 1fr}.roster-table-filters .result-count{margin-left:0;padding:0}.madden-depth-row{grid-template-columns:44px minmax(0,1fr)}.madden-player-tile{flex-basis:154px}}
 @media(max-width:520px){.roster-table-filters{grid-template-columns:1fr}.roster-table-filters .field{min-width:0}}
+
+/* v5.5.1c — Compact roster rows and formation depth chart */
+.team-roster-table--single{min-width:820px}
+.team-roster-table--single th,.team-roster-table--single td{padding-top:8px;padding-bottom:8px}
+.roster-player-inline{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:260px}
+.roster-player-inline__identity{display:flex;align-items:baseline;gap:5px;min-width:0;white-space:nowrap}
+.roster-player-inline__identity strong{font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.roster-player-inline__identity small{font-size:10px;color:var(--muted);flex:none}
+.roster-trade-button--compact{padding:5px 9px;border-color:rgba(139,92,246,.45);background:rgba(124,58,237,.2);color:#d8c7ff;font-size:8px;line-height:1}
+.roster-trade-button--compact:hover{border-color:#9b7cff;background:rgba(124,58,237,.34);color:#fff}
+.roster-player-name--single{display:block;min-width:150px}
+.roster-player-name--single strong{font-size:12px}
+.player-directory-table{min-width:940px}
+.formation-section+.formation-section{margin-top:26px;padding-top:22px;border-top:1px solid var(--border)}
+.formation-section h4{margin:0 0 14px;font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.football-formation{display:grid;gap:14px 10px;align-items:start;min-width:980px;padding:20px 18px 34px;border:1px solid var(--border);border-radius:14px;background:linear-gradient(180deg,rgba(var(--accent-rgb),.045),rgba(255,255,255,.012))}
+.football-formation--offense{grid-template-columns:repeat(8,minmax(100px,1fr));grid-template-areas:"wr1 lt lg c rg rt te wr2" ". . . qb qb . . ." ". . . rb rb fb . ."}
+.football-formation--defense{grid-template-columns:repeat(10,minmax(90px,1fr));grid-template-areas:". . . . s s . . . ." ". . . lolb mlb mlb rolb . . ." "cb1 le dt1 dt1 dt2 dt2 re cb2 cb2 cb2"}
+.formation-position{position:relative;min-height:104px;display:flex;flex-direction:column;align-items:center}
+.formation-position--empty{opacity:.25;justify-content:center;border:1px dashed var(--border);border-radius:10px;color:var(--muted);font-size:9px;font-weight:800}
+.formation-position__label{position:relative;z-index:30;margin-bottom:5px;padding:3px 7px;border-radius:999px;background:var(--surface-3);border:1px solid var(--border);color:var(--muted);font-size:8px;font-weight:900}
+.formation-stack{position:relative;width:100%;max-width:142px;height:calc(70px + (var(--stack-count) - 1) * 15px)}
+.formation-player-card{position:absolute;inset:0 0 auto;width:100%;min-height:70px;transform:translateY(calc(var(--stack-index) * 15px));padding:10px 9px;text-align:left;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--text);box-shadow:0 7px 16px rgba(0,0,0,.28);cursor:pointer;transition:transform .16s ease,border-color .16s ease,background .16s ease}
+.formation-player-card:hover{border-color:rgba(var(--accent-rgb),.5)}
+.formation-player-card.is-selected{border-color:var(--accent);background:rgba(var(--accent-rgb),.13);transform:translateY(0) scale(1.02)}
+.formation-player-card strong{display:block;padding-right:30px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+.formation-player-card small{display:block;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:7px}
+.formation-player-card__ovr{position:absolute;top:7px;right:7px;display:grid;place-items:center;min-width:25px;height:23px;padding:0 5px;border-radius:7px;background:rgba(var(--accent-rgb),.17);font-size:9px;font-weight:900}
+@media(max-width:1100px){.madden-depth-card .card-body{overflow-x:auto}.football-formation{min-width:980px}}
+@media(max-width:760px){.roster-player-inline{min-width:220px}.roster-player-inline__identity strong{max-width:140px}}
