@@ -12,3 +12,7 @@ Required outcomes:
 - Development data does not activate merely because a demo snapshot exists.
 - The validated banner cosmetic refinement remains unchanged.
 - No JavaScript console errors occur.
+
+## Preliminary console check
+
+Before continuing the startup-mode tests, refresh the application and confirm that the console no longer reports `renderGlobalLeagueDataBanner is not defined`.

@@ -31,3 +31,7 @@ The previously validated banner contrast refinement remains part of the v5.4.5 r
 - `league-engine/data-state.js`
 - `VERSION-5.4.5.md`
 - `VALIDATION-5.4.5.md`
+
+## Corrected release package
+
+The corrected package also includes `app.js`. This restores the declared `renderGlobalLeagueDataBanner()` function required by the League Data subscription callback. No banner design changes are introduced by this correction.
