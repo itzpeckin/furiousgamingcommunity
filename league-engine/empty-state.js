@@ -70,7 +70,7 @@
     return true;
   }
 
-  FranchiseHQ.leagueEmptyState = Object.freeze({
+  const emptyStateService = Object.freeze({
     definitions: DEFINITIONS,
     isEmpty,
     model,
@@ -78,8 +78,24 @@
     render
   });
 
-  // Roadmap-compatible alias for future League module consumers.
-  FranchiseHQ.modules = FranchiseHQ.modules || {};
-  FranchiseHQ.modules.league = FranchiseHQ.modules.league || {};
-  FranchiseHQ.modules.league.emptyState = FranchiseHQ.leagueEmptyState;
+  // Register through the Platform-owned module registry. FranchiseHQ.modules
+  // is a protected property and must not be reassigned by League features.
+  if (typeof FranchiseHQ.defineModuleService === 'function') {
+    FranchiseHQ.defineModuleService('league', 'emptyState', emptyStateService, {
+      alias: 'leagueEmptyState',
+      replace: true
+    });
+  } else {
+    // Compatibility fallback for isolated component tests without Platform Core.
+    Object.defineProperty(FranchiseHQ, 'leagueEmptyState', {
+      configurable: true,
+      enumerable: false,
+      value: emptyStateService
+    });
+
+    if (FranchiseHQ.modules && typeof FranchiseHQ.modules === 'object') {
+      const leagueModule = FranchiseHQ.modules.league || (FranchiseHQ.modules.league = {});
+      leagueModule.emptyState = emptyStateService;
+    }
+  }
 })(window);
