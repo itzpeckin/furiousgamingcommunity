@@ -12,8 +12,12 @@
   const nativeStoredMode = (() => {
     try { return window.localStorage.getItem(MODE_KEY); } catch (_) { return null; }
   })();
-  const storedMode = String(HQ.store?.getString?.(MODE_KEY, nativeStoredMode || 'auto') || nativeStoredMode || 'auto').toLowerCase();
-  let requestedMode = MODES.includes(storedMode) ? storedMode : 'auto';
+  // Startup is deliberately limited to commissioner-facing modes.
+  // `auto` remains available as an internal compatibility mode, but an old
+  // saved `auto` value must not silently activate development data.
+  const STARTUP_MODES = Object.freeze(['empty', 'demo', 'live']);
+  const storedMode = String(HQ.store?.getString?.(MODE_KEY, nativeStoredMode || 'empty') || nativeStoredMode || 'empty').toLowerCase();
+  let requestedMode = STARTUP_MODES.includes(storedMode) ? storedMode : 'empty';
   let demoSnapshot = null;
   let lastTransitionAt = new Date().toISOString();
 
@@ -76,7 +80,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '5.4.4',
+      version: '5.4.5',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -205,7 +209,7 @@
   });
 
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '5.4.4',
+    version: '5.4.5',
     modes: MODES,
     current,
     exportCurrent,
@@ -233,7 +237,7 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '5.4.4',
+    version: '5.4.5',
     dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
     capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'import-status']
   });
