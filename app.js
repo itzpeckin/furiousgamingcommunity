@@ -1604,25 +1604,10 @@
   }
 
   function renderGlobalLeagueDataBanner() {
-    const host = document.querySelector('[data-league-data-global-banner]');
-    if (!host) return;
-    const status = window.FranchiseHQ?.leagueData?.status?.();
-    if (!status || status.isLive === true || status.activeMode === 'live') { host.innerHTML = ''; host.hidden = true; return; }
-
-    const isEmpty = status.isEmpty === true;
-    const title = isEmpty ? 'No League Loaded' : 'Development Mode';
-    const copy = isEmpty
-      ? 'No league data is currently loaded.'
-      : 'You are viewing sample league data used for development and testing.';
-    const badge = isEmpty ? 'NO DATA' : 'SAMPLE DATA';
-    const icon = isEmpty ? 'icon-info' : 'icon-settings';
-    const canManage = commissionerAccessState() === true;
-    host.hidden = false;
-    host.innerHTML = `<aside class="league-data-global-banner league-data-global-banner--${isEmpty?'empty':'development'}" role="status" aria-live="polite">
-      <span class="league-data-global-banner__icon"><svg><use href="#${icon}"></use></svg></span>
-      <div class="league-data-global-banner__copy"><span>${badge}</span><strong>${title}</strong><p>${copy}</p></div>
-      ${canManage?'<button class="button button--ghost button--small" data-route="commissioner/league-data">Manage source</button>':''}
-    </aside>`;
+    return window.FranchiseHQ?.leagueDataBanner?.renderGlobal?.({
+      host: document.querySelector('[data-league-data-global-banner]'),
+      canManage: commissionerAccessState() === true
+    }) ?? false;
   }
 
   function renderLeagueDataEmpty(subject = 'league data') {
