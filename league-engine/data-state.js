@@ -193,9 +193,16 @@
     });
   }
 
-  function emitNormalizedEvent(name, payload) {
-    HQ.events?.emit?.(name, payload, { source: 'leagueDataState' });
+  function emitNormalizedEvent(name, browserAlias, payload) {
+    // The platform event service requires canonical lowercase, hyphenated
+    // namespace:past-tense-action names. Suppress its automatic window event
+    // so we can publish one canonical browser event plus the roadmap alias
+    // without creating duplicate notifications.
+    HQ.events?.emit?.(name, payload, { source: 'leagueDataState', window: false });
     window.dispatchEvent(new CustomEvent(`franchisehq:${name}`, { detail: payload }));
+    if (browserAlias) {
+      window.dispatchEvent(new CustomEvent(`franchisehq:${browserAlias}`, { detail: payload }));
+    }
   }
 
   function notify(reason) {
@@ -222,12 +229,12 @@
 
     // Emit normalized module events only for the transitions they describe.
     if (previous.requestedMode !== next.requestedMode || previous.activeMode !== next.activeMode) {
-      emitNormalizedEvent('league:modeChanged', eventPayload);
+      emitNormalizedEvent('league:mode-changed', 'league:modeChanged', eventPayload);
     }
     if (dataSignature(previous) !== dataSignature(next)) {
-      emitNormalizedEvent('league:dataChanged', eventPayload);
+      emitNormalizedEvent('league:data-changed', 'league:dataChanged', eventPayload);
     }
-    emitNormalizedEvent('league:stateChanged', eventPayload);
+    emitNormalizedEvent('league:state-changed', 'league:stateChanged', eventPayload);
 
     previousEventStatus = next;
     return detail;
