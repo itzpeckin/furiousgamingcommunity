@@ -133,7 +133,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '5.4.8',
+      version: '5.4.8b',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -193,16 +193,58 @@
     });
   }
 
-  function emitNormalizedEvent(name, browserAlias, payload) {
-    // The platform event service requires canonical lowercase, hyphenated
-    // namespace:past-tense-action names. Suppress its automatic window event
-    // so we can publish one canonical browser event plus the roadmap alias
-    // without creating duplicate notifications.
-    HQ.events?.emit?.(name, payload, { source: 'leagueDataState', window: false });
-    window.dispatchEvent(new CustomEvent(`franchisehq:${name}`, { detail: payload }));
-    if (browserAlias) {
-      window.dispatchEvent(new CustomEvent(`franchisehq:${browserAlias}`, { detail: payload }));
+  const normalizedEventDiagnostics = {
+    emitted: { mode: 0, data: 0, state: 0 },
+    failed: { mode: 0, data: 0, state: 0 },
+    lastFailure: null
+  };
+
+  function safePlatformEmit(name, payload, channel) {
+    try {
+      HQ.events?.emit?.(name, payload, { source: 'leagueDataState', window: false });
+      normalizedEventDiagnostics.emitted[channel] += 1;
+      return true;
+    } catch (error) {
+      normalizedEventDiagnostics.failed[channel] += 1;
+      normalizedEventDiagnostics.lastFailure = Object.freeze({
+        channel,
+        name,
+        message: error?.message || String(error),
+        timestamp: new Date().toISOString()
+      });
+      console.error(`[FranchiseHQ] Failed to emit ${name}`, error);
+      return false;
     }
+  }
+
+  function safeBrowserEmit(name, payload) {
+    try {
+      window.dispatchEvent(new CustomEvent(name, { detail: payload }));
+      return true;
+    } catch (error) {
+      console.error(`[FranchiseHQ] Failed to dispatch browser event ${name}`, error);
+      return false;
+    }
+  }
+
+  function emitNormalizedEvents({ modeChanged, dataChanged, payload }) {
+    // Emit every canonical platform event independently before dispatching any
+    // browser aliases. A failing compatibility listener can therefore never
+    // prevent the remaining platform events from reaching their subscribers.
+    if (modeChanged) safePlatformEmit('league:mode-changed', payload, 'mode');
+    if (dataChanged) safePlatformEmit('league:data-changed', payload, 'data');
+    safePlatformEmit('league:state-changed', payload, 'state');
+
+    if (modeChanged) {
+      safeBrowserEmit('franchisehq:league:mode-changed', payload);
+      safeBrowserEmit('franchisehq:league:modeChanged', payload);
+    }
+    if (dataChanged) {
+      safeBrowserEmit('franchisehq:league:data-changed', payload);
+      safeBrowserEmit('franchisehq:league:dataChanged', payload);
+    }
+    safeBrowserEmit('franchisehq:league:state-changed', payload);
+    safeBrowserEmit('franchisehq:league:stateChanged', payload);
   }
 
   function notify(reason) {
@@ -227,14 +269,11 @@
     // Preserve the v5.4.0 browser event for existing consumers.
     window.dispatchEvent(new CustomEvent('franchisehq:league-data-state-changed', { detail }));
 
-    // Emit normalized module events only for the transitions they describe.
-    if (previous.requestedMode !== next.requestedMode || previous.activeMode !== next.activeMode) {
-      emitNormalizedEvent('league:mode-changed', 'league:modeChanged', eventPayload);
-    }
-    if (dataSignature(previous) !== dataSignature(next)) {
-      emitNormalizedEvent('league:data-changed', 'league:dataChanged', eventPayload);
-    }
-    emitNormalizedEvent('league:state-changed', 'league:stateChanged', eventPayload);
+    // Determine the transition once, then emit all event channels through the
+    // isolated dispatcher so one listener cannot interrupt another channel.
+    const modeChanged = previous.requestedMode !== next.requestedMode || previous.activeMode !== next.activeMode;
+    const dataChanged = dataSignature(previous) !== dataSignature(next);
+    emitNormalizedEvents({ modeChanged, dataChanged, payload: eventPayload });
 
     previousEventStatus = next;
     return detail;
@@ -385,6 +424,11 @@
       persistence: Object.freeze({ ...persistenceState }),
       storage: HQ.storage?.diagnostics?.() || null,
       subscriberCount: listeners.size,
+      normalizedEvents: Object.freeze({
+        emitted: Object.freeze({ ...normalizedEventDiagnostics.emitted }),
+        failed: Object.freeze({ ...normalizedEventDiagnostics.failed }),
+        lastFailure: normalizedEventDiagnostics.lastFailure
+      }),
       repository: HQ.leagueRepository.diagnostics(),
       compliant: state.readOnly === true && (!state.isLive || state.authority === 'madden')
     });
@@ -395,7 +439,7 @@
   });
 
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '5.4.8',
+    version: '5.4.8b',
     modes: MODES,
     current,
     exportCurrent,
@@ -430,7 +474,7 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '5.4.8',
+    version: '5.4.8b',
     dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
     capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'public-api-compatibility', 'source-metadata', 'normalized-events', 'event-compatibility', 'import-status']
   });
