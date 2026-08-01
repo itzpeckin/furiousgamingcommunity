@@ -822,14 +822,23 @@
       const ordered = [...list];
       const selectedIndex = ordered.findIndex(player => player.id === state.depthSelectedPlayer);
       if (selectedIndex > 0) ordered.unshift(...ordered.splice(selectedIndex,1));
-      const visible = ordered.slice(0,4);
+      const visible = ordered.slice(0,3);
+      const front = visible[0];
+      const backups = visible.slice(1);
       return `<section class="formation-position" style="grid-area:${area}">
         <span class="formation-position__label">${label}</span>
-        <div class="formation-stack formation-stack--uniform" style="--stack-count:${visible.length}">
-          ${visible.map((player,index)=>`<button type="button" class="formation-player-card formation-player-card--uniform ${depthDevelopmentClass(player.dev)} ${state.depthSelectedPlayer===player.id?'is-selected':''}" style="--stack-index:${index};--stack-z:${visible.length-index}" data-depth-player-id="${escapeHtml(player.id||'')}" aria-label="Show ${escapeHtml(player.name)}">
-            <span class="formation-player-card__ovr">${player.overall ?? '—'}</span>
-            <strong>${escapeHtml(player.name)}</strong>
-          </button>`).join('')}
+        <div class="formation-depth-card">
+          <button type="button" class="formation-depth-card__starter ${depthDevelopmentClass(front.dev)} ${state.depthSelectedPlayer===front.id?'is-selected':''}" data-depth-player-id="${escapeHtml(front.id||'')}" aria-label="Show ${escapeHtml(front.name)}">
+            <span class="formation-player-card__ovr">${front.overall ?? '—'}</span>
+            <strong>${escapeHtml(front.name)}</strong>
+          </button>
+          <div class="formation-depth-card__backups">
+            ${[0,1].map(index=>{
+              const player=backups[index];
+              if (!player) return `<span class="formation-depth-card__backup formation-depth-card__backup--empty" aria-hidden="true"></span>`;
+              return `<button type="button" class="formation-depth-card__backup ${depthDevelopmentClass(player.dev)} ${state.depthSelectedPlayer===player.id?'is-selected':''}" data-depth-player-id="${escapeHtml(player.id||'')}" aria-label="Show ${escapeHtml(player.name)}"><strong>${escapeHtml(player.name)}</strong><b>${player.overall ?? '—'}</b></button>`;
+            }).join('')}
+          </div>
         </div>
       </section>`;
     };

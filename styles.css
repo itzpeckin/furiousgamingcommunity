@@ -3458,3 +3458,192 @@ table td{
   .formation-player-card--uniform strong{font-size:9px;right:32px;left:8px;bottom:8px}
   .formation-player-card--uniform .formation-player-card__ovr{top:7px;right:7px;min-width:27px;height:25px;font-size:10px}
 }
+
+/* v5.5.3c — Fixed uniform formation grid */
+.madden-depth-card .card-body{overflow-x:hidden}
+.football-formation{
+  display:grid;
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  grid-template-columns:repeat(12,minmax(0,1fr));
+  column-gap:12px;
+  row-gap:26px;
+  padding:24px 18px 34px;
+  align-items:start;
+}
+.football-formation--offense{
+  grid-template-areas:
+    "lt lt lg lg c c rg rg rt rt te te"
+    "wr1 wr1 . . . qb qb . . . wr2 wr2"
+    ". . . . rb rb fb fb . . . .";
+}
+.football-formation--defense{
+  grid-template-areas:
+    ". . . . . s s . . . . ."
+    ". . lolb lolb mlb mlb rolb rolb . . . ."
+    "cb1 cb1 le le dt1 dt1 dt2 dt2 re re cb2 cb2";
+}
+.formation-position{
+  width:100%;
+  min-width:0;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+}
+.formation-position__label{
+  align-self:center;
+  min-width:36px;
+  height:22px;
+  margin:0 0 7px;
+  padding:0 9px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:rgba(120,137,168,.18);
+  border:1px solid rgba(137,157,194,.16);
+  color:#cbd5e8;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.06em;
+}
+.formation-depth-card{
+  width:100%;
+  height:142px;
+  display:grid;
+  grid-template-rows:86px 56px;
+  overflow:hidden;
+  border:1px solid rgba(137,157,194,.28);
+  border-radius:10px;
+  background:#111a29;
+  box-shadow:0 9px 22px rgba(0,0,0,.25);
+}
+.formation-depth-card__starter{
+  position:relative;
+  width:100%;
+  min-width:0;
+  height:86px;
+  padding:12px 42px 12px 12px;
+  border:0;
+  border-bottom:1px solid rgba(137,157,194,.32);
+  border-radius:0;
+  background:linear-gradient(145deg,#27344b,#1d2739);
+  color:#fff;
+  text-align:left;
+  cursor:pointer;
+  overflow:hidden;
+  transition:filter .15s ease,box-shadow .15s ease;
+}
+.formation-depth-card__starter strong{
+  position:absolute;
+  left:12px;
+  right:42px;
+  bottom:11px;
+  margin:0;
+  padding:0;
+  font-size:13px;
+  line-height:1.15;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.formation-depth-card__starter .formation-player-card__ovr{
+  position:absolute;
+  top:10px;
+  right:10px;
+  min-width:34px;
+  height:32px;
+  padding:0 7px;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  background:rgba(7,11,19,.58);
+  color:#fff;
+  font-size:14px;
+  font-weight:900;
+}
+.formation-depth-card__backups{
+  display:grid;
+  grid-template-rows:28px 28px;
+  background:#111a29;
+}
+.formation-depth-card__backup{
+  position:relative;
+  min-width:0;
+  width:100%;
+  height:28px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 28px;
+  align-items:center;
+  gap:6px;
+  padding:0 9px 0 11px;
+  border:0;
+  border-bottom:1px solid rgba(137,157,194,.18);
+  background:#152033;
+  color:#edf2fb;
+  text-align:left;
+  cursor:pointer;
+  overflow:hidden;
+}
+.formation-depth-card__backup:last-child{border-bottom:0}
+.formation-depth-card__backup strong{
+  min-width:0;
+  font-size:11px;
+  font-weight:750;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.formation-depth-card__backup b{
+  font-size:11px;
+  text-align:right;
+  color:#fff;
+}
+.formation-depth-card__backup--empty{
+  display:block;
+  cursor:default;
+  background:#111a29;
+}
+.formation-depth-card__starter:hover,
+.formation-depth-card__backup:hover{filter:brightness(1.1)}
+.formation-depth-card__starter.is-selected,
+.formation-depth-card__backup.is-selected{
+  box-shadow:inset 0 0 0 2px #d0c3ff;
+  filter:brightness(1.13);
+}
+.formation-depth-card__starter.formation-dev--xfactor{background:linear-gradient(145deg,#c7242e,#84141b)}
+.formation-depth-card__starter.formation-dev--superstar{background:linear-gradient(145deg,#bc8a0b,#6e4d00)}
+.formation-depth-card__starter.formation-dev--star{background:linear-gradient(145deg,#778091,#444b5a)}
+.formation-depth-card__starter.formation-dev--normal{background:linear-gradient(145deg,#27344b,#1d2739)}
+.formation-depth-card__backup.formation-dev--xfactor{background:linear-gradient(90deg,rgba(199,36,46,.42),#152033 38%);border-left:3px solid #e43c45}
+.formation-depth-card__backup.formation-dev--superstar{background:linear-gradient(90deg,rgba(188,138,11,.4),#152033 38%);border-left:3px solid #e1ad24}
+.formation-depth-card__backup.formation-dev--star{background:linear-gradient(90deg,rgba(119,128,145,.42),#152033 38%);border-left:3px solid #aeb7c8}
+.formation-depth-card__backup.formation-dev--normal{border-left:3px solid #314562}
+.formation-position--empty{
+  height:171px;
+  min-height:171px;
+  justify-content:center;
+}
+@media(max-width:1100px){
+  .football-formation{column-gap:8px;row-gap:22px;padding:20px 12px 30px}
+  .formation-depth-card{height:132px;grid-template-rows:80px 52px}
+  .formation-depth-card__starter{height:80px}
+  .formation-depth-card__backups{grid-template-rows:26px 26px}
+  .formation-depth-card__backup{height:26px;padding-inline:8px}
+  .formation-depth-card__starter strong{font-size:11px;left:10px;right:38px;bottom:10px}
+  .formation-depth-card__backup strong,.formation-depth-card__backup b{font-size:9px}
+  .formation-depth-card__starter .formation-player-card__ovr{top:8px;right:8px;min-width:30px;height:29px;font-size:12px}
+}
+@media(max-width:760px){
+  .football-formation{column-gap:5px;row-gap:18px;padding:16px 7px 24px}
+  .formation-depth-card{height:118px;grid-template-rows:72px 46px}
+  .formation-depth-card__starter{height:72px}
+  .formation-depth-card__backups{grid-template-rows:23px 23px}
+  .formation-depth-card__backup{height:23px;padding:0 5px;grid-template-columns:minmax(0,1fr) 22px}
+  .formation-depth-card__starter strong{font-size:9px;left:7px;right:31px;bottom:8px}
+  .formation-depth-card__backup strong,.formation-depth-card__backup b{font-size:8px}
+  .formation-depth-card__starter .formation-player-card__ovr{top:6px;right:6px;min-width:25px;height:24px;padding:0 4px;font-size:10px}
+  .formation-position__label{min-width:28px;height:19px;padding:0 5px;font-size:8px}
+}
