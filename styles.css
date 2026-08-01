@@ -3344,3 +3344,117 @@ table td{
   .football-formation--offense,.football-formation--defense{min-width:1180px}
   .formation-stack--clean{max-width:164px}
 }
+
+/* v5.5.3b — Uniform full-width depth chart tiles */
+.madden-depth-card .card-body{overflow-x:hidden}
+.football-formation{
+  width:100%;
+  min-width:0;
+  gap:16px 10px;
+  padding:24px 18px 34px;
+  box-sizing:border-box;
+}
+.football-formation--offense{
+  grid-template-columns:repeat(8,minmax(0,1fr));
+  grid-template-areas:
+    ". lt lg c rg rt te ."
+    "wr1 . . qb qb . . wr2"
+    ". . . rb rb fb . .";
+  min-width:0;
+}
+.football-formation--defense{
+  grid-template-columns:repeat(8,minmax(0,1fr));
+  grid-template-areas:
+    ". . . s s . . ."
+    ". . lolb mlb mlb rolb . ."
+    "cb1 le dt1 dt2 dt2 re cb2 cb2";
+  min-width:0;
+}
+.formation-position{
+  min-width:0;
+  min-height:124px;
+  width:100%;
+}
+.formation-position__label{
+  min-width:34px;
+  height:22px;
+  margin-bottom:6px;
+  padding:0 8px;
+  font-size:9px;
+}
+.formation-stack--uniform{
+  position:relative;
+  width:100%;
+  max-width:none;
+  height:calc(82px + (var(--stack-count) - 1) * 18px);
+}
+.formation-player-card--uniform{
+  position:absolute;
+  top:calc(var(--stack-index) * 18px);
+  left:0;
+  width:100%;
+  height:82px;
+  min-height:82px;
+  padding:10px 38px 10px 10px;
+  border-radius:10px;
+  border:1px solid rgba(158,177,214,.28);
+  background:linear-gradient(145deg,#27344b,#1d2739);
+  color:#f6f8fc;
+  box-shadow:0 8px 18px rgba(0,0,0,.26);
+  text-align:left;
+  cursor:pointer;
+  overflow:hidden;
+  z-index:var(--stack-z);
+  transition:filter .16s ease,border-color .16s ease,transform .16s ease,box-shadow .16s ease;
+}
+.formation-player-card--uniform:hover{filter:brightness(1.08)}
+.formation-player-card--uniform.is-selected{
+  border-color:#d0c3ff;
+  box-shadow:0 0 0 3px rgba(174,151,255,.42),0 12px 24px rgba(0,0,0,.34);
+  filter:brightness(1.14);
+  transform:translateY(-1px);
+}
+.formation-player-card--uniform strong{
+  position:absolute;
+  left:10px;
+  right:36px;
+  bottom:9px;
+  display:block;
+  margin:0;
+  padding:0;
+  font-size:11px;
+  line-height:1.15;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.formation-player-card--uniform .formation-player-card__ovr{
+  position:absolute;
+  top:8px;
+  right:8px;
+  min-width:30px;
+  height:28px;
+  padding:0 6px;
+  border-radius:8px;
+  background:rgba(7,11,19,.56);
+  color:#fff;
+  font-size:12px;
+}
+.formation-player-card--uniform.formation-dev--xfactor{background:linear-gradient(145deg,#6d2429,#3e171b);border-color:rgba(255,107,113,.62)}
+.formation-player-card--uniform.formation-dev--superstar{background:linear-gradient(145deg,#6a531d,#3a2d10);border-color:rgba(255,211,92,.64);color:#fff8d8}
+.formation-player-card--uniform.formation-dev--star{background:linear-gradient(145deg,#596273,#333946);border-color:rgba(216,226,242,.62);color:#f5f8ff}
+.formation-player-card--uniform.formation-dev--normal{background:linear-gradient(145deg,#27344b,#1d2739);border-color:rgba(158,177,214,.28)}
+@media(max-width:1100px){
+  .madden-depth-card .card-body{overflow-x:hidden}
+  .football-formation--offense,.football-formation--defense{min-width:0}
+  .football-formation{gap:14px 8px;padding:20px 14px 30px}
+  .formation-player-card--uniform strong{font-size:10px}
+}
+@media(max-width:760px){
+  .football-formation{gap:12px 6px;padding:18px 10px 26px}
+  .formation-position{min-height:114px}
+  .formation-stack--uniform{height:calc(74px + (var(--stack-count) - 1) * 16px)}
+  .formation-player-card--uniform{height:74px;min-height:74px;padding-right:34px}
+  .formation-player-card--uniform strong{font-size:9px;right:32px;left:8px;bottom:8px}
+  .formation-player-card--uniform .formation-player-card__ovr{top:7px;right:7px;min-width:27px;height:25px;font-size:10px}
+}
