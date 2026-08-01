@@ -301,6 +301,14 @@
     return `dev-badge--${dev.toLowerCase().replace(/[^a-z]/g,'')}`;
   }
 
+  function depthDevelopmentClass(dev) {
+    const value=String(dev || 'Normal').toLowerCase().replace(/[^a-z]/g,'');
+    if (value.includes('xfactor')) return 'formation-dev--xfactor';
+    if (value.includes('superstar')) return 'formation-dev--superstar';
+    if (value === 'star') return 'formation-dev--star';
+    return 'formation-dev--normal';
+  }
+
 
   function gameForTeamWeek(teamId, weekNumber) {
     return schedule.find(w=>w.week===weekNumber)?.games.find(g=>g.homeId===teamId||g.awayId===teamId) || null;
@@ -819,12 +827,12 @@
       return `<section class="formation-position" style="grid-area:${area}">
         <span class="formation-position__label">${label}</span>
         <div class="formation-stack formation-stack--clean">
-          <button type="button" class="formation-player-card formation-player-card--front ${state.depthSelectedPlayer===active.id?'is-selected':''}" data-depth-player-id="${escapeHtml(active.id||'')}">
+          <button type="button" class="formation-player-card formation-player-card--front ${depthDevelopmentClass(active.dev)} ${state.depthSelectedPlayer===active.id?'is-selected':''}" data-depth-player-id="${escapeHtml(active.id||'')}">
             <span class="formation-player-card__ovr">${active.overall ?? '—'}</span>
             <strong>${escapeHtml(active.name)}</strong>
             <small>${escapeHtml(active.dev)} · ${active.depth===1?'Starter':`Depth ${active.depth ?? 1}`}</small>
           </button>
-          ${backups.length?`<div class="formation-backup-stack">${backups.map((player,index)=>`<button type="button" class="formation-backup-card ${state.depthSelectedPlayer===player.id?'is-selected':''}" data-depth-player-id="${escapeHtml(player.id||'')}" aria-label="Show ${escapeHtml(player.name)}"><span>${index+2}</span><strong>${escapeHtml(player.name)}</strong><b>${player.overall ?? '—'}</b></button>`).join('')}</div>`:''}
+          ${backups.length?`<div class="formation-backup-stack">${backups.map((player,index)=>`<button type="button" class="formation-backup-card ${depthDevelopmentClass(player.dev)} ${state.depthSelectedPlayer===player.id?'is-selected':''}" data-depth-player-id="${escapeHtml(player.id||'')}" aria-label="Show ${escapeHtml(player.name)}"><span>${index+2}</span><strong>${escapeHtml(player.name)}</strong><b>${player.overall ?? '—'}</b></button>`).join('')}</div>`:''}
         </div>
       </section>`;
     };
@@ -2122,8 +2130,14 @@
     const teamSchedulePhase=event.target.closest('[data-team-schedule-phase]');
     if (teamSchedulePhase) {
       event.preventDefault();
+      const windowScroll=window.scrollY;
+      const mainScroll=mainContent?.scrollTop || 0;
       state.teamSchedulePhase=teamSchedulePhase.dataset.teamSchedulePhase;
       renderRoute(location.hash.slice(1));
+      requestAnimationFrame(() => {
+        window.scrollTo({top:windowScroll,left:0,behavior:'instant'});
+        if (mainContent) mainContent.scrollTop=mainScroll;
+      });
       return;
     }
 

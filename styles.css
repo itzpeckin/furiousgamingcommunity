@@ -3291,3 +3291,56 @@ table td{
 .team-stats-view{display:grid;gap:18px}.team-stat-section{overflow:hidden}.team-stat-table th,.team-stat-table td{white-space:nowrap}.team-stat-table td:first-child{min-width:190px}.team-stat-table td:first-child small,.cap-roster-table td:first-child small{display:block;color:var(--muted);margin-top:3px}
 .team-schedule-view{display:grid;gap:16px}.team-schedule-filters{justify-content:space-between}.team-schedule-list{display:grid;gap:10px}.team-schedule-card{display:grid;grid-template-columns:170px minmax(0,1fr) 145px;align-items:center;gap:16px;width:100%;padding:16px 18px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);text-align:left;cursor:pointer}.team-schedule-card:hover{border-color:rgba(var(--accent-rgb),.34);background:rgba(var(--accent-rgb),.045)}.team-schedule-card__week{color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}.team-schedule-card__matchup{display:flex;align-items:center;gap:12px}.team-schedule-card__matchup div,.team-schedule-card__result{display:grid;gap:3px}.team-schedule-card small{color:var(--muted)}.team-schedule-card__result{text-align:right}.team-schedule-card.is-final .team-schedule-card__result strong{color:#d9e2f2}.team-schedule-card.is-live{border-color:rgba(50,213,131,.38)}.team-schedule-card.is-live .team-schedule-card__result strong{color:#76e5aa}.team-schedule-card.is-upcoming .team-schedule-card__result strong{color:#bcaaff}
 @media(max-width:760px){.team-schedule-card{grid-template-columns:1fr;gap:10px}.team-schedule-card__result{text-align:left}.team-schedule-filters{display:grid}.football-formation--offense,.football-formation--defense{min-width:1080px}}
+
+
+/* v5.5.3a — Depth chart development colors and schedule focus hotfix */
+.football-formation{gap:22px 16px;padding:30px 26px 48px}
+.football-formation--offense{
+  grid-template-columns:repeat(8,minmax(132px,1fr));
+  grid-template-areas:
+    ". lt lg c rg rt te ."
+    "wr1 . . . . . . wr2"
+    ". . . qb qb . . ."
+    ". . . rb rb fb . .";
+  min-width:1240px
+}
+.football-formation--defense{
+  grid-template-columns:repeat(8,minmax(132px,1fr));
+  grid-template-areas:
+    ". . . s s . . ."
+    ". . lolb mlb mlb rolb . ."
+    "cb1 le dt1 dt2 dt2 re cb2 cb2";
+  min-width:1240px
+}
+.formation-position{min-height:154px}
+.formation-stack--clean{max-width:172px}
+.formation-stack--clean .formation-player-card--front{min-height:128px;padding:18px 15px}
+.formation-player-card--front strong{font-size:15px;line-height:1.22;padding-right:46px}
+.formation-player-card--front small{font-size:12px;line-height:1.35}
+.formation-player-card__ovr{min-width:44px;height:40px;font-size:16px}
+.formation-backup-stack{margin:9px 6px 0;gap:5px}
+.formation-backup-card{grid-template-columns:20px minmax(0,1fr) 30px;min-height:40px;padding:6px 8px;border-radius:8px}
+.formation-backup-card+ .formation-backup-card{margin-top:0}
+.formation-backup-card span{font-size:9px}
+.formation-backup-card strong{font-size:10px;line-height:1.15}
+.formation-backup-card b{font-size:10px}
+
+/* Development trait colors remain visible for starters and backups. */
+.formation-player-card--front.formation-dev--xfactor,
+.formation-backup-card.formation-dev--xfactor{background:linear-gradient(145deg,#6d2429,#3e171b);border-color:rgba(255,107,113,.62);color:#fff}
+.formation-player-card--front.formation-dev--superstar,
+.formation-backup-card.formation-dev--superstar{background:linear-gradient(145deg,#6a531d,#3a2d10);border-color:rgba(255,211,92,.64);color:#fff8d8}
+.formation-player-card--front.formation-dev--star,
+.formation-backup-card.formation-dev--star{background:linear-gradient(145deg,#596273,#333946);border-color:rgba(216,226,242,.62);color:#f5f8ff}
+.formation-player-card--front.formation-dev--normal{background:linear-gradient(145deg,#27344b,#1d2739);border-color:rgba(158,177,214,.28)}
+.formation-backup-card.formation-dev--normal{background:#151e2d;border-color:rgba(120,139,173,.22)}
+
+/* Selected cards keep their development identity while receiving a clear focus ring. */
+.formation-player-card--front.is-selected,
+.formation-backup-card.is-selected{box-shadow:0 0 0 3px rgba(174,151,255,.48),0 14px 32px rgba(0,0,0,.38);border-color:#d0c3ff;filter:brightness(1.16)}
+.formation-player-card--front.is-selected{transform:translateY(-2px)}
+
+@media(max-width:760px){
+  .football-formation--offense,.football-formation--defense{min-width:1180px}
+  .formation-stack--clean{max-width:164px}
+}
