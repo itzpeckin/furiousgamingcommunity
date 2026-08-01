@@ -757,11 +757,18 @@
   function schoolAbbreviation(value) {
     const school = String(value || '').trim();
     if (!school || school === '—') return '—';
-    if (/^[A-Z0-9&.-]{2,6}$/.test(school)) return school;
-    const ignored = new Set(['of','the','at','and']);
-    const parts = school.replace(/[^A-Za-z0-9 ]+/g,' ').split(/\s+/).filter(Boolean);
-    const initials = parts.filter(part => !ignored.has(part.toLowerCase())).map(part => part[0]).join('').toUpperCase();
-    return initials.slice(0,5) || school.slice(0,5).toUpperCase();
+    const normalized = school.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    const known = {
+      'oklahoma':'OKL','ohio state':'OSU','alabama':'ALA','georgia':'UGA','texas':'TEX','lsu':'LSU',
+      'louisiana state':'LSU','michigan':'MCH','oregon':'ORE','clemson':'CLE','penn state':'PSU',
+      'florida state':'FSU','usc':'USC','southern california':'USC','notre dame':'NDM','tennessee':'TEN',
+      'washington':'WAS','miami':'MIA','ucla':'UCL','tcu':'TCU','auburn':'AUB','baylor':'BAY',
+      'oklahoma state':'OKS','texas a m':'TAM','texas a&m':'TAM','virginia tech':'VTK','kansas state':'KSU'
+    };
+    if (known[normalized]) return known[normalized];
+    const compact = school.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+    if (compact.length >= 3) return compact.slice(0,3);
+    return compact.padEnd(3,'X');
   }
 
   function rosterGroupForPlayer(player) {
@@ -805,7 +812,19 @@
       const ordered = [...list];
       const selectedIndex = ordered.findIndex(player => player.id === state.depthSelectedPlayer);
       if (selectedIndex > 0) ordered.unshift(...ordered.splice(selectedIndex,1));
-      return `<section class="formation-position" style="grid-area:${area}"><span class="formation-position__label">${label}</span><div class="formation-stack" style="--stack-count:${Math.min(ordered.length,4)}">${ordered.slice(0,4).map((player,index)=>`<button class="formation-player-card ${state.depthSelectedPlayer===player.id?'is-selected':''}" style="--stack-index:${index};z-index:${10-index}" data-depth-player-id="${escapeHtml(player.id||'')}"><span class="formation-player-card__ovr">${player.overall ?? '—'}</span><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.dev)} · ${index===0?'Starter':`Depth ${player.depth ?? index+1}`}</small></button>`).join('')}</div></section>`;
+      const active = ordered[0];
+      const backups = ordered.slice(1,4);
+      return `<section class="formation-position" style="grid-area:${area}">
+        <span class="formation-position__label">${label}</span>
+        <div class="formation-stack formation-stack--clean">
+          <button class="formation-player-card formation-player-card--front ${state.depthSelectedPlayer===active.id?'is-selected':''}" data-depth-player-id="${escapeHtml(active.id||'')}">
+            <span class="formation-player-card__ovr">${active.overall ?? '—'}</span>
+            <strong>${escapeHtml(active.name)}</strong>
+            <small>${escapeHtml(active.dev)} · ${active.depth===1?'Starter':`Depth ${active.depth ?? 1}`}</small>
+          </button>
+          ${backups.length?`<div class="formation-backup-stack">${backups.map((player,index)=>`<button class="formation-backup-card" data-depth-player-id="${escapeHtml(player.id||'')}" aria-label="Show ${escapeHtml(player.name)}"><span>${index+2}</span><strong>${escapeHtml(player.name)}</strong><b>${player.overall ?? '—'}</b></button>`).join('')}</div>`:''}
+        </div>
+      </section>`;
     };
     const wr = byPosition('WR');
     const cb = byPosition('CB');
@@ -817,7 +836,7 @@
     const defense = [
       stackMarkup('S',safeties,'s'), stackMarkup('LOLB',byPosition('LOLB'),'lolb'), stackMarkup('ILB',byPosition('MLB'),'mlb'), stackMarkup('ROLB',byPosition('ROLB'),'rolb'), stackMarkup('CB1',split(cb,0),'cb1'), stackMarkup('EDGE',byPosition('LE'),'le'), stackMarkup('DT1',split(dt,0),'dt1'), stackMarkup('DT2',split(dt,1),'dt2'), stackMarkup('EDGE',byPosition('RE'),'re'), stackMarkup('CB2',split(cb,1),'cb2')
     ].join('');
-    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Click a stacked backup to bring it forward. Click the front card again to open the full player card.</p></div></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div></div></article>`;
+    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Click a backup strip to bring that player forward. Click the front card again to open the full player card.</p></div></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div></div></article>`;
   }
 
   function openRosterPlayerDetail(playerId) {
@@ -908,9 +927,10 @@
   function summaryStatBox(label,value) { return `<div class="stat-box"><span>${label}</span><strong>${value}</strong></div>`; }
 
   function renderTeamCap(team, roster) {
-    const sorted = [...roster].sort((a,b)=>b.capHit-a.capHit);
-    const total = roster.reduce((sum,p)=>sum+p.capHit,0);
-    return `<div class="content-grid"><article class="card"><div class="card-header"><div><span class="eyebrow">Financial overview</span><h3>Salary cap</h3></div></div><div class="card-body"><div class="stat-box-grid">${summaryStatBox('Cap Space',formatMoney(team.cap))}${summaryStatBox('Active Commitments',formatMoney(total))}${summaryStatBox('Largest Cap Hit',formatMoney(sorted[0].capHit))}${summaryStatBox('Expiring Deals',roster.filter(p=>p.years===1).length)}</div></div></article><article class="card"><div class="card-header"><div><span class="eyebrow">Largest contracts</span><h3>Top cap hits</h3></div></div><div class="table-wrap"><table><thead><tr><th>Player</th><th>Years</th><th>Salary</th><th>Cap Hit</th></tr></thead><tbody>${sorted.slice(0,8).map(player=>`<tr class="clickable-row" data-player-id="${player.id}"><td>${renderPlayerIdentity(player,false)}</td><td>${player.years}</td><td>${formatMoney(player.salary)}</td><td><strong>${formatMoney(player.capHit)}</strong></td></tr>`).join('')}</tbody></table></div></article></div>`;
+    const sorted = [...roster].sort((a,b)=>(Number(b.capHit)||0)-(Number(a.capHit)||0)||String(a.name).localeCompare(String(b.name)));
+    const total = roster.reduce((sum,p)=>sum+(Number(p.capHit)||0),0);
+    const largest = sorted[0]?.capHit || 0;
+    return `<div class="content-grid content-grid--cap"><article class="card"><div class="card-header"><div><span class="eyebrow">Financial overview</span><h3>Salary cap</h3></div></div><div class="card-body"><div class="stat-box-grid">${summaryStatBox('Cap Space',formatMoney(team.cap))}${summaryStatBox('Active Commitments',formatMoney(total))}${summaryStatBox('Largest Cap Hit',formatMoney(largest))}${summaryStatBox('Expiring Deals',roster.filter(p=>p.years===1).length)}</div></div></article><article class="card cap-roster-card"><div class="card-header"><div><span class="eyebrow">Full roster salaries</span><h3>Player contracts</h3></div><span class="pill pill--neutral">${sorted.length} players</span></div><div class="table-wrap"><table class="cap-roster-table"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Years</th><th>Salary</th><th>Cap Hit</th></tr></thead><tbody>${sorted.map(player=>`<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(schoolAbbreviation(player.college))}</small></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.years || '—'}</td><td>${player.salary ? formatMoney(player.salary) : 'Not provided'}</td><td><strong>${player.capHit ? formatMoney(player.capHit) : 'Not provided'}</strong></td></tr>`).join('')}</tbody></table></div></article></div>`;
   }
 
   function renderPlayers() {

@@ -3256,3 +3256,22 @@ table td{
 .formation-player-card__ovr{position:absolute;top:7px;right:7px;display:grid;place-items:center;min-width:25px;height:23px;padding:0 5px;border-radius:7px;background:rgba(var(--accent-rgb),.17);font-size:9px;font-weight:900}
 @media(max-width:1100px){.madden-depth-card .card-body{overflow-x:auto}.football-formation{min-width:980px}}
 @media(max-width:760px){.roster-player-inline{min-width:220px}.roster-player-inline__identity strong{max-width:140px}}
+
+/* v5.5.2 — Roster Experience Polish */
+.formation-position{min-height:132px}
+.formation-stack--clean{position:relative;width:100%;max-width:148px;height:auto;display:flex;flex-direction:column;align-items:stretch}
+.formation-stack--clean .formation-player-card--front{position:relative;inset:auto;transform:none;width:100%;min-height:74px;z-index:5}
+.formation-stack--clean .formation-player-card--front.is-selected{transform:none}
+.formation-backup-stack{display:flex;flex-direction:column;gap:3px;margin:-2px 8px 0;position:relative;z-index:4}
+.formation-backup-card{display:grid;grid-template-columns:18px minmax(0,1fr) 25px;align-items:center;gap:5px;min-height:24px;padding:3px 6px;border:1px solid var(--border);border-top:0;border-radius:0 0 7px 7px;background:color-mix(in srgb,var(--surface-2) 86%,#000);color:var(--text);cursor:pointer;box-shadow:0 5px 10px rgba(0,0,0,.2)}
+.formation-backup-card+ .formation-backup-card{margin-top:-2px}
+.formation-backup-card:hover{border-color:rgba(var(--accent-rgb),.55);background:rgba(var(--accent-rgb),.11)}
+.formation-backup-card span{font-size:7px;color:var(--muted);font-weight:900}
+.formation-backup-card strong{font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.formation-backup-card b{font-size:7px;text-align:right}
+.cap-roster-card{grid-column:1/-1;overflow:hidden}
+.cap-roster-table{min-width:760px}
+.cap-roster-table td:first-child{display:flex;flex-direction:column;gap:2px;min-width:180px}
+.cap-roster-table td:first-child small{font-size:9px;color:var(--muted)}
+.content-grid--cap{grid-template-columns:1fr}
+@media(max-width:1100px){.formation-position{min-height:126px}}
