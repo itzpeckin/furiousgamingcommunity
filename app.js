@@ -42,6 +42,8 @@
     playerMaxAge: 45,
     playerSort: 'overall-desc',
     standingsView: 'division',
+    confidenceStandingsView: 'season',
+    confidenceStandingsWeek: 1,
     statsCategory: 'passing',
     scheduleWeek: 8,
     scheduleTeam: 'All',
@@ -1146,34 +1148,50 @@
     return { week, opponent:opponent.abbr, primary:`${1+base%4} FGM`, secondary:`${base%2} XP`, fantasy:3+base/10 };
   }
 
+  function standingsService() {
+    return window.FranchiseHQ?.modules?.league?.standings || window.FranchiseHQ?.leagueStandings || null;
+  }
+
   function renderStandings() {
-    const tabs = [['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture']];
+    const service=standingsService();
+    if(!service){pageContent.innerHTML='<div class="empty-state"><h2>Standings unavailable</h2><p>The standings service has not loaded.</p></div>';return;}
+    const season=scheduleService()?.getSeason?.()||{id:leagueYear(),currentWeek:state.scheduleWeek};
+    const tabs = [['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture'],['confidence','Confidence Pool']];
     pageContent.innerHTML = `
-      <div class="page-heading"><div><span class="eyebrow">Season 4 · Through Week 7</span><h1>Standings</h1><p>Track every division race, conference seed, scoring margin, streak, and projected playoff position.</p></div><div class="heading-actions"><div class="segmented-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${state.standingsView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div>
+      <div class="page-heading"><div><span class="eyebrow">Season ${season.id} · Through Week ${season.currentWeek}</span><h1>Standings</h1><p>League races and Confidence Pool rankings powered by completed game results.</p></div><div class="heading-actions"><div class="segmented-tabs standings-primary-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${state.standingsView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div>
       <div data-standings-content>${renderStandingsContent()}</div>`;
   }
 
   function renderStandingsContent() {
-    if (state.standingsView==='league') return renderStandingsTable([...teams].sort(sortStandings),true);
-    if (state.standingsView==='conference') return `<div class="content-grid content-grid--equal">${['AFC','NFC'].map(conf=>`<article class="card"><div class="card-header"><div><span class="eyebrow">Conference rankings</span><h3>${conf}</h3></div></div>${renderStandingsTable(teams.filter(t=>t.conference===conf).sort(sortStandings),false,true)}</article>`).join('')}</div>`;
+    const service=standingsService();
+    if(state.standingsView==='confidence') return renderConfidenceStandings();
+    if (state.standingsView==='league') return renderStandingsTable(service.getStandings(),true,true);
+    if (state.standingsView==='conference') {const groups=service.getConferenceStandings();return `<div class="content-grid content-grid--equal">${['AFC','NFC'].map(conf=>`<article class="card"><div class="card-header"><div><span class="eyebrow">Conference rankings</span><h3>${conf}</h3></div></div>${renderStandingsTable(groups[conf]||[],false,true)}</article>`).join('')}</div>`;}
     if (state.standingsView==='playoffs') return renderPlayoffPicture();
-    const divisions = ['East','North','South','West'];
-    return `<div class="division-grid">${['AFC','NFC'].flatMap(conf=>divisions.map(div=>{
-      const group=teams.filter(t=>t.conference===conf&&t.division===div).sort(sortStandings);
-      return `<article class="card division-card"><div class="card-header"><div><span class="eyebrow">${conf}</span><h3>${div}</h3></div><span class="pill pill--neutral">${group[0].record} leader</span></div>${renderStandingsTable(group,false,false)}</article>`;
-    })).join('')}</div>`;
+    const groups=service.getDivisionStandings();
+    return `<div class="division-grid">${Object.entries(groups).map(([name,group])=>`<article class="card division-card"><div class="card-header"><div><span class="eyebrow">${name.split(' ')[0]}</span><h3>${name.split(' ').slice(1).join(' ')}</h3></div><span class="pill pill--neutral">${group[0]?.record||'0-0'} leader</span></div>${renderStandingsTable(group,false,false)}</article>`).join('')}</div>`;
   }
 
   function renderStandingsTable(group, wrapped=true, seeded=false) {
-    const table = `<div class="table-wrap"><table><thead><tr>${seeded?'<th>Seed</th>':''}<th>Team</th><th>W</th><th>L</th><th>PF</th><th>PA</th><th>Diff</th><th>Streak</th></tr></thead><tbody>${group.map((team,index)=>`<tr class="clickable-row" data-team-id="${team.id}">${seeded?`<td><span class="seed">${index+1}</span></td>`:''}<td><div class="table-team">${renderTeamMark(team)}<div><strong>${team.fullName}</strong><small>${team.conference} ${team.division}</small></div></div></td><td><strong>${team.wins}</strong></td><td>${team.losses}</td><td>${team.pf}</td><td>${team.pa}</td><td class="${team.pf-team.pa>=0?'streak--win':'streak--loss'}">${team.pf-team.pa>=0?'+':''}${team.pf-team.pa}</td><td><span class="streak ${team.streak.startsWith('W')?'streak--win':'streak--loss'}">${team.streak}</span></td></tr>`).join('')}</tbody></table></div>`;
+    const table = `<div class="table-wrap"><table class="standings-service-table"><thead><tr>${seeded?'<th>Rank</th>':''}<th>Team</th><th>W</th><th>L</th><th>T</th><th>PCT</th><th>DIV</th><th>CONF</th><th>PF</th><th>PA</th><th>DIFF</th><th>STRK</th></tr></thead><tbody>${group.map((row,index)=>{const team=teamById(row.teamId)||{};return `<tr class="clickable-row" data-team-id="${row.teamId}">${seeded?`<td><span class="seed">${row.leagueRank||row.conferenceRank||index+1}</span></td>`:''}<td><div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(row.team||team.fullName||row.teamId)}</strong><small>${row.conference} ${row.division}</small></div></div></td><td><strong>${row.wins}</strong></td><td>${row.losses}</td><td>${row.ties}</td><td>${Number(row.winPct).toFixed(3).replace(/^0/,'')}</td><td>${row.divisionRecord}</td><td>${row.conferenceRecord}</td><td>${row.pointsFor}</td><td>${row.pointsAgainst}</td><td class="${row.pointDifferential>=0?'streak--win':'streak--loss'}">${row.pointDifferential>=0?'+':''}${row.pointDifferential}</td><td><span class="streak ${String(row.streak).startsWith('W')?'streak--win':String(row.streak).startsWith('L')?'streak--loss':''}">${row.streak}</span></td></tr>`}).join('')}</tbody></table></div>`;
     return wrapped?`<article class="card">${table}</article>`:table;
   }
 
   function renderPlayoffPicture() {
-    return `<div class="playoff-grid">${['AFC','NFC'].map(conf=>{
-      const ranked=teams.filter(t=>t.conference===conf).sort(sortStandings).slice(0,9);
-      return `<article class="card"><div class="card-header"><div><span class="eyebrow">Projected postseason</span><h3>${conf} Playoff Picture</h3></div><span class="pill pill--accent">7 teams qualify</span></div><div class="playoff-bracket">${ranked.map((team,index)=>`<div class="playoff-seed ${index===7?'playoff-cutline':''}" data-team-id="${team.id}"><span class="seed">${index+1}</span>${renderTeamMark(team)}<div><strong>${team.fullName}</strong><small style="display:block;color:var(--muted);font-size:9px">${index<4?'Division leader':index<7?'Wild card':'In the hunt'}</small></div><strong>${team.record}</strong></div>`).join('')}</div></article>`;
-    }).join('')}</div>`;
+    const picture=standingsService().getPlayoffPicture();
+    return `<div class="playoff-grid">${['AFC','NFC'].map(conf=>{const data=picture[conf]||{seeds:[],inHunt:[]};return `<article class="card"><div class="card-header"><div><span class="eyebrow">Projected postseason</span><h3>${conf} Playoff Picture</h3></div><span class="pill pill--accent">7 teams qualify</span></div><div class="playoff-bracket">${data.seeds.map(row=>{const team=teamById(row.teamId);return `<div class="playoff-seed" data-team-id="${row.teamId}"><span class="seed">${row.seed}</span>${renderTeamMark(team)}<div><strong>${escapeHtml(row.team)}</strong><small>${row.type}</small></div><strong>${row.record}</strong></div>`}).join('')}${data.inHunt.length?`<div class="playoff-cutline-label">In the hunt</div>${data.inHunt.map(row=>{const team=teamById(row.teamId);return `<div class="playoff-seed playoff-seed--hunt" data-team-id="${row.teamId}"><span class="seed">—</span>${renderTeamMark(team)}<div><strong>${escapeHtml(row.team)}</strong><small>${row.pointDifferential>=0?'+':''}${row.pointDifferential} differential</small></div><strong>${row.record}</strong></div>`}).join('')}`:''}</div></article>`}).join('')}</div>`;
+  }
+
+  function renderConfidenceStandings() {
+    const service=standingsService();
+    const seasonRows=service.getConfidencePoolStandings();
+    const maxWeek=Math.max(1,...(scheduleService()?.getAllGames?.()||[]).map(g=>Number(g.week)||1));
+    const weeklyRows=service.getConfidencePoolWeek(state.confidenceStandingsWeek);
+    const rows=state.confidenceStandingsView==='weekly'?weeklyRows:seasonRows;
+    return `<div class="confidence-standings-shell">
+      <article class="card confidence-standings-toolbar"><div><span class="eyebrow">Confidence Pool</span><h3>${state.confidenceStandingsView==='weekly'?`Week ${state.confidenceStandingsWeek} Results`:'Season Standings'}</h3><p>${state.confidenceStandingsView==='weekly'?'Compare points earned from completed games in the selected week.':'Track total points, correct picks, weekly wins, and remaining scoring potential.'}</p></div><div class="confidence-standings-controls"><div class="segmented-tabs"><button data-confidence-standings-view="season" class="${state.confidenceStandingsView==='season'?'is-active':''}">Season</button><button data-confidence-standings-view="weekly" class="${state.confidenceStandingsView==='weekly'?'is-active':''}">Weekly</button></div>${state.confidenceStandingsView==='weekly'?`<div class="week-nav compact"><button class="icon-button icon-button--small" data-confidence-standings-week="-1" ${state.confidenceStandingsWeek<=1?'disabled':''}>‹</button><strong>Week ${state.confidenceStandingsWeek}</strong><button class="icon-button icon-button--small" data-confidence-standings-week="1" ${state.confidenceStandingsWeek>=maxWeek?'disabled':''}>›</button></div>`:''}</div></article>
+      <article class="card"><div class="table-wrap"><table class="confidence-standings-table"><thead><tr>${state.confidenceStandingsView==='weekly'?'<th>Rank</th><th>Owner</th><th>Team</th><th>Points</th><th>Correct</th><th>Final Games</th><th>Status</th>':'<th>Rank</th><th>Owner</th><th>Team</th><th>Total Points</th><th>Correct</th><th>Weeks Won</th><th>Average</th><th>Best Week</th><th>Max Remaining</th><th>Status</th>'}</tr></thead><tbody>${rows.map(row=>{const team=teamById(row.teamId);return `<tr><td><span class="seed">${row.rank}</span></td><td><strong>${escapeHtml(row.name)}</strong></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<span>${team.abbr}</span></div>`:'—'}</td><td><strong>${state.confidenceStandingsView==='weekly'?row.points:row.totalPoints}</strong></td><td>${row.correctPicks}</td>${state.confidenceStandingsView==='weekly'?`<td>${row.finalGames}</td>`:`<td>${row.weeksWon}</td><td>${Number(row.averageWeeklyScore).toFixed(1)}</td><td>${row.bestWeek}</td><td>${row.remainingPossiblePoints}</td>`}<td><span class="pill ${row.status==='submitted'?'pill--success':'pill--neutral'}">${titleCase(row.status||'draft')}</span></td></tr>`}).join('')||`<tr><td colspan="${state.confidenceStandingsView==='weekly'?7:10}">No Confidence Pool entries have been saved yet.</td></tr>`}</tbody></table></div></article>
+    </div>`;
   }
 
   function renderStats() {
@@ -2282,6 +2300,10 @@
 
     const standingsView=event.target.closest('[data-standings-view]');
     if (standingsView) { state.standingsView=standingsView.dataset.standingsView; renderStandings(); return; }
+    const confidenceStandingsView=event.target.closest('[data-confidence-standings-view]');
+    if(confidenceStandingsView){state.confidenceStandingsView=confidenceStandingsView.dataset.confidenceStandingsView;renderStandings();return;}
+    const confidenceStandingsWeek=event.target.closest('[data-confidence-standings-week]');
+    if(confidenceStandingsWeek){state.confidenceStandingsWeek=clamp(state.confidenceStandingsWeek+Number(confidenceStandingsWeek.dataset.confidenceStandingsWeek),1,Math.max(1,...schedule.map(w=>w.week)));renderStandings();return;}
 
     const statsCategory=event.target.closest('[data-stats-category]');
     if (statsCategory) { state.statsCategory=statsCategory.dataset.statsCategory; renderStats(); return; }
