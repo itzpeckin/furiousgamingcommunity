@@ -721,6 +721,8 @@
       capHit: Number(contract.capHit ?? raw.capHit ?? raw.salary ?? 0) || 0,
       depth: player?.depthOrder ?? raw.depth ?? null,
       college: raw.college || raw.school || '—',
+      imageUrl: raw.imageUrl || raw.playerImageUrl || raw.headshotUrl || raw.headshot || raw.photoUrl || raw.photo || raw.portraitUrl || raw.portrait || player?.imageUrl || player?.headshotUrl || null,
+      imageAssetId: raw.imageAssetId || raw.portraitId || raw.headshotId || null,
       number: raw.number || raw.jerseyNumber || '—',
       height: raw.height || '—',
       weight: raw.weight || '—',
@@ -813,6 +815,30 @@
     </div>`;
   }
 
+  function depthPlayerImageMarkup(player) {
+    const imageUrl = String(player?.imageUrl || '').trim();
+    if (imageUrl) {
+      return `<span class="formation-player-card__image"><img src="${escapeHtml(imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.classList.add('is-placeholder');this.remove();"></span>`;
+    }
+    return `<span class="formation-player-card__image is-placeholder" aria-hidden="true"><svg><use href="#icon-user"></use></svg></span>`;
+  }
+
+  function scrollTeamTabsToTop() {
+    const tabs = pageContent?.querySelector?.('[data-team-tabs]');
+    if (!tabs) return;
+    requestAnimationFrame(() => {
+      const mainRect = mainContent?.getBoundingClientRect?.();
+      const tabsRect = tabs.getBoundingClientRect();
+      if (mainContent && mainRect) {
+        const nextTop = mainContent.scrollTop + tabsRect.top - mainRect.top - 12;
+        mainContent.scrollTo({ top: Math.max(0, nextTop), behavior: 'instant' });
+      } else {
+        const nextTop = window.scrollY + tabsRect.top - 12;
+        window.scrollTo({ top: Math.max(0, nextTop), left: 0, behavior: 'instant' });
+      }
+    });
+  }
+
   function renderRosterDepthChart(rosterModel) {
     const players = rosterModel.players.map(rosterPlayerView).sort((a,b)=>(Number(a.depth)||99)-(Number(b.depth)||99)||(Number(b.overall)||0)-(Number(a.overall)||0));
     const byPosition = position => players.filter(player => player.position === position);
@@ -829,6 +855,7 @@
         <span class="formation-position__label">${label}</span>
         <div class="formation-depth-card">
           <button type="button" class="formation-depth-card__starter ${depthDevelopmentClass(front.dev)} ${state.depthSelectedPlayer===front.id?'is-selected':''}" data-depth-player-id="${escapeHtml(front.id||'')}" aria-label="Show ${escapeHtml(front.name)}">
+            ${depthPlayerImageMarkup(front)}
             <span class="formation-player-card__ovr">${front.overall ?? '—'}</span>
             <strong>${escapeHtml(front.name)}</strong>
           </button>
@@ -2202,7 +2229,13 @@
     if (modalTeam) { const id=modalTeam.dataset.modalTeam; closeDetail(); setRoute(`teams/${id}`); return; }
 
     const teamTab=event.target.closest('[data-team-tab]');
-    if (teamTab) { state.teamTab=teamTab.dataset.teamTab; renderRoute(location.hash.slice(1)); return; }
+    if (teamTab) {
+      event.preventDefault();
+      state.teamTab=teamTab.dataset.teamTab;
+      renderRoute(location.hash.slice(1));
+      scrollTeamTabsToTop();
+      return;
+    }
 
     const featureGame=event.target.closest('[data-feature-game]');
     if (featureGame) { state.featuredGameId=featureGame.dataset.featureGame; renderLeagueHome(); return; }
