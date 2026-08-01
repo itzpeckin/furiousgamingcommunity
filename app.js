@@ -45,6 +45,8 @@
     statsCategory: 'passing',
     scheduleWeek: 8,
     scheduleTeam: 'All',
+    scheduleSection: 'schedule',
+    confidenceWeek: 1,
     newsCategory: 'All',
     teamTab: 'roster',
     rosterGroup: 'All',
@@ -1215,17 +1217,45 @@
     return `<article class="leader-card card" data-rank="${rank}" data-player-id="${player.id}"><div class="leader-card__top"><span class="rank-number">#${rank}</span><span class="pill pill--neutral">${player.position}</span></div><div class="leader-card__player"><span class="player-avatar" style="${teamStyle(team)}">${player.initials}</span><div><strong>${escapeHtml(player.name)}</strong><span>${team.abbr} · ${player.overall} OVR</span></div></div><strong class="leader-value">${leader.value}<small>${leader.label}</small></strong></article>`;
   }
 
+  function scheduleService() { return window.FranchiseHQ?.modules?.league?.games || window.FranchiseHQ?.leagueGames || null; }
+
+  function confidencePoolModel() {
+    const service=scheduleService();
+    if(!service) return null;
+    const current=window.FGC_TRADE?.getCurrentAccount?.() || {id:'commissioner',handle:'Commissioner',teamId:'dal'};
+    return {service,current,config:service.confidence.config(),entry:service.confidence.getEntry(current.id)};
+  }
+
+  function renderConfidencePicks() {
+    const model=confidencePoolModel();
+    if(!model) return `<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Confidence Pool loading</h3><p>The Season & Games service is still initializing.</p></div></article>`;
+    const {service,current,config,entry}=model;
+    const week=service.getWeek(state.confidenceWeek);
+    const locked=config.status!=='open';
+    const validation=service.confidence.validateEntry(current.id);
+    return `<div class="confidence-pool-shell">
+      <article class="card confidence-pool-status"><div><span class="eyebrow">Season ${config.season} Confidence Pool</span><h2>${locked?'Submissions Locked':'Season Picks Open'}</h2><p>Complete every regular-season week before the Commissioner closes the season entry window. Confidence values reset within each week.</p></div><div class="confidence-status-actions"><span class="pill ${locked?'pill--warning':'pill--success'}">${locked?'Locked':'Open'}</span><strong>${validation.picked} / ${validation.totalGames}</strong><small>games picked</small></div></article>
+      <div class="week-control confidence-week-control"><div class="week-nav"><button class="icon-button icon-button--small" data-confidence-week-change="-1" ${state.confidenceWeek<=1?'disabled':''}><svg style="transform:rotate(90deg)"><use href="#icon-chevron"></use></svg></button><div class="week-label"><strong>Week ${state.confidenceWeek}</strong><span>${week.games.length} confidence values</span></div><button class="icon-button icon-button--small" data-confidence-week-change="1" ${state.confidenceWeek>=schedule.length?'disabled':''}><svg style="transform:rotate(-90deg)"><use href="#icon-chevron"></use></svg></button></div><button class="button button--ghost" data-confidence-auto="${state.confidenceWeek}" ${locked?'disabled':''}>Auto-Assign Week</button><button class="button button--primary" data-confidence-submit ${locked?'disabled':''}>Submit Season Entry</button></div>
+      <div class="confidence-pick-list">${week.games.map(game=>{const away=teamById(game.awayId),home=teamById(game.homeId),pick=entry.picks?.[game.id]||{};return `<article class="card confidence-pick-card"><div class="confidence-matchup"><span>Week ${game.week}</span><strong>${away.abbr} @ ${home.abbr}</strong><small>${game.day} · ${game.time}</small></div><div class="confidence-team-choice"><button type="button" data-confidence-team="${game.id}:${away.id}" class="${pick.selectedTeamId===away.id?'is-selected':''}" ${locked?'disabled':''}>${renderTeamMark(away,'mini-team')}<span>${away.abbr}</span></button><button type="button" data-confidence-team="${game.id}:${home.id}" class="${pick.selectedTeamId===home.id?'is-selected':''}" ${locked?'disabled':''}>${renderTeamMark(home,'mini-team')}<span>${home.abbr}</span></button></div><label class="field confidence-value"><span>Confidence</span><select data-confidence-value="${game.id}" ${locked?'disabled':''}><option value="">—</option>${week.games.map((_,i)=>`<option value="${i+1}" ${Number(pick.confidence)===i+1?'selected':''}>${i+1}</option>`).join('')}</select></label></article>`}).join('')}</div>
+    </div>`;
+  }
+
+  function renderConfidenceResults() {
+    const service=scheduleService();
+    const board=service?.confidence?.leaderboard?.()||[];
+    return `<article class="card confidence-results"><div class="card-header"><div><span class="eyebrow">Season leaderboard preview</span><h3>Confidence Pool Results</h3></div></div><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Owner</th><th>Team</th><th>Points</th><th>Correct</th><th>Status</th></tr></thead><tbody>${board.map((row,i)=>`<tr><td><strong>#${i+1}</strong></td><td>${escapeHtml(row.name)}</td><td>${escapeHtml(teamById(row.teamId)?.abbr||'—')}</td><td><strong>${row.totalPoints}</strong></td><td>${row.correctPicks}</td><td><span class="pill ${row.status==='submitted'?'pill--success':'pill--neutral'}">${titleCase(row.status)}</span></td></tr>`).join('')||`<tr><td colspan="6">No Confidence Pool entries have been saved yet.</td></tr>`}</tbody></table></div></article>`;
+  }
+
   function renderSchedule() {
-    const week = schedule.find(item=>item.week===state.scheduleWeek) || schedule[7];
+    const service=scheduleService();
+    const maxWeek=service?.getSeason?.().currentWeek ? schedule.length : schedule.length;
+    const week = service?.getWeek?.(state.scheduleWeek) || schedule.find(item=>item.week===state.scheduleWeek) || schedule[0];
     const filtered = week.games.filter(game=>state.scheduleTeam==='All'||game.homeId===state.scheduleTeam||game.awayId===state.scheduleTeam);
+    const pool=service?.confidence?.config?.();
     pageContent.innerHTML = `
-      <div class="page-heading"><div><span class="eyebrow">Season 4 calendar</span><h1>Schedule & Results</h1><p>Move between weeks, filter by team, and open any matchup for a detailed game summary.</p></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Real advance dates will come from league settings when the backend is connected."><svg><use href="#icon-calendar"></use></svg>Advance calendar</button></div></div>
-      <div class="week-control">
-        <div class="week-nav"><button class="icon-button icon-button--small" data-week-change="-1" ${state.scheduleWeek===1?'disabled':''}><svg style="transform:rotate(90deg)"><use href="#icon-chevron"></use></svg></button><div class="week-label"><strong>Week ${state.scheduleWeek}</strong><span>${state.scheduleWeek<8?'Completed slate':state.scheduleWeek===8?'Current league week':'Upcoming slate'}</span></div><button class="icon-button icon-button--small" data-week-change="1" ${state.scheduleWeek===9?'disabled':''}><svg style="transform:rotate(-90deg)"><use href="#icon-chevron"></use></svg></button></div>
-        <label class="field"><span>Filter team</span><select data-schedule-team><option value="All">All teams</option>${teams.map(team=>`<option value="${team.id}" ${state.scheduleTeam===team.id?'selected':''}>${team.abbr} · ${team.fullName}</option>`).join('')}</select></label>
-        <div class="segmented-tabs">${[6,7,8,9].map(num=>`<button data-week="${num}" class="${state.scheduleWeek===num?'is-active':''}">Week ${num}</button>`).join('')}</div>
-      </div>
-      <div class="schedule-grid">${filtered.map(game=>renderGameCard(game)).join('')}</div>`;
+      <div class="page-heading"><div><span class="eyebrow">Season 4 calendar</span><h1>Schedule & Confidence Pool</h1><p>Review the league schedule, complete full-season predictions, and follow Confidence Pool results.</p></div></div>
+      <div class="schedule-section-tabs segmented-tabs"><button data-schedule-section="schedule" class="${state.scheduleSection==='schedule'?'is-active':''}">League Schedule</button><button data-schedule-section="picks" class="${state.scheduleSection==='picks'?'is-active':''}">My Season Picks</button><button data-schedule-section="results" class="${state.scheduleSection==='results'?'is-active':''}">Pool Results</button>${pool?`<span class="pill ${pool.status==='open'?'pill--success':'pill--warning'}">Picks ${titleCase(pool.status)}</span>`:''}</div>
+      ${state.scheduleSection==='picks'?renderConfidencePicks():state.scheduleSection==='results'?renderConfidenceResults():`<div class="week-control"><div class="week-nav"><button class="icon-button icon-button--small" data-week-change="-1" ${state.scheduleWeek===1?'disabled':''}><svg style="transform:rotate(90deg)"><use href="#icon-chevron"></use></svg></button><div class="week-label"><strong>Week ${state.scheduleWeek}</strong><span>${state.scheduleWeek<8?'Completed slate':state.scheduleWeek===8?'Current league week':'Upcoming slate'}</span></div><button class="icon-button icon-button--small" data-week-change="1" ${state.scheduleWeek===maxWeek?'disabled':''}><svg style="transform:rotate(-90deg)"><use href="#icon-chevron"></use></svg></button></div><label class="field"><span>Filter team</span><select data-schedule-team><option value="All">All teams</option>${teams.map(team=>`<option value="${team.id}" ${state.scheduleTeam===team.id?'selected':''}>${team.abbr} · ${team.fullName}</option>`).join('')}</select></label><div class="segmented-tabs">${schedule.map(item=>`<button data-week="${item.week}" class="${state.scheduleWeek===item.week?'is-active':''}">Week ${item.week}</button>`).join('')}</div></div><div class="schedule-grid">${filtered.map(game=>renderGameCard(game)).join('')}</div>`}`;
   }
 
   function renderGameCard(game, perspectiveTeamId=null) {
@@ -2256,6 +2286,16 @@
     const statsCategory=event.target.closest('[data-stats-category]');
     if (statsCategory) { state.statsCategory=statsCategory.dataset.statsCategory; renderStats(); return; }
 
+    const scheduleSection=event.target.closest('[data-schedule-section]');
+    if(scheduleSection){state.scheduleSection=scheduleSection.dataset.scheduleSection;renderSchedule();return;}
+    const confidenceWeekChange=event.target.closest('[data-confidence-week-change]');
+    if(confidenceWeekChange){state.confidenceWeek=clamp(state.confidenceWeek+Number(confidenceWeekChange.dataset.confidenceWeekChange),1,schedule.length);renderSchedule();return;}
+    const confidenceTeam=event.target.closest('[data-confidence-team]');
+    if(confidenceTeam){const [gameId,teamId]=confidenceTeam.dataset.confidenceTeam.split(':');const select=document.querySelector(`[data-confidence-value="${gameId}"]`);const value=Number(select?.value)||1;const result=scheduleService()?.confidence?.savePick(gameId,teamId,value);if(!result?.ok)showToast('Pick not saved',result?.error||'Unable to save pick.');renderSchedule();return;}
+    const confidenceAuto=event.target.closest('[data-confidence-auto]');
+    if(confidenceAuto){const result=scheduleService()?.confidence?.autoAssign(Number(confidenceAuto.dataset.confidenceAuto));showToast(result?.ok?'Week auto-assigned':'Unable to assign',result?.error||`Week ${state.confidenceWeek} confidence values were assigned.`);renderSchedule();return;}
+    if(event.target.closest('[data-confidence-submit]')){const result=scheduleService()?.confidence?.submit();showToast(result?.ok?'Season entry submitted':'Entry incomplete',result?.error||'Your full-season Confidence Pool entry is complete.');renderSchedule();return;}
+
     const weekButton=event.target.closest('[data-week]');
     if (weekButton) { state.scheduleWeek=Number(weekButton.dataset.week); renderSchedule(); return; }
 
@@ -2336,6 +2376,7 @@
     if (event.target.matches('[data-player-dev]')) { state.playerDev=event.target.value; refreshPlayerTable(); }
     if (event.target.matches('[data-player-sort]')) { state.playerSort=event.target.value; refreshPlayerTable(); }
     if (event.target.matches('[data-schedule-team]')) { state.scheduleTeam=event.target.value; renderSchedule(); }
+    if (event.target.matches('[data-confidence-value]')) { const gameId=event.target.dataset.confidenceValue; const card=event.target.closest('.confidence-pick-card'); const selected=card?.querySelector('[data-confidence-team].is-selected')?.dataset.confidenceTeam?.split(':')[1]; if(selected){ const result=scheduleService()?.confidence?.savePick(gameId,selected,Number(event.target.value)); if(!result?.ok) showToast('Confidence not saved',result?.error||'Choose another confidence value.'); } renderSchedule(); }
   });
 
   document.addEventListener('keydown', event => {
