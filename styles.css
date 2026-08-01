@@ -3711,3 +3711,7 @@ table td{
 
 /* v5.6.1a */
 .confidence-window-controls{display:grid;grid-template-columns:repeat(2,minmax(0,180px));gap:12px;margin:16px 0}.mobile-source-recovery{margin-top:14px}@media(max-width:720px){.confidence-window-controls{grid-template-columns:1fr}.league-data-empty-state .mobile-source-recovery,.league-data-empty-state [data-use-development-device]{width:100%;margin-top:14px}.confidence-week-actions{display:grid;grid-template-columns:1fr 1fr}.confidence-week-actions .button{width:100%}}
+
+/* v5.6.1b — Commissioner HQ Navigation & Schedule Cleanup */
+.week-control--compact{grid-template-columns:minmax(260px,.7fr) minmax(260px,1fr);align-items:end}
+@media(max-width:760px){.week-control--compact{grid-template-columns:1fr}}
