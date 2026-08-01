@@ -456,6 +456,8 @@ function renderCommissionerImport(){
  <div class="commissioner-confirm-modal" data-publish-confirm aria-hidden="true"><div class="commissioner-confirm-backdrop" data-close-publish-confirm></div><section class="commissioner-confirm-dialog" role="dialog" aria-modal="true"><div><span class="eyebrow">Final confirmation</span><h2>Publish Week ${commissionerOps.currentWeek+1}?</h2><p>This will save the validated import, mark core weekly operations complete, and advance Franchise HQ from Week ${commissionerOps.currentWeek} to Week ${commissionerOps.currentWeek+1}.</p></div><div class="commissioner-confirm-summary"><span><small>File</small><strong>${escapeHtml(draft?.file||'No file')}</strong></span><span><small>Validation</small><strong>${validations.filter(v=>v.value).length}/${validations.length} passed</strong></span><span><small>Warnings</small><strong>${warnings.length}</strong></span></div><div class="commissioner-confirm-actions"><button class="button button--ghost" data-close-publish-confirm>Cancel</button><button class="button button--primary" data-publish-import>Publish & Advance</button></div></section></div>`}
 function renderCommissionerTeams(){
  const users=ownershipState.directory.filter(u=>u.role!=='committee');
+ const ownerRankings=window.FranchiseHQ?.leagueGames?.confidence?.getOwnerRankings?.()||[];
+ const ownerRankingByTeam=new Map(ownerRankings.map(item=>[item.teamId,item]));
  return`<div class="ownership-summary-grid">
    <article class="metric-card card"><span class="metric-label">Assigned franchises</span><strong class="metric-value">${ownershipAssignedCount()}</strong><small>32 total teams</small></article>
    <article class="metric-card card"><span class="metric-label">CPU franchises</span><strong class="metric-value">${Object.values(ownershipState.assignments).filter(a=>a.control==='cpu').length}</strong><small>Not user-controlled</small></article>
@@ -464,11 +466,12 @@ function renderCommissionerTeams(){
  </div>
  <section class="card commissioner-teams-card">
    <div class="card-header"><div><span class="eyebrow">League identity and ownership</span><h2>Teams & Owners</h2><p>Assign users, manage control type, link Discord identity, and configure franchise branding.</p></div><label class="field commissioner-team-search"><span>Search</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-commissioner-team-search placeholder="Team, owner, or role..."></div></label></div>
-   <div class="ownership-table-head"><span>Franchise</span><span>Assigned identity</span><span>Control</span><span>Role</span><span>Discord</span><span></span></div>
+   <div class="ownership-table-head"><span>Franchise</span><span>Assigned identity</span><span>Rank</span><span>Control</span><span>Role</span><span>Discord</span><span></span></div>
    <div class="commissioner-team-table ownership-team-table" data-commissioner-team-table>
      ${teams.map(t=>{const a=assignmentFor(t.id),u=directoryUser(a.ownerId);return`<div class="commissioner-team-row ownership-team-row" data-commissioner-team-row="${escapeHtml(`${t.fullName} ${u?.handle||'unassigned'} ${a.role}`.toLowerCase())}">
        <span>${renderTeamMark({...t,primary:a.primary||t.primary,secondary:a.secondary||t.secondary},'team-logo')}<span><strong>${escapeHtml(a.brandName||t.fullName)}</strong><small>${t.conference} ${t.division}</small></span></span>
        <span><strong>${escapeHtml(u?.handle||'Unassigned')}</strong><small>${escapeHtml(u?.name||'No league member')}</small></span>
+       <span class="owner-power-rank" title="Commissioner-only historical team-owner ranking">#${ownerRankingByTeam.get(t.id)?.rank||'—'}</span>
        <select data-ownership-control="${t.id}"><option value="user" ${a.control==='user'?'selected':''}>User</option><option value="cpu" ${a.control==='cpu'?'selected':''}>CPU</option></select>
        <select data-ownership-role="${t.id}" ${a.control==='cpu'?'disabled':''}><option value="owner" ${a.role==='owner'?'selected':''}>Team Owner</option><option value="co-commissioner" ${a.role==='co-commissioner'?'selected':''}>Co-Commissioner</option><option value="commissioner" ${a.role==='commissioner'?'selected':''}>Commissioner</option></select>
        <button class="discord-status discord-status--${a.discord}" data-toggle-discord="${t.id}"><span></span>${a.discord==='connected'?'Connected':'Not connected'}</button>
