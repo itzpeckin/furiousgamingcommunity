@@ -51,6 +51,7 @@
     rosterPosition: 'All',
     rosterDev: 'All',
     depthSelectedPlayer: null,
+    teamSchedulePhase: 'regular',
     activityFilter: 'all',
     featuredGameId: null,
     homeLeaderMetrics: {
@@ -717,7 +718,8 @@
       weight: raw.weight || '—',
       tradeBlock: Boolean(raw.tradeBlock),
       initials: raw.initials || String(player?.name || '?').split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase(),
-      ratings: player?.ratings || raw.ratings || {}
+      ratings: player?.ratings || raw.ratings || {},
+      stats: player?.stats || raw.stats || {}
     };
   }
 
@@ -813,16 +815,16 @@
       const selectedIndex = ordered.findIndex(player => player.id === state.depthSelectedPlayer);
       if (selectedIndex > 0) ordered.unshift(...ordered.splice(selectedIndex,1));
       const active = ordered[0];
-      const backups = ordered.slice(1,4);
+      const backups = ordered.slice(1,5);
       return `<section class="formation-position" style="grid-area:${area}">
         <span class="formation-position__label">${label}</span>
         <div class="formation-stack formation-stack--clean">
-          <button class="formation-player-card formation-player-card--front ${state.depthSelectedPlayer===active.id?'is-selected':''}" data-depth-player-id="${escapeHtml(active.id||'')}">
+          <button type="button" class="formation-player-card formation-player-card--front ${state.depthSelectedPlayer===active.id?'is-selected':''}" data-depth-player-id="${escapeHtml(active.id||'')}">
             <span class="formation-player-card__ovr">${active.overall ?? '—'}</span>
             <strong>${escapeHtml(active.name)}</strong>
             <small>${escapeHtml(active.dev)} · ${active.depth===1?'Starter':`Depth ${active.depth ?? 1}`}</small>
           </button>
-          ${backups.length?`<div class="formation-backup-stack">${backups.map((player,index)=>`<button class="formation-backup-card" data-depth-player-id="${escapeHtml(player.id||'')}" aria-label="Show ${escapeHtml(player.name)}"><span>${index+2}</span><strong>${escapeHtml(player.name)}</strong><b>${player.overall ?? '—'}</b></button>`).join('')}</div>`:''}
+          ${backups.length?`<div class="formation-backup-stack">${backups.map((player,index)=>`<button type="button" class="formation-backup-card ${state.depthSelectedPlayer===player.id?'is-selected':''}" data-depth-player-id="${escapeHtml(player.id||'')}" aria-label="Show ${escapeHtml(player.name)}"><span>${index+2}</span><strong>${escapeHtml(player.name)}</strong><b>${player.overall ?? '—'}</b></button>`).join('')}</div>`:''}
         </div>
       </section>`;
     };
@@ -836,7 +838,7 @@
     const defense = [
       stackMarkup('S',safeties,'s'), stackMarkup('LOLB',byPosition('LOLB'),'lolb'), stackMarkup('ILB',byPosition('MLB'),'mlb'), stackMarkup('ROLB',byPosition('ROLB'),'rolb'), stackMarkup('CB1',split(cb,0),'cb1'), stackMarkup('EDGE',byPosition('LE'),'le'), stackMarkup('DT1',split(dt,0),'dt1'), stackMarkup('DT2',split(dt,1),'dt2'), stackMarkup('EDGE',byPosition('RE'),'re'), stackMarkup('CB2',split(cb,1),'cb2')
     ].join('');
-    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Click a backup strip to bring that player forward. Click the front card again to open the full player card.</p></div></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div></div></article>`;
+    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Select a backup to bring it forward. Click the selected front card again to open the full player card.</p></div></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div></div></article>`;
   }
 
   function openRosterPlayerDetail(playerId) {
@@ -883,7 +885,7 @@
     if (!rosterModel) return `<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>Roster service unavailable</h2><p>The Roster Read Model has not loaded.</p></div></article>`;
     if (state.teamTab === 'depth') return renderRosterDepthChart(rosterModel);
     if (state.teamTab === 'schedule') return renderTeamSchedule(team, teamGames);
-    if (state.teamTab === 'stats') return renderTeamStats(team, leaders);
+    if (state.teamTab === 'stats') return renderTeamStats(team, roster);
     if (state.teamTab === 'cap') return renderTeamCap(team, roster);
     return renderRosterExperience(team, rosterModel);
   }
@@ -916,12 +918,79 @@
     }).join('')}</div></div></article>`;
   }
 
-  function renderTeamSchedule(team, teamGames) {
-    return `<div class="schedule-grid">${teamGames.slice(0,9).map(game => renderGameCard(game,team.id)).join('')}</div>`;
+  function currentLeaguePhase() {
+    return { phase: 'regular', week: 8 };
   }
 
-  function renderTeamStats(team, leaders) {
-    return `<div class="content-grid"><article class="card"><div class="card-header"><div><span class="eyebrow">Team profile</span><h3>Season performance</h3></div></div><div class="card-body"><div class="stat-box-grid">${summaryStatBox('Points / Game',(team.pf/7).toFixed(1))}${summaryStatBox('Allowed / Game',(team.pa/7).toFixed(1))}${summaryStatBox('Point Diff',`${team.pf-team.pa>=0?'+':''}${team.pf-team.pa}`)}${summaryStatBox('Win Rate',percent(team.wins/(team.wins+team.losses)*100))}</div></div></article><article class="card"><div class="card-header"><div><span class="eyebrow">Top talent</span><h3>Roster leaders</h3></div></div><div class="activity-list">${leaders.map(player => leaderActivity(player,`${player.position} overall`,player.overall)).join('')}</div></article></div>`;
+  function buildExtendedTeamSchedule(team, existingGames) {
+    const preseason = Array.from({length:3}, (_,index) => {
+      const opponent = teams[(teams.findIndex(item=>item.id===team.id)+index+5) % teams.length];
+      const home = index % 2 === 0;
+      const status = 'final';
+      const teamScore = seededNumber(`${team.id}-pre-${index}-team`,13,31);
+      const oppScore = seededNumber(`${team.id}-pre-${index}-opp`,10,30);
+      return {
+        id:`pre-${index+1}-${team.id}-${opponent.id}`, phase:'preseason', phaseLabel:'Preseason', week:index+1,
+        awayId:home?opponent.id:team.id, homeId:home?team.id:opponent.id,
+        awayScore:home?oppScore:teamScore, homeScore:home?teamScore:oppScore, status,
+        day:'SAT', time:'7:00 PM', network:'LOCAL', stadium:home?team.stadium:opponent.stadium
+      };
+    });
+    const regular = [...existingGames];
+    for (let week=10; week<=18; week+=1) {
+      const opponent = teams[(teams.findIndex(item=>item.id===team.id)+week*3) % teams.length];
+      const home = week % 2 === 0;
+      regular.push({
+        id:`w${week}-${home?opponent.id:team.id}-${home?team.id:opponent.id}`, phase:'regular', phaseLabel:'Regular Season', week,
+        awayId:home?opponent.id:team.id, homeId:home?team.id:opponent.id,
+        awayScore:null, homeScore:null, status:'scheduled', day:week===18?'SAT':'SUN', time:week%4===0?'4:25 PM':'1:00 PM', network:week%3===0?'FOX':'CBS', stadium:home?team.stadium:opponent.stadium
+      });
+    }
+    regular.forEach(game => { game.phase='regular'; game.phaseLabel='Regular Season'; });
+    const phase=currentLeaguePhase();
+    const playoffs = phase.phase === 'playoffs' ? ['Wild Card','Divisional','Conference','Championship'].map((round,index)=>{
+      const opponent=teams[(teams.findIndex(item=>item.id===team.id)+index+11)%teams.length];
+      return {id:`po-${index}-${team.id}`,phase:'playoffs',phaseLabel:'Playoffs',round,week:index+1,awayId:opponent.id,homeId:team.id,awayScore:null,homeScore:null,status:'scheduled',day:'SUN',time:index===3?'6:30 PM':'4:30 PM',network:'NATIONAL',stadium:team.stadium};
+    }) : [];
+    return { preseason, regular, playoffs };
+  }
+
+  function renderTeamScheduleCard(game, teamId) {
+    const opponent = teamById(game.homeId===teamId?game.awayId:game.homeId);
+    const home = game.homeId===teamId;
+    const final = game.status==='final';
+    const live = game.status==='live';
+    const teamScore = home?game.homeScore:game.awayScore;
+    const oppScore = home?game.awayScore:game.homeScore;
+    const result = final ? `${teamScore>oppScore?'W':'L'} ${teamScore}-${oppScore}` : live ? `LIVE ${teamScore}-${oppScore}` : `${home?'vs':'@'} ${opponent.abbr}`;
+    return `<button type="button" class="team-schedule-card ${final?'is-final':live?'is-live':'is-upcoming'}" data-game-id="${escapeHtml(game.id)}"><span class="team-schedule-card__week">${game.round || `${game.phaseLabel} · Week ${game.week}`}</span><div class="team-schedule-card__matchup">${renderTeamMark(opponent,'mini-team')}<div><strong>${home?'vs':'@'} ${escapeHtml(opponent.fullName)}</strong><small>${escapeHtml(game.day)} · ${escapeHtml(game.time)} · ${escapeHtml(game.network)}</small></div></div><div class="team-schedule-card__result"><strong>${escapeHtml(result)}</strong><small>${final?'Final':live?'In Progress':'Upcoming'}</small></div></button>`;
+  }
+
+  function renderTeamSchedule(team, teamGames) {
+    const scheduleByPhase=buildExtendedTeamSchedule(team,teamGames);
+    const leaguePhase=currentLeaguePhase();
+    if (state.teamSchedulePhase==='playoffs' && leaguePhase.phase!=='playoffs') state.teamSchedulePhase='regular';
+    const availablePhases=['preseason','regular',...(leaguePhase.phase==='playoffs'?['playoffs']:[])];
+    const selected=scheduleByPhase[state.teamSchedulePhase] || scheduleByPhase.regular;
+    return `<div class="team-schedule-view"><div class="filter-bar team-schedule-filters"><div class="segmented-tabs">${availablePhases.map(phase=>`<button type="button" data-team-schedule-phase="${phase}" class="${state.teamSchedulePhase===phase?'is-active':''}">${phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'}</button>`).join('')}</div><span class="result-count">${selected.length} game${selected.length===1?'':'s'}</span></div><div class="team-schedule-list">${selected.map(game=>renderTeamScheduleCard(game,team.id)).join('') || `<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No playoff schedule yet</h3><p>Playoff games appear only after the league advances beyond the regular season.</p></div></article>`}</div></div>`;
+  }
+
+  function teamStatTable(title, players, columns, emptyMessage) {
+    return `<article class="card team-stat-section"><div class="card-header"><div><span class="eyebrow">Position-specific production</span><h3>${title}</h3></div><span class="pill pill--neutral">${players.length} player${players.length===1?'':'s'}</span></div><div class="table-wrap"><table class="team-stat-table"><thead><tr><th>Player</th>${columns.map(column=>`<th>${column.label}</th>`).join('')}</tr></thead><tbody>${players.length?players.map(player=>`<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id)}"><td><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position)}</small></td>${columns.map(column=>`<td>${column.format?column.format(player.stats?.[column.key],player):escapeHtml(String(player.stats?.[column.key] ?? '—'))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${columns.length+1}">${emptyMessage}</td></tr>`}</tbody></table></div></article>`;
+  }
+
+  function renderTeamStats(team, roster) {
+    const formatPct=value=>Number.isFinite(Number(value))?`${Number(value).toFixed(1)}%`:'—';
+    const formatDecimal=value=>Number.isFinite(Number(value))?Number(value).toFixed(1):'—';
+    const categories=[
+      ['Passing',roster.filter(player=>player.position==='QB'),[{label:'GP',key:'games'},{label:'CMP',key:'completions'},{label:'ATT',key:'attempts'},{label:'CMP%',key:'compPct',format:formatPct},{label:'YDS',key:'passingYards'},{label:'TD',key:'passingTD'},{label:'INT',key:'interceptions'}]],
+      ['Rushing',roster.filter(player=>['QB','RB','FB'].includes(player.position)&&Number(player.stats?.rushingYards)>=0),[{label:'GP',key:'games'},{label:'CAR',key:'carries'},{label:'YDS',key:'rushingYards'},{label:'TD',key:'rushingTD'}]],
+      ['Receiving',roster.filter(player=>['RB','FB','WR','TE'].includes(player.position)&&player.stats?.receivingYards!=null),[{label:'GP',key:'games'},{label:'REC',key:'receptions'},{label:'TGT',key:'targets'},{label:'YDS',key:'receivingYards'},{label:'TD',key:'receivingTD'},{label:'Y/C',key:'yardsPerCatch',format:formatDecimal}]],
+      ['Defense',roster.filter(player=>defensePositions.includes(player.position)),[{label:'GP',key:'games'},{label:'TKL',key:'tackles'},{label:'SACK',key:'sacks',format:formatDecimal},{label:'INT',key:'interceptions'},{label:'FF',key:'forcedFumbles'},{label:'PD',key:'passDeflections'},{label:'TD',key:'defensiveTD'}]],
+      ['Kicking',roster.filter(player=>player.position==='K'),[{label:'GP',key:'games'},{label:'FGM',key:'fgm'},{label:'FGA',key:'fga'},{label:'FG%',key:'fgPct',format:formatPct},{label:'LONG',key:'long'},{label:'PTS',key:'points'}]],
+      ['Punting',roster.filter(player=>player.position==='P'),[{label:'GP',key:'games'},{label:'PUNTS',key:'punts'},{label:'AVG',key:'average',format:formatDecimal},{label:'IN 20',key:'inside20'},{label:'LONG',key:'long'}]]
+    ];
+    return `<div class="team-stats-view">${categories.map(([title,players,columns])=>teamStatTable(title,[...players].sort((a,b)=>(Number(b.stats?.[columns[1]?.key])||0)-(Number(a.stats?.[columns[1]?.key])||0)),columns,`No ${title.toLowerCase()} statistics are available.`)).join('')}</div>`;
   }
 
   function summaryStatBox(label,value) { return `<div class="stat-box"><span>${label}</span><strong>${value}</strong></div>`; }
@@ -2037,7 +2106,24 @@
       event.preventDefault();
       const playerId=depthPlayerTarget.dataset.depthPlayerId;
       if (state.depthSelectedPlayer===playerId) openRosterPlayerDetail(playerId);
-      else { state.depthSelectedPlayer=playerId; renderRoute(location.hash.slice(1)); }
+      else {
+        const windowScroll=window.scrollY;
+        const mainScroll=mainContent?.scrollTop || 0;
+        state.depthSelectedPlayer=playerId;
+        renderRoute(location.hash.slice(1));
+        requestAnimationFrame(() => {
+          window.scrollTo({top:windowScroll,left:0,behavior:'instant'});
+          if (mainContent) mainContent.scrollTop=mainScroll;
+        });
+      }
+      return;
+    }
+
+    const teamSchedulePhase=event.target.closest('[data-team-schedule-phase]');
+    if (teamSchedulePhase) {
+      event.preventDefault();
+      state.teamSchedulePhase=teamSchedulePhase.dataset.teamSchedulePhase;
+      renderRoute(location.hash.slice(1));
       return;
     }
 
