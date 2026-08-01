@@ -2,6 +2,7 @@
   'use strict';
   const HQ=global.FranchiseHQ=global.FranchiseHQ||{};
   const KEY='franchisehq:confidence-pool:v1';
+  const BASELINE=50;
   const clone=v=>JSON.parse(JSON.stringify(v));
   const freeze=v=>{if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.values(v).forEach(freeze);Object.freeze(v)}return v};
   const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')||{seasons:{}}}catch{return{seasons:{}}}};
@@ -9,10 +10,20 @@
   const games=()=>global.FGC_APP?.schedule||[];
   const seasonId=()=>String(global.FGC_APP?.leagueYear?.()||2026);
   const account=()=>global.FGC_TRADE?.getCurrentAccount?.()||{id:'commissioner',name:'Commissioner',teamId:'dal',role:'commissioner'};
+  const teams=()=>global.FGC_APP?.teams||[];
   function ensure(){const s=read(),id=seasonId();if(!s.seasons[id])s.seasons[id]={season:id,status:'open',openedAt:new Date().toISOString(),lockedAt:null,entries:{}};write(s);return s}
   function config(){const s=ensure(),c=s.seasons[seasonId()];return freeze(clone(c))}
   function setStatus(status){if(!['open','locked','final'].includes(status))throw new Error('Invalid pool status');const s=ensure(),c=s.seasons[seasonId()];c.status=status;c[status==='open'?'openedAt':status==='locked'?'lockedAt':'finalizedAt']=new Date().toISOString();write(s);return config()}
-  function allGames(){return freeze(games().flatMap(w=>w.games.map(g=>({...g,season:seasonId(),phase:'regular'}))))}
+  function allGames(){return freeze(games().flatMap(w=>w.games.map(g=>({...g,season:seasonId(),phase:g.phase||g.gameType||'regular'}))))}
+  function historicalGames(){
+    const current=allGames().map(clone),extra=[];
+    const scheduleHistory=global.FGC_APP?.scheduleHistory;
+    if(Array.isArray(scheduleHistory))scheduleHistory.forEach(season=>{const seasonValue=String(season?.season||season?.year||'');(season?.weeks||season?.schedule||[]).forEach(w=>(w.games||[]).forEach(g=>extra.push({...g,season:seasonValue||String(g.season||''),week:g.week??w.week,phase:g.phase||g.gameType||w.phase||'regular'})))});
+    const snapshot=HQ.leagueData?.current?.();
+    const snapshotGames=Array.isArray(snapshot?.games)?snapshot.games:[];
+    snapshotGames.forEach(g=>extra.push({...g,season:String(g.season||snapshot?.league?.season||seasonId()),phase:g.phase||g.gameType||g.seasonType||'regular'}));
+    const map=new Map();[...extra,...current].forEach(g=>{if(g?.id)map.set(String(g.id),g)});return [...map.values()]
+  }
   function getWeek(week){const w=games().find(x=>Number(x.week)===Number(week));return freeze(clone(w||{week:Number(week),games:[]}))}
   function getGame(id){return allGames().find(g=>g.id===id)||null}
   function getTeamSchedule(teamId){return freeze(allGames().filter(g=>g.homeId===teamId||g.awayId===teamId))}
@@ -22,12 +33,53 @@
   function saveSelection(gameId,selectedTeamId,userId=account().id){const s=ensure(),c=s.seasons[seasonId()];if(c.status!=='open')return{ok:false,error:'Confidence Pool submissions are locked.'};const game=getGame(gameId);if(!game||![game.homeId,game.awayId].includes(selectedTeamId))return{ok:false,error:'Choose a valid team.'};const e=baseEntry(c,userId),existing=e.picks[gameId]||{};e.picks[gameId]={gameId,week:game.week,selectedTeamId,confidence:Number.isInteger(Number(existing.confidence))?Number(existing.confidence):null};e.updatedAt=new Date().toISOString();c.entries[userId]=e;write(s);return{ok:true,entry:entry(userId)}}
   function saveConfidence(gameId,confidence,userId=account().id){const s=ensure(),c=s.seasons[seasonId()];if(c.status!=='open')return{ok:false,error:'Confidence Pool submissions are locked.'};const game=getGame(gameId);if(!game)return{ok:false,error:'Choose a valid game.'};const e=baseEntry(c,userId),existing=e.picks[gameId];if(!existing?.selectedTeamId)return{ok:false,error:'Choose a winner before assigning confidence.'};if(confidence===''||confidence===null||typeof confidence==='undefined'){existing.confidence=null;e.updatedAt=new Date().toISOString();c.entries[userId]=e;write(s);return{ok:true,entry:entry(userId)}}const week=String(game.week),value=Number(confidence);if(!Number.isInteger(value)||value<1||value>getWeek(game.week).games.length)return{ok:false,error:'Choose a valid confidence value.'};for(const [id,p] of Object.entries(e.picks)){if(id!==gameId&&String(p.week)===week&&Number(p.confidence)===value)return{ok:false,error:`Confidence ${value} is already used in Week ${week}.`}}existing.confidence=value;e.updatedAt=new Date().toISOString();c.entries[userId]=e;write(s);return{ok:true,entry:entry(userId)}}
   function savePick(gameId,selectedTeamId,confidence,userId=account().id){const selected=saveSelection(gameId,selectedTeamId,userId);if(!selected.ok)return selected;if(confidence===''||confidence===null||typeof confidence==='undefined')return selected;return saveConfidence(gameId,confidence,userId)}
-  function autoAssign(week,userId=account().id){const s=ensure(),c=s.seasons[seasonId()];if(c.status!=='open')return{ok:false,error:'Confidence Pool submissions are locked.'};const e=baseEntry(c,userId),weekGames=getWeek(week).games;const missing=weekGames.filter(g=>!e.picks[g.id]?.selectedTeamId);if(missing.length)return{ok:false,error:'Make a winner selection for every game before auto-assigning confidence.'};weekGames.forEach((g,i)=>{e.picks[g.id].confidence=i+1});e.updatedAt=new Date().toISOString();c.entries[userId]=e;write(s);return{ok:true,entry:entry(userId)}}
+  function clearWeek(week,userId=account().id){const s=ensure(),c=s.seasons[seasonId()];if(c.status!=='open')return{ok:false,error:'Confidence Pool submissions are locked.'};const e=baseEntry(c,userId);Object.keys(e.picks).forEach(id=>{if(Number(e.picks[id]?.week)===Number(week))delete e.picks[id]});e.status='draft';e.submittedAt=null;e.updatedAt=new Date().toISOString();c.entries[userId]=e;write(s);return{ok:true,entry:entry(userId)}}
+  function clearSeason(userId=account().id){const s=ensure(),c=s.seasons[seasonId()];if(c.status!=='open')return{ok:false,error:'Confidence Pool submissions are locked.'};c.entries[userId]={userId,season:seasonId(),status:'draft',picks:{},updatedAt:new Date().toISOString(),submittedAt:null};write(s);return{ok:true,entry:entry(userId)}}
+  function isFinalGame(g){return String(g?.status||'').toLowerCase()==='final'}
+  function winnerFor(g){if(!isFinalGame(g))return null;const h=Number(g.homeScore),a=Number(g.awayScore);if(!Number.isFinite(h)||!Number.isFinite(a))return null;return h===a?'tie':h>a?g.homeId:g.awayId}
+  function isPlayoff(g){return /playoff|wild|divisional|conference|super bowl|superbowl/i.test(String(g.phase||g.gameType||g.round||g.seasonType||''))}
+  function isSuperBowl(g){return /super\s?bowl|championship/i.test(String(g.phase||g.gameType||g.round||''))}
+  function ownerHistory(){
+    const rows={};teams().forEach(t=>rows[t.id]={teamId:t.id,games:0,wins:0,losses:0,ties:0,pointsFor:0,pointsAgainst:0,playoffGames:0,playoffWins:0,superBowlAppearances:0,superBowlWins:0});
+    historicalGames().filter(isFinalGame).forEach(g=>{
+      const home=rows[g.homeId]||(rows[g.homeId]={teamId:g.homeId,games:0,wins:0,losses:0,ties:0,pointsFor:0,pointsAgainst:0,playoffGames:0,playoffWins:0,superBowlAppearances:0,superBowlWins:0});
+      const away=rows[g.awayId]||(rows[g.awayId]={teamId:g.awayId,games:0,wins:0,losses:0,ties:0,pointsFor:0,pointsAgainst:0,playoffGames:0,playoffWins:0,superBowlAppearances:0,superBowlWins:0});
+      const hs=Number(g.homeScore)||0,as=Number(g.awayScore)||0,w=winnerFor(g),playoff=isPlayoff(g),sb=isSuperBowl(g);
+      [[home,hs,as,g.homeId],[away,as,hs,g.awayId]].forEach(([r,pf,pa,id])=>{r.games++;r.pointsFor+=pf;r.pointsAgainst+=pa;if(w==='tie')r.ties++;else if(w===id)r.wins++;else r.losses++;if(playoff){r.playoffGames++;if(w===id)r.playoffWins++}if(sb){r.superBowlAppearances++;if(w===id)r.superBowlWins++}})
+    });
+    const values=Object.values(rows),maxWins=Math.max(1,...values.map(r=>r.wins)),maxPlayoffWins=Math.max(1,...values.map(r=>r.playoffWins)),maxApps=Math.max(1,...values.map(r=>r.superBowlAppearances)),maxTitles=Math.max(1,...values.map(r=>r.superBowlWins));
+    values.forEach(r=>{
+      const winPct=((r.wins+.5*r.ties)+1)/(r.games+2);
+      const diff=r.games?(r.pointsFor-r.pointsAgainst)/r.games:0;
+      const winPctScore=winPct*100;
+      const winsScore=(r.wins/maxWins)*100;
+      const playoffScore=(r.playoffWins/maxPlayoffWins)*100;
+      const appScore=(r.superBowlAppearances/maxApps)*100;
+      const titleScore=(r.superBowlWins/maxTitles)*100;
+      const differentialScore=50+50*Math.tanh(diff/21);
+      const raw=winPctScore*.30+winsScore*.15+playoffScore*.15+appScore*.10+titleScore*.15+differentialScore*.15;
+      const reliability=r.games/(r.games+16);
+      r.rating=Number((BASELINE+(raw-BASELINE)*reliability).toFixed(2));
+      r.winPct=Number((r.games?((r.wins+.5*r.ties)/r.games):.5).toFixed(4));
+      r.pointDifferentialPerGame=Number(diff.toFixed(2));
+    });
+    const sorted=values.sort((a,b)=>b.rating-a.rating||b.wins-a.wins||b.pointDifferentialPerGame-a.pointDifferentialPerGame||String(a.teamId).localeCompare(String(b.teamId)));let previous=null,rank=0;return sorted.map((r,i)=>{if(previous===null||Math.abs(r.rating-previous)>.0001)rank=i+1;previous=r.rating;return{...r,rank}})
+  }
+  function ownerStrength(teamId){const row=ownerHistory().find(x=>x.teamId===teamId);return freeze(clone(row||{teamId,rank:teams().length,rating:BASELINE,games:0,wins:0,losses:0,ties:0,pointsFor:0,pointsAgainst:0,playoffWins:0,superBowlAppearances:0,superBowlWins:0,winPct:.5,pointDifferentialPerGame:0}))}
+  function matchupPrediction(gameId){const g=getGame(gameId);if(!g)return null;const home=ownerStrength(g.homeId),away=ownerStrength(g.awayId),difference=home.rating-away.rating,homeProbability=1/(1+Math.exp(-difference/8));let predictedTeamId;if(Math.abs(difference)<.0001){const seed=String(g.id||`${g.awayId}-${g.homeId}`).split('').reduce((total,ch)=>((total*31)+ch.charCodeAt(0))>>>0,0);predictedTeamId=seed%2===0?g.homeId:g.awayId}else predictedTeamId=homeProbability>.5?g.homeId:g.awayId;const probability=Math.abs(difference)<.0001?.5:Math.max(homeProbability,1-homeProbability);return freeze({gameId:g.id,homeTeamId:g.homeId,awayTeamId:g.awayId,homeRating:home.rating,awayRating:away.rating,predictedTeamId,probability:Number(probability.toFixed(4)),certainty:Number(Math.abs(probability-.5).toFixed(4))})}
+  function autoAssign(week,userId=account().id){
+    const s=ensure(),c=s.seasons[seasonId()];if(c.status!=='open')return{ok:false,error:'Confidence Pool submissions are locked.'};
+    const e=baseEntry(c,userId),weekGames=getWeek(week).games;
+    const ranked=weekGames.map(g=>{const prediction=matchupPrediction(g.id);const current=e.picks[g.id]||{};const selectedTeamId=current.selectedTeamId||prediction.predictedTeamId;const homeProbability=1/(1+Math.exp(-(prediction.homeRating-prediction.awayRating)/8));const selectedProbability=selectedTeamId===g.homeId?homeProbability:1-homeProbability;return{g,prediction,selectedTeamId,certainty:Math.abs(selectedProbability-.5)}}).sort((a,b)=>a.certainty-b.certainty||String(a.g.id).localeCompare(String(b.g.id)));
+    ranked.forEach((item,i)=>{e.picks[item.g.id]={gameId:item.g.id,week:item.g.week,selectedTeamId:item.selectedTeamId,confidence:i+1}});
+    e.updatedAt=new Date().toISOString();c.entries[userId]=e;write(s);return{ok:true,entry:entry(userId),predictions:freeze(clone(ranked.map(x=>({gameId:x.g.id,predictedTeamId:x.prediction.predictedTeamId,selectedTeamId:x.selectedTeamId,confidence:e.picks[x.g.id].confidence,probability:x.prediction.probability}))))};
+  }
   function validateEntry(userId=account().id){const e=entry(userId),issues=[];games().forEach(w=>{const vals=[];w.games.forEach(g=>{const p=e.picks[g.id];if(!p?.selectedTeamId)issues.push(`Week ${w.week}: missing winner for ${g.id}`);if(!Number.isInteger(Number(p?.confidence)))issues.push(`Week ${w.week}: missing confidence for ${g.id}`);else vals.push(Number(p.confidence))});if(new Set(vals).size!==vals.length)issues.push(`Week ${w.week}: duplicate confidence values`)});return freeze({valid:issues.length===0,issues,totalGames:allGames().length,picked:Object.values(e.picks).filter(p=>p?.selectedTeamId).length})}
   function submit(userId=account().id){const valid=validateEntry(userId);if(!valid.valid)return{ok:false,error:'Complete every game and use each weekly confidence value once.',validation:valid};const s=ensure(),c=s.seasons[seasonId()],e=c.entries[userId];e.status='submitted';e.submittedAt=new Date().toISOString();write(s);return{ok:true,entry:entry(userId)}}
-  function score(userId=account().id){const e=entry(userId);let total=0,correct=0;const weeks={};allGames().forEach(g=>{const p=e.picks[g.id];if(!p)return;const final=g.status==='final';const winner=final?(g.homeScore===g.awayScore?'tie':g.homeScore>g.awayScore?g.homeId:g.awayId):null;const points=!final?0:winner==='tie'?p.confidence/2:winner===p.selectedTeamId?p.confidence:0;if(points>0&&winner!=='tie')correct++;total+=points;(weeks[g.week]||(weeks[g.week]={week:g.week,points:0,correct:0,finalGames:0})).points+=points;if(points>0&&winner!=='tie')weeks[g.week].correct++;if(final)weeks[g.week].finalGames++});return freeze({userId,totalPoints:total,correctPicks:correct,weeks:Object.values(weeks)})}
+  function score(userId=account().id){const e=entry(userId);let total=0,correct=0;const weeks={};allGames().forEach(g=>{const p=e.picks[g.id];if(!p)return;const winner=winnerFor(g),final=Boolean(winner);const points=!final?0:winner==='tie'?p.confidence/2:winner===p.selectedTeamId?p.confidence:0;if(points>0&&winner!=='tie')correct++;total+=points;(weeks[g.week]||(weeks[g.week]={week:g.week,points:0,correct:0,finalGames:0})).points+=points;if(points>0&&winner!=='tie')weeks[g.week].correct++;if(final)weeks[g.week].finalGames++});return freeze({userId,totalPoints:total,correctPicks:correct,weeks:Object.values(weeks)})}
   function leaderboard(){const s=ensure(),c=s.seasons[seasonId()];const accounts=global.FGC_TRADE?.accounts||[];return freeze(Object.keys(c.entries).map(id=>{const a=accounts.find(x=>x.id===id)||{id,name:id,teamId:null};return{...score(id),name:a.handle||a.name||id,teamId:a.teamId,status:c.entries[id].status}}).sort((a,b)=>b.totalPoints-a.totalPoints))}
-  function diagnostics(){const c=config();return freeze({service:'games',version:'5.6.0a',season:c.season,poolStatus:c.status,gameCount:allGames().length,currentWeek:currentWeek(),entryCount:Object.keys(c.entries).length})}
-  const service={getSeason:()=>freeze({id:seasonId(),phase:'regular',currentWeek:currentWeek()}),getWeek,getGame,getTeamSchedule,getUpcomingGames:()=>freeze(allGames().filter(g=>g.status==='scheduled')),getCompletedGames:()=>freeze(allGames().filter(g=>g.status==='final')),getCurrentWeek:currentWeek,getAllGames:allGames,confidence:{config,setStatus,getEntry:entry,saveSelection,saveConfidence,savePick,autoAssign,validateEntry,submit,score,leaderboard},diagnostics};
+  function diagnostics(){const c=config();return freeze({service:'games',version:'5.6.0b',season:c.season,poolStatus:c.status,gameCount:allGames().length,currentWeek:currentWeek(),entryCount:Object.keys(c.entries).length,ownerRatingBaseline:BASELINE,ownerRankingCount:ownerHistory().length})}
+  const confidence={config,setStatus,getEntry:entry,saveSelection,saveConfidence,savePick,clearWeek,clearSeason,autoAssign,validateEntry,submit,score,leaderboard,getOwnerStrength:ownerStrength,getOwnerRankings:()=>freeze(clone(ownerHistory())),getMatchupPrediction:matchupPrediction,predictionDiagnostics:matchupPrediction};
+  const service={getSeason:()=>freeze({id:seasonId(),phase:'regular',currentWeek:currentWeek()}),getWeek,getGame,getTeamSchedule,getUpcomingGames:()=>freeze(allGames().filter(g=>g.status==='scheduled')),getCompletedGames:()=>freeze(allGames().filter(g=>g.status==='final')),getCurrentWeek:currentWeek,getAllGames:allGames,confidence,diagnostics};
   if(HQ.defineModuleService)HQ.defineModuleService('league','games',service,{alias:'leagueGames',replace:true});else{HQ.modules=HQ.modules||{};HQ.modules.league=HQ.modules.league||{};HQ.modules.league.games=service;HQ.leagueGames=service}
 })(window);
