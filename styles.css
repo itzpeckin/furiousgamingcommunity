@@ -3846,3 +3846,22 @@ table td{
 @media(max-width:760px){
  .trade-summary-card--multi .multi-card-teams,.multi-fairness-assets{grid-template-columns:1fr}
 }
+
+/* v5.7.0e — live valuation and trade-limit controls */
+.live-fairness-panel{margin-top:18px}
+.live-fairness-panel .multi-fairness-grid{margin-top:16px}
+.trade-limit-preview{margin-top:18px}
+.trade-limit-team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:16px}
+.trade-limit-team-grid>div{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid rgba(148,163,184,.22);border-radius:14px;background:rgba(15,23,42,.42)}
+.trade-limit-team-grid>div.is-ready{border-color:rgba(52,211,153,.35)}
+.trade-limit-team-grid>div.is-over{border-color:rgba(248,113,113,.6);background:rgba(127,29,29,.18)}
+.trade-limit-team-grid .team-logo{width:34px;height:34px;flex:0 0 34px}
+.trade-limit-team-grid span{display:flex;flex-direction:column;min-width:0}
+.trade-limit-team-grid strong{font-size:.92rem}
+.trade-limit-team-grid small{color:var(--muted);line-height:1.35}
+.trade-rule-controls{margin-top:0}
+.trade-rule-toggle{display:flex;align-items:flex-start;gap:12px;padding:15px 16px;margin:4px 0 18px;border:1px solid rgba(148,163,184,.22);border-radius:14px;background:rgba(15,23,42,.38);cursor:pointer}
+.trade-rule-toggle input{margin-top:3px;width:18px;height:18px}
+.trade-rule-toggle span{display:flex;flex-direction:column;gap:3px}
+.trade-rule-toggle small{color:var(--muted)}
+@media(max-width:720px){.trade-limit-team-grid{grid-template-columns:1fr}.live-fairness-panel .multi-fairness-grid{grid-template-columns:1fr}}
