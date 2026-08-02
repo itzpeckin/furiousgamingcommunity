@@ -3970,3 +3970,21 @@ table td{
 .committee-comment-field{margin-bottom:22px!important}
 .committee-vote-actions{margin-top:4px!important;gap:12px!important}
 @media(max-width:900px){.multi-review-workspace{grid-template-columns:1fr!important}.multi-review-workspace .committee-roster-grid{grid-template-columns:1fr}.trade-heading-response-actions,.multi-heading-actions{justify-content:flex-start}}
+
+
+/* v5.7.0k — Trade detail clarity and calculator consistency */
+.trade-detail-heading{margin-bottom:18px}
+.trade-detail-heading .heading-actions{align-self:center}
+.timeline-version-history{margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
+.timeline-version-history>summary{cursor:pointer;font-weight:800;color:var(--accent);list-style:none}
+.timeline-version-history>summary::-webkit-details-marker{display:none}
+.timeline-version-history .version-history-list{margin-top:12px}
+.multi-fairness-panel .inline-player-calculation__body{padding:12px 14px 14px}
+.multi-fairness-panel .inline-calculation-heading{font-size:12px}
+.multi-fairness-panel .inline-value-row{padding:9px 0;gap:12px}
+.multi-fairness-panel .inline-value-row strong{font-size:12px;line-height:1.3}
+.multi-fairness-panel .inline-value-row small{font-size:10px;line-height:1.45;color:var(--muted)}
+.multi-fairness-panel .inline-value-row>b{font-size:12px;line-height:1.3}
+.multi-fairness-panel .inline-value-open-card{font-size:11px;margin-top:10px}
+.trade-heading-response-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+@media(max-width:760px){.trade-heading-response-actions{justify-content:flex-start}.trade-detail-heading{align-items:flex-start}}
