@@ -3796,3 +3796,7 @@ table td{
 .unified-draft-asset__flow select{width:100%;min-width:0}
 @media(max-width:1050px){.unified-participant-grid{grid-template-columns:1fr}.unified-flow-status{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.unified-team-toolbar{grid-template-columns:1fr}.unified-draft-asset{grid-template-columns:1fr}.unified-flow-warning{flex-direction:column}.unified-flow-warning strong{white-space:normal}.unified-flow-status{grid-template-columns:1fr}.unified-draft-asset__flow{grid-template-columns:1fr auto}.unified-draft-asset__flow>span{grid-column:1/-1}}
+
+
+/* v5.7.0b — Unified Trade Draft Persistence Hotfix */
+.builder-leave-modal{position:fixed;inset:0;z-index:1600;display:none;align-items:center;justify-content:center;padding:20px}.builder-leave-modal.is-open{display:flex}.builder-leave-backdrop{position:absolute;inset:0;border:0;background:rgba(3,8,18,.78);backdrop-filter:blur(5px)}.builder-leave-dialog{position:relative;z-index:1;width:min(560px,100%);padding:24px;border:1px solid var(--border);border-radius:18px;background:var(--surface);box-shadow:0 26px 80px rgba(0,0,0,.45)}.builder-leave-dialog h2{margin:5px 0 10px}.builder-leave-dialog p{margin:0 0 22px;color:var(--muted);line-height:1.55}.button--subtle{background:transparent}.trade-note-card__footer .heading-actions{flex-wrap:wrap}
