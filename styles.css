@@ -3941,3 +3941,32 @@ table td{
 .trade-tabs .segmented-tabs{overflow-x:auto;scrollbar-width:thin}
 .trade-tabs .segmented-tabs button{flex:0 0 auto}
 @media(max-width:760px){.inline-player-calculation .breakdown-grid{grid-template-columns:1fr}.multi-review-workspace{grid-template-columns:1fr!important}}
+
+/* v5.7.0j — trade actions, unread badges, committee layout, and valuation cleanup */
+.trade-center-nav .segmented-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.trade-tab-action-badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--danger);color:#fff;font-size:.75rem;font-weight:900;line-height:1;box-shadow:0 0 0 2px rgba(255,255,255,.06)}
+.trade-heading-response-actions,.multi-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.multi-detail-asset{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:14px 18px!important}
+.multi-detail-asset__copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.multi-detail-asset__copy strong,.multi-detail-asset__copy small{white-space:normal;overflow-wrap:anywhere}
+.multi-detail-asset__copy small{color:var(--muted);font-size:.88rem}
+.multi-detail-asset>b{white-space:nowrap;align-self:center}
+.inline-player-calculation__body{padding:14px!important}
+.inline-value-list{display:grid;border-top:1px solid var(--border);margin-top:10px}
+.inline-value-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start;padding:14px 0;border-bottom:1px solid var(--border)}
+.inline-value-row span{display:flex;flex-direction:column;gap:5px;min-width:0}
+.inline-value-row strong{font-size:.95rem;line-height:1.25}
+.inline-value-row small{color:var(--muted);line-height:1.4;overflow-wrap:anywhere}
+.inline-value-row b{color:var(--success);white-space:nowrap;font-size:1rem}
+.inline-value-row b.is-negative{color:var(--danger)}
+.inline-value-open-card{margin-top:14px}
+.multi-committee-layout{display:block!important;width:100%;margin-top:24px}
+.multi-review-workspace{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(360px,430px)!important;width:100%!important;max-width:none!important;gap:24px;align-items:start}
+.multi-review-workspace .committee-roster,.multi-review-workspace__roster{min-width:0;width:100%}
+.multi-review-workspace .committee-roster-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.multi-review-workspace .committee-member-status{min-width:0}
+.multi-review-workspace .committee-member-status__name{min-width:0;overflow:hidden}
+.multi-review-workspace .committee-member-status__name strong,.multi-review-workspace .committee-member-status__name small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.committee-comment-field{margin-bottom:22px!important}
+.committee-vote-actions{margin-top:4px!important;gap:12px!important}
+@media(max-width:900px){.multi-review-workspace{grid-template-columns:1fr!important}.multi-review-workspace .committee-roster-grid{grid-template-columns:1fr}.trade-heading-response-actions,.multi-heading-actions{justify-content:flex-start}}
