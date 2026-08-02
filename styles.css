@@ -3988,3 +3988,32 @@ table td{
 .multi-fairness-panel .inline-value-open-card{font-size:11px;margin-top:10px}
 .trade-heading-response-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 @media(max-width:760px){.trade-heading-response-actions{justify-content:flex-start}.trade-detail-heading{align-items:flex-start}}
+
+/* v5.7.0l — committee authorization and QA reset */
+.committee-review-workspace .committee-roster-grid,
+.multi-review-workspace .committee-roster-grid{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+.committee-wait-inline{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:16px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:rgba(255,255,255,.025);
+  color:var(--muted);
+}
+.committee-wait-inline svg{width:20px;height:20px;flex:0 0 auto;color:var(--accent)}
+.committee-wait-inline div{display:flex;flex-direction:column;gap:4px}
+.committee-wait-inline strong{color:var(--text)}
+.trade-data-reset-card{display:flex;align-items:center;justify-content:space-between;gap:24px;border-color:rgba(239,68,68,.35)}
+.trade-data-reset-card>div{max-width:760px}
+.trade-data-reset-card p{margin:6px 0 0;color:var(--muted);line-height:1.55}
+@media(max-width:720px){
+ .committee-review-workspace .committee-roster-grid,
+ .multi-review-workspace .committee-roster-grid{grid-template-columns:1fr!important}
+ .trade-data-reset-card{align-items:stretch;flex-direction:column}
+}
