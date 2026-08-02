@@ -3917,3 +3917,27 @@ table td{
 .team-trade-history-row{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:12px 14px;border:1px solid rgba(148,163,184,.22);border-radius:12px;background:rgba(15,23,42,.55)}
 .team-trade-history-row span{display:flex;flex-direction:column;min-width:0}.team-trade-history-row small{color:var(--muted);margin-top:3px}.team-trade-history-row b{white-space:nowrap;color:#a5b4fc}
 @media(max-width:760px){.multi-trade-heading{align-items:flex-start}.multi-heading-actions{justify-content:flex-start}.multi-committee-layout{grid-template-columns:1fr}}
+
+
+/* v5.7.0i — Trade Center Tabs, Committee Visibility & Valuation Detail */
+.committee-comment-field{display:grid;gap:8px;margin:0 0 22px!important}
+.committee-comment-field textarea,.committee-ballot .field textarea{margin-bottom:0}
+.committee-ballot .committee-vote-actions{margin-top:20px!important;padding-top:18px;border-top:1px solid var(--border-color)}
+.trade-decision-strip{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.decision-chip{display:inline-flex;align-items:center;min-height:30px;padding:6px 11px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.02em;border:1px solid rgba(148,163,184,.3);background:rgba(148,163,184,.08);color:var(--text-muted)}
+.decision-chip.is-current,.decision-chip.is-voted{border-color:rgba(96,165,250,.55);background:rgba(59,130,246,.17);color:#bfdbfe}
+.decision-chip.is-pending{border-color:rgba(250,204,21,.55);background:rgba(234,179,8,.14);color:#fde68a}
+.decision-chip.is-accepted,.decision-chip.is-approved{border-color:rgba(74,222,128,.55);background:rgba(34,197,94,.14);color:#bbf7d0}
+.decision-chip.is-rejected{border-color:rgba(251,113,133,.55);background:rgba(244,63,94,.14);color:#fecdd3}
+.inline-player-calculation{border:1px solid var(--border-color);border-radius:12px;background:rgba(255,255,255,.02);overflow:hidden;margin-bottom:8px}
+.inline-player-calculation>summary{list-style:none;cursor:pointer;margin:0;border:0;border-radius:0;width:100%}
+.inline-player-calculation>summary::-webkit-details-marker{display:none}
+.inline-player-calculation__body{padding:14px;border-top:1px solid var(--border-color);display:grid;gap:14px;background:rgba(7,11,20,.5)}
+.inline-calculation-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--text-muted);font-size:12px}
+.inline-calculation-heading strong{color:var(--text-primary);font-size:14px}
+.inline-player-calculation .breakdown-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.inline-player-calculation .breakdown-tile{min-width:0;padding:10px}
+.multi-review-workspace{width:min(100%,1120px);grid-template-columns:minmax(0,3fr) minmax(290px,1fr)!important}
+.trade-tabs .segmented-tabs{overflow-x:auto;scrollbar-width:thin}
+.trade-tabs .segmented-tabs button{flex:0 0 auto}
+@media(max-width:760px){.inline-player-calculation .breakdown-grid{grid-template-columns:1fr}.multi-review-workspace{grid-template-columns:1fr!important}}
