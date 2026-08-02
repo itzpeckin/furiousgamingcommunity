@@ -3899,3 +3899,21 @@ table td{
 .team-trade-history button small{color:var(--muted);margin-top:3px}
 .team-trade-history button b{white-space:nowrap;color:#a5b4fc}
 @media(max-width:1100px){.ownership-table-head{display:none}.ownership-team-row{grid-template-columns:1fr 1fr}.trade-remaining-cell{justify-self:start}}
+
+
+/* v5.7.0h — Multi-team negotiation and committee UX */
+.committee-vote-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px!important;align-items:stretch}
+.committee-vote-actions .button{width:100%;min-width:0;position:relative!important;inset:auto!important;margin:0!important;white-space:nowrap}
+@media(max-width:560px){.committee-vote-actions{grid-template-columns:1fr}.committee-vote-actions .button{width:100%}}
+.multi-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.multi-heading-actions .button{min-width:108px}
+.multi-committee-layout{display:grid;grid-template-columns:minmax(0,440px);justify-content:end;margin-top:18px}
+.multi-fairness-assets .package-engine-side{margin-top:12px;padding-top:12px;border-top:1px solid rgba(148,163,184,.18)}
+.multi-fairness-assets .package-engine-side__header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.multi-fairness-assets .package-engine-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start}
+.team-trade-usage-modal{position:fixed;inset:0;z-index:260;display:none;place-items:center;padding:20px}
+.team-trade-usage-modal.is-open{display:grid}
+.team-trade-usage-modal .ownership-dialog{margin:auto;width:min(760px,100%);max-height:min(84vh,760px)}
+.team-trade-history-row{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:12px 14px;border:1px solid rgba(148,163,184,.22);border-radius:12px;background:rgba(15,23,42,.55)}
+.team-trade-history-row span{display:flex;flex-direction:column;min-width:0}.team-trade-history-row small{color:var(--muted);margin-top:3px}.team-trade-history-row b{white-space:nowrap;color:#a5b4fc}
+@media(max-width:760px){.multi-trade-heading{align-items:flex-start}.multi-heading-actions{justify-content:flex-start}.multi-committee-layout{grid-template-columns:1fr}}
