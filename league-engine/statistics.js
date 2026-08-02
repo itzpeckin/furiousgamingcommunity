@@ -1,7 +1,7 @@
 (function initStatisticsService(global){
   'use strict';
   const HQ=global.FranchiseHQ=global.FranchiseHQ||{};
-  const VERSION='5.6.2';
+  const VERSION='5.6.2a';
   const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
   const freeze=(v,seen=new WeakSet())=>{if(!v||typeof v!=='object'||seen.has(v))return v;seen.add(v);Object.values(v).forEach(x=>freeze(x,seen));return Object.freeze(v)};
   const num=(v,fallback=0)=>Number.isFinite(Number(v))?Number(v):fallback;
@@ -16,6 +16,12 @@
   const defensePositions=new Set(['LE','RE','DE','DT','NT','LOLB','MLB','ROLB','LB','EDGE','CB','FS','SS','S']);
   const categoryPositions={passing:['QB'],rushing:['QB','RB','FB'],receiving:['RB','FB','WR','TE'],defense:[...defensePositions],kicking:['K'],punting:['P']};
   const categorySort={passing:'passingYards',rushing:'rushingYards',receiving:'receivingYards',defense:'tackles',kicking:'points',punting:'average'};
+
+  let normalizedCache=null;
+  const teamStatsCache=new Map();
+  const teamRankingsCache=new Map();
+  function clearCaches(){ normalizedCache=null; teamStatsCache.clear(); teamRankingsCache.clear(); }
+  try { HQ.events?.on?.('league:state-changed', clearCaches); } catch (_) {}
 
   function rawPlayers(){
     const service=rosterService();
@@ -67,11 +73,13 @@
     };
   }
   function normalizedPlayers(){
+    if(normalizedCache) return normalizedCache;
     const teams=teamMap();
-    return rawPlayers().map(p=>{
+    normalizedCache=rawPlayers().map(p=>{
       const stats=normalizeStats(p);const team=teams.get(String(p.teamId));
-      return {id:p.id,name:p.name,position:String(p.position||'').toUpperCase(),teamId:p.teamId,teamName:team?.fullName||team?.name||'',teamAbbr:team?.abbr||'',overall:num(p.overall),stats,gameLog:clone(p.stats?.gameLog||p.stats?.weekly||p.raw?.stats?.gameLog||[])};
+      return {id:p.id,name:p.name,position:String(p.position||'').toUpperCase(),teamId:p.teamId,teamName:team?.fullName||team?.name||'',teamAbbr:team?.abbr||'',overall:num(p.overall),stats,rawStats:clone(p.stats||{}),gameLog:clone(p.stats?.gameLog||p.stats?.weekly||p.raw?.stats?.gameLog||[])};
     });
+    return normalizedCache;
   }
   function categoryRows(category,options={}){
     const positions=categoryPositions[category]||categoryPositions.passing;
@@ -93,21 +101,36 @@
     rows.sort((a,b)=>num(b.stats[key])-num(a.stats[key]));return freeze(clone(rows.map((r,i)=>({...r,rank:i+1})).slice(0,num(options.limit,100))))
   }
   function getTeamStats(teamId){
-    const team=teamMap().get(String(teamId));const players=normalizedPlayers().filter(p=>String(p.teamId)===String(teamId));
+    const cacheId=String(teamId); if(teamStatsCache.has(cacheId)) return teamStatsCache.get(cacheId);
+    const team=teamMap().get(cacheId);const players=normalizedPlayers().filter(p=>String(p.teamId)===String(teamId));
     const totals={};Object.keys(categoryPositions).forEach(c=>{totals[c]=categoryRows(c,{teamId})});
     const standing=(standingsService()?.getStandings?.()||[]).find(r=>String(r.teamId)===String(teamId))||{};
     const games=num(standing.games)||Math.max(1,...players.map(p=>p.stats.games));
     const passingYards=players.reduce((s,p)=>s+p.stats.passingYards,0),rushingYards=players.reduce((s,p)=>s+p.stats.rushingYards,0);
     const takeaways=players.reduce((s,p)=>s+p.stats.defensiveInterceptions+p.stats.fumbleRecoveries,0);
     const turnovers=players.reduce((s,p)=>s+p.stats.interceptions+p.stats.fumbles,0);
-    return freeze(clone({teamId,team,players,totals,overview:{games,pointsFor:num(standing.pointsFor),pointsAgainst:num(standing.pointsAgainst),pointsPerGame:games?Number((num(standing.pointsFor)/games).toFixed(1)):0,pointsAllowedPerGame:games?Number((num(standing.pointsAgainst)/games).toFixed(1)):0,totalOffense:passingYards+rushingYards,passingOffense:passingYards,rushingOffense:rushingYards,turnovers,takeaways,turnoverDifferential:takeaways-turnovers,sacks:players.reduce((s,p)=>s+p.stats.sacks,0)}}))
+    const result=freeze(clone({teamId,team,players,totals,overview:{games,pointsFor:num(standing.pointsFor),pointsAgainst:num(standing.pointsAgainst),pointsPerGame:games?Number((num(standing.pointsFor)/games).toFixed(1)):0,pointsAllowedPerGame:games?Number((num(standing.pointsAgainst)/games).toFixed(1)):0,totalOffense:passingYards+rushingYards,passingOffense:passingYards,rushingOffense:rushingYards,turnovers,takeaways,turnoverDifferential:takeaways-turnovers,sacks:players.reduce((s,p)=>s+p.stats.sacks,0)}})); teamStatsCache.set(cacheId,result); return result;
   }
   function getTeamRankings(category='scoringOffense'){
+    if(teamRankingsCache.has(category)) return teamRankingsCache.get(category);
     const standings=standingsService()?.getStandings?.()||[];
     const rows=appTeams().map(team=>{const t=getTeamStats(team.id),s=standings.find(r=>String(r.teamId)===String(team.id))||{};const values={scoringOffense:t.overview.pointsPerGame,scoringDefense:t.overview.pointsAllowedPerGame,totalOffense:t.overview.totalOffense,passingOffense:t.overview.passingOffense,rushingOffense:t.overview.rushingOffense,turnoverDifferential:t.overview.turnoverDifferential,sacks:t.overview.sacks,pointDifferential:num(s.pointDifferential)};return{teamId:team.id,team:team.fullName||team.name,abbr:team.abbr,games:t.overview.games,value:num(values[category]),category}});
     const ascending=category==='scoringDefense';rows.sort((a,b)=>(ascending?a.value-b.value:b.value-a.value)||String(a.team).localeCompare(String(b.team)));const avg=rows.length?rows.reduce((s,r)=>s+r.value,0)/rows.length:0;return freeze(clone(rows.map((r,i)=>({...r,rank:i+1,leagueAverage:Number(avg.toFixed(1))}))));
   }
+  function getSupportedFields(category){
+    const aliases={
+      passing:{games:['games','gamesPlayed'],completions:['completions','passCompletions','cmp'],attempts:['attempts','passAttempts','att'],compPct:['compPct','completions','attempts','passCompletions','passAttempts'],passingYards:['passingYards','passYards'],passingTD:['passingTD','passTD','passingTouchdowns'],interceptions:['interceptions','passInterceptions'],yardsPerAttempt:['yardsPerAttempt','passingYards','attempts'],passerRating:['passerRating','rating']},
+      rushing:{games:['games','gamesPlayed'],carries:['carries','rushAttempts'],rushingYards:['rushingYards','rushYards'],rushingTD:['rushingTD','rushTD','rushingTouchdowns'],yardsPerCarry:['yardsPerCarry','carries','rushingYards'],fumbles:['fumbles'],longRush:['longRush','rushingLong']},
+      receiving:{games:['games','gamesPlayed'],targets:['targets'],receptions:['receptions','rec'],receivingYards:['receivingYards','recYards'],receivingTD:['receivingTD','recTD','receivingTouchdowns'],yardsPerCatch:['yardsPerCatch','receptions','receivingYards'],drops:['drops'],longReception:['longReception','receivingLong']},
+      defense:{games:['games','gamesPlayed'],tackles:['tackles','totalTackles','soloTackles','assistedTackles'],tacklesForLoss:['tacklesForLoss','tfl'],sacks:['sacks'],defensiveInterceptions:['defensiveInterceptions','interceptions'],passDeflections:['passDeflections','pd'],forcedFumbles:['forcedFumbles'],fumbleRecoveries:['fumbleRecoveries'],defensiveTD:['defensiveTD','defensiveTouchdowns']},
+      kicking:{games:['games','gamesPlayed'],fgm:['fgm','fieldGoalsMade'],fga:['fga','fieldGoalsAttempted'],fgPct:['fgPct','fgm','fga'],longFieldGoal:['longFieldGoal','long'],xpm:['xpm','extraPointsMade'],xpa:['xpa','extraPointsAttempted'],points:['points','fgm','xpm']},
+      punting:{games:['games','gamesPlayed'],punts:['punts'],average:['average','puntAverage','punts','puntYards'],netAverage:['netAverage'],inside20:['inside20'],touchbacks:['touchbacks'],longPunt:['longPunt','long']}
+    };
+    const rows=normalizedPlayers().filter(p=>(categoryPositions[category]||[]).includes(p.position));
+    const rawKeys=new Set(rows.flatMap(p=>Object.keys(p.rawStats||{})));
+    return freeze(Object.entries(aliases[category]||{}).filter(([,keys])=>keys.some(k=>rawKeys.has(k))).map(([key])=>key));
+  }
   function diagnostics(){const players=normalizedPlayers(),teams=appTeams();const weeklyCount=players.reduce((s,p)=>s+(p.gameLog?.length||0),0);return freeze({service:'statistics',version:VERSION,season:gamesService()?.getSeason?.()?.season||gamesService()?.getSeason?.()?.year||2026,playerStatCount:players.length,teamStatCount:teams.length,weeklyStatCount:weeklyCount,categories:Object.keys(categoryPositions),healthy:Boolean(players.length&&teams.length),errorCount:0,warningCount:weeklyCount?0:1})}
-  const service={getPlayerStats,getPlayerGameLog,getTeamStats,getLeagueLeaders,getSeasonTotals,getWeeklyLeaders,getTeamRankings,diagnostics};
+  const service={getPlayerStats,getPlayerGameLog,getTeamStats,getLeagueLeaders,getSeasonTotals,getWeeklyLeaders,getTeamRankings,getSupportedFields,diagnostics};
   if(HQ.defineModuleService)HQ.defineModuleService('league','statistics',service,{alias:'leagueStatistics',replace:true});else{HQ.modules=HQ.modules||{};HQ.modules.league=HQ.modules.league||{};HQ.modules.league.statistics=service;HQ.leagueStatistics=service}
 })(window);
