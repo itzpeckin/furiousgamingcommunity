@@ -3865,3 +3865,13 @@ table td{
 .trade-rule-toggle span{display:flex;flex-direction:column;gap:3px}
 .trade-rule-toggle small{color:var(--muted)}
 @media(max-width:720px){.trade-limit-team-grid{grid-template-columns:1fr}.live-fairness-panel .multi-fairness-grid{grid-template-columns:1fr}}
+
+
+/* v5.7.0f — valuation layout and Commissioner navigation */
+.multi-fairness-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+.multi-fairness-team,.multi-fairness-assets>div{min-width:0}
+.multi-fairness-assets{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+.multi-valuation-asset{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;min-width:0;overflow:hidden}
+.multi-valuation-asset span{min-width:0;overflow:hidden}
+.multi-valuation-asset b{flex:none;white-space:nowrap;margin-left:8px}
+@media(max-width:1280px){.multi-fairness-assets{grid-template-columns:1fr}}
