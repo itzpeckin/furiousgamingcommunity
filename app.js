@@ -94,7 +94,7 @@
     ['SF','San Francisco','49ers','NFC','West','#aa0000','#b3995d'], ['SEA','Seattle','Seahawks','NFC','West','#002244','#69be28']
   ];
 
-  const owners = ['GridironGuru','FourthAndLong','NoFlyZone','JetFuel','PurpleReign','WhoDeyKing','DawgPound','SteelCurtain','H-TownHeat','BlueHorseshoe','DuvalDynasty','TitanUp','MileHighMike','ArrowheadAce','SilverBlack','BoltAction','Peckin','BigBlueCrew','BirdGangPhilly','HailVictory','MonstersMidway','MotorCityDan','CheeseHead','SkolCommander','DirtyBird','KeepPounding','WhoDat','CannonFire','RedSea','RamsHouse','GoldRush','12thMan'];
+  const owners = ["Strike", "Benny", "Blevins", "Devo", "Yankee", "Dr Malice", "Saluki", "Term", "Carter B", "Domino", "TP", "Antwan", "Broncos", "Turbo", "Casp", "Eddie", "Joey", "Nola", "L1nkin", "Cokills", "Big Red", "Chop", "Gas", "Potato", "Kobe", "Burning Pulse", "Ry", "Peckin", "Big June", "Kpmr", "Mcghee", "Wayneo"];
   const records = [[6,1],[4,3],[3,4],[2,5],[6,1],[4,3],[3,4],[5,2],[5,2],[3,4],[4,3],[2,5],[4,3],[7,0],[3,4],[5,2],[6,1],[3,4],[5,2],[2,5],[3,4],[6,1],[5,2],[4,3],[4,3],[2,5],[3,4],[5,2],[2,5],[4,3],[6,1],[3,4]];
 
   const teams = rawTeams.map((item, index) => {
@@ -1230,7 +1230,8 @@
 
   function renderPlayerStatisticsLeaderboard(service){
     const category=state.statsCategory;
-    const columns=statsColumnMap[category]||statsColumnMap.passing;
+    const supportedFields=service.getSupportedFields?.(category)||null;
+    const columns=(statsColumnMap[category]||statsColumnMap.passing).filter(([key])=>!supportedFields||supportedFields.includes(key));
     const sortKey=state.statsSortKey||({passing:'passingYards',rushing:'rushingYards',receiving:'receivingYards',defense:'tackles',kicking:'points',punting:'average'}[category]);
     const options={teamId:state.statsTeam,minimumGames:state.statsMinimumGames,sortKey,direction:state.statsSortDirection,limit:100};
     const rows=state.statsScope==='week'?service.getWeeklyLeaders(state.statsWeek,category,options):service.getLeagueLeaders(category,options);
