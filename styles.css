@@ -3875,3 +3875,27 @@ table td{
 .multi-valuation-asset span{min-width:0;overflow:hidden}
 .multi-valuation-asset b{flex:none;white-space:nowrap;margin-left:8px}
 @media(max-width:1280px){.multi-fairness-assets{grid-template-columns:1fr}}
+
+/* v5.7.0g — approved trade usage and commissioner visibility */
+.trade-limit-preview{position:relative;isolation:isolate;overflow:hidden}
+.trade-limit-team-grid{position:relative;z-index:1;align-items:stretch}
+.trade-limit-team-grid>div{min-width:0;overflow:hidden}
+.trade-limit-team-grid>div>span{min-width:0}
+.trade-limit-team-grid strong,.trade-limit-team-grid small{overflow-wrap:anywhere}
+.trade-limit-preview .unified-flow-warning{position:relative;z-index:2;margin-top:14px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.trade-start-control{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:190px}
+.trade-start-control .button[disabled]{opacity:.42;cursor:not-allowed;filter:grayscale(.45)}
+.trade-remaining{display:block;text-align:center;color:#6ee7b7;font-size:.78rem;font-weight:800}
+.trade-remaining.is-zero{color:#f87171}
+.ownership-table-head,.ownership-team-row{grid-template-columns:minmax(210px,1.4fr) minmax(170px,1fr) 70px 105px 100px 140px 130px 78px}
+.trade-remaining-cell{border:1px solid currentColor;border-radius:999px;background:transparent;padding:7px 10px;font-weight:900;cursor:pointer}
+.trade-remaining-cell.is-positive{color:#34d399;background:rgba(16,185,129,.08)}
+.trade-remaining-cell.is-zero{color:#f87171;background:rgba(239,68,68,.08)}
+.team-trade-usage-modal{position:fixed;inset:0;display:none;z-index:1000}
+.team-trade-usage-modal.is-open{display:block}
+.team-trade-history{display:grid;gap:10px;margin-top:12px}
+.team-trade-history button{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:12px 14px;border:1px solid rgba(148,163,184,.22);border-radius:12px;background:rgba(15,23,42,.55);color:inherit;text-align:left;cursor:pointer}
+.team-trade-history button span{display:flex;flex-direction:column;min-width:0}
+.team-trade-history button small{color:var(--muted);margin-top:3px}
+.team-trade-history button b{white-space:nowrap;color:#a5b4fc}
+@media(max-width:1100px){.ownership-table-head{display:none}.ownership-team-row{grid-template-columns:1fr 1fr}.trade-remaining-cell{justify-self:start}}
