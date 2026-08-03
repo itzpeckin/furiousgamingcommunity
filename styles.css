@@ -4054,3 +4054,9 @@ table td{
 
 /* v5.7.0s */
 .builder-action-buttons{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.ai-suggestion-card__actions .button[disabled]{opacity:.42;filter:grayscale(1);cursor:not-allowed;box-shadow:none}.ai-trade-limit-empty .pill{display:inline-flex;margin-bottom:12px}.ai-trade-limit-empty{border-color:rgba(255,91,105,.38)}
+
+/* v5.7.0t — Trade Builder Interaction Hotfix */
+.asset-result:not(:disabled){pointer-events:auto;position:relative;z-index:1}
+.asset-result em{pointer-events:none}
+.trade-note-card__footer>.heading-actions{margin-left:auto}
+.trade-note-card__footer .builder-action-buttons{margin-left:0}
