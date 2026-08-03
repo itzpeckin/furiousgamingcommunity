@@ -167,6 +167,8 @@ function committedTradeUnits(teamId,{excludeId=null}={}){const activeStatuses=ne
 function remainingTradeCredits(teamId){const rules=tradeRules();if(!rules.limitEnabled)return Infinity;return Math.max(0,Number(rules.seasonTradeLimit)-committedTradeUnits(teamId))}
 function approvedTradeRecords(teamId){const rows=[];negotiations().forEach(t=>{if(t.status!=='approved'||![t.teamAId,t.teamBId].includes(teamId))return;rows.push({id:String(t.negotiationId||t.id),type:'two',at:t.publicAt||t.updatedAt||t.createdAt||'',units:legacyTradeUnits(t,teamId),teams:[t.teamAId,t.teamBId]})});multiTrades().forEach(t=>{if(t.status!=='approved'||!(t.teamIds||[]).includes(teamId))return;rows.push({id:String(t.id),type:'multi',at:t.publicAt||t.updatedAt||t.createdAt||'',units:multiTradeUnits(t,teamId),teams:[...(t.teamIds||[])]})});return rows.sort((a,b)=>String(b.at).localeCompare(String(a.at)))}
 function approvalLimitRowsForLegacy(t){const rules=tradeRules();if(!rules.limitEnabled)return[];return [t.teamAId,t.teamBId].map(teamId=>{const used=committedTradeUnits(teamId,{excludeId:t.id}),needed=legacyTradeUnits(t,teamId),remaining=Math.max(0,Number(rules.seasonTradeLimit)-used);return{teamId,team:teamById(teamId),used,needed,remaining,allowed:needed<=remaining}})}
+function approvalLimitRowsForMulti(t){const rules=tradeRules();if(!rules.limitEnabled)return[];return (t.teamIds||[]).map(teamId=>{const used=committedTradeUnits(teamId,{excludeId:t.id}),needed=multiTradeUnits(t,teamId),remaining=Math.max(0,Number(rules.seasonTradeLimit)-used);return{teamId,team:teamById(teamId),used,needed,remaining,allowed:needed<=remaining}})}
+function multiApprovalLimitCheck(t){const rules=tradeRules();if(!rules.limitEnabled)return{ok:true,rows:[],message:''};const rows=approvalLimitRowsForMulti(t),blocked=rows.filter(row=>!row.allowed);return{ok:blocked.length===0,rows,message:approvalLimitMessage(rows)}}
 function approvalLimitMessage(rows){return (rows||[]).filter(r=>!r.allowed).map(r=>`${r.team.fullName} is out of trades. This approval requires ${r.needed} trade${r.needed===1?'':'s'} with ${r.remaining} remaining.`).join(' ')}
 function builderTradeLimitRows(){const b=ensureUnifiedBuilder(),rules=tradeRules();return b.teamIds.map(teamId=>{const assets=b.assetsByTeam[teamId]||[],cost=assetUnitCost(assets),used=committedTradeUnits(teamId,{excludeId:b.tradeId||b.multiTradeId}),remaining=rules.limitEnabled?Math.max(0,Number(rules.seasonTradeLimit)-used):Infinity,allowed=!rules.limitEnabled||cost.units<=remaining;return{teamId,team:teamById(teamId),...cost,used,remaining,allowed}})}
 function builderTradeLimitsValid(){return builderTradeLimitRows().every(row=>row.allowed)}
@@ -740,7 +742,7 @@ function getActivitySnapshot(){
 function tradeDataDiagnostics(){
   return Object.freeze({
     service:'trade-center',
-    version:'5.7.0o',
+    version:'5.7.0p',
     twoTeamTrades:negotiations().length,
     multiTeamTrades:multiTrades().length,savedDrafts:(store.savedDrafts||[]).length,
     notifications:Array.isArray(store.notifications)?store.notifications.length:0,
