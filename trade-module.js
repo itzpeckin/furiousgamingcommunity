@@ -311,6 +311,17 @@ function renderTradeCenter(x){
  const content=`<div class="privacy-banner"><span><svg><use href="#icon-eye"></use></svg></span><div><strong>Your calculator work is private</strong><p>Saved drafts and unsent ideas are visible only to the creator. Once an offer is sent, both owners see the calculation. After acceptance, the hidden Trade Committee sees the submitted version and its calculation. Other owners never see it.</p></div><span class="pill pill--accent">Authorized roles only</span></div><div class="metric-grid trade-metrics"><article class="metric-card card"><span class="metric-label">Sent</span><strong class="metric-value">${negotiations().filter(t=>visible(t)&&['draft','negotiating','committee','committee-rejected'].includes(t.status)).length+filteredMultiTrades().filter(t=>['draft','negotiating','committee','committee-rejected'].includes(t.status)).length}</strong><small>Visible to your role</small></article><article class="metric-card card"><span class="metric-label">Received</span><strong class="metric-value">${negotiations().filter(t=>visible(t)&&t.status==='negotiating'&&ver(t).targetId===a.id).length}</strong><small>Waiting for you</small></article><article class="metric-card card"><span class="metric-label">Committee</span><strong class="metric-value">${negotiations().filter(t=>visible(t)&&t.status==='committee').length}</strong><small>Hidden reviews</small></article></div><div class="filter-bar trade-tabs"><span class="result-count">${escapeHtml(a.handle)} · ${labelRole(a.role)}</span></div>${combinedCards.length?`<div class="trade-list-grid">${combinedCards.map(item=>item.kind==='multi'?multiTradeCard(item.row):tradeCard(item.row)).join('')}</div>`:`<article class="empty-state card"><span class="roadmap-icon"><svg><use href="#icon-swap"></use></svg></span><h2>No trades in this view</h2><p>Private transactions appear only for authorized accounts.</p>${can?'<button class="button button--primary" data-start-trade>Build a trade</button>':''}</article>`}<div class="prototype-guide card"><div><span class="eyebrow">Suggested test</span><h3>Try Trade #104</h3><p>Open as Dallas, switch to Green Bay, accept it, then switch through committee accounts to vote.</p></div><button class="button button--ghost" data-open-login>Switch mock account</button></div>`;
  pageContent.innerHTML=tradeCenterShell(content,ui.tab)
 }
+function teamPositionProfile(teamId){
+ const teamPlayers=players.filter(player=>player.teamId===teamId);
+ const leaguePositions=[...new Set(players.map(player=>String(player.position||'').trim()).filter(Boolean))];
+ return leaguePositions.map(position=>{
+  const positionPlayers=teamPlayers.filter(player=>String(player.position||'').trim()===position);
+  const sorted=positionPlayers.slice().sort((a,b)=>Number(b.overall||0)-Number(a.overall||0));
+  const best=sorted.length?Number(sorted[0].overall||0):0;
+  const average=sorted.length?sorted.reduce((sum,player)=>sum+Number(player.overall||0),0)/sorted.length:0;
+  return{position,best,average,count:sorted.length,players:sorted};
+ }).sort((a,b)=>a.best-b.best||a.average-b.average||a.position.localeCompare(b.position));
+}
 function generateAISuggestions(){
  const a=me();if(!a.teamId)return[];
  const own=a.teamId,profile=teamPositionProfile(own),needs=profile.sort((x,y)=>x.best-y.best).slice(0,5).map(x=>x.position);
