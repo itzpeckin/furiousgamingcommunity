@@ -733,6 +733,17 @@ function getActivitySnapshot(){
  });
  return{approvedTrades,blockPlayers,blockPicks};
 }
+
+function tradeDataDiagnostics(){
+  return Object.freeze({
+    service:'trade-center',
+    version:'5.7.0n',
+    twoTeamTrades:negotiations().length,
+    multiTeamTrades:multiTrades().length,
+    notifications:Array.isArray(store.notifications)?store.notifications.length:0,
+    recoveryDraftPresent:(()=>{try{return Boolean(localStorage.getItem(BUILDER_RECOVERY))}catch{return false}})()
+  });
+}
 function resetAllTradeData(){if(me().role!=='commissioner'){showToast('Commissioner access required','Only a Commissioner can reset all trade data.');return}const confirmation=prompt('Type RESET TRADES to permanently clear every trade, draft, message, vote, notification, and trade-history record in this browser.');if(confirmation!=='RESET TRADES'){showToast('Reset cancelled','No trade data was changed.');return}store.negotiations=[];store.multiTrades=[];store.notifications=[];store.audit=[];store.block={};store.blockPicks={};ui.builder=null;ui.multiBuilder=null;ui.activeNegotiationId=null;try{localStorage.removeItem(BUILDER_RECOVERY);localStorage.removeItem(TRADE_TAB_SEEN_KEY)}catch{}save();showToast('All trade data cleared','Trade Center is ready for a clean Phase 5.7 validation run.');setRoute('trade-center/sent')}
 function reset(){if(!confirm('Reset all Milestone 1 trade prototype data?'))return;{const fresh=seed();store={...fresh,negotiations:fresh.trades.map(normalizeNegotiation)};delete store.trades;}save();ui.builder=null;showToast('Prototype reset','Seeded trades and messages restored.');renderRoute()}
 function isWatched(pid){return(store.watchlist||[]).includes(String(pid))}
@@ -1015,7 +1026,7 @@ document.addEventListener('keydown',e=>{
  const button=input.closest('.chat-compose')?.querySelector('[data-send-chat]');
  if(button)sendChat(button.dataset.sendChat);
 });
-window.FGC_TRADE={renderTradeCenter,renderMultiTradeBuilder,renderMultiTradeDetail,multiTrades,renderTradeBlock,renderCommissioner,getApprovedNews,getActivitySnapshot,accounts,getCurrentAccount:me,setUser,openLogin,resetDemo:()=>{{const fresh=seed();store={...fresh,negotiations:fresh.trades.map(normalizeNegotiation)};delete store.trades;}save();ui.builder=null;renderRoute();},playerValuation,pickValuation,packageValuation,tradeValueSettings,defaultTradeValueSettings,tradeRules,defaultTradeRules,committedTradeUnits,remainingTradeCredits,approvedTradeRecords,assetUnitCost,resetAllTradeData,currentReviewers,openValueCard,openPickCard,renderProjectionEditor,leagueYear,draftDistance,saveDraft,submit,accept,decline,withdraw,revise:(tradeId)=>{const t=trade(tradeId);if(t){initBuilder(t);setRoute('trade-center/new')}},replay:(tradeId)=>{const t=trade(tradeId);if(t)renderReplay(t)},sendMessage:sendChat,isWatched,toggleWatch,togglePlayerBlock,addPlayerToTrade,onBlock,openBlockManager,renderAISuggestions,generateAISuggestions};
+window.FGC_TRADE={renderTradeCenter,renderMultiTradeBuilder,renderMultiTradeDetail,multiTrades,renderTradeBlock,renderCommissioner,getApprovedNews,getActivitySnapshot,accounts,getCurrentAccount:me,setUser,openLogin,resetDemo:()=>{{const fresh=seed();store={...fresh,negotiations:fresh.trades.map(normalizeNegotiation)};delete store.trades;}save();ui.builder=null;renderRoute();},playerValuation,pickValuation,packageValuation,tradeValueSettings,defaultTradeValueSettings,tradeRules,defaultTradeRules,committedTradeUnits,remainingTradeCredits,approvedTradeRecords,assetUnitCost,resetAllTradeData,tradeDataDiagnostics,currentReviewers,openValueCard,openPickCard,renderProjectionEditor,leagueYear,draftDistance,saveDraft,submit,accept,decline,withdraw,revise:(tradeId)=>{const t=trade(tradeId);if(t){initBuilder(t);setRoute('trade-center/new')}},replay:(tradeId)=>{const t=trade(tradeId);if(t)renderReplay(t)},sendMessage:sendChat,isWatched,toggleWatch,togglePlayerBlock,addPlayerToTrade,onBlock,openBlockManager,renderAISuggestions,generateAISuggestions};
 window.FranchiseHQ?.trade?.attachLegacy?.(window.FGC_TRADE);
 window.FranchiseHQ?.getService?.('trade.negotiations')?.attachLegacy?.(window.FGC_TRADE);
 window.FranchiseHQ?.ui?.registerAdapter?.('legacy-trade', {
