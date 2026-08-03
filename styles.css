@@ -4024,3 +4024,11 @@ table td{
 .inline-approved-trade{margin-top:16px;padding:18px}.inline-approved-trade p{margin:6px 0}.team-trade-history-row{width:100%;border:0;background:transparent;text-align:left;cursor:pointer}
 .trade-status-prominent{padding:14px 18px;border:2px solid var(--warning,#d79b28);border-radius:14px;font-weight:800;font-size:1rem}
 @media(max-width:760px){.builder-position-filter{flex-basis:100%;max-width:none}.committee-view-filters button{flex:1 1 100%}}
+
+/* v5.7.0q stabilization */
+.asset-browser-controls .builder-position-filter{flex:0 0 118px!important;width:118px!important;max-width:118px!important;min-width:118px!important}
+.asset-browser-controls .builder-position-filter select{width:118px!important;max-width:118px!important}
+.trade-awaiting-committee-banner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;margin:0 0 20px;padding:20px 24px;border:2px solid #d79b2f;border-radius:16px;background:linear-gradient(135deg,rgba(215,155,47,.23),rgba(106,65,180,.18));text-align:center;box-shadow:0 10px 28px rgba(0,0,0,.14)}
+.trade-awaiting-committee-banner strong{font-size:1.08rem;letter-spacing:.08em}.trade-awaiting-committee-banner span{font-size:1.35rem;font-weight:900;letter-spacing:.04em}
+.ai-asset-line{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+@media(max-width:760px){.asset-browser-controls .builder-position-filter,.asset-browser-controls .builder-position-filter select{flex-basis:100%!important;width:100%!important;max-width:none!important;min-width:0!important}}
