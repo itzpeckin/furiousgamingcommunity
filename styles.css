@@ -4017,3 +4017,10 @@ table td{
  .multi-review-workspace .committee-roster-grid{grid-template-columns:1fr!important}
  .trade-data-reset-card{align-items:stretch;flex-direction:column}
 }
+
+/* v5.7.0o stabilization */
+.builder-position-filter{flex:0 0 108px;max-width:108px}.builder-position-filter select{width:100%}
+.committee-view-filters{margin:0 0 18px;display:flex;gap:8px;flex-wrap:wrap}.committee-view-filters button{min-width:150px}
+.inline-approved-trade{margin-top:16px;padding:18px}.inline-approved-trade p{margin:6px 0}.team-trade-history-row{width:100%;border:0;background:transparent;text-align:left;cursor:pointer}
+.trade-status-prominent{padding:14px 18px;border:2px solid var(--warning,#d79b28);border-radius:14px;font-weight:800;font-size:1rem}
+@media(max-width:760px){.builder-position-filter{flex-basis:100%;max-width:none}.committee-view-filters button{flex:1 1 100%}}
