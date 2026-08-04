@@ -1008,6 +1008,16 @@ function consumeActiveSavedDraft(builder=ui.builder){
 function saveDraftLegacyTwoTeam(){
  return saveCurrentBuilderDraft();
 }
+function hasInjured(assets){
+ const list=Array.isArray(assets)?assets:[];
+ return list.some(asset=>{
+  if(!asset||asset.type!=='player')return false;
+  const player=playerById(asset.id);
+  if(!player)return false;
+  const status=String(player.injury||player.injuryStatus||player.status||'Healthy').trim().toLowerCase();
+  return status!==''&&status!=='healthy'&&status!=='none'&&status!=='uninjured';
+ });
+}
 function submitLegacyTwoTeam(){
  const a=me(),b=ensureUnifiedBuilder(),proposerId=actingOwnerId(a);
  if(hasInjured([...(b.assetsA||[]),...(b.assetsB||[])]))return showToast('Injured player blocked','League rules prohibit trading injured players.');
@@ -1111,8 +1121,8 @@ window.FranchiseHQ?.simulation?.setAccount?.(userId,{silent:true,source:'trade-m
 
 
   if (window.FranchiseHQ?.events?.emit) {
-    window.FranchiseHQ.events.emit('trade-ready', { version: '5.7.0u' });
+    window.FranchiseHQ.events.emit('trade-ready', { version: '5.7.0v' });
   } else {
-    window.dispatchEvent(new CustomEvent('franchisehq:trade-ready', { detail: { version: '5.7.0u' } }));
+    window.dispatchEvent(new CustomEvent('franchisehq:trade-ready', { detail: { version: '5.7.0v' } }));
   }
 })();
