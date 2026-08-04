@@ -4061,7 +4061,7 @@ table td{
 .trade-note-card__footer>.heading-actions{margin-left:auto}
 .trade-note-card__footer .builder-action-buttons{margin-left:0}
 
-/* v5.7.0w Trade settings consolidation and workspace cleanup */
+/* v5.7.0x Final Trade Center controls and calculator toggle */
 .trade-setting-grid--four{grid-template-columns:repeat(4,minmax(0,1fr))}
 .trade-setting-grid--six{grid-template-columns:repeat(6,minmax(0,1fr))}
 .value-model-tabs{margin-bottom:18px;flex-wrap:wrap}
@@ -4070,3 +4070,32 @@ table td{
 .unified-trade-draft .card-header h2{margin:0}
 @media(max-width:1200px){.trade-setting-grid--six{grid-template-columns:repeat(3,minmax(0,1fr))}.trade-setting-grid--four{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.trade-setting-grid--six,.trade-setting-grid--four{grid-template-columns:1fr}.value-model-tabs button{flex:1 1 45%}}
+
+
+/* v5.7.0x final Commissioner Trade Center cleanup */
+.player-model-settings .trade-setting-grid--five,
+.trade-setting-grid--five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.commissioner-pick-projections .projection-team-row > span {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.commissioner-pick-projections .projection-team-row select {
+  min-width: 210px;
+  width: 100%;
+}
+.trade-calculator-master-control {
+  border: 1px solid rgba(139, 92, 246, .32);
+}
+.trade-calculator-master-control .trade-rule-toggle {
+  margin-top: 0;
+}
+@media (max-width: 1180px) {
+  .player-model-settings .trade-setting-grid--five,
+  .trade-setting-grid--five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .player-model-settings .trade-setting-grid--five,
+  .trade-setting-grid--five { grid-template-columns: 1fr; }
+  .commissioner-pick-projections .projection-team-row select { min-width: 0; }
+}
