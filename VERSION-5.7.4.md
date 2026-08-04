@@ -1,10 +1,5 @@
-# Franchise HQ v5.7.4 — Commissioner Free Trade Rules
+# Franchise HQ v5.7.4 — Authorized Free Trade Designation
 
-Adds Commissioner-configurable Free Trade rules under Commissioner Controls → Trade Center → Trade Limits & Asset Rules.
+This release replaces automatic OVR/round-based Free Trade qualification with an authorized reviewer designation.
 
-A transaction counts as a Free Trade only when every participating team's full outgoing package qualifies. Qualifying approved trades consume zero seasonal trades while still appearing in Approved, History, Team Trade History, Analytics, and notifications.
-
-Default Development settings:
-- Free Trades enabled
-- Maximum player overall: 69
-- Earliest eligible draft round: Round 4
+Commissioners and eligible Trade Committee members can mark a trade Free during Committee Review or after approval. Free Trades use zero seasonal trades. Review screens show each participant’s remaining trades and warn when a team is out of trades and the toggle is off.

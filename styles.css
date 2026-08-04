@@ -4300,3 +4300,26 @@ table td{
 .free-trade-review-badge,.standard-trade-review-badge{display:inline-flex;margin-top:10px;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.75);font-size:.78rem}
 .standard-trade-review-badge{color:#92400e}
 @media(max-width:760px){.free-trade-eligible-banner,.free-trade-standard-note{align-items:flex-start;flex-direction:column}}
+
+/* v5.7.4 Authorized Free Trade Designation */
+.committee-trade-limit-card{margin:0 0 18px;padding:16px;border:1px solid var(--border,#d9dce5);border-radius:14px;background:var(--surface-subtle,#f7f8fb)}
+.committee-trade-limit-card.has-warning{border-color:#e3a73b;background:#fff8e8}
+.committee-trade-limit-card__head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px}
+.committee-trade-limit-card__head strong{font-size:.95rem;letter-spacing:.02em}
+.committee-trade-limit-card__head span{font-size:.8rem;color:var(--text-muted,#68707d);text-align:right}
+.committee-trade-limit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.committee-trade-limit-grid>div{display:grid;gap:3px;padding:11px 12px;border:1px solid var(--border,#d9dce5);border-radius:10px;background:#fff}
+.committee-trade-limit-grid span{font-size:.78rem;color:var(--text-muted,#68707d)}
+.committee-trade-limit-grid strong{font-size:.95rem}
+.committee-trade-limit-grid small{font-size:.75rem;color:var(--text-muted,#68707d)}
+.committee-trade-limit-warning{display:grid;gap:4px;margin-top:12px;padding:12px 14px;border-radius:10px;background:#fff0d0;color:#7c4a00}
+.free-trade-designation-toggle{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 18px;padding:14px 16px;border:1px solid #7a5cff;border-radius:12px;background:#f4f0ff}
+.free-trade-designation-toggle span{display:grid;gap:4px}
+.free-trade-designation-toggle small{color:var(--text-muted,#68707d)}
+.free-trade-designation-toggle input{width:22px;height:22px;accent-color:#6b4eff}
+.approved-free-trade-control{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}
+.approved-free-trade-control .free-trade-designation-toggle{flex:1;margin:0}
+.free-trade-review-badge,.standard-trade-review-badge{display:inline-flex;margin-top:8px;padding:6px 10px;border-radius:999px;font-size:.78rem;font-weight:800;letter-spacing:.04em}
+.free-trade-review-badge{background:#dff7e8;color:#167443}.standard-trade-review-badge{background:#eceef3;color:#4c5564}
+.trade-analytics-counts{display:grid;justify-items:end;gap:3px}.trade-analytics-counts span{font-size:.72rem;color:var(--text-muted,#68707d)}
+@media(max-width:760px){.committee-trade-limit-grid{grid-template-columns:1fr}.committee-trade-limit-card__head,.approved-free-trade-control{flex-direction:column}.committee-trade-limit-card__head span{text-align:left}}
