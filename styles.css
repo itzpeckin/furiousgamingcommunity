@@ -4144,9 +4144,42 @@ table td{
   max-width: 100%;
   box-sizing: border-box;
 }
-.multi-detail-grid > .multi-detail-team:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
-}
 @media (max-width: 760px) {
   .commissioner-pick-projections .projection-team-row { padding: 14px; }
+}
+
+
+/* v5.7.0z — multi-team detail grid and action-row separation */
+.multi-detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+  align-items: start;
+  width: 100%;
+}
+.multi-detail-grid > .multi-detail-team {
+  grid-column: auto !important;
+  min-width: 0;
+  height: 100%;
+}
+.multi-detail-grid + .multi-fairness-panel,
+.multi-detail-grid + .multi-fairness-grid {
+  margin-top: 20px;
+}
+.multi-detail-grid ~ .negotiation-layout {
+  clear: both;
+  width: 100%;
+  margin-top: 20px;
+  align-items: start;
+}
+.negotiation-layout > .multi-private-chat,
+.negotiation-layout > .negotiation-actions {
+  min-width: 0;
+  position: relative;
+  z-index: 0;
+}
+.negotiation-layout + .multi-acceptance-panel {
+  margin-top: 20px;
+}
+@media (max-width: 900px) {
+  .multi-detail-grid { grid-template-columns: 1fr; }
 }
