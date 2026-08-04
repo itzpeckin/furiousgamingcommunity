@@ -4198,3 +4198,29 @@ table td{
 .ai-suggestion-card__head>div:first-child>span small{display:block;margin-top:1px;line-height:1.2;letter-spacing:.08em}
 .ai-market-readiness--two{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media(max-width:900px){.trade-block-my-needs{grid-template-columns:1fr}.ai-market-readiness--two{grid-template-columns:1fr}}
+
+/* v5.7.1b — Trade Block team-mark alignment hotfix */
+.ai-suggestion-card__head .team-logo,
+.trade-block-my-needs .team-logo,
+.block-asset-identity .team-logo {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  place-items: center !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  overflow: hidden;
+}
+.ai-suggestion-card__head .team-logo {
+  flex: 0 0 88px;
+  width: 88px;
+  height: 88px;
+}
+.ai-suggestion-card__head .team-logo > * {
+  margin: 0 !important;
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  line-height: 1 !important;
+}
