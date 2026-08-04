@@ -997,6 +997,39 @@ function renderBuilder(){const a=me();if(!ui.builder&&readBuilderRecovery())rest
  pageContent.innerHTML=`<div class="page-heading"><div><button class="text-button" data-builder-back><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>${edit?`Trade #${edit.id}`:'Trade Center'}</button><span class="eyebrow">Unified private trade workspace</span><h1>${edit?'Modify Trade':'Create a New Trade'}</h1><p>Add up to four franchises, select assets with the familiar player and pick filters, then direct each item inside one private trade draft.</p></div><div class="builder-heading-actions"><span class="pill pill--accent">${b.teamIds.length} of 4 teams</span>${builderActionButtons(Boolean(edit))}</div></div><div class="private-workspace-label"><span class="status-dot status-dot--live"></span><strong>Private calculator session</strong><span>Visible only to participating owners until committee review</span></div><div class="trade-builder-toolbar card unified-team-toolbar"><label class="field"><span>Your team</span><select disabled><option>${escapeHtml(teamById(b.teamIds[0]).fullName)}</option></select></label><label class="field field--grow"><span>Trade partner</span><select data-builder-team-select ${b.teamIds.length>=4?'disabled':''}><option value="">Select another team...</option>${available.map(t=>{const rem=remainingTradeCredits(t.id),disabled=tradeRules().limitEnabled&&rem<=0;return`<option value="${t.id}" ${disabled?'disabled':''}>${escapeHtml(t.abbr)} - ${escapeHtml(t.fullName)} - ${escapeHtml(t.owner)} - ${tradeRules().limitEnabled?`${rem} Trade${rem===1?'':'s'} Remaining`:'Unlimited Trades'}</option>`}).join('')}</select></label><button class="button button--secondary" data-add-builder-team ${b.teamIds.length>=4?'disabled':''}>Add</button></div><div class="unified-participant-grid">${b.teamIds.map(unifiedParticipantSide).join('')}</div>${unifiedDraftPanel()}${unifiedLiveFairnessPanel()}${unifiedTradeLimitPanel()}<article class="card trade-note-card"><label class="field"><span>Message to all participating owners</span><textarea data-builder-note placeholder="Explain the complete transaction...">${escapeHtml(b.note||'')}</textarea></label><div class="trade-note-card__footer"><span>Every owner accepts the same complete package. An approved trade remains pending Madden execution and does not modify site rosters.</span><div class="heading-actions">${builderActionButtons(Boolean(edit))}</div></div></article>`
 }
 
+
+function consumeActiveSavedDraft(builder=ui.builder){
+ const draftId=builder?.savedDraftId;
+ if(!draftId)return false;
+ store.savedDrafts=(store.savedDrafts||[]).filter(d=>String(d.id)!==String(draftId));
+ if(builder)delete builder.savedDraftId;
+ return true;
+}
+function saveDraftLegacyTwoTeam(){
+ return saveCurrentBuilderDraft();
+}
+function submitLegacyTwoTeam(){
+ const a=me(),b=ensureUnifiedBuilder(),proposerId=actingOwnerId(a);
+ if(hasInjured([...(b.assetsA||[]),...(b.assetsB||[])]))return showToast('Injured player blocked','League rules prohibit trading injured players.');
+ if(!b.assetsA?.length||!b.assetsB?.length)return showToast('Trade incomplete','Each side needs at least one asset.');
+ if(b.tradeId){
+  const t=trade(b.tradeId);if(!t)return showToast('Unable to submit trade','The negotiation could not be found. Return to Trade Center and reopen it.');
+  if(blockForApprovedAsset('two',t))return;
+  const num=Math.max(0,...(t.versions||[]).map(v=>Number(v.number)||0))+1,target=other(t,proposerId),versionId=`${t.negotiationId||t.id}-v${num}`;
+  t.versions.push({versionId,number:num,proposerId,targetId:target,createdAt:now(),note:b.note||'',assetsA:structuredClone(b.assetsA),assetsB:structuredClone(b.assetsB)});
+  t.currentVersion=num;t.status='negotiating';t.updatedAt=now();t.votes={};t.viewedBy=(t.viewedBy||[]).filter(x=>x!==target);t.rejectedBy=null;t.rejectedByName=null;t.rejectionSource=null;
+  t.chat=Array.isArray(t.chat)?t.chat:[];t.chat.push({id:id(),authorId:'system',text:`${acc(proposerId)?.handle||a.handle} proposed Version ${num}.`,at:now()});
+  activity(t,'counter',`${acc(proposerId)?.handle||a.handle} submitted Version ${num}.`,proposerId);
+  notify(target,t.negotiationId||t.id,'Trade offer received',`${acc(proposerId)?.handle||a.handle} sent Version ${num} of Trade #${t.negotiationId||t.id}.`,'counter');
+  consumeActiveSavedDraft(b);save();clearBuilderRecovery();ui.builder=null;showToast('Trade offer sent',`${acc(target)?.handle||'The other owner'} can now review it.`);setRoute(`trade-center/${t.negotiationId||t.id}`);return;
+ }
+ const numericIds=negotiations().map(t=>Number(t.negotiationId||t.id)).filter(Number.isFinite),n=String(Math.max(105,...numericIds)+1),target=owner(b.teamBId)?.id;
+ if(!target)return showToast('Trade partner unavailable','The selected team does not have an assigned owner.');
+ const versionId=`${n}-v1`,t=normalizeNegotiation({negotiationId:n,status:'negotiating',creatorId:proposerId,teamAId:b.teamAId,teamBId:b.teamBId,createdAt:now(),updatedAt:now(),currentVersion:1,versions:[{versionId,number:1,proposerId,targetId:target,createdAt:now(),note:b.note||'',assetsA:structuredClone(b.assetsA),assetsB:structuredClone(b.assetsB)}],chat:[{id:id(),authorId:'system',text:`${acc(proposerId)?.handle||a.handle} sent a private trade offer.`,at:now()}],activity:[],viewedBy:[],votes:{}});
+ activity(t,'sent',`${acc(proposerId)?.handle||a.handle} sent Version 1 to ${acc(target)?.handle||'the other owner'}.`,proposerId);negotiations().push(t);
+ notify(target,t.negotiationId,'New trade offer',`${acc(proposerId)?.handle||a.handle} sent Trade #${n}.`,'offer');audit(`Trade #${n} sent privately to ${acc(target)?.handle||'the other owner'}.`);
+ consumeActiveSavedDraft(b);save();clearBuilderRecovery();ui.builder=null;showToast('Trade offer sent',`${acc(target)?.handle||'The other owner'} can now review it.`);setRoute(`trade-center/${n}`);
+}
 function syncLegacyTwoTeamBuilder(){const b=ensureUnifiedBuilder();b.teamAId=b.teamIds[0];b.teamBId=b.teamIds[1];b.assetsA=b.assetsByTeam[b.teamAId]||[];b.assetsB=b.assetsByTeam[b.teamBId]||[]}
 function saveDraft(){
  const b=ensureUnifiedBuilder();if(!unifiedReady())return showToast('Trade is incomplete','All participating teams must send and receive at least one item.');
@@ -1078,8 +1111,8 @@ window.FranchiseHQ?.simulation?.setAccount?.(userId,{silent:true,source:'trade-m
 
 
   if (window.FranchiseHQ?.events?.emit) {
-    window.FranchiseHQ.events.emit('trade-ready', { version: '5.7.0t' });
+    window.FranchiseHQ.events.emit('trade-ready', { version: '5.7.0u' });
   } else {
-    window.dispatchEvent(new CustomEvent('franchisehq:trade-ready', { detail: { version: '5.7.0t' } }));
+    window.dispatchEvent(new CustomEvent('franchisehq:trade-ready', { detail: { version: '5.7.0u' } }));
   }
 })();
