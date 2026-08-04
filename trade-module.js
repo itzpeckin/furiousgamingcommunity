@@ -370,7 +370,7 @@ function completedTradeAnalytics(){
 function analyticsTradeCards(records){return records.map(record=>record.kind==='multi'?multiTradeCard(record.row):tradeCard(record.row)).join('')}
 function analyticsDrilldown(data){
  const drill=ui.analyticsDrilldown;if(!drill)return'';
- const allApproved=approvedTradeRecords().filter(record=>record.status==='approved'&&!record.cancelled);
+ const allApproved=allTradeRecords().filter(record=>record.status==='approved'&&!record.row?.cancelled&&!record.row?.cancelReason);
  const seasons=[...new Set(allApproved.map(record=>record.season).filter(Boolean))].sort((a,b)=>Number(b)-Number(a));
  const seasonFiltered=ui.analyticsModalSeason==='all'?allApproved:allApproved.filter(record=>String(record.season)===String(ui.analyticsModalSeason));
  let title='Completed league trades',records=seasonFiltered;
