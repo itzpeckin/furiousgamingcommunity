@@ -924,7 +924,7 @@
         ${summaryTile('Overall',team.ovr,'Team rating')}${summaryTile('Offense',team.off,'Unit rating')}${summaryTile('Defense',team.def,'Unit rating')}${summaryTile('Points For',team.pf,`${(team.pf/7).toFixed(1)} per game`)}${summaryTile('Points Against',team.pa,`${(team.pa/7).toFixed(1)} per game`)}${summaryTile('Cap Space',formatMoney(team.cap),'Current estimate')}
       </div>
       <div class="subnav" data-team-tabs>
-        ${['roster','depth','schedule','stats','cap'].map(tab => `<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab === 'depth' ? 'Depth Chart' : titleCase(tab)}</button>`).join('')}
+        ${['roster','depth','schedule','stats','cap','trade-history'].map(tab => `<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab === 'depth' ? 'Depth Chart' : tab === 'trade-history' ? 'Trade History' : titleCase(tab)}</button>`).join('')}
       </div>
       <div data-team-tab-content>${renderTeamTab(team, rosterModel, roster, teamGames, leaders)}</div>`;
   }
@@ -939,6 +939,7 @@
     if (state.teamTab === 'schedule') return renderTeamSchedule(team, teamGames);
     if (state.teamTab === 'stats') return renderTeamStats(team, roster);
     if (state.teamTab === 'cap') return renderTeamCap(team, roster);
+    if (state.teamTab === 'trade-history') return renderTeamTradeHistory(team);
     return renderRosterExperience(team, rosterModel);
   }
 
@@ -1049,6 +1050,11 @@
     const total = roster.reduce((sum,p)=>sum+(Number(p.capHit)||0),0);
     const largest = sorted[0]?.capHit || 0;
     return `<div class="content-grid content-grid--cap"><article class="card"><div class="card-header"><div><span class="eyebrow">Financial overview</span><h3>Salary cap</h3></div></div><div class="card-body"><div class="stat-box-grid">${summaryStatBox('Cap Space',formatMoney(team.cap))}${summaryStatBox('Active Commitments',formatMoney(total))}${summaryStatBox('Largest Cap Hit',formatMoney(largest))}${summaryStatBox('Expiring Deals',roster.filter(p=>p.years===1).length)}</div></div></article><article class="card cap-roster-card"><div class="card-header"><div><span class="eyebrow">Full roster salaries</span><h3>Player contracts</h3></div><span class="pill pill--neutral">${sorted.length} players</span></div><div class="table-wrap"><table class="cap-roster-table"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Years</th><th>Salary</th><th>Cap Hit</th></tr></thead><tbody>${sorted.map(player=>`<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(schoolAbbreviation(player.college))}</small></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.years || '—'}</td><td>${player.salary ? formatMoney(player.salary) : 'Not provided'}</td><td><strong>${player.capHit ? formatMoney(player.capHit) : 'Not provided'}</strong></td></tr>`).join('')}</tbody></table></div></article></div>`;
+  }
+
+  function renderTeamTradeHistory(team) {
+    const rows = window.FGC_TRADE?.getTeamTradeHistory?.(team.id) || [];
+    return `<div class="team-trade-history-view"><div class="section-heading"><div><span class="eyebrow">Permanent franchise transaction record</span><h2>${escapeHtml(team.fullName)} Trade History</h2><p>Approved and Commissioner-cancelled Franchise HQ transactions involving this team.</p></div><span class="pill pill--neutral">${rows.length} trade${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-trade-history-list">${rows.map(row=>{const partners=row.teamIds.filter(id=>id!==team.id).map(id=>teamById(id)?.fullName||id).join(', ');return `<button type="button" class="team-trade-history-row card" ${row.kind==='multi'?`data-route="trade-center/multi-${escapeHtml(row.id)}"`:`data-route="trade-center/${escapeHtml(row.id)}"`}><span><strong>Trade #${escapeHtml(row.id)}</strong><small>${escapeHtml(row.date||'Date unavailable')} · ${escapeHtml(partners||'League transaction')}</small><em>${escapeHtml(row.summary||'No asset summary available')}</em></span><span class="pill ${row.status==='approved'?'pill--success':'pill--danger'}">${row.status==='approved'?'Approved':'Cancelled by Commissioner'}</span></button>`}).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No completed trade history</h3><p>This franchise has not appeared in an approved Franchise HQ trade record.</p></div></article>`}</div>`;
   }
 
   function renderPlayers() {
