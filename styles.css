@@ -4099,3 +4099,54 @@ table td{
   .trade-setting-grid--five { grid-template-columns: 1fr; }
   .commissioner-pick-projections .projection-team-row select { min-width: 0; }
 }
+
+/* v5.7.0y — projection cards and trade-detail layout polish */
+.commissioner-pick-projections .projection-team-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+.commissioner-pick-projections .projection-team-owner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.commissioner-pick-projections .projection-team-owner small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.commissioner-pick-projections .projection-team-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.commissioner-pick-projections .projection-team-field em {
+  order: 0;
+  font-style: normal;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.2;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-align: left;
+}
+.commissioner-pick-projections .projection-team-field select {
+  order: 1;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.multi-detail-grid > .multi-detail-team:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+@media (max-width: 760px) {
+  .commissioner-pick-projections .projection-team-row { padding: 14px; }
+}
