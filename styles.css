@@ -4244,3 +4244,25 @@ table td{
 .trade-tab-search+.empty-state{margin-top:0}
 @media(max-width:1100px){.trade-history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.trade-history-filters .field--grow{grid-column:1/-1}.trade-history-filters>.button{width:100%}}
 @media(max-width:700px){.trade-history-filters{grid-template-columns:1fr}.trade-history-filters .field--grow{grid-column:auto}}
+
+/* v5.7.3 — Trade notifications and completed trade analytics */
+.notification-menu__header-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.notification-menu__header-actions .text-button{font-size:12px;padding:4px 6px}
+.trade-analytics-controls{display:flex;justify-content:flex-end;margin-bottom:18px}
+.trade-analytics-controls .field{min-width:220px}
+.trade-analytics-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:18px}
+.trade-analytics-total{display:grid;gap:8px;padding:22px}
+.trade-analytics-total>span{color:var(--muted);font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.trade-analytics-total>strong{font-size:42px;line-height:1;color:var(--text)}
+.trade-analytics-total>small{color:var(--muted)}
+.trade-analytics-table{padding:22px}
+.trade-analytics-table .box-heading{margin-bottom:10px}
+.trade-analytics-row{display:grid;grid-template-columns:34px 48px minmax(0,1fr) 70px;align-items:center;gap:12px;padding:13px 4px;border-top:1px solid var(--border)}
+.trade-analytics-row>span{color:var(--muted);font-weight:800;text-align:center}
+.trade-analytics-row .team-logo{width:44px;height:44px;font-size:13px}
+.trade-analytics-row>div{display:grid;gap:3px;min-width:0}
+.trade-analytics-row>div strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trade-analytics-row>div small{color:var(--muted)}
+.trade-analytics-row>b{font-size:20px;text-align:right;color:var(--accent)}
+.trade-analytics-row.is-single{grid-template-columns:48px minmax(0,1fr) 70px}
+@media(max-width:760px){.trade-analytics-summary{grid-template-columns:1fr}.trade-analytics-controls{justify-content:stretch}.trade-analytics-controls .field{width:100%;min-width:0}.trade-analytics-row{grid-template-columns:28px 42px minmax(0,1fr) 52px}.trade-analytics-row .team-logo{width:40px;height:40px}}
