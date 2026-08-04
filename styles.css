@@ -4060,3 +4060,13 @@ table td{
 .asset-result em{pointer-events:none}
 .trade-note-card__footer>.heading-actions{margin-left:auto}
 .trade-note-card__footer .builder-action-buttons{margin-left:0}
+
+/* v5.7.0w Trade settings consolidation and workspace cleanup */
+.trade-setting-grid--four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.trade-setting-grid--six{grid-template-columns:repeat(6,minmax(0,1fr))}
+.value-model-tabs{margin-bottom:18px;flex-wrap:wrap}
+.projection-team-row select{width:100%;min-width:0}
+.unified-trade-draft .card-header{align-items:center}
+.unified-trade-draft .card-header h2{margin:0}
+@media(max-width:1200px){.trade-setting-grid--six{grid-template-columns:repeat(3,minmax(0,1fr))}.trade-setting-grid--four{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.trade-setting-grid--six,.trade-setting-grid--four{grid-template-columns:1fr}.value-model-tabs button{flex:1 1 45%}}
