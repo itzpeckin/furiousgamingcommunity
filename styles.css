@@ -4266,3 +4266,14 @@ table td{
 .trade-analytics-row>b{font-size:20px;text-align:right;color:var(--accent)}
 .trade-analytics-row.is-single{grid-template-columns:48px minmax(0,1fr) 70px}
 @media(max-width:760px){.trade-analytics-summary{grid-template-columns:1fr}.trade-analytics-controls{justify-content:stretch}.trade-analytics-controls .field{width:100%;min-width:0}.trade-analytics-row{grid-template-columns:28px 42px minmax(0,1fr) 52px}.trade-analytics-row .team-logo{width:40px;height:40px}}
+
+
+/* v5.7.3a — notification read-state and analytics drilldown */
+.trade-analytics-total{width:100%;text-align:left;color:inherit;cursor:pointer;font:inherit;border:1px solid var(--border)}
+.trade-analytics-total:hover,.trade-analytics-total:focus-visible{border-color:rgba(var(--accent-rgb),.55);background:rgba(var(--accent-rgb),.06);outline:none}
+.trade-analytics-count{justify-self:end;min-width:44px;padding:8px 11px;border:1px solid rgba(var(--accent-rgb),.42);border-radius:10px;background:rgba(var(--accent-rgb),.10);color:var(--accent);font-size:20px;font-weight:900;cursor:pointer}
+.trade-analytics-count:hover,.trade-analytics-count:focus-visible{background:rgba(var(--accent-rgb),.20);outline:none}
+.trade-analytics-drilldown{margin-top:18px;padding:22px}
+.trade-analytics-drilldown .box-heading{align-items:flex-start;margin-bottom:16px}
+.trade-analytics-drilldown .box-heading p{margin:5px 0 0;color:var(--muted)}
+.trade-analytics-drilldown .trade-list-grid{margin-top:0}
