@@ -4268,7 +4268,7 @@ table td{
 @media(max-width:760px){.trade-analytics-summary{grid-template-columns:1fr}.trade-analytics-controls{justify-content:stretch}.trade-analytics-controls .field{width:100%;min-width:0}.trade-analytics-row{grid-template-columns:28px 42px minmax(0,1fr) 52px}.trade-analytics-row .team-logo{width:40px;height:40px}}
 
 
-/* v5.7.3a — notification read-state and analytics drilldown */
+/* v5.7.3b — notification read-state and analytics drilldown */
 .trade-analytics-total{width:100%;text-align:left;color:inherit;cursor:pointer;font:inherit;border:1px solid var(--border)}
 .trade-analytics-total:hover,.trade-analytics-total:focus-visible{border-color:rgba(var(--accent-rgb),.55);background:rgba(var(--accent-rgb),.06);outline:none}
 .trade-analytics-count{justify-self:end;min-width:44px;padding:8px 11px;border:1px solid rgba(var(--accent-rgb),.42);border-radius:10px;background:rgba(var(--accent-rgb),.10);color:var(--accent);font-size:20px;font-weight:900;cursor:pointer}
@@ -4277,3 +4277,14 @@ table td{
 .trade-analytics-drilldown .box-heading{align-items:flex-start;margin-bottom:16px}
 .trade-analytics-drilldown .box-heading p{margin:5px 0 0;color:var(--muted)}
 .trade-analytics-drilldown .trade-list-grid{margin-top:0}
+
+/* v5.7.3b — analytics modal and notification panel controls */
+.trade-analytics-drilldown{display:none!important}
+.trade-analytics-modal{position:fixed;inset:0;z-index:350;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(3,8,16,.76);backdrop-filter:blur(5px)}
+.trade-analytics-modal__dialog{width:min(980px,calc(100vw - 32px));max-height:min(82vh,820px);overflow:auto;padding:24px;box-shadow:0 28px 90px rgba(0,0,0,.58)}
+.trade-analytics-modal__dialog .box-heading{position:sticky;top:-24px;z-index:2;margin:-24px -24px 18px;padding:24px;background:var(--panel);border-bottom:1px solid var(--border)}
+.trade-analytics-modal__season{width:min(280px,100%);margin:0 0 18px}
+.trade-analytics-modal__dialog .trade-list-grid{margin-top:0}
+.notification-menu__header-actions{align-items:center}
+.notification-menu__header-actions .text-button{white-space:nowrap}
+@media(max-width:700px){.trade-analytics-modal{padding:12px;align-items:flex-end}.trade-analytics-modal__dialog{width:100%;max-height:88vh;border-radius:18px 18px 0 0}.trade-analytics-modal__dialog .box-heading{top:-24px}}
