@@ -1,10 +1,3 @@
-# Franchise HQ v5.8.0a
+# Franchise HQ v5.8.0a — Larger League News Scroll
 
-Home Dashboard Readability & Layout Patch.
-
-- Team-color GOTW gradient now continues through the Top Players area.
-- Playoff standings column is narrower with larger typography.
-- League Leader tables now sit directly beneath GOTW in the primary column.
-- Every leader table has clickable category filters and displays the top 10 for the selected statistic.
-- Dashboard typography and background now match the rest of Franchise HQ.
-- Duplicate schedule-team abbreviations were removed.
+This patch increases the League Headlines ticker height and typography, and adds a one-line story summary beneath every headline. The continuous scroll, hover pause, focus pause, and click-to-open behavior remain unchanged.

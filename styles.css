@@ -4442,13 +4442,13 @@ table td{
   .free-trade-designation-toggle{grid-template-columns:minmax(0,1fr) auto}
 }
 
-/* v5.8.0 — League News Automatic Scroll */
+/* v5.8.0a — Larger League News Automatic Scroll */
 .league-news-ticker{
   display:grid;
   grid-template-columns:auto minmax(0,1fr);
   align-items:stretch;
-  min-height:42px;
-  margin:0 0 16px;
+  min-height:72px;
+  margin:0 0 18px;
   overflow:hidden;
   border:1px solid var(--border);
   border-radius:12px;
@@ -4460,67 +4460,75 @@ table td{
   z-index:2;
   display:flex;
   align-items:center;
-  gap:8px;
-  padding:0 15px;
+  gap:9px;
+  padding:0 18px;
   border-right:1px solid var(--border);
   background:var(--surface-2);
   color:var(--text);
   white-space:nowrap;
-  font-size:9px;
+  font-size:11px;
   font-weight:900;
   letter-spacing:.08em;
   text-transform:uppercase;
 }
-.league-news-ticker__label svg{width:15px;height:15px;color:var(--accent)}
+.league-news-ticker__label svg{width:18px;height:18px;color:var(--accent)}
 .league-news-ticker__viewport{
   min-width:0;
   overflow:hidden;
-  mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
-  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+  mask-image:linear-gradient(90deg,transparent 0,#000 26px,#000 calc(100% - 26px),transparent 100%);
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 26px,#000 calc(100% - 26px),transparent 100%);
 }
 .league-news-ticker__track{
   display:flex;
   width:max-content;
   min-width:100%;
-  animation:league-news-ticker-scroll 52s linear infinite;
+  animation:league-news-ticker-scroll 64s linear infinite;
   will-change:transform;
 }
 .league-news-ticker:hover .league-news-ticker__track,
 .league-news-ticker:focus-within .league-news-ticker__track{animation-play-state:paused}
-.league-news-ticker__group{display:flex;align-items:center;flex-shrink:0}
+.league-news-ticker__group{display:flex;align-items:stretch;flex-shrink:0}
 .league-news-ticker__item{
-  display:flex;
+  display:grid;
+  grid-template-columns:auto minmax(250px,360px) auto;
   align-items:center;
-  gap:9px;
-  min-height:40px;
-  padding:0 8px 0 18px;
+  gap:12px;
+  min-height:70px;
+  padding:8px 14px 8px 20px;
   border:0;
+  border-right:1px solid rgba(255,255,255,.06);
   background:transparent;
   color:var(--text);
   cursor:pointer;
-  white-space:nowrap;
+  text-align:left;
   font:inherit;
 }
+.league-news-ticker__item:hover{background:rgba(var(--accent-rgb),.06)}
 .league-news-ticker__item:hover .league-news-ticker__headline,
 .league-news-ticker__item:focus-visible .league-news-ticker__headline{color:var(--accent);text-decoration:underline}
 .league-news-ticker__item:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:7px}
 .league-news-ticker__category{
-  padding:3px 7px;
+  padding:4px 8px;
   border:1px solid rgba(var(--accent-rgb),.35);
   border-radius:999px;
   background:rgba(var(--accent-rgb),.10);
   color:var(--accent);
-  font-size:7px;
+  font-size:8px;
   font-weight:900;
   letter-spacing:.06em;
   text-transform:uppercase;
+  white-space:nowrap;
 }
-.league-news-ticker__headline{font-size:9px;font-weight:750;transition:color .15s ease}
-.league-news-ticker__separator{margin-left:8px;color:var(--muted);font-size:12px}
+.league-news-ticker__copy{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
+.league-news-ticker__headline{font-size:12px;line-height:1.25;font-weight:850;transition:color .15s ease;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.league-news-ticker__summary{max-width:360px;color:var(--muted);font-size:9px;line-height:1.35;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.league-news-ticker__separator{margin-left:4px;color:var(--muted);font-size:15px}
 @keyframes league-news-ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){.league-news-ticker__track{animation:none}.league-news-ticker__viewport{overflow-x:auto;mask-image:none;-webkit-mask-image:none}}
 @media(max-width:700px){
-  .league-news-ticker{grid-template-columns:1fr}
-  .league-news-ticker__label{justify-content:center;min-height:34px;border-right:0;border-bottom:1px solid var(--border)}
-  .league-news-ticker__headline{font-size:8px}
+  .league-news-ticker{grid-template-columns:1fr;min-height:108px}
+  .league-news-ticker__label{justify-content:center;min-height:36px;border-right:0;border-bottom:1px solid var(--border);font-size:10px}
+  .league-news-ticker__item{grid-template-columns:auto minmax(220px,300px) auto;min-height:70px}
+  .league-news-ticker__headline{font-size:11px}
+  .league-news-ticker__summary{font-size:8px}
 }

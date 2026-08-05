@@ -407,11 +407,17 @@
       .filter(item => item && item.id && item.title)
       .slice(0, 12);
     if (!items.length) return '';
-    const tickerItems = items.map((item,index)=>`<button type="button" class="league-news-ticker__item" data-news-id="${escapeHtml(item.id)}" aria-label="Open headline: ${escapeHtml(item.title)}">
-      <span class="league-news-ticker__category">${escapeHtml(item.category || 'League News')}</span>
-      <span class="league-news-ticker__headline">${escapeHtml(item.title)}</span>
-      <span class="league-news-ticker__separator" aria-hidden="true">•</span>
-    </button>`).join('');
+    const tickerItems = items.map((item,index)=>{
+      const summary = item.excerpt || item.summary || item.story || item.detail || 'Open the full story for the latest league update.';
+      return `<button type="button" class="league-news-ticker__item" data-news-id="${escapeHtml(item.id)}" aria-label="Open headline: ${escapeHtml(item.title)}">
+        <span class="league-news-ticker__category">${escapeHtml(item.category || 'League News')}</span>
+        <span class="league-news-ticker__copy">
+          <span class="league-news-ticker__headline">${escapeHtml(item.title)}</span>
+          <span class="league-news-ticker__summary">${escapeHtml(summary)}</span>
+        </span>
+        <span class="league-news-ticker__separator" aria-hidden="true">•</span>
+      </button>`;
+    }).join('');
     return `<section class="league-news-ticker" aria-label="League headlines">
       <div class="league-news-ticker__label"><svg><use href="#icon-news"></use></svg><span>League Headlines</span></div>
       <div class="league-news-ticker__viewport">
