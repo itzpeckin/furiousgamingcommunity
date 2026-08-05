@@ -4936,3 +4936,31 @@ table td{
 .gotw-save-bar>div{display:grid;gap:4px}.gotw-save-bar span{font-size:13px;color:var(--muted)}
 .featured-game-label span{display:inline-flex;align-items:center;gap:6px}
 @media(max-width:900px){.gotw-matchup-option{grid-template-columns:1fr}.gotw-matchup-option__meta{text-align:left;min-width:0}.gotw-matchup-option__teams{grid-template-columns:1fr}.gotw-versus{justify-content:start}.gotw-save-bar{align-items:stretch;flex-direction:column}}
+
+
+/* v5.8.3a — GOTW selected state and matchup player label polish */
+.gotw-matchup-option.is-selected{
+  border-color:var(--accent);
+  background:linear-gradient(135deg,rgba(var(--accent-rgb),.18),var(--surface-3));
+  box-shadow:0 0 0 2px rgba(var(--accent-rgb),.2),0 10px 24px rgba(0,0,0,.18);
+}
+.gotw-matchup-option.is-selected::before{
+  content:'✓';
+  display:grid;
+  place-items:center;
+  position:absolute;
+  top:10px;
+  left:10px;
+  width:24px;
+  height:24px;
+  border-radius:999px;
+  background:var(--accent);
+  color:#fff;
+  font-size:13px;
+  font-weight:900;
+}
+.gotw-matchup-option{position:relative}
+.gotw-selected-cue{color:var(--accent);font-size:11px;font-style:normal;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+.featured-player-row>span:first-child{justify-content:flex-start;gap:6px}
+.featured-player-row strong{font-size:11px;line-height:1.2}
+.featured-player-row small{font-size:8px;line-height:1.2;color:var(--muted);font-weight:800;white-space:nowrap}
