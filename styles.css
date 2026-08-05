@@ -4964,3 +4964,42 @@ table td{
 .featured-player-row>span:first-child{justify-content:flex-start;gap:6px}
 .featured-player-row strong{font-size:11px;line-height:1.2}
 .featured-player-row small{font-size:8px;line-height:1.2;color:var(--muted);font-weight:800;white-space:nowrap}
+
+/* v5.8.4 — Playoff Hunt data refinement (component-scoped only) */
+.home-standings-columns{
+  display:grid;
+  grid-template-columns:56px minmax(0,1fr) 44px 42px 30px;
+  gap:8px;
+  align-items:center;
+  padding:6px 12px;
+  border-top:1px solid var(--border);
+  color:var(--muted);
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.home-standings-columns span:first-child{grid-column:1/3}
+.home-standings-list button{
+  grid-template-columns:25px 25px minmax(0,1fr) 44px 42px 30px;
+}
+.home-standings-team{min-width:0}
+.home-standings-record,
+.home-standings-pct,
+.home-standings-gb{
+  font-size:10px!important;
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.home-standings-pct,
+.home-standings-gb{color:var(--muted)}
+.home-standings-list button.wildcard-cutline{
+  border-top:2px solid rgba(var(--accent-rgb),.58);
+}
+@media(max-width:420px){
+  .home-standings-columns{grid-template-columns:50px minmax(0,1fr) 42px 38px}
+  .home-standings-columns span:last-child{display:none}
+  .home-standings-list button{grid-template-columns:23px 23px minmax(0,1fr) 42px 38px}
+  .home-standings-gb{display:none}
+}

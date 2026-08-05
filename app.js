@@ -399,15 +399,46 @@
     </button>`;
   }
 
+  function playoffHuntRows(conference) {
+    const conferenceTeams=teams.filter(team=>team.conference===conference);
+    const divisions=[...new Set(conferenceTeams.map(team=>team.division))];
+    const divisionLeaders=divisions
+      .map(division=>conferenceTeams.filter(team=>team.division===division).sort(sortStandings)[0])
+      .filter(Boolean)
+      .sort(sortStandings);
+    const leaderIds=new Set(divisionLeaders.map(team=>team.id));
+    const remaining=conferenceTeams.filter(team=>!leaderIds.has(team.id)).sort(sortStandings);
+    const wildCards=remaining.slice(0,3);
+    const inHunt=remaining.slice(3,6);
+    const rows=[
+      ...divisionLeaders.map(team=>({team,type:'Division leader'})),
+      ...wildCards.map(team=>({team,type:'Wild card'})),
+      ...inHunt.map(team=>({team,type:'In the hunt'}))
+    ];
+    const conferenceLeader=[...conferenceTeams].sort(sortStandings)[0];
+    return rows.slice(0,10).map((row,index)=>{
+      const team=row.team;
+      const gamesPlayed=(Number(team.wins)||0)+(Number(team.losses)||0)+(Number(team.ties)||0);
+      const winPct=gamesPlayed?((Number(team.wins)||0)+((Number(team.ties)||0)*0.5))/gamesPlayed:0;
+      const gamesBehind=conferenceLeader
+        ? (((Number(conferenceLeader.wins)||0)-(Number(team.wins)||0))+((Number(team.losses)||0)-(Number(conferenceLeader.losses)||0)))/2
+        : 0;
+      return {...row,seed:index+1,winPct,gamesBehind:Math.max(0,gamesBehind)};
+    });
+  }
+
   function renderConferenceSnapshot(conference) {
-    const ranked=teams.filter(t=>t.conference===conference).sort(sortStandings).slice(0,10);
+    const ranked=playoffHuntRows(conference);
     return `<article class="card home-standings-card">
       <div class="card-header"><div><span class="eyebrow">Playoff picture</span><h3>${conference} Standings</h3></div><button class="text-button" data-route="standings">View all <svg><use href="#icon-arrow"></use></svg></button></div>
+      <div class="home-standings-columns" aria-hidden="true"><span></span><span>Team</span><span>W-L</span><span>PCT</span><span>GB</span></div>
       <div class="home-standings-list">
-        ${ranked.map((team,index)=>`<button type="button" data-team-id="${team.id}" data-route="teams/${team.id}" class="${index===7?'wildcard-cutline':''}">
-          <span class="seed">${index+1}</span>${renderTeamMark(team)}
-          <span><strong>${team.fullName}</strong><small>${index<4?'Division leader':index<7?'Wild card':'In the hunt'}</small></span>
-          <strong>${team.record}</strong>
+        ${ranked.map(({team,type,seed,winPct,gamesBehind})=>`<button type="button" data-team-id="${team.id}" data-route="teams/${team.id}" class="${seed===8?'wildcard-cutline':''}">
+          <span class="seed">${seed}</span>${renderTeamMark(team)}
+          <span class="home-standings-team"><strong>${team.fullName}</strong><small>${type}</small></span>
+          <strong class="home-standings-record">${team.record}${team.ties?`-${team.ties}`:''}</strong>
+          <span class="home-standings-pct">${winPct.toFixed(3).replace(/^0/,'')}</span>
+          <span class="home-standings-gb">${gamesBehind===0?'—':Number.isInteger(gamesBehind)?gamesBehind:gamesBehind.toFixed(1)}</span>
         </button>`).join('')}
       </div>
     </article>`;
