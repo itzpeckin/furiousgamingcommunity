@@ -198,6 +198,50 @@
   function percent(value) { return `${Number(value).toFixed(1)}%`; }
   function routeBase(route) { return route.split('/')[0] || 'home'; }
 
+  const GOTW_STORAGE_KEY = 'franchisehq:home.gotw.v1';
+  function readGotwSelections() {
+    try { return JSON.parse(localStorage.getItem(GOTW_STORAGE_KEY) || '{}') || {}; }
+    catch { return {}; }
+  }
+  function currentHomeWeek() {
+    return schedule.find(week => Number(week.week) === Number(state.scheduleWeek || 8)) || schedule.find(week => Number(week.week) === 8) || schedule[0];
+  }
+  function officialGotwId(weekNumber = currentHomeWeek()?.week) {
+    const selections = readGotwSelections();
+    return selections[String(weekNumber)] || null;
+  }
+  function saveOfficialGotw(weekNumber, gameId) {
+    const week = schedule.find(item => Number(item.week) === Number(weekNumber));
+    if (!week || !week.games.some(game => String(game.id) === String(gameId))) return { ok:false, error:'The selected matchup is not available for this week.' };
+    const selections = readGotwSelections();
+    selections[String(weekNumber)] = String(gameId);
+    localStorage.setItem(GOTW_STORAGE_KEY, JSON.stringify(selections));
+    window.dispatchEvent(new CustomEvent('franchisehq:gotw-changed', { detail:{ week:Number(weekNumber), gameId:String(gameId) } }));
+    return { ok:true, gameId:String(gameId) };
+  }
+  function allTimeTeamProfile(team) {
+    const games = seededNumber(`${team.abbr}-all-time-games`, 210, 430);
+    const wins = seededNumber(`${team.abbr}-all-time-wins`, Math.floor(games * .38), Math.floor(games * .67));
+    const titles = seededNumber(`${team.abbr}-sb-titles`, 0, 6);
+    return { games, wins, winPct: games ? wins / games : 0, superBowlTitles: titles };
+  }
+  function gotwWeekModel(weekNumber = currentHomeWeek()?.week) {
+    const week = schedule.find(item => Number(item.week) === Number(weekNumber)) || currentHomeWeek();
+    return {
+      week: Number(week?.week || weekNumber || 1),
+      officialGameId: officialGotwId(week?.week),
+      games: (week?.games || []).map(game => {
+        const away = teamById(game.awayId), home = teamById(game.homeId);
+        const mapTeam = team => ({
+          id:team.id, abbr:team.abbr, fullName:team.fullName, owner:team.owner, record:team.record,
+          seasonWinPct:(Number(team.wins)||0) / Math.max(1,(Number(team.wins)||0)+(Number(team.losses)||0)+(Number(team.ties)||0)),
+          ...allTimeTeamProfile(team)
+        });
+        return { ...game, away:mapTeam(away), home:mapTeam(home) };
+      })
+    };
+  }
+
   function playerNumber(position, teamIndex, depth) {
     const ranges = { QB:[1,19], RB:[20,39], FB:[30,49], WR:[1,19], TE:[80,89], LT:[60,79], LG:[60,79], C:[50,69], RG:[60,79], RT:[60,79], LE:[90,99], RE:[90,99], DT:[90,99], LOLB:[40,59], MLB:[40,59], ROLB:[40,59], CB:[20,39], FS:[20,39], SS:[20,39], K:[1,19], P:[1,19] };
     const [min,max] = ranges[position] || [1,99];
@@ -441,17 +485,19 @@
   }
 
   function renderLeagueHome() {
-    const currentWeek=schedule.find(w=>w.week===8)||schedule[0];
+    const currentWeek=currentHomeWeek();
     const availableGames=currentWeek.games;
+    const officialGameId=officialGotwId(currentWeek.week);
     if(!state.featuredGameId||!availableGames.some(g=>g.id===state.featuredGameId)){
       const ranked=[...availableGames].sort((a,b)=>{
         const ar=teamById(a.awayId).wins+teamById(a.homeId).wins;
         const br=teamById(b.awayId).wins+teamById(b.homeId).wins;
         return br-ar;
       });
-      state.featuredGameId=ranked[0]?.id;
+      state.featuredGameId=availableGames.some(game=>String(game.id)===String(officialGameId))?officialGameId:ranked[0]?.id;
     }
     const featured=availableGames.find(g=>g.id===state.featuredGameId)||availableGames[0];
+    const isOfficialGotw=String(featured.id)===String(officialGameId);
     const away=teamById(featured.awayId),home=teamById(featured.homeId);
     const awayOff=topUnitPlayers(away.id,'offense'),homeOff=topUnitPlayers(home.id,'offense');
     const awayDef=topUnitPlayers(away.id,'defense'),homeDef=topUnitPlayers(home.id,'defense');
@@ -483,7 +529,7 @@
         <div class="league-home-primary">
           <section class="featured-game card" data-game-id="${featured.id}" style="--away:${away.primary};--home:${home.primary}">
           <div class="featured-game-label">
-            <span>Game of the Week</span>
+            <span>${isOfficialGotw?'★ Game of the Week':'Selected Matchup'}</span>
             <small>${featured.day} · ${featured.time} · ${featured.network} · ${featured.stadium}</small>
           </div>
 
@@ -2495,6 +2541,12 @@
     if (routeBase(location.hash.slice(1))==='my-team') renderRoute('my-team');
   });
 
+  window.addEventListener('franchisehq:gotw-changed', event=>{
+    const currentWeek=currentHomeWeek();
+    if(Number(event.detail?.week)===Number(currentWeek?.week)) state.featuredGameId=event.detail?.gameId||null;
+    if(routeBase(location.hash.slice(1))==='home') renderLeagueHome();
+  });
+
   window.FranchiseHQ?.sidebar?.init?.({ sidebar, overlay: mobileOverlay });
 
   window.FGC_APP = {
@@ -2503,7 +2555,8 @@
     devClass, formatMoney, escapeHtml, setRoute, renderRoute, showToast,
     openDetail, closeDetail, applyRole, closeProfileMenu,
     commissionerAccessState, syncCommissionerAccess, renderGlobalLeagueDataBanner,
-    rosterService, rosterPlayerView, renderRosterExperience, openRosterPlayerDetail
+    rosterService, rosterPlayerView, renderRosterExperience, openRosterPlayerDetail,
+    gotw: { getWeekModel:gotwWeekModel, getOfficialGameId:officialGotwId, saveOfficial:saveOfficialGotw, currentWeek:currentHomeWeek }
   };
 
   window.FranchiseHQ?.ui?.registerAdapter?.('legacy-app', {

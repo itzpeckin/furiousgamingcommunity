@@ -4910,3 +4910,29 @@ table td{
     margin:0 0 10px!important;
   }
 }
+
+
+/* v5.8.3 — Game of the Week controls */
+.gotw-control-card{overflow:hidden}
+.gotw-matchup-list{display:grid;gap:12px}
+.gotw-matchup-option{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--surface-2);cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .18s ease}
+.gotw-matchup-option:hover{border-color:rgba(var(--accent-rgb),.55);background:var(--surface-3);transform:translateY(-1px)}
+.gotw-matchup-option.is-selected{border-color:var(--accent);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.18) inset}
+.gotw-matchup-option.is-official{background:linear-gradient(135deg,rgba(var(--accent-rgb),.12),var(--surface-2) 55%)}
+.gotw-matchup-option>input{position:absolute;opacity:0;pointer-events:none}
+.gotw-matchup-option__teams{display:grid;grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr);align-items:center;gap:10px}
+.gotw-team-summary{display:flex;align-items:center;gap:12px;min-width:0}
+.gotw-team-summary .team-logo{flex:0 0 auto}
+.gotw-team-summary div{display:grid;min-width:0}
+.gotw-team-summary strong{font-size:15px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gotw-team-summary span{font-size:13px;color:var(--muted)}
+.gotw-team-summary small{font-size:12px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gotw-versus{display:grid;place-items:center;color:var(--muted);font-weight:800}
+.gotw-matchup-option__meta{display:grid;text-align:right;gap:3px;min-width:190px}
+.gotw-matchup-option__meta strong{font-size:14px;color:var(--text)}
+.gotw-matchup-option__meta span{font-size:12px;color:var(--muted)}
+.gotw-matchup-option__meta em{font-size:11px;color:#f6c94c;font-style:normal;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.gotw-save-bar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:18px;padding-top:18px;border-top:1px solid var(--border)}
+.gotw-save-bar>div{display:grid;gap:4px}.gotw-save-bar span{font-size:13px;color:var(--muted)}
+.featured-game-label span{display:inline-flex;align-items:center;gap:6px}
+@media(max-width:900px){.gotw-matchup-option{grid-template-columns:1fr}.gotw-matchup-option__meta{text-align:left;min-width:0}.gotw-matchup-option__teams{grid-template-columns:1fr}.gotw-versus{justify-content:start}.gotw-save-bar{align-items:stretch;flex-direction:column}}
