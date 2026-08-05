@@ -68,7 +68,8 @@
     homeLeaderMetrics: {
       passing: 'passingYards',
       rushing: 'rushingYards',
-      receiving: 'receivingYards'
+      receiving: 'receptions',
+      defense: 'tackles'
     },
     gameCenterTab: 'team',
     recapFormat: 'landscape',
@@ -238,10 +239,10 @@
     const s = seed => seededNumber(`${player.id}-${seed}`,0,9999);
     if (player.position === 'QB') {
       const attempts = 170 + (s('att') % 115); const completions = Math.round(attempts * (.57 + (s('pct') % 120)/1000));
-      return { games, passingYards: 1250 + (s('py') % 1350), passingTD: 8 + (s('ptd') % 18), interceptions: 2 + (s('int') % 10), attempts, completions, compPct: completions/attempts*100, rushingYards: s('qry') % 420, rushingTD: s('qrtd') % 6, fantasy: 105 + (s('fp') % 900)/10 };
+      return { games, passingYards: 1250 + (s('py') % 1350), passingTD: 8 + (s('ptd') % 18), interceptions: 2 + (s('int') % 10), attempts, completions, compPct: completions/attempts*100, rushingYards: s('qry') % 420, rushingTD: s('qrtd') % 6, fumbles: s('qfum') % 5, fantasy: 105 + (s('fp') % 900)/10 };
     }
     if (['RB','FB'].includes(player.position)) {
-      return { games, carries: 45 + (s('car') % 115), rushingYards: 220 + (s('ry') % 770), rushingTD: 1 + (s('rtd') % 10), receptions: 8 + (s('rec') % 35), receivingYards: 55 + (s('rey') % 360), receivingTD: s('retd') % 5, fantasy: 55 + (s('fp') % 950)/10 };
+      return { games, carries: 45 + (s('car') % 115), rushingYards: 220 + (s('ry') % 770), rushingTD: 1 + (s('rtd') % 10), receptions: 8 + (s('rec') % 35), receivingYards: 55 + (s('rey') % 360), receivingTD: s('retd') % 5, fumbles: s('fum') % 5, fantasy: 55 + (s('fp') % 950)/10 };
     }
     if (['WR','TE'].includes(player.position)) {
       return { games, receptions: 14 + (s('rec') % 55), targets: 25 + (s('tgt') % 70), receivingYards: 180 + (s('rey') % 850), receivingTD: 1 + (s('retd') % 9), yardsPerCatch: 9 + (s('ypc') % 95)/10, fantasy: 45 + (s('fp') % 970)/10 };
@@ -373,15 +374,19 @@
     const configs={
       passing:{
         positions:['QB'],
-        tabs:[['passingYards','Yards'],['passingTD','TDs']]
+        tabs:[['passingYards','Yards'],['passingTD','TDs'],['interceptions','INTs']]
       },
       rushing:{
         positions:['RB','FB','QB'],
-        tabs:[['rushingYards','Yards'],['rushingTD','TDs']]
+        tabs:[['rushingYards','Yards'],['rushingTD','TDs'],['fumbles','Fumbles']]
       },
       receiving:{
-        positions:['WR','TE','RB'],
-        tabs:[['receivingYards','Yards'],['receptions','Receptions'],['receivingTD','TDs']]
+        positions:['WR','TE','RB','FB'],
+        tabs:[['receptions','Receptions'],['receivingYards','Yards'],['receivingTD','TDs']]
+      },
+      defense:{
+        positions:defensePositions,
+        tabs:[['tackles','Tackles'],['sacks','Sacks'],['interceptions','INTs']]
       }
     };
     return {...configs[category],metric};
@@ -390,14 +395,19 @@
   function renderHomeLeaderCard(category,title) {
     const cfg=leaderMetricConfig(category);
     const eligible=players.filter(p=>cfg.positions.includes(p.position)&&p.stats[cfg.metric]!==undefined)
-      .sort((a,b)=>Number(b.stats[cfg.metric]||0)-Number(a.stats[cfg.metric]||0)).slice(0,5);
-    return `<article class="card home-leader-card">
-      <div class="card-header"><div><span class="eyebrow">League leaders</span><h3>${title}</h3></div></div>
-      <div class="mini-toggle">${cfg.tabs.map(([key,label])=>`<button type="button" data-home-leader-category="${category}" data-home-leader-metric="${key}" class="${cfg.metric===key?'is-active':''}">${label}</button>`).join('')}</div>
+      .sort((a,b)=>Number(b.stats[cfg.metric]||0)-Number(a.stats[cfg.metric]||0)||a.name.localeCompare(b.name)).slice(0,5);
+    return `<article class="card home-leader-card home-leader-card--${category}">
+      <div class="home-leader-card__header">
+        <div><span class="eyebrow">League leaders</span><h3>${title}</h3></div>
+        <div class="mini-toggle" role="group" aria-label="${title} leaderboard statistic">
+          ${cfg.tabs.map(([key,label])=>`<button type="button" data-home-leader-category="${category}" data-home-leader-metric="${key}" class="${cfg.metric===key?'is-active':''}">${label}</button>`).join('')}
+        </div>
+      </div>
       <div class="home-leader-list">${eligible.map((player,index)=>`<button type="button" data-player-id="${player.id}">
-        <span class="leader-rank">${index+1}</span>${renderPlayerIdentity(player)}
-        <strong>${formatStatValue(cfg.metric,player.stats[cfg.metric])}</strong>
-      </button>`).join('')}</div>
+        <span class="leader-rank">${index+1}</span>
+        <span class="home-leader-player"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position)} · ${escapeHtml(teamById(player.teamId)?.abbr||'FA')}</small></span>
+        <strong class="home-leader-value">${formatStatValue(cfg.metric,player.stats[cfg.metric])}</strong>
+      </button>`).join('')||`<div class="home-leader-empty">No statistics available.</div>`}</div>
     </article>`;
   }
 
@@ -427,18 +437,6 @@
         </div>
       </div>
     </section>`;
-  }
-
-  function renderFixedLeaderCard(title, metric, positions) {
-    const eligible=players.filter(p=>positions.includes(p.position)&&p.stats[metric]!==undefined)
-      .sort((a,b)=>Number(b.stats[metric]||0)-Number(a.stats[metric]||0)).slice(0,5);
-    return `<article class="card home-leader-card">
-      <div class="card-header"><div><span class="eyebrow">Defense</span><h3>${title}</h3></div></div>
-      <div class="home-leader-list home-leader-list--fixed">${eligible.map((player,index)=>`<button type="button" data-player-id="${player.id}">
-        <span class="leader-rank">${index+1}</span>${renderPlayerIdentity(player)}
-        <strong>${formatStatValue(metric,player.stats[metric])}</strong>
-      </button>`).join('')}</div>
-    </article>`;
   }
 
   function renderLeagueHome() {
@@ -533,6 +531,16 @@
             </div>
           </div>
         </section>
+
+          <section class="home-leaders-section home-leaders-section--embedded">
+            <div class="section-heading home-leaders-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
+            <div class="home-leaders-grid home-leaders-grid--embedded">
+              ${renderHomeLeaderCard('passing','Passing')}
+              ${renderHomeLeaderCard('rushing','Rushing')}
+              ${renderHomeLeaderCard('receiving','Receiving')}
+              ${renderHomeLeaderCard('defense','Defense')}
+            </div>
+          </section>
         </div>
 
         <aside class="league-home-standings">
@@ -540,18 +548,7 @@
           ${renderConferenceSnapshot('NFC')}
         </aside>
       </div>
-
-      <section class="home-section home-leaders-section">
-        <div class="section-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
-        <div class="home-leaders-grid home-leaders-grid--single-row">
-          ${renderHomeLeaderCard('passing','Passing')}
-          ${renderHomeLeaderCard('rushing','Rushing')}
-          ${renderHomeLeaderCard('receiving','Receiving')}
-          ${renderFixedLeaderCard('Tackles','tackles',defensePositions)}
-          ${renderFixedLeaderCard('Sacks','sacks',defensePositions)}
-          ${renderFixedLeaderCard('Interceptions','interceptions',defensePositions)}
-        </div>
-      </section>`;
+`;
   }
 
   function renderActivity() {
