@@ -4696,3 +4696,69 @@ table td{
     min-height:0;
   }
 }
+
+/* v5.8.2c — Matchup-edge alignment and leaderboard readability */
+@media(min-width:1201px){
+  .league-home-main{
+    row-gap:10px!important;
+  }
+  .league-home-main>.home-leaders-section--embedded{
+    align-self:start!important;
+  }
+  .home-leaders-heading{
+    display:none!important;
+  }
+  .home-leaders-grid--embedded{
+    margin-top:0!important;
+    align-items:stretch!important;
+  }
+}
+
+/* Give player names more room by tightening rank and statistic columns. */
+.home-leader-columns{
+  grid-template-columns:16px minmax(0,1fr) 40px!important;
+  gap:6px!important;
+  padding:6px 10px!important;
+  font-size:6.5px!important;
+}
+.home-leaders-grid--embedded .home-leader-list button{
+  grid-template-columns:16px minmax(0,1fr) 40px!important;
+  gap:6px!important;
+  min-height:42px!important;
+  padding:7px 10px!important;
+}
+.home-leaders-grid--embedded .leader-rank{
+  font-size:8px!important;
+  text-align:left!important;
+}
+.home-leader-player strong{
+  font-size:11px!important;
+  line-height:1.18!important;
+  letter-spacing:-.01em;
+}
+.home-leader-player small{
+  font-size:6.5px!important;
+  line-height:1.15!important;
+}
+.home-leader-value{
+  font-size:8.5px!important;
+  line-height:1!important;
+  font-weight:850!important;
+  text-align:right!important;
+}
+.home-leader-card__header{
+  min-height:52px!important;
+  padding:10px 11px!important;
+}
+.home-leader-card__header h3{
+  font-size:13px!important;
+}
+.home-leaders-grid--embedded .mini-toggle button{
+  padding:4px 6px!important;
+  font-size:7px!important;
+}
+
+@media(max-width:1450px) and (min-width:1201px){
+  .home-leader-player strong{font-size:10px!important}
+  .home-leader-value{font-size:8px!important}
+}
