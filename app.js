@@ -397,12 +397,13 @@
     const eligible=players.filter(p=>cfg.positions.includes(p.position)&&p.stats[cfg.metric]!==undefined)
       .sort((a,b)=>Number(b.stats[cfg.metric]||0)-Number(a.stats[cfg.metric]||0)||a.name.localeCompare(b.name)).slice(0,5);
     return `<article class="card home-leader-card home-leader-card--${category}">
-      <div class="home-leader-card__header">
+      <div class="card-header home-leader-card__header">
         <div><span class="eyebrow">League leaders</span><h3>${title}</h3></div>
         <div class="mini-toggle" role="group" aria-label="${title} leaderboard statistic">
           ${cfg.tabs.map(([key,label])=>`<button type="button" data-home-leader-category="${category}" data-home-leader-metric="${key}" class="${cfg.metric===key?'is-active':''}">${label}</button>`).join('')}
         </div>
       </div>
+      <div class="home-leader-columns"><span>#</span><span>Player</span><span>${escapeHtml(cfg.tabs.find(([key])=>key===cfg.metric)?.[1]||'Value')}</span></div>
       <div class="home-leader-list">${eligible.map((player,index)=>`<button type="button" data-player-id="${player.id}">
         <span class="leader-rank">${index+1}</span>
         <span class="home-leader-player"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position)} · ${escapeHtml(teamById(player.teamId)?.abbr||'FA')}</small></span>
@@ -532,21 +533,22 @@
           </div>
         </section>
 
-          <section class="home-leaders-section home-leaders-section--embedded">
-            <div class="section-heading home-leaders-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
-            <div class="home-leaders-grid home-leaders-grid--embedded">
-              ${renderHomeLeaderCard('passing','Passing')}
-              ${renderHomeLeaderCard('rushing','Rushing')}
-              ${renderHomeLeaderCard('receiving','Receiving')}
-              ${renderHomeLeaderCard('defense','Defense')}
-            </div>
-          </section>
         </div>
 
         <aside class="league-home-standings">
           ${renderConferenceSnapshot('AFC')}
           ${renderConferenceSnapshot('NFC')}
         </aside>
+
+        <section class="home-leaders-section home-leaders-section--embedded">
+          <div class="section-heading home-leaders-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
+          <div class="home-leaders-grid home-leaders-grid--embedded">
+            ${renderHomeLeaderCard('passing','Passing')}
+            ${renderHomeLeaderCard('rushing','Rushing')}
+            ${renderHomeLeaderCard('receiving','Receiving')}
+            ${renderHomeLeaderCard('defense','Defense')}
+          </div>
+        </section>
       </div>
 `;
   }
