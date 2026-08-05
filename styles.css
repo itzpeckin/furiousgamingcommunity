@@ -4657,3 +4657,42 @@ table td{
 @media(max-width:760px){
   .home-leaders-grid--embedded{grid-template-columns:1fr!important}
 }
+
+/* v5.8.2b — Align leaderboards with the bottom of the standings column */
+@media(min-width:1201px){
+  .league-home-main{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 340px!important;
+    grid-template-areas:
+      "feature standings"
+      "leaders standings"!important;
+    column-gap:18px!important;
+    row-gap:14px!important;
+    align-items:stretch!important;
+  }
+  .league-home-main>div:first-child{
+    grid-area:feature;
+    min-width:0;
+  }
+  .league-home-main>.league-home-standings{
+    grid-area:standings;
+    min-width:0;
+    height:100%;
+    align-self:stretch;
+  }
+  .league-home-main>.home-leaders-section--embedded{
+    grid-area:leaders;
+    grid-column:auto!important;
+    width:100%;
+    min-width:0;
+    margin:0!important;
+    align-self:end;
+  }
+  .home-leaders-grid--embedded{
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:10px!important;
+  }
+  .home-leaders-grid--embedded .home-leader-card{
+    min-height:0;
+  }
+}
