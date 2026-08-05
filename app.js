@@ -401,6 +401,28 @@
     </article>`;
   }
 
+  function renderLeagueNewsTicker() {
+    const approvedNews = window.FGC_TRADE?.getApprovedNews?.() || [];
+    const items = [...approvedNews, ...newsArticles]
+      .filter(item => item && item.id && item.title)
+      .slice(0, 12);
+    if (!items.length) return '';
+    const tickerItems = items.map((item,index)=>`<button type="button" class="league-news-ticker__item" data-news-id="${escapeHtml(item.id)}" aria-label="Open headline: ${escapeHtml(item.title)}">
+      <span class="league-news-ticker__category">${escapeHtml(item.category || 'League News')}</span>
+      <span class="league-news-ticker__headline">${escapeHtml(item.title)}</span>
+      <span class="league-news-ticker__separator" aria-hidden="true">•</span>
+    </button>`).join('');
+    return `<section class="league-news-ticker" aria-label="League headlines">
+      <div class="league-news-ticker__label"><svg><use href="#icon-news"></use></svg><span>League Headlines</span></div>
+      <div class="league-news-ticker__viewport">
+        <div class="league-news-ticker__track">
+          <div class="league-news-ticker__group">${tickerItems}</div>
+          <div class="league-news-ticker__group" aria-hidden="true">${tickerItems}</div>
+        </div>
+      </div>
+    </section>`;
+  }
+
   function renderFixedLeaderCard(title, metric, positions) {
     const eligible=players.filter(p=>positions.includes(p.position)&&p.stats[metric]!==undefined)
       .sort((a,b)=>Number(b.stats[metric]||0)-Number(a.stats[metric]||0)).slice(0,5);
@@ -435,6 +457,8 @@
         <div><span class="eyebrow">Season 4 · Week ${currentWeek.week}</span><h1>League Home</h1><p>Your weekly franchise command center for matchups, standings, news, and league leaders.</p></div>
         <div class="heading-actions"><button class="button button--ghost" data-route="league-activity"><svg><use href="#icon-activity"></use></svg>League Activity</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div>
       </div>
+
+      ${renderLeagueNewsTicker()}
 
       <section class="week-ribbon-wrap">
         <div class="week-ribbon">

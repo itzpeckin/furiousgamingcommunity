@@ -1,3 +1,5 @@
-# Franchise HQ v5.8.0 — League Home Dashboard
+# Franchise HQ v5.8.0 — League News Automatic Scroll
 
-Converts League Home into the approved broadcast-style dashboard with clickable headline ticker, current-week schedule carousel, Commissioner-selected Game of the Week, playoff-hunt standings, and top-10 statistical leaderboards.
+This release adds a continuously scrolling League Headlines ticker to the existing League Home without changing the rest of the homepage layout.
+
+The ticker combines existing League News with approved trade announcements, pauses while hovered or keyboard-focused, and opens the associated story when selected.

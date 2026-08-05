@@ -1,10 +1,12 @@
 # Franchise HQ v5.8.0 Validation
 
-1. Open League Home and confirm headline ticker, schedule, Game Highlight, AFC/NFC playoff tables, and four top-10 leader tables render.
-2. Click a headline and confirm the associated article or trade opens.
-3. Manually scroll the current-week schedule and click a matchup; confirm Game Highlight updates.
-4. Open Commish HQ → Commissioner Controls → GOTW, select a matchup, save, and return Home; confirm it is the default Game of the Week.
-5. Confirm each leader table shows ten players with the requested statistics.
-6. Confirm player, team, schedule, and preview links open correctly.
-7. Resize below 1250px and 760px and confirm the dashboard reflows without overlap.
-8. Confirm no red JavaScript errors.
+1. Confirm the footer displays `v5.8.0 · League News Automatic Scroll`.
+2. Open League Home and confirm the League Headlines ticker appears between the page heading and current-week schedule.
+3. Confirm headlines move continuously from right to left.
+4. Hover over the ticker and confirm movement pauses.
+5. Move the pointer away and confirm scrolling resumes.
+6. Click a League News headline and confirm its article opens.
+7. Click an approved-trade headline, when available, and confirm its associated story opens.
+8. Confirm the current schedule, GOTW, standings, League News tiles, and Stat Leaders retain their pre-5.8 layout.
+9. Narrow the browser and confirm the ticker remains readable and horizontally contained.
+10. Confirm there are no red JavaScript console errors.
