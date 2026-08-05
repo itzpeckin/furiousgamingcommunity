@@ -69,7 +69,8 @@
     homeLeaderMetrics: {
       passing: 'passingYards',
       rushing: 'rushingYards',
-      receiving: 'receivingYards'
+      receiving: 'receivingYards',
+      defense: 'tackles'
     },
     gameCenterTab: 'team',
     recapFormat: 'landscape',
@@ -465,24 +466,33 @@
     return `${s.tackles||0} TKL · ${s.sacks||0} SCK · ${s.interceptions||0} INT`;
   }
 
-  function categoryLeaders(category) {
-    const cfg={
-      passing:{positions:['QB'],primary:'passingYards'},
-      rushing:{positions:['RB','FB','QB'],primary:'rushingYards'},
-      receiving:{positions:['WR','TE','RB'],primary:'receivingYards'},
-      defense:{positions:defensePositions,primary:'tackles'}
-    }[category];
+  function dashboardLeaderConfig(category) {
+    const configs={
+      passing:{positions:['QB'],metrics:[['passingYards','Yards'],['passingTD','TDs'],['interceptionsThrown','INTs']]},
+      rushing:{positions:['RB','FB','QB'],metrics:[['rushingYards','Yards'],['rushingTD','TDs'],['fumbles','Fumbles']]},
+      receiving:{positions:['WR','TE','RB'],metrics:[['receptions','Catches'],['receivingYards','Yards'],['receivingTD','TDs']]},
+      defense:{positions:defensePositions,metrics:[['tackles','Tackles'],['sacks','Sacks'],['interceptions','INTs']]}
+    };
+    const cfg=configs[category];
+    const active=state.homeLeaderMetrics[category]||cfg.metrics[0][0];
+    return {...cfg,active};
+  }
+
+  function categoryLeaders(category,metric) {
+    const cfg=dashboardLeaderConfig(category);
     return players.filter(p=>cfg.positions.includes(p.position))
-      .sort((a,b)=>Number(b.stats?.[cfg.primary]||0)-Number(a.stats?.[cfg.primary]||0)||b.overall-a.overall)
+      .sort((a,b)=>Number(b.stats?.[metric]||0)-Number(a.stats?.[metric]||0)||b.overall-a.overall)
       .slice(0,10);
   }
 
-  function renderDashboardLeaderTable(category,title,columns,tone) {
-    const rows=categoryLeaders(category);
+  function renderDashboardLeaderTable(category,title,tone) {
+    const cfg=dashboardLeaderConfig(category);
+    const rows=categoryLeaders(category,cfg.active);
+    const activeLabel=(cfg.metrics.find(([key])=>key===cfg.active)||cfg.metrics[0])[1];
     return `<article class="dashboard-leader-table dashboard-leader-table--${tone}">
-      <header><span class="dashboard-leader-icon">${category==='passing'?'↗':category==='rushing'?'↯':category==='receiving'?'◎':'⬡'}</span><h3>${title}</h3></header>
-      <div class="dashboard-table-head"><span>Rank</span><span>Player</span>${columns.map(c=>`<span>${c.label}</span>`).join('')}</div>
-      <div class="dashboard-table-body">${rows.map((player,index)=>{const team=teamById(player.teamId);return `<button type="button" data-player-id="${player.id}"><span>${index+1}</span><span class="dashboard-player-cell">${renderTeamMark(team,'mini-team')}<strong>${escapeHtml(player.name)}</strong><small>${team.abbr}</small></span>${columns.map(c=>`<span>${formatStatValue(c.key,player.stats?.[c.key]||0)}</span>`).join('')}</button>`}).join('')}</div>
+      <header><div class="dashboard-leader-heading"><span class="dashboard-leader-icon">${category==='passing'?'↗':category==='rushing'?'↯':category==='receiving'?'◎':'⬡'}</span><h3>${title}</h3></div><div class="dashboard-leader-tabs">${cfg.metrics.map(([key,label])=>`<button type="button" data-home-leader-category="${category}" data-home-leader-metric="${key}" class="${cfg.active===key?'is-active':''}">${label}</button>`).join('')}</div></header>
+      <div class="dashboard-table-head"><span>Rank</span><span>Player</span><span>${activeLabel}</span></div>
+      <div class="dashboard-table-body">${rows.map((player,index)=>{const team=teamById(player.teamId);return `<button type="button" data-player-id="${player.id}"><span>${index+1}</span><span class="dashboard-player-cell">${renderTeamMark(team,'mini-team')}<strong>${escapeHtml(player.name)}</strong><small>${team.abbr}</small></span><span>${formatStatValue(cfg.active,player.stats?.[cfg.active]||0)}</span></button>`}).join('')}</div>
     </article>`;
   }
 
@@ -523,11 +533,12 @@
 
       <section class="dashboard-schedule-panel">
         <header><div><h2>Current Week Schedule</h2><span>Week ${currentWeek.week}</span></div><div><small>All Times Eastern</small><button class="button button--ghost button--small" data-route="schedule">View Full Schedule</button></div></header>
-        <div class="dashboard-schedule-carousel"><button class="schedule-arrow" data-home-schedule-scroll="-1" aria-label="Previous games">‹</button><div class="dashboard-schedule-track" data-home-schedule-track>${availableGames.map(game=>{const a=teamById(game.awayId),h=teamById(game.homeId),final=game.status==='final';return `<button type="button" class="dashboard-game-tile ${game.id===featured.id?'is-active':''}" data-feature-game="${game.id}"><div><span>${renderTeamMark(a,'schedule-team-mark')}</span><b>${a.abbr}</b></div><em>@</em><div><span>${renderTeamMark(h,'schedule-team-mark')}</span><b>${h.abbr}</b></div><small>${final?`${game.awayScore}-${game.homeScore} · Final`:`${game.day} ${game.time}`}</small></button>`}).join('')}</div><button class="schedule-arrow" data-home-schedule-scroll="1" aria-label="Next games">›</button></div>
+        <div class="dashboard-schedule-carousel"><button class="schedule-arrow" data-home-schedule-scroll="-1" aria-label="Previous games">‹</button><div class="dashboard-schedule-track" data-home-schedule-track>${availableGames.map(game=>{const a=teamById(game.awayId),h=teamById(game.homeId),final=game.status==='final';return `<button type="button" class="dashboard-game-tile ${game.id===featured.id?'is-active':''}" data-feature-game="${game.id}"><div>${renderTeamMark(a,'schedule-team-mark')}</div><em>@</em><div>${renderTeamMark(h,'schedule-team-mark')}</div><small>${final?`${game.awayScore}-${game.homeScore} · Final`:`${game.day} ${game.time}`}</small></button>`}).join('')}</div><button class="schedule-arrow" data-home-schedule-scroll="1" aria-label="Next games">›</button></div>
       </section>
 
       <div class="dashboard-feature-grid">
-        <section class="dashboard-game-highlight" style="--away:${away.primary};--home:${home.primary}">
+        <div class="dashboard-primary-column">
+        <section class="dashboard-game-highlight" style="--away:${away.primary};--away-secondary:${away.secondary};--home:${home.primary};--home-secondary:${home.secondary}">
           <header><h2>Game Highlight</h2><span class="gotw-badge ${featured.id===commissionedId?'is-active':''}">★ ${featured.id===commissionedId?'Game of the Week':'Selected Matchup'}</span><button class="button button--ghost button--small" data-game-id="${featured.id}">View Full Preview</button></header>
           <div class="dashboard-matchup-hero">
             <div class="dashboard-feature-team">${renderTeamMark(away,'dashboard-feature-logo')}<strong>${away.record}</strong><span>${away.city}</span><h3>${away.name}</h3><p>${escapeHtml(away.owner)}</p><small>Last Game</small><b>${previousGameCopy(away.id,currentWeek.week)}</b></div>
@@ -539,15 +550,15 @@
             <article><h4>Top Defensive Players</h4>${[...awayDef.slice(0,2),...homeDef.slice(0,1)].map(player=>`<button type="button" data-player-id="${player.id}">${renderPlayerIdentity(player)}<span>${playerStatLine(player,'defense')}</span></button>`).join('')}</article>
           </div>
         </section>
+        <section class="dashboard-leaders-section">
+          ${renderDashboardLeaderTable('passing','Passing Leaders','blue')}
+          ${renderDashboardLeaderTable('rushing','Rushing Leaders','green')}
+          ${renderDashboardLeaderTable('receiving','Receiving Leaders','purple')}
+          ${renderDashboardLeaderTable('defense','Defensive Leaders','red')}
+        </section>
+        </div>
         <aside class="dashboard-playoff-column">${renderPlayoffTable('AFC')}${renderPlayoffTable('NFC')}</aside>
       </div>
-
-      <section class="dashboard-leaders-section">
-        ${renderDashboardLeaderTable('passing','Passing Leaders',[{key:'passingYards',label:'YDS'},{key:'passingTD',label:'TD'},{key:'interceptionsThrown',label:'INT'}],'blue')}
-        ${renderDashboardLeaderTable('rushing','Rushing Leaders',[{key:'rushingYards',label:'YDS'},{key:'rushingTD',label:'TD'},{key:'fumbles',label:'FUM'}],'green')}
-        ${renderDashboardLeaderTable('receiving','Receiving Leaders',[{key:'receptions',label:'REC'},{key:'receivingYards',label:'YDS'},{key:'receivingTD',label:'TD'}],'purple')}
-        ${renderDashboardLeaderTable('defense','Defensive Leaders',[{key:'tackles',label:'TKL'},{key:'sacks',label:'SCK'},{key:'interceptions',label:'INT'}],'red')}
-      </section>
     </div>`;
   }
 
