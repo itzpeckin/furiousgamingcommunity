@@ -536,7 +536,7 @@
 
     pageContent.innerHTML=`
       <div class="page-heading league-home-heading">
-        <div><span class="eyebrow">Season 4 · Week ${currentWeek.week}</span><h1>League Home</h1><p>Your weekly franchise command center for matchups, standings, news, and league leaders.</p></div>
+        <div><span class="eyebrow">Season 4 · Week ${currentWeek.week}</span><h1>League Home</h1></div>
         <div class="heading-actions"><button class="button button--ghost" data-route="league-activity"><svg><use href="#icon-activity"></use></svg>League Activity</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div>
       </div>
 

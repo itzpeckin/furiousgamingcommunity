@@ -5005,3 +5005,126 @@ table td{
   .home-standings-list button{grid-template-columns:23px 23px minmax(0,1fr) 42px 38px}
   .home-standings-gb{display:none}
 }
+
+/* v5.8.5 — Final Home Dashboard responsive and visual polish (Home-scoped only) */
+.league-home-heading{
+  align-items:flex-end;
+  margin-bottom:16px;
+}
+.league-home-heading>div:first-child{min-width:0}
+.league-home-heading h1{margin-bottom:0}
+
+/* Consistent vertical rhythm without changing the validated grid structure. */
+.league-home-heading + .league-news-ticker{margin-top:0}
+.league-news-ticker{margin-bottom:16px}
+.week-ribbon-wrap{margin-bottom:18px}
+.league-home-main{gap:18px!important}
+.league-home-primary{gap:14px!important}
+.home-leaders-section--embedded{min-width:0}
+
+/* Keep homepage content readable and prevent long imported labels from breaking cards. */
+.week-matchup-card,
+.featured-game,
+.home-standings-card,
+.home-leader-card{min-width:0}
+.week-matchup-team strong,
+.featured-half-copy h2,
+.home-standings-team strong,
+.home-leader-player strong{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.home-standings-record,
+.home-standings-pct,
+.home-standings-gb,
+.home-leader-value{font-variant-numeric:tabular-nums}
+
+/* Equal-height conference cards and leaderboard cards in their current validated layout. */
+.league-home-standings{align-content:stretch}
+.home-standings-card{display:flex;flex-direction:column;min-height:0}
+.home-standings-list{flex:1 1 auto}
+.home-leaders-grid--embedded{align-items:stretch}
+.home-leaders-grid--embedded .home-leader-card{display:flex;flex-direction:column}
+.home-leaders-grid--embedded .home-leader-list{flex:1 1 auto}
+
+/* Interaction polish remains component-scoped. */
+.week-matchup-card{
+  transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease;
+}
+.week-matchup-card:hover{
+  transform:translateY(-1px);
+  border-color:rgba(var(--accent-rgb),.55);
+  box-shadow:0 8px 20px rgba(0,0,0,.16);
+}
+.week-matchup-card:focus-visible,
+.home-standings-list button:focus-visible,
+.home-leader-list button:focus-visible,
+.home-leaders-heading .text-button:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+.home-standings-list button,
+.home-leader-list button{transition:background .15s ease,color .15s ease}
+
+/* Clean Home-only fallbacks if imported datasets are incomplete. */
+.home-dashboard-empty{
+  display:grid;
+  place-items:center;
+  min-height:150px;
+  padding:24px;
+  border:1px dashed var(--border);
+  border-radius:14px;
+  color:var(--muted);
+  text-align:center;
+  background:var(--surface-1);
+}
+
+/* Standard laptop: preserve the current design but give the content more breathing room. */
+@media(max-width:1360px){
+  .league-home-main{grid-template-columns:minmax(0,1fr) 320px!important}
+  .home-standings-columns,
+  .home-standings-list button{gap:6px}
+  .home-leader-card__header h3{font-size:13px!important}
+  .home-leaders-grid--embedded .mini-toggle button{font-size:6.5px!important}
+}
+
+/* Tablet and narrow laptop: stack standings beneath the matchup without touching shared cards. */
+@media(max-width:1120px){
+  .league-home-main{grid-template-columns:1fr!important}
+  .league-home-standings{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:14px!important;
+  }
+  .league-home-main>.home-leaders-section--embedded{grid-column:1!important}
+  .home-leaders-grid--embedded{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+@media(max-width:780px){
+  .league-home-heading{align-items:stretch;gap:12px}
+  .league-home-heading .heading-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}
+  .league-home-heading .heading-actions .button{justify-content:center}
+  .league-home-standings,
+  .home-leaders-grid--embedded{grid-template-columns:1fr!important}
+  .featured-split{grid-template-columns:1fr!important}
+  .featured-half--away{border-right:0!important;border-bottom:1px solid rgba(255,255,255,.09)!important}
+  .featured-half--home{border-left:0!important}
+  .home-leaders-heading{align-items:flex-start!important;gap:10px!important}
+  .home-leaders-heading .text-button{white-space:nowrap}
+}
+
+@media(max-width:520px){
+  .league-home-heading .heading-actions{grid-template-columns:1fr}
+  .week-ribbon{scroll-padding-inline:8px}
+  .week-matchup-card{min-width:165px}
+  .home-standings-columns,
+  .home-standings-list button{
+    grid-template-columns:22px 22px minmax(0,1fr) 40px 38px!important;
+    padding-left:9px!important;
+    padding-right:9px!important;
+  }
+  .home-standings-columns span:last-child,
+  .home-standings-gb{display:none!important}
+  .home-leader-card__header{min-height:0!important}
+}
