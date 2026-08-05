@@ -436,6 +436,8 @@
     })[0] || week.games[0];
   }
 
+  const homeHeadlineStartedAt=Date.now();
+
   function homeHeadlineItems() {
     const items=[];
     const tradeNews=window.FGC_TRADE?.getApprovedNews?.() || [];
@@ -490,9 +492,9 @@
     const rows=categoryLeaders(category,cfg.active);
     const activeLabel=(cfg.metrics.find(([key])=>key===cfg.active)||cfg.metrics[0])[1];
     return `<article class="dashboard-leader-table dashboard-leader-table--${tone}">
-      <header><div class="dashboard-leader-heading"><span class="dashboard-leader-icon">${category==='passing'?'↗':category==='rushing'?'↯':category==='receiving'?'◎':'⬡'}</span><h3>${title}</h3></div><div class="dashboard-leader-tabs">${cfg.metrics.map(([key,label])=>`<button type="button" data-home-leader-category="${category}" data-home-leader-metric="${key}" class="${cfg.active===key?'is-active':''}">${label}</button>`).join('')}</div></header>
-      <div class="dashboard-table-head"><span>Rank</span><span>Player</span><span>${activeLabel}</span></div>
-      <div class="dashboard-table-body">${rows.map((player,index)=>{const team=teamById(player.teamId);return `<button type="button" data-player-id="${player.id}"><span>${index+1}</span><span class="dashboard-player-cell">${renderTeamMark(team,'mini-team')}<strong>${escapeHtml(player.name)}</strong><small>${team.abbr}</small></span><span>${formatStatValue(cfg.active,player.stats?.[cfg.active]||0)}</span></button>`}).join('')}</div>
+      <header><div class="dashboard-leader-heading"><span class="dashboard-leader-icon">${category==='passing'?'↗':category==='rushing'?'↯':category==='receiving'?'◎':'⬡'}</span><h3>${title}</h3></div><label class="dashboard-leader-select"><span>Stat</span><select data-home-leader-select="${category}">${cfg.metrics.map(([key,label])=>`<option value="${key}" ${cfg.active===key?'selected':''}>${label}</option>`).join('')}</select></label></header>
+      <div class="dashboard-table-head"><span>#</span><span>Player</span><span>${activeLabel}</span></div>
+      <div class="dashboard-table-body">${rows.map((player,index)=>{const team=teamById(player.teamId);return `<button type="button" data-player-id="${player.id}"><span>${index+1}</span><span class="dashboard-player-cell">${renderTeamMark(team,'mini-team')}<strong>${escapeHtml(player.name)}</strong></span><span>${formatStatValue(cfg.active,player.stats?.[cfg.active]||0)}</span></button>`}).join('')}</div>
     </article>`;
   }
 
@@ -506,14 +508,15 @@
     return `<article class="dashboard-standings-card">
       <header><span class="conference-mark conference-mark--${conference.toLowerCase()}">${conference[0]}</span><h3>${conference} Playoff Hunt</h3></header>
       <div class="dashboard-standings-head"><span>Team</span><span>W-L</span><span>PCT</span><span>GB</span></div>
-      <div class="dashboard-standings-body">${rows.map((team,index)=>{const gamesBack=((Number(leader?.wins||0)-Number(team.wins||0))+(Number(team.losses||0)-Number(leader?.losses||0)))/2;return `<button type="button" data-route="teams/${team.id}"><span><b>${index+1}</b>${renderTeamMark(team,'mini-team')}<strong>${team.name}</strong><small>${escapeHtml(team.owner)}</small></span><span>${team.record}</span><span>${(team.wins/Math.max(1,team.wins+team.losses)).toFixed(3).replace(/^0/,'')}</span><span>${index===0?'—':gamesBack.toFixed(1)}</span></button>`}).join('')}</div>
+      <div class="dashboard-standings-body">${rows.map((team,index)=>{const gamesBack=((Number(leader?.wins||0)-Number(team.wins||0))+(Number(team.losses||0)-Number(leader?.losses||0)))/2;return `<button type="button" data-route="teams/${team.id}"><span><b>${index+1}</b>${renderTeamMark(team,'mini-team')}<strong>${team.name}</strong></span><span>${team.record}</span><span>${(team.wins/Math.max(1,team.wins+team.losses)).toFixed(3).replace(/^0/,'')}</span><span>${index===0?'—':gamesBack.toFixed(1)}</span></button>`}).join('')}</div>
     </article>`;
   }
 
   function renderHeadlineTicker() {
     const headlines=homeHeadlineItems();
     const doubled=[...headlines,...headlines];
-    return `<section class="league-headline-ticker" aria-label="League Headlines"><div class="league-headline-label">League<br>Headlines</div><div class="league-headline-window"><div class="league-headline-track">${doubled.map(item=>`<button type="button" ${item.newsId?`data-news-id="${item.newsId}"`:`data-route="${item.route}"`} class="headline-item headline-item--${item.tone}"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.meta)}</small></button>`).join('')}</div></div><button class="headline-more" data-route="news" aria-label="View League News">›</button></section>`;
+    const elapsed=((Date.now()-homeHeadlineStartedAt)/1000)%48;
+    return `<section class="league-headline-ticker" aria-label="League Headlines"><div class="league-headline-label">League<br>Headlines</div><div class="league-headline-window"><div class="league-headline-track" style="animation-delay:-${elapsed}s">${doubled.map(item=>`<button type="button" ${item.newsId?`data-news-id="${item.newsId}"`:`data-route="${item.route}"`} class="headline-item headline-item--${item.tone}"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.meta)}</small></button>`).join('')}</div></div><button class="headline-more" data-route="news" aria-label="View League News">›</button></section>`;
   }
 
   function renderLeagueHome() {
@@ -546,8 +549,10 @@
             <div class="dashboard-feature-team">${renderTeamMark(home,'dashboard-feature-logo')}<strong>${home.record}</strong><span>${home.city}</span><h3>${home.name}</h3><p>${escapeHtml(home.owner)}</p><small>Last Game</small><b>${previousGameCopy(home.id,currentWeek.week)}</b></div>
           </div>
           <div class="dashboard-feature-players">
-            <article><h4>Top Offensive Players</h4>${[...awayOff.slice(0,2),...homeOff.slice(0,1)].map(player=>`<button type="button" data-player-id="${player.id}">${renderPlayerIdentity(player)}<span>${playerStatLine(player,player.position==='QB'?'passing':player.position==='WR'||player.position==='TE'?'receiving':'rushing')}</span></button>`).join('')}</article>
-            <article><h4>Top Defensive Players</h4>${[...awayDef.slice(0,2),...homeDef.slice(0,1)].map(player=>`<button type="button" data-player-id="${player.id}">${renderPlayerIdentity(player)}<span>${playerStatLine(player,'defense')}</span></button>`).join('')}</article>
+            <article class="dashboard-team-unit"><h4>${away.abbr} Offense</h4>${awayOff.slice(0,3).map(player=>`<button type="button" data-player-id="${player.id}">${renderPlayerIdentity(player,false)}<span><b>${player.overall} OVR</b><small>${escapeHtml(player.dev)}</small></span></button>`).join('')}</article>
+            <article class="dashboard-team-unit dashboard-team-unit--defense"><h4>${away.abbr} Defense</h4>${awayDef.slice(0,3).map(player=>`<button type="button" data-player-id="${player.id}">${renderPlayerIdentity(player,false)}<span><b>${player.overall} OVR</b><small>${escapeHtml(player.dev)}</small></span></button>`).join('')}</article>
+            <article class="dashboard-team-unit"><h4>${home.abbr} Offense</h4>${homeOff.slice(0,3).map(player=>`<button type="button" data-player-id="${player.id}">${renderPlayerIdentity(player,false)}<span><b>${player.overall} OVR</b><small>${escapeHtml(player.dev)}</small></span></button>`).join('')}</article>
+            <article class="dashboard-team-unit dashboard-team-unit--defense"><h4>${home.abbr} Defense</h4>${homeDef.slice(0,3).map(player=>`<button type="button" data-player-id="${player.id}">${renderPlayerIdentity(player,false)}<span><b>${player.overall} OVR</b><small>${escapeHtml(player.dev)}</small></span></button>`).join('')}</article>
           </div>
         </section>
         <section class="dashboard-leaders-section">
@@ -2466,6 +2471,7 @@
   });
 
   document.addEventListener('change', event => {
+    if (event.target.matches('[data-home-leader-select]')) { state.homeLeaderMetrics[event.target.dataset.homeLeaderSelect]=event.target.value; renderLeagueHome(); return; }
     if (event.target.matches('[data-team-conference]')) { state.teamConference=event.target.value; refreshTeamGrid(); }
     if (event.target.matches('[data-team-division]')) { state.teamDivision=event.target.value; refreshTeamGrid(); }
     if (event.target.matches('[data-roster-group]')) { state.rosterGroup=event.target.value; renderRoute(location.hash.slice(1)); }
