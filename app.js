@@ -533,10 +533,6 @@
             </div>
           </div>
         </section>
-          <section class="home-news-section">
-            <div class="section-heading"><div><span class="section-number">01</span><h2>League News</h2></div><button class="text-button" data-route="news">View all news <svg><use href="#icon-arrow"></use></svg></button></div>
-            <div class="home-news-grid home-news-grid--compact">${recentNews.map(article=>renderNewsCard(article)).join('')}</div>
-          </section>
         </div>
 
         <aside class="league-home-standings">
