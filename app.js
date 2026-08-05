@@ -398,7 +398,7 @@
       .sort((a,b)=>Number(b.stats[cfg.metric]||0)-Number(a.stats[cfg.metric]||0)||a.name.localeCompare(b.name)).slice(0,5);
     return `<article class="card home-leader-card home-leader-card--${category}">
       <div class="card-header home-leader-card__header">
-        <div><span class="eyebrow">League leaders</span><h3>${title}</h3></div>
+        <div><h3>${title}</h3></div>
         <div class="mini-toggle" role="group" aria-label="${title} leaderboard statistic">
           ${cfg.tabs.map(([key,label])=>`<button type="button" data-home-leader-category="${category}" data-home-leader-metric="${key}" class="${cfg.metric===key?'is-active':''}">${label}</button>`).join('')}
         </div>

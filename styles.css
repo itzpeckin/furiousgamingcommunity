@@ -4762,3 +4762,55 @@ table td{
   .home-leader-player strong{font-size:10px!important}
   .home-leader-value{font-size:8px!important}
 }
+
+
+/* v5.8.2d — Fill the complete matchup/standings height and simplify leaderboard headers */
+@media(min-width:1201px){
+  .league-home-main{
+    grid-template-rows:auto minmax(0,1fr)!important;
+    row-gap:10px!important;
+  }
+  .league-home-main>div:first-child{
+    align-self:start!important;
+  }
+  .league-home-main>.home-leaders-section--embedded{
+    align-self:stretch!important;
+    height:100%!important;
+    min-height:0!important;
+  }
+  .home-leaders-grid--embedded{
+    height:100%!important;
+    min-height:0!important;
+    align-items:stretch!important;
+  }
+  .home-leaders-grid--embedded .home-leader-card{
+    height:100%!important;
+    min-height:0!important;
+  }
+  .home-leaders-grid--embedded .home-leader-list{
+    display:grid!important;
+    grid-template-rows:repeat(5,minmax(0,1fr))!important;
+    flex:1 1 auto!important;
+    min-height:0!important;
+  }
+  .home-leaders-grid--embedded .home-leader-list button{
+    height:100%!important;
+    min-height:0!important;
+  }
+}
+.home-leader-card__header{
+  align-items:center!important;
+}
+.home-leader-card__header>div:first-child{
+  display:flex!important;
+  align-items:center!important;
+  min-width:0!important;
+}
+.home-leader-card__header h3{
+  margin:0!important;
+  font-size:14px!important;
+  line-height:1.05!important;
+}
+.home-leader-card__header .eyebrow{
+  display:none!important;
+}
