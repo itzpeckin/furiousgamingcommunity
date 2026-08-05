@@ -4814,3 +4814,99 @@ table td{
 .home-leader-card__header .eyebrow{
   display:none!important;
 }
+
+
+/* v5.8.2e — Stat Leaders section label, stacked card controls, and top-10 rows */
+@media(min-width:1201px){
+  .league-home-main{
+    grid-template-rows:auto minmax(0,1fr)!important;
+    row-gap:8px!important;
+  }
+  .league-home-main>.home-leaders-section--embedded{
+    display:flex!important;
+    flex-direction:column!important;
+    min-height:0!important;
+    height:100%!important;
+  }
+  .home-leaders-heading{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    margin:0 0 8px!important;
+    min-height:28px!important;
+  }
+  .home-leaders-heading>div{
+    display:flex!important;
+    align-items:center!important;
+    gap:8px!important;
+  }
+  .home-leaders-heading .section-number{
+    display:none!important;
+  }
+  .home-leaders-heading h2{
+    margin:0!important;
+    font-size:14px!important;
+    line-height:1!important;
+  }
+  .home-leaders-heading .text-button{
+    font-size:9px!important;
+  }
+  .home-leaders-grid--embedded{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    height:auto!important;
+  }
+  .home-leaders-grid--embedded .home-leader-card{
+    min-height:0!important;
+    height:100%!important;
+  }
+  .home-leaders-grid--embedded .home-leader-list{
+    display:grid!important;
+    grid-template-rows:repeat(10,minmax(0,1fr))!important;
+    flex:1 1 auto!important;
+    min-height:0!important;
+  }
+  .home-leaders-grid--embedded .home-leader-list button{
+    min-height:0!important;
+    height:100%!important;
+    padding-top:5px!important;
+    padding-bottom:5px!important;
+  }
+}
+
+.home-leader-card__header{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:7px!important;
+  min-height:68px!important;
+  padding:10px 11px 9px!important;
+}
+.home-leader-card__header>div:first-child{
+  display:block!important;
+  width:100%!important;
+}
+.home-leader-card__header h3{
+  margin:0!important;
+  font-size:14px!important;
+  line-height:1.05!important;
+  text-align:left!important;
+}
+.home-leaders-grid--embedded .mini-toggle{
+  width:100%!important;
+  justify-content:flex-start!important;
+  padding:0!important;
+}
+.home-leaders-grid--embedded .mini-toggle button{
+  font-size:7px!important;
+  padding:4px 6px!important;
+}
+
+@media(max-width:1200px){
+  .home-leaders-heading{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    margin:0 0 10px!important;
+  }
+}

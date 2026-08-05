@@ -395,7 +395,7 @@
   function renderHomeLeaderCard(category,title) {
     const cfg=leaderMetricConfig(category);
     const eligible=players.filter(p=>cfg.positions.includes(p.position)&&p.stats[cfg.metric]!==undefined)
-      .sort((a,b)=>Number(b.stats[cfg.metric]||0)-Number(a.stats[cfg.metric]||0)||a.name.localeCompare(b.name)).slice(0,5);
+      .sort((a,b)=>Number(b.stats[cfg.metric]||0)-Number(a.stats[cfg.metric]||0)||a.name.localeCompare(b.name)).slice(0,10);
     return `<article class="card home-leader-card home-leader-card--${category}">
       <div class="card-header home-leader-card__header">
         <div><h3>${title}</h3></div>
@@ -541,7 +541,7 @@
         </aside>
 
         <section class="home-leaders-section home-leaders-section--embedded">
-          <div class="section-heading home-leaders-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">Full leaderboards <svg><use href="#icon-arrow"></use></svg></button></div>
+          <div class="section-heading home-leaders-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">View Full Leaderboard <svg><use href="#icon-arrow"></use></svg></button></div>
           <div class="home-leaders-grid home-leaders-grid--embedded">
             ${renderHomeLeaderCard('passing','Passing')}
             ${renderHomeLeaderCard('rushing','Rushing')}
