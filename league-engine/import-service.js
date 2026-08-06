@@ -8,6 +8,7 @@
     'leagueImportQuarantine',
     'leagueRepository',
     'leagueSnapshotManager',
+    'leagueValidationEngine',
     'leagueImportState'
   ];
   if (!HQ?.defineModuleService || deps.some((name) => !HQ[name])) {
@@ -82,13 +83,22 @@
     });
     let snapshot;
     try {
+      const validation = HQ.leagueValidationEngine.validateSnapshot(candidate.id, { rejectOnFailure: true });
+      if (!validation.valid) {
+        const message = validation.errors.map((entry) => entry.message).join('; ') || 'Candidate snapshot failed validation.';
+        const error = new Error(message);
+        error.validation = validation;
+        throw error;
+      }
       HQ.leagueSnapshotManager.activateSnapshot(candidate.id, {
         validated: true,
-        validation: previewResult.report
+        validation
       });
       snapshot = HQ.leagueRepository.current() || previewResult.snapshot;
     } catch (error) {
-      HQ.leagueSnapshotManager.rejectSnapshot(candidate.id, error.message);
+      if (HQ.leagueSnapshotManager.getSnapshot(candidate.id)) {
+        HQ.leagueSnapshotManager.rejectSnapshot(candidate.id, error.message);
+      }
       throw error;
     }
     const record = Object.freeze({
@@ -184,13 +194,14 @@
   function diagnostics() {
     return Object.freeze({
       service: 'leagueImportService',
-      version: '5.9.0.2',
+      version: '5.9.0.3',
       lastValidImportId: HQ.leagueRepository.current()?.source?.importId || null,
       successfulImports: history.length,
       quarantinedImports: HQ.leagueImportQuarantine.diagnostics().count,
       readOnlyOfficialState: true,
       lifecycleState: HQ.leagueImportState.diagnostics(),
       snapshotManager: HQ.leagueSnapshotManager.diagnostics(),
+      validationEngine: HQ.leagueValidationEngine.diagnostics(),
       backwardCompatibleApis: Object.freeze(['preview', 'commit', 'ingest', 'history'])
     });
   }
@@ -214,7 +225,7 @@
     id: 'league-import-service',
     service: 'leagueImportService',
     script: 'league-engine/import-service.js',
-    version: '5.9.0.2',
+    version: '5.9.0.3',
     dependencies: deps,
     capabilities: [
       'preview-before-publish',
@@ -224,7 +235,9 @@
       'shared-import-lifecycle',
       'observable-import-status',
       'development-import-simulation',
-      'candidate-snapshot-activation'
+      'candidate-snapshot-activation',
+      'modular-snapshot-validation',
+      'automatic-invalid-candidate-rejection'
     ]
   });
 })();
