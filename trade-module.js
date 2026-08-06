@@ -797,6 +797,15 @@ function renderLeagueDataSelector(state){
  </article>
  <div class="commissioner-confirm-modal" data-league-source-confirm aria-hidden="true"><div class="commissioner-confirm-backdrop" data-close-league-source-confirm></div><section class="commissioner-confirm-dialog league-source-confirm-card" role="dialog" aria-modal="true" aria-labelledby="league-source-confirm-title"><span class="eyebrow">Confirm source change</span><h2 id="league-source-confirm-title">Change League Data source?</h2><p data-league-source-confirm-copy>This changes the active League Engine read source.</p><div class="league-source-confirm-warning"><svg><use href="#icon-info"></use></svg><span>No snapshots or imported records will be deleted.</span></div><div class="commissioner-confirm-actions"><button class="button button--ghost" data-close-league-source-confirm>Cancel</button><button class="button button--primary" data-confirm-league-source>Change Source</button></div></section></div>`;
 }
+
+function renderLeagueTenantPanel(){
+ const tenant=window.FranchiseHQ?.leagueTenant;
+ if(!tenant)return'<article class="card league-tenant-card"><h3>League Tenant</h3><p>Tenant service unavailable.</p></article>';
+ const league=tenant.current();
+ const d=tenant.diagnostics();
+ return `<article class="card league-tenant-card" data-league-tenant-panel><div class="card-header"><div><span class="eyebrow">v5.9.1.3 · Multi-league foundation</span><h3>League Tenant</h3><p>Your current site is now registered as one tenant inside a multi-league platform.</p></div><span class="pill pill--success">Active</span></div><div class="league-import-framework-grid"><div><span>League Name</span><strong>${escapeHtml(league.name)}</strong></div><div><span>League ID</span><strong>${escapeHtml(league.id)}</strong></div><div><span>League Slug</span><strong>${escapeHtml(league.slug)}</strong></div><div><span>Registered Leagues</span><strong>${d.leagueCount}</strong></div><div><span>Public Route</span><strong>${escapeHtml(tenant.publicPath())}</strong></div><div><span>Future Export API</span><strong>${escapeHtml(tenant.exportEndpoint())}</strong></div></div><div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>The existing root URL still opens this league automatically. Snapshots, import history, and refresh events are now scoped to ${escapeHtml(league.id)}.</span></div></article>`;
+}
+
 function renderCommissionerLeagueData(){
  const state=window.FranchiseHQ?.leagueData?.status?.()||{activeMode:'empty',authority:'empty',counts:{},warning:'League Data State is unavailable.'};
  const view=leagueDataModePresentation(state);
@@ -807,6 +816,7 @@ function renderCommissionerLeagueData(){
      <span class="pill pill--${view.tone}">${view.label}</span>
    </div>
    ${renderCurrentDataSourceCard(state)}
+   ${renderLeagueTenantPanel()}
    ${renderLeagueDataSelector(state)}
    ${window.FranchiseHQ?.leagueImportFrameworkUI?.renderPanel?.()||'<article class="card league-import-framework-card" data-import-framework-panel><h3>Madden Companion Import Framework</h3><p>Framework UI unavailable.</p></article>'}
    ${window.FranchiseHQ?.leagueCompanionImportUI?.renderPanel?.()||'<article class="card companion-json-import-card" data-companion-import-panel><h3>Companion Teams Importer</h3><p>Mapper UI unavailable.</p></article>'}
