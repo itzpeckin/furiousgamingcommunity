@@ -8,13 +8,14 @@
     'leagueImportQuarantine',
     'leagueRepository',
     'leagueSnapshotManager',
-    'leagueImportState'
+    'leagueImportState',
+    'leagueImportHistory',
+    'leagueDataEvents'
   ];
   if (!HQ?.defineModuleService || deps.some((name) => !HQ[name])) {
     throw new Error('League import dependencies did not load correctly.');
   }
 
-  const history = [];
   const clone = (value) => {
     if (value == null) return value;
     return typeof structuredClone === 'function'
@@ -110,8 +111,12 @@
       installedAt: new Date().toISOString(),
       warnings: previewResult.report.warnings.length
     });
-    history.unshift(record);
-    if (history.length > 50) history.length = 50;
+    HQ.leagueImportHistory.add({
+      id: record.importId || candidate.id, importId: record.importId, source: candidate.source, snapshotId: candidate.id,
+      snapshotVersion: candidate.version, season: candidate.season, week: candidate.week, startedAt: candidate.createdAt,
+      completedAt: record.installedAt, status: 'successful', warnings: record.warnings, simulated: false
+    });
+    HQ.leagueDataEvents.publishLeagueDataUpdated({ reason: 'import-completed', source: candidate.source, snapshotId: candidate.id, importId: record.importId, season: candidate.season, week: candidate.week });
 
     if (manageState) {
       HQ.leagueImportState.complete({
@@ -196,9 +201,9 @@
   function diagnostics() {
     return Object.freeze({
       service: 'leagueImportService',
-      version: '5.9.0.3b',
+      version: '5.9.0.4',
       lastValidImportId: HQ.leagueRepository.current()?.source?.importId || null,
-      successfulImports: history.length,
+      successfulImports: HQ.leagueImportHistory.getImportHistory().filter((item) => item.status === 'successful').length,
       quarantinedImports: HQ.leagueImportQuarantine.diagnostics().count,
       readOnlyOfficialState: true,
       lifecycleState: HQ.leagueImportState.diagnostics(),
@@ -217,7 +222,9 @@
     getImportStatus,
     subscribeToImportStatus,
     resetImportStatus,
-    history: () => Object.freeze(history.map(clone)),
+    history: (options) => HQ.leagueImportHistory.getImportHistory(options),
+    getImportHistory: (options) => HQ.leagueImportHistory.getImportHistory(options),
+    getLatestImport: () => HQ.leagueImportHistory.getLatestImport(),
     diagnostics
   });
 
@@ -227,7 +234,7 @@
     id: 'league-import-service',
     service: 'leagueImportService',
     script: 'league-engine/import-service.js',
-    version: '5.9.0.3b',
+    version: '5.9.0.4',
     dependencies: deps,
     capabilities: [
       'preview-before-publish',
@@ -239,7 +246,9 @@
       'development-import-simulation',
       'candidate-snapshot-activation',
       'modular-snapshot-validation',
-      'automatic-invalid-candidate-rejection'
+      'automatic-invalid-candidate-rejection',
+      'persistent-import-history',
+      'league-data-updated-broadcast'
     ]
   });
 })();

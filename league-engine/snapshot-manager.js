@@ -256,7 +256,7 @@
   function diagnostics() {
     return freeze({
       service: 'leagueSnapshotManager',
-      version: '5.9.0.3b',
+      version: '5.9.0.4',
       activeSnapshotId: memory.activeId,
       candidateCount: memory.candidates.size,
       retainedCount: memory.retained.length,
@@ -293,7 +293,7 @@
     id: 'league-snapshot-manager',
     service: 'leagueSnapshotManager',
     script: 'league-engine/snapshot-manager.js',
-    version: '5.9.0.3b',
+    version: '5.9.0.4',
     dependencies: ['leagueRepository'],
     capabilities: [
       'candidate-snapshots',
