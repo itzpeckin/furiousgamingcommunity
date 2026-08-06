@@ -128,7 +128,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'release',
-      version: '1.1.2',
+      version: '1.1.3',
       build: buildInfo(),
       lastPreflight,
       lastCertification
@@ -150,7 +150,7 @@
     id: 'release',
     service: 'release',
     script: 'platform/release.js',
-    version: '1.1.2',
+    version: '1.1.3',
     capabilities: ['release-preflight', 'release-certification', 'support-bundle', 'build-metadata'],
     dependencies: ['manifest', 'security', 'validate', 'runtime']
   });
