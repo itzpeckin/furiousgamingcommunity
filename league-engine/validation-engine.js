@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '5.9.0.4';
+  const VERSION = '5.9.0.5';
 
   function snapshotManager() {
     return HQ.leagueSnapshotManager || HQ.modules?.league?.leagueSnapshotManager || null;

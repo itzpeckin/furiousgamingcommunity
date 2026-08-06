@@ -14,7 +14,7 @@
     return payload;
   }
   function subscribeToLeagueDataUpdated(listener,options={}){ if(typeof listener!=='function') throw new TypeError('League data listener must be a function.'); listeners.add(listener); if(options.immediate===true) listener(Object.freeze({event:EVENT_NAME,reason:'subscription-ready',timestamp:new Date().toISOString()})); return ()=>listeners.delete(listener); }
-  function diagnostics(){ return Object.freeze({service:'leagueDataEvents',version:'5.9.0.4a',eventName:EVENT_NAME,internalEventName:INTERNAL_EVENT_NAME,subscriberCount:listeners.size,browserCompatibilityEvent:`franchisehq:${EVENT_NAME}`}); }
+  function diagnostics(){ return Object.freeze({service:'leagueDataEvents',version:'5.9.0.5',eventName:EVENT_NAME,internalEventName:INTERNAL_EVENT_NAME,subscriberCount:listeners.size,browserCompatibilityEvent:`franchisehq:${EVENT_NAME}`}); }
   const service=HQ.defineModuleService('league','leagueDataEvents',{EVENT_NAME,publishLeagueDataUpdated,subscribeToLeagueDataUpdated,diagnostics},{replace:true,alias:'leagueDataEvents'});
-  HQ.manifest?.register?.({scope:'module',module:'league',id:'league-data-events',service:'leagueDataEvents',script:'league-engine/league-data-events.js',version:'5.9.0.4a',dependencies:[],capabilities:['league-data-updated-event','shared-refresh-subscriptions','browser-event-compatibility']});
+  HQ.manifest?.register?.({scope:'module',module:'league',id:'league-data-events',service:'leagueDataEvents',script:'league-engine/league-data-events.js',version:'5.9.0.5',dependencies:[],capabilities:['league-data-updated-event','shared-refresh-subscriptions','browser-event-compatibility']});
 })();

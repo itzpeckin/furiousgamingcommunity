@@ -34,8 +34,8 @@
   function getLatestImport(){ return records.length?clone(records[0]):null; }
   function clear(){ records=[]; try{localStorage.removeItem(STORAGE_KEY);}catch(_){} HQ.events?.emit?.('import:history-updated',{record:null,count:0}); return diagnostics(); }
   function simulate(options={}){ const started=now(); const id=options.importId||`simulation-${Date.now()}`; return add({id,importId:id,source:options.source||'development-simulation',season:options.season??2027,week:options.week??4,startedAt:started,completedAt:now(),status:options.fail?'failed':'successful',failureReason:options.fail?'Simulated validation failure.':null,validationErrors:options.fail?['Simulated validation failure.']:[],simulated:true,snapshotId:options.fail?null:`snapshot-${Date.now()}`,snapshotVersion:options.fail?null:records.length+1}); }
-  function diagnostics(){ return freeze({service:'leagueImportHistory',version:'5.9.0.4a',recordCount:records.length,maxRecords:MAX_RECORDS,persistence:'localStorage',latestStatus:records[0]?.status||null}); }
+  function diagnostics(){ return freeze({service:'leagueImportHistory',version:'5.9.0.5',recordCount:records.length,maxRecords:MAX_RECORDS,persistence:'localStorage',latestStatus:records[0]?.status||null}); }
   hydrate();
   const service=HQ.defineModuleService('league','leagueImportHistory',{add,update,getImportHistory,getLatestImport,clear,simulate,diagnostics},{replace:true,alias:'leagueImportHistory'});
-  HQ.manifest?.register?.({scope:'module',module:'league',id:'league-import-history',service:'leagueImportHistory',script:'league-engine/import-history.js',version:'5.9.0.4a',dependencies:[],capabilities:['persistent-import-history','latest-import','success-and-failure-records','bounded-history']});
+  HQ.manifest?.register?.({scope:'module',module:'league',id:'league-import-history',service:'leagueImportHistory',script:'league-engine/import-history.js',version:'5.9.0.5',dependencies:[],capabilities:['persistent-import-history','latest-import','success-and-failure-records','bounded-history']});
 })();
