@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '5.9.1.3';
+  const VERSION = '5.9.1.4';
   let latestResult = null;
 
   const freeze = (value, seen = new WeakSet()) => {
