@@ -165,7 +165,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'leagueImportService',
-      version: '5.9.0.1',
+      version: '5.9.0.1.3',
       lastValidImportId: HQ.leagueRepository.current()?.source?.importId || null,
       successfulImports: history.length,
       quarantinedImports: HQ.leagueImportQuarantine.diagnostics().count,
@@ -194,7 +194,7 @@
     id: 'league-import-service',
     service: 'leagueImportService',
     script: 'league-engine/import-service.js',
-    version: '5.9.0.1',
+    version: '5.9.0.1.3',
     dependencies: deps,
     capabilities: [
       'preview-before-publish',

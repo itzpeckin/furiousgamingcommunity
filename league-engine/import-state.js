@@ -222,7 +222,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'leagueImportState',
-      version: '5.9.0.1',
+      version: '5.9.0.1.3',
       status: current.status,
       active: current.active,
       listenerCount: listeners.size,
@@ -253,7 +253,7 @@
     id: 'league-import-state',
     service: 'leagueImportState',
     script: 'league-engine/import-state.js',
-    version: '5.9.0.1',
+    version: '5.9.0.1.3',
     dependencies: ['events'],
     capabilities: [
       'guarded-import-lifecycle',
