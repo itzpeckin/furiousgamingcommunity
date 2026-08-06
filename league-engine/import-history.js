@@ -1,41 +1,19 @@
 (() => {
   'use strict';
-  const HQ = window.FranchiseHQ;
-  if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before import-history.js.');
-  const STORAGE_KEY = 'franchisehq.import.history.v1';
-  const MAX_RECORDS = 100;
-  let records = [];
-  const clone = (v) => v == null ? v : (typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
-  const freeze = (v) => Object.freeze(v);
-  const now = () => new Date().toISOString();
-  function persist(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); return true; }catch(e){ console.warn('[importHistory] persistence unavailable',e); return false; } }
-  function hydrate(){ try{ const raw=localStorage.getItem(STORAGE_KEY); const parsed=raw?JSON.parse(raw):[]; records=Array.isArray(parsed)?parsed.slice(0,MAX_RECORDS):[]; }catch(_){ records=[]; } }
-  function normalize(input={}){
-    return freeze({
-      id: input.id || input.importId || `import-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      importId: input.importId || null,
-      source: input.source || 'madden-companion',
-      snapshotId: input.snapshotId || null,
-      snapshotVersion: input.snapshotVersion || null,
-      season: input.season ?? null,
-      week: input.week ?? null,
-      startedAt: input.startedAt || now(),
-      completedAt: input.completedAt || null,
-      status: input.status || 'started',
-      warnings: Number(input.warnings || 0),
-      validationErrors: freeze([...(input.validationErrors || [])]),
-      failureReason: input.failureReason || null,
-      simulated: input.simulated === true
-    });
-  }
-  function add(input={}){ const record=normalize(input); records=[record,...records.filter(x=>x.id!==record.id)].slice(0,MAX_RECORDS); persist(); HQ.events?.emit?.('import:history-updated',{record,count:records.length}); return clone(record); }
-  function update(id, patch={}){ const current=records.find(x=>x.id===id || x.importId===id); if(!current) return add({...patch,id}); return add({...current,...patch,id:current.id}); }
-  function getImportHistory(options={}){ const limit=Number.isFinite(options.limit)?Math.max(0,options.limit):MAX_RECORDS; return freeze(records.slice(0,limit).map(clone)); }
-  function getLatestImport(){ return records.length?clone(records[0]):null; }
-  function clear(){ records=[]; try{localStorage.removeItem(STORAGE_KEY);}catch(_){} HQ.events?.emit?.('import:history-updated',{record:null,count:0}); return diagnostics(); }
-  function simulate(options={}){ const started=now(); const id=options.importId||`simulation-${Date.now()}`; return add({id,importId:id,source:options.source||'development-simulation',season:options.season??2027,week:options.week??4,startedAt:started,completedAt:now(),status:options.fail?'failed':'successful',failureReason:options.fail?'Simulated validation failure.':null,validationErrors:options.fail?['Simulated validation failure.']:[],simulated:true,snapshotId:options.fail?null:`snapshot-${Date.now()}`,snapshotVersion:options.fail?null:records.length+1}); }
-  function diagnostics(){ return freeze({service:'leagueImportHistory',version:'5.9.0.5',recordCount:records.length,maxRecords:MAX_RECORDS,persistence:'localStorage',latestStatus:records[0]?.status||null}); }
-  hydrate();
-  const service=HQ.defineModuleService('league','leagueImportHistory',{add,update,getImportHistory,getLatestImport,clear,simulate,diagnostics},{replace:true,alias:'leagueImportHistory'});
-  HQ.manifest?.register?.({scope:'module',module:'league',id:'league-import-history',service:'leagueImportHistory',script:'league-engine/import-history.js',version:'5.9.0.5',dependencies:[],capabilities:['persistent-import-history','latest-import','success-and-failure-records','bounded-history']});
+  const HQ=window.FranchiseHQ;if(!HQ?.defineModuleService||!HQ.leagueTenant)throw new Error('Tenant service must load before import-history.js.');
+  const VERSION='5.9.1.3',BASE_KEY='franchisehq.import.history.v2',MAX_RECORDS=100,stores=new Map();
+  const clone=v=>v==null?v:(typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v)));const freeze=v=>Object.freeze(v);const now=()=>new Date().toISOString();
+  const leagueId=o=>o?.leagueId||HQ.leagueTenant.current().id;const key=id=>HQ.leagueTenant.scopedKey(BASE_KEY,id);
+  function records(id=leagueId()){if(!stores.has(id)){let list=[];try{let raw=localStorage.getItem(key(id));if(!raw&&id===HQ.leagueTenant.DEFAULT_LEAGUE.id){raw=localStorage.getItem('franchisehq.import.history.v1');if(raw)localStorage.setItem(key(id),raw);}const p=JSON.parse(raw||'[]');list=Array.isArray(p)?p.map(x=>({...x,leagueId:id})).slice(0,MAX_RECORDS):[];}catch(_){}stores.set(id,list);}return stores.get(id);}
+  function persist(id){try{localStorage.setItem(key(id),JSON.stringify(records(id)));return true;}catch(e){console.warn('[importHistory] persistence unavailable',e);return false;}}
+  function normalize(input={}){const lid=leagueId(input);return freeze({id:input.id||input.importId||`import-${Date.now()}-${Math.random().toString(16).slice(2)}`,leagueId:lid,importId:input.importId||null,source:input.source||'madden-companion',snapshotId:input.snapshotId||null,snapshotVersion:input.snapshotVersion||null,season:input.season??null,week:input.week??null,startedAt:input.startedAt||now(),completedAt:input.completedAt||null,status:input.status||'started',warnings:Number(input.warnings||0),validationErrors:freeze([...(input.validationErrors||[])]),failureReason:input.failureReason||null,simulated:input.simulated===true});}
+  function add(input={}){const r=normalize(input),lid=r.leagueId,list=records(lid);stores.set(lid,[r,...list.filter(x=>x.id!==r.id)].slice(0,MAX_RECORDS));persist(lid);HQ.events?.emit?.('import:history-updated',{leagueId:lid,record:r,count:stores.get(lid).length});return clone(r);}
+  function update(id,patch={}){const lid=leagueId(patch),current=records(lid).find(x=>x.id===id||x.importId===id);return add(current?{...current,...patch,id:current.id,leagueId:lid}:{...patch,id,leagueId:lid});}
+  function getImportHistory(options={}){const limit=Number.isFinite(options.limit)?Math.max(0,options.limit):MAX_RECORDS;return freeze(records(leagueId(options)).slice(0,limit).map(clone));}
+  function getLatestImport(options={}){return clone(records(leagueId(options))[0]||null);}
+  function clear(options={}){const lid=leagueId(options);stores.set(lid,[]);try{localStorage.removeItem(key(lid));}catch(_){}HQ.events?.emit?.('import:history-updated',{leagueId:lid,record:null,count:0});return diagnostics({leagueId:lid});}
+  function simulate(options={}){const lid=leagueId(options),id=options.importId||`simulation-${Date.now()}`;return add({leagueId:lid,id,importId:id,source:options.source||'development-simulation',season:options.season??2027,week:options.week??4,startedAt:now(),completedAt:now(),status:options.fail?'failed':'successful',failureReason:options.fail?'Simulated validation failure.':null,validationErrors:options.fail?['Simulated validation failure.']:[],simulated:true,snapshotId:options.fail?null:`snapshot-${Date.now()}`,snapshotVersion:options.fail?null:records(lid).length+1});}
+  function diagnostics(options={}){const lid=leagueId(options),list=records(lid);return freeze({service:'leagueImportHistory',version:VERSION,leagueId:lid,recordCount:list.length,maxRecords:MAX_RECORDS,persistence:'league-scoped-localStorage',latestStatus:list[0]?.status||null});}
+  HQ.defineModuleService('league','leagueImportHistory',{add,update,getImportHistory,getLatestImport,clear,simulate,diagnostics},{replace:true,alias:'leagueImportHistory'});
+  HQ.manifest?.register?.({scope:'module',module:'league',id:'league-import-history',service:'leagueImportHistory',script:'league-engine/import-history.js',version:VERSION,dependencies:['leagueTenant'],capabilities:['league-scoped-import-history','latest-import','success-and-failure-records','bounded-history']});
 })();

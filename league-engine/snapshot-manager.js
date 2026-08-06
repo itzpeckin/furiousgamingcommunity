@@ -1,308 +1,35 @@
 (() => {
   'use strict';
-
   const HQ = window.FranchiseHQ;
-  if (!HQ?.defineModuleService || !HQ.leagueRepository) {
-    throw new Error('League repository must load before snapshot-manager.js.');
-  }
-
-  const STORAGE_KEY = 'franchisehq.import.snapshots.v1';
-  const MAX_RETAINED = 10;
-  const listeners = new Set();
-  const memory = {
-    candidates: new Map(),
-    retained: [],
-    activeId: null,
-    sequence: 0
-  };
-
-  const clone = (value) => {
-    if (value == null) return value;
-    return typeof structuredClone === 'function'
-      ? structuredClone(value)
-      : JSON.parse(JSON.stringify(value));
-  };
-
-  const freeze = (value, seen = new WeakSet()) => {
-    if (!value || typeof value !== 'object' || seen.has(value)) return value;
-    seen.add(value);
-    Object.getOwnPropertyNames(value).forEach((key) => freeze(value[key], seen));
-    return Object.freeze(value);
-  };
-
-  function now() { return new Date().toISOString(); }
-  function makeId(prefix = 'snapshot') {
-    return window.crypto?.randomUUID?.()
-      ? `${prefix}-${window.crypto.randomUUID()}`
-      : `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
-
-  function persist() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        retained: memory.retained,
-        activeId: memory.activeId,
-        sequence: memory.sequence
-      }));
-      return true;
-    } catch (error) {
-      console.warn('[snapshotManager] persistence unavailable', error);
-      return false;
-    }
-  }
-
-  function hydrate() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      memory.retained = Array.isArray(parsed.retained) ? parsed.retained.slice(0, MAX_RETAINED) : [];
-      memory.activeId = parsed.activeId || null;
-      memory.sequence = Number.isFinite(parsed.sequence) ? parsed.sequence : memory.retained.length;
-    } catch (error) {
-      console.warn('[snapshotManager] saved snapshot metadata could not be restored', error);
-    }
-  }
-
-  function summary(record) {
-    if (!record) return null;
-    return freeze({
-      id: record.id,
-      version: record.version,
-      status: record.status,
-      source: record.source,
-      importId: record.importId,
-      season: record.season,
-      week: record.week,
-      createdAt: record.createdAt,
-      activatedAt: record.activatedAt || null,
-      rejectedAt: record.rejectedAt || null,
-      rejectionReason: record.rejectionReason || null,
-      recordCounts: freeze(clone(record.recordCounts || {}))
-    });
-  }
-
-  function publish(type, record, extra = {}) {
-    const payload = freeze({ type, snapshot: summary(record), timestamp: now(), ...clone(extra) });
-    listeners.forEach((listener) => {
-      try { listener(payload); }
-      catch (error) { console.error('[snapshotManager] listener failed', error); }
-    });
-    HQ.events?.emit?.('snapshot:changed', payload, { source: 'leagueSnapshotManager' });
-    window.dispatchEvent(new CustomEvent('franchisehq:snapshot-changed', { detail: payload }));
-    return payload;
-  }
-
-  function recordCounts(snapshot) {
-    const counts = {};
-    ['teams','players','schedule','games','standings','statistics','transactions'].forEach((key) => {
-      if (Array.isArray(snapshot?.[key])) counts[key] = snapshot[key].length;
-      else if (snapshot?.[key] && typeof snapshot[key] === 'object') counts[key] = Object.keys(snapshot[key]).length;
-    });
-    return counts;
-  }
-
-  function createSnapshot(snapshot, metadata = {}) {
-    if (!snapshot || typeof snapshot !== 'object') throw new TypeError('Snapshot data must be an object.');
-    const id = metadata.snapshotId || makeId('candidate');
-    if (memory.candidates.has(id) || memory.retained.some((item) => item.id === id)) {
-      throw new Error(`Snapshot ID already exists: ${id}`);
-    }
-    const createdAt = now();
-    const record = freeze({
-      id,
-      version: ++memory.sequence,
-      status: 'candidate',
-      source: metadata.source || snapshot.source?.provider || snapshot.source?.source || 'madden-companion',
-      importId: metadata.importId || snapshot.source?.importId || null,
-      season: metadata.season ?? snapshot.season ?? snapshot.meta?.season ?? null,
-      week: metadata.week ?? snapshot.week ?? snapshot.meta?.week ?? null,
-      createdAt,
-      activatedAt: null,
-      rejectedAt: null,
-      rejectionReason: null,
-      recordCounts: recordCounts(snapshot),
-      snapshot: freeze(clone(snapshot)),
-      validation: metadata.validation ? freeze(clone(metadata.validation)) : null
-    });
-    memory.candidates.set(id, record);
-    persist();
-    publish('candidate-created', record);
-    return summary(record);
-  }
-
-  function getSnapshot(id, options = {}) {
-    const record = memory.candidates.get(id) || memory.retained.find((item) => item.id === id) || null;
-    if (!record) return null;
-    return options.includeData === true ? freeze(clone(record)) : summary(record);
-  }
-
-  function getCandidateSnapshot() {
-    const candidates = Array.from(memory.candidates.values());
-    return summary(candidates[candidates.length - 1] || null);
-  }
-
-  function getActiveSnapshot(options = {}) {
-    const record = memory.retained.find((item) => item.id === memory.activeId) || null;
-    if (!record) return null;
-    return options.includeData === true ? freeze(clone(record)) : summary(record);
-  }
-
-  function activateSnapshot(id, options = {}) {
-    const candidate = memory.candidates.get(id);
-    if (!candidate) throw new Error(`Candidate snapshot not found: ${id}`);
-    if (options.validated !== true) throw new Error('Candidate snapshots may only be activated after validation.');
-
-    const previous = memory.retained.find((item) => item.id === memory.activeId) || null;
-    const activated = freeze({ ...clone(candidate), status: 'active', activatedAt: now() });
-
-    if (activated.snapshot?.source?.source === 'madden') {
-      HQ.leagueRepository.install(activated.snapshot, { validated: true, receipt: options.validation || activated.validation });
-    }
-
-    memory.candidates.delete(id);
-    memory.activeId = id;
-    memory.retained = [activated, ...memory.retained.filter((item) => item.id !== id)].slice(0, MAX_RETAINED);
-    persist();
-    publish('snapshot-activated', activated, { previousSnapshotId: previous?.id || null });
-    return summary(activated);
-  }
-
-  function rejectSnapshot(id, reason = 'Snapshot rejected.') {
-    const candidate = memory.candidates.get(id);
-    if (!candidate) return null;
-    const rejected = freeze({
-      ...clone(candidate),
-      status: 'rejected',
-      rejectedAt: now(),
-      rejectionReason: String(reason || 'Snapshot rejected.'),
-      snapshot: null
-    });
-    memory.candidates.delete(id);
-    publish('snapshot-rejected', rejected);
-    return summary(rejected);
-  }
-
-  function rollbackSnapshot(targetId, options = {}) {
-    const target = memory.retained.find((item) => item.id === targetId);
-    if (!target) throw new Error(`Retained snapshot not found: ${targetId}`);
-    if (targetId === memory.activeId) return summary(target);
-    if (options.authorized !== true) throw new Error('Snapshot rollback requires explicit authorization.');
-
-    const previousId = memory.activeId;
-    if (target.snapshot?.source?.source === 'madden') {
-      HQ.leagueRepository.install(target.snapshot, { validated: true, receipt: target.validation });
-    }
-    const reactivated = freeze({ ...clone(target), status: 'active', activatedAt: now() });
-    memory.retained = [reactivated, ...memory.retained.filter((item) => item.id !== targetId)].slice(0, MAX_RETAINED);
-    memory.activeId = targetId;
-    persist();
-    publish('snapshot-rolled-back', reactivated, { previousSnapshotId: previousId });
-    return summary(reactivated);
-  }
-
-  function deleteSnapshot(id) {
-    if (id === memory.activeId) throw new Error('The active snapshot cannot be deleted.');
-    const candidateDeleted = memory.candidates.delete(id);
-    const before = memory.retained.length;
-    memory.retained = memory.retained.filter((item) => item.id !== id);
-    persist();
-    const deleted = candidateDeleted || before !== memory.retained.length;
-    if (deleted) publish('snapshot-deleted', { id, status: 'deleted', version: null, source: null, importId: null, season: null, week: null, createdAt: null, recordCounts: {} });
-    return deleted;
-  }
-
-  function listSnapshots() {
-    return freeze(memory.retained.map(summary));
-  }
-
-  function listCandidates() {
-    return freeze(Array.from(memory.candidates.values()).map(summary));
-  }
-
-  function subscribe(listener, options = {}) {
-    if (typeof listener !== 'function') throw new TypeError('Snapshot listener must be a function.');
-    listeners.add(listener);
-    if (options.immediate === true) listener(freeze({ type: 'snapshot-status', snapshot: getActiveSnapshot(), timestamp: now() }));
-    return () => listeners.delete(listener);
-  }
-
-  async function simulate(options = {}) {
-    const candidate = createSnapshot({
-      source: { source: 'development', importId: options.importId || `simulation-${Date.now()}` },
-      season: options.season ?? 2027,
-      week: options.week ?? 4,
-      teams: [],
-      players: []
-    }, {
-      source: 'development-simulation',
-      season: options.season ?? 2027,
-      week: options.week ?? 4
-    });
-    if (options.reject === true) return rejectSnapshot(candidate.id, 'Development rejection simulation.');
-    return activateSnapshot(candidate.id, { validated: true });
-  }
-
-  function resetDevelopmentState() {
-    memory.candidates.clear();
-    memory.retained = [];
-    memory.activeId = null;
-    memory.sequence = 0;
-    try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
-    publish('snapshot-state-reset', null);
-    return diagnostics();
-  }
-
-  function diagnostics() {
-    return freeze({
-      service: 'leagueSnapshotManager',
-      version: '5.9.0.5',
-      activeSnapshotId: memory.activeId,
-      candidateCount: memory.candidates.size,
-      retainedCount: memory.retained.length,
-      maxRetained: MAX_RETAINED,
-      persistence: 'localStorage-metadata',
-      immutableSnapshots: true,
-      guardedActivation: true,
-      rollbackAvailable: true
-    });
-  }
-
-  hydrate();
-
-  HQ.defineModuleService('league', 'leagueSnapshotManager', {
-    createSnapshot,
-    getSnapshot,
-    getCandidateSnapshot,
-    getActiveSnapshot,
-    activateSnapshot,
-    rejectSnapshot,
-    rollbackSnapshot,
-    deleteSnapshot,
-    listSnapshots,
-    listCandidates,
-    subscribe,
-    simulate,
-    resetDevelopmentState,
-    diagnostics
-  });
-
-  HQ.manifest?.register?.({
-    scope: 'module',
-    module: 'league',
-    id: 'league-snapshot-manager',
-    service: 'leagueSnapshotManager',
-    script: 'league-engine/snapshot-manager.js',
-    version: '5.9.0.5',
-    dependencies: ['leagueRepository'],
-    capabilities: [
-      'candidate-snapshots',
-      'immutable-snapshot-records',
-      'validated-activation',
-      'failed-candidate-rejection',
-      'retained-snapshot-history',
-      'authorized-rollback',
-      'snapshot-events'
-    ]
-  });
+  if (!HQ?.defineModuleService || !HQ.leagueRepository || !HQ.leagueTenant) throw new Error('League repository and tenant service must load before snapshot-manager.js.');
+  const VERSION='5.9.1.3', BASE_KEY='franchisehq.import.snapshots.v2', MAX_RETAINED=10;
+  const memories=new Map(), listeners=new Set();
+  const clone=v=>v==null?v:(typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v)));
+  const freeze=(v,seen=new WeakSet())=>{if(!v||typeof v!=='object'||seen.has(v))return v;seen.add(v);Object.getOwnPropertyNames(v).forEach(k=>freeze(v[k],seen));return Object.freeze(v);};
+  const now=()=>new Date().toISOString();
+  const leagueId=options=>options?.leagueId||HQ.leagueTenant.current().id;
+  const key=id=>HQ.leagueTenant.scopedKey(BASE_KEY,id);
+  function empty(){return{candidates:new Map(),retained:[],activeId:null,sequence:0};}
+  function memory(id=leagueId()){if(!memories.has(id)){const m=empty();try{let raw=localStorage.getItem(key(id));if(!raw&&id===HQ.leagueTenant.DEFAULT_LEAGUE.id){raw=localStorage.getItem('franchisehq.import.snapshots.v1');if(raw)localStorage.setItem(key(id),raw);}const p=JSON.parse(raw||'null');if(p){m.retained=Array.isArray(p.retained)?p.retained.map(x=>({...x,leagueId:id})).slice(0,MAX_RETAINED):[];m.activeId=p.activeId||null;m.sequence=Number.isFinite(p.sequence)?p.sequence:m.retained.length;}}catch(_){}memories.set(id,m);}return memories.get(id);}
+  function persist(id){const m=memory(id);try{localStorage.setItem(key(id),JSON.stringify({retained:m.retained,activeId:m.activeId,sequence:m.sequence}));return true;}catch(e){console.warn('[snapshotManager] persistence unavailable',e);return false;}}
+  function makeId(){return `candidate-${crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(16).slice(2)}`}`;}
+  function counts(s){const out={};['teams','players','schedule','games','standings','statistics','transactions'].forEach(k=>{if(Array.isArray(s?.[k]))out[k]=s[k].length;else if(s?.[k]&&typeof s[k]==='object')out[k]=Object.keys(s[k]).length;});return out;}
+  function summary(r){return r?freeze({id:r.id,leagueId:r.leagueId,version:r.version,status:r.status,source:r.source,importId:r.importId,season:r.season,week:r.week,createdAt:r.createdAt,activatedAt:r.activatedAt||null,rejectedAt:r.rejectedAt||null,rejectionReason:r.rejectionReason||null,recordCounts:freeze(clone(r.recordCounts||{}))}):null;}
+  function publish(type,r,extra={}){const payload=freeze({type,leagueId:r?.leagueId||extra.leagueId||leagueId(),snapshot:summary(r),timestamp:now(),...clone(extra)});listeners.forEach(fn=>{try{fn(payload);}catch(e){console.error('[snapshotManager] listener failed',e);}});HQ.events?.emit?.('snapshot:changed',payload,{source:'leagueSnapshotManager'});window.dispatchEvent(new CustomEvent('franchisehq:snapshot-changed',{detail:payload}));return payload;}
+  function createSnapshot(snapshot,metadata={}){const id=leagueId(metadata),m=memory(id),sid=metadata.snapshotId||makeId();if(!snapshot||typeof snapshot!=='object')throw new TypeError('Snapshot data must be an object.');if(m.candidates.has(sid)||m.retained.some(x=>x.id===sid))throw new Error(`Snapshot ID already exists: ${sid}`);const record=freeze({id:sid,leagueId:id,version:++m.sequence,status:'candidate',source:metadata.source||snapshot.source?.provider||snapshot.source?.source||'madden-companion',importId:metadata.importId||snapshot.source?.importId||null,season:metadata.season??snapshot.season??snapshot.meta?.season??null,week:metadata.week??snapshot.week??snapshot.meta?.week??null,createdAt:now(),activatedAt:null,rejectedAt:null,rejectionReason:null,recordCounts:counts(snapshot),snapshot:freeze(clone({...snapshot,meta:{...(snapshot.meta||{}),leagueId:id}})),validation:metadata.validation?freeze(clone(metadata.validation)):null});m.candidates.set(sid,record);persist(id);publish('candidate-created',record);return summary(record);}
+  function find(id,options={}){const lid=leagueId(options),m=memory(lid);return m.candidates.get(id)||m.retained.find(x=>x.id===id)||null;}
+  function getSnapshot(id,options={}){const r=find(id,options);return r?(options.includeData?freeze(clone(r)):summary(r)):null;}
+  function getCandidateSnapshot(options={}){const vals=[...memory(leagueId(options)).candidates.values()];return summary(vals.at(-1)||null);}
+  function getActiveSnapshot(options={}){const m=memory(leagueId(options)),r=m.retained.find(x=>x.id===m.activeId)||null;return r?(options.includeData?freeze(clone(r)):summary(r)):null;}
+  function activateSnapshot(id,options={}){const lid=leagueId(options),m=memory(lid),c=m.candidates.get(id);if(!c)throw new Error(`Candidate snapshot not found: ${id}`);if(options.validated!==true)throw new Error('Candidate snapshots may only be activated after validation.');const previous=m.retained.find(x=>x.id===m.activeId)||null,active=freeze({...clone(c),status:'active',activatedAt:now()});if(active.snapshot?.source?.source==='madden')HQ.leagueRepository.install(active.snapshot,{validated:true,receipt:options.validation||active.validation});m.candidates.delete(id);m.activeId=id;m.retained=[active,...m.retained.filter(x=>x.id!==id)].slice(0,MAX_RETAINED);persist(lid);publish('snapshot-activated',active,{previousSnapshotId:previous?.id||null});return summary(active);}
+  function rejectSnapshot(id,reason='Snapshot rejected.',options={}){const lid=leagueId(options),m=memory(lid),c=m.candidates.get(id);if(!c)return null;const r=freeze({...clone(c),status:'rejected',rejectedAt:now(),rejectionReason:String(reason),snapshot:null});m.candidates.delete(id);persist(lid);publish('snapshot-rejected',r);return summary(r);}
+  function rollbackSnapshot(id,options={}){const lid=leagueId(options),m=memory(lid),target=m.retained.find(x=>x.id===id);if(!target)throw new Error(`Retained snapshot not found: ${id}`);if(options.authorized!==true)throw new Error('Snapshot rollback requires explicit authorization.');const prev=m.activeId,active=freeze({...clone(target),status:'active',activatedAt:now()});m.retained=[active,...m.retained.filter(x=>x.id!==id)].slice(0,MAX_RETAINED);m.activeId=id;persist(lid);publish('snapshot-rolled-back',active,{previousSnapshotId:prev});return summary(active);}
+  function deleteSnapshot(id,options={}){const lid=leagueId(options),m=memory(lid);if(id===m.activeId)throw new Error('The active snapshot cannot be deleted.');const a=m.candidates.delete(id),before=m.retained.length;m.retained=m.retained.filter(x=>x.id!==id);persist(lid);return a||before!==m.retained.length;}
+  function listSnapshots(options={}){return freeze(memory(leagueId(options)).retained.map(summary));}
+  function listCandidates(options={}){return freeze([...memory(leagueId(options)).candidates.values()].map(summary));}
+  function subscribe(fn,options={}){listeners.add(fn);if(options.immediate)fn(freeze({type:'snapshot-status',leagueId:leagueId(options),snapshot:getActiveSnapshot(options),timestamp:now()}));return()=>listeners.delete(fn);}
+  function resetDevelopmentState(options={}){const lid=leagueId(options);memories.set(lid,empty());try{localStorage.removeItem(key(lid));}catch(_){}publish('snapshot-state-reset',null,{leagueId:lid});return diagnostics({leagueId:lid});}
+  function diagnostics(options={}){const lid=leagueId(options),m=memory(lid);return freeze({service:'leagueSnapshotManager',version:VERSION,leagueId:lid,activeSnapshotId:m.activeId,candidateCount:m.candidates.size,retainedCount:m.retained.length,maxRetained:MAX_RETAINED,persistence:'league-scoped-localStorage',immutableSnapshots:true,guardedActivation:true,rollbackAvailable:true});}
+  HQ.defineModuleService('league','leagueSnapshotManager',{createSnapshot,getSnapshot,getCandidateSnapshot,getActiveSnapshot,activateSnapshot,rejectSnapshot,rollbackSnapshot,deleteSnapshot,listSnapshots,listCandidates,subscribe,resetDevelopmentState,diagnostics},{replace:true,alias:'leagueSnapshotManager'});
+  HQ.manifest?.register?.({scope:'module',module:'league',id:'league-snapshot-manager',service:'leagueSnapshotManager',script:'league-engine/snapshot-manager.js',version:VERSION,dependencies:['leagueTenant'],capabilities:['league-scoped-snapshots','candidate-snapshots','guarded-activation','rollback','persistent-metadata']});
 })();

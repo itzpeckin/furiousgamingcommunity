@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '5.9.1.2';
+  const VERSION = '5.9.1.3';
   let latestResult = null;
 
   const freeze = (value, seen = new WeakSet()) => {
@@ -21,7 +21,8 @@
       validation: HQ.leagueValidationEngine,
       state: HQ.leagueImportState,
       history: HQ.leagueImportHistory,
-      events: HQ.leagueDataEvents
+      events: HQ.leagueDataEvents,
+      tenant: HQ.leagueTenant
     };
   }
 
@@ -47,6 +48,7 @@
     const importId = options.importId || `companion-teams-${makeId()}`;
     const metadata = selected.mapped.metadata || {};
     const source = metadata.source || 'Madden Companion';
+    const league = deps.tenant.current();
     const startedAt = new Date().toISOString();
     let candidate = null;
 
@@ -75,7 +77,7 @@
         meta: freeze({
           season: metadata.season,
           week: metadata.week,
-          leagueId: metadata.leagueId || '',
+          leagueId: league.id,
           leagueName: metadata.leagueName || '',
           partialDataset: true,
           pendingDatasets: freeze(['players'])
@@ -88,7 +90,8 @@
         source: 'madden-companion-teams',
         importId,
         season: metadata.season,
-        week: metadata.week
+        week: metadata.week,
+        leagueId: league.id
       });
 
       const validation = deps.validation.validateSnapshot(candidate.id, { rejectOnFailure: true });
@@ -104,6 +107,7 @@
         source: 'madden-companion-teams',
         snapshotId: activeSnapshot.id,
         snapshotVersion: activeSnapshot.version,
+        leagueId: league.id,
         season: metadata.season,
         week: metadata.week,
         startedAt,
@@ -117,6 +121,7 @@
 
       deps.events.publishLeagueDataUpdated({
         reason: 'companion-teams-imported',
+        leagueId: league.id,
         source: 'madden-companion-teams',
         snapshotId: activeSnapshot.id,
         importId,
@@ -149,6 +154,7 @@
         id: importId,
         importId,
         source: 'madden-companion-teams',
+        leagueId: league.id,
         snapshotId: candidate?.id || null,
         season: metadata.season,
         week: metadata.week,
@@ -160,8 +166,8 @@
         dataset: 'teams',
         simulated: options.simulated === true
       });
-      deps.state.fail(error, { metadata: { importId, dataset: 'teams', retainedSnapshotId: deps.snapshots.getActiveSnapshot()?.id || null } });
-      latestResult = freeze({ installed: false, importId, error: error.message, snapshot: deps.snapshots.getActiveSnapshot(), partialDataset: true });
+      deps.state.fail(error, { metadata: { importId, dataset: 'teams', retainedSnapshotId: deps.snapshots.getActiveSnapshot({leagueId:league.id})?.id || null } });
+      latestResult = freeze({ installed: false, importId, error: error.message, snapshot: deps.snapshots.getActiveSnapshot({leagueId:league.id}), partialDataset: true });
       throw error;
     }
   }
@@ -182,6 +188,8 @@
       validationAvailable: Boolean(deps.validation),
       historyAvailable: Boolean(deps.history),
       eventIntegrationAvailable: Boolean(deps.events),
+      tenantAvailable: Boolean(deps.tenant),
+      leagueId: deps.tenant?.current?.().id || null,
       teamsOnly: true,
       playersActivated: false,
       latestInstalled: latestResult?.installed ?? null,
@@ -199,7 +207,7 @@
   HQ.manifest?.register?.({
     scope: 'module', module: 'league', id: 'league-companion-teams-importer', service: 'leagueCompanionTeamsImporter',
     script: 'league-engine/companion-teams-importer.js', version: VERSION,
-    dependencies: ['leagueCompanionJsonMapper','leagueSnapshotManager','leagueValidationEngine','leagueImportState','leagueImportHistory','leagueDataEvents'],
+    dependencies: ['leagueCompanionJsonMapper','leagueTenant','leagueSnapshotManager','leagueValidationEngine','leagueImportState','leagueImportHistory','leagueDataEvents'],
     capabilities: ['teams-only-import','candidate-snapshot','validated-activation','failed-candidate-rejection','import-history','league-data-updated-event','partial-dataset-provenance']
   });
 })();
