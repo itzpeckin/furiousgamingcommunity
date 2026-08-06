@@ -5193,3 +5193,7 @@ table td{
 .league-import-framework-note svg{width:18px;height:18px;stroke:var(--accent);fill:none;flex:0 0 auto;}
 @media(max-width:900px){.league-import-framework-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:560px){.league-import-framework-grid{grid-template-columns:1fr;}}
+
+
+/* v5.9.0.3 · Validation Engine checkpoint */
+.league-import-framework-card [data-validation-status="failed"]{border-color:var(--danger,#ef4444)}
