@@ -6,7 +6,7 @@
     throw new Error('Snapshot Manager must load before validation-engine.js.');
   }
 
-  const VERSION = '5.9.0.3';
+  const VERSION = '5.9.0.3a';
   const validators = new Map();
   const results = new Map();
   let latestResult = null;

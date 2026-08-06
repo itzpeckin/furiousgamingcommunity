@@ -8,7 +8,6 @@
     'leagueImportQuarantine',
     'leagueRepository',
     'leagueSnapshotManager',
-    'leagueValidationEngine',
     'leagueImportState'
   ];
   if (!HQ?.defineModuleService || deps.some((name) => !HQ[name])) {
@@ -83,6 +82,9 @@
     });
     let snapshot;
     try {
+      if (!HQ.leagueValidationEngine?.validateSnapshot) {
+        throw new Error('Validation Engine is not available. Confirm validation-engine.js loaded before starting an import.');
+      }
       const validation = HQ.leagueValidationEngine.validateSnapshot(candidate.id, { rejectOnFailure: true });
       if (!validation.valid) {
         const message = validation.errors.map((entry) => entry.message).join('; ') || 'Candidate snapshot failed validation.';
@@ -194,14 +196,14 @@
   function diagnostics() {
     return Object.freeze({
       service: 'leagueImportService',
-      version: '5.9.0.3',
+      version: '5.9.0.3a',
       lastValidImportId: HQ.leagueRepository.current()?.source?.importId || null,
       successfulImports: history.length,
       quarantinedImports: HQ.leagueImportQuarantine.diagnostics().count,
       readOnlyOfficialState: true,
       lifecycleState: HQ.leagueImportState.diagnostics(),
       snapshotManager: HQ.leagueSnapshotManager.diagnostics(),
-      validationEngine: HQ.leagueValidationEngine.diagnostics(),
+      validationEngine: HQ.leagueValidationEngine?.diagnostics?.() || { available: false },
       backwardCompatibleApis: Object.freeze(['preview', 'commit', 'ingest', 'history'])
     });
   }
@@ -225,7 +227,7 @@
     id: 'league-import-service',
     service: 'leagueImportService',
     script: 'league-engine/import-service.js',
-    version: '5.9.0.3',
+    version: '5.9.0.3a',
     dependencies: deps,
     capabilities: [
       'preview-before-publish',
