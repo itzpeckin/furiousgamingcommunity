@@ -5180,7 +5180,7 @@ table td{
 }
 
 
-/* v5.9.0.1.3 · Import Core & State UI checkpoint */
+/* v5.9.0.2 · Snapshot Manager checkpoint */
 .league-import-framework-card{display:grid;gap:16px;border-color:color-mix(in srgb,var(--accent) 28%,var(--border));}
 .league-import-framework-card .card-header{align-items:flex-start;}
 .league-import-framework-card .card-header p{margin:0;}
