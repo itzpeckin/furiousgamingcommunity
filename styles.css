@@ -5178,3 +5178,14 @@ table td{
   .home-standings-columns{grid-template-columns:40px minmax(0,1fr) 52px!important}
   .home-standings-list button{grid-template-columns:20px 24px minmax(0,1fr) 52px!important}
 }
+
+/* v5.8.5b — Home typography refinement */
+.home-leader-player strong{
+  font-size:11px!important;
+  line-height:1.15!important;
+}
+.home-standings-record{
+  font-size:12px!important;
+  line-height:1.1!important;
+  font-weight:800!important;
+}
