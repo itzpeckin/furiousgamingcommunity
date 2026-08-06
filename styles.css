@@ -5128,3 +5128,53 @@ table td{
   .home-standings-gb{display:none!important}
   .home-leader-card__header{min-height:0!important}
 }
+
+
+/* v5.8.5a — Home standings simplification and full-name leader readability */
+.home-standings-columns{
+  grid-template-columns:44px minmax(0,1fr) 58px!important;
+  gap:8px!important;
+  padding:7px 12px!important;
+}
+.home-standings-columns span{grid-column:auto!important}
+.home-standings-columns span:first-child{text-align:center!important}
+.home-standings-columns span:nth-child(2){text-align:left!important}
+.home-standings-columns span:last-child{text-align:right!important}
+.home-standings-list button{
+  grid-template-columns:22px 28px minmax(0,1fr) 58px!important;
+  gap:8px!important;
+}
+.home-standings-team strong{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  line-height:1.15!important;
+}
+.home-standings-record{text-align:right!important}
+.home-standings-pct,.home-standings-gb{display:none!important}
+.home-leader-columns{
+  grid-template-columns:18px minmax(0,1fr) 40px!important;
+  gap:5px!important;
+  padding-left:10px!important;
+  padding-right:10px!important;
+}
+.home-leaders-grid--embedded .home-leader-list button{
+  grid-template-columns:18px minmax(0,1fr) 40px!important;
+  gap:5px!important;
+  padding-left:10px!important;
+  padding-right:10px!important;
+}
+.home-leaders-grid--embedded .leader-rank{font-size:8px!important}
+.home-leader-value{font-size:8px!important;line-height:1!important}
+.home-leader-player strong{
+  font-size:10px!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  line-height:1.1!important;
+}
+.home-leader-player small{font-size:6.5px!important}
+@media(max-width:520px){
+  .home-standings-columns{grid-template-columns:40px minmax(0,1fr) 52px!important}
+  .home-standings-list button{grid-template-columns:20px 24px minmax(0,1fr) 52px!important}
+}

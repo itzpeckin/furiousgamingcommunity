@@ -431,14 +431,12 @@
     const ranked=playoffHuntRows(conference);
     return `<article class="card home-standings-card">
       <div class="card-header"><div><span class="eyebrow">Playoff picture</span><h3>${conference} Standings</h3></div><button class="text-button" data-route="standings">View all <svg><use href="#icon-arrow"></use></svg></button></div>
-      <div class="home-standings-columns" aria-hidden="true"><span></span><span>Team</span><span>W-L</span><span>PCT</span><span>GB</span></div>
+      <div class="home-standings-columns" aria-hidden="true"><span>Rank</span><span>Team</span><span>Record</span></div>
       <div class="home-standings-list">
-        ${ranked.map(({team,type,seed,winPct,gamesBehind})=>`<button type="button" data-team-id="${team.id}" data-route="teams/${team.id}" class="${seed===8?'wildcard-cutline':''}">
+        ${ranked.map(({team,type,seed})=>`<button type="button" data-team-id="${team.id}" data-route="teams/${team.id}" class="${seed===8?'wildcard-cutline':''}">
           <span class="seed">${seed}</span>${renderTeamMark(team)}
           <span class="home-standings-team"><strong>${team.fullName}</strong><small>${type}</small></span>
           <strong class="home-standings-record">${team.record}${team.ties?`-${team.ties}`:''}</strong>
-          <span class="home-standings-pct">${winPct.toFixed(3).replace(/^0/,'')}</span>
-          <span class="home-standings-gb">${gamesBehind===0?'—':Number.isInteger(gamesBehind)?gamesBehind:gamesBehind.toFixed(1)}</span>
         </button>`).join('')}
       </div>
     </article>`;
