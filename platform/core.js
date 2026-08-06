@@ -17,11 +17,11 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '5.9.0.2',
+    version: '5.9.0.3',
     release: 5,
     epic: 9,
     patch: 1,
-    build: 'madden-companion-import-core-state'
+    build: 'madden-companion-validation-engine'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
