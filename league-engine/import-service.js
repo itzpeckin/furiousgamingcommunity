@@ -7,6 +7,7 @@
     'leagueImportValidator',
     'leagueImportQuarantine',
     'leagueRepository',
+    'leagueSnapshotManager',
     'leagueImportState'
   ];
   if (!HQ?.defineModuleService || deps.some((name) => !HQ[name])) {
@@ -72,10 +73,28 @@
       });
     }
 
-    const snapshot = HQ.leagueRepository.install(previewResult.snapshot, { receipt: previewResult.report });
+    const candidate = HQ.leagueSnapshotManager.createSnapshot(previewResult.snapshot, {
+      source: previewResult.envelope?.source || previewResult.snapshot?.source?.provider || 'madden-companion',
+      importId: previewResult.report.importId || previewResult.envelope?.importId || previewResult.snapshot?.source?.importId || null,
+      season: previewResult.envelope?.season ?? previewResult.snapshot?.season ?? null,
+      week: previewResult.envelope?.week ?? previewResult.snapshot?.week ?? null,
+      validation: previewResult.report
+    });
+    let snapshot;
+    try {
+      HQ.leagueSnapshotManager.activateSnapshot(candidate.id, {
+        validated: true,
+        validation: previewResult.report
+      });
+      snapshot = HQ.leagueRepository.current() || previewResult.snapshot;
+    } catch (error) {
+      HQ.leagueSnapshotManager.rejectSnapshot(candidate.id, error.message);
+      throw error;
+    }
     const record = Object.freeze({
-      importId: snapshot.source.importId,
-      importedAt: snapshot.source.importedAt,
+      importId: snapshot.source?.importId || candidate.importId,
+      snapshotId: candidate.id,
+      importedAt: snapshot.source?.importedAt || candidate.createdAt,
       installedAt: new Date().toISOString(),
       warnings: previewResult.report.warnings.length
     });
@@ -165,12 +184,13 @@
   function diagnostics() {
     return Object.freeze({
       service: 'leagueImportService',
-      version: '5.9.0.1.3',
+      version: '5.9.0.2',
       lastValidImportId: HQ.leagueRepository.current()?.source?.importId || null,
       successfulImports: history.length,
       quarantinedImports: HQ.leagueImportQuarantine.diagnostics().count,
       readOnlyOfficialState: true,
       lifecycleState: HQ.leagueImportState.diagnostics(),
+      snapshotManager: HQ.leagueSnapshotManager.diagnostics(),
       backwardCompatibleApis: Object.freeze(['preview', 'commit', 'ingest', 'history'])
     });
   }
@@ -194,7 +214,7 @@
     id: 'league-import-service',
     service: 'leagueImportService',
     script: 'league-engine/import-service.js',
-    version: '5.9.0.1.3',
+    version: '5.9.0.2',
     dependencies: deps,
     capabilities: [
       'preview-before-publish',
@@ -203,7 +223,8 @@
       'import-history',
       'shared-import-lifecycle',
       'observable-import-status',
-      'development-import-simulation'
+      'development-import-simulation',
+      'candidate-snapshot-activation'
     ]
   });
 })();
