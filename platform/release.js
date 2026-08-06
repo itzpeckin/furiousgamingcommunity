@@ -68,7 +68,7 @@
       dependenciesCompliant: dependencies.compliant === true,
       platformHealthy: health.overall === 'healthy',
       manifestCompliant: manifest.compliant === true,
-      releaseMatches: /^\d+\.\d+(?:\.\d+)?$/.test(HQ.metadata.version) && contract.release === '4.21'
+      releaseMatches: /^\d+\.\d+(?:\.\d+){0,2}[a-z]?$/.test(HQ.metadata.version) && contract.release === '4.21'
     });
     const failures = Object.entries(checks)
       .filter(([, passed]) => !passed)
@@ -128,7 +128,7 @@
   function diagnostics() {
     return Object.freeze({
       service: 'release',
-      version: '1.1.1',
+      version: '1.1.2',
       build: buildInfo(),
       lastPreflight,
       lastCertification
@@ -150,7 +150,7 @@
     id: 'release',
     service: 'release',
     script: 'platform/release.js',
-    version: '1.1.1',
+    version: '1.1.2',
     capabilities: ['release-preflight', 'release-certification', 'support-bundle', 'build-metadata'],
     dependencies: ['manifest', 'security', 'validate', 'runtime']
   });
