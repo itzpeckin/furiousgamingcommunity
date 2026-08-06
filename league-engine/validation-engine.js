@@ -1,12 +1,18 @@
 (() => {
   'use strict';
 
-  const HQ = window.FranchiseHQ;
-  if (!HQ?.defineModuleService || !HQ.leagueSnapshotManager) {
-    throw new Error('Snapshot Manager must load before validation-engine.js.');
+  const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
+  const VERSION = '5.9.0.3b';
+
+  function snapshotManager() {
+    return HQ.leagueSnapshotManager || HQ.modules?.league?.leagueSnapshotManager || null;
   }
 
-  const VERSION = '5.9.0.3a';
+  function requireSnapshotManager() {
+    const manager = snapshotManager();
+    if (!manager) throw new Error('Snapshot Manager is not available. Confirm snapshot-manager.js loaded before using validation APIs.');
+    return manager;
+  }
   const validators = new Map();
   const results = new Map();
   let latestResult = null;
@@ -72,7 +78,7 @@
 
   function resolveSnapshot(target) {
     if (typeof target === 'string') {
-      const record = HQ.leagueSnapshotManager.getSnapshot(target, { includeData: true });
+      const record = requireSnapshotManager().getSnapshot(target, { includeData: true });
       if (!record) throw new Error(`Snapshot not found: ${target}`);
       return { id: target, record, snapshot: record.snapshot, candidate: record.status === 'candidate' };
     }
@@ -143,7 +149,7 @@
     window.dispatchEvent(new CustomEvent('franchisehq:snapshot-validated', { detail: result }));
 
     if (!valid && resolved.id && resolved.candidate && options.rejectOnFailure !== false) {
-      HQ.leagueSnapshotManager.rejectSnapshot(
+      requireSnapshotManager().rejectSnapshot(
         resolved.id,
         errors.map((entry) => entry.message).join('; ') || 'Snapshot failed validation.'
       );
@@ -272,21 +278,21 @@
       teams: [{ id: 'TEAM-1', name: 'Development Team' }],
       players: [{ id: 'PLAYER-1', teamId: 'TEAM-1', position: 'QB' }]
     };
-    const candidate = HQ.leagueSnapshotManager.createSnapshot(snapshot, {
+    const candidate = requireSnapshotManager().createSnapshot(snapshot, {
       source: 'development-validation',
       season: snapshot.season,
       week: snapshot.week
     });
     const result = validateSnapshot(candidate.id, { rejectOnFailure: true });
     if (result.valid && options.activate === true) {
-      HQ.leagueSnapshotManager.activateSnapshot(candidate.id, { validated: true, validation: result });
+      requireSnapshotManager().activateSnapshot(candidate.id, { validated: true, validation: result });
     } else if (result.valid && options.retainCandidate !== true) {
-      HQ.leagueSnapshotManager.rejectSnapshot(candidate.id, 'Development validation simulation completed.');
+      requireSnapshotManager().rejectSnapshot(candidate.id, 'Development validation simulation completed.');
     }
     return result;
   }
 
-  HQ.defineModuleService('league', 'leagueValidationEngine', {
+  const service = Object.freeze({
     registerValidator,
     listValidators,
     validateSnapshot,
@@ -295,6 +301,25 @@
     simulate,
     diagnostics
   });
+
+  if (typeof HQ.defineModuleService === 'function') {
+    HQ.defineModuleService('league', 'leagueValidationEngine', service, { replace: true, alias: 'leagueValidationEngine' });
+  }
+
+  // Explicit compatibility registration. This guarantees the public API even
+  // when an older cached Platform core does not create module aliases.
+  const descriptor = Object.getOwnPropertyDescriptor(HQ, 'leagueValidationEngine');
+  if (!descriptor || descriptor.configurable === true) {
+    Object.defineProperty(HQ, 'leagueValidationEngine', {
+      configurable: true,
+      enumerable: true,
+      value: service,
+      writable: false
+    });
+  }
+  if (HQ.modules?.league && !HQ.modules.league.leagueValidationEngine) {
+    try { HQ.modules.league.leagueValidationEngine = service; } catch (_) {}
+  }
 
   HQ.manifest?.register?.({
     scope: 'module',
