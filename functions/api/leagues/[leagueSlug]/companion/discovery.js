@@ -1,4 +1,4 @@
-import { json, database, validLeagueSlug, resolveLeague } from '../../../../../_lib/cloud-platform.js';
+import { json, normalizeSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
 export async function onRequestGet(context) {
   const slug = String(context.params?.leagueSlug || '').trim().toLowerCase();
