@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.2.1';
+  const VERSION = '5.9.2.1a';
   let latest = null;
   let lastError = null;
   const listeners = new Set();
@@ -39,7 +39,7 @@
     const stateLabel = ready ? 'Platform Ready' : configured ? 'Migration Required' : 'Configuration Required';
     const tone = ready ? 'success' : 'warning';
     return `<article class="card league-import-framework-card" data-cloud-platform-panel>
-      <div class="card-header"><div><span class="eyebrow">v5.9.2.1 · Storage foundation</span><h3>Cloud Platform Foundation</h3><p>D1, R2, KV, and secret readiness for the multi-league backend.</p></div>${pill(tone, stateLabel)}</div>
+      <div class="card-header"><div><span class="eyebrow">v5.9.2.1a · Storage foundation</span><h3>Cloud Platform Foundation</h3><p>D1, R2, KV, and secret readiness for the multi-league backend.</p></div>${pill(tone, stateLabel)}</div>
       <div class="league-import-framework-grid">
         ${item('D1 Binding', bindings.d1 ? 'Configured' : 'Missing', bindings.d1 ? 'success' : 'warning')}
         ${item('D1 Migration', database.migrated ? 'Applied' : 'Not Applied', database.migrated ? 'success' : 'warning')}
