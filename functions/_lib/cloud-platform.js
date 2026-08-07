@@ -132,5 +132,40 @@ export async function platformReadiness(env) {
   const bindings = bindingStatus(env);
   const dbStatus = await databaseStatus(env);
   const configured = bindings.d1 && bindings.r2 && bindings.kv && bindings.secret;
-  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '5.9.2.1a' };
+  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '5.9.3.0' };
+}
+
+
+export function normalizeDiscoveryPath(context) {
+  const raw = context.params?.datasetPath;
+  const parts = Array.isArray(raw) ? raw : String(raw || '').split('/');
+  return parts.map(part => decodeURIComponent(String(part))).filter(Boolean).join('/');
+}
+
+export function safeRouteSegment(value) {
+  return String(value || 'root').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'root';
+}
+
+export function companionRouteObjectKey(slug, sessionId, routePath, captureId, receivedAt) {
+  const date = receivedAt.slice(0, 10);
+  const route = String(routePath || 'root').split('/').map(safeRouteSegment).join('/');
+  return `companion-route-discovery/${slug}/${date}/${sessionId}/${route}/${captureId}.json`;
+}
+
+export function summarizePayloadShape(payload) {
+  const typeOf = value => Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value;
+  const root = payload && typeof payload === 'object' ? payload : null;
+  const keys = root && !Array.isArray(root) ? Object.keys(root).slice(0, 100) : [];
+  const collections = [];
+  const walk = (value, path, depth) => {
+    if (depth > 3 || collections.length >= 50 || value == null) return;
+    if (Array.isArray(value)) {
+      collections.push({ path: path || '$', count: value.length, sampleKeys: value[0] && typeof value[0] === 'object' && !Array.isArray(value[0]) ? Object.keys(value[0]).slice(0, 60) : [] });
+      if (value[0] && typeof value[0] === 'object') walk(value[0], `${path}[0]`, depth + 1);
+      return;
+    }
+    if (typeof value === 'object') Object.entries(value).slice(0, 100).forEach(([key, child]) => walk(child, path ? `${path}.${key}` : key, depth + 1));
+  };
+  walk(root, '', 0);
+  return { rootType: typeOf(payload), topLevelKeys: keys, collections };
 }
