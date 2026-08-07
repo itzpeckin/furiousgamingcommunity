@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.2.0';
+  const VERSION = '5.9.2.1';
   let latest = null;
   let lastError = null;
   const listeners = new Set();
@@ -39,7 +39,7 @@
     const stateLabel = ready ? 'Platform Ready' : configured ? 'Migration Required' : 'Configuration Required';
     const tone = ready ? 'success' : 'warning';
     return `<article class="card league-import-framework-card" data-cloud-platform-panel>
-      <div class="card-header"><div><span class="eyebrow">v5.9.2.0 · Backend foundation</span><h3>Cloud Platform Foundation</h3><p>D1, R2, KV, and secret readiness for the multi-league backend.</p></div>${pill(tone, stateLabel)}</div>
+      <div class="card-header"><div><span class="eyebrow">v5.9.2.1 · Storage foundation</span><h3>Cloud Platform Foundation</h3><p>D1, R2, KV, and secret readiness for the multi-league backend.</p></div>${pill(tone, stateLabel)}</div>
       <div class="league-import-framework-grid">
         ${item('D1 Binding', bindings.d1 ? 'Configured' : 'Missing', bindings.d1 ? 'success' : 'warning')}
         ${item('D1 Migration', database.migrated ? 'Applied' : 'Not Applied', database.migrated ? 'success' : 'warning')}
@@ -48,7 +48,7 @@
         ${item('Export Secret', bindings.secret ? 'Configured' : 'Missing', bindings.secret ? 'success' : 'warning')}
         ${item('Release', VERSION)}
       </div>
-      <div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>${ready ? 'All cloud services are configured and migration 0001 is installed.' : configured ? 'Bindings are present. Apply migrations/0001_cloud_platform_foundation.sql to FRANCHISE_HQ_DB.' : 'Add the exact Cloudflare bindings listed in the validation guide, then redeploy.'}</span></div>
+      <div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>${ready ? 'All cloud services are configured and migrations 0001–0002 are installed.' : configured ? 'Bindings are present. Apply migrations/0002_companion_storage_layer.sql to FRANCHISE_HQ_DB.' : 'Add the exact Cloudflare bindings listed in the validation guide, then redeploy.'}</span></div>
       <button class="button button--primary" data-check-cloud-platform>Check Cloud Platform</button>
       <p class="league-import-status-note" data-cloud-platform-message>${lastError || latest?.message || 'Run the readiness check after configuring Cloudflare.'}</p>
     </article>`;
