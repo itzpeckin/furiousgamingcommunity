@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '5.9.2.1a';
+  const VERSION = '5.9.3.0';
   const STORAGE_KEY = 'franchise-hq:developer-mode-enabled';
   let enabled = localStorage.getItem(STORAGE_KEY) === 'true';
   let latestResult = null;
