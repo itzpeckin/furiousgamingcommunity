@@ -6,9 +6,9 @@ export async function onRequestGet(context) {
     ok: true,
     platform,
     message: platform.ready
-      ? 'Cloud Platform Foundation is ready.'
+      ? 'Cloud Platform and Companion Storage Layer are ready.'
       : platform.configured
-        ? 'Cloud bindings are configured, but the D1 migration is not yet applied.'
+        ? 'Cloud bindings are configured, but migration 0002 is not yet applied.'
         : 'One or more Cloudflare bindings are not configured.'
   });
 }
