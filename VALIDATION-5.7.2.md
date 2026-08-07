@@ -6,4 +6,4 @@
 4. Open a player card → Transaction History and verify approved/cancelled trade records.
 5. As Commissioner, open two-team and multi-team trade details and verify the Audit Trail.
 6. Confirm unrelated owners cannot access private negotiating trades through search.
-7. Confirm no red console errors.
+7. Confirm no red console errors..
