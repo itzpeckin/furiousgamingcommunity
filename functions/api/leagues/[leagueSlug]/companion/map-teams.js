@@ -6,8 +6,9 @@ import {
   resolveLeague
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { enrichTeamBranding, findTeamBranding } from '../../../../_lib/team-branding.js';
 
-const RELEASE = '5.9.3.2a';
+const RELEASE = '5.9.3.2b';
 
 const ALIASES = Object.freeze({
   id: ['teamId', 'teamID', 'id', 'team_id', 'clubId', 'franchiseId'],
@@ -134,7 +135,7 @@ function canonicalTeam(record, index) {
   const suppliedName = cleanString(first(record, ALIASES.displayName));
   const displayName = suppliedName || [city, nickname].filter(Boolean).join(' ') || `Team ${index + 1}`;
   const externalId = cleanString(first(record, ALIASES.id)) || `generated-team-${index + 1}`;
-  return {
+  return enrichTeamBranding({
     externalId,
     displayName,
     cityName: city,
@@ -151,7 +152,7 @@ function canonicalTeam(record, index) {
     losses: integer(first(record, ALIASES.losses)),
     ties: integer(first(record, ALIASES.ties)),
     sourceRecord: record
-  };
+  });
 }
 
 function routePriority(routePath) {
@@ -203,23 +204,32 @@ async function previewTeams(db, leagueId, runId) {
       owner_name, wins, losses, ties
     FROM companion_canonical_teams_preview
     WHERE league_id = ? AND mapping_run_id = ? ORDER BY display_name ASC`).bind(leagueId, runId).all();
-  return (result.results || []).map(row => ({
-    externalId: row.external_id,
-    displayName: row.display_name,
-    cityName: row.city_name,
-    nickname: row.nickname,
-    abbreviation: row.abbreviation,
-    conferenceName: row.conference_name,
-    divisionName: row.division_name,
-    primaryColor: row.primary_color,
-    secondaryColor: row.secondary_color,
-    logoUrl: row.logo_url,
-    userControlled: Boolean(row.user_controlled),
-    ownerName: row.owner_name,
-    wins: row.wins,
-    losses: row.losses,
-    ties: row.ties
-  }));
+  return (result.results || []).map(row => {
+    const team = {
+      externalId: row.external_id,
+      displayName: row.display_name,
+      cityName: row.city_name,
+      nickname: row.nickname,
+      abbreviation: row.abbreviation,
+      conferenceName: row.conference_name,
+      divisionName: row.division_name,
+      primaryColor: row.primary_color,
+      secondaryColor: row.secondary_color,
+      logoUrl: row.logo_url,
+      userControlled: Boolean(row.user_controlled),
+      ownerName: row.owner_name,
+      wins: row.wins,
+      losses: row.losses,
+      ties: row.ties
+    };
+    const branding = findTeamBranding(team);
+    return {
+      ...team,
+      brandingKey: branding?.key || null,
+      brandingSource: branding ? 'canonical-registry' : 'export-fallback',
+      logoProvider: branding?.logoProvider || (team.logoUrl ? 'Madden export' : null)
+    };
+  });
 }
 
 function response(run, teams, slug, leagueId) {
@@ -290,6 +300,7 @@ export async function onRequestPost(context) {
       seen.add(team.externalId);
       if (team.externalId.startsWith('generated-team-')) warnings.push(`Generated missing team ID for ${team.displayName}.`);
       if (!team.abbreviation) warnings.push(`Missing abbreviation for ${team.displayName}.`);
+      if (team.brandingSource !== 'canonical-registry') warnings.push(`Canonical branding was not found for ${team.displayName}; exported branding or neutral fallbacks will be used.`);
       canonical.push(team);
     }
     if (!canonical.length) return json({ ok: false, error: 'No canonical teams were produced from the payload.' }, 422);
@@ -318,12 +329,12 @@ export async function onRequestPost(context) {
       .bind(runId, league.id, team.externalId, team.displayName, team.cityName, team.nickname,
         team.abbreviation, team.conferenceName, team.divisionName, team.primaryColor,
         team.secondaryColor, team.logoUrl, team.userControlled, team.ownerName, team.wins,
-        team.losses, team.ties, JSON.stringify(team.sourceRecord)));
+        team.losses, team.ties, JSON.stringify({ record: team.sourceRecord, branding: { key: team.brandingKey, source: team.brandingSource, logoProvider: team.logoProvider } })));
     for (let offset = 0; offset < statements.length; offset += 50) await db.batch(statements.slice(offset, offset + 50));
 
     const run = await latestRun(db, league.id);
     const teams = await previewTeams(db, league.id, runId);
-    return json({ ...response(run, teams, slug, league.id), collectionPath: collection.path, collectionScore: collection.score, selectionPolicy: 'leagueteams-first-player-records-rejected' });
+    return json({ ...response(run, teams, slug, league.id), collectionPath: collection.path, collectionScore: collection.score, selectionPolicy: 'leagueteams-first-player-records-rejected', brandingPolicy: 'canonical-nfl-registry-with-export-fallback' });
   } catch (error) {
     console.error('Team mapping failed:', error);
     return json({ ok: false, error: 'Team mapping failed.', detail: String(error?.message || error), release: RELEASE }, 500);
