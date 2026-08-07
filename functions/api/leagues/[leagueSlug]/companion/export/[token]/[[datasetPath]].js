@@ -11,7 +11,7 @@ import {
   normalizeDiscoveryPath,
   companionRouteObjectKey,
   summarizePayloadShape
-} from '../../../../../../../_lib/cloud-platform.js';
+} from '../../../../../../_lib/cloud-platform.js';
 
 const RELEASE = '5.9.3.0a';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
