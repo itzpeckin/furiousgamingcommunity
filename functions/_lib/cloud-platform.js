@@ -132,5 +132,5 @@ export async function platformReadiness(env) {
   const bindings = bindingStatus(env);
   const dbStatus = await databaseStatus(env);
   const configured = bindings.d1 && bindings.r2 && bindings.kv && bindings.secret;
-  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '5.9.2.1' };
+  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '5.9.2.1a' };
 }
