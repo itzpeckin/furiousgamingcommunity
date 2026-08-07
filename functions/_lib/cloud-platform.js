@@ -14,10 +14,11 @@ export const JSON_HEADERS = Object.freeze({
 });
 
 export function json(body, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...JSON_HEADERS, ...extraHeaders }
-  });
+  return new Response(JSON.stringify(body), { status, headers: { ...JSON_HEADERS, ...extraHeaders } });
+}
+
+export function database(env) {
+  return env.FRANCHISE_HQ_DB?.prepare ? env.FRANCHISE_HQ_DB : (env.DB?.prepare ? env.DB : null);
 }
 
 export function normalizeLeagueSlug(context) {
@@ -28,22 +29,17 @@ export function validLeagueSlug(slug) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(slug || ''));
 }
 
-export function companionMetadataKey(slug) {
-  return `league:${slug}:companion:latest`;
-}
-
-export function companionTokenKey(slug) {
-  return `league:${slug}:companion:export-token`;
-}
-
-export function companionObjectKey(slug, exportId, receivedAt) {
-  return `companion-exports/${slug}/${receivedAt.slice(0, 10)}/${exportId}.json`;
+export function companionMetadataKey(slug) { return `league:${slug}:companion:latest`; }
+export function companionTokenKey(slug) { return `league:${slug}:companion:export-token`; }
+export function companionObjectKey(slug, exportId, receivedAt, season = null, week = null) {
+  const date = receivedAt.slice(0, 10);
+  const seasonPart = season == null ? 'season-unknown' : `season-${season}`;
+  const weekPart = week == null ? 'week-unknown' : `week-${String(week).padStart(2, '0')}`;
+  return `companion-exports/${slug}/${seasonPart}/${weekPart}/${date}/${exportId}.json`;
 }
 
 export async function configuredExportToken(env, slug) {
-  const leagueToken = env.LEAGUE_CONFIG?.get
-    ? await env.LEAGUE_CONFIG.get(companionTokenKey(slug))
-    : null;
+  const leagueToken = env.LEAGUE_CONFIG?.get ? await env.LEAGUE_CONFIG.get(companionTokenKey(slug)) : null;
   return leagueToken || env.COMPANION_EXPORT_TOKEN || null;
 }
 
@@ -51,8 +47,7 @@ export function suppliedExportToken(request) {
   const url = new URL(request.url);
   return request.headers.get('x-franchisehq-export-token')
     || request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-    || url.searchParams.get('token')
-    || '';
+    || url.searchParams.get('token') || '';
 }
 
 export function safeEqual(left, right) {
@@ -64,9 +59,57 @@ export function safeEqual(left, right) {
   return mismatch === 0;
 }
 
-export function bindingStatus(env) {
+export async function sha256Hex(value) {
+  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function resolveLeague(env, slug) {
+  const db = database(env);
+  if (!db) return null;
+  return db.prepare(`SELECT id, name, slug, current_season, current_week, public_status
+    FROM leagues WHERE slug = ? LIMIT 1`).bind(slug).first();
+}
+
+export function detectCompanionMetadata(payload) {
+  const root = payload && typeof payload === 'object' ? payload : {};
+  const meta = root.metadata || root.meta || root.league || root.franchise || {};
+  const season = root.season ?? root.seasonYear ?? meta.season ?? meta.seasonYear ?? null;
+  const week = root.week ?? root.currentWeek ?? meta.week ?? meta.currentWeek ?? null;
+  const teams = root.teams || root.teamInfoList || root.leagueTeams || root.data?.teams || [];
+  const players = root.players || root.rosters || root.playerInfoList || root.data?.players || [];
   return {
-    d1: Boolean(env.FRANCHISE_HQ_DB?.prepare),
+    season: Number.isFinite(Number(season)) ? Number(season) : null,
+    week: Number.isFinite(Number(week)) ? Number(week) : null,
+    teamCount: Array.isArray(teams) ? teams.length : null,
+    playerCount: Array.isArray(players) ? players.length : null
+  };
+}
+
+export function publicExport(row) {
+  if (!row) return null;
+  return {
+    exportId: row.id || row.export_id,
+    leagueId: row.league_id,
+    receivedAt: row.received_at,
+    status: row.status,
+    byteLength: row.byte_length,
+    contentType: row.content_type,
+    season: row.season,
+    week: row.week,
+    teamCount: row.team_count,
+    playerCount: row.player_count,
+    payloadStored: Boolean(row.r2_object_key),
+    inspected: Boolean(row.inspection_json),
+    processedAt: row.processed_at || null
+  };
+}
+
+export function bindingStatus(env) {
+  const db = database(env);
+  return {
+    d1: Boolean(db?.prepare),
     r2: Boolean(env.COMPANION_EXPORTS?.put && env.COMPANION_EXPORTS?.get),
     kv: Boolean(env.COMPANION_EXPORT_META?.put && env.COMPANION_EXPORT_META?.get),
     secret: Boolean(env.COMPANION_EXPORT_TOKEN),
@@ -75,40 +118,19 @@ export function bindingStatus(env) {
 }
 
 export async function databaseStatus(env) {
-  if (!env.FRANCHISE_HQ_DB?.prepare) {
-    return { configured: false, reachable: false, migrated: false, migration: null, error: null };
-  }
+  const db = database(env);
+  if (!db) return { configured: false, reachable: false, migrated: false, migration: null, error: null };
   try {
-    const row = await env.FRANCHISE_HQ_DB
-      .prepare('SELECT version, name, applied_at FROM schema_migrations ORDER BY version DESC LIMIT 1')
-      .first();
-    return {
-      configured: true,
-      reachable: true,
-      migrated: Boolean(row && Number(row.version) >= 1),
-      migration: row || null,
-      error: null
-    };
+    const row = await db.prepare('SELECT version, name, applied_at FROM schema_migrations ORDER BY version DESC LIMIT 1').first();
+    return { configured: true, reachable: true, migrated: Boolean(row && Number(row.version) >= 2), migration: row || null, error: null };
   } catch (error) {
-    return {
-      configured: true,
-      reachable: true,
-      migrated: false,
-      migration: null,
-      error: String(error?.message || error)
-    };
+    return { configured: true, reachable: true, migrated: false, migration: null, error: String(error?.message || error) };
   }
 }
 
 export async function platformReadiness(env) {
   const bindings = bindingStatus(env);
-  const database = await databaseStatus(env);
+  const dbStatus = await databaseStatus(env);
   const configured = bindings.d1 && bindings.r2 && bindings.kv && bindings.secret;
-  return {
-    configured,
-    ready: configured && database.migrated,
-    bindings,
-    database,
-    release: '5.9.2.0'
-  };
+  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '5.9.2.1' };
 }
