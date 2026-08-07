@@ -7,7 +7,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.3.3';
+const RELEASE = '5.9.3.3a';
 
 const A = Object.freeze({
   id: ['playerId','playerID','id','player_id','rosterId','assetId'],
@@ -78,18 +78,39 @@ function routeRank(path){
   if(p.endsWith('/players'))return 1;
   if(p.endsWith('/rosters')||p.endsWith('/roster'))return 2;
   if(p.endsWith('/freeagents'))return 3;
-  return 99;
+  if(p.endsWith('/leagueteams'))return 10;
+  if(p.endsWith('/standings'))return 20;
+  if(p.endsWith('/team'))return 30;
+  return 40;
 }
-function forbidden(path){return /\/(passing|rushing|receiving|kicking|punting|defense|team|teams|leagueteams|standings|schedules)$/.test(String(path||'').toLowerCase().replace(/\/+$/,''));}
-async function sourceCapture(db,leagueId){
+function weeklyStatRoute(path){return /\/week\/(?:pre|reg|post)\/\d+\/(passing|rushing|receiving|kicking|punting|defense|schedules|team)$/.test(String(path||'').toLowerCase().replace(/\/+$/,''));}
+async function sourceCaptures(db,leagueId){
   const result=await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
       COALESCE(i.dataset_type,'unknown') dataset_type,COALESCE(i.confidence_score,0) confidence_score
     FROM companion_route_captures c
     LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id
     WHERE c.league_id=? ORDER BY c.received_at DESC`).bind(leagueId).all();
-  const rows=(result.results||[]).filter(r=>!forbidden(r.route_path)&&routeRank(r.route_path)<99)
+  const all=result.results||[];
+  const rows=all.filter(r=>!weeklyStatRoute(r.route_path))
     .sort((a,b)=>routeRank(a.route_path)-routeRank(b.route_path)||Number(b.confidence_score)-Number(a.confidence_score)||String(b.received_at).localeCompare(String(a.received_at)));
-  return {capture:rows[0]||null,candidates:(result.results||[]).map(r=>r.route_path)};
+  return {captures:rows,candidates:all.map(r=>r.route_path)};
+}
+async function discoverNestedPlayerCollection(env,captures){
+  const diagnostics=[];
+  let best=null;
+  for(const capture of captures){
+    try{
+      const payload=await parsePayload(env,capture);
+      const collection=chooseCollection(payload);
+      if(!collection){diagnostics.push({routePath:capture.route_path,accepted:false,reason:'No player-shaped nested array found.'});continue;}
+      const routeBonus=Math.max(0,12-routeRank(capture.route_path));
+      const totalScore=collection.score+routeBonus+Math.min(8,Math.log10(Math.max(10,collection.objects.length))*2);
+      const candidate={capture,collection,totalScore};
+      diagnostics.push({routePath:capture.route_path,collectionPath:collection.path,recordCount:collection.objects.length,shapeScore:Number(collection.score.toFixed(2)),totalScore:Number(totalScore.toFixed(2)),accepted:true});
+      if(!best||candidate.totalScore>best.totalScore||(candidate.totalScore===best.totalScore&&candidate.collection.objects.length>best.collection.objects.length))best=candidate;
+    }catch(error){diagnostics.push({routePath:capture.route_path,accepted:false,reason:error?.message||String(error)});}
+  }
+  return {best,diagnostics};
 }
 async function parsePayload(env,capture){
   if(!capture?.r2_object_key)throw new Error('The player capture has no R2 object key.');
@@ -129,10 +150,12 @@ export async function onRequestPost(context){
   const league=await resolveLeague(context.env,slug);if(!league)return json({ok:false,error:'League not found.'},404);
   if(auth.session.membership?.leagueId!==league.id)return json({ok:false,error:'Commissioner membership does not match this league.'},403);
   try{
-    const source=await sourceCapture(db,league.id);
-    if(!source.capture)return json({ok:false,error:'No roster/player dataset has been captured yet.',detail:'Run a Madden Companion Rosters/Players export. Weekly passing, rushing, receiving, defense, kicking, and punting routes are intentionally rejected.',availableRoutes:source.candidates},404);
-    const payload=await parsePayload(context.env,source.capture);const collection=chooseCollection(payload);
-    if(!collection||collection.score<8)return json({ok:false,error:'The selected route did not contain a reliable player-record collection.',sourceRoutePath:source.capture.route_path},422);
+    const source=await sourceCaptures(db,league.id);
+    if(!source.captures.length)return json({ok:false,error:'No eligible League Info payloads have been captured yet.',availableRoutes:source.candidates},404);
+    const discovery=await discoverNestedPlayerCollection(context.env,source.captures);
+    if(!discovery.best||discovery.best.collection.score<8)return json({ok:false,error:'No reliable nested player collection was found in the captured League Info payloads.',detail:'The hotfix inspected every non-weekly-stat capture and rejected collections that did not contain player identity fields.',availableRoutes:source.candidates,candidateDiagnostics:discovery.diagnostics},422);
+    const sourceCapture=discovery.best.capture;
+    const collection=discovery.best.collection;
     const validTeams=await teamIds(db,league.id);if(!validTeams.size)return json({ok:false,error:'Map the canonical Teams preview before mapping players.'},409);
     const warnings=[],players=[],seen=new Set();let rostered=0,freeAgents=0;
     for(let i=0;i<collection.objects.length;i++){
@@ -145,9 +168,9 @@ export async function onRequestPost(context){
     if(!players.length)return json({ok:false,error:'No canonical players were produced.'},422);
     await db.prepare(`UPDATE companion_player_mapping_runs SET status='superseded',updated_at=? WHERE league_id=? AND status='pending-preview'`).bind(new Date().toISOString(),league.id).run();
     const runId=crypto.randomUUID(),now=new Date().toISOString();
-    await db.prepare(`INSERT INTO companion_player_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,rostered_count,free_agent_count,warning_count,warnings_json,created_at,updated_at) VALUES (?,?,?,?,?,'pending-preview',?,?,?,?,?,?,?)`).bind(runId,league.id,source.capture.discovery_session_id,source.capture.capture_id,source.capture.route_path,players.length,rostered,freeAgents,warnings.length,JSON.stringify(warnings),now,now).run();
+    await db.prepare(`INSERT INTO companion_player_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,rostered_count,free_agent_count,warning_count,warnings_json,created_at,updated_at) VALUES (?,?,?,?,?,'pending-preview',?,?,?,?,?,?,?)`).bind(runId,league.id,sourceCapture.discovery_session_id,sourceCapture.capture_id,sourceCapture.route_path,players.length,rostered,freeAgents,warnings.length,JSON.stringify(warnings),now,now).run();
     const stmt=db.prepare(`INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,team_external_id,first_name,last_name,display_name,position,archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id,ratings_json,source_record_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     for(const p of players){await stmt.bind(runId,league.id,p.externalId,p.teamExternalId,p.firstName,p.lastName,p.displayName,p.position,p.archetype,p.overall,p.developmentTrait,p.age,p.yearsPro,p.jerseyNumber,p.heightInches,p.weightLbs,p.college,p.injuryStatus,p.isInjured?1:0,p.contractYearsRemaining,p.salary,p.capHit,p.portraitId,JSON.stringify(p.ratings),JSON.stringify(p.sourceRecord),now).run();}
-    const run=await latestRun(db,league.id);return json(response(run,await preview(db,league.id,run.id),slug,league.id,{collectionPath:collection.path}));
+    const run=await latestRun(db,league.id);return json(response(run,await preview(db,league.id,run.id),slug,league.id,{collectionPath:collection.path,candidateDiagnostics:discovery.diagnostics}));
   }catch(error){return json({ok:false,error:'Player mapping failed.',detail:error?.message||String(error),release:RELEASE},500);}
 }
