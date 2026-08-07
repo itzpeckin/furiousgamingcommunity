@@ -803,7 +803,7 @@ function renderLeagueTenantPanel(){
  if(!tenant)return'<article class="card league-tenant-card"><h3>League Tenant</h3><p>Tenant service unavailable.</p></article>';
  const league=tenant.current();
  const d=tenant.diagnostics();
- return `<article class="card league-tenant-card" data-league-tenant-panel><div class="card-header"><div><span class="eyebrow">v5.9.3.2b · Dataset classification</span><h3>League Tenant</h3><p>Your current site is now registered as one tenant inside a multi-league platform.</p></div><span class="pill pill--success">Active</span></div><div class="league-import-framework-grid"><div><span>League Name</span><strong>${escapeHtml(league.name)}</strong></div><div><span>League ID</span><strong>${escapeHtml(league.id)}</strong></div><div><span>League Slug</span><strong>${escapeHtml(league.slug)}</strong></div><div><span>Registered Leagues</span><strong>${d.leagueCount}</strong></div><div><span>Public Route</span><strong>${escapeHtml(tenant.publicPath())}</strong></div><div><span>Future Export API</span><strong>${escapeHtml(tenant.exportEndpoint())}</strong></div></div><div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>The existing root URL still opens this league automatically. Snapshots, import history, and refresh events are now scoped to ${escapeHtml(league.id)}.</span></div></article>`;
+ return `<article class="card league-tenant-card" data-league-tenant-panel><div class="card-header"><div><span class="eyebrow">v5.9.3.3 · Dataset classification</span><h3>League Tenant</h3><p>Your current site is now registered as one tenant inside a multi-league platform.</p></div><span class="pill pill--success">Active</span></div><div class="league-import-framework-grid"><div><span>League Name</span><strong>${escapeHtml(league.name)}</strong></div><div><span>League ID</span><strong>${escapeHtml(league.id)}</strong></div><div><span>League Slug</span><strong>${escapeHtml(league.slug)}</strong></div><div><span>Registered Leagues</span><strong>${d.leagueCount}</strong></div><div><span>Public Route</span><strong>${escapeHtml(tenant.publicPath())}</strong></div><div><span>Future Export API</span><strong>${escapeHtml(tenant.exportEndpoint())}</strong></div></div><div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>The existing root URL still opens this league automatically. Snapshots, import history, and refresh events are now scoped to ${escapeHtml(league.id)}.</span></div></article>`;
 }
 
 function renderCommissionerLeagueData(){
@@ -822,6 +822,7 @@ function renderCommissionerLeagueData(){
    ${window.FranchiseHQ?.leagueCompanionRouteDiscovery?.renderPanel?.()||''}
    ${window.FranchiseHQ?.leagueCompanionDatasetClassification?.renderPanel?.()||''}
    ${window.FranchiseHQ?.leagueCompanionTeamMapper?.renderPanel?.()||''}
+   ${window.FranchiseHQ?.leagueCompanionPlayerMapper?.renderPanel?.()||''}
    ${window.FranchiseHQ?.leagueDeveloperMode?.renderPanel?.()||''}
    ${renderLeagueDataSelector(state)}
    ${window.FranchiseHQ?.leagueImportFrameworkUI?.renderPanel?.()||'<article class="card league-import-framework-card" data-import-framework-panel><h3>Madden Companion Import Framework</h3><p>Framework UI unavailable.</p></article>'}
