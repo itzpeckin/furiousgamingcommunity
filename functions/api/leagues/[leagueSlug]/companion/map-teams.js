@@ -7,7 +7,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.3.2';
+const RELEASE = '5.9.3.2a';
 
 const ALIASES = Object.freeze({
   id: ['teamId', 'teamID', 'id', 'team_id', 'clubId', 'franchiseId'],
@@ -71,16 +71,32 @@ function normalizeColor(value) {
   return text;
 }
 
-function teamScore(record) {
-  if (!record || typeof record !== 'object' || Array.isArray(record)) return 0;
+const PLAYER_SHAPED_FIELDS = Object.freeze([
+  'playerid', 'player_id', 'firstname', 'first_name', 'lastname', 'last_name',
+  'position', 'overall', 'overallrating', 'jerseynumber', 'jersey_number',
+  'passattempts', 'passyards', 'passingyards', 'rushyards', 'receivingyards'
+]);
+
+function recordShape(record) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return { teamScore: 0, playerSignals: 0, teamSignals: 0 };
   const keys = new Set(Object.keys(record).map(key => key.toLowerCase()));
-  let score = 0;
-  for (const name of ['teamid', 'team_id', 'displayname', 'teamname', 'abbrname', 'abbreviation', 'cityname', 'divisionname']) {
-    if (keys.has(name)) score += name.includes('teamid') ? 4 : 2;
+  let teamSignals = 0;
+  for (const name of ['teamid', 'team_id', 'displayname', 'teamname', 'abbrname', 'abbreviation', 'cityname', 'divisionname', 'conferenceid']) {
+    if (keys.has(name)) teamSignals += name.includes('teamid') ? 3 : 1;
   }
-  if (first(record, ALIASES.id) !== null) score += 4;
-  if (first(record, ALIASES.displayName) !== null) score += 3;
-  return score;
+  let playerSignals = 0;
+  for (const name of PLAYER_SHAPED_FIELDS) if (keys.has(name)) playerSignals += 1;
+  let teamScore = teamSignals;
+  if (first(record, ALIASES.id) !== null) teamScore += 4;
+  if (first(record, ALIASES.displayName) !== null) teamScore += 3;
+  if (first(record, ALIASES.abbreviation) !== null) teamScore += 2;
+  return { teamScore, playerSignals, teamSignals };
+}
+
+function teamScore(record) {
+  const shape = recordShape(record);
+  if (shape.playerSignals >= 2) return -20;
+  return shape.teamScore;
 }
 
 function collectArrays(value, path = '$', depth = 0, out = []) {
@@ -99,12 +115,16 @@ function collectArrays(value, path = '$', depth = 0, out = []) {
 function chooseTeamCollection(payload) {
   const candidates = collectArrays(payload).map(candidate => {
     const objects = candidate.records.filter(item => item && typeof item === 'object' && !Array.isArray(item));
-    const sample = objects.slice(0, 10);
+    const sample = objects.slice(0, 12);
+    const shapes = sample.map(recordShape);
+    const playerLikeCount = shapes.filter(shape => shape.playerSignals >= 2).length;
+    const teamLikeCount = shapes.filter(shape => shape.teamScore >= 7 && shape.playerSignals < 2).length;
     const average = sample.length ? sample.reduce((sum, item) => sum + teamScore(item), 0) / sample.length : 0;
-    const pathBonus = /teams?|teaminfo/i.test(candidate.path) ? 8 : 0;
-    return { ...candidate, objects, score: average + pathBonus };
-  }).filter(candidate => candidate.objects.length);
-  candidates.sort((a, b) => b.score - a.score || b.objects.length - a.objects.length);
+    const pathBonus = /(?:^|\.)(?:league)?teams?(?:$|\[)/i.test(candidate.path) ? 12 : /teaminfo/i.test(candidate.path) ? 8 : 0;
+    const rejected = sample.length > 0 && (playerLikeCount >= Math.ceil(sample.length / 3) || teamLikeCount < Math.min(3, sample.length));
+    return { ...candidate, objects, score: average + pathBonus, playerLikeCount, teamLikeCount, rejected };
+  }).filter(candidate => candidate.objects.length && !candidate.rejected);
+  candidates.sort((a, b) => b.score - a.score || b.teamLikeCount - a.teamLikeCount || b.objects.length - a.objects.length);
   return candidates[0] || null;
 }
 
@@ -134,18 +154,31 @@ function canonicalTeam(record, index) {
   };
 }
 
+function routePriority(routePath) {
+  const path = String(routePath || '').toLowerCase().replace(/\/+$/, '');
+  if (path.endsWith('/leagueteams')) return 0;
+  if (path.endsWith('/teams')) return 1;
+  if (/\/week\/(?:pre|reg|post)\/\d+\/team$/.test(path)) return 2;
+  return 99;
+}
+
+function routeIsForbidden(routePath) {
+  return /\/(?:passing|rushing|receiving|kicking|punting|defense|schedules|standings)$/.test(String(routePath || '').toLowerCase().replace(/\/+$/, ''));
+}
+
 async function latestTeamCapture(db, leagueId) {
-  const classified = await db.prepare(`SELECT i.capture_id, i.discovery_session_id, i.route_path,
-      c.r2_object_key, c.content_type, c.received_at
+  const result = await db.prepare(`SELECT i.capture_id, i.discovery_session_id, i.route_path,
+      i.confidence_score, c.r2_object_key, c.content_type, c.received_at
     FROM companion_dataset_inspections i
     JOIN companion_route_captures c ON c.id = i.capture_id
     WHERE i.league_id = ? AND i.dataset_type = 'teams'
-    ORDER BY i.inspected_at DESC, c.received_at DESC LIMIT 1`).bind(leagueId).first();
-  if (classified) return classified;
-  return db.prepare(`SELECT id AS capture_id, discovery_session_id, route_path, r2_object_key, content_type, received_at
-    FROM companion_route_captures
-    WHERE league_id = ? AND (LOWER(route_path) LIKE '%team%' OR LOWER(route_path) LIKE '%standing%')
-    ORDER BY received_at DESC LIMIT 1`).bind(leagueId).first();
+    ORDER BY i.inspected_at DESC, c.received_at DESC`).bind(leagueId).all();
+  const candidates = (result.results || [])
+    .filter(row => !routeIsForbidden(row.route_path) && routePriority(row.route_path) < 99)
+    .sort((a, b) => routePriority(a.route_path) - routePriority(b.route_path)
+      || Number(b.confidence_score || 0) - Number(a.confidence_score || 0)
+      || String(b.received_at || '').localeCompare(String(a.received_at || '')));
+  return candidates[0] || null;
 }
 
 async function parseObject(env, capture) {
@@ -243,7 +276,7 @@ export async function onRequestPost(context) {
     if (!capture) return json({ ok: false, error: 'No classified Teams dataset is available. Run v5.9.3.1 classification first.' }, 404);
     const payload = await parseObject(context.env, capture);
     const collection = chooseTeamCollection(payload);
-    if (!collection || collection.score < 5) return json({ ok: false, error: 'A team-like record collection could not be identified in the classified payload.' }, 422);
+    if (!collection || collection.score < 10) return json({ ok: false, error: 'A team-like record collection could not be identified in the classified payload.' }, 422);
 
     const warnings = [];
     const canonical = [];
@@ -260,6 +293,13 @@ export async function onRequestPost(context) {
       canonical.push(team);
     }
     if (!canonical.length) return json({ ok: false, error: 'No canonical teams were produced from the payload.' }, 422);
+
+    await db.prepare(`UPDATE companion_team_mapping_runs
+      SET status = 'superseded-invalid-source', updated_at = ?
+      WHERE league_id = ? AND status = 'pending-preview'
+        AND LOWER(source_route_path) NOT LIKE '%/leagueteams'
+        AND LOWER(source_route_path) NOT LIKE '%/teams'`)
+      .bind(new Date().toISOString(), league.id).run();
 
     const runId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -283,7 +323,7 @@ export async function onRequestPost(context) {
 
     const run = await latestRun(db, league.id);
     const teams = await previewTeams(db, league.id, runId);
-    return json({ ...response(run, teams, slug, league.id), collectionPath: collection.path, collectionScore: collection.score });
+    return json({ ...response(run, teams, slug, league.id), collectionPath: collection.path, collectionScore: collection.score, selectionPolicy: 'leagueteams-first-player-records-rejected' });
   } catch (error) {
     console.error('Team mapping failed:', error);
     return json({ ok: false, error: 'Team mapping failed.', detail: String(error?.message || error), release: RELEASE }, 500);
