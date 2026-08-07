@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.3.3c';
+  const VERSION = '5.9.3.3c.a';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
@@ -16,11 +16,10 @@
   const normalize = value => String(value || '').trim().toLowerCase();
 
   function isPlatformOwner() {
+    const identityService = HQ?.platformOwnerIdentity;
+    if (identityService?.isPlatformOwner) return Boolean(identityService.isPlatformOwner());
     const current = account();
-    if (!current) return false;
-    const handleMatch = normalize(current.handle) === OWNER_HANDLE;
-    const roleMatch = normalize(current.role) === 'commissioner';
-    return handleMatch && roleMatch;
+    return Boolean(current && String(current.id) === 'owner-tb');
   }
 
   function currentTab() {
@@ -146,7 +145,7 @@
 
   function diagnostics() {
     return Object.freeze({
-      service: 'platformWorkspace', version: VERSION, configuredOwnerHandle: OWNER_HANDLE,
+      service: 'platformWorkspace', version: VERSION, configuredOwnerHandle: OWNER_HANDLE, ownerIdentity: HQ?.platformOwnerIdentity?.diagnostics?.() || null,
       platformOwner: isPlatformOwner(), commissionerAccess: false, memberAccess: false,
       hiddenNavigation: true, isolatedTabs: true, activeTab: currentTab()
     });
