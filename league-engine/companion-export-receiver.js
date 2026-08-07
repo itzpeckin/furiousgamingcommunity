@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '5.9.3.0';
+  const VERSION = '5.9.3.0a';
   let latestStatus = null, latestHistory = null, latestInspection = null, latestDiscovery = null, lastError = null;
   const listeners = new Set();
   const clone = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
@@ -54,7 +54,7 @@
     const status=latestStatus, receiver=status?.receiver||{}, pending=status?.pendingExport||null, latest=status?.latestExport||null;
     const tone=pending?'warning':receiver.ready?'success':'neutral'; const label=pending?'New Export Available':receiver.ready?'Storage Ready':status?'Setup Required':'Not Checked';
     return `<article class="card companion-export-receiver-card" data-companion-export-receiver-panel>
-      <div class="card-header"><div><span class="eyebrow">v5.9.3.0 · Route discovery</span><h3>Madden Companion Route Discovery</h3><p>Captures every dataset route Madden appends to the base URL and records its real JSON structure without activating league data.</p></div><span class="pill pill--${tone}">${label}</span></div>
+      <div class="card-header"><div><span class="eyebrow">v5.9.3.0a · Route discovery</span><h3>Madden Companion Route Discovery</h3><p>Captures every dataset route Madden appends to the base URL and records its real JSON structure without activating league data.</p></div><span class="pill pill--${tone}">${label}</span></div>
       <div class="league-import-framework-grid">
         <div><span>League</span><strong>${escapeHtml(tenant().current().name)}</strong></div><div><span>League ID</span><strong>${escapeHtml(status?.leagueId||tenant().current().id)}</strong></div>
         <div><span>R2 Storage</span><strong>${receiver.storageConfigured===true?'Ready':'Not ready'}</strong></div><div><span>D1 Storage</span><strong>${receiver.databaseConfigured===true?'Ready':'Not ready'}</strong></div>
