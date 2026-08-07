@@ -1,9 +1,4 @@
-import {
-  json,
-  database,
-  validLeagueSlug,
-  resolveLeague
-} from '../../../../_lib/cloud-platform.js';
+import { json, database, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
 export async function onRequestGet(context) {
   const slug = String(context.params?.leagueSlug || '').trim().toLowerCase();
@@ -29,7 +24,7 @@ export async function onRequestGet(context) {
     if (!current.latestReceivedAt) { current.latestReceivedAt=capture.receivedAt; current.latestByteLength=capture.byteLength; current.topLevelKeys=capture.topLevelKeys; current.collections=capture.collections; }
     byRoute.set(capture.routePath,current);
   }
-  return json({ ok:true, release:'5.9.3.0', leagueId:league.id, leagueSlug:slug,
+  return json({ ok:true, release:'5.9.3.0a', leagueId:league.id, leagueSlug:slug,
     sessionCount:new Set(captures.map(row=>row.discoverySessionId)).size,
     routeCount:byRoute.size, captureCount:captures.length, routes:[...byRoute.values()], captures,
     activationPerformed:false, rawPayloadReturned:false });
