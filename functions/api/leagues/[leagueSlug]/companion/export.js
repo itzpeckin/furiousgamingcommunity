@@ -1,56 +1,17 @@
-const JSON_HEADERS = {
-  'content-type': 'application/json; charset=utf-8',
-  'cache-control': 'no-store',
-  'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET,POST,OPTIONS',
-  'access-control-allow-headers': 'content-type,x-franchisehq-export-token'
-};
+import {
+  JSON_HEADERS,
+  bindingStatus,
+  companionMetadataKey,
+  companionObjectKey,
+  configuredExportToken,
+  json,
+  normalizeLeagueSlug,
+  safeEqual,
+  suppliedExportToken,
+  validLeagueSlug
+} from '../../../../_lib/cloud-platform.js';
 
 const MAX_BYTES = 20 * 1024 * 1024;
-const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-function json(body, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...JSON_HEADERS, ...extraHeaders }
-  });
-}
-
-function leagueSlug(context) {
-  return String(context.params?.leagueSlug || '').trim().toLowerCase();
-}
-
-function metadataKey(slug) {
-  return `league:${slug}:companion:latest`;
-}
-
-function tokenKey(slug) {
-  return `league:${slug}:companion:export-token`;
-}
-
-function objectKey(slug, exportId, receivedAt) {
-  const date = receivedAt.slice(0, 10);
-  return `companion-exports/${slug}/${date}/${exportId}.json`;
-}
-
-async function configuredToken(env, slug) {
-  const fromKv = env.LEAGUE_CONFIG?.get ? await env.LEAGUE_CONFIG.get(tokenKey(slug)) : null;
-  return fromKv || env.COMPANION_EXPORT_TOKEN || null;
-}
-
-function suppliedToken(request) {
-  const url = new URL(request.url);
-  return request.headers.get('x-franchisehq-export-token') || url.searchParams.get('token') || '';
-}
-
-function safeEqual(left, right) {
-  const a = new TextEncoder().encode(String(left || ''));
-  const b = new TextEncoder().encode(String(right || ''));
-  if (a.length !== b.length || !a.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i += 1) mismatch |= a[i] ^ b[i];
-  return mismatch === 0;
-}
 
 function detectMetadata(payload) {
   const root = payload && typeof payload === 'object' ? payload : {};
@@ -67,19 +28,54 @@ function detectMetadata(payload) {
   };
 }
 
+async function resolveLeagueId(env, slug) {
+  if (!env.FRANCHISE_HQ_DB?.prepare) return null;
+  try {
+    const row = await env.FRANCHISE_HQ_DB.prepare('SELECT id FROM leagues WHERE slug = ? LIMIT 1').bind(slug).first();
+    return row?.id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function auditExport(env, metadata) {
+  if (!env.FRANCHISE_HQ_DB?.prepare || !metadata.leagueId) return false;
+  try {
+    await env.FRANCHISE_HQ_DB.prepare(`
+      INSERT INTO companion_exports
+      (id, league_id, received_at, status, r2_object_key, byte_length, content_type, season, week, team_count, player_count)
+      VALUES (?, ?, ?, 'pending', ?, ?, 'application/json', ?, ?, ?, ?)
+    `).bind(
+      metadata.exportId, metadata.leagueId, metadata.receivedAt, metadata.r2ObjectKey,
+      metadata.byteLength, metadata.season, metadata.week, metadata.teamCount, metadata.playerCount
+    ).run();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 export async function onRequestOptions() {
-  return new Response(null, { status: 204, headers: JSON_HEADERS });
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...JSON_HEADERS,
+      'access-control-allow-methods': 'GET,POST,OPTIONS',
+      'access-control-allow-headers': 'content-type,authorization,x-franchisehq-export-token'
+    }
+  });
 }
 
 export async function onRequestGet(context) {
-  const slug = leagueSlug(context);
-  if (!slugPattern.test(slug)) return json({ ok: false, error: 'Invalid league slug.' }, 400);
+  const slug = normalizeLeagueSlug(context);
+  if (!validLeagueSlug(slug)) return json({ ok: false, error: 'Invalid league slug.' }, 400);
 
-  const storageConfigured = Boolean(context.env.COMPANION_EXPORTS && context.env.COMPANION_EXPORT_META);
-  const tokenConfigured = Boolean(await configuredToken(context.env, slug));
+  const bindings = bindingStatus(context.env);
+  const storageConfigured = bindings.r2 && bindings.kv;
+  const tokenConfigured = Boolean(await configuredExportToken(context.env, slug));
   let latest = null;
   if (context.env.COMPANION_EXPORT_META?.get) {
-    latest = await context.env.COMPANION_EXPORT_META.get(metadataKey(slug), { type: 'json' });
+    latest = await context.env.COMPANION_EXPORT_META.get(companionMetadataKey(slug), { type: 'json' });
   }
 
   return json({
@@ -89,6 +85,7 @@ export async function onRequestGet(context) {
       ready: storageConfigured && tokenConfigured,
       storageConfigured,
       tokenConfigured,
+      databaseConfigured: bindings.d1,
       maxBytes: MAX_BYTES
     },
     pendingExport: latest ? {
@@ -101,14 +98,15 @@ export async function onRequestGet(context) {
       week: latest.week,
       teamCount: latest.teamCount,
       playerCount: latest.playerCount,
-      payloadStored: latest.payloadStored === true
+      payloadStored: latest.payloadStored === true,
+      databaseRecorded: latest.databaseRecorded === true
     } : null
   });
 }
 
 export async function onRequestPost(context) {
-  const slug = leagueSlug(context);
-  if (!slugPattern.test(slug)) return json({ ok: false, error: 'Invalid league slug.' }, 400);
+  const slug = normalizeLeagueSlug(context);
+  if (!validLeagueSlug(slug)) return json({ ok: false, error: 'Invalid league slug.' }, 400);
   if (!context.env.COMPANION_EXPORTS?.put || !context.env.COMPANION_EXPORT_META?.put) {
     return json({
       ok: false,
@@ -117,9 +115,11 @@ export async function onRequestPost(context) {
     }, 503);
   }
 
-  const expectedToken = await configuredToken(context.env, slug);
+  const expectedToken = await configuredExportToken(context.env, slug);
   if (!expectedToken) return json({ ok: false, error: 'No export token is configured for this league.' }, 503);
-  if (!safeEqual(suppliedToken(context.request), expectedToken)) return json({ ok: false, error: 'Unauthorized export request.' }, 401);
+  if (!safeEqual(suppliedExportToken(context.request), expectedToken)) {
+    return json({ ok: false, error: 'Unauthorized export request.' }, 401);
+  }
 
   const contentType = context.request.headers.get('content-type') || '';
   if (!contentType.toLowerCase().includes('application/json')) {
@@ -135,50 +135,39 @@ export async function onRequestPost(context) {
   if (byteLength > MAX_BYTES) return json({ ok: false, error: 'Export exceeds the 20 MB receiver limit.' }, 413);
 
   let payload;
-  try {
-    payload = JSON.parse(raw);
-  } catch (_) {
-    return json({ ok: false, error: 'Export body is not valid JSON.' }, 400);
-  }
+  try { payload = JSON.parse(raw); }
+  catch (_) { return json({ ok: false, error: 'Export body is not valid JSON.' }, 400); }
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return json({ ok: false, error: 'Export JSON must contain an object at the top level.' }, 400);
   }
 
   const receivedAt = new Date().toISOString();
   const exportId = crypto.randomUUID();
-  const key = objectKey(slug, exportId, receivedAt);
+  const r2ObjectKey = companionObjectKey(slug, exportId, receivedAt);
   const detected = detectMetadata(payload);
-  await context.env.COMPANION_EXPORTS.put(key, raw, {
+  const leagueId = await resolveLeagueId(context.env, slug);
+
+  await context.env.COMPANION_EXPORTS.put(r2ObjectKey, raw, {
     httpMetadata: { contentType: 'application/json' },
     customMetadata: { leagueSlug: slug, exportId, receivedAt }
   });
 
   const metadata = {
-    exportId,
-    leagueSlug: slug,
-    receivedAt,
-    status: 'pending',
-    byteLength,
-    contentType: 'application/json',
-    r2ObjectKey: key,
-    payloadStored: true,
-    ...detected
+    exportId, leagueId, leagueSlug: slug, receivedAt, status: 'pending', byteLength,
+    contentType: 'application/json', r2ObjectKey, payloadStored: true, ...detected
   };
-  await context.env.COMPANION_EXPORT_META.put(metadataKey(slug), JSON.stringify(metadata));
+  metadata.databaseRecorded = await auditExport(context.env, metadata);
+  await context.env.COMPANION_EXPORT_META.put(companionMetadataKey(slug), JSON.stringify(metadata));
 
   return json({
     ok: true,
     accepted: true,
     message: 'Companion export received and stored as pending. No league data was activated.',
     pendingExport: {
-      exportId,
-      receivedAt,
-      status: 'pending',
-      byteLength,
-      season: detected.season,
-      week: detected.week,
-      teamCount: detected.teamCount,
-      playerCount: detected.playerCount
+      exportId, receivedAt, status: 'pending', byteLength,
+      season: detected.season, week: detected.week,
+      teamCount: detected.teamCount, playerCount: detected.playerCount,
+      databaseRecorded: metadata.databaseRecorded
     }
   }, 202);
 }
