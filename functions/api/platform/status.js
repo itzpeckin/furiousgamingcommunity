@@ -1,1 +1,14 @@
+import { json, platformReadiness } from '../../_lib/cloud-platform.js';
 
+export async function onRequestGet(context) {
+  const platform = await platformReadiness(context.env);
+  return json({
+    ok: true,
+    platform,
+    message: platform.ready
+      ? 'Cloud Platform Foundation is ready.'
+      : platform.configured
+        ? 'Cloud bindings are configured, but the D1 migration is not yet applied.'
+        : 'One or more Cloudflare bindings are not configured.'
+  });
+}
