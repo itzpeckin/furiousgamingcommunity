@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0e14" />
-  <meta name="franchise-hq-platform-version" content="5.9.3.4" />
+  <meta name="franchise-hq-platform-version" content="5.9.3.5" />
   <meta name="franchise-hq-platform-owner-handle" content="Peckin" />
   <meta name="franchise-hq-platform-owner-account-id" content="owner-tb" />
   <meta name="franchise-hq-platform-owner-discord-id" content="" />
   <meta name="description" content="Interactive Madden connected-franchise league prototype with private trade workflow, role-based mock login, committee review, and browser-saved demo data." />
-  <title>Furious Gaming Community — Franchise HQ v5.9.3.4</title>
+  <title>Furious Gaming Community — Franchise HQ v5.9.3.5</title>
   <link rel="stylesheet" href="styles.css?v=5.9.0.5" />
 
   <style id="platform-workspace-styles">
@@ -31,6 +31,8 @@
     @media(max-width:1050px){.data-explorer-layout{grid-template-columns:1fr}.data-explorer-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:none}}
     @media(max-width:700px){.data-explorer-grid{grid-template-columns:1fr}.data-explorer-toolbar{grid-template-columns:1fr}}
 
+  
+    .stats-category-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.stats-category-tab{appearance:none;border:1px solid var(--border,#d9dce5);background:var(--surface,#fff);border-radius:999px;padding:8px 12px;font:inherit;font-weight:700;cursor:pointer}.stats-category-tab.is-active{background:var(--accent,#6d4aff);color:#fff;border-color:var(--accent,#6d4aff)}.stats-preview-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px 0}.stats-preview-summary>div{border:1px solid var(--border,#d9dce5);border-radius:12px;padding:10px}.stats-preview-summary span{display:block;font-size:.75rem;opacity:.7}.stats-preview-summary strong{font-size:1.15rem}.stats-metrics-cell{max-width:420px;white-space:normal;word-break:break-word}
   </style>
 </head>
 <body data-density="comfortable">
@@ -92,7 +94,7 @@
           <span class="status-dot status-dot--warning"></span>
           <div><strong>Mock data mode</strong><span>Real Madden sync arrives in Milestone 3</span></div>
         </div>
-        <span class="version-label">v5.9.3.4 · Canonical Schedule & Game Mapper</span>
+        <span class="version-label">v5.9.3.5 · Canonical Statistics Engine</span>
       </div>
     </aside>
 
@@ -407,7 +409,7 @@
     <symbol id="icon-external" viewBox="0 0 24 24"><path d="M14 4h6v6m0-6-9 9M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></symbol>
   </svg>
 
- <script src="platform/core.js?v=5.9.3.4"></script>
+ <script src="platform/core.js?v=5.9.3.5"></script>
 <script src="platform/manifest.js?v=5.4.12a"></script>
 <script src="platform/storage.js"></script>
 <script src="platform/config.js"></script>
@@ -465,10 +467,11 @@
 <script src="league-engine/companion-dataset-classification.js?v=5.9.3.3b"></script>
 <script src="league-engine/companion-team-mapper.js?v=5.9.3.3b"></script>
 <script src="league-engine/companion-player-mapper.js?v=5.9.3.3b"></script>
-<script src="league-engine/companion-schedule-mapper.js?v=5.9.3.4"></script>
-<script src="league-engine/platform-owner-identity.js?v=5.9.3.4"></script>
-<script src="league-engine/data-explorer.js?v=5.9.3.4"></script>
-<script src="league-engine/platform-workspace.js?v=5.9.3.4"></script>
+<script src="league-engine/companion-schedule-mapper.js?v=5.9.3.5"></script>
+<script src="league-engine/companion-statistics-engine.js?v=5.9.3.5"></script>
+<script src="league-engine/platform-owner-identity.js?v=5.9.3.5"></script>
+<script src="league-engine/data-explorer.js?v=5.9.3.5"></script>
+<script src="league-engine/platform-workspace.js?v=5.9.3.5"></script>
 <script src="league-engine/developer-mode.js?v=5.9.3.3b"></script>
 <script src="league-engine/companion-json-mapper.js?v=5.9.1.2"></script>
 <script src="league-engine/companion-teams-importer.js?v=5.9.3.3b"></script>
@@ -483,7 +486,7 @@
 <script src="app.js?v=5.8.5a"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
-<script src="trade-module.js?v=5.9.3.4"></script>
+<script src="trade-module.js?v=5.9.3.5"></script>
 <script src="auth-ui.js"></script>
 <script src="dev-mode.js"></script>
 </body>
