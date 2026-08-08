@@ -17,7 +17,7 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '5.9.3.3c.a',
+    version: '5.9.3.3d',
     release: 5,
     epic: 9,
     patch: 1,
