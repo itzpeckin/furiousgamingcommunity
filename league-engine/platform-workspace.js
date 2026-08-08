@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.3.3c.a';
+  const VERSION = '5.9.3.3d';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
@@ -67,7 +67,7 @@
       case 'classification': return servicePanel('leagueCompanionDatasetClassification','Dataset Classification');
       case 'team-mapper': return servicePanel('leagueCompanionTeamMapper','Team Mapper');
       case 'player-mapper': return servicePanel('leagueCompanionPlayerMapper','Player Mapper');
-      case 'payload-inspector': return `<article class="card"><div class="card-header"><div><span class="eyebrow">Next release</span><h3>Roster Payload Inspector</h3></div><span class="pill pill--neutral">5.9.3.3d</span></div><p>The payload inspector will open here without adding another card to Commissioner HQ.</p></article>`;
+      case 'payload-inspector': return servicePanel('leagueDataExplorer','Data Explorer & Payload Inspector');
       case 'schedule-mapper': return servicePanel('leagueCompanionScheduleMapper','Schedule Mapper');
       case 'statistics-mapper': return servicePanel('leagueCompanionStatisticsMapper','Statistics Mapper');
       case 'snapshot-builder': return servicePanel('leagueSnapshotBuilder','Snapshot Builder');
