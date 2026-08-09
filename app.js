@@ -1152,7 +1152,8 @@
   function compactMoney(value) {
     const number=Number(value);
     if(!Number.isFinite(number)) return '—';
-    return `${number<0?'-$':'$'}${Math.abs(number).toFixed(1)}M`;
+    const millions=Math.abs(number)>=100000?Math.abs(number)/1000000:Math.abs(number);
+    return `${number<0?'-$':'$'}${millions.toFixed(1)}M`;
   }
 
   function officialRating(source={}, keys=[]) {
@@ -1183,9 +1184,9 @@
       primary:team.primaryColor||source.primaryColor||'#27364f',
       secondary:team.secondaryColor||source.secondaryColor||'#8fa4c4',
       logo:team.logo||source.logo_url||source.logoUrl||null,
-      ovr:officialRating({...source,...team},['overall','ovrRating','teamOvr','overallRating']),
-      off:officialRating(source,['offRating','offenseRating','offOvr','offensiveOverall']),
-      def:officialRating(source,['defRating','defenseRating','defOvr','defensiveOverall']),
+      ovr:officialRating({...source,...standing?.source,...team},['overall','ovrRating','teamOvr','overallRating']),
+      off:null,
+      def:null,
       cap:Number(standing?.source?.capAvailable??standing?.source?.capRoom??source.capAvailable??0),
       pf:Number(standing?.source?.ptsFor||0),
       pa:Number(standing?.source?.ptsAgainst||0),
@@ -1340,10 +1341,10 @@
     });
     document.querySelector('[data-team-count]').textContent = `${filtered.length} of ${teamCollection.length} teams`;
     grid.innerHTML = filtered.length ? filtered.map(team => `
-      <article class="team-card card" style="${teamStyle(team)}" data-team-id="${team.id}">
+      <article class="team-card card team-card--clickable" style="${teamStyle(team)}" data-team-id="${team.id}" tabindex="0" role="button" aria-label="Open ${escapeHtml(team.fullName)}">
         <div class="team-card__top">${renderTeamMark(team,'team-logo')}<div class="team-card__record"><strong>${team.record}</strong><small>#${team.divisionRank} ${team.division}</small></div></div>
         <h3>${team.fullName}${ownedTeamId===team.id?'<span class="my-team-tag">MY TEAM</span>':''}</h3><span class="team-card__owner">${escapeHtml(team.owner)} · ${team.conference} ${team.division}</span>
-        <div class="team-card__metrics"><span><strong>${team.ovr}</strong><small>Overall</small></span><span><strong>${team.off}</strong><small>Offense</small></span><span><strong>${team.def}</strong><small>Defense</small></span></div>
+        <div class="team-card__metrics team-card__metrics--overall"><span><strong>${team.ovr??'—'}</strong><small>Overall</small></span></div>
         <div class="team-card__footer"><span>${compactMoney(team.cap)} cap space</span><span>${escapeHtml(team.streak)}</span></div>
       </article>`).join('') : `<article class="card roadmap-state" style="grid-column:1/-1"><div class="roadmap-state__inner"><div class="roadmap-icon"><svg><use href="#icon-search"></use></svg></div><h2>No teams found</h2><p>Try clearing a filter or searching for another city, nickname, abbreviation, or owner.</p></div></article>`;
   }
@@ -1582,7 +1583,7 @@
           <div class="team-hero__content"><div class="team-hero__copy"><span class="eyebrow">${escapeHtml(team.conference)} ${escapeHtml(team.division)} · Owner ${escapeHtml(team.owner)}</span><h1>${escapeHtml(team.fullName)}</h1></div><div class="team-hero__record"><strong>${escapeHtml(team.record)}</strong><span>${escapeHtml(team.conference)} ${escapeHtml(team.division)}</span></div></div>
         </section>
         <div class="team-summary-grid">
-          ${team.ovr?summaryTile('Overall',team.ovr,'Official team rating'):''}${team.off?summaryTile('Offense',team.off,'Official EA rating'):''}${team.def?summaryTile('Defense',team.def,'Official EA rating'):''}${summaryTile('Points For',team.pf,'Season total')}${summaryTile('Points Against',team.pa,'Season total')}${summaryTile('Cap Space',compactMoney(team.cap),'Current snapshot')}
+          ${team.ovr?summaryTile('Overall',team.ovr,'Official team rating'):''}${summaryTile('Points For',team.pf,'Season total')}${summaryTile('Points Against',team.pa,'Season total')}${summaryTile('Cap Space',compactMoney(team.cap),'Current snapshot')}
         </div>
         <div class="subnav" data-team-tabs>
           ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Trade History':titleCase(tab)}</button>`).join('')}
@@ -2971,12 +2972,28 @@
     }
 
     const routeTarget=event.target.closest('[data-route]');
-    if (routeTarget) { event.preventDefault(); setRoute(routeTarget.dataset.route); return; }
+    if (routeTarget) {
+      event.preventDefault();
+      const route=routeTarget.dataset.route;
+      if(/^teams\//.test(route)){
+        const hash=`#${route}`;
+        if(location.hash===hash) renderRoute(route);
+        else location.hash=hash;
+      } else setRoute(route);
+      return;
+    }
 
     const interactiveTarget=event.target.closest('button, a, input, select, textarea, label, [role="button"]');
 
     const teamTarget=event.target.closest('[data-team-id]');
-    if (teamTarget && !interactiveTarget) { setRoute(`teams/${teamTarget.dataset.teamId}`); return; }
+    if (teamTarget && !interactiveTarget) {
+      event.preventDefault();
+      const route=`teams/${teamTarget.dataset.teamId}`;
+      const hash=`#${route}`;
+      if(location.hash===hash) renderRoute(route);
+      else location.hash=hash;
+      return;
+    }
 
     const playerTarget=event.target.closest('[data-player-id]');
     if (playerTarget) {
