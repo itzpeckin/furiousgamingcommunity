@@ -2868,6 +2868,19 @@
   }
 
   document.addEventListener('click', event => {
+    const teamCard=event.target.closest('.team-card[data-team-id]');
+    if(!teamCard) return;
+    const nested=event.target.closest('button, a, input, select, textarea, label');
+    if(nested && nested!==teamCard) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const teamId=teamCard.dataset.teamId;
+    const route=`teams/${teamId}`;
+    history.pushState(null,'',`#${route}`);
+    renderTeamDetail(teamId);
+  }, true);
+
+  document.addEventListener('click', event => {
     const closeDetailTarget=event.target.closest('[data-close-detail]');
     if (closeDetailTarget) { event.preventDefault(); event.stopPropagation(); closeDetail(); return; }
 
@@ -3143,6 +3156,17 @@
     else { state.rosterSortKey=key; state.rosterSortDirection=key==='player'||key==='position'||key==='development'||key==='status'?'asc':'desc'; }
     renderRoute(location.hash.slice(1));
   });
+
+  document.addEventListener('keydown', event => {
+    const teamCard=event.target.closest('.team-card[data-team-id]');
+    if(!teamCard || !['Enter',' '].includes(event.key)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const teamId=teamCard.dataset.teamId;
+    const route=`teams/${teamId}`;
+    history.pushState(null,'',`#${route}`);
+    renderTeamDetail(teamId);
+  }, true);
 
   document.addEventListener('keydown', event => {
     const teamCard=event.target.closest('.team-card[data-team-id]');
