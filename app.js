@@ -1456,6 +1456,23 @@
     return 'Other';
   }
 
+  function rosterSortValue(player,key) {
+    if(key==='player') return String(player.name||'').toLowerCase();
+    if(key==='position') return String(player.position||'');
+    if(key==='overall'||key==='age') return Number(player[key]??-1);
+    if(key==='development') return String(player.dev||'');
+    if(key==='contract') return Number(player.years||0);
+    if(key==='salary') return Number(player.salary||0);
+    if(key==='status') return String(player.injury||player.rosterStatus||'');
+    return 0;
+  }
+
+  function rosterSortButton(key,label) {
+    const active=(state.rosterSortKey||'overall')===key;
+    const direction=state.rosterSortDirection||'desc';
+    return `<button type="button" class="roster-sort-button ${active?'is-active':''}" data-roster-sort="${key}">${label}${active?` <span>${direction==='asc'?'▲':'▼'}</span>`:''}</button>`;
+  }
+
   function renderRosterExperience(team, rosterModel) {
     const allPlayers = rosterModel.players.map(rosterPlayerView).sort((a,b) => (Number(b.overall)||0) - (Number(a.overall)||0) || String(a.name).localeCompare(String(b.name)));
     const positions = [...new Set(allPlayers.map(player => player.position).filter(Boolean))].sort();
