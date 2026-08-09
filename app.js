@@ -1251,6 +1251,15 @@
   }
 
   function stageWeekContext(source={},fallbackWeek=0,fallbackStage='reg') {
+    const route=String(source.routePath||source.route_path||source.sourceRoutePath||source.source_route_path||'');
+    const routeMatch=route.match(/\/week\/(pre|reg|post|playoffs?)\/(\d+)/i);
+    if(routeMatch){
+      const token=routeMatch[1].toLowerCase();
+      const phase=token==='pre'?'preseason':token==='reg'?'regular':'playoffs';
+      const week=Number(routeMatch[2]);
+      const round=phase==='playoffs'?({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[week]||`Playoff Week ${week}`):null;
+      return {phase,week,round,label:phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'};
+    }
     const stageIndex=Number(source.stageIndex);
     const rawWeek=Number(source.weekIndex);
     const stageText=String(source.stage||source.stageName||fallbackStage||'reg').toLowerCase();
@@ -1648,9 +1657,16 @@
   }
 
   function openRosterPlayerDetail(playerId) {
+    const savedWindowScroll=window.scrollY;
+    const savedMainScroll=mainContent?.scrollTop||0;
+    const restorePlayerScroll=()=>requestAnimationFrame(()=>{
+      window.scrollTo({top:savedWindowScroll,left:0,behavior:'instant'});
+      if(mainContent) mainContent.scrollTop=savedMainScroll;
+    });
     const legacy = playerById(playerId);
     if (legacy && window.FGC_TRADE?.openValueCard) {
       window.FGC_TRADE.openValueCard(playerId);
+      restorePlayerScroll();
       return;
     }
     const normalized = rosterService()?.findPlayer?.(playerId) || liveRosterPlayers.get(String(playerId));
@@ -1659,6 +1675,7 @@
     const team = rosterTeamView(player.teamId);
     const ratings = Object.entries(player.ratings || {}).sort((a,b)=>Number(b[1])-Number(a[1]));
     openDetail(`<div class="modal-hero"><div><span class="eyebrow">${escapeHtml(team?.fullName || 'Free Agent')} · ${escapeHtml(player.position || '—')}</span><h2>${escapeHtml(player.name)}</h2><div class="player-profile-meta"><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'} OVR</span><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span><span>Age ${player.age ?? '—'}</span></div></div></div><div class="modal-body"><div class="modal-summary-grid"><div><span>Contract</span><strong>${escapeHtml(formatRosterContract(player))}</strong></div><div><span>Injury</span><strong>${escapeHtml(player.injury)}</strong></div><div><span>Depth</span><strong>${player.depth ?? 'Not provided'}</strong></div><div><span>Roster Status</span><strong>${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</strong></div></div>${ratings.length?`<div class="rating-bars roster-detail-ratings">${ratings.map(([label,value])=>`<div class="rating-row"><span>${escapeHtml(label)}</span><div class="rating-track"><div class="rating-fill" style="width:${Math.max(0,Math.min(100,Number(value)||0))}%"></div></div><strong>${escapeHtml(String(value))}</strong></div>`).join('')}</div>`:''}<div class="heading-actions" style="justify-content:flex-start"><button class="button button--primary" data-close-detail>Close</button>${player.teamId?`<button class="button button--ghost" data-modal-team="${escapeHtml(player.teamId)}">View Team</button>`:''}</div></div>`);
+    restorePlayerScroll();
   }
 
   function renderTeamDetailLegacy(teamId) {
@@ -1784,8 +1801,8 @@
     return {
       id:String(game.id||source.gameId||''),
       phase,
-      phaseLabel:phase==='preseason'?'Preseason':phase==='playoffs'?'Playoffs':'Regular Season',
-      week:Number(game.week??source.weekIndex??0),
+      phaseLabel:context.label,
+      week:context.week,
       awayId:String(game.awayTeamId??source.awayTeamId??''),
       homeId:String(game.homeTeamId??source.homeTeamId??''),
       awayScore:game.awayScore??source.awayScore??null,
