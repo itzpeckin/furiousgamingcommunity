@@ -1205,8 +1205,8 @@
     const source=player.source||{};
     const nested=source.contract||{};
     const contract={
-      yearsRemaining:nested.yearsRemaining??nested.years??source.contractYearsLeft??source.contractYearsRemaining??source.contractLength??source.contractYears??source.yearsRemaining??null,
-      currentYearSalary:nested.currentYearSalary??nested.salary??source.currentYearSalary??source.currentSalary??source.salary??source.capSalary??source.contractSalary??null,
+      yearsRemaining:nested.yearsRemaining??nested.years??source.contractYearsLeft??source.contractYearsRemaining??source.contractLength??source.contractYears??source.yearsRemaining??source.yearsLeft??null,
+      currentYearSalary:nested.currentYearSalary??nested.salary??source.currentYearSalary??source.currentSalary??source.capSalary??source.contractSalary??source.salary??null,
       capHit:nested.capHit??source.capHit??source.salaryCapHit??source.currentCapHit??null,
       bonus:nested.bonus??source.contractBonus??source.signingBonus??null
     };
@@ -1221,7 +1221,7 @@
       lastName:player.lastName||source.lastName||'',
       teamId:String(player.teamId||source.teamId||source.team_id||source.rosterTeamId||''),
       position:String(player.position||source.position||source.positionName||source.pos||'').toUpperCase(),
-      overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall']),
+      overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall','overall_rating']),
       age:Number(player.age||source.age||0)||null,
       yearsPro:Number(source.yearsPro||source.experience||0)||null,
       developmentTrait:player.devTrait||source.devTrait||source.developmentTrait||source.dev||'Normal',
@@ -1358,6 +1358,8 @@
         }
         const teamId=card.dataset.teamId;
         history.pushState(null,'',`#teams/${teamId}`);
+        if(mainContent?.scrollTo) mainContent.scrollTo({top:0,left:0,behavior:'instant'});
+        window.scrollTo({top:0,left:0,behavior:'instant'});
         pageContent.innerHTML='<section class="empty-state"><strong>Loading team…</strong><p>Opening the active franchise roster.</p></section>';
         renderTeamDetail(teamId);
       };
@@ -1612,7 +1614,9 @@
       const rosterModel=liveRosterModel(team,players);
       const roster=players.map(rosterPlayerView);
       const leaders=[...roster].sort((a,b)=>(Number(b.overall)||0)-(Number(a.overall)||0)).slice(0,5);
-      const teamGames=[];
+      const teamGames=(directory.games||[])
+        .filter(game=>String(game.homeTeamId)===String(team.id)||String(game.awayTeamId)===String(team.id))
+        .map(game=>liveTeamScheduleGame(game));
 
       pageContent.innerHTML=`
         <div class="page-heading"><div><button class="text-button" data-route="teams"><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>All teams</button></div><div class="heading-actions">${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?`<button class="button button--ghost" data-open-block-drawer><svg><use href="#icon-tag"></use></svg>Manage Trade Block</button>`:''}<button class="button button--primary" data-start-team-trade="${team.id}"><svg><use href="#icon-swap"></use></svg>${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?'Start Trade Proposal':`Start Trade w/ ${escapeHtml(team.fullName)}`}</button></div></div>
@@ -1627,6 +1631,10 @@
           ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Trade History':titleCase(tab)}</button>`).join('')}
         </div>
         <div data-team-tab-content>${renderTeamTab(team,rosterModel,roster,teamGames,leaders)}</div>`;
+      requestAnimationFrame(()=>{
+        if(mainContent?.scrollTo) mainContent.scrollTo({top:0,left:0,behavior:'instant'});
+        window.scrollTo({top:0,left:0,behavior:'instant'});
+      });
     }catch(error){
       pageContent.removeAttribute('aria-busy');
       console.error('[Team Detail Live Integration]',error);
@@ -1676,45 +1684,55 @@
     }).join('')}</div></div></article>`;
   }
 
+  function liveTeamScheduleGame(game={}) {
+    const source=game.source||{};
+    const stage=String(game.stage||source.stage||source.stageIndex||'reg').toLowerCase();
+    const phase=stage.includes('pre')?'preseason':stage.includes('post')||stage.includes('playoff')?'playoffs':'regular';
+    const scheduled=game.scheduledAt||source.scheduledAt||source.date||source.gameDate||null;
+    let day='TBD',time='TBD';
+    if(scheduled){
+      const date=new Date(scheduled);
+      if(!Number.isNaN(date.getTime())){
+        day=date.toLocaleDateString(undefined,{weekday:'short'}).toUpperCase();
+        time=date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+      }
+    }
+    return {
+      id:String(game.id||source.gameId||''),
+      phase,
+      phaseLabel:phase==='preseason'?'Preseason':phase==='playoffs'?'Playoffs':'Regular Season',
+      week:Number(game.week??source.weekIndex??0),
+      awayId:String(game.awayTeamId??source.awayTeamId??''),
+      homeId:String(game.homeTeamId??source.homeTeamId??''),
+      awayScore:game.awayScore??source.awayScore??null,
+      homeScore:game.homeScore??source.homeScore??null,
+      status:String(game.status||source.status||'scheduled').toLowerCase(),
+      day,time,
+      network:source.network||'',
+      stadium:source.stadiumName||source.stadium||'',
+      round:source.roundName||source.playoffRound||null
+    };
+  }
+
   function currentLeaguePhase() {
     return { phase: 'regular', week: 8 };
   }
 
   function buildExtendedTeamSchedule(team, existingGames) {
-    const preseason = Array.from({length:3}, (_,index) => {
-      const opponent = teams[(teams.findIndex(item=>item.id===team.id)+index+5) % teams.length];
-      const home = index % 2 === 0;
-      const status = 'final';
-      const teamScore = seededNumber(`${team.id}-pre-${index}-team`,13,31);
-      const oppScore = seededNumber(`${team.id}-pre-${index}-opp`,10,30);
-      return {
-        id:`pre-${index+1}-${team.id}-${opponent.id}`, phase:'preseason', phaseLabel:'Preseason', week:index+1,
-        awayId:home?opponent.id:team.id, homeId:home?team.id:opponent.id,
-        awayScore:home?oppScore:teamScore, homeScore:home?teamScore:oppScore, status,
-        day:'SAT', time:'7:00 PM', network:'LOCAL', stadium:home?team.stadium:opponent.stadium
-      };
+    const sorted=[...existingGames].sort((a,b)=>{
+      const order={preseason:0,regular:1,playoffs:2};
+      return (order[a.phase]-order[b.phase])||(Number(a.week)-Number(b.week));
     });
-    const regular = [...existingGames];
-    for (let week=10; week<=18; week+=1) {
-      const opponent = teams[(teams.findIndex(item=>item.id===team.id)+week*3) % teams.length];
-      const home = week % 2 === 0;
-      regular.push({
-        id:`w${week}-${home?opponent.id:team.id}-${home?team.id:opponent.id}`, phase:'regular', phaseLabel:'Regular Season', week,
-        awayId:home?opponent.id:team.id, homeId:home?team.id:opponent.id,
-        awayScore:null, homeScore:null, status:'scheduled', day:week===18?'SAT':'SUN', time:week%4===0?'4:25 PM':'1:00 PM', network:week%3===0?'FOX':'CBS', stadium:home?team.stadium:opponent.stadium
-      });
-    }
-    regular.forEach(game => { game.phase='regular'; game.phaseLabel='Regular Season'; });
-    const phase=currentLeaguePhase();
-    const playoffs = phase.phase === 'playoffs' ? ['Wild Card','Divisional','Conference','Championship'].map((round,index)=>{
-      const opponent=teams[(teams.findIndex(item=>item.id===team.id)+index+11)%teams.length];
-      return {id:`po-${index}-${team.id}`,phase:'playoffs',phaseLabel:'Playoffs',round,week:index+1,awayId:opponent.id,homeId:team.id,awayScore:null,homeScore:null,status:'scheduled',day:'SUN',time:index===3?'6:30 PM':'4:30 PM',network:'NATIONAL',stadium:team.stadium};
-    }) : [];
-    return { preseason, regular, playoffs };
+    return {
+      preseason:sorted.filter(game=>game.phase==='preseason'),
+      regular:sorted.filter(game=>game.phase==='regular'),
+      playoffs:sorted.filter(game=>game.phase==='playoffs')
+    };
   }
 
   function renderTeamScheduleCard(game, teamId) {
-    const opponent = teamById(game.homeId===teamId?game.awayId:game.homeId);
+    const opponentId=game.homeId===teamId?game.awayId:game.homeId;
+    const opponent = liveTeamDirectory?.teamMap?.get(String(opponentId)) || teamById(opponentId) || {id:opponentId,abbr:'TBD',fullName:'Opponent',primary:'#27364f',secondary:'#8fa4c4'};
     const home = game.homeId===teamId;
     const final = game.status==='final';
     const live = game.status==='live';
@@ -1726,10 +1744,9 @@
 
   function renderTeamSchedule(team, teamGames) {
     const scheduleByPhase=buildExtendedTeamSchedule(team,teamGames);
-    const leaguePhase=currentLeaguePhase();
-    if (state.teamSchedulePhase==='playoffs' && leaguePhase.phase!=='playoffs') state.teamSchedulePhase='regular';
-    const availablePhases=['preseason','regular',...(leaguePhase.phase==='playoffs'?['playoffs']:[])];
-    const selected=scheduleByPhase[state.teamSchedulePhase] || scheduleByPhase.regular;
+    const availablePhases=['preseason','regular','playoffs'].filter(phase=>scheduleByPhase[phase].length);
+    if(!availablePhases.includes(state.teamSchedulePhase)) state.teamSchedulePhase=availablePhases.includes('regular')?'regular':availablePhases[0]||'regular';
+    const selected=scheduleByPhase[state.teamSchedulePhase] || [];
     return `<div class="team-schedule-view"><div class="filter-bar team-schedule-filters"><div class="segmented-tabs">${availablePhases.map(phase=>`<button type="button" data-team-schedule-phase="${phase}" class="${state.teamSchedulePhase===phase?'is-active':''}">${phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'}</button>`).join('')}</div><span class="result-count">${selected.length} game${selected.length===1?'':'s'}</span></div><div class="team-schedule-list">${selected.map(game=>renderTeamScheduleCard(game,team.id)).join('') || `<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No playoff schedule yet</h3><p>Playoff games appear only after the league advances beyond the regular season.</p></div></article>`}</div></div>`;
   }
 
@@ -1751,10 +1768,28 @@
   function summaryStatBox(label,value) { return `<div class="stat-box"><span>${label}</span><strong>${value}</strong></div>`; }
 
   function renderTeamCap(team, roster) {
-    const sorted = [...roster].sort((a,b)=>(Number(b.capHit)||0)-(Number(a.capHit)||0)||String(a.name).localeCompare(String(b.name)));
-    const total = roster.reduce((sum,p)=>sum+(Number(p.capHit)||0),0);
-    const largest = sorted[0]?.capHit || 0;
-    return `<div class="content-grid content-grid--cap"><article class="card"><div class="card-header"><div><span class="eyebrow">Financial overview</span><h3>Salary cap</h3></div></div><div class="card-body"><div class="stat-box-grid">${summaryStatBox('Cap Space',formatMoney(team.cap))}${summaryStatBox('Active Commitments',formatMoney(total))}${summaryStatBox('Largest Cap Hit',formatMoney(largest))}${summaryStatBox('Expiring Deals',roster.filter(p=>p.years===1).length)}</div></div></article><article class="card cap-roster-card"><div class="card-header"><div><span class="eyebrow">Full roster salaries</span><h3>Player contracts</h3></div><span class="pill pill--neutral">${sorted.length} players</span></div><div class="table-wrap"><table class="cap-roster-table"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Years</th><th>Salary</th><th>Cap Hit</th></tr></thead><tbody>${sorted.map(player=>`<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(schoolAbbreviation(player.college))}</small></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.years || '—'}</td><td>${player.salary ? formatMoney(player.salary) : 'Not provided'}</td><td><strong>${player.capHit ? formatMoney(player.capHit) : 'Not provided'}</strong></td></tr>`).join('')}</tbody></table></div></article></div>`;
+    const sorted=[...roster].sort((a,b)=>(Number(b.salary)||0)-(Number(a.salary)||0)||String(a.name).localeCompare(String(b.name)));
+    const total=roster.reduce((sum,p)=>sum+(Number(p.salary)||0),0);
+    const largest=sorted[0]?.salary||0;
+    return `<div class="content-grid content-grid--cap">
+      <article class="card"><div class="card-header"><div><span class="eyebrow">Financial overview</span><h3>Salary cap</h3></div></div><div class="card-body"><div class="stat-box-grid">
+        ${summaryStatBox('Cap Space',compactMoney(team.cap))}
+        ${summaryStatBox('Current Salaries',compactMoney(total))}
+        ${summaryStatBox('Largest Salary',compactMoney(largest))}
+        ${summaryStatBox('Expiring Deals',roster.filter(p=>Number(p.years)===1).length)}
+      </div></div></article>
+      <article class="card cap-roster-card"><div class="card-header"><div><span class="eyebrow">Active contracts</span><h3>Player contracts</h3></div><span class="pill pill--neutral">${sorted.length} players</span></div>
+        <div class="table-wrap"><table class="cap-roster-table"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Years Remaining</th><th>Current Year Salary</th><th>Cap Hit</th></tr></thead>
+        <tbody>${sorted.map(player=>`<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}">
+          <td><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(schoolAbbreviation(player.college))}</small></td>
+          <td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td>
+          <td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall??'—'}</span></td>
+          <td>${player.years||'—'}</td>
+          <td>${player.salary?compactMoney(player.salary):'—'}</td>
+          <td><strong>${player.capHit?compactMoney(player.capHit):'—'}</strong></td>
+        </tr>`).join('')}</tbody></table></div>
+      </article>
+    </div>`;
   }
 
   function renderTeamTradeHistory(team) {
@@ -3189,10 +3224,24 @@
   document.addEventListener('click', event => {
     const button=event.target.closest('[data-roster-sort]');
     if(!button)return;
+    event.preventDefault();
+    event.stopPropagation();
     const key=button.dataset.rosterSort;
     if((state.rosterSortKey||'overall')===key) state.rosterSortDirection=(state.rosterSortDirection||'desc')==='asc'?'desc':'asc';
     else { state.rosterSortKey=key; state.rosterSortDirection=key==='player'||key==='position'||key==='development'||key==='status'?'asc':'desc'; }
-    renderRoute(location.hash.slice(1));
+    const scrollHost=mainContent||document.scrollingElement;
+    const savedTop=scrollHost?.scrollTop??window.scrollY;
+    const teamId=String(location.hash.split('/')[1]||'');
+    const team=liveTeamDirectory?.teamMap?.get(teamId);
+    const players=liveTeamDirectory?.playersByTeam?.get(teamId)||[];
+    const target=pageContent.querySelector('[data-team-tab-content]');
+    if(team&&target){
+      target.innerHTML=renderRosterExperience(team,liveRosterModel(team,players));
+      requestAnimationFrame(()=>{
+        if(scrollHost?.scrollTo) scrollHost.scrollTo({top:savedTop,left:0,behavior:'instant'});
+        else window.scrollTo({top:savedTop,left:0,behavior:'instant'});
+      });
+    }
   });
 
   document.addEventListener('keydown', event => {
