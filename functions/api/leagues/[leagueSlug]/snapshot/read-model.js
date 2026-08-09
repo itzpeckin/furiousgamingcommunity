@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE = '5.9.4.2gg';
+const RELEASE = '5.9.4.2ig';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -54,7 +54,7 @@ function normalizePlayer(raw = {}) {
     jerseyNumber: raw.jersey_number ?? raw.jerseyNumber ?? null,
     contract: raw.contract ?? {
       yearsRemaining: raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.contractLength ?? raw.contractYears ?? raw.yearsRemaining ?? raw.yearsLeft ?? raw.contractLengthRemaining ?? null,
-      currentYearSalary: raw.currentYearSalary ?? raw.currentSalary ?? raw.capSalary ?? raw.contractSalary ?? raw.salary ?? null,
+      currentYearSalary: raw.currentYearSalary ?? raw.currentSalary ?? raw.capSalary ?? raw.currentSeasonSalary ?? null,
       capHit: raw.capHit ?? raw.salaryCapHit ?? raw.currentCapHit ?? null,
       bonus: raw.contractBonus ?? raw.signingBonus ?? null
     },
