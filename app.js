@@ -1250,6 +1250,25 @@
     return `${n}${suffix} in NFL`;
   }
 
+  function scheduleSourceInspection(game={}) {
+    const source=game.source||{};
+    const route=String(source.routePath||source.route_path||source.sourceRoutePath||source.source_route_path||source.route||'');
+    const context=stageWeekContext(source,game.week,game.stage);
+    return {route:route||'—',rawStage:source.stage??source.stageName??game.stage??'—',stageIndex:source.stageIndex??'—',rawWeekIndex:source.weekIndex??'—',canonicalWeek:game.week??'—',calculatedStage:context.phase,calculatedWeek:context.week,calculatedLabel:context.round||`${context.label} Week ${context.week}`,homeTeamId:String(game.homeTeamId??source.homeTeamId??'—'),awayTeamId:String(game.awayTeamId??source.awayTeamId??'—'),status:String(game.status??source.status??'—')};
+  }
+
+  function renderScheduleSourceInspector() {
+    const rows=(liveTeamDirectory?.games||[]).map(scheduleSourceInspection);
+    const routes=[...new Set(rows.map(row=>row.route))];
+    const counts=rows.reduce((a,r)=>(a[r.calculatedStage]=(a[r.calculatedStage]||0)+1,a),{});
+    pageContent.innerHTML=`<section class="developer-workspace schedule-source-inspector">
+      <div class="page-heading"><div><span class="eyebrow">Developer Tools · Schedule</span><h1>Schedule Source Inspector</h1><p>Private diagnostic view for certifying Madden stage and week mapping before public schedule integration.</p></div></div>
+      <div class="summary-grid">${summaryTile('Captured Games',rows.length,'')}${summaryTile('Routes',routes.length,'')}${summaryTile('Preseason',counts.preseason||0,'')}${summaryTile('Regular Season',counts.regular||0,'')}${summaryTile('Playoffs',counts.playoffs||0,'')}</div>
+      <article class="card"><div class="card-header"><div><span class="eyebrow">Raw → Canonical</span><h3>Captured Schedule Records</h3></div><span class="pill pill--neutral">${rows.length} records</span></div><div class="table-wrap"><table class="schedule-inspector-table"><thead><tr><th>Route</th><th>Raw Stage</th><th>Stage Index</th><th>Raw Week Index</th><th>Canonical Week</th><th>Calculated Stage</th><th>Calculated Week</th><th>Display Label</th><th>Away</th><th>Home</th><th>Status</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td><code>${escapeHtml(r.route)}</code></td><td>${escapeHtml(r.rawStage)}</td><td>${escapeHtml(r.stageIndex)}</td><td>${escapeHtml(r.rawWeekIndex)}</td><td>${escapeHtml(r.canonicalWeek)}</td><td>${escapeHtml(r.calculatedStage)}</td><td><strong>${escapeHtml(r.calculatedWeek)}</strong></td><td>${escapeHtml(r.calculatedLabel)}</td><td>${escapeHtml(r.awayTeamId)}</td><td>${escapeHtml(r.homeTeamId)}</td><td>${escapeHtml(r.status)}</td></tr>`).join(''):`<tr><td colspan="11">No captured schedule records are available in the active snapshot.</td></tr>`}</tbody></table></div></article>
+      <article class="card"><div class="card-header"><div><span class="eyebrow">Captured Sources</span><h3>Unique Schedule Routes</h3></div></div><div class="card-body">${routes.length?routes.map(route=>`<div class="diagnostic-row"><code>${escapeHtml(route)}</code></div>`).join(''):'No source-route metadata was captured.'}</div></article>
+    </section>`;
+  }
+
   function stageWeekContext(source={},fallbackWeek=0,fallbackStage='reg') {
     const route=String(source.routePath||source.route_path||source.sourceRoutePath||source.source_route_path||'');
     const routeMatch=route.match(/\/week\/(pre|reg|post|playoffs?)\/(\d+)/i);
@@ -2933,6 +2952,7 @@
         window.FranchiseHQ?.trade?.renderCommissioner ? window.FranchiseHQ.trade.renderCommissioner() : window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base);
         break;
       }
+      case 'schedule-source-inspector': renderScheduleSourceInspector(); break;
       default: renderRoadmap(base);
     }
     mainContent.focus({preventScroll:true});
