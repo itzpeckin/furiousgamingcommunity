@@ -1982,6 +1982,15 @@
     return liveTeamDirectory?.teamMap?.get(String(teamId)) || teamById(teamId) || {id:String(teamId||''),abbr:'TBD',fullName:'Team',owner:'Unassigned',record:'—',primary:'#27364f',secondary:'#8fa4c4'};
   }
 
+  function matchupTabPanel(tab) {
+    const panels={
+      team:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Game comparison</span><h3>Team Statistics</h3></div></div><div class="card-body"><p>Game-specific team-stat mapping will populate here after the schedule/statistics join is certified.</p></div></section>`,
+      player:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Game leaders</span><h3>Player Statistics</h3></div></div><div class="card-body"><p>Passing, rushing, receiving, defense, and kicking records will populate after game-ID joins are certified.</p></div></section>`,
+      advanced:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Verified calculations</span><h3>Advanced Statistics</h3></div></div><div class="card-body"><p>Advanced rates will appear only when all required source fields are available.</p></div></section>`
+    };
+    return panels[tab]||panels.team;
+  }
+
   function openMatchupCard(gameId) {
     const game=liveMatchupGames.get(String(gameId)) || liveTeamDirectory?.games?.find(item=>String(item.id)===String(gameId));
     if(!game){showToast('Matchup unavailable','The selected game could not be resolved from the active snapshot.');return;}
@@ -1993,18 +2002,22 @@
     const homeScore=game.homeScore??resolvedGameScore(game,'home');
     const score=(awayScore!==null&&homeScore!==null)?`${awayScore} – ${homeScore}`:(status==='final'?'Score unavailable':'Upcoming');
     const info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
-    openDetail(`<div class="matchup-modal">
-      <div class="matchup-modal__header"><span class="eyebrow">${escapeHtml(canonicalScheduleLabel(game))}</span><span class="pill ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span></div>
+    openDetail(`<div class="matchup-modal" data-matchup-modal>
+      <div class="matchup-modal__header">
+        <span class="eyebrow matchup-modal__week">${escapeHtml(canonicalScheduleLabel(game))}</span>
+        <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span>
+      </div>
       <div class="matchup-scoreboard" style="--away:${away.primary};--home:${home.primary}">
-        <div class="matchup-team">${renderTeamMark(away,'featured-team-logo')}<h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · ${escapeHtml(away.owner||'Unassigned')}</p></div>
+        <div class="matchup-team">${renderTeamMark(away,'matchup-team-logo')}<h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · ${escapeHtml(away.owner||'Unassigned')}</p></div>
         <div class="matchup-score"><strong>${escapeHtml(score)}</strong>${info?`<small>${escapeHtml(info)}</small>`:''}</div>
-        <div class="matchup-team matchup-team--home">${renderTeamMark(home,'featured-team-logo')}<h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · ${escapeHtml(home.owner||'Unassigned')}</p></div>
+        <div class="matchup-team matchup-team--home">${renderTeamMark(home,'matchup-team-logo')}<h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · ${escapeHtml(home.owner||'Unassigned')}</p></div>
       </div>
-      <div class="matchup-section-grid">
-        <section class="card"><div class="card-header"><div><span class="eyebrow">Game comparison</span><h3>Team Statistics</h3></div></div><div class="card-body"><p>Game-specific team-stat mapping will populate here after the schedule/statistics join is certified.</p></div></section>
-        <section class="card"><div class="card-header"><div><span class="eyebrow">Game leaders</span><h3>Player Statistics</h3></div></div><div class="card-body"><p>Passing, rushing, receiving, defense, and kicking records will populate after game-ID joins are certified.</p></div></section>
-        <section class="card"><div class="card-header"><div><span class="eyebrow">Verified calculations</span><h3>Advanced Statistics</h3></div></div><div class="card-body"><p>Advanced rates will appear only when all required source fields are available.</p></div></section>
+      <div class="matchup-stat-tabs" role="tablist" aria-label="Matchup statistics">
+        <button type="button" class="is-active" data-matchup-tab="team" role="tab" aria-selected="true">Team Stats</button>
+        <button type="button" data-matchup-tab="player" role="tab" aria-selected="false">Player Stats</button>
+        <button type="button" data-matchup-tab="advanced" role="tab" aria-selected="false">Advanced Stats</button>
       </div>
+      <div class="matchup-tab-content" data-matchup-tab-content>${matchupTabPanel('team')}</div>
     </div>`);
   }
 
@@ -3436,6 +3449,21 @@
       depthPlayerTarget.innerHTML=`<strong>${escapeHtml(current.name)}</strong><b>${current.overall??'—'}</b>`;
 
       state.depthSelectedPlayer=selected.id;
+      return;
+    }
+
+    const matchupTab=event.target.closest('[data-matchup-tab]');
+    if(matchupTab){
+      event.preventDefault();
+      const modal=matchupTab.closest('[data-matchup-modal]');
+      const target=modal?.querySelector('[data-matchup-tab-content]');
+      if(!modal||!target)return;
+      modal.querySelectorAll('[data-matchup-tab]').forEach(button=>{
+        const active=button===matchupTab;
+        button.classList.toggle('is-active',active);
+        button.setAttribute('aria-selected',String(active));
+      });
+      target.innerHTML=matchupTabPanel(matchupTab.dataset.matchupTab);
       return;
     }
 
