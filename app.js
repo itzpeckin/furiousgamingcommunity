@@ -1271,16 +1271,37 @@
 
   window.FranchiseHQ = window.FranchiseHQ || {};
   window.FranchiseHQ.scheduleSourceInspector = {
-    renderPanel() {
-      const rows=(liveTeamDirectory?.games||[]).map(scheduleSourceInspection);
+    renderRows(rows=[]) {
       const routes=[...new Set(rows.map(row=>row.route))];
       const counts=rows.reduce((a,r)=>(a[r.calculatedStage]=(a[r.calculatedStage]||0)+1,a),{});
       return `<section class="schedule-source-inspector">
         <div class="card-header"><div><span class="eyebrow">Raw → Canonical</span><h3>Schedule Source Inspector</h3><p>Compare captured Madden route, stage, and week metadata against Franchise HQ's calculated display week.</p></div><span class="pill pill--neutral">${rows.length} records</span></div>
         <div class="summary-grid">${summaryTile('Captured Games',rows.length,'')}${summaryTile('Routes',routes.length,'')}${summaryTile('Preseason',counts.preseason||0,'')}${summaryTile('Regular Season',counts.regular||0,'')}${summaryTile('Playoffs',counts.playoffs||0,'')}</div>
-        <article class="card"><div class="table-wrap"><table class="schedule-inspector-table"><thead><tr><th>Route</th><th>Raw Stage</th><th>Stage Index</th><th>Raw Week Index</th><th>Canonical Week</th><th>Calculated Stage</th><th>Calculated Week</th><th>Display Label</th><th>Away</th><th>Home</th><th>Status</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td><code>${escapeHtml(r.route)}</code></td><td>${escapeHtml(r.rawStage)}</td><td>${escapeHtml(r.stageIndex)}</td><td>${escapeHtml(r.rawWeekIndex)}</td><td>${escapeHtml(r.canonicalWeek)}</td><td>${escapeHtml(r.calculatedStage)}</td><td><strong>${escapeHtml(r.calculatedWeek)}</strong></td><td>${escapeHtml(r.calculatedLabel)}</td><td>${escapeHtml(r.awayTeamId)}</td><td>${escapeHtml(r.homeTeamId)}</td><td>${escapeHtml(r.status)}</td></tr>`).join(''):`<tr><td colspan="11">No captured schedule records are available in the active snapshot.</td></tr>`}</tbody></table></div></article>
-        <article class="card"><div class="card-header"><div><span class="eyebrow">Captured Sources</span><h3>Unique Schedule Routes</h3></div></div><div class="card-body">${routes.length?routes.map(route=>`<div class="diagnostic-row"><code>${escapeHtml(route)}</code></div>`).join(''):'No source-route metadata was captured.'}</div></article>
+        <article class="card"><div class="table-wrap"><table class="schedule-inspector-table"><thead><tr><th>Route</th><th>Raw Stage</th><th>Stage Index</th><th>Raw Week Index</th><th>Canonical Week</th><th>Calculated Stage</th><th>Calculated Week</th><th>Display Label</th><th>Away</th><th>Home</th><th>Status</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td><code>${escapeHtml(r.route)}</code></td><td>${escapeHtml(r.rawStage)}</td><td>${escapeHtml(r.stageIndex)}</td><td>${escapeHtml(r.rawWeekIndex)}</td><td>${escapeHtml(r.canonicalWeek)}</td><td>${escapeHtml(r.calculatedStage)}</td><td><strong>${escapeHtml(r.calculatedWeek)}</strong></td><td>${escapeHtml(r.calculatedLabel)}</td><td>${escapeHtml(r.awayTeamId)}</td><td>${escapeHtml(r.homeTeamId)}</td><td>${escapeHtml(r.status)}</td></tr>`).join(''):`<tr><td colspan="11">The active snapshot returned no schedule records.</td></tr>`}</tbody></table></div></article>
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Captured Sources</span><h3>Unique Schedule Routes</h3></div></div><div class="card-body">${routes.length?routes.map(route=>`<div class="diagnostic-row"><code>${escapeHtml(route)}</code></div>`).join(''):'No source-route metadata was present on the returned records.'}</div></article>
       </section>`;
+    },
+    async load(targetId) {
+      const target=document.getElementById(targetId);
+      if(!target)return;
+      try{
+        const service=liveReadModel();
+        if(!service) throw new Error('Live Read Model service is unavailable.');
+        const stateValue=await service.getState();
+        if(stateValue!=='live') throw new Error('No active live snapshot is available.');
+        const games=await service.getSchedule();
+        const rows=(games||[]).map(scheduleSourceInspection);
+        const liveTarget=document.getElementById(targetId);
+        if(liveTarget)liveTarget.innerHTML=this.renderRows(rows);
+      }catch(error){
+        const liveTarget=document.getElementById(targetId);
+        if(liveTarget)liveTarget.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Schedule inspection failed</h3><p>${escapeHtml(error?.message||'The active snapshot schedule could not be loaded.')}</p><button type="button" class="button button--primary" data-schedule-inspector-retry="${escapeHtml(targetId)}">Retry</button></div></article>`;
+      }
+    },
+    renderPanel() {
+      const targetId=`schedule-source-inspector-${Date.now()}`;
+      setTimeout(()=>this.load(targetId),0);
+      return `<section id="${targetId}" class="schedule-source-inspector"><article class="card roadmap-state"><div class="roadmap-state__inner"><div class="spinner" aria-hidden="true"></div><h3>Loading schedule records…</h3><p>Reading directly from the active snapshot.</p></div></article></section>`;
     }
   };
 
@@ -3081,6 +3102,13 @@
     const toast=document.createElement('div'); toast.className='toast'; toast.innerHTML=`<span><svg><use href="#icon-info"></use></svg></span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></div>`;
     toastRegion.appendChild(toast); setTimeout(()=>toast.remove(),3800);
   }
+
+  document.addEventListener('click', event => {
+    const retry=event.target.closest('[data-schedule-inspector-retry]');
+    if(!retry)return;
+    event.preventDefault();
+    window.FranchiseHQ?.scheduleSourceInspector?.load?.(retry.dataset.scheduleInspectorRetry);
+  });
 
   document.addEventListener('click', event => {
     const teamCard=event.target.closest('.team-card[data-team-id]');
