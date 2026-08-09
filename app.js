@@ -1415,10 +1415,15 @@
         const directGames=summaries.filter(row=>row.direct.length).length;
         const contextualGames=summaries.filter(row=>!row.direct.length&&row.contextual.length).length;
         const unjoinedGames=summaries.filter(row=>!row.direct.length&&!row.contextual.length).length;
-        const statFields=[...new Set(statRows.flatMap(({row})=>Object.keys({...row,...(row.source||{})}).filter(key=>/game|schedule|team|player|stage|week|route/i.test(key)))].sort();
+        const statFields=[...new Set(
+          statRows.flatMap(({row}) =>
+            Object.keys({...row,...(row.source||{})})
+              .filter(key=>/game|schedule|team|player|stage|week|route/i.test(key))
+          )
+        )].sort();
 
         target.innerHTML=`<section class="game-state-join-inspector">
-          <div class="card-header"><div><span class="eyebrow">v5.9.5.0 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
+          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.1.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
           <div class="summary-grid game-join-summary">
             ${summaryTile('Direct ID Join',directGames,'gameId or scheduleId')}
             ${summaryTile('Context Join',contextualGames,'phase + week + team')}
