@@ -37,7 +37,7 @@ function normalizePlayer(raw = {}) {
     teamId: String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? ''),
     firstName: raw.first_name ?? raw.firstName ?? null,
     lastName: raw.last_name ?? raw.lastName ?? null,
-    displayName: raw.display_name ?? raw.displayName ?? [raw.first_name ?? raw.firstName, raw.last_name ?? raw.lastName].filter(Boolean).join(' ') || null,
+    displayName: raw.display_name ?? raw.displayName ?? ([raw.first_name ?? raw.firstName, raw.last_name ?? raw.lastName].filter(Boolean).join(' ') || null),
     position: raw.position ?? raw.position_name ?? raw.positionName ?? null,
     overall: raw.overall ?? raw.overall_rating ?? raw.overallRating ?? null,
     age: raw.age ?? null,
