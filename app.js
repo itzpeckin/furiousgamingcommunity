@@ -2983,10 +2983,10 @@
       return;
     }
 
-    const interactiveTarget=event.target.closest('button, a, input, select, textarea, label, [role="button"]');
-
+    const interactiveTarget=event.target.closest('button, a, input, select, textarea, label');
     const teamTarget=event.target.closest('[data-team-id]');
-    if (teamTarget && !interactiveTarget) {
+    const nestedInteractive=interactiveTarget && interactiveTarget!==teamTarget;
+    if (teamTarget && !nestedInteractive) {
       event.preventDefault();
       const route=`teams/${teamTarget.dataset.teamId}`;
       const hash=`#${route}`;
@@ -3142,6 +3142,16 @@
     if((state.rosterSortKey||'overall')===key) state.rosterSortDirection=(state.rosterSortDirection||'desc')==='asc'?'desc':'asc';
     else { state.rosterSortKey=key; state.rosterSortDirection=key==='player'||key==='position'||key==='development'||key==='status'?'asc':'desc'; }
     renderRoute(location.hash.slice(1));
+  });
+
+  document.addEventListener('keydown', event => {
+    const teamCard=event.target.closest('.team-card[data-team-id]');
+    if(!teamCard || !['Enter',' '].includes(event.key)) return;
+    event.preventDefault();
+    const route=`teams/${teamCard.dataset.teamId}`;
+    const hash=`#${route}`;
+    if(location.hash===hash) renderRoute(route);
+    else location.hash=hash;
   });
 
   document.addEventListener('input', event => {
