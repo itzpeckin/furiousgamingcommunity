@@ -1347,6 +1347,25 @@
         <div class="team-card__metrics team-card__metrics--overall"><span><strong>${team.ovr??'—'}</strong><small>Overall</small></span></div>
         <div class="team-card__footer"><span>${compactMoney(team.cap)} cap space</span><span>${escapeHtml(team.streak)}</span></div>
       </article>`).join('') : `<article class="card roadmap-state" style="grid-column:1/-1"><div class="roadmap-state__inner"><div class="roadmap-icon"><svg><use href="#icon-search"></use></svg></div><h2>No teams found</h2><p>Try clearing a filter or searching for another city, nickname, abbreviation, or owner.</p></div></article>`;
+
+    grid.querySelectorAll('.team-card[data-team-id]').forEach(card=>{
+      const open=event=>{
+        if(event){
+          const nested=event.target.closest('button, a, input, select, textarea, label');
+          if(nested && nested!==card) return;
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        const teamId=card.dataset.teamId;
+        history.pushState(null,'',`#teams/${teamId}`);
+        pageContent.innerHTML='<section class="empty-state"><strong>Loading team…</strong><p>Opening the active franchise roster.</p></section>';
+        renderTeamDetail(teamId);
+      };
+      card.onclick=open;
+      card.onkeydown=event=>{
+        if(['Enter',' '].includes(event.key)) open(event);
+      };
+    });
   }
 
   function rosterService() {
@@ -1566,8 +1585,10 @@
     try{
       const directory=await loadLiveTeamDirectory();
       pageContent.removeAttribute('aria-busy');
-      if(routeBase(location.hash.slice(1))!=='teams' || String(location.hash.split('/')[1]||'')!==String(teamId)) return;
-      if(!directory){renderTeamDetailLegacy(teamId);return;}
+      if(!directory){
+        pageContent.innerHTML='<section class="empty-state"><strong>Live team data unavailable</strong><p>The active snapshot did not return a team directory.</p></section>';
+        return;
+      }
       const team=directory.teamMap.get(String(teamId));
       if(!team){setRoute('teams');return;}
       const players=directory.playersByTeam.get(String(teamId))||[];
@@ -1592,7 +1613,7 @@
     }catch(error){
       pageContent.removeAttribute('aria-busy');
       console.error('[Team Detail Live Integration]',error);
-      renderTeamDetailLegacy(teamId);
+      pageContent.innerHTML=`<section class="empty-state"><strong>Team page could not load</strong><p>${escapeHtml(error?.message||'An unexpected Team-page rendering error occurred.')}</p></section>`;
     }
   }
 
@@ -2719,7 +2740,7 @@
     switch(base) {
       case 'home': renderLeagueHome(); break;
       case 'league-activity': renderActivity(); break;
-      case 'teams': id?renderTeamDetail(id):renderTeams(); break;
+      case 'teams': if(id){renderTeamDetail(id);}else{renderTeams();} break;
       case 'my-team': {
         const tradeService=window.FGC_TRADE;
         if (!tradeService?.getCurrentAccount) {
