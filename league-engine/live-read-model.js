@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.4.2';
+  const VERSION = '5.9.4.2a';
   const cache = new Map();
   let summary = null;
   let busy = false;
@@ -88,7 +88,7 @@
     const state = String(summary?.state || 'not-loaded').toUpperCase();
     return `<section data-live-read-model-panel>
       <article class="card">
-        <div class="card-header"><div><span class="eyebrow">v5.9.4.2 · Live Snapshot Read Model</span><h3>Live Read Model</h3><p>Stable application-facing contracts backed only by the league's active immutable snapshot.</p></div><span class="pill pill--${state==='LIVE'?'success':'neutral'}">${esc(state)}</span></div>
+        <div class="card-header"><div><span class="eyebrow">v5.9.4.2a · Live Snapshot Read Model</span><h3>Live Read Model</h3><p>Stable application-facing contracts backed only by the league's active immutable snapshot.</p></div><span class="pill pill--${state==='LIVE'?'success':'neutral'}">${esc(state)}</span></div>
         <div class="league-import-framework-grid">
           <div><span>Snapshot</span><strong>${esc(s?.id || '—')}</strong></div>
           <div><span>Season / Week</span><strong>${esc(s ? `${s.seasonYear ?? '—'} / ${s.weekIndex ?? '—'}` : '—')}</strong></div>
