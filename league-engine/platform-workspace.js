@@ -2,12 +2,12 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.3.6';
+  const VERSION = '5.9.3.7';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
     'overview','route-discovery','classification','team-mapper','player-mapper',
-    'payload-inspector','schedule-mapper','statistics-mapper','snapshot-builder',
+    'payload-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle',
     'certification','diagnostics'
   ]);
 
@@ -71,6 +71,7 @@
       case 'schedule-mapper': return servicePanel('leagueCompanionScheduleMapper','Schedule Mapper');
       case 'statistics-mapper': return servicePanel('leagueCompanionStatisticsMapper','Statistics Mapper');
       case 'snapshot-builder': return servicePanel('leagueSnapshotBuilder','Snapshot Builder');
+      case 'snapshot-lifecycle': return servicePanel('snapshotLifecycle','Validation & Activation');
       case 'certification': return `${servicePanel('leagueImportFrameworkUI','Import Framework Certification')}${servicePanel('leagueCompanionImportUI','Companion Import Certification')}`;
       case 'diagnostics': return diagnosticsPanel();
       default: return overviewPanel();
@@ -80,7 +81,7 @@
   const tabs = [
     ['overview','Overview'],['route-discovery','Route Discovery'],['classification','Dataset Classification'],
     ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],
-    ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],
+    ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],['snapshot-lifecycle','Validation & Activation'],
     ['certification','Certification'],['diagnostics','Diagnostics']
   ];
 
