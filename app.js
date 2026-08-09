@@ -716,7 +716,10 @@
     return 0;
   }
   function livePlayerShape(player={},stats=[]) {
-    const relevant=stats.filter(row=>String(row.playerId)===String(player.id));
+    const source=player.source||{};
+    const playerId=String(player.id||source.external_id||source.playerId||source.player_id||'');
+    const teamId=String(player.teamId||source.teamId||source.team_id||source.teamID||source.rosterTeamId||source.roster_team_id||source.currentTeamId||'');
+    const relevant=stats.filter(row=>String(row.playerId||row.source?.playerId||row.source?.player_id)===playerId);
     const totals={};
     Object.values(LIVE_METRIC_ALIASES).forEach(group=>Object.entries(group).forEach(([metric,aliases])=>{
       totals[metric]=relevant.reduce((sum,row)=>{
@@ -725,8 +728,12 @@
       },0);
     }));
     return {
-      id:String(player.id||''),teamId:String(player.teamId||''),name:player.displayName||[player.firstName,player.lastName].filter(Boolean).join(' ')||'Unknown Player',
-      position:player.position||'',overall:Number(player.overall||0),stats:totals
+      id:playerId,teamId,
+      name:player.displayName||source.displayName||source.fullName||[player.firstName||source.firstName,player.lastName||source.lastName].filter(Boolean).join(' ')||'Unknown Player',
+      position:String(player.position||source.position||source.positionName||source.pos||'').toUpperCase(),
+      overall:Number(player.overall||source.overallRating||source.playerBestOvr||source.overall||0),
+      dev:player.devTrait||source.devTrait||source.developmentTrait||source.dev||'Normal',
+      stats:totals
     };
   }
   function livePreviousGameCopy(teamId,week,games,teamMap) {
@@ -736,14 +743,45 @@
     const scored=Number(home?previous.homeScore:previous.awayScore),allowed=Number(home?previous.awayScore:previous.homeScore);
     return `${scored>allowed?'W':scored<allowed?'L':'T'} ${scored}-${allowed} ${home?'vs':'@'} ${opponent?.abbr||'OPP'}`;
   }
+  function liveStandingsSort(a,b) {
+    return (b.winPct-a.winPct)
+      || (Number(b.source?.confWins||0)-Number(a.source?.confWins||0))
+      || (Number(b.source?.divWins||0)-Number(a.source?.divWins||0))
+      || (b.pointDifferential-a.pointDifferential)
+      || (b.pointsFor-a.pointsFor)
+      || String(a.team).localeCompare(String(b.team));
+  }
+  function buildConferencePicture(conference,standings) {
+    const conferenceRows=standings.filter(row=>String(row.conference).toUpperCase().includes(conference));
+    const divisionNames=[...new Set(conferenceRows.map(row=>String(row.division||'').trim()).filter(Boolean))];
+    const leaders=divisionNames.map(division=>conferenceRows.filter(row=>String(row.division)===division).sort(liveStandingsSort)[0]).filter(Boolean).sort(liveStandingsSort);
+    const leaderIds=new Set(leaders.map(row=>String(row.teamId)));
+    const remaining=conferenceRows.filter(row=>!leaderIds.has(String(row.teamId))).sort(liveStandingsSort);
+    return {
+      seeds:[
+        ...leaders.map((row,index)=>({...row,playoffSeed:index+1,qualification:'Division leader'})),
+        ...remaining.slice(0,3).map((row,index)=>({...row,playoffSeed:index+5,qualification:'Wild card'}))
+      ],
+      inHunt:remaining.slice(3,6).map(row=>({...row,qualification:'In the hunt'}))
+    };
+  }
+  function publicSeasonContext(snapshot,games) {
+    const normalized=games.filter(game=>Number(game.week)>0);
+    const priority=stage=>{const value=String(stage||'').toLowerCase();return value.includes('post')||value.includes('playoff')?3:value.includes('reg')?2:value.includes('pre')?1:0};
+    const latest=[...normalized].sort((a,b)=>priority(b.stage)-priority(a.stage)||Number(b.week)-Number(a.week))[0];
+    const stage=String(latest?.stage||'reg').toLowerCase();
+    const label=stage.includes('pre')?'Preseason':stage.includes('post')||stage.includes('playoff')?'Playoffs':'Regular Season';
+    return {season:snapshot?.seasonYear??latest?.season??'—',stage,label,week:Number(latest?.week||1)};
+  }
   function renderLiveConferenceSnapshot(conference,standings,teamMap) {
-    const ranked=standings.filter(row=>String(row.conference).toUpperCase().includes(conference)).sort((a,b)=>(a.rank-b.rank)||(b.winPct-a.winPct)).slice(0,8);
+    const picture=buildConferencePicture(conference,standings);
+    const rows=[...picture.seeds,...picture.inHunt];
     return `<article class="card home-standings-card">
       <div class="card-header"><div><span class="eyebrow">Playoff picture</span><h3>${conference} Standings</h3></div><button class="text-button" data-route="standings">View all <svg><use href="#icon-arrow"></use></svg></button></div>
-      <div class="home-standings-columns" aria-hidden="true"><span>Rank</span><span>Team</span><span>Record</span></div>
-      <div class="home-standings-list">${ranked.map((row,index)=>{const team=teamMap.get(String(row.teamId))||{};return `<button type="button" data-team-id="${escapeHtml(row.teamId)}" data-route="teams/${escapeHtml(row.teamId)}">
-        <span class="seed">${row.seed||index+1}</span>${renderTeamMark(team)}
-        <span class="home-standings-team"><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml(row.division||'')}</small></span>
+      <div class="home-standings-columns" aria-hidden="true"><span>Seed</span><span>Team</span><span>Record</span></div>
+      <div class="home-standings-list">${rows.map((row,index)=>{const team=teamMap.get(String(row.teamId))||{};const seed=row.playoffSeed||index+1;return `<button type="button" data-team-id="${escapeHtml(row.teamId)}" data-route="teams/${escapeHtml(row.teamId)}">
+        <span class="seed">${seed}</span>${renderTeamMark(team)}
+        <span class="home-standings-team"><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml(row.qualification||row.division||'')}</small></span>
         <strong class="home-standings-record">${escapeHtml(row.record)}</strong>
       </button>`}).join('')||'<div class="home-leader-empty">No conference standings available.</div>'}</div>
     </article>`;
@@ -774,11 +812,12 @@
   async function renderLeagueHomeLive() {
     const service=liveReadModel();
     if(!service){renderLeagueHomeLegacy();return;}
-    renderLiveState('Loading live franchise','Reading the active Franchise HQ snapshot.');
+    pageContent.setAttribute('aria-busy','true');
     try{
       const [stateValue,snapshot,teamRows,standingRows,gameRows,statRows,playerRows]=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),service.getStatistics(),service.getPlayers()
       ]);
+      pageContent.removeAttribute('aria-busy');
       if(routeBase(location.hash.slice(1))!=='home')return;
       if(stateValue!=='live'||!snapshot){renderLiveState('No live franchise connected','Activate a validated snapshot to populate League Home.');return;}
 
@@ -792,7 +831,7 @@
 
       if(!availableGames.length){
         pageContent.innerHTML=`
-          <div class="page-heading league-home-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')} · Week ${escapeHtml(currentWeek)}</span><h1>League Home</h1></div><div class="heading-actions"><button class="button button--ghost" data-route="league-activity"><svg><use href="#icon-activity"></use></svg>League Activity</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div></div>
+          <div class="page-heading league-home-heading"><div><span class="eyebrow">${escapeHtml(seasonContext.season)} ${escapeHtml(seasonContext.label)} · Week ${escapeHtml(currentWeek)}</span><h1>League Home</h1></div><div class="heading-actions"><button class="button button--ghost" data-route="league-activity"><svg><use href="#icon-activity"></use></svg>League Activity</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div></div>
           ${renderLeagueNewsTicker()}
           <article class="card empty-state"><h2>No schedule captured for Week ${escapeHtml(currentWeek)}</h2><p>Export this week's schedule to restore the matchup ribbon and Game of the Week.</p></article>
           <div class="league-home-main"><aside class="league-home-standings">${renderLiveConferenceSnapshot('AFC',standings,teamMap)}${renderLiveConferenceSnapshot('NFC',standings,teamMap)}</aside></div>`;
@@ -809,14 +848,14 @@
       const featured=availableGames.find(game=>String(game.id)===String(state.featuredGameId))||availableGames[0];
       const away=featured.away||{},home=featured.home||{};
       const teamPlayers=teamId=>playerModels.filter(player=>String(player.teamId)===String(teamId)).sort((a,b)=>b.overall-a.overall);
-      const offensePositions=['QB','RB','FB','WR','TE','LT','LG','C','RG','RT'];
-      const defenseSet=new Set(defensePositions);
+      const offensePositions=['QB','HB','RB','FB','WR','TE','LT','LG','C','RG','RT','OL'];
+      const defenseSet=new Set([...defensePositions,'LE','RE','DT','LOLB','MLB','ROLB','LB','CB','FS','SS','S','EDGE']);
       const topUnit=(teamId,type)=>teamPlayers(teamId).filter(player=>type==='offense'?offensePositions.includes(player.position):defenseSet.has(player.position)).slice(0,3);
       const featuredPlayerRow=player=>`<button type="button" class="featured-player-row" data-player-id="${escapeHtml(player.id)}"><span><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position)} · ${player.overall} OVR</small></span><strong>${player.overall}</strong></button>`;
 
       pageContent.innerHTML=`
         <div class="page-heading league-home-heading">
-          <div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')} · Week ${escapeHtml(currentWeek)}</span><h1>League Home</h1></div>
+          <div><span class="eyebrow">${escapeHtml(seasonContext.season)} ${escapeHtml(seasonContext.label)} · Week ${escapeHtml(currentWeek)}</span><h1>League Home</h1></div>
           <div class="heading-actions"><button class="button button--ghost" data-route="league-activity"><svg><use href="#icon-activity"></use></svg>League Activity</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div>
         </div>
 
@@ -1539,9 +1578,10 @@
   async function renderStandingsLive() {
     const service=liveReadModel();
     if(!service){renderStandingsLegacy();return;}
-    renderLiveState('Loading live standings','Reading the active Franchise HQ snapshot.');
+    pageContent.setAttribute('aria-busy','true');
     try{
       const [stateValue,snapshot,teamRows,standingRows]=await Promise.all([service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings()]);
+      pageContent.removeAttribute('aria-busy');
       if(routeBase(location.hash.slice(1))!=='standings')return;
       if(stateValue!=='live'||!snapshot){renderLiveState('No live standings available','Activate a validated snapshot to populate Standings.');return;}
       const liveTeams=teamRows.map(liveTeamShape),teamMap=new Map(liveTeams.map(t=>[String(t.id),t]));
@@ -1552,9 +1592,13 @@
       const confGroups=Object.fromEntries(['AFC','NFC'].map(conf=>[conf,ranked.filter(r=>String(r.conference).toUpperCase()===conf).map((r,i)=>({...r,leagueRank:i+1}))]));
       const divisionGroups={};ranked.forEach(row=>{const key=[row.conference,row.division].filter(Boolean).join(' ')||'League';(divisionGroups[key]||(divisionGroups[key]=[])).push(row)});Object.values(divisionGroups).forEach(group=>group.sort(sortRows));
       const activeView=state.standingsView==='confidence'?'division':state.standingsView;
-      const content=activeView==='league'?`<article class="card">${table(ranked,true)}</article>`:activeView==='conference'?`<div class="content-grid content-grid--equal">${['AFC','NFC'].map(conf=>`<article class="card"><div class="card-header"><div><span class="eyebrow">Conference rankings</span><h3>${conf}</h3></div></div>${table(confGroups[conf]||[],true)}</article>`).join('')}</div>`:activeView==='playoffs'?`<div class="playoff-grid">${['AFC','NFC'].map(conf=>`<article class="card"><div class="card-header"><div><span class="eyebrow">Current snapshot</span><h3>${conf} Playoff Picture</h3></div><span class="pill pill--accent">Top 7</span></div><div class="playoff-bracket">${(confGroups[conf]||[]).slice(0,7).map((row,index)=>{const team=teamMap.get(row.teamId)||{};return `<div class="playoff-seed"><span class="seed">${index+1}</span>${renderTeamMark(team)}<div><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${index<4?'Division / conference position':'Wild card position'}</small></div><strong>${escapeHtml(row.record)}</strong></div>`}).join('')}</div></article>`).join('')}</div>`:`<div class="division-grid">${Object.entries(divisionGroups).map(([name,group])=>`<article class="card division-card"><div class="card-header"><div><span class="eyebrow">${escapeHtml(name.split(' ')[0]||'League')}</span><h3>${escapeHtml(name.split(' ').slice(1).join(' ')||name)}</h3></div><span class="pill pill--neutral">${escapeHtml(group[0]?.record||'0-0')} leader</span></div>${table(group,false)}</article>`).join('')}</div>`;
+      const content=activeView==='league'?`<article class="card">${table(ranked,true)}</article>`:
+        activeView==='conference'?`<div class="content-grid content-grid--equal">${['AFC','NFC'].map(conf=>`<article class="card"><div class="card-header"><div><span class="eyebrow">Conference rankings</span><h3>${conf}</h3></div></div>${table(confGroups[conf]||[],true)}</article>`).join('')}</div>`:
+        activeView==='playoffs'?`<div class="playoff-grid">${['AFC','NFC'].map(conf=>{const picture=buildConferencePicture(conf,rows);return `<article class="card"><div class="card-header"><div><h3>${conf} Playoff Picture</h3></div><span class="pill pill--accent">Top 7</span></div><div class="playoff-bracket">${picture.seeds.map(row=>{const team=teamMap.get(String(row.teamId))||{};return `<div class="playoff-seed"><span class="seed">${row.playoffSeed}</span>${renderTeamMark(team)}<div><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml(row.qualification)}</small></div><strong>${escapeHtml(row.record)}</strong></div>`}).join('')}</div></article>`}).join('')}</div>`:
+        `<div class="division-grid">${Object.entries(divisionGroups).map(([name,group])=>`<article class="card division-card"><div class="card-header"><div><span class="eyebrow">${escapeHtml(name.split(' ')[0]||'League')}</span><h3>${escapeHtml(name.split(' ').slice(1).join(' ')||name)}</h3></div></div>${table(group,false)}</article>`).join('')}</div>`;
       const tabs=[['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture']];
-      pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')} · Through Week ${escapeHtml(snapshot.weekIndex??'—')}</span><h1>Standings</h1><p>Official standings from the active Madden franchise snapshot.</p></div><div class="heading-actions"><div class="segmented-tabs standings-primary-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${activeView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div><div data-standings-content>${content}</div>`;
+      const context=publicSeasonContext(snapshot,[]);
+      pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')}</span><h1>Standings</h1></div><div class="heading-actions"><div class="segmented-tabs standings-primary-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${activeView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div><div data-standings-content>${content}</div>`;
     }catch(error){console.error('[Standings Live Integration]',error);if(routeBase(location.hash.slice(1))==='standings')renderLiveState('Live standings unavailable',error.message||'The active snapshot could not be loaded.','warning');}
   }
   function renderStandings() {
