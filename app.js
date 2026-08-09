@@ -563,7 +563,7 @@
 
       <div class="league-home-main">
         <div class="league-home-primary">
-          <section class="featured-game card" data-game-id="${featured.id}" style="--away:${away.primary};--home:${home.primary}">
+          <section class="featured-game featured-game--opens-matchup card" data-game-id="${featured.id}" role="button" tabindex="0" aria-label="Open matchup card" style="--away:${away.primary};--home:${home.primary}">
           <div class="featured-game-label">
             <span>${isOfficialGotw?'★ Game of the Week':'Selected Matchup'}</span>
             <small>${featured.day} · ${featured.time} · ${featured.network} · ${featured.stadium}</small>
@@ -1991,9 +1991,56 @@
     return panels[tab]||panels.team;
   }
 
+  function matchupGameContext(game={}) {
+    const source=game.source||{};
+    return stageWeekContext(source,game.week,game.stage||game.phase);
+  }
+
+  function previousCapturedMatchup(teamId,currentGame={}) {
+    const current=matchupGameContext(currentGame);
+    const phaseOrder={preseason:0,regular:1,playoffs:2};
+    const games=[...liveMatchupGames.values(),...(liveTeamDirectory?.games||[])]
+      .filter((game,index,array)=>array.findIndex(item=>String(item.id)===String(game.id))===index)
+      .filter(game=>{
+        const home=String(game.homeTeamId??game.homeId??'');
+        const away=String(game.awayTeamId??game.awayId??'');
+        if(home!==String(teamId)&&away!==String(teamId)) return false;
+        if(String(game.id)===String(currentGame.id)) return false;
+        const candidate=matchupGameContext(game);
+        return phaseOrder[candidate.phase]<phaseOrder[current.phase]
+          || (candidate.phase===current.phase&&Number(candidate.week)<Number(current.week));
+      })
+      .sort((a,b)=>{
+        const ac=matchupGameContext(a),bc=matchupGameContext(b);
+        return phaseOrder[bc.phase]-phaseOrder[ac.phase]||Number(bc.week)-Number(ac.week);
+      });
+    return games[0]||null;
+  }
+
+  function previousMatchupMarkup(teamId,currentGame) {
+    const previous=previousCapturedMatchup(teamId,currentGame);
+    if(!previous) return `<div class="matchup-previous matchup-previous--empty"><span>Previous matchup</span><strong>No captured result</strong></div>`;
+    const homeId=String(previous.homeTeamId??previous.homeId??'');
+    const awayId=String(previous.awayTeamId??previous.awayId??'');
+    const opponentId=homeId===String(teamId)?awayId:homeId;
+    const opponent=matchupTeam(opponentId);
+    const status=previous.status||resolvedGameStatus(previous,window.FranchiseHQ?.currentSeasonContext||null);
+    const teamScore=homeId===String(teamId)?(previous.homeScore??resolvedGameScore(previous,'home')):(previous.awayScore??resolvedGameScore(previous,'away'));
+    const oppScore=homeId===String(teamId)?(previous.awayScore??resolvedGameScore(previous,'away')):(previous.homeScore??resolvedGameScore(previous,'home'));
+    const result=status==='final'&&teamScore!==null&&oppScore!==null
+      ? `${teamScore>oppScore?'W':'L'} ${teamScore}-${oppScore}`
+      : status==='live'?'Live':'Scheduled';
+    return `<button type="button" class="matchup-previous" data-previous-game-id="${escapeHtml(previous.id||'')}">
+      <span>Previous matchup</span>
+      <strong>${escapeHtml(canonicalScheduleLabel(previous))} · ${escapeHtml(opponent.abbr||opponent.fullName)}</strong>
+      <small>${escapeHtml(result)}</small>
+    </button>`;
+  }
+
   function openMatchupCard(gameId) {
     const game=liveMatchupGames.get(String(gameId)) || liveTeamDirectory?.games?.find(item=>String(item.id)===String(gameId));
     if(!game){showToast('Matchup unavailable','The selected game could not be resolved from the active snapshot.');return;}
+    liveMatchupGames.set(String(game.id||gameId),game);
     const away=matchupTeam(game.awayTeamId??game.awayId);
     const home=matchupTeam(game.homeTeamId??game.homeId);
     const meta=gameMetadata(game);
@@ -2002,15 +2049,31 @@
     const homeScore=game.homeScore??resolvedGameScore(game,'home');
     const score=(awayScore!==null&&homeScore!==null)?`${awayScore} – ${homeScore}`:(status==='final'?'Score unavailable':'Upcoming');
     const info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
-    openDetail(`<div class="matchup-modal" data-matchup-modal>
+    openDetail(`<div class="matchup-modal matchup-modal--gotw" data-matchup-modal>
       <div class="matchup-modal__header">
         <span class="eyebrow matchup-modal__week">${escapeHtml(canonicalScheduleLabel(game))}</span>
         <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span>
       </div>
-      <div class="matchup-scoreboard" style="--away:${away.primary};--home:${home.primary}">
-        <div class="matchup-team">${renderTeamMark(away,'matchup-team-logo')}<h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · ${escapeHtml(away.owner||'Unassigned')}</p></div>
-        <div class="matchup-score"><strong>${escapeHtml(score)}</strong>${info?`<small>${escapeHtml(info)}</small>`:''}</div>
-        <div class="matchup-team matchup-team--home">${renderTeamMark(home,'matchup-team-logo')}<h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · ${escapeHtml(home.owner||'Unassigned')}</p></div>
+      <div class="matchup-gotw-board">
+        <section class="matchup-gotw-half matchup-gotw-half--away" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
+          <div class="matchup-gotw-identity">
+            ${renderTeamMark(away,'matchup-team-logo')}
+            <div><span class="eyebrow">${escapeHtml(away.city||away.abbr||'Away')}</span><h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p></div>
+          </div>
+          ${previousMatchupMarkup(away.id,game)}
+        </section>
+        <div class="matchup-gotw-center">
+          <span>${escapeHtml(canonicalScheduleLabel(game))}</span>
+          <strong>${escapeHtml(score)}</strong>
+          <small>${info?escapeHtml(info):(status==='final'?'Final':'Scheduled')}</small>
+        </div>
+        <section class="matchup-gotw-half matchup-gotw-half--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
+          <div class="matchup-gotw-identity matchup-gotw-identity--home">
+            <div><span class="eyebrow">${escapeHtml(home.city||home.abbr||'Home')}</span><h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p></div>
+            ${renderTeamMark(home,'matchup-team-logo')}
+          </div>
+          ${previousMatchupMarkup(home.id,game)}
+        </section>
       </div>
       <div class="matchup-stat-tabs" role="tablist" aria-label="Matchup statistics">
         <button type="button" class="is-active" data-matchup-tab="team" role="tab" aria-selected="true">Team Stats</button>
@@ -3452,6 +3515,14 @@
       return;
     }
 
+    const previousGameTarget=event.target.closest('[data-previous-game-id]');
+    if(previousGameTarget){
+      event.preventDefault();
+      event.stopPropagation();
+      openMatchupCard(previousGameTarget.dataset.previousGameId);
+      return;
+    }
+
     const matchupTab=event.target.closest('[data-matchup-tab]');
     if(matchupTab){
       event.preventDefault();
@@ -3689,6 +3760,15 @@
         if(scrollHost?.scrollTo) scrollHost.scrollTo({top:savedTop,left:0,behavior:'instant'});
         else window.scrollTo({top:savedTop,left:0,behavior:'instant'});
       });
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    const gameTarget=event.target.closest('[data-game-id]');
+    if(gameTarget&&['Enter',' '].includes(event.key)){
+      event.preventDefault();
+      openMatchupCard(gameTarget.dataset.gameId);
+      return;
     }
   });
 
