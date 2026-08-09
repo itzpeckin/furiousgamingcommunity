@@ -679,9 +679,8 @@
     const home=teamMap.get(String(game.homeTeamId)),away=teamMap.get(String(game.awayTeamId));
     const rawStatus=String(game.status||source.status||'').toLowerCase();
     const completed=['final','completed','complete'].includes(rawStatus)||game.homeScore!==null&&game.awayScore!==null&&Number(game.homeScore)+Number(game.awayScore)>0;
-    return {...game,home,away,completed,status:completed?'final':rawStatus||'scheduled',week:Number.isFinite(Number(source.weekIndex))
-        ? Number(source.weekIndex)+1
-        : Number(game.week??0),stage:game.stage||source.stage||'reg'};
+    const context=stageWeekContext(source,game.week,game.stage);
+    return {...game,home,away,completed,status:completed?'final':rawStatus||'scheduled',week:context.week,stage:context.phase,stageLabel:context.label,round:context.round};
   }
   function liveMetricValue(stat={},category='') {
     const m=stat.metrics||{};
@@ -895,7 +894,7 @@
         <section class="week-ribbon-wrap">
           <div class="week-ribbon">
             ${availableGames.map(game=>`<button type="button" class="week-matchup-card ${String(game.id)===String(featured.id)?'is-active':''}" data-feature-game="${escapeHtml(game.id)}">
-              <span class="week-matchup-time">Week ${game.week} · ${game.completed?'Final':'Scheduled'}</span>
+              <span class="week-matchup-time">${escapeHtml(game.round||`${game.stageLabel||'Regular Season'} Week ${game.week}`)} · ${game.completed?'Final':'Scheduled'}</span>
               <span class="week-matchup-team">${renderTeamMark(game.away||{})}<strong>${escapeHtml(game.away?.abbr||'AWY')}</strong><small>${game.completed?Number(game.awayScore||0):escapeHtml(recordForTeam(game.away))}</small></span>
               <span class="week-matchup-team">${renderTeamMark(game.home||{})}<strong>${escapeHtml(game.home?.abbr||'HME')}</strong><small>${game.completed?Number(game.homeScore||0):escapeHtml(recordForTeam(game.home))}</small></span>
               <span class="week-matchup-network">${game.completed?'Final':'Upcoming'}</span>
@@ -1208,19 +1207,83 @@
     return shaped;
   }
 
+  function normalizeLiveDevelopment(value) {
+    if(value===null||value===undefined||value==='') return 'Normal';
+    const numeric=Number(value);
+    if(Number.isFinite(numeric)&&String(value).trim()!==''){
+      if(numeric>=3) return 'X-Factor';
+      if(numeric===2) return 'Superstar';
+      if(numeric===1) return 'Star';
+      return 'Normal';
+    }
+    const text=String(value).trim().toLowerCase();
+    if(text.includes('x')) return 'X-Factor';
+    if(text.includes('superstar')) return 'Superstar';
+    if(text.includes('star')) return 'Star';
+    return 'Normal';
+  }
+
+  function firstNumeric(source={},keys=[]) {
+    for(const key of keys){
+      const value=Number(source?.[key]);
+      if(Number.isFinite(value)&&value>=0) return value;
+    }
+    return null;
+  }
+
+  function corePlayerRatings(source={},existing={}) {
+    const all={...source,...existing};
+    return {
+      spd:firstNumeric(all,['spd','speed','speedRating','playerSpeed']),
+      str:firstNumeric(all,['str','strength','strengthRating','playerStrength']),
+      agi:firstNumeric(all,['agi','agility','agilityRating','playerAgility']),
+      acc:firstNumeric(all,['acc','acceleration','accelerationRating','playerAcceleration']),
+      awr:firstNumeric(all,['awr','aws','awareness','awarenessRating','playerAwareness'])
+    };
+  }
+
+  function ordinalRank(value) {
+    const n=Number(value);
+    if(!Number.isFinite(n)||n<=0) return '—';
+    const mod100=n%100;
+    const suffix=(mod100>=11&&mod100<=13)?'th':({1:'st',2:'nd',3:'rd'}[n%10]||'th');
+    return `${n}${suffix} in NFL`;
+  }
+
+  function stageWeekContext(source={},fallbackWeek=0,fallbackStage='reg') {
+    const stageIndex=Number(source.stageIndex);
+    const rawWeek=Number(source.weekIndex);
+    const stageText=String(source.stage||source.stageName||fallbackStage||'reg').toLowerCase();
+    const phase=Number.isFinite(stageIndex)
+      ? (stageIndex===0?'preseason':stageIndex===1?'regular':'playoffs')
+      : (stageText.includes('pre')?'preseason':stageText.includes('post')||stageText.includes('playoff')?'playoffs':'regular');
+    let week=Number.isFinite(rawWeek)?rawWeek:Number(fallbackWeek||0);
+    if(Number.isFinite(rawWeek)){
+      if(phase==='preseason') week=rawWeek+1;
+      else if(phase==='regular') week=rawWeek>=3?rawWeek-2:rawWeek+1;
+      else week=rawWeek>=21?rawWeek-20:rawWeek+1;
+    }
+    const round=phase==='playoffs'
+      ? ({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[week]||`Playoff Week ${week}`)
+      : null;
+    return {phase,week:Math.max(1,week||1),round,label:phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'};
+  }
+
   function liveRosterPlayerShape(player={}) {
     const source=player.source||{};
     const nested=source.contract||{};
     const contract={
       yearsRemaining:nested.yearsRemaining??nested.years??source.contractYearsLeft??source.contractYearsRemaining??source.contractLength??source.contractYears??source.yearsRemaining??source.yearsLeft??source.contractLengthRemaining??null,
-      currentYearSalary:nested.currentYearSalary??nested.salary??source.currentYearSalary??source.currentSalary??source.capSalary??source.contractSalary??source.salary??null,
+      currentYearSalary:nested.currentYearSalary??source.currentYearSalary??source.currentSalary??source.capSalary??source.currentSeasonSalary??null,
       capHit:nested.capHit??source.capHit??source.salaryCapHit??source.currentCapHit??null,
       bonus:nested.bonus??source.contractBonus??source.signingBonus??null
     };
     const ratings={};
     Object.entries(source).forEach(([key,value])=>{
-      if(typeof value==='number' && /rating|speed|acceleration|awareness|strength|agility|throw|catch|route|tackle|coverage|block|power|finesse/i.test(key)) ratings[key]=value;
+      const numeric=Number(value);
+      if(Number.isFinite(numeric) && /rating|speed|acceleration|awareness|strength|agility|throw|catch|route|tackle|coverage|block|power|finesse|^spd$|^str$|^agi$|^acc$|^awr$|^aws$/i.test(key)) ratings[key]=numeric;
     });
+    Object.assign(ratings,corePlayerRatings(source,ratings));
     return {
       id:String(player.id||source.playerId||source.external_id||''),
       name:player.displayName||source.displayName||source.fullName||[player.firstName||source.firstName,player.lastName||source.lastName].filter(Boolean).join(' ')||'Unknown Player',
@@ -1231,7 +1294,7 @@
       overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall','overall_rating','playerOverall','ovr']),
       age:Number(player.age||source.age||0)||null,
       yearsPro:Number(source.yearsPro||source.experience||0)||null,
-      developmentTrait:player.devTrait||source.devTrait||source.developmentTrait||source.dev||'Normal',
+      developmentTrait:normalizeLiveDevelopment(player.devTrait??source.devTrait??source.developmentTrait??source.dev),
       injuryStatus:source.injuryStatus||source.injury||'Healthy',
       depthOrder:Number(source.depthOrder??source.depthChartOrder??source.depth??99),
       rosterStatus:String(source.rosterStatus||source.status||'active').toLowerCase(),
@@ -1262,6 +1325,8 @@
       const rawTeamMap=new Map(teamRows.map(team=>[String(team.id),team]));
       const standingMap=new Map(standingRows.map(row=>[String(row.teamId),row]));
       const teamsLive=teamRows.map(team=>liveTeamUiShape(team,standingMap.get(String(team.id))));
+      [...teamsLive].sort((a,b)=>Number(b.pf)-Number(a.pf)||String(a.fullName).localeCompare(String(b.fullName))).forEach((team,index)=>team.pfRank=index+1);
+      [...teamsLive].sort((a,b)=>Number(a.pa)-Number(b.pa)||String(a.fullName).localeCompare(String(b.fullName))).forEach((team,index)=>team.paRank=index+1);
       const playersLive=playerRows.map(liveRosterPlayerShape);
       liveRosterPlayers.clear();
       playersLive.forEach(player=>{if(player.id)liveRosterPlayers.set(String(player.id),player)});
@@ -1387,7 +1452,7 @@
     const contract = player?.contract || {};
     return {
       ...player,
-      dev: player?.developmentTrait || raw.dev || raw.developmentTrait || 'Normal',
+      dev: normalizeLiveDevelopment(player?.developmentTrait ?? raw.dev ?? raw.developmentTrait),
       injury: player?.injuryStatus || raw.injury || 'Healthy',
       years: Number(contract.yearsRemaining ?? contract.years ?? raw.years ?? raw.contractYears ?? 0) || 0,
       salary: Number(contract.currentYearSalary ?? contract.salary ?? contract.totalSalary ?? raw.currentYearSalary ?? raw.currentSalary ?? raw.salary ?? 0) || 0,
@@ -1401,7 +1466,7 @@
       weight: raw.weight || '—',
       tradeBlock: Boolean(raw.tradeBlock),
       initials: raw.initials || String(player?.name || '?').split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase(),
-      ratings: player?.ratings || raw.ratings || {},
+      ratings: corePlayerRatings(raw,player?.ratings||raw.ratings||{}),
       stats: player?.stats || raw.stats || {}
     };
   }
@@ -1470,6 +1535,7 @@
     if(key==='player') return String(player.name||'').toLowerCase();
     if(key==='position') return String(player.position||'');
     if(key==='overall'||key==='age') return Number(player[key]??-1);
+    if(['spd','str','agi','acc','awr'].includes(key)) return Number(player.ratings?.[key]??-1);
     if(key==='development') return String(player.dev||'');
     if(key==='contract') return Number(player.years||0);
     if(key==='salary') return Number(player.salary||0);
@@ -1509,7 +1575,7 @@
         <label class="field"><span>Development</span><select data-roster-dev><option value="All">All Traits</option>${devTraits.map(value=>`<option value="${escapeHtml(value)}" ${state.rosterDev===value?'selected':''}>${escapeHtml(value)}</option>`).join('')}</select></label>
         <span class="result-count">${filtered.length} player${filtered.length===1?'':'s'} · sorted by ${escapeHtml(state.rosterSortKey||'overall')}</span>
       </div>
-      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>${rosterSortButton('player','Player')}</th><th>${rosterSortButton('position','Pos')}</th><th>${rosterSortButton('overall','OVR')}</th><th>${rosterSortButton('age','Age')}</th><th>${rosterSortButton('development','Development')}</th><th>${rosterSortButton('salary','Years Remaining / Current Year Salary')}</th><th>${rosterSortButton('status','Status')}</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="7"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
+      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>${rosterSortButton('player','Player')}</th><th>${rosterSortButton('position','Pos')}</th><th>${rosterSortButton('overall','OVR')}</th><th>${rosterSortButton('age','Age')}</th><th>${rosterSortButton('development','Development')}</th><th>${rosterSortButton('spd','SPD')}</th><th>${rosterSortButton('str','STR')}</th><th>${rosterSortButton('agi','AGI')}</th><th>${rosterSortButton('acc','ACC')}</th><th>${rosterSortButton('awr','AWR')}</th><th>${rosterSortButton('salary','Years Remaining / Current Year Salary')}</th><th>${rosterSortButton('status','Status')}</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td class="roster-core-rating">${player.ratings?.spd??'—'}</td><td class="roster-core-rating">${player.ratings?.str??'—'}</td><td class="roster-core-rating">${player.ratings?.agi??'—'}</td><td class="roster-core-rating">${player.ratings?.acc??'—'}</td><td class="roster-core-rating">${player.ratings?.awr??'—'}</td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="12"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
     </div>`;
   }
 
@@ -1642,7 +1708,7 @@
           <div class="team-hero__content"><div class="team-hero__copy"><span class="eyebrow">${escapeHtml(team.conference)} ${escapeHtml(team.division)} · Owner ${escapeHtml(team.owner)}</span><h1>${escapeHtml(team.fullName)}</h1></div><div class="team-hero__record"><strong>${escapeHtml(team.record)}</strong><span>${escapeHtml(team.conference)} ${escapeHtml(team.division)}</span></div></div>
         </section>
         <div class="team-summary-grid">
-          ${team.ovr?summaryTile('Overall',team.ovr,'Official team rating'):''}${summaryTile('Points For',team.pf,'Season total')}${summaryTile('Points Against',team.pa,'Season total')}${summaryTile('Cap Space',compactMoney(team.cap),'Current snapshot')}
+          ${team.ovr?summaryTile('Overall',team.ovr,''):''}${summaryTile('Points For',team.pf,ordinalRank(team.pfRank))}${summaryTile('Points Against',team.pa,ordinalRank(team.paRank))}${summaryTile('Cap Space',compactMoney(team.cap),'')}
         </div>
         <div class="subnav" data-team-tabs>
           ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Trade History':titleCase(tab)}</button>`).join('')}
@@ -1659,7 +1725,7 @@
     }
   }
 
-  function summaryTile(label, value, detail) { return `<article class="summary-tile card"><span>${label}</span><strong>${value}</strong><small>${detail}</small></article>`; }
+  function summaryTile(label, value, detail='') { return `<article class="summary-tile card"><span>${label}</span><strong>${value}</strong>${detail?`<small>${detail}</small>`:''}</article>`; }
   function titleCase(value) { return value.replace(/\b\w/g, letter => letter.toUpperCase()); }
   function positionOrder(position) { return positionBlueprint.findIndex(([pos]) => pos === position); }
 
@@ -1703,8 +1769,8 @@
 
   function liveTeamScheduleGame(game={}) {
     const source=game.source||{};
-    const stage=String(game.stage||source.stage||source.stageIndex||'reg').toLowerCase();
-    const phase=stage.includes('pre')?'preseason':stage.includes('post')||stage.includes('playoff')?'playoffs':'regular';
+    const context=stageWeekContext(source,game.week,game.stage);
+    const phase=context.phase;
     const scheduled=game.scheduledAt||source.scheduledAt||source.date||source.gameDate||null;
     let day='TBD',time='TBD';
     if(scheduled){
@@ -1727,7 +1793,7 @@
       day,time,
       network:source.network||'',
       stadium:source.stadiumName||source.stadium||'',
-      round:source.roundName||source.playoffRound||null
+      round:source.roundName||source.playoffRound||context.round||null
     };
   }
 
