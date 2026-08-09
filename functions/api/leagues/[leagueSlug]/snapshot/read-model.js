@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE = '5.9.4.1a';
+const RELEASE = '5.9.4.1b';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -34,12 +34,12 @@ function normalizeTeam(raw = {}) {
 function normalizePlayer(raw = {}) {
   return {
     id: String(raw.external_id ?? raw.player_id ?? raw.playerId ?? ''),
-    teamId: String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? ''),
+    teamId: String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? raw.teamID ?? raw.rosterTeamId ?? raw.roster_team_id ?? raw.currentTeamId ?? ''),
     firstName: raw.first_name ?? raw.firstName ?? null,
     lastName: raw.last_name ?? raw.lastName ?? null,
     displayName: raw.display_name ?? raw.displayName ?? ([raw.first_name ?? raw.firstName, raw.last_name ?? raw.lastName].filter(Boolean).join(' ') || null),
-    position: raw.position ?? raw.position_name ?? raw.positionName ?? null,
-    overall: raw.overall ?? raw.overall_rating ?? raw.overallRating ?? null,
+    position: raw.position ?? raw.position_name ?? raw.positionName ?? raw.pos ?? null,
+    overall: raw.overall ?? raw.overall_rating ?? raw.overallRating ?? raw.playerBestOvr ?? null,
     age: raw.age ?? null,
     devTrait: raw.dev_trait ?? raw.devTrait ?? raw.development_trait ?? null,
     jerseyNumber: raw.jersey_number ?? raw.jerseyNumber ?? null,
@@ -69,7 +69,7 @@ function normalizeStatistic(raw = {}) {
     id: String(raw.external_key ?? raw.external_id ?? raw.id ?? ''),
     category: raw.category ?? raw.statistic_category ?? null,
     playerId: String(raw.player_external_id ?? raw.player_id ?? raw.playerId ?? ''),
-    teamId: String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? ''),
+    teamId: String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? raw.teamID ?? raw.rosterTeamId ?? raw.roster_team_id ?? raw.currentTeamId ?? ''),
     season: raw.season_year ?? raw.seasonYear ?? null,
     stage: raw.stage ?? null,
     week: raw.week_index ?? raw.weekIndex ?? null,
