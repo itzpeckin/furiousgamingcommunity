@@ -17,11 +17,11 @@
   const metadata = Object.freeze({
     name: 'Franchise HQ',
     architecture: 'Frontend Architecture v2',
-    version: '5.9.3.7a',
+    version: '5.9.3.8',
     release: 5,
     epic: 9,
     patch: 1,
-    build: 'canonical-statistics-engine'
+    build: 'live-data-verification'
   });
 
   const REQUIRED_SERVICES = Object.freeze([
