@@ -345,7 +345,9 @@
   }
 
   function renderTeamMark(team, className = 'mini-team') {
-    return `<span class="${className}" style="${teamStyle(team)}">${team.abbr}</span>`;
+    const logo=team?.logo||team?.logoUrl||team?.source?.logo_url||team?.source?.logoUrl||null;
+    const label=escapeHtml(team?.abbr||team?.abbreviation||'—');
+    return `<span class="${className}" style="${teamStyle(team||{})}">${logo?`<img src="${escapeHtml(logo)}" alt="${escapeHtml(team?.fullName||team?.displayName||label)} logo" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:contain" onerror="this.remove();this.parentElement.querySelector('[data-team-mark-fallback]').style.display='grid'">`:''}<span data-team-mark-fallback style="${logo?'display:none;':'display:grid;'}width:100%;height:100%;place-items:center">${label}</span></span>`;
   }
 
   function renderPlayerIdentity(player, includeTeam = true) {
@@ -681,6 +683,91 @@
     const first=Object.entries(m).find(([,v])=>Number.isFinite(Number(v)));
     return first?{key:first[0],value:Number(first[1])}:{key:'value',value:0};
   }
+
+  const LIVE_METRIC_ALIASES={
+    passing:{
+      passingYards:['passYds','passingYards','passYards','pass_yds'],
+      passingTD:['passTDs','passingTDs','passTds','pass_td'],
+      interceptions:['passInts','interceptions','ints','passInt']
+    },
+    rushing:{
+      rushingYards:['rushYds','rushingYards','rushYards','rush_yds'],
+      rushingTD:['rushTDs','rushingTDs','rushTds','rush_td'],
+      fumbles:['fumbles','rushFumbles','fumblesLost']
+    },
+    receiving:{
+      receptions:['receptions','recCatches','catches'],
+      receivingYards:['recYds','receivingYards','receiveYards','rec_yds'],
+      receivingTD:['recTDs','receivingTDs','recTds','rec_td']
+    },
+    defense:{
+      tackles:['defTotalTackles','totalTackles','tackles'],
+      sacks:['defSacks','sacks'],
+      interceptions:['defInts','interceptions','ints']
+    }
+  };
+  function liveStatMetric(row,category,metric) {
+    const values=row?.metrics||{};
+    const aliases=LIVE_METRIC_ALIASES[category]?.[metric]||[metric];
+    for(const key of aliases){
+      const value=Number(values[key]);
+      if(Number.isFinite(value)) return value;
+    }
+    return 0;
+  }
+  function livePlayerShape(player={},stats=[]) {
+    const relevant=stats.filter(row=>String(row.playerId)===String(player.id));
+    const totals={};
+    Object.values(LIVE_METRIC_ALIASES).forEach(group=>Object.entries(group).forEach(([metric,aliases])=>{
+      totals[metric]=relevant.reduce((sum,row)=>{
+        for(const key of aliases){const value=Number(row.metrics?.[key]);if(Number.isFinite(value))return sum+value;}
+        return sum;
+      },0);
+    }));
+    return {
+      id:String(player.id||''),teamId:String(player.teamId||''),name:player.displayName||[player.firstName,player.lastName].filter(Boolean).join(' ')||'Unknown Player',
+      position:player.position||'',overall:Number(player.overall||0),stats:totals
+    };
+  }
+  function livePreviousGameCopy(teamId,week,games,teamMap) {
+    const previous=games.filter(g=>g.completed&&g.week<week&&(String(g.homeTeamId)===String(teamId)||String(g.awayTeamId)===String(teamId))).sort((a,b)=>b.week-a.week)[0];
+    if(!previous)return 'No previous result captured';
+    const home=String(previous.homeTeamId)===String(teamId),opponent=teamMap.get(String(home?previous.awayTeamId:previous.homeTeamId));
+    const scored=Number(home?previous.homeScore:previous.awayScore),allowed=Number(home?previous.awayScore:previous.homeScore);
+    return `${scored>allowed?'W':scored<allowed?'L':'T'} ${scored}-${allowed} ${home?'vs':'@'} ${opponent?.abbr||'OPP'}`;
+  }
+  function renderLiveConferenceSnapshot(conference,standings,teamMap) {
+    const ranked=standings.filter(row=>String(row.conference).toUpperCase().includes(conference)).sort((a,b)=>(a.rank-b.rank)||(b.winPct-a.winPct)).slice(0,8);
+    return `<article class="card home-standings-card">
+      <div class="card-header"><div><span class="eyebrow">Playoff picture</span><h3>${conference} Standings</h3></div><button class="text-button" data-route="standings">View all <svg><use href="#icon-arrow"></use></svg></button></div>
+      <div class="home-standings-columns" aria-hidden="true"><span>Rank</span><span>Team</span><span>Record</span></div>
+      <div class="home-standings-list">${ranked.map((row,index)=>{const team=teamMap.get(String(row.teamId))||{};return `<button type="button" data-team-id="${escapeHtml(row.teamId)}" data-route="teams/${escapeHtml(row.teamId)}">
+        <span class="seed">${row.seed||index+1}</span>${renderTeamMark(team)}
+        <span class="home-standings-team"><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml(row.division||'')}</small></span>
+        <strong class="home-standings-record">${escapeHtml(row.record)}</strong>
+      </button>`}).join('')||'<div class="home-leader-empty">No conference standings available.</div>'}</div>
+    </article>`;
+  }
+  function renderLiveHomeLeaderCard(category,title,livePlayers,teamMap) {
+    const cfg=leaderMetricConfig(category);
+    const eligible=livePlayers.filter(player=>cfg.positions.includes(player.position))
+      .sort((a,b)=>Number(b.stats[cfg.metric]||0)-Number(a.stats[cfg.metric]||0)||a.name.localeCompare(b.name)).slice(0,10);
+    return `<article class="card home-leader-card home-leader-card--${category}">
+      <div class="card-header home-leader-card__header">
+        <div><h3>${title}</h3></div>
+        <div class="mini-toggle" role="group" aria-label="${title} leaderboard statistic">
+          ${cfg.tabs.map(([key,label])=>`<button type="button" data-home-leader-category="${category}" data-home-leader-metric="${key}" class="${cfg.metric===key?'is-active':''}">${label}</button>`).join('')}
+        </div>
+      </div>
+      <div class="home-leader-columns"><span>#</span><span>Player</span><span>${escapeHtml(cfg.tabs.find(([key])=>key===cfg.metric)?.[1]||'Value')}</span></div>
+      <div class="home-leader-list">${eligible.map((player,index)=>`<button type="button" data-player-id="${escapeHtml(player.id)}">
+        <span class="leader-rank">${index+1}</span>
+        <span class="home-leader-player"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position)} · ${escapeHtml(teamMap.get(String(player.teamId))?.abbr||'FA')}</small></span>
+        <strong class="home-leader-value">${formatStatValue(cfg.metric,player.stats[cfg.metric])}</strong>
+      </button>`).join('')||'<div class="home-leader-empty">No statistics available.</div>'}</div>
+    </article>`;
+  }
+
   function renderLiveState(title,copy,tone='neutral') {
     pageContent.innerHTML=`<article class="card empty-state"><span class="pill pill--${tone}">${escapeHtml(title)}</span><h2>${escapeHtml(title)}</h2><p>${escapeHtml(copy)}</p></article>`;
   }
@@ -694,32 +781,119 @@
       ]);
       if(routeBase(location.hash.slice(1))!=='home')return;
       if(stateValue!=='live'||!snapshot){renderLiveState('No live franchise connected','Activate a validated snapshot to populate League Home.');return;}
-      const liveTeams=teamRows.map(liveTeamShape),teamMap=new Map(liveTeams.map(t=>[String(t.id),t]));
-      const standings=standingRows.map(r=>liveStandingShape(r,teamMap)).sort((a,b)=>(a.rank-b.rank)||(b.winPct-a.winPct)||(b.pointDifferential-a.pointDifferential));
-      const games=gameRows.map(g=>liveGameShape(g,teamMap));
-      const currentWeek=Number(snapshot.weekIndex||Math.max(1,...games.map(g=>g.week||0)));
-      const currentGames=games.filter(g=>g.week===currentWeek);
-      const completed=games.filter(g=>g.completed).sort((a,b)=>b.week-a.week).slice(0,6);
-      const upcoming=games.filter(g=>!g.completed).sort((a,b)=>a.week-b.week).slice(0,6);
-      const playerMap=new Map(playerRows.map(p=>[String(p.id),p]));
-      const leaderCategories=['passing','rushing','receiving','defense'];
-      const leaders=leaderCategories.map(category=>{
-        const rows=statRows.filter(x=>String(x.category).toLowerCase()===category).map(x=>({...x,metric:liveMetricValue(x,category)})).sort((a,b)=>b.metric.value-a.metric.value).slice(0,5);
-        return {category,rows};
-      });
-      const selected=(currentGames.find(g=>String(g.id)===String(state.featuredGameId))||currentGames[0]||upcoming[0]||completed[0]);
-      if(selected)state.featuredGameId=selected.id;
+
+      const liveTeams=teamRows.map(liveTeamShape),teamMap=new Map(liveTeams.map(team=>[String(team.id),team]));
+      const standings=standingRows.map(row=>liveStandingShape(row,teamMap)).sort((a,b)=>(a.rank-b.rank)||(b.winPct-a.winPct)||(b.pointDifferential-a.pointDifferential));
+      const games=gameRows.map(game=>liveGameShape(game,teamMap));
+      const currentWeek=Number(snapshot.weekIndex||Math.max(1,...games.map(game=>game.week||0)));
+      const availableGames=games.filter(game=>game.week===currentWeek);
+      const playerModels=playerRows.map(player=>livePlayerShape(player,statRows));
+      const playerMap=new Map(playerModels.map(player=>[String(player.id),player]));
+
+      if(!availableGames.length){
+        pageContent.innerHTML=`
+          <div class="page-heading league-home-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')} · Week ${escapeHtml(currentWeek)}</span><h1>League Home</h1></div><div class="heading-actions"><button class="button button--ghost" data-route="league-activity"><svg><use href="#icon-activity"></use></svg>League Activity</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div></div>
+          ${renderLeagueNewsTicker()}
+          <article class="card empty-state"><h2>No schedule captured for Week ${escapeHtml(currentWeek)}</h2><p>Export this week's schedule to restore the matchup ribbon and Game of the Week.</p></article>
+          <div class="league-home-main"><aside class="league-home-standings">${renderLiveConferenceSnapshot('AFC',standings,teamMap)}${renderLiveConferenceSnapshot('NFC',standings,teamMap)}</aside></div>`;
+        return;
+      }
+
+      if(!state.featuredGameId||!availableGames.some(game=>String(game.id)===String(state.featuredGameId))){
+        state.featuredGameId=[...availableGames].sort((a,b)=>{
+          const ar=Number(a.away?.wins||0)+Number(a.home?.wins||0);
+          const br=Number(b.away?.wins||0)+Number(b.home?.wins||0);
+          return br-ar;
+        })[0]?.id;
+      }
+      const featured=availableGames.find(game=>String(game.id)===String(state.featuredGameId))||availableGames[0];
+      const away=featured.away||{},home=featured.home||{};
+      const teamPlayers=teamId=>playerModels.filter(player=>String(player.teamId)===String(teamId)).sort((a,b)=>b.overall-a.overall);
+      const offensePositions=['QB','RB','FB','WR','TE','LT','LG','C','RG','RT'];
+      const defenseSet=new Set(defensePositions);
+      const topUnit=(teamId,type)=>teamPlayers(teamId).filter(player=>type==='offense'?offensePositions.includes(player.position):defenseSet.has(player.position)).slice(0,3);
+      const featuredPlayerRow=player=>`<button type="button" class="featured-player-row" data-player-id="${escapeHtml(player.id)}"><span><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position)} · ${player.overall} OVR</small></span><strong>${player.overall}</strong></button>`;
+
       pageContent.innerHTML=`
-        <div class="page-heading league-home-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')} · Week ${escapeHtml(currentWeek)}</span><h1>League Home</h1><p>Powered by the active Madden franchise snapshot.</p></div><div class="heading-actions"><button class="button button--ghost" data-route="standings">Standings</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div></div>
+        <div class="page-heading league-home-heading">
+          <div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')} · Week ${escapeHtml(currentWeek)}</span><h1>League Home</h1></div>
+          <div class="heading-actions"><button class="button button--ghost" data-route="league-activity"><svg><use href="#icon-activity"></use></svg>League Activity</button><button class="button button--primary" data-route="schedule"><svg><use href="#icon-calendar"></use></svg>Full Schedule</button></div>
+        </div>
+
         ${renderLeagueNewsTicker()}
-        ${currentGames.length?`<section class="week-ribbon-wrap"><div class="week-ribbon">${currentGames.map(game=>`<button type="button" class="week-matchup-card ${String(game.id)===String(selected?.id)?'is-active':''}" data-feature-game="${escapeHtml(game.id)}"><span class="week-matchup-time">Week ${game.week} · ${game.completed?'Final':'Scheduled'}</span><span class="week-matchup-team">${renderTeamMark(game.away||{})}<strong>${escapeHtml(game.away?.abbr||'AWY')}</strong><small>${game.completed?game.awayScore:game.away?.record||'—'}</small></span><span class="week-matchup-team">${renderTeamMark(game.home||{})}<strong>${escapeHtml(game.home?.abbr||'HME')}</strong><small>${game.completed?game.homeScore:game.home?.record||'—'}</small></span><span class="week-matchup-network">Live Snapshot</span></button>`).join('')}</div></section>`:''}
+
+        <section class="week-ribbon-wrap">
+          <div class="week-ribbon">
+            ${availableGames.map(game=>`<button type="button" class="week-matchup-card ${String(game.id)===String(featured.id)?'is-active':''}" data-feature-game="${escapeHtml(game.id)}">
+              <span class="week-matchup-time">Week ${game.week} · ${game.completed?'Final':'Scheduled'}</span>
+              <span class="week-matchup-team">${renderTeamMark(game.away||{})}<strong>${escapeHtml(game.away?.abbr||'AWY')}</strong><small>${game.completed?Number(game.awayScore||0):escapeHtml(game.away?.record||'—')}</small></span>
+              <span class="week-matchup-team">${renderTeamMark(game.home||{})}<strong>${escapeHtml(game.home?.abbr||'HME')}</strong><small>${game.completed?Number(game.homeScore||0):escapeHtml(game.home?.record||'—')}</small></span>
+              <span class="week-matchup-network">${game.completed?'Final':'Upcoming'}</span>
+            </button>`).join('')}
+          </div>
+        </section>
+
         <div class="league-home-main">
-          <div class="league-home-primary">${selected?`<section class="featured-game card" style="--away:${escapeHtml(selected.away?.primary||'#333')};--home:${escapeHtml(selected.home?.primary||'#555')}"><div class="featured-game-label"><span>${selected.completed?'Latest Result':'Featured Matchup'}</span><small>Week ${selected.week} · ${escapeHtml(String(selected.stage||'Regular Season'))}</small></div><div class="featured-split"><div class="featured-half featured-half--away"><div class="featured-half-hero">${renderTeamMark(selected.away||{},'featured-team-logo')}<div class="featured-half-copy"><span class="eyebrow">${escapeHtml(selected.away?.city||'')}</span><h2>${escapeHtml(selected.away?.name||selected.away?.fullName||'Away')}</h2><p>${escapeHtml(selected.away?.record||'—')} · ${escapeHtml(selected.away?.owner||'Unassigned')}</p>${selected.completed?`<strong class="live-featured-score">${Number(selected.awayScore||0)}</strong>`:''}</div></div></div><div class="featured-half featured-half--home"><div class="featured-half-hero featured-half-hero--home"><div class="featured-half-copy"><span class="eyebrow">${escapeHtml(selected.home?.city||'')}</span><h2>${escapeHtml(selected.home?.name||selected.home?.fullName||'Home')}</h2><p>${escapeHtml(selected.home?.record||'—')} · ${escapeHtml(selected.home?.owner||'Unassigned')}</p>${selected.completed?`<strong class="live-featured-score">${Number(selected.homeScore||0)}</strong>`:''}</div>${renderTeamMark(selected.home||{},'featured-team-logo')}</div></div></div></section>`:`<article class="card empty-state"><h2>No games in the active snapshot</h2><p>Export additional schedule weeks to populate matchups.</p></article>`}</div>
-          <aside class="league-home-standings">${['AFC','NFC'].map(conf=>{const rows=standings.filter(r=>String(r.conference).toUpperCase()===conf).slice(0,8);return `<article class="card home-standings-card"><div class="card-header"><div><span class="eyebrow">Live snapshot</span><h3>${conf} Standings</h3></div><button class="text-button" data-route="standings">View all <svg><use href="#icon-arrow"></use></svg></button></div><div class="home-standings-columns"><span>Rank</span><span>Team</span><span>Record</span></div><div class="home-standings-list">${rows.map((row,index)=>{const team=teamMap.get(row.teamId)||{};return `<button type="button" data-route="standings"><span class="seed">${index+1}</span>${renderTeamMark(team)}<span class="home-standings-team"><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml(row.division||conf)}</small></span><strong class="home-standings-record">${escapeHtml(row.record)}</strong></button>`}).join('')||'<div class="home-leader-empty">No conference standings available.</div>'}</div></article>`}).join('')}</aside>
-          <section class="home-leaders-section home-leaders-section--embedded"><div class="section-heading home-leaders-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">View Full Leaderboard <svg><use href="#icon-arrow"></use></svg></button></div><div class="home-leaders-grid home-leaders-grid--embedded">${leaders.map(group=>`<article class="card home-leader-card home-leader-card--${group.category}"><div class="card-header home-leader-card__header"><div><h3>${escapeHtml(group.category[0].toUpperCase()+group.category.slice(1))}</h3></div><span class="pill pill--neutral">Live</span></div><div class="home-leader-columns"><span>#</span><span>Player</span><span>Value</span></div><div class="home-leader-list">${group.rows.map((row,index)=>{const player=playerMap.get(String(row.playerId))||{};const team=teamMap.get(String(row.teamId));return `<div><span class="leader-rank">${index+1}</span><span class="home-leader-player"><strong>${escapeHtml(player.displayName||row.playerId||'Unknown Player')}</strong><small>${escapeHtml(player.position||'')} · ${escapeHtml(team?.abbr||'FA')}</small></span><strong class="home-leader-value">${row.metric.value.toLocaleString()}</strong></div>`}).join('')||'<div class="home-leader-empty">No statistics available.</div>'}</div></article>`).join('')}</div></section>
-          <section class="content-grid content-grid--equal"><article class="card"><div class="card-header"><div><span class="eyebrow">Latest finals</span><h3>Recent Games</h3></div></div>${completed.map(g=>`<div class="playoff-seed"><span>${renderTeamMark(g.away||{})}</span><div><strong>${escapeHtml(g.away?.abbr||'AWY')} ${Number(g.awayScore||0)} · ${escapeHtml(g.home?.abbr||'HME')} ${Number(g.homeScore||0)}</strong><small>Week ${g.week}</small></div></div>`).join('')||'<p>No completed games captured.</p>'}</article><article class="card"><div class="card-header"><div><span class="eyebrow">On the horizon</span><h3>Upcoming Games</h3></div></div>${upcoming.map(g=>`<div class="playoff-seed"><span>${renderTeamMark(g.away||{})}</span><div><strong>${escapeHtml(g.away?.abbr||'AWY')} at ${escapeHtml(g.home?.abbr||'HME')}</strong><small>Week ${g.week}</small></div></div>`).join('')||'<p>No upcoming games captured.</p>'}</article></section>
+          <div class="league-home-primary">
+            <section class="featured-game card" data-game-id="${escapeHtml(featured.id)}" style="--away:${escapeHtml(away.primary||'#333')};--home:${escapeHtml(home.primary||'#555')}">
+              <div class="featured-game-label">
+                <span>★ Game of the Week</span>
+                <small>Week ${featured.week} · ${featured.completed?'Final':'Upcoming'} · ${escapeHtml(String(featured.stage||'Regular Season'))}</small>
+              </div>
+              <div class="featured-split featured-split--clickable" aria-label="Open Game Center">
+                <div class="featured-half featured-half--away">
+                  <div class="featured-half-hero">
+                    ${renderTeamMark(away,'featured-team-logo')}
+                    <div class="featured-half-copy">
+                      <span class="eyebrow">${escapeHtml(away.city||'')}</span>
+                      <h2>${escapeHtml(away.name||away.fullName||'Away')}</h2>
+                      <p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p>
+                      <div class="previous-result"><span>${featured.completed?'Final score':'Previous game'}</span><strong>${featured.completed?`${Number(featured.awayScore||0)} points`:escapeHtml(livePreviousGameCopy(away.id,currentWeek,games,teamMap))}</strong></div>
+                    </div>
+                  </div>
+                  <div class="featured-unit-stack">
+                    <div class="featured-unit"><span class="eyebrow">Top Offense</span>${topUnit(away.id,'offense').map(featuredPlayerRow).join('')||'<p>No offensive players available.</p>'}</div>
+                    <div class="featured-unit"><span class="eyebrow">Top Defense</span>${topUnit(away.id,'defense').map(featuredPlayerRow).join('')||'<p>No defensive players available.</p>'}</div>
+                  </div>
+                </div>
+                <div class="featured-half featured-half--home">
+                  <div class="featured-half-hero featured-half-hero--home">
+                    <div class="featured-half-copy">
+                      <span class="eyebrow">${escapeHtml(home.city||'')}</span>
+                      <h2>${escapeHtml(home.name||home.fullName||'Home')}</h2>
+                      <p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p>
+                      <div class="previous-result"><span>${featured.completed?'Final score':'Previous game'}</span><strong>${featured.completed?`${Number(featured.homeScore||0)} points`:escapeHtml(livePreviousGameCopy(home.id,currentWeek,games,teamMap))}</strong></div>
+                    </div>
+                    ${renderTeamMark(home,'featured-team-logo')}
+                  </div>
+                  <div class="featured-unit-stack">
+                    <div class="featured-unit"><span class="eyebrow">Top Offense</span>${topUnit(home.id,'offense').map(featuredPlayerRow).join('')||'<p>No offensive players available.</p>'}</div>
+                    <div class="featured-unit"><span class="eyebrow">Top Defense</span>${topUnit(home.id,'defense').map(featuredPlayerRow).join('')||'<p>No defensive players available.</p>'}</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="league-home-standings">
+            ${renderLiveConferenceSnapshot('AFC',standings,teamMap)}
+            ${renderLiveConferenceSnapshot('NFC',standings,teamMap)}
+          </aside>
+
+          <section class="home-leaders-section home-leaders-section--embedded">
+            <div class="section-heading home-leaders-heading"><div><span class="section-number">02</span><h2>Stat Leaders</h2></div><button class="text-button" data-route="stats">View Full Leaderboard <svg><use href="#icon-arrow"></use></svg></button></div>
+            <div class="home-leaders-grid home-leaders-grid--embedded">
+              ${renderLiveHomeLeaderCard('passing','Passing',playerModels,teamMap)}
+              ${renderLiveHomeLeaderCard('rushing','Rushing',playerModels,teamMap)}
+              ${renderLiveHomeLeaderCard('receiving','Receiving',playerModels,teamMap)}
+              ${renderLiveHomeLeaderCard('defense','Defense',playerModels,teamMap)}
+            </div>
+          </section>
         </div>`;
-    }catch(error){console.error('[Home Live Integration]',error);if(routeBase(location.hash.slice(1))==='home')renderLiveState('Live data unavailable',error.message||'The active snapshot could not be loaded.','warning');}
+    }catch(error){
+      console.error('[Home Live Integration]',error);
+      if(routeBase(location.hash.slice(1))==='home')renderLiveState('Live data unavailable',error.message||'The active snapshot could not be loaded.','warning');
+    }
   }
   function renderLeagueHome() {
     const service=liveReadModel();
