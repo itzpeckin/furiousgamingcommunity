@@ -774,10 +774,12 @@
   function publicSeasonContext(snapshot,games) {
     const normalized=games.filter(game=>Number(game.week)>0);
     const priority=stage=>{const value=String(stage||'').toLowerCase();return value.includes('post')||value.includes('playoff')?3:value.includes('reg')?2:value.includes('pre')?1:0};
-    const latest=[...normalized].sort((a,b)=>priority(b.stage)-priority(a.stage)||Number(b.week)-Number(a.week))[0];
+    const latest=[...normalized].sort((a,b)=>priority(b.stage)-priority(a.stage)||Number(b.week)-Number(a.week)||String(b.id||'').localeCompare(String(a.id||'')))[0];
     const stage=String(latest?.stage||'reg').toLowerCase();
     const label=stage.includes('pre')?'Preseason':stage.includes('post')||stage.includes('playoff')?'Playoffs':'Regular Season';
-    return {season:snapshot?.seasonYear??latest?.season??'—',stage,label,week:Number(latest?.week||1)};
+    const week=Number(latest?.week||1);
+    const displayLabel=latest?.round||`${label} Week ${week}`;
+    return {season:snapshot?.seasonYear??latest?.season??'—',stage,label,week,displayLabel};
   }
   function renderLiveConferenceSnapshot(conference,standings,teamMap) {
     const picture=buildConferencePicture(conference,standings);
@@ -894,7 +896,7 @@
         <section class="week-ribbon-wrap">
           <div class="week-ribbon">
             ${availableGames.map(game=>`<button type="button" class="week-matchup-card ${String(game.id)===String(featured.id)?'is-active':''}" data-feature-game="${escapeHtml(game.id)}">
-              <span class="week-matchup-time">${escapeHtml(game.round||`${game.stageLabel||'Regular Season'} Week ${game.week}`)} · ${game.completed?'Final':'Scheduled'}</span>
+              <span class="week-matchup-time">${escapeHtml(canonicalScheduleLabel(game))} · ${game.completed?'Final':'Scheduled'}</span>
               <span class="week-matchup-team">${renderTeamMark(game.away||{})}<strong>${escapeHtml(game.away?.abbr||'AWY')}</strong><small>${game.completed?Number(game.awayScore||0):escapeHtml(recordForTeam(game.away))}</small></span>
               <span class="week-matchup-team">${renderTeamMark(game.home||{})}<strong>${escapeHtml(game.home?.abbr||'HME')}</strong><small>${game.completed?Number(game.homeScore||0):escapeHtml(recordForTeam(game.home))}</small></span>
               <span class="week-matchup-network">${game.completed?'Final':'Upcoming'}</span>
@@ -1275,7 +1277,7 @@
       const routes=[...new Set(rows.map(row=>row.route))];
       const counts=rows.reduce((a,r)=>(a[r.calculatedStage]=(a[r.calculatedStage]||0)+1,a),{});
       return `<section class="schedule-source-inspector">
-        <div class="card-header"><div><span class="eyebrow">Raw → Canonical</span><h3>Schedule Source Inspector</h3><p>Compare captured Madden route, stage, and week metadata against Franchise HQ's calculated display week.</p></div><span class="pill pill--neutral">${rows.length} records</span></div>
+        <div class="card-header"><div><span class="eyebrow">Raw → Canonical</span><h3>Schedule Source Inspector</h3><p><span class="pill pill--success">Mapping certified</span></p><p>Compare captured Madden route, stage, and week metadata against Franchise HQ's calculated display week.</p></div><span class="pill pill--neutral">${rows.length} records</span></div>
         <div class="summary-grid">${summaryTile('Captured Games',rows.length,'')}${summaryTile('Routes',routes.length,'')}${summaryTile('Preseason',counts.preseason||0,'')}${summaryTile('Regular Season',counts.regular||0,'')}${summaryTile('Playoffs',counts.playoffs||0,'')}</div>
         <article class="card"><div class="table-wrap"><table class="schedule-inspector-table"><thead><tr><th>Route</th><th>Raw Stage</th><th>Stage Index</th><th>Raw Week Index</th><th>Canonical Week</th><th>Calculated Stage</th><th>Calculated Week</th><th>Display Label</th><th>Away</th><th>Home</th><th>Status</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td><code>${escapeHtml(r.route)}</code></td><td>${escapeHtml(r.rawStage)}</td><td>${escapeHtml(r.stageIndex)}</td><td>${escapeHtml(r.rawWeekIndex)}</td><td>${escapeHtml(r.canonicalWeek)}</td><td>${escapeHtml(r.calculatedStage)}</td><td><strong>${escapeHtml(r.calculatedWeek)}</strong></td><td>${escapeHtml(r.calculatedLabel)}</td><td>${escapeHtml(r.awayTeamId)}</td><td>${escapeHtml(r.homeTeamId)}</td><td>${escapeHtml(r.status)}</td></tr>`).join(''):`<tr><td colspan="11">The active snapshot returned no schedule records.</td></tr>`}</tbody></table></div></article>
         <article class="card"><div class="card-header"><div><span class="eyebrow">Captured Sources</span><h3>Unique Schedule Routes</h3></div></div><div class="card-body">${routes.length?routes.map(route=>`<div class="diagnostic-row"><code>${escapeHtml(route)}</code></div>`).join(''):'No source-route metadata was present on the returned records.'}</div></article>
@@ -1321,16 +1323,19 @@
     const phase=Number.isFinite(stageIndex)
       ? (stageIndex===0?'preseason':stageIndex===1?'regular':'playoffs')
       : (stageText.includes('pre')?'preseason':stageText.includes('post')||stageText.includes('playoff')?'playoffs':'regular');
-    let week=Number.isFinite(rawWeek)?rawWeek:Number(fallbackWeek||0);
-    if(Number.isFinite(rawWeek)){
-      if(phase==='preseason') week=rawWeek+1;
-      else if(phase==='regular') week=rawWeek>=3?rawWeek-2:rawWeek+1;
-      else week=rawWeek>=21?rawWeek-20:rawWeek+1;
-    }
+    let week=Number.isFinite(rawWeek)?rawWeek+1:Number(fallbackWeek||0);
+    if(!Number.isFinite(rawWeek) && week<1) week=1;
     const round=phase==='playoffs'
       ? ({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[week]||`Playoff Week ${week}`)
       : null;
     return {phase,week:Math.max(1,week||1),round,label:phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'};
+  }
+
+  function canonicalScheduleLabel(game={}) {
+    if(game.round) return game.round;
+    const phase=String(game.stage||game.phase||'regular').toLowerCase();
+    const label=game.stageLabel||game.phaseLabel||(phase.includes('pre')?'Preseason':phase.includes('post')||phase.includes('playoff')?'Playoffs':'Regular Season');
+    return `${label} Week ${Number(game.week)||1}`;
   }
 
   function liveRosterPlayerShape(player={}) {
@@ -1876,9 +1881,6 @@
     };
   }
 
-  function currentLeaguePhase() {
-    return { phase: 'regular', week: 8 };
-  }
 
   function buildExtendedTeamSchedule(team, existingGames) {
     const sorted=[...existingGames].sort((a,b)=>{
@@ -1901,7 +1903,7 @@
     const teamScore = home?game.homeScore:game.awayScore;
     const oppScore = home?game.awayScore:game.homeScore;
     const result = final ? `${teamScore>oppScore?'W':'L'} ${teamScore}-${oppScore}` : live ? `LIVE ${teamScore}-${oppScore}` : `${home?'vs':'@'} ${opponent.abbr}`;
-    return `<button type="button" class="team-schedule-card ${final?'is-final':live?'is-live':'is-upcoming'}" data-game-id="${escapeHtml(game.id)}"><span class="team-schedule-card__week">${game.round || `${game.phaseLabel} · Week ${game.week}`}</span><div class="team-schedule-card__matchup">${renderTeamMark(opponent,'mini-team')}<div><strong>${home?'vs':'@'} ${escapeHtml(opponent.fullName)}</strong><small>${escapeHtml(game.day)} · ${escapeHtml(game.time)} · ${escapeHtml(game.network)}</small></div></div><div class="team-schedule-card__result"><strong>${escapeHtml(result)}</strong><small>${final?'Final':live?'In Progress':'Upcoming'}</small></div></button>`;
+    return `<button type="button" class="team-schedule-card ${final?'is-final':live?'is-live':'is-upcoming'}" data-game-id="${escapeHtml(game.id)}"><span class="team-schedule-card__week">${canonicalScheduleLabel(game)}</span><div class="team-schedule-card__matchup">${renderTeamMark(opponent,'mini-team')}<div><strong>${home?'vs':'@'} ${escapeHtml(opponent.fullName)}</strong><small>${escapeHtml(game.day)} · ${escapeHtml(game.time)} · ${escapeHtml(game.network)}</small></div></div><div class="team-schedule-card__result"><strong>${escapeHtml(result)}</strong><small>${final?'Final':live?'In Progress':'Upcoming'}</small></div></button>`;
   }
 
   function renderTeamSchedule(team, teamGames) {
