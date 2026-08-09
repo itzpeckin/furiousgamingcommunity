@@ -457,11 +457,11 @@
       },
       receiving:{
         positions:['WR','TE','RB','FB'],
-        tabs:[['receptions','Receptions'],['receivingYards','Yards'],['receivingTD','TDs']]
+        tabs:[['receptions','Rec'],['receivingYards','Yards'],['receivingTD','TDs']]
       },
       defense:{
         positions:defensePositions,
-        tabs:[['tackles','Tackles'],['sacks','Sacks'],['interceptions','INTs']]
+        tabs:[['tackles','TKLs'],['sacks','Sacks'],['interceptions','INTs']]
       }
     };
     return {...configs[category],metric};
@@ -823,6 +823,21 @@
 
       const liveTeams=teamRows.map(liveTeamShape),teamMap=new Map(liveTeams.map(team=>[String(team.id),team]));
       const standings=standingRows.map(row=>liveStandingShape(row,teamMap)).sort((a,b)=>(a.rank-b.rank)||(b.winPct-a.winPct)||(b.pointDifferential-a.pointDifferential));
+      const standingForTeam=team=>{
+        const id=String(team?.id||'');
+        const abbr=String(team?.abbr||team?.abbreviation||'').toUpperCase();
+        const fullName=String(team?.fullName||team?.displayName||'').toLowerCase();
+        return standings.find(row=>String(row.teamId)===id)
+          || standings.find(row=>String(row.source?.teamId||row.source?.team_id||'')===id)
+          || standings.find(row=>abbr&&String(row.source?.abbrName||row.source?.teamAbbr||'').toUpperCase()===abbr)
+          || standings.find(row=>fullName&&String(row.team||row.source?.teamName||'').toLowerCase()===fullName)
+          || null;
+      };
+      const recordForTeam=team=>{
+        const row=standingForTeam(team);
+        return row?.record || ((Number(row?.wins)||0)+'-'+(Number(row?.losses)||0)+(Number(row?.ties)?'-'+Number(row.ties):'')) || '0-0';
+      };
+      liveTeams.forEach(team=>{const row=standingForTeam(team);if(row)Object.assign(team,{wins:row.wins,losses:row.losses,ties:row.ties,record:recordForTeam(team)});});
       const games=gameRows.map(game=>liveGameShape(game,teamMap));
       const seasonContext=publicSeasonContext(snapshot,games);
       const currentWeek=seasonContext.week;
@@ -874,8 +889,8 @@
           <div class="week-ribbon">
             ${availableGames.map(game=>`<button type="button" class="week-matchup-card ${String(game.id)===String(featured.id)?'is-active':''}" data-feature-game="${escapeHtml(game.id)}">
               <span class="week-matchup-time">Week ${game.week} · ${game.completed?'Final':'Scheduled'}</span>
-              <span class="week-matchup-team">${renderTeamMark(game.away||{})}<strong>${escapeHtml(game.away?.abbr||'AWY')}</strong><small>${game.completed?Number(game.awayScore||0):escapeHtml(game.away?.record||'—')}</small></span>
-              <span class="week-matchup-team">${renderTeamMark(game.home||{})}<strong>${escapeHtml(game.home?.abbr||'HME')}</strong><small>${game.completed?Number(game.homeScore||0):escapeHtml(game.home?.record||'—')}</small></span>
+              <span class="week-matchup-team">${renderTeamMark(game.away||{})}<strong>${escapeHtml(game.away?.abbr||'AWY')}</strong><small>${game.completed?Number(game.awayScore||0):escapeHtml(recordForTeam(game.away))}</small></span>
+              <span class="week-matchup-team">${renderTeamMark(game.home||{})}<strong>${escapeHtml(game.home?.abbr||'HME')}</strong><small>${game.completed?Number(game.homeScore||0):escapeHtml(recordForTeam(game.home))}</small></span>
               <span class="week-matchup-network">${game.completed?'Final':'Upcoming'}</span>
             </button>`).join('')}
           </div>
@@ -895,7 +910,7 @@
                     <div class="featured-half-copy">
                       <span class="eyebrow">${escapeHtml(away.city||'')}</span>
                       <h2>${escapeHtml(away.name||away.fullName||'Away')}</h2>
-                      <p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p>
+                      <p>${escapeHtml(recordForTeam(away))} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p>
                       <div class="previous-result"><span>${featured.completed?'Final score':'Previous game'}</span><strong>${featured.completed?`${Number(featured.awayScore||0)} points`:escapeHtml(livePreviousGameCopy(away.id,currentWeek,games,teamMap))}</strong></div>
                     </div>
                   </div>
@@ -909,7 +924,7 @@
                     <div class="featured-half-copy">
                       <span class="eyebrow">${escapeHtml(home.city||'')}</span>
                       <h2>${escapeHtml(home.name||home.fullName||'Home')}</h2>
-                      <p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p>
+                      <p>${escapeHtml(recordForTeam(home))} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p>
                       <div class="previous-result"><span>${featured.completed?'Final score':'Previous game'}</span><strong>${featured.completed?`${Number(featured.homeScore||0)} points`:escapeHtml(livePreviousGameCopy(home.id,currentWeek,games,teamMap))}</strong></div>
                     </div>
                     ${renderTeamMark(home,'featured-team-logo')}
