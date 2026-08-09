@@ -1338,6 +1338,27 @@
   }
 
   window.FranchiseHQ = window.FranchiseHQ || {};
+  window.FranchiseHQ.gameDetailInspector = {
+    async load(targetId) {
+      const target=document.getElementById(targetId); if(!target)return;
+      try{
+        const service=liveReadModel();
+        const games=await service.getSchedule();
+        const rows=(games||[]).map(game=>{
+          const context=stageWeekContext(game.source||{},game.week,game.stage);
+          return {game,context,meta:gameMetadata(game)};
+        });
+        target.innerHTML=`<section class="game-detail-inspector"><div class="card-header"><div><span class="eyebrow">Game Metadata Analysis</span><h3>Date, Time & Join Inspector</h3><p>Use this view to identify the exact Madden fields for kickoff metadata and game-stat joins.</p></div><span class="pill pill--neutral">${rows.length} games</span></div>
+        <div class="table-wrap"><table class="game-metadata-table"><thead><tr><th>Route</th><th>Game ID</th><th>Stage / Week</th><th>Source Field</th><th>Raw Value</th><th>Parsed Timestamp</th><th>Day</th><th>Time</th><th>Stadium</th><th>Raw Date/Time Fields</th></tr></thead><tbody>${rows.map(({game,context,meta})=>`<tr><td><code>${escapeHtml(game.source?.routePath||game.source?.route_path||'—')}</code></td><td><code>${escapeHtml(game.id||game.source?.gameId||'—')}</code></td><td>${escapeHtml(context.round||`${context.label} Week ${context.week}`)}</td><td>${escapeHtml(meta.usedField||'—')}</td><td>${escapeHtml(meta.rawValue||'—')}</td><td>${escapeHtml(meta.parsedTimestamp||'—')}</td><td>${escapeHtml(meta.dayLabel||'—')}</td><td>${escapeHtml(meta.timeLabel||'—')}</td><td>${escapeHtml(meta.stadium||'—')}</td><td><details><summary>JSON</summary><pre>${escapeHtml(JSON.stringify(meta.rawFields,null,2))}</pre></details></td></tr>`).join('')}</tbody></table></div></section>`;
+      }catch(error){target.innerHTML=`<article class="card"><div class="card-body"><h3>Game metadata inspection failed</h3><p>${escapeHtml(error?.message||'Unable to load schedule metadata.')}</p></div></article>`;}
+    },
+    renderPanel(){
+      const id=`game-detail-inspector-${Date.now()}`;
+      setTimeout(()=>this.load(id),0);
+      return `<section id="${id}"><article class="card"><div class="card-body"><h3>Loading game metadata…</h3></div></article></section>`;
+    }
+  };
+
   window.FranchiseHQ.scheduleSourceInspector = {
     renderRows(rows=[]) {
       const routes=[...new Set(rows.map(row=>row.route))];
@@ -1917,20 +1938,82 @@
     }).join('')}</div></div></article>`;
   }
 
+  const liveMatchupGames=new Map();
+
+  function gameMetadata(game={}) {
+    const source=game.source||{};
+    const merged={...game,...source};
+    const candidates=[
+      ['scheduledAt',merged.scheduledAt],['scheduledDate',merged.scheduledDate],['scheduleDate',merged.scheduleDate],
+      ['gameDate',merged.gameDate],['date',merged.date],['startTime',merged.startTime],
+      ['kickoffTime',merged.kickoffTime],['gameTime',merged.gameTime],['time',merged.time]
+    ];
+    let parsed=null,usedField=null,rawValue=null;
+    for(const [field,value] of candidates){
+      if(value===undefined||value===null||value==='') continue;
+      const date=new Date(value);
+      if(!Number.isNaN(date.getTime())){parsed=date;usedField=field;rawValue=value;break;}
+    }
+    if(!parsed){
+      const year=Number(firstDefined(merged,['calendarYear','year']));
+      const month=Number(firstDefined(merged,['calendarMonth','month']));
+      const day=Number(firstDefined(merged,['calendarDay','dayOfMonth','day']));
+      const hour=Number(firstDefined(merged,['hour','gameHour']));
+      const minute=Number(firstDefined(merged,['minute','gameMinute']));
+      if(Number.isFinite(year)&&Number.isFinite(month)&&Number.isFinite(day)){
+        const date=new Date(year,Math.max(0,month-1),day,Number.isFinite(hour)?hour:0,Number.isFinite(minute)?minute:0);
+        if(!Number.isNaN(date.getTime())){parsed=date;usedField='calendar parts';rawValue=`${year}-${month}-${day} ${hour||0}:${minute||0}`;}
+      }
+    }
+    const explicitDay=firstDefined(merged,['dayOfWeek','gameDay','dayName']);
+    const explicitTime=firstDefined(merged,['kickoffTime','gameTime','timeLabel']);
+    const dayLabel=parsed?parsed.toLocaleDateString(undefined,{weekday:'short'}).toUpperCase():(explicitDay?String(explicitDay).toUpperCase():null);
+    const timeLabel=parsed?parsed.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):(explicitTime?String(explicitTime):null);
+    return {
+      parsedTimestamp:parsed?parsed.toISOString():null,
+      dayLabel,timeLabel,usedField,rawValue,
+      stadium:firstDefined(merged,['stadiumName','stadium']),
+      network:firstDefined(merged,['network','broadcastNetwork']),
+      rawFields:Object.fromEntries(Object.entries(merged).filter(([key,value])=>/date|time|calendar|hour|minute|kick|start|day|zone/i.test(key)&&value!==null&&value!==undefined&&value!==''))
+    };
+  }
+
+  function matchupTeam(teamId) {
+    return liveTeamDirectory?.teamMap?.get(String(teamId)) || teamById(teamId) || {id:String(teamId||''),abbr:'TBD',fullName:'Team',owner:'Unassigned',record:'—',primary:'#27364f',secondary:'#8fa4c4'};
+  }
+
+  function openMatchupCard(gameId) {
+    const game=liveMatchupGames.get(String(gameId)) || liveTeamDirectory?.games?.find(item=>String(item.id)===String(gameId));
+    if(!game){showToast('Matchup unavailable','The selected game could not be resolved from the active snapshot.');return;}
+    const away=matchupTeam(game.awayTeamId??game.awayId);
+    const home=matchupTeam(game.homeTeamId??game.homeId);
+    const meta=gameMetadata(game);
+    const status=game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null);
+    const awayScore=game.awayScore??resolvedGameScore(game,'away');
+    const homeScore=game.homeScore??resolvedGameScore(game,'home');
+    const score=(awayScore!==null&&homeScore!==null)?`${awayScore} – ${homeScore}`:(status==='final'?'Score unavailable':'Upcoming');
+    const info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
+    openDetail(`<div class="matchup-modal">
+      <div class="matchup-modal__header"><span class="eyebrow">${escapeHtml(canonicalScheduleLabel(game))}</span><span class="pill ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span></div>
+      <div class="matchup-scoreboard" style="--away:${away.primary};--home:${home.primary}">
+        <div class="matchup-team">${renderTeamMark(away,'featured-team-logo')}<h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · ${escapeHtml(away.owner||'Unassigned')}</p></div>
+        <div class="matchup-score"><strong>${escapeHtml(score)}</strong>${info?`<small>${escapeHtml(info)}</small>`:''}</div>
+        <div class="matchup-team matchup-team--home">${renderTeamMark(home,'featured-team-logo')}<h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · ${escapeHtml(home.owner||'Unassigned')}</p></div>
+      </div>
+      <div class="matchup-section-grid">
+        <section class="card"><div class="card-header"><div><span class="eyebrow">Game comparison</span><h3>Team Statistics</h3></div></div><div class="card-body"><p>Game-specific team-stat mapping will populate here after the schedule/statistics join is certified.</p></div></section>
+        <section class="card"><div class="card-header"><div><span class="eyebrow">Game leaders</span><h3>Player Statistics</h3></div></div><div class="card-body"><p>Passing, rushing, receiving, defense, and kicking records will populate after game-ID joins are certified.</p></div></section>
+        <section class="card"><div class="card-header"><div><span class="eyebrow">Verified calculations</span><h3>Advanced Statistics</h3></div></div><div class="card-body"><p>Advanced rates will appear only when all required source fields are available.</p></div></section>
+      </div>
+    </div>`);
+  }
+
   function liveTeamScheduleGame(game={}) {
     const source=game.source||{};
     const context=stageWeekContext(source,game.week,game.stage);
     const phase=context.phase;
-    const scheduled=game.scheduledAt||source.scheduledAt||source.date||source.gameDate||null;
-    let day='TBD',time='TBD';
-    if(scheduled){
-      const date=new Date(scheduled);
-      if(!Number.isNaN(date.getTime())){
-        day=date.toLocaleDateString(undefined,{weekday:'short'}).toUpperCase();
-        time=date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-      }
-    }
-    return {
+    const metadata=gameMetadata(game);
+    const normalized={
       id:String(game.id||source.gameId||''),
       phase,
       phaseLabel:context.label,
@@ -1940,11 +2023,16 @@
       awayScore:resolvedGameScore(game,'away'),
       homeScore:resolvedGameScore(game,'home'),
       status:resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null),
-      day,time,
-      network:source.network||'',
-      stadium:source.stadiumName||source.stadium||'',
+      day:metadata.dayLabel,
+      time:metadata.timeLabel,
+      network:metadata.network||'',
+      stadium:metadata.stadium||'',
+      metadata,
+      source,
       round:source.roundName||source.playoffRound||context.round||null
     };
+    liveMatchupGames.set(String(normalized.id),normalized);
+    return normalized;
   }
 
 
@@ -1969,7 +2057,7 @@
     const teamScore = home?game.homeScore:game.awayScore;
     const oppScore = home?game.awayScore:game.homeScore;
     const result = final ? `${teamScore>oppScore?'W':'L'} ${teamScore}-${oppScore}` : live ? `LIVE ${teamScore}-${oppScore}` : `${home?'vs':'@'} ${opponent.abbr}`;
-    return `<button type="button" class="team-schedule-card ${final?'is-final':live?'is-live':'is-upcoming'}" data-game-id="${escapeHtml(game.id)}"><span class="team-schedule-card__week">${canonicalScheduleLabel(game)}</span><div class="team-schedule-card__matchup">${renderTeamMark(opponent,'mini-team')}<div><strong>${home?'vs':'@'} ${escapeHtml(opponent.fullName)}</strong><small>${escapeHtml(game.day)} · ${escapeHtml(game.time)} · ${escapeHtml(game.network)}</small></div></div><div class="team-schedule-card__result"><strong>${escapeHtml(result)}</strong><small>${final?'Final':live?'In Progress':'Upcoming'}</small></div></button>`;
+    return `<button type="button" class="team-schedule-card ${final?'is-final':live?'is-live':'is-upcoming'}" data-game-id="${escapeHtml(game.id)}"><span class="team-schedule-card__week">${canonicalScheduleLabel(game)}</span><div class="team-schedule-card__matchup">${renderTeamMark(opponent,'mini-team')}<div><strong>${home?'vs':'@'} ${escapeHtml(opponent.fullName)}</strong>${[game.day,game.time,game.network].filter(Boolean).length?`<small>${[game.day,game.time,game.network].filter(Boolean).map(escapeHtml).join(' · ')}</small>`:''}</div></div><div class="team-schedule-card__result"><strong>${escapeHtml(result)}</strong><small>${final?'Final':live?'In Progress':'Upcoming'}</small></div></button>`;
   }
 
   function renderTeamSchedule(team, teamGames) {
@@ -2342,6 +2430,7 @@
   }
 
   function renderLiveScheduleCard(game,teamMap,current) {
+    liveMatchupGames.set(String(game.id||''),game);
     const away=teamMap.get(String(game.awayTeamId))||{fullName:'Away Team',record:'',abbr:'AWY'};
     const home=teamMap.get(String(game.homeTeamId))||{fullName:'Home Team',record:'',abbr:'HME'};
     const isFinal=game.status==='final';
@@ -2349,7 +2438,7 @@
     const scoresAvailable=game.awayScore!==null&&game.homeScore!==null;
     const winnerId=isFinal&&scoresAvailable?(game.awayScore>game.homeScore?String(game.awayTeamId):String(game.homeTeamId)):null;
     const label=canonicalScheduleLabel(game);
-    return `<article class="game-card card" data-game-id="${escapeHtml(game.id||'')}">
+    return `<button type="button" class="game-card card" data-game-id="${escapeHtml(game.id||'')}">
       <div class="game-card__meta"><span>${escapeHtml(label)}</span><span class="pill ${isFinal?'pill--neutral':isLive?'pill--danger':'pill--accent'}">${isFinal?'Final':isLive?'Live':'Upcoming'}</span></div>
       <div class="game-card__body">
         <div class="game-team">${renderTeamMark(away)}<div><strong>${escapeHtml(away.fullName)}</strong><span>${escapeHtml(away.record||'')}</span></div></div>
@@ -2357,7 +2446,7 @@
         <div class="game-team game-team--away"><div><strong>${escapeHtml(home.fullName)}</strong><span>${escapeHtml(home.record||'')}</span></div>${renderTeamMark(home)}</div>
       </div>
       <div class="game-card__footer"><span>${escapeHtml(game.source?.stadiumName||game.source?.stadium||'')}</span><span>${isFinal?'Completed game':isLive?'In progress':Number(game.week)<Number(current.week)&&game.stage===current.phase?'Historical record':'Upcoming matchup'}</span></div>
-    </article>`;
+    </button>`;
   }
 
   function renderGameCard(game, perspectiveTeamId=null) {
@@ -3347,6 +3436,14 @@
       depthPlayerTarget.innerHTML=`<strong>${escapeHtml(current.name)}</strong><b>${current.overall??'—'}</b>`;
 
       state.depthSelectedPlayer=selected.id;
+      return;
+    }
+
+    const matchupTarget=event.target.closest('[data-game-id]');
+    if(matchupTarget){
+      event.preventDefault();
+      event.stopPropagation();
+      openMatchupCard(matchupTarget.dataset.gameId);
       return;
     }
 
