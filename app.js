@@ -356,7 +356,12 @@
   }
 
   function devClass(dev) {
-    return `dev-badge--${dev.toLowerCase().replace(/[^a-z]/g,'')}`;
+    const raw=dev===null||dev===undefined?'Normal':dev;
+    const n=Number(raw);
+    const label=Number.isFinite(n)&&String(raw).trim()!==''
+      ? (n>=3?'X-Factor':n===2?'Superstar':n===1?'Star':'Normal')
+      : String(raw);
+    return `dev-badge--${label.toLowerCase().replace(/[^a-z]/g,'')}`;
   }
 
   function depthDevelopmentClass(dev) {
