@@ -2,12 +2,12 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.4.3c.1.2';
+  const VERSION = '5.9.4.3d.2';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
     'overview','route-discovery','classification','team-mapper','player-mapper',
-    'payload-inspector','schedule-source-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle','snapshot-verification','live-read-model',
+    'payload-inspector','schedule-source-inspector','game-detail-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle','snapshot-verification','live-read-model',
     'certification','diagnostics'
   ]);
 
@@ -69,6 +69,7 @@
       case 'player-mapper': return servicePanel('leagueCompanionPlayerMapper','Player Mapper');
       case 'payload-inspector': return servicePanel('leagueDataExplorer','Data Explorer & Payload Inspector');
       case 'schedule-source-inspector': return servicePanel('scheduleSourceInspector','Schedule Source Inspector');
+      case 'game-detail-inspector': return servicePanel('gameDetailInspector','Game Detail Inspector');
       case 'schedule-mapper': return servicePanel('leagueCompanionScheduleMapper','Schedule Mapper');
       case 'statistics-mapper': return servicePanel('leagueCompanionStatisticsMapper','Statistics Mapper');
       case 'snapshot-builder': return servicePanel('leagueSnapshotBuilder','Snapshot Builder');
@@ -83,7 +84,7 @@
 
   const tabs = [
     ['overview','Overview'],['route-discovery','Route Discovery'],['classification','Dataset Classification'],
-    ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],['schedule-source-inspector','Schedule Source Inspector'],
+    ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],['schedule-source-inspector','Schedule Source Inspector'],['game-detail-inspector','Game Detail Inspector'],
     ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],['snapshot-lifecycle','Validation & Activation'],['snapshot-verification','Snapshot Verification'],['live-read-model','Live Read Model'],
     ['certification','Certification'],['diagnostics','Diagnostics']
   ];
