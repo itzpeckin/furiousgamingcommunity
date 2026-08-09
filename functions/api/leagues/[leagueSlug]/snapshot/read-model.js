@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE = '5.9.4.2a';
+const RELEASE = '5.9.4.2gg';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -13,7 +13,15 @@ const rows = async (db, sql, ...args) => {
   return result.results || [];
 };
 
+function sourceRecord(raw = {}) {
+  const nested = typeof raw.source_record_json === 'string'
+    ? parse(raw.source_record_json)
+    : (raw.source_record_json || raw.sourceRecord || raw.source || null);
+  return nested && typeof nested === 'object' ? {...raw, ...nested} : raw;
+}
+
 function normalizeTeam(raw = {}) {
+  raw = sourceRecord(raw);
   return {
     id: String(raw.external_id ?? raw.team_id ?? raw.teamId ?? ''),
     displayName: raw.display_name ?? raw.displayName ?? raw.teamName ?? null,
@@ -32,6 +40,7 @@ function normalizeTeam(raw = {}) {
 }
 
 function normalizePlayer(raw = {}) {
+  raw = sourceRecord(raw);
   return {
     id: String(raw.external_id ?? raw.player_id ?? raw.playerId ?? ''),
     teamId: String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? raw.teamID ?? raw.rosterTeamId ?? raw.roster_team_id ?? raw.currentTeamId ?? ''),
@@ -39,16 +48,22 @@ function normalizePlayer(raw = {}) {
     lastName: raw.last_name ?? raw.lastName ?? null,
     displayName: raw.display_name ?? raw.displayName ?? ([raw.first_name ?? raw.firstName, raw.last_name ?? raw.lastName].filter(Boolean).join(' ') || null),
     position: raw.position ?? raw.position_name ?? raw.positionName ?? raw.pos ?? null,
-    overall: raw.overall ?? raw.overall_rating ?? raw.overallRating ?? raw.playerBestOvr ?? null,
+    overall: raw.overall ?? raw.overall_rating ?? raw.overallRating ?? raw.ovrRating ?? raw.playerBestOvr ?? raw.bestOverall ?? raw.playerOverall ?? raw.ovr ?? null,
     age: raw.age ?? null,
     devTrait: raw.dev_trait ?? raw.devTrait ?? raw.development_trait ?? null,
     jerseyNumber: raw.jersey_number ?? raw.jerseyNumber ?? null,
-    contract: raw.contract ?? null,
+    contract: raw.contract ?? {
+      yearsRemaining: raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.contractLength ?? raw.contractYears ?? raw.yearsRemaining ?? raw.yearsLeft ?? raw.contractLengthRemaining ?? null,
+      currentYearSalary: raw.currentYearSalary ?? raw.currentSalary ?? raw.capSalary ?? raw.contractSalary ?? raw.salary ?? null,
+      capHit: raw.capHit ?? raw.salaryCapHit ?? raw.currentCapHit ?? null,
+      bonus: raw.contractBonus ?? raw.signingBonus ?? null
+    },
     source: raw
   };
 }
 
 function normalizeGame(raw = {}) {
+  raw = sourceRecord(raw);
   return {
     id: String(raw.external_id ?? raw.game_id ?? raw.gameId ?? ''),
     season: raw.season_year ?? raw.seasonYear ?? null,
@@ -65,6 +80,7 @@ function normalizeGame(raw = {}) {
 }
 
 function normalizeStatistic(raw = {}) {
+  raw = sourceRecord(raw);
   return {
     id: String(raw.external_key ?? raw.external_id ?? raw.id ?? ''),
     category: raw.category ?? raw.statistic_category ?? null,
@@ -79,6 +95,7 @@ function normalizeStatistic(raw = {}) {
 }
 
 function normalizeStanding(raw = {}) {
+  raw = sourceRecord(raw);
   return {
     teamId: String(raw.teamId ?? raw.team_id ?? raw.external_id ?? ''),
     teamName: raw.teamName ?? raw.team_name ?? null,
