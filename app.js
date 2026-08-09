@@ -674,14 +674,77 @@
       rank:Number(row.rank??source.rank??999),seed:Number(row.seed??source.seed??0)
     };
   }
-  function liveGameShape(game={},teamMap=new Map()) {
+  function firstDefined(source={},keys=[]) {
+    for(const key of keys){
+      const value=source?.[key];
+      if(value!==undefined&&value!==null&&value!=='') return value;
+    }
+    return null;
+  }
+
+  function resolvedGameScore(game={},side='home') {
+    const source=game.source||{};
+    const keys=side==='home'
+      ? ['homeScore','homeTeamScore','home_score','homePts','homePoints','scoreHome','home_score_total']
+      : ['awayScore','awayTeamScore','away_score','awayPts','awayPoints','scoreAway','away_score_total'];
+    const value=firstDefined({...source,...game},keys);
+    const number=Number(value);
+    return Number.isFinite(number)?number:null;
+  }
+
+  function resolvedGameStatus(game={},currentContext=null) {
+    const source=game.source||{};
+    const homeScore=resolvedGameScore(game,'home');
+    const awayScore=resolvedGameScore(game,'away');
+    const raw=String(firstDefined({...source,...game},['status','gameStatus','scheduleStatus','state','statusText'])??'').toLowerCase();
+    const numeric=Number(firstDefined({...source,...game},['status','gameStatus','scheduleStatus','state']));
+    if(['final','completed','complete','played'].includes(raw)) return 'final';
+    if(['live','in-progress','in_progress','playing'].includes(raw)) return 'live';
+    if(homeScore!==null&&awayScore!==null&&(homeScore>0||awayScore>0)) return 'final';
+    if(currentContext){
+      const context=stageWeekContext(source,game.week,game.stage);
+      const order={preseason:0,regular:1,playoffs:2};
+      if(order[context.phase]<order[currentContext.phase] || (context.phase===currentContext.phase&&context.week<currentContext.week)) return 'final';
+    }
+    if(Number.isFinite(numeric)&&numeric===2) return 'live';
+    return 'scheduled';
+  }
+
+  function authoritativeSeasonContext(snapshot,standings=[],games=[]) {
+    const candidates=standings.map(row=>{
+      const source=row.source||{};
+      const stageIndex=Number(source.stageIndex);
+      const weekIndex=Number(source.weekIndex);
+      if(!Number.isFinite(stageIndex)||!Number.isFinite(weekIndex)) return null;
+      const phase=stageIndex===0?'preseason':stageIndex===1?'regular':'playoffs';
+      const week=weekIndex+1;
+      return {phase,week,label:phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'};
+    }).filter(Boolean);
+    if(candidates.length){
+      const keyCounts=new Map();
+      candidates.forEach(item=>{
+        const key=`${item.phase}:${item.week}`;
+        keyCounts.set(key,(keyCounts.get(key)||0)+1);
+      });
+      const [winningKey]=[...keyCounts.entries()].sort((a,b)=>b[1]-a[1])[0];
+      const selected=candidates.find(item=>`${item.phase}:${item.week}`===winningKey);
+      const round=selected.phase==='playoffs'?({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[selected.week]||`Playoff Week ${selected.week}`):null;
+      return {...selected,season:snapshot?.seasonYear??'—',round,displayLabel:round||`${selected.label} Week ${selected.week}`,authority:'standings'};
+    }
+    return publicSeasonContext(snapshot,games);
+  }
+
+  function liveGameShape(game={},teamMap=new Map(),currentContext=null) {
     const source=game.source||{};
     const home=teamMap.get(String(game.homeTeamId)),away=teamMap.get(String(game.awayTeamId));
-    const rawStatus=String(game.status||source.status||'').toLowerCase();
-    const completed=['final','completed','complete'].includes(rawStatus)||game.homeScore!==null&&game.awayScore!==null&&Number(game.homeScore)+Number(game.awayScore)>0;
     const context=stageWeekContext(source,game.week,game.stage);
-    return {...game,home,away,completed,status:completed?'final':rawStatus||'scheduled',week:context.week,stage:context.phase,stageLabel:context.label,round:context.round};
+    const homeScore=resolvedGameScore(game,'home');
+    const awayScore=resolvedGameScore(game,'away');
+    const status=resolvedGameStatus(game,currentContext);
+    const completed=status==='final';
+    return {...game,home,away,homeScore,awayScore,completed,status,week:context.week,stage:context.phase,stageLabel:context.label,round:context.round};
   }
+
   function liveMetricValue(stat={},category='') {
     const m=stat.metrics||{};
     const candidates={passing:['passYds','passingYards','passYards','yards'],rushing:['rushYds','rushingYards','yards'],receiving:['recYds','receivingYards','yards'],defense:['defTotalTackles','tackles','sacks']}[category]||[];
@@ -846,8 +909,11 @@
         return row?.record || ((Number(row?.wins)||0)+'-'+(Number(row?.losses)||0)+(Number(row?.ties)?'-'+Number(row.ties):'')) || '0-0';
       };
       liveTeams.forEach(team=>{const row=standingForTeam(team);if(row)Object.assign(team,{wins:row.wins,losses:row.losses,ties:row.ties,record:recordForTeam(team)});});
-      const games=gameRows.map(game=>liveGameShape(game,teamMap));
-      const seasonContext=publicSeasonContext(snapshot,games);
+      const provisionalGames=gameRows.map(game=>liveGameShape(game,teamMap));
+      const seasonContext=authoritativeSeasonContext(snapshot,standingRows,provisionalGames);
+      window.FranchiseHQ=window.FranchiseHQ||{};
+      window.FranchiseHQ.currentSeasonContext=seasonContext;
+      const games=gameRows.map(game=>liveGameShape(game,teamMap,seasonContext));
       const currentWeek=seasonContext.week;
       const availableGames=games.filter(game=>{
         const sameWeek=Number(game.week)===Number(currentWeek);
@@ -1256,7 +1322,7 @@
     const source=game.source||{};
     const route=String(source.routePath||source.route_path||source.sourceRoutePath||source.source_route_path||source.route||'');
     const context=stageWeekContext(source,game.week,game.stage);
-    return {route:route||'—',rawStage:source.stage??source.stageName??game.stage??'—',stageIndex:source.stageIndex??'—',rawWeekIndex:source.weekIndex??'—',canonicalWeek:game.week??'—',calculatedStage:context.phase,calculatedWeek:context.week,calculatedLabel:context.round||`${context.label} Week ${context.week}`,homeTeamId:String(game.homeTeamId??source.homeTeamId??'—'),awayTeamId:String(game.awayTeamId??source.awayTeamId??'—'),status:String(game.status??source.status??'—')};
+    return {route:route||'—',rawStage:source.stage??source.stageName??game.stage??'—',stageIndex:source.stageIndex??'—',rawWeekIndex:source.weekIndex??'—',canonicalWeek:game.week??'—',calculatedStage:context.phase,calculatedWeek:context.week,calculatedLabel:context.round||`${context.label} Week ${context.week}`,homeTeamId:String(game.homeTeamId??source.homeTeamId??'—'),awayTeamId:String(game.awayTeamId??source.awayTeamId??'—'),status:String(game.status??source.status??'—'),rawHomeScore:firstDefined({...source,...game},['homeScore','homeTeamScore','home_score','homePts','homePoints','scoreHome'])??'—',rawAwayScore:firstDefined({...source,...game},['awayScore','awayTeamScore','away_score','awayPts','awayPoints','scoreAway'])??'—',calculatedStatus:resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null)};
   }
 
   function renderScheduleSourceInspector() {
@@ -1266,7 +1332,7 @@
     pageContent.innerHTML=`<section class="developer-workspace schedule-source-inspector">
       <div class="page-heading"><div><span class="eyebrow">Developer Tools · Schedule</span><h1>Schedule Source Inspector</h1><p>Private diagnostic view for certifying Madden stage and week mapping before public schedule integration.</p></div></div>
       <div class="summary-grid">${summaryTile('Captured Games',rows.length,'')}${summaryTile('Routes',routes.length,'')}${summaryTile('Preseason',counts.preseason||0,'')}${summaryTile('Regular Season',counts.regular||0,'')}${summaryTile('Playoffs',counts.playoffs||0,'')}</div>
-      <article class="card"><div class="card-header"><div><span class="eyebrow">Raw → Canonical</span><h3>Captured Schedule Records</h3></div><span class="pill pill--neutral">${rows.length} records</span></div><div class="table-wrap"><table class="schedule-inspector-table"><thead><tr><th>Route</th><th>Raw Stage</th><th>Stage Index</th><th>Raw Week Index</th><th>Canonical Week</th><th>Calculated Stage</th><th>Calculated Week</th><th>Display Label</th><th>Away</th><th>Home</th><th>Status</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td><code>${escapeHtml(r.route)}</code></td><td>${escapeHtml(r.rawStage)}</td><td>${escapeHtml(r.stageIndex)}</td><td>${escapeHtml(r.rawWeekIndex)}</td><td>${escapeHtml(r.canonicalWeek)}</td><td>${escapeHtml(r.calculatedStage)}</td><td><strong>${escapeHtml(r.calculatedWeek)}</strong></td><td>${escapeHtml(r.calculatedLabel)}</td><td>${escapeHtml(r.awayTeamId)}</td><td>${escapeHtml(r.homeTeamId)}</td><td>${escapeHtml(r.status)}</td></tr>`).join(''):`<tr><td colspan="11">No captured schedule records are available in the active snapshot.</td></tr>`}</tbody></table></div></article>
+      <article class="card"><div class="card-header"><div><span class="eyebrow">Raw → Canonical</span><h3>Captured Schedule Records</h3></div><span class="pill pill--neutral">${rows.length} records</span></div><div class="table-wrap"><table class="schedule-inspector-table"><thead><tr><th>Route</th><th>Raw Stage</th><th>Stage Index</th><th>Raw Week Index</th><th>Canonical Week</th><th>Calculated Stage</th><th>Calculated Week</th><th>Display Label</th><th>Away</th><th>Home</th><th>Raw Status</th><th>Away Score</th><th>Home Score</th><th>Calculated Status</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td><code>${escapeHtml(r.route)}</code></td><td>${escapeHtml(r.rawStage)}</td><td>${escapeHtml(r.stageIndex)}</td><td>${escapeHtml(r.rawWeekIndex)}</td><td>${escapeHtml(r.canonicalWeek)}</td><td>${escapeHtml(r.calculatedStage)}</td><td><strong>${escapeHtml(r.calculatedWeek)}</strong></td><td>${escapeHtml(r.calculatedLabel)}</td><td>${escapeHtml(r.awayTeamId)}</td><td>${escapeHtml(r.homeTeamId)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.rawAwayScore)}</td><td>${escapeHtml(r.rawHomeScore)}</td><td>${escapeHtml(r.calculatedStatus)}</td></tr>`).join(''):`<tr><td colspan="14">No captured schedule records are available in the active snapshot.</td></tr>`}</tbody></table></div></article>
       <article class="card"><div class="card-header"><div><span class="eyebrow">Captured Sources</span><h3>Unique Schedule Routes</h3></div></div><div class="card-body">${routes.length?routes.map(route=>`<div class="diagnostic-row"><code>${escapeHtml(route)}</code></div>`).join(''):'No source-route metadata was captured.'}</div></article>
     </section>`;
   }
@@ -1279,7 +1345,7 @@
       return `<section class="schedule-source-inspector">
         <div class="card-header"><div><span class="eyebrow">Raw → Canonical</span><h3>Schedule Source Inspector</h3><p><span class="pill pill--success">Mapping certified</span></p><p>Compare captured Madden route, stage, and week metadata against Franchise HQ's calculated display week.</p></div><span class="pill pill--neutral">${rows.length} records</span></div>
         <div class="summary-grid">${summaryTile('Captured Games',rows.length,'')}${summaryTile('Routes',routes.length,'')}${summaryTile('Preseason',counts.preseason||0,'')}${summaryTile('Regular Season',counts.regular||0,'')}${summaryTile('Playoffs',counts.playoffs||0,'')}</div>
-        <article class="card"><div class="table-wrap"><table class="schedule-inspector-table"><thead><tr><th>Route</th><th>Raw Stage</th><th>Stage Index</th><th>Raw Week Index</th><th>Canonical Week</th><th>Calculated Stage</th><th>Calculated Week</th><th>Display Label</th><th>Away</th><th>Home</th><th>Status</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td><code>${escapeHtml(r.route)}</code></td><td>${escapeHtml(r.rawStage)}</td><td>${escapeHtml(r.stageIndex)}</td><td>${escapeHtml(r.rawWeekIndex)}</td><td>${escapeHtml(r.canonicalWeek)}</td><td>${escapeHtml(r.calculatedStage)}</td><td><strong>${escapeHtml(r.calculatedWeek)}</strong></td><td>${escapeHtml(r.calculatedLabel)}</td><td>${escapeHtml(r.awayTeamId)}</td><td>${escapeHtml(r.homeTeamId)}</td><td>${escapeHtml(r.status)}</td></tr>`).join(''):`<tr><td colspan="11">The active snapshot returned no schedule records.</td></tr>`}</tbody></table></div></article>
+        <article class="card"><div class="table-wrap"><table class="schedule-inspector-table"><thead><tr><th>Route</th><th>Raw Stage</th><th>Stage Index</th><th>Raw Week Index</th><th>Canonical Week</th><th>Calculated Stage</th><th>Calculated Week</th><th>Display Label</th><th>Away</th><th>Home</th><th>Raw Status</th><th>Away Score</th><th>Home Score</th><th>Calculated Status</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td><code>${escapeHtml(r.route)}</code></td><td>${escapeHtml(r.rawStage)}</td><td>${escapeHtml(r.stageIndex)}</td><td>${escapeHtml(r.rawWeekIndex)}</td><td>${escapeHtml(r.canonicalWeek)}</td><td>${escapeHtml(r.calculatedStage)}</td><td><strong>${escapeHtml(r.calculatedWeek)}</strong></td><td>${escapeHtml(r.calculatedLabel)}</td><td>${escapeHtml(r.awayTeamId)}</td><td>${escapeHtml(r.homeTeamId)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.rawAwayScore)}</td><td>${escapeHtml(r.rawHomeScore)}</td><td>${escapeHtml(r.calculatedStatus)}</td></tr>`).join(''):`<tr><td colspan="14">The active snapshot returned no schedule records.</td></tr>`}</tbody></table></div></article>
         <article class="card"><div class="card-header"><div><span class="eyebrow">Captured Sources</span><h3>Unique Schedule Routes</h3></div></div><div class="card-body">${routes.length?routes.map(route=>`<div class="diagnostic-row"><code>${escapeHtml(route)}</code></div>`).join(''):'No source-route metadata was present on the returned records.'}</div></article>
       </section>`;
     },
@@ -1871,9 +1937,9 @@
       week:context.week,
       awayId:String(game.awayTeamId??source.awayTeamId??''),
       homeId:String(game.homeTeamId??source.homeTeamId??''),
-      awayScore:game.awayScore??source.awayScore??null,
-      homeScore:game.homeScore??source.homeScore??null,
-      status:String(game.status||source.status||'scheduled').toLowerCase(),
+      awayScore:resolvedGameScore(game,'away'),
+      homeScore:resolvedGameScore(game,'home'),
+      status:resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null),
       day,time,
       network:source.network||'',
       stadium:source.stadiumName||source.stadium||'',
@@ -2235,16 +2301,63 @@
     return `<article class="card confidence-results"><div class="card-header"><div><span class="eyebrow">Season leaderboard preview</span><h3>Confidence Pool Results</h3></div></div><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Owner</th><th>Team</th><th>Points</th><th>Correct</th><th>Status</th></tr></thead><tbody>${board.map((row,i)=>`<tr><td><strong>#${i+1}</strong></td><td>${escapeHtml(row.name)}</td><td>${escapeHtml(teamById(row.teamId)?.abbr||'—')}</td><td><strong>${row.totalPoints}</strong></td><td>${row.correctPicks}</td><td><span class="pill ${row.status==='submitted'?'pill--success':'pill--neutral'}">${titleCase(row.status)}</span></td></tr>`).join('')||`<tr><td colspan="6">No Confidence Pool entries have been saved yet.</td></tr>`}</tbody></table></div></article>`;
   }
 
-  function renderSchedule() {
-    const service=scheduleService();
-    const maxWeek=service?.getSeason?.().currentWeek ? schedule.length : schedule.length;
-    const week = service?.getWeek?.(state.scheduleWeek) || schedule.find(item=>item.week===state.scheduleWeek) || schedule[0];
-    const filtered = week.games.filter(game=>state.scheduleTeam==='All'||game.homeId===state.scheduleTeam||game.awayId===state.scheduleTeam);
-    const pool=service?.confidence?.config?.();
-    pageContent.innerHTML = `
-      <div class="page-heading"><div><span class="eyebrow">Season 4 calendar</span><h1>Schedule & Confidence Pool</h1><p>Review the league schedule, complete full-season predictions, and follow Confidence Pool results.</p></div></div>
-      <div class="schedule-section-tabs segmented-tabs"><button data-schedule-section="schedule" class="${state.scheduleSection==='schedule'?'is-active':''}">League Schedule</button><button data-schedule-section="picks" class="${state.scheduleSection==='picks'?'is-active':''}">My Season Picks</button><button data-schedule-section="results" class="${state.scheduleSection==='results'?'is-active':''}">Pool Results</button>${pool?`<span class="pill ${pool.status==='open'?'pill--success':'pill--warning'}">Picks ${titleCase(pool.status)}</span>`:''}</div>
-      ${state.scheduleSection==='picks'?renderConfidencePicks():state.scheduleSection==='results'?renderConfidenceResults():`<div class="week-control week-control--compact"><div class="week-nav"><button class="icon-button icon-button--small" data-week-change="-1" ${state.scheduleWeek===1?'disabled':''}><svg style="transform:rotate(90deg)"><use href="#icon-chevron"></use></svg></button><div class="week-label"><strong>Week ${state.scheduleWeek}</strong><span>${state.scheduleWeek<8?'Completed slate':state.scheduleWeek===8?'Current league week':'Upcoming slate'}</span></div><button class="icon-button icon-button--small" data-week-change="1" ${state.scheduleWeek===maxWeek?'disabled':''}><svg style="transform:rotate(-90deg)"><use href="#icon-chevron"></use></svg></button></div><label class="field"><span>Filter team</span><select data-schedule-team><option value="All">All teams</option>${teams.map(team=>`<option value="${team.id}" ${state.scheduleTeam===team.id?'selected':''}>${team.abbr} · ${team.fullName}</option>`).join('')}</select></label></div><div class="schedule-grid">${filtered.map(game=>renderGameCard(game)).join('')}</div>`}`;
+  async function renderSchedule() {
+    pageContent.innerHTML='<section class="empty-state"><strong>Loading live schedule…</strong><p>Reading the active franchise snapshot.</p></section>';
+    try{
+      const service=liveReadModel();
+      if(!service) throw new Error('Live Read Model service is unavailable.');
+      const [stateValue,snapshot,teamRows,standingRows,gameRows]=await Promise.all([
+        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule()
+      ]);
+      if(stateValue!=='live'||!snapshot) throw new Error('No active live snapshot is available.');
+      const liveTeams=teamRows.map(liveTeamUiShape);
+      const teamMap=new Map(liveTeams.map(team=>[String(team.id),team]));
+      const provisional=gameRows.map(game=>liveGameShape(game,teamMap));
+      const current=authoritativeSeasonContext(snapshot,standingRows,provisional);
+      const games=gameRows.map(game=>liveGameShape(game,teamMap,current));
+      window.FranchiseHQ=window.FranchiseHQ||{};
+      window.FranchiseHQ.currentSeasonContext=current;
+
+      const phases=['preseason','regular','playoffs'].filter(phase=>games.some(game=>game.stage===phase));
+      if(!phases.includes(state.schedulePhase)) state.schedulePhase=phases.includes(current.phase)?current.phase:(phases[0]||'regular');
+      const phaseGames=games.filter(game=>game.stage===state.schedulePhase);
+      const weeks=[...new Set(phaseGames.map(game=>Number(game.week)).filter(Boolean))].sort((a,b)=>a-b);
+      if(!weeks.includes(Number(state.scheduleWeek))) state.scheduleWeek=weeks.includes(current.week)&&state.schedulePhase===current.phase?current.week:(weeks[0]||1);
+      const filtered=phaseGames.filter(game=>Number(game.week)===Number(state.scheduleWeek))
+        .filter(game=>state.scheduleTeam==='All'||String(game.homeTeamId)===String(state.scheduleTeam)||String(game.awayTeamId)===String(state.scheduleTeam));
+      const phaseLabel=state.schedulePhase==='preseason'?'Preseason':state.schedulePhase==='playoffs'?'Playoffs':'Regular Season';
+
+      pageContent.innerHTML=`
+        <div class="page-heading"><div><span class="eyebrow">Live franchise calendar</span><h1>League Schedule</h1><p>Current franchise context: ${escapeHtml(current.displayLabel)}. Future captured exports do not change the current week.</p></div></div>
+        <div class="filter-bar live-schedule-controls">
+          <div class="segmented-tabs">${phases.map(phase=>`<button type="button" data-live-schedule-phase="${phase}" class="${state.schedulePhase===phase?'is-active':''}">${phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'}</button>`).join('')}</div>
+          <label class="field"><span>Week</span><select data-live-schedule-week>${weeks.map(week=>`<option value="${week}" ${Number(state.scheduleWeek)===week?'selected':''}>${state.schedulePhase==='playoffs'?({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[week]||`Playoff Week ${week}`):`${phaseLabel} Week ${week}`}</option>`).join('')}</select></label>
+          <label class="field"><span>Filter team</span><select data-schedule-team><option value="All">All teams</option>${liveTeams.map(team=>`<option value="${team.id}" ${String(state.scheduleTeam)===String(team.id)?'selected':''}>${escapeHtml(team.abbr)} · ${escapeHtml(team.fullName)}</option>`).join('')}</select></label>
+          <span class="pill pill--success">${escapeHtml(current.displayLabel)} current</span>
+        </div>
+        <div class="schedule-grid">${filtered.length?filtered.map(game=>renderLiveScheduleCard(game,teamMap,current)).join(''):`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No captured games</h3><p>No live schedule records were captured for this phase and week.</p></div></article>`}</div>`;
+    }catch(error){
+      pageContent.innerHTML=`<section class="empty-state"><strong>Live schedule unavailable</strong><p>${escapeHtml(error?.message||'The active schedule could not be loaded.')}</p></section>`;
+    }
+  }
+
+  function renderLiveScheduleCard(game,teamMap,current) {
+    const away=teamMap.get(String(game.awayTeamId))||{fullName:'Away Team',record:'',abbr:'AWY'};
+    const home=teamMap.get(String(game.homeTeamId))||{fullName:'Home Team',record:'',abbr:'HME'};
+    const isFinal=game.status==='final';
+    const isLive=game.status==='live';
+    const scoresAvailable=game.awayScore!==null&&game.homeScore!==null;
+    const winnerId=isFinal&&scoresAvailable?(game.awayScore>game.homeScore?String(game.awayTeamId):String(game.homeTeamId)):null;
+    const label=canonicalScheduleLabel(game);
+    return `<article class="game-card card" data-game-id="${escapeHtml(game.id||'')}">
+      <div class="game-card__meta"><span>${escapeHtml(label)}</span><span class="pill ${isFinal?'pill--neutral':isLive?'pill--danger':'pill--accent'}">${isFinal?'Final':isLive?'Live':'Upcoming'}</span></div>
+      <div class="game-card__body">
+        <div class="game-team">${renderTeamMark(away)}<div><strong>${escapeHtml(away.fullName)}</strong><span>${escapeHtml(away.record||'')}</span></div></div>
+        ${scoresAvailable?`<div class="game-score"><strong class="${winnerId===String(game.awayTeamId)?'streak--win':''}">${game.awayScore}</strong><span>–</span><strong class="${winnerId===String(game.homeTeamId)?'streak--win':''}">${game.homeScore}</strong></div>`:`<div class="game-time"><strong>TBD</strong><span>${isFinal?'Score unavailable':'Scheduled'}</span></div>`}
+        <div class="game-team game-team--away"><div><strong>${escapeHtml(home.fullName)}</strong><span>${escapeHtml(home.record||'')}</span></div>${renderTeamMark(home)}</div>
+      </div>
+      <div class="game-card__footer"><span>${escapeHtml(game.source?.stadiumName||game.source?.stadium||'')}</span><span>${isFinal?'Completed game':isLive?'In progress':Number(game.week)<Number(current.week)&&game.stage===current.phase?'Historical record':'Upcoming matchup'}</span></div>
+    </article>`;
   }
 
   function renderGameCard(game, perspectiveTeamId=null) {
@@ -3104,6 +3217,22 @@
     const toast=document.createElement('div'); toast.className='toast'; toast.innerHTML=`<span><svg><use href="#icon-info"></use></svg></span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></div>`;
     toastRegion.appendChild(toast); setTimeout(()=>toast.remove(),3800);
   }
+
+  document.addEventListener('click', event => {
+    const phase=event.target.closest('[data-live-schedule-phase]');
+    if(!phase)return;
+    event.preventDefault();
+    state.schedulePhase=phase.dataset.liveSchedulePhase;
+    state.scheduleWeek=1;
+    renderSchedule();
+  });
+
+  document.addEventListener('change', event => {
+    if(event.target.matches('[data-live-schedule-week]')){
+      state.scheduleWeek=Number(event.target.value);
+      renderSchedule();
+    }
+  });
 
   document.addEventListener('click', event => {
     const retry=event.target.closest('[data-schedule-inspector-retry]');
