@@ -1423,7 +1423,7 @@
         )].sort();
 
         target.innerHTML=`<section class="game-state-join-inspector">
-          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.2.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
+          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.3.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
           <div class="summary-grid game-join-summary">
             ${summaryTile('Direct ID Join',directGames,'gameId or scheduleId')}
             ${summaryTile('Context Join',contextualGames,'phase + week + team')}
@@ -2094,7 +2094,18 @@
   }
 
   function matchupTeam(teamId) {
-    return liveTeamDirectory?.teamMap?.get(String(teamId)) || teamById(teamId) || {id:String(teamId||''),abbr:'TBD',fullName:'Team',owner:'Unassigned',record:'—',primary:'#27364f',secondary:'#8fa4c4'};
+    const id=String(teamId??'');
+    const directoryMatch=liveTeamDirectory?.teamMap?.get(id)
+      || liveTeamDirectory?.teams?.find(team=>String(team.id)===id||String(team.source?.teamId??'')===id);
+    const team=directoryMatch||teamById(teamId);
+    if(team){
+      return {
+        ...team,
+        primary:team.primary||team.primaryColor||team.source?.primaryColor||'#27364f',
+        secondary:team.secondary||team.secondaryColor||team.source?.secondaryColor||team.primary||'#8fa4c4'
+      };
+    }
+    return {id,abbr:'TBD',fullName:'Team',owner:'Unassigned',record:'—',primary:'#27364f',secondary:'#8fa4c4'};
   }
 
   function matchupTabPanel(tab) {
@@ -2153,38 +2164,14 @@
   }
 
   async function hydrateMatchupRegistry() {
-    const service=liveReadModel();
-    if(!service) throw new Error('Live Read Model service is unavailable.');
-    const [games,teams,standings]=await Promise.all([
-      service.getSchedule(),
-      service.getTeams(),
-      service.getStandings()
-    ]);
-
-    if(!liveTeamDirectory){
-      liveTeamDirectory={teams:[],players:[],games:[],teamMap:new Map(),standings:[]};
-    }
-
-    const liveTeams=(teams||[]).map(liveTeamUiShape);
-    const teamMap=new Map(liveTeams.map(team=>[String(team.id),team]));
-    const standingMap=new Map((standings||[]).map(row=>[String(row.teamId??row.source?.teamId??''),row]));
-
-    liveTeams.forEach(team=>{
-      const standing=standingMap.get(String(team.id));
-      if(standing){
-        const shaped=liveTeamUiShape(team,standing);
-        teamMap.set(String(team.id),shaped);
-      }
-    });
+    const directory=await loadLiveTeamDirectory(true);
+    if(!directory) throw new Error('The active snapshot team directory is unavailable.');
 
     const current=window.FranchiseHQ?.currentSeasonContext||null;
-    const normalized=(games||[]).map(game=>liveGameShape(game,teamMap,current));
+    const normalized=(directory.games||[]).map(game=>liveGameShape(game,directory.teamMap,current));
 
     normalized.forEach(game=>liveMatchupGames.set(String(game.id||''),game));
-    liveTeamDirectory.teams=liveTeams;
-    liveTeamDirectory.teamMap=teamMap;
-    liveTeamDirectory.games=normalized;
-    liveTeamDirectory.standings=standings||[];
+    directory.games=normalized;
 
     return normalized;
   }
