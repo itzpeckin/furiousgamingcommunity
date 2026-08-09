@@ -824,8 +824,17 @@
       const liveTeams=teamRows.map(liveTeamShape),teamMap=new Map(liveTeams.map(team=>[String(team.id),team]));
       const standings=standingRows.map(row=>liveStandingShape(row,teamMap)).sort((a,b)=>(a.rank-b.rank)||(b.winPct-a.winPct)||(b.pointDifferential-a.pointDifferential));
       const games=gameRows.map(game=>liveGameShape(game,teamMap));
-      const currentWeek=Number(snapshot.weekIndex||Math.max(1,...games.map(game=>game.week||0)));
-      const availableGames=games.filter(game=>game.week===currentWeek);
+      const seasonContext=publicSeasonContext(snapshot,games);
+      const currentWeek=seasonContext.week;
+      const availableGames=games.filter(game=>{
+        const sameWeek=Number(game.week)===Number(currentWeek);
+        const gameStage=String(game.stage||'').toLowerCase();
+        const sameStage=!gameStage||gameStage===seasonContext.stage
+          || (seasonContext.stage.includes('reg')&&gameStage.includes('reg'))
+          || (seasonContext.stage.includes('pre')&&gameStage.includes('pre'))
+          || ((seasonContext.stage.includes('post')||seasonContext.stage.includes('playoff'))&&(gameStage.includes('post')||gameStage.includes('playoff')));
+        return sameWeek&&sameStage;
+      });
       const playerModels=playerRows.map(player=>livePlayerShape(player,statRows));
       const playerMap=new Map(playerModels.map(player=>[String(player.id),player]));
 
