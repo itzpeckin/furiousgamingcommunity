@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.3.7',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.3.7a',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -11,6 +11,7 @@ async function listSnapshots(db,leagueId){const a=await active(db,leagueId);cons
 function key(record,...names){for(const n of names)if(record?.[n]!==undefined&&record[n]!==null&&record[n]!=='')return String(record[n]);return null;}
 async function validateSnapshot(db,leagueId,snapshot){const records=await rows(db,`SELECT domain,external_id,data_json FROM league_snapshot_records WHERE league_id=? AND snapshot_id=?`,leagueId,snapshot.id);const by={teams:[],players:[],games:[],statistics:[],standings:[]};for(const r of records){if(by[r.domain])by[r.domain].push(parse(r.data_json)||{});}const errors=[],warnings=[],domains={};
  for(const d of Object.keys(by))domains[d]={count:by[d].length,score:100,errors:[],warnings:[]};
+ domains.snapshot={count:1,score:100,errors:[],warnings:[]};
  const err=(d,m)=>{errors.push(`${d}: ${m}`);domains[d].errors.push(m);};const warn=(d,m)=>{warnings.push(`${d}: ${m}`);domains[d].warnings.push(m);};
  if(by.teams.length!==32)err('teams',`Expected 32 teams; found ${by.teams.length}.`);
  if(!by.players.length)err('players','No player records exist.');
