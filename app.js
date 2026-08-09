@@ -1121,6 +1121,48 @@
   let liveTeamDirectoryLoading = false;
   const liveRosterPlayers = new Map();
 
+
+  function assignedAccountForLiveTeam(team={}) {
+    const accounts=window.FGC_TRADE?.accounts||[];
+    const id=String(team.id||'').toLowerCase();
+    const abbr=String(team.abbr||team.abbreviation||'').toLowerCase();
+    return accounts.find(account=>{
+      const assigned=String(account?.teamId||'').toLowerCase();
+      return assigned && (assigned===id || assigned===abbr);
+    }) || null;
+  }
+
+  function liveOwnedTeamId() {
+    const account=window.FGC_TRADE?.getCurrentAccount?.();
+    if(!account?.teamId) return null;
+    const assigned=String(account.teamId).toLowerCase();
+    const match=liveTeamDirectory?.teams?.find(team=>
+      String(team.id).toLowerCase()===assigned || String(team.abbr).toLowerCase()===assigned
+    );
+    return match?.id || account.teamId;
+  }
+
+  function decodeTeamStreak(value) {
+    const raw=Number(value);
+    if(!Number.isFinite(raw)||raw===0) return '—';
+    const signed=raw>127?raw-256:raw;
+    return `${signed>0?'W':'L'}${Math.abs(signed)}`;
+  }
+
+  function compactMoney(value) {
+    const number=Number(value);
+    if(!Number.isFinite(number)) return '—';
+    return `${number<0?'-$':'$'}${Math.abs(number).toFixed(1)}M`;
+  }
+
+  function officialRating(source={}, keys=[]) {
+    for(const key of keys){
+      const value=Number(source[key]);
+      if(Number.isFinite(value)&&value>0) return value;
+    }
+    return null;
+  }
+
   function liveTeamUiShape(team={},standing=null) {
     const source=team.source||{};
     const city=team.city||source.cityName||source.city_name||'';
@@ -1130,11 +1172,10 @@
     const divisionRaw=team.division||source.divisionName||source.divName||standing?.division||'';
     const division=String(divisionRaw).replace(/^AFC\s+|^NFC\s+/i,'');
     const wins=Number(standing?.wins||0),losses=Number(standing?.losses||0),ties=Number(standing?.ties||0);
-    return {
+    const shaped={
       id:String(team.id||source.teamId||''),
       abbr:team.abbreviation||source.abbrName||source.abbreviation||String(nickname).slice(0,3).toUpperCase(),
       city,name:nickname,fullName,
-      owner:team.owner||source.userName||source.ownerName||'Unassigned',
       conference,division,
       record:`${wins}-${losses}${ties?`-${ties}`:''}`,
       wins,losses,ties,
@@ -1142,25 +1183,31 @@
       primary:team.primaryColor||source.primaryColor||'#27364f',
       secondary:team.secondaryColor||source.secondaryColor||'#8fa4c4',
       logo:team.logo||source.logo_url||source.logoUrl||null,
-      ovr:Number(team.overall||source.ovrRating||source.teamOvr||0)||'—',
-      off:Number(source.offRating||source.offenseRating||source.offOvr||0)||'—',
-      def:Number(source.defRating||source.defenseRating||source.defOvr||0)||'—',
-      cap:Number(standing?.source?.capAvailable||standing?.source?.capRoom||source.capAvailable||0),
+      ovr:officialRating({...source,...team},['overall','ovrRating','teamOvr','overallRating']),
+      off:officialRating(source,['offRating','offenseRating','offOvr','offensiveOverall']),
+      def:officialRating(source,['defRating','defenseRating','defOvr','defensiveOverall']),
+      cap:Number(standing?.source?.capAvailable??standing?.source?.capRoom??source.capAvailable??0),
       pf:Number(standing?.source?.ptsFor||0),
       pa:Number(standing?.source?.ptsAgainst||0),
-      streak:standing?.source?.winLossStreak||'',
+      streak:decodeTeamStreak(standing?.source?.winLossStreak),
       coach:source.coachName||source.headCoach||'—',
       stadium:source.stadiumName||source.stadium||'—',
       source
     };
+    const assignment=assignedAccountForLiveTeam(shaped);
+    shaped.owner=assignment?.handle||assignment?.name||team.owner||source.userName||source.ownerName||'Unassigned';
+    shaped.ownerAccountId=assignment?.id||null;
+    return shaped;
   }
 
   function liveRosterPlayerShape(player={}) {
     const source=player.source||{};
-    const contract=source.contract||{
-      yearsRemaining:source.contractYearsLeft??source.contractYears??source.yearsRemaining??0,
-      capHit:source.capHit??source.capSalary??source.salaryCapHit??0,
-      salary:source.totalSalary??source.salary??0
+    const nested=source.contract||{};
+    const contract={
+      yearsRemaining:nested.yearsRemaining??nested.years??source.contractYearsLeft??source.contractYearsRemaining??source.contractLength??source.contractYears??source.yearsRemaining??null,
+      currentYearSalary:nested.currentYearSalary??nested.salary??source.currentYearSalary??source.currentSalary??source.salary??source.capSalary??source.contractSalary??null,
+      capHit:nested.capHit??source.capHit??source.salaryCapHit??source.currentCapHit??null,
+      bonus:nested.bonus??source.contractBonus??source.signingBonus??null
     };
     const ratings={};
     Object.entries(source).forEach(([key,value])=>{
@@ -1173,7 +1220,7 @@
       lastName:player.lastName||source.lastName||'',
       teamId:String(player.teamId||source.teamId||source.team_id||source.rosterTeamId||''),
       position:String(player.position||source.position||source.positionName||source.pos||'').toUpperCase(),
-      overall:Number(player.overall||source.overallRating||source.playerBestOvr||source.overall||0)||null,
+      overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall']),
       age:Number(player.age||source.age||0)||null,
       yearsPro:Number(source.yearsPro||source.experience||0)||null,
       developmentTrait:player.devTrait||source.devTrait||source.developmentTrait||source.dev||'Normal',
@@ -1281,7 +1328,7 @@
     const grid = document.querySelector('[data-team-grid]');
     if (!grid) return;
     const term = state.teamSearch.trim().toLowerCase();
-    const ownedTeamId = window.FGC_TRADE?.getCurrentAccount?.()?.teamId || null;
+    const ownedTeamId = liveOwnedTeamId();
     const teamCollection = liveTeamDirectory?.teams || teams;
     const filtered = teamCollection.filter(team => {
       const matchesTerm = !term || `${team.fullName} ${team.abbr} ${team.owner}`.toLowerCase().includes(term);
@@ -1297,7 +1344,7 @@
         <div class="team-card__top">${renderTeamMark(team,'team-logo')}<div class="team-card__record"><strong>${team.record}</strong><small>#${team.divisionRank} ${team.division}</small></div></div>
         <h3>${team.fullName}${ownedTeamId===team.id?'<span class="my-team-tag">MY TEAM</span>':''}</h3><span class="team-card__owner">${escapeHtml(team.owner)} · ${team.conference} ${team.division}</span>
         <div class="team-card__metrics"><span><strong>${team.ovr}</strong><small>Overall</small></span><span><strong>${team.off}</strong><small>Offense</small></span><span><strong>${team.def}</strong><small>Defense</small></span></div>
-        <div class="team-card__footer"><span>${formatMoney(team.cap)} cap space</span><span>${team.streak}</span></div>
+        <div class="team-card__footer"><span>${compactMoney(team.cap)} cap space</span><span>${escapeHtml(team.streak)}</span></div>
       </article>`).join('') : `<article class="card roadmap-state" style="grid-column:1/-1"><div class="roadmap-state__inner"><div class="roadmap-icon"><svg><use href="#icon-search"></use></svg></div><h2>No teams found</h2><p>Try clearing a filter or searching for another city, nickname, abbreviation, or owner.</p></div></article>`;
   }
 
@@ -1313,8 +1360,8 @@
       dev: player?.developmentTrait || raw.dev || raw.developmentTrait || 'Normal',
       injury: player?.injuryStatus || raw.injury || 'Healthy',
       years: Number(contract.yearsRemaining ?? contract.years ?? raw.years ?? raw.contractYears ?? 0) || 0,
-      salary: Number(contract.salary ?? contract.totalSalary ?? raw.salary ?? 0) || 0,
-      capHit: Number(contract.capHit ?? raw.capHit ?? raw.salary ?? 0) || 0,
+      salary: Number(contract.currentYearSalary ?? contract.salary ?? contract.totalSalary ?? raw.currentYearSalary ?? raw.currentSalary ?? raw.salary ?? 0) || 0,
+      capHit: Number(contract.capHit ?? raw.capHit ?? raw.salaryCapHit ?? 0) || 0,
       depth: player?.depthOrder ?? raw.depth ?? null,
       college: raw.college || raw.school || '—',
       imageUrl: raw.imageUrl || raw.playerImageUrl || raw.headshotUrl || raw.headshot || raw.photoUrl || raw.photo || raw.portraitUrl || raw.portrait || player?.imageUrl || player?.headshotUrl || null,
@@ -1356,10 +1403,9 @@
 
   function formatRosterContract(player) {
     const view = rosterPlayerView(player);
-    if (!view.years && !view.salary && !view.capHit) return 'Not provided';
-    const years = view.years ? `${view.years} yr${view.years === 1 ? '' : 's'}` : 'Term unavailable';
-    const money = view.capHit ? formatMoney(view.capHit) : view.salary ? formatMoney(view.salary) : 'Cap unavailable';
-    return `${years} · ${money}`;
+    const years = view.years ? `${view.years} yr${view.years === 1 ? '' : 's'}` : '—';
+    const salary = view.salary ? compactMoney(view.salary) : '—';
+    return `${years} / ${salary}`;
   }
 
   function schoolAbbreviation(value) {
@@ -1405,9 +1451,9 @@
         <label class="field"><span>Roster Group</span><select data-roster-group><option value="All">Full Roster</option>${['Offense','Defense','Special Teams','Injured Reserve','Practice Squad / Other','Other'].map(value=>`<option value="${value}" ${state.rosterGroup===value?'selected':''}>${value}</option>`).join('')}</select></label>
         <label class="field"><span>Position</span><select data-roster-position><option value="All">All Positions</option>${positions.map(value=>`<option value="${escapeHtml(value)}" ${state.rosterPosition===value?'selected':''}>${escapeHtml(value)}</option>`).join('')}</select></label>
         <label class="field"><span>Development</span><select data-roster-dev><option value="All">All Traits</option>${devTraits.map(value=>`<option value="${escapeHtml(value)}" ${state.rosterDev===value?'selected':''}>${escapeHtml(value)}</option>`).join('')}</select></label>
-        <span class="result-count">${filtered.length} player${filtered.length===1?'':'s'} · sorted by OVR</span>
+        <span class="result-count">${filtered.length} player${filtered.length===1?'':'s'} · sorted by ${escapeHtml(state.rosterSortKey||'overall')}</span>
       </div>
-      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Age</th><th>Development</th><th>Contract / Cap</th><th>Status</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="7"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
+      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>${rosterSortButton('player','Player')}</th><th>${rosterSortButton('position','Pos')}</th><th>${rosterSortButton('overall','OVR')}</th><th>${rosterSortButton('age','Age')}</th><th>${rosterSortButton('development','Development')}</th><th>${rosterSortButton('salary','Years Remaining / Current Year Salary')}</th><th>${rosterSortButton('status','Status')}</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="7"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
     </div>`;
   }
 
@@ -1531,11 +1577,12 @@
 
       pageContent.innerHTML=`
         <div class="page-heading"><div><button class="text-button" data-route="teams"><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>All teams</button></div><div class="heading-actions">${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?`<button class="button button--ghost" data-open-block-drawer><svg><use href="#icon-tag"></use></svg>Manage Trade Block</button>`:''}<button class="button button--primary" data-start-team-trade="${team.id}"><svg><use href="#icon-swap"></use></svg>${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?'Start Trade Proposal':`Start Trade w/ ${escapeHtml(team.fullName)}`}</button></div></div>
-        <section class="team-hero" style="${teamStyle(team)}" data-abbr="${escapeHtml(team.abbr)}">
-          <div class="team-hero__content">${renderTeamMark(team,'team-logo team-logo--large')}<div class="team-hero__copy"><span class="eyebrow">${escapeHtml(team.conference)} ${escapeHtml(team.division)} · Owner ${escapeHtml(team.owner)}</span><h1>${escapeHtml(team.fullName)}</h1><p>${players.length} roster records · Active Madden snapshot</p></div><div class="team-hero__record"><strong>${escapeHtml(team.record)}</strong><span>${escapeHtml(team.conference)} ${escapeHtml(team.division)}</span></div></div>
+        <section class="team-hero team-hero--watermark" style="${teamStyle(team)}" data-abbr="${escapeHtml(team.abbr)}">
+          ${team.logo?`<img class="team-hero__watermark" src="${escapeHtml(team.logo)}" alt="" aria-hidden="true" loading="lazy">`:''}
+          <div class="team-hero__content"><div class="team-hero__copy"><span class="eyebrow">${escapeHtml(team.conference)} ${escapeHtml(team.division)} · Owner ${escapeHtml(team.owner)}</span><h1>${escapeHtml(team.fullName)}</h1></div><div class="team-hero__record"><strong>${escapeHtml(team.record)}</strong><span>${escapeHtml(team.conference)} ${escapeHtml(team.division)}</span></div></div>
         </section>
         <div class="team-summary-grid">
-          ${summaryTile('Overall',team.ovr,'Team rating')}${summaryTile('Offense',team.off,'Unit rating')}${summaryTile('Defense',team.def,'Unit rating')}${summaryTile('Points For',team.pf,'Season total')}${summaryTile('Points Against',team.pa,'Season total')}${summaryTile('Cap Space',formatMoney(team.cap),'Current snapshot')}
+          ${team.ovr?summaryTile('Overall',team.ovr,'Official team rating'):''}${team.off?summaryTile('Offense',team.off,'Official EA rating'):''}${team.def?summaryTile('Defense',team.def,'Official EA rating'):''}${summaryTile('Points For',team.pf,'Season total')}${summaryTile('Points Against',team.pa,'Season total')}${summaryTile('Cap Space',compactMoney(team.cap),'Current snapshot')}
         </div>
         <div class="subnav" data-team-tabs>
           ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Trade History':titleCase(tab)}</button>`).join('')}
@@ -2679,7 +2726,7 @@
           break;
         }
         const account=tradeService.getCurrentAccount();
-        if(account?.teamId) renderTeamDetail(account.teamId);
+        if(account?.teamId) renderTeamDetail(liveOwnedTeamId()||account.teamId);
         else { showToast('My Team unavailable','Switch to an owner or commissioner identity with an assigned franchise.'); setRoute('teams'); }
         break;
       }
@@ -3070,6 +3117,15 @@
       closeSidebar();
     }
   }, true);
+
+  document.addEventListener('click', event => {
+    const button=event.target.closest('[data-roster-sort]');
+    if(!button)return;
+    const key=button.dataset.rosterSort;
+    if((state.rosterSortKey||'overall')===key) state.rosterSortDirection=(state.rosterSortDirection||'desc')==='asc'?'desc':'asc';
+    else { state.rosterSortKey=key; state.rosterSortDirection=key==='player'||key==='position'||key==='development'||key==='status'?'asc':'desc'; }
+    renderRoute(location.hash.slice(1));
+  });
 
   document.addEventListener('input', event => {
     if (event.target.matches('[data-team-search]')) { state.teamSearch=event.target.value; refreshTeamGrid(); }
