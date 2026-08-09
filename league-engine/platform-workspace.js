@@ -2,12 +2,12 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.3.8';
+  const VERSION = '5.9.4.0';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
     'overview','route-discovery','classification','team-mapper','player-mapper',
-    'payload-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle','snapshot-verification',
+    'payload-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle','snapshot-verification','live-read-model',
     'certification','diagnostics'
   ]);
 
@@ -73,6 +73,7 @@
       case 'snapshot-builder': return servicePanel('leagueSnapshotBuilder','Snapshot Builder');
       case 'snapshot-lifecycle': return servicePanel('snapshotLifecycle','Validation & Activation');
       case 'snapshot-verification': return servicePanel('snapshotVerification','Snapshot Verification');
+      case 'live-read-model': return servicePanel('liveData','Live Read Model');
       case 'certification': return `${servicePanel('leagueImportFrameworkUI','Import Framework Certification')}${servicePanel('leagueCompanionImportUI','Companion Import Certification')}`;
       case 'diagnostics': return diagnosticsPanel();
       default: return overviewPanel();
@@ -82,7 +83,7 @@
   const tabs = [
     ['overview','Overview'],['route-discovery','Route Discovery'],['classification','Dataset Classification'],
     ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],
-    ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],['snapshot-lifecycle','Validation & Activation'],['snapshot-verification','Snapshot Verification'],
+    ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],['snapshot-lifecycle','Validation & Activation'],['snapshot-verification','Snapshot Verification'],['live-read-model','Live Read Model'],
     ['certification','Certification'],['diagnostics','Diagnostics']
   ];
 
