@@ -1338,6 +1338,116 @@
   }
 
   window.FranchiseHQ = window.FranchiseHQ || {};
+  function joinFieldValue(record={},keys=[]) {
+    const source=record.source||{};
+    const merged={...record,...source};
+    for(const key of keys){
+      const value=merged[key];
+      if(value!==undefined&&value!==null&&value!=='') return String(value);
+    }
+    return '';
+  }
+
+  function gameJoinIdentity(game={}) {
+    const source=game.source||{};
+    const context=stageWeekContext(source,game.week,game.stage);
+    return {
+      gameId:joinFieldValue(game,['gameId','game_id','id','scheduleId','schedule_id']),
+      scheduleId:joinFieldValue(game,['scheduleId','schedule_id','gameId','game_id','id']),
+      stageIndex:joinFieldValue(game,['stageIndex','stage_index']),
+      weekIndex:joinFieldValue(game,['weekIndex','week_index']),
+      phase:context.phase,
+      week:String(context.week),
+      homeTeamId:joinFieldValue(game,['homeTeamId','home_team_id','homeId']),
+      awayTeamId:joinFieldValue(game,['awayTeamId','away_team_id','awayId']),
+      route:joinFieldValue(game,['routePath','route_path','sourceRoutePath','source_route_path'])
+    };
+  }
+
+  function statisticJoinIdentity(row={}) {
+    const source=row.source||{};
+    const context=stageWeekContext(source,row.week,row.stage);
+    return {
+      gameId:joinFieldValue(row,['gameId','game_id','scheduleId','schedule_id']),
+      scheduleId:joinFieldValue(row,['scheduleId','schedule_id','gameId','game_id']),
+      teamId:joinFieldValue(row,['teamId','team_id','clubId','club_id']),
+      playerId:joinFieldValue(row,['playerId','player_id','rosterId','roster_id']),
+      stageIndex:joinFieldValue(row,['stageIndex','stage_index']),
+      weekIndex:joinFieldValue(row,['weekIndex','week_index']),
+      phase:context.phase,
+      week:String(context.week),
+      category:joinFieldValue(row,['category','statCategory','stat_category','type']),
+      route:joinFieldValue(row,['routePath','route_path','sourceRoutePath','source_route_path'])
+    };
+  }
+
+  function joinCandidateMatches(gameIdentity,statIdentity) {
+    const matches=[];
+    if(gameIdentity.gameId&&statIdentity.gameId&&gameIdentity.gameId===statIdentity.gameId) matches.push('gameId');
+    if(gameIdentity.scheduleId&&statIdentity.scheduleId&&gameIdentity.scheduleId===statIdentity.scheduleId) matches.push('scheduleId');
+    if(gameIdentity.stageIndex&&statIdentity.stageIndex&&gameIdentity.stageIndex===statIdentity.stageIndex) matches.push('stageIndex');
+    if(gameIdentity.weekIndex&&statIdentity.weekIndex&&gameIdentity.weekIndex===statIdentity.weekIndex) matches.push('weekIndex');
+    if(gameIdentity.phase===statIdentity.phase&&gameIdentity.week===statIdentity.week) matches.push('phase+week');
+    if(statIdentity.teamId&&(statIdentity.teamId===gameIdentity.homeTeamId||statIdentity.teamId===gameIdentity.awayTeamId)) matches.push('teamId');
+    return matches;
+  }
+
+  window.FranchiseHQ.gameStateJoinInspector = {
+    async load(targetId) {
+      const target=document.getElementById(targetId);
+      if(!target)return;
+      try{
+        const service=liveReadModel();
+        if(!service) throw new Error('Live Read Model service is unavailable.');
+        const [games,statistics,players]=await Promise.all([service.getSchedule(),service.getStatistics(),service.getPlayers()]);
+        const gameRows=(games||[]).map(game=>({game,identity:gameJoinIdentity(game)}));
+        const statRows=(statistics||[]).map(row=>({row,identity:statisticJoinIdentity(row)}));
+        const playerIds=new Set((players||[]).map(player=>String(player.id||player.playerId||player.source?.playerId||'')));
+        const summaries=gameRows.map(({game,identity})=>{
+          const candidates=statRows.map(item=>({item,matches:joinCandidateMatches(identity,item.identity)})).filter(result=>result.matches.length);
+          const direct=candidates.filter(result=>result.matches.includes('gameId')||result.matches.includes('scheduleId'));
+          const contextual=candidates.filter(result=>!result.matches.includes('gameId')&&!result.matches.includes('scheduleId')&&result.matches.includes('phase+week')&&result.matches.includes('teamId'));
+          const linkedPlayers=new Set(candidates.map(result=>result.item.identity.playerId).filter(id=>id&&playerIds.has(id)));
+          const teamStats=candidates.filter(result=>!result.item.identity.playerId);
+          const playerStats=candidates.filter(result=>result.item.identity.playerId);
+          return {game,identity,direct,contextual,linkedPlayers,teamStats,playerStats};
+        });
+        const directGames=summaries.filter(row=>row.direct.length).length;
+        const contextualGames=summaries.filter(row=>!row.direct.length&&row.contextual.length).length;
+        const unjoinedGames=summaries.filter(row=>!row.direct.length&&!row.contextual.length).length;
+        const statFields=[...new Set(statRows.flatMap(({row})=>Object.keys({...row,...(row.source||{})}).filter(key=>/game|schedule|team|player|stage|week|route/i.test(key)))].sort();
+
+        target.innerHTML=`<section class="game-state-join-inspector">
+          <div class="card-header"><div><span class="eyebrow">v5.9.5.0 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
+          <div class="summary-grid game-join-summary">
+            ${summaryTile('Direct ID Join',directGames,'gameId or scheduleId')}
+            ${summaryTile('Context Join',contextualGames,'phase + week + team')}
+            ${summaryTile('Unjoined Games',unjoinedGames,'requires mapper work')}
+            ${summaryTile('Statistic Records',statRows.length,'active snapshot')}
+            ${summaryTile('Join Fields Found',statFields.length,'raw field names')}
+          </div>
+          <article class="card"><div class="card-header"><div><span class="eyebrow">Per-game analysis</span><h3>Join Coverage</h3></div></div>
+            <div class="table-wrap"><table class="game-join-table"><thead><tr><th>Game</th><th>Route</th><th>Game ID</th><th>Schedule ID</th><th>Stage / Week</th><th>Teams</th><th>Direct Matches</th><th>Context Matches</th><th>Team Stats</th><th>Player Stats</th><th>Linked Players</th><th>Recommended Join</th></tr></thead>
+            <tbody>${summaries.length?summaries.map(row=>{
+              const label=canonicalScheduleLabel({...row.game,stage:row.identity.phase,week:Number(row.identity.week)});
+              const recommendation=row.direct.length?'Direct ID':row.contextual.length?'Phase + Week + Team':'No verified join';
+              return `<tr><td>${escapeHtml(label)}</td><td><code>${escapeHtml(row.identity.route||'—')}</code></td><td><code>${escapeHtml(row.identity.gameId||'—')}</code></td><td><code>${escapeHtml(row.identity.scheduleId||'—')}</code></td><td>${escapeHtml(`${row.identity.phase} / ${row.identity.week}`)}</td><td><code>${escapeHtml(`${row.identity.awayTeamId||'—'} @ ${row.identity.homeTeamId||'—'}`)}</code></td><td>${row.direct.length}</td><td>${row.contextual.length}</td><td>${row.teamStats.length}</td><td>${row.playerStats.length}</td><td>${row.linkedPlayers.size}</td><td><span class="pill ${recommendation==='Direct ID'?'pill--success':recommendation==='Phase + Week + Team'?'pill--accent':'pill--warning'}">${escapeHtml(recommendation)}</span></td></tr>`;
+            }).join(''):`<tr><td colspan="12">No schedule records were returned.</td></tr>`}</tbody></table></div>
+          </article>
+          <article class="card"><div class="card-header"><div><span class="eyebrow">Raw schema</span><h3>Available Join Fields</h3><p>Identifier-like fields found across active statistic records.</p></div></div><div class="card-body game-join-fields">${statFields.length?statFields.map(field=>`<code>${escapeHtml(field)}</code>`).join(''):'No identifier-like fields were found.'}</div></article>
+          <article class="card"><div class="card-header"><div><span class="eyebrow">Sample records</span><h3>Statistic Join JSON</h3></div></div><div class="card-body"><details><summary>Open first five normalized statistic identities</summary><pre>${escapeHtml(JSON.stringify(statRows.slice(0,5).map(item=>item.identity),null,2))}</pre></details></div></article>
+        </section>`;
+      }catch(error){
+        target.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Join inspection failed</h3><p>${escapeHtml(error?.message||'Unable to inspect active snapshot joins.')}</p><button type="button" class="button button--primary" data-game-state-join-retry="${escapeHtml(targetId)}">Retry</button></div></article>`;
+      }
+    },
+    renderPanel() {
+      const id=`game-state-join-${Date.now()}`;
+      setTimeout(()=>this.load(id),0);
+      return `<section id="${id}"><article class="card roadmap-state"><div class="roadmap-state__inner"><div class="spinner" aria-hidden="true"></div><h3>Analyzing game-state joins…</h3><p>Comparing schedule, statistic, team, and player identifiers.</p></div></article></section>`;
+    }
+  };
+
   window.FranchiseHQ.gameDetailInspector = {
     async load(targetId) {
       const target=document.getElementById(targetId); if(!target)return;
@@ -3382,6 +3492,13 @@
     const toast=document.createElement('div'); toast.className='toast'; toast.innerHTML=`<span><svg><use href="#icon-info"></use></svg></span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></div>`;
     toastRegion.appendChild(toast); setTimeout(()=>toast.remove(),3800);
   }
+
+  document.addEventListener('click', event => {
+    const retry=event.target.closest('[data-game-state-join-retry]');
+    if(!retry)return;
+    event.preventDefault();
+    window.FranchiseHQ?.gameStateJoinInspector?.load?.(retry.dataset.gameStateJoinRetry);
+  });
 
   document.addEventListener('click', event => {
     const phase=event.target.closest('[data-live-schedule-phase]');
