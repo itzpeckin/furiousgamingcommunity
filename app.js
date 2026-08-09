@@ -1657,12 +1657,18 @@
   }
 
   function openRosterPlayerDetail(playerId) {
-    const savedWindowScroll=window.scrollY;
+    const scrollingElement=document.scrollingElement;
+    const savedWindowScroll=scrollingElement?.scrollTop??window.scrollY;
     const savedMainScroll=mainContent?.scrollTop||0;
-    const restorePlayerScroll=()=>requestAnimationFrame(()=>{
-      window.scrollTo({top:savedWindowScroll,left:0,behavior:'instant'});
-      if(mainContent) mainContent.scrollTop=savedMainScroll;
-    });
+    const restorePlayerScroll=()=>{
+      const restore=()=>{
+        if(scrollingElement) scrollingElement.scrollTop=savedWindowScroll;
+        window.scrollTo(0,savedWindowScroll);
+        if(mainContent) mainContent.scrollTop=savedMainScroll;
+      };
+      restore();
+      requestAnimationFrame(()=>{restore();requestAnimationFrame(restore);});
+    };
     const legacy = playerById(playerId);
     if (legacy && window.FGC_TRADE?.openValueCard) {
       window.FGC_TRADE.openValueCard(playerId);
@@ -3115,18 +3121,12 @@
     const depthPlayerTarget=event.target.closest('[data-depth-player-id]');
     if (depthPlayerTarget) {
       event.preventDefault();
+      event.stopPropagation();
       const playerId=depthPlayerTarget.dataset.depthPlayerId;
-      if (state.depthSelectedPlayer===playerId) openRosterPlayerDetail(playerId);
-      else {
-        const windowScroll=window.scrollY;
-        const mainScroll=mainContent?.scrollTop || 0;
-        state.depthSelectedPlayer=playerId;
-        renderRoute(location.hash.slice(1));
-        requestAnimationFrame(() => {
-          window.scrollTo({top:windowScroll,left:0,behavior:'instant'});
-          if (mainContent) mainContent.scrollTop=mainScroll;
-        });
-      }
+      state.depthSelectedPlayer=playerId;
+      document.querySelectorAll('[data-depth-player-id].is-selected').forEach(node=>node.classList.remove('is-selected'));
+      depthPlayerTarget.classList.add('is-selected');
+      openRosterPlayerDetail(playerId);
       return;
     }
 
