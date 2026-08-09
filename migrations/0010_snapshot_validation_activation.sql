@@ -1,4 +1,4 @@
--- Franchise HQ v5.9.3.7 -- Snapshot Validation & Activation
+-- Franchise HQ v5.9.3.7a -- Snapshot Validation & Activation
 PRAGMA foreign_keys = ON;
 ALTER TABLE league_snapshots ADD COLUMN validation_status TEXT;
 ALTER TABLE league_snapshots ADD COLUMN validation_score REAL;
