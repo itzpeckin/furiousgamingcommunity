@@ -729,7 +729,7 @@
       const [winningKey]=[...keyCounts.entries()].sort((a,b)=>b[1]-a[1])[0];
       const selected=candidates.find(item=>`${item.phase}:${item.week}`===winningKey);
       const round=selected.phase==='playoffs'?({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[selected.week]||`Playoff Week ${selected.week}`):null;
-      return {...selected,season:snapshot?.seasonYear??'—',round,displayLabel:round||`${selected.label} Week ${selected.week}`,authority:'standings'};
+      return {...selected,stage:selected.phase,season:snapshot?.seasonYear??'—',round,displayLabel:round||`${selected.label} Week ${selected.week}`,authority:'standings'};
     }
     return publicSeasonContext(snapshot,games);
   }
@@ -919,9 +919,9 @@
         const sameWeek=Number(game.week)===Number(currentWeek);
         const gameStage=String(game.stage||'').toLowerCase();
         const sameStage=!gameStage||gameStage===seasonContext.stage
-          || (seasonContext.stage.includes('reg')&&gameStage.includes('reg'))
-          || (seasonContext.stage.includes('pre')&&gameStage.includes('pre'))
-          || ((seasonContext.stage.includes('post')||seasonContext.stage.includes('playoff'))&&(gameStage.includes('post')||gameStage.includes('playoff')));
+          || (String(seasonContext.stage||seasonContext.phase||'').includes('reg')&&gameStage.includes('reg'))
+          || (String(seasonContext.stage||seasonContext.phase||'').includes('pre')&&gameStage.includes('pre'))
+          || ((String(seasonContext.stage||seasonContext.phase||'').includes('post')||String(seasonContext.stage||seasonContext.phase||'').includes('playoff'))&&(gameStage.includes('post')||gameStage.includes('playoff')));
         return sameWeek&&sameStage;
       });
       const playerModels=playerRows.map(player=>livePlayerShape(player,statRows));
