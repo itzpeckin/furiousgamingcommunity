@@ -3122,11 +3122,37 @@
     if (depthPlayerTarget) {
       event.preventDefault();
       event.stopPropagation();
+      const section=depthPlayerTarget.closest('.formation-position');
+      const starter=section?.querySelector('.formation-depth-card__starter');
       const playerId=depthPlayerTarget.dataset.depthPlayerId;
-      state.depthSelectedPlayer=playerId;
-      document.querySelectorAll('[data-depth-player-id].is-selected').forEach(node=>node.classList.remove('is-selected'));
-      depthPlayerTarget.classList.add('is-selected');
-      openRosterPlayerDetail(playerId);
+
+      if(depthPlayerTarget===starter){
+        if(state.depthSelectedPlayer===playerId) openRosterPlayerDetail(playerId);
+        else {
+          state.depthSelectedPlayer=playerId;
+          section?.querySelectorAll('[data-depth-player-id].is-selected').forEach(node=>node.classList.remove('is-selected'));
+          starter.classList.add('is-selected');
+        }
+        return;
+      }
+
+      if(!starter||!section) return;
+      const selected=rosterPlayerView(liveRosterPlayers.get(String(playerId))||rosterService()?.findPlayer?.(playerId));
+      const starterId=starter.dataset.depthPlayerId;
+      const current=rosterPlayerView(liveRosterPlayers.get(String(starterId))||rosterService()?.findPlayer?.(starterId));
+      if(!selected||!current) return;
+
+      starter.dataset.depthPlayerId=selected.id;
+      starter.setAttribute('aria-label',`Show ${selected.name}`);
+      starter.className=`formation-depth-card__starter ${depthDevelopmentClass(selected.dev)} is-selected`;
+      starter.innerHTML=`${depthPlayerImageMarkup(selected)}<span class="formation-player-card__ovr">${selected.overall??'—'}</span><strong>${escapeHtml(selected.name)}</strong>`;
+
+      depthPlayerTarget.dataset.depthPlayerId=current.id;
+      depthPlayerTarget.setAttribute('aria-label',`Show ${current.name}`);
+      depthPlayerTarget.className=`formation-depth-card__backup ${depthDevelopmentClass(current.dev)}`;
+      depthPlayerTarget.innerHTML=`<strong>${escapeHtml(current.name)}</strong><b>${current.overall??'—'}</b>`;
+
+      state.depthSelectedPlayer=selected.id;
       return;
     }
 
