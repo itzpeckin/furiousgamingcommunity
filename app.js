@@ -126,8 +126,8 @@
     ['QB',2],['RB',3],['FB',1],['WR',5],['TE',3],['LT',2],['LG',2],['C',2],['RG',2],['RT',2],
     ['LE',2],['RE',2],['DT',3],['LOLB',2],['MLB',3],['ROLB',2],['CB',5],['FS',2],['SS',2],['K',1],['P',1]
   ];
-  const offensePositions = ['QB','RB','FB','WR','TE','LT','LG','C','RG','RT'];
-  const defensePositions = ['LE','RE','DT','LOLB','MLB','ROLB','CB','FS','SS'];
+  const offensePositions = ['QB','HB','RB','FB','WR','TE','LT','LG','C','RG','RT'];
+  const defensePositions = ['LE','RE','REDGE','LEDGE','DT','LOLB','MLB','ROLB','SAM','MIKE','WILL','CB','FS','SS'];
   const specialPositions = ['K','P'];
   const colleges = ['Oklahoma','Ohio State','Alabama','Georgia','Texas','LSU','Michigan','Oregon','Clemson','Penn State','Florida State','USC','Notre Dame','Tennessee','Washington','Miami'];
 
@@ -1226,7 +1226,7 @@
   function firstNumeric(source={},keys=[]) {
     for(const key of keys){
       const value=Number(source?.[key]);
-      if(Number.isFinite(value)&&value>=0) return value;
+      if(Number.isFinite(value)&&value>0) return value;
     }
     return null;
   }
@@ -1237,8 +1237,8 @@
       spd:firstNumeric(all,['spd','speed','speedRating','playerSpeed']),
       str:firstNumeric(all,['str','strength','strengthRating','playerStrength']),
       agi:firstNumeric(all,['agi','agility','agilityRating','playerAgility']),
-      acc:firstNumeric(all,['acc','acceleration','accelerationRating','playerAcceleration']),
-      awr:firstNumeric(all,['awr','aws','awareness','awarenessRating','playerAwareness'])
+      acc:firstNumeric(all,['accelRating','accelerationRating','playerAcceleration','acceleration','acc']),
+      awr:firstNumeric(all,['awareRating','awarenessRating','playerAwareness','awareness','awr','aws'])
     };
   }
 
@@ -1606,16 +1606,17 @@
   function renderRosterDepthChart(rosterModel) {
     const players = rosterModel.players.map(rosterPlayerView).sort((a,b)=>(Number(a.depth)||99)-(Number(b.depth)||99)||(Number(b.overall)||0)-(Number(a.overall)||0));
     const byPosition = position => players.filter(player => player.position === position);
+    const byPositions = (...positions) => players.filter(player => positions.includes(player.position));
     const split = (list, parity) => list.filter((_,index)=>index % 2 === parity);
     const stackMarkup = (label, list, area) => {
-      if (!list.length) return `<div class="formation-position formation-position--empty" style="grid-area:${area}"><span>${label}</span></div>`;
+      if (!list.length) return `<div class="formation-position formation-position--empty" data-depth-area="${area}" style="grid-area:${area}"><span>${label}</span></div>`;
       const ordered = [...list];
       const selectedIndex = ordered.findIndex(player => player.id === state.depthSelectedPlayer);
       if (selectedIndex > 0) ordered.unshift(...ordered.splice(selectedIndex,1));
       const visible = ordered.slice(0,3);
       const front = visible[0];
       const backups = visible.slice(1);
-      return `<section class="formation-position" style="grid-area:${area}">
+      return `<section class="formation-position" data-depth-area="${area}" style="grid-area:${area}">
         <span class="formation-position__label">${label}</span>
         <div class="formation-depth-card">
           <button type="button" class="formation-depth-card__starter ${depthDevelopmentClass(front.dev)} ${state.depthSelectedPlayer===front.id?'is-selected':''}" data-depth-player-id="${escapeHtml(front.id||'')}" aria-label="Show ${escapeHtml(front.name)}">
@@ -1638,10 +1639,10 @@
     const dt = byPosition('DT');
     const safeties = [...byPosition('FS'), ...byPosition('SS')].sort((a,b)=>(Number(a.depth)||99)-(Number(b.depth)||99)||(Number(b.overall)||0)-(Number(a.overall)||0));
     const offense = [
-      stackMarkup('WR1', split(wr,0), 'wr1'), stackMarkup('LT',byPosition('LT'),'lt'), stackMarkup('LG',byPosition('LG'),'lg'), stackMarkup('C',byPosition('C'),'c'), stackMarkup('RG',byPosition('RG'),'rg'), stackMarkup('RT',byPosition('RT'),'rt'), stackMarkup('TE',byPosition('TE'),'te'), stackMarkup('WR2',split(wr,1),'wr2'), stackMarkup('QB',byPosition('QB'),'qb'), stackMarkup('RB',byPosition('RB'),'rb'), stackMarkup('FB',byPosition('FB'),'fb')
+      stackMarkup('WR1', split(wr,0), 'wr1'), stackMarkup('LT',byPosition('LT'),'lt'), stackMarkup('LG',byPosition('LG'),'lg'), stackMarkup('C',byPosition('C'),'c'), stackMarkup('RG',byPosition('RG'),'rg'), stackMarkup('RT',byPosition('RT'),'rt'), stackMarkup('TE',byPosition('TE'),'te'), stackMarkup('WR2',split(wr,1),'wr2'), stackMarkup('QB',byPosition('QB'),'qb'), stackMarkup('HB',byPositions('HB','RB'),'rb'), stackMarkup('FB',byPosition('FB'),'fb')
     ].join('');
     const defense = [
-      stackMarkup('S',safeties,'s'), stackMarkup('LOLB',byPosition('LOLB'),'lolb'), stackMarkup('ILB',byPosition('MLB'),'mlb'), stackMarkup('ROLB',byPosition('ROLB'),'rolb'), stackMarkup('CB1',split(cb,0),'cb1'), stackMarkup('EDGE',byPosition('LE'),'le'), stackMarkup('DT1',split(dt,0),'dt1'), stackMarkup('DT2',split(dt,1),'dt2'), stackMarkup('EDGE',byPosition('RE'),'re'), stackMarkup('CB2',split(cb,1),'cb2')
+      stackMarkup('S',safeties,'s'), stackMarkup('SAM',byPositions('SAM','LOLB'),'lolb'), stackMarkup('MIKE',byPositions('MIKE','MLB'),'mlb'), stackMarkup('WILL',byPositions('WILL','ROLB'),'rolb'), stackMarkup('CB1',split(cb,0),'cb1'), stackMarkup('REDGE',byPositions('REDGE','RE'),'le'), stackMarkup('DT1',split(dt,0),'dt1'), stackMarkup('DT2',split(dt,1),'dt2'), stackMarkup('LEDGE',byPositions('LEDGE','LE'),'re'), stackMarkup('CB2',split(cb,1),'cb2')
     ].join('');
     return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Select a backup to bring it forward. Click the selected front card again to open the full player card.</p></div></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div></div></article>`;
   }
