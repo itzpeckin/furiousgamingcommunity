@@ -1116,7 +1116,155 @@
     return `<div class="activity-item clickable-row" data-news-id="${article.id}"><span class="activity-icon activity-icon--news"><svg><use href="#icon-news"></use></svg></span><div><strong>${escapeHtml(article.category)}</strong><p>${escapeHtml(article.title)}</p><span>${escapeHtml(article.time)}</span></div></div>`;
   }
 
+
+  let liveTeamDirectory = null;
+  let liveTeamDirectoryLoading = false;
+  const liveRosterPlayers = new Map();
+
+  function liveTeamUiShape(team={},standing=null) {
+    const source=team.source||{};
+    const city=team.city||source.cityName||source.city_name||'';
+    const nickname=team.nickname||source.nickName||source.nickname||team.displayName||source.displayName||'Team';
+    const fullName=team.displayName||source.displayName||[city,nickname].filter(Boolean).join(' ')||nickname;
+    const conference=team.conference||source.conferenceName||source.confName||String(standing?.conference||'').split(' ')[0]||'';
+    const divisionRaw=team.division||source.divisionName||source.divName||standing?.division||'';
+    const division=String(divisionRaw).replace(/^AFC\s+|^NFC\s+/i,'');
+    const wins=Number(standing?.wins||0),losses=Number(standing?.losses||0),ties=Number(standing?.ties||0);
+    return {
+      id:String(team.id||source.teamId||''),
+      abbr:team.abbreviation||source.abbrName||source.abbreviation||String(nickname).slice(0,3).toUpperCase(),
+      city,name:nickname,fullName,
+      owner:team.owner||source.userName||source.ownerName||'Unassigned',
+      conference,division,
+      record:`${wins}-${losses}${ties?`-${ties}`:''}`,
+      wins,losses,ties,
+      divisionRank:Number(standing?.rank||standing?.source?.rank||0)||'—',
+      primary:team.primaryColor||source.primaryColor||'#27364f',
+      secondary:team.secondaryColor||source.secondaryColor||'#8fa4c4',
+      logo:team.logo||source.logo_url||source.logoUrl||null,
+      ovr:Number(team.overall||source.ovrRating||source.teamOvr||0)||'—',
+      off:Number(source.offRating||source.offenseRating||source.offOvr||0)||'—',
+      def:Number(source.defRating||source.defenseRating||source.defOvr||0)||'—',
+      cap:Number(standing?.source?.capAvailable||standing?.source?.capRoom||source.capAvailable||0),
+      pf:Number(standing?.source?.ptsFor||0),
+      pa:Number(standing?.source?.ptsAgainst||0),
+      streak:standing?.source?.winLossStreak||'',
+      coach:source.coachName||source.headCoach||'—',
+      stadium:source.stadiumName||source.stadium||'—',
+      source
+    };
+  }
+
+  function liveRosterPlayerShape(player={}) {
+    const source=player.source||{};
+    const contract=source.contract||{
+      yearsRemaining:source.contractYearsLeft??source.contractYears??source.yearsRemaining??0,
+      capHit:source.capHit??source.capSalary??source.salaryCapHit??0,
+      salary:source.totalSalary??source.salary??0
+    };
+    const ratings={};
+    Object.entries(source).forEach(([key,value])=>{
+      if(typeof value==='number' && /rating|speed|acceleration|awareness|strength|agility|throw|catch|route|tackle|coverage|block|power|finesse/i.test(key)) ratings[key]=value;
+    });
+    return {
+      id:String(player.id||source.playerId||source.external_id||''),
+      name:player.displayName||source.displayName||source.fullName||[player.firstName||source.firstName,player.lastName||source.lastName].filter(Boolean).join(' ')||'Unknown Player',
+      firstName:player.firstName||source.firstName||'',
+      lastName:player.lastName||source.lastName||'',
+      teamId:String(player.teamId||source.teamId||source.team_id||source.rosterTeamId||''),
+      position:String(player.position||source.position||source.positionName||source.pos||'').toUpperCase(),
+      overall:Number(player.overall||source.overallRating||source.playerBestOvr||source.overall||0)||null,
+      age:Number(player.age||source.age||0)||null,
+      yearsPro:Number(source.yearsPro||source.experience||0)||null,
+      developmentTrait:player.devTrait||source.devTrait||source.developmentTrait||source.dev||'Normal',
+      injuryStatus:source.injuryStatus||source.injury||'Healthy',
+      depthOrder:Number(source.depthOrder??source.depthChartOrder??source.depth??99),
+      rosterStatus:String(source.rosterStatus||source.status||'active').toLowerCase(),
+      contract,
+      ratings,
+      raw:{...source,
+        college:source.college||source.school||source.collegeName||'—',
+        jerseyNumber:player.jerseyNumber||source.jerseyNumber||source.number||'—',
+        imageUrl:source.imageUrl||source.playerImageUrl||source.headshotUrl||source.portraitUrl||null
+      }
+    };
+  }
+
+  async function loadLiveTeamDirectory(force=false) {
+    if(liveTeamDirectory && !force) return liveTeamDirectory;
+    if(liveTeamDirectoryLoading) {
+      while(liveTeamDirectoryLoading) await new Promise(resolve=>setTimeout(resolve,25));
+      return liveTeamDirectory;
+    }
+    liveTeamDirectoryLoading=true;
+    try{
+      const service=liveReadModel();
+      if(!service) return null;
+      const [stateValue,teamRows,standingRows,playerRows,gameRows]=await Promise.all([
+        service.getState(),service.getTeams(),service.getStandings(),service.getPlayers(),service.getSchedule()
+      ]);
+      if(stateValue!=='live') return null;
+      const rawTeamMap=new Map(teamRows.map(team=>[String(team.id),team]));
+      const standingMap=new Map(standingRows.map(row=>[String(row.teamId),row]));
+      const teamsLive=teamRows.map(team=>liveTeamUiShape(team,standingMap.get(String(team.id))));
+      const playersLive=playerRows.map(liveRosterPlayerShape);
+      liveRosterPlayers.clear();
+      playersLive.forEach(player=>{if(player.id)liveRosterPlayers.set(String(player.id),player)});
+      const playersByTeam=new Map();
+      playersLive.forEach(player=>{
+        const key=String(player.teamId||'');
+        if(!playersByTeam.has(key)) playersByTeam.set(key,[]);
+        playersByTeam.get(key).push(player);
+      });
+      playersByTeam.forEach(list=>list.sort((a,b)=>(Number(a.depthOrder)||99)-(Number(b.depthOrder)||99)||(Number(b.overall)||0)-(Number(a.overall)||0)||a.name.localeCompare(b.name)));
+      liveTeamDirectory={teams:teamsLive,teamMap:new Map(teamsLive.map(team=>[String(team.id),team])),standingMap,players:playersLive,playersByTeam,games:gameRows};
+      return liveTeamDirectory;
+    } finally {
+      liveTeamDirectoryLoading=false;
+    }
+  }
+
+  function liveRosterModel(team,players) {
+    const active=players.filter(player=>player.rosterStatus==='active'||!player.rosterStatus).length;
+    return {
+      teamId:String(team.id),team,found:true,players,
+      summary:{total:players.length,active,injuredReserve:players.filter(player=>player.rosterStatus==='injured-reserve').length,practiceSquad:players.filter(player=>player.rosterStatus==='practice-squad').length,other:players.length-active},
+      provenance:{mode:'live',authority:'active-snapshot',authoritative:true,sourceType:'madden-companion'},
+      health:{healthy:true,playerCount:players.length,errorCount:0,warningCount:0,issues:[]}
+    };
+  }
+
+  async function renderTeamsLive() {
+    pageContent.setAttribute('aria-busy','true');
+    try{
+      const directory=await loadLiveTeamDirectory();
+      pageContent.removeAttribute('aria-busy');
+      if(routeBase(location.hash.slice(1))!=='teams' || location.hash.split('/')[1]) return;
+      if(!directory){
+        pageContent.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>No live team directory</h2><p>Activate a validated snapshot to populate Teams.</p></div></article>`;
+        return;
+      }
+      liveTeamDirectory=directory;
+      pageContent.innerHTML=`
+        <div class="page-heading"><div><span class="eyebrow">League directory</span><h1>Teams</h1><p>Browse every live franchise, owner, record, rating, roster, and depth chart.</p></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Team comparison remains planned for a later release."><svg><use href="#icon-chart"></use></svg>Compare teams</button></div></div>
+        <div class="filter-bar">
+          <label class="field field--grow"><span>Search teams or owners</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-team-search value="${escapeHtml(state.teamSearch)}" placeholder="Ravens, owner, Baltimore..." /></div></label>
+          <label class="field"><span>Conference</span><select data-team-conference><option ${state.teamConference==='All'?'selected':''}>All</option><option ${state.teamConference==='AFC'?'selected':''}>AFC</option><option ${state.teamConference==='NFC'?'selected':''}>NFC</option></select></label>
+          <label class="field"><span>Division</span><select data-team-division><option ${state.teamDivision==='All'?'selected':''}>All</option><option>East</option><option>North</option><option>South</option><option>West</option></select></label>
+          <span class="result-count" data-team-count></span>
+        </div>
+        <div class="team-grid" data-team-grid></div>`;
+      refreshTeamGrid();
+    }catch(error){
+      pageContent.removeAttribute('aria-busy');
+      console.error('[Teams Live Integration]',error);
+      pageContent.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>Live teams unavailable</h2><p>${escapeHtml(error.message||'The active snapshot could not be read.')}</p></div></article>`;
+    }
+  }
+
   function renderTeams() {
+    renderTeamsLive();
+    return;
     pageContent.innerHTML = `
       <div class="page-heading"><div><span class="eyebrow">League directory</span><h1>Teams</h1><p>Browse every franchise, owner, record, rating, cap situation, roster, schedule, and team profile.</p></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Team comparison will be added after the core league pages are complete."><svg><use href="#icon-chart"></use></svg>Compare teams</button></div></div>
       <div class="filter-bar">
@@ -1134,7 +1282,8 @@
     if (!grid) return;
     const term = state.teamSearch.trim().toLowerCase();
     const ownedTeamId = window.FGC_TRADE?.getCurrentAccount?.()?.teamId || null;
-    const filtered = teams.filter(team => {
+    const teamCollection = liveTeamDirectory?.teams || teams;
+    const filtered = teamCollection.filter(team => {
       const matchesTerm = !term || `${team.fullName} ${team.abbr} ${team.owner}`.toLowerCase().includes(term);
       return matchesTerm && (state.teamConference === 'All' || team.conference === state.teamConference) && (state.teamDivision === 'All' || team.division === state.teamDivision);
     }).sort((a,b) => {
@@ -1142,7 +1291,7 @@
       if (ownedTeamId && b.id === ownedTeamId && a.id !== ownedTeamId) return 1;
       return a.conference.localeCompare(b.conference) || a.division.localeCompare(b.division) || sortStandings(a,b);
     });
-    document.querySelector('[data-team-count]').textContent = `${filtered.length} of 32 teams`;
+    document.querySelector('[data-team-count]').textContent = `${filtered.length} of ${teamCollection.length} teams`;
     grid.innerHTML = filtered.length ? filtered.map(team => `
       <article class="team-card card" style="${teamStyle(team)}" data-team-id="${team.id}">
         <div class="team-card__top">${renderTeamMark(team,'team-logo')}<div class="team-card__record"><strong>${team.record}</strong><small>#${team.divisionRank} ${team.division}</small></div></div>
@@ -1335,7 +1484,7 @@
       window.FGC_TRADE.openValueCard(playerId);
       return;
     }
-    const normalized = rosterService()?.findPlayer?.(playerId);
+    const normalized = rosterService()?.findPlayer?.(playerId) || liveRosterPlayers.get(String(playerId));
     if (!normalized) return;
     const player = rosterPlayerView(normalized);
     const team = rosterTeamView(player.teamId);
@@ -1343,7 +1492,7 @@
     openDetail(`<div class="modal-hero"><div><span class="eyebrow">${escapeHtml(team?.fullName || 'Free Agent')} · ${escapeHtml(player.position || '—')}</span><h2>${escapeHtml(player.name)}</h2><div class="player-profile-meta"><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'} OVR</span><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span><span>Age ${player.age ?? '—'}</span></div></div></div><div class="modal-body"><div class="modal-summary-grid"><div><span>Contract</span><strong>${escapeHtml(formatRosterContract(player))}</strong></div><div><span>Injury</span><strong>${escapeHtml(player.injury)}</strong></div><div><span>Depth</span><strong>${player.depth ?? 'Not provided'}</strong></div><div><span>Roster Status</span><strong>${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</strong></div></div>${ratings.length?`<div class="rating-bars roster-detail-ratings">${ratings.map(([label,value])=>`<div class="rating-row"><span>${escapeHtml(label)}</span><div class="rating-track"><div class="rating-fill" style="width:${Math.max(0,Math.min(100,Number(value)||0))}%"></div></div><strong>${escapeHtml(String(value))}</strong></div>`).join('')}</div>`:''}<div class="heading-actions" style="justify-content:flex-start"><button class="button button--primary" data-close-detail>Close</button>${player.teamId?`<button class="button button--ghost" data-modal-team="${escapeHtml(player.teamId)}">View Team</button>`:''}</div></div>`);
   }
 
-  function renderTeamDetail(teamId) {
+  function renderTeamDetailLegacy(teamId) {
     const team = teamById(teamId);
     if (!team) { setRoute('teams'); return; }
     const rosterModel = rosterService()?.getTeamRoster?.(team.id);
@@ -1363,6 +1512,40 @@
         ${['roster','depth','schedule','stats','cap','trade-history'].map(tab => `<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab === 'depth' ? 'Depth Chart' : tab === 'trade-history' ? 'Trade History' : titleCase(tab)}</button>`).join('')}
       </div>
       <div data-team-tab-content>${renderTeamTab(team, rosterModel, roster, teamGames, leaders)}</div>`;
+  }
+
+  async function renderTeamDetail(teamId) {
+    pageContent.setAttribute('aria-busy','true');
+    try{
+      const directory=await loadLiveTeamDirectory();
+      pageContent.removeAttribute('aria-busy');
+      if(routeBase(location.hash.slice(1))!=='teams' || String(location.hash.split('/')[1]||'')!==String(teamId)) return;
+      if(!directory){renderTeamDetailLegacy(teamId);return;}
+      const team=directory.teamMap.get(String(teamId));
+      if(!team){setRoute('teams');return;}
+      const players=directory.playersByTeam.get(String(teamId))||[];
+      const rosterModel=liveRosterModel(team,players);
+      const roster=players.map(rosterPlayerView);
+      const leaders=[...roster].sort((a,b)=>(Number(b.overall)||0)-(Number(a.overall)||0)).slice(0,5);
+      const teamGames=[];
+
+      pageContent.innerHTML=`
+        <div class="page-heading"><div><button class="text-button" data-route="teams"><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>All teams</button></div><div class="heading-actions">${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?`<button class="button button--ghost" data-open-block-drawer><svg><use href="#icon-tag"></use></svg>Manage Trade Block</button>`:''}<button class="button button--primary" data-start-team-trade="${team.id}"><svg><use href="#icon-swap"></use></svg>${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?'Start Trade Proposal':`Start Trade w/ ${escapeHtml(team.fullName)}`}</button></div></div>
+        <section class="team-hero" style="${teamStyle(team)}" data-abbr="${escapeHtml(team.abbr)}">
+          <div class="team-hero__content">${renderTeamMark(team,'team-logo team-logo--large')}<div class="team-hero__copy"><span class="eyebrow">${escapeHtml(team.conference)} ${escapeHtml(team.division)} · Owner ${escapeHtml(team.owner)}</span><h1>${escapeHtml(team.fullName)}</h1><p>${players.length} roster records · Active Madden snapshot</p></div><div class="team-hero__record"><strong>${escapeHtml(team.record)}</strong><span>${escapeHtml(team.conference)} ${escapeHtml(team.division)}</span></div></div>
+        </section>
+        <div class="team-summary-grid">
+          ${summaryTile('Overall',team.ovr,'Team rating')}${summaryTile('Offense',team.off,'Unit rating')}${summaryTile('Defense',team.def,'Unit rating')}${summaryTile('Points For',team.pf,'Season total')}${summaryTile('Points Against',team.pa,'Season total')}${summaryTile('Cap Space',formatMoney(team.cap),'Current snapshot')}
+        </div>
+        <div class="subnav" data-team-tabs>
+          ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Trade History':titleCase(tab)}</button>`).join('')}
+        </div>
+        <div data-team-tab-content>${renderTeamTab(team,rosterModel,roster,teamGames,leaders)}</div>`;
+    }catch(error){
+      pageContent.removeAttribute('aria-busy');
+      console.error('[Team Detail Live Integration]',error);
+      renderTeamDetailLegacy(teamId);
+    }
   }
 
   function summaryTile(label, value, detail) { return `<article class="summary-tile card"><span>${label}</span><strong>${value}</strong><small>${detail}</small></article>`; }
@@ -1393,7 +1576,7 @@
 
   function renderRosterTable(roster) {
     const account = window.FGC_TRADE?.getCurrentAccount?.();
-    return `<article class="card"><div class="card-header"><div><span class="eyebrow">53-player mock roster</span><h3>Active roster</h3></div><span class="pill pill--neutral">${roster.length} records</span></div><div class="table-wrap" data-roster-scroll><table class="team-roster-table"><thead><tr><th class="quick-star-col"><span class="sr-only">Quick action</span></th><th>Player</th><th>OVR</th><th>Age</th><th>Development</th><th>Contract</th><th>Cap Hit</th><th>Status</th></tr></thead><tbody>${roster.map(player => { const actions=renderRosterPlayerActions(player,account); return `<tr class="clickable-row roster-player-row" data-player-id="${player.id}" data-roster-player-row="${player.id}"><td class="quick-star-col">${actions.star}</td><td><div class="roster-player-cell">${renderPlayerIdentity(player,false)}${actions.trade}</div></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span></td><td>${player.age}</td><td><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span></td><td>${player.years} year${player.years===1?'':'s'}</td><td>${formatMoney(player.capHit)}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${player.injury}</span></td></tr>` }).join('')}</tbody></table></div></article>`;
+    return `<article class="card"><div class="card-header"><div><span class="eyebrow">Active franchise roster</span><h3>Active roster</h3></div><span class="pill pill--neutral">${roster.length} records</span></div><div class="table-wrap" data-roster-scroll><table class="team-roster-table"><thead><tr><th class="quick-star-col"><span class="sr-only">Quick action</span></th><th>Player</th><th>OVR</th><th>Age</th><th>Development</th><th>Contract</th><th>Cap Hit</th><th>Status</th></tr></thead><tbody>${roster.map(player => { const actions=renderRosterPlayerActions(player,account); return `<tr class="clickable-row roster-player-row" data-player-id="${player.id}" data-roster-player-row="${player.id}"><td class="quick-star-col">${actions.star}</td><td><div class="roster-player-cell">${renderPlayerIdentity(player,false)}${actions.trade}</div></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span></td><td>${player.age}</td><td><span class="dev-badge ${devClass(player.dev)}">${player.dev}</span></td><td>${player.years} year${player.years===1?'':'s'}</td><td>${formatMoney(player.capHit)}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${player.injury}</span></td></tr>` }).join('')}</tbody></table></div></article>`;
   }
 
   function renderDepthChart(roster) {
@@ -1401,7 +1584,7 @@
       ['QB',['QB']],['HB',['RB','FB']],['REC',['WR','TE']],['OL',['LT','LG','C','RG','RT']],
       ['DL',['LE','RE','DT']],['LB',['LOLB','MLB','ROLB']],['DB',['CB','FS','SS']],['ST',['K','P']]
     ];
-    return `<article class="card"><div class="card-header"><div><span class="eyebrow">Projected lineup</span><h3>Depth chart</h3></div><span class="pill pill--accent">Mock ordering</span></div><div class="card-body"><div class="depth-chart">${groups.map(([label, positions]) => {
+    return `<article class="card"><div class="card-header"><div><span class="eyebrow">Projected lineup</span><h3>Depth chart</h3></div><span class="pill pill--accent">OVR-derived order</span></div><div class="card-body"><div class="depth-chart">${groups.map(([label, positions]) => {
       const groupPlayers = roster.filter(player => positions.includes(player.position)).sort((a,b) => b.overall-a.overall).slice(0,3);
       return `<div class="depth-row"><span class="depth-position">${label}</span>${groupPlayers.map(player => `<button class="depth-player" data-player-id="${player.id}"><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall}</span><div><strong>${escapeHtml(player.name)}</strong><small>${player.position} · ${player.dev}</small></div></button>`).join('')}</div>`;
     }).join('')}</div></div></article>`;
