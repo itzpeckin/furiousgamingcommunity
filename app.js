@@ -674,7 +674,9 @@
     const home=teamMap.get(String(game.homeTeamId)),away=teamMap.get(String(game.awayTeamId));
     const rawStatus=String(game.status||source.status||'').toLowerCase();
     const completed=['final','completed','complete'].includes(rawStatus)||game.homeScore!==null&&game.awayScore!==null&&Number(game.homeScore)+Number(game.awayScore)>0;
-    return {...game,home,away,completed,status:completed?'final':rawStatus||'scheduled',week:Number(game.week??source.weekIndex??0),stage:game.stage||source.stage||'reg'};
+    return {...game,home,away,completed,status:completed?'final':rawStatus||'scheduled',week:Number.isFinite(Number(source.weekIndex))
+        ? Number(source.weekIndex)+1
+        : Number(game.week??0),stage:game.stage||source.stage||'reg'};
   }
   function liveMetricValue(stat={},category='') {
     const m=stat.metrics||{};
@@ -1205,7 +1207,7 @@
     const source=player.source||{};
     const nested=source.contract||{};
     const contract={
-      yearsRemaining:nested.yearsRemaining??nested.years??source.contractYearsLeft??source.contractYearsRemaining??source.contractLength??source.contractYears??source.yearsRemaining??source.yearsLeft??null,
+      yearsRemaining:nested.yearsRemaining??nested.years??source.contractYearsLeft??source.contractYearsRemaining??source.contractLength??source.contractYears??source.yearsRemaining??source.yearsLeft??source.contractLengthRemaining??null,
       currentYearSalary:nested.currentYearSalary??nested.salary??source.currentYearSalary??source.currentSalary??source.capSalary??source.contractSalary??source.salary??null,
       capHit:nested.capHit??source.capHit??source.salaryCapHit??source.currentCapHit??null,
       bonus:nested.bonus??source.contractBonus??source.signingBonus??null
@@ -1221,7 +1223,7 @@
       lastName:player.lastName||source.lastName||'',
       teamId:String(player.teamId||source.teamId||source.team_id||source.rosterTeamId||''),
       position:String(player.position||source.position||source.positionName||source.pos||'').toUpperCase(),
-      overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall','overall_rating']),
+      overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall','overall_rating','playerOverall','ovr']),
       age:Number(player.age||source.age||0)||null,
       yearsPro:Number(source.yearsPro||source.experience||0)||null,
       developmentTrait:player.devTrait||source.devTrait||source.developmentTrait||source.dev||'Normal',
@@ -1357,6 +1359,7 @@
           event.stopPropagation();
         }
         const teamId=card.dataset.teamId;
+        state.teamTab='roster';
         history.pushState(null,'',`#teams/${teamId}`);
         if(mainContent?.scrollTo) mainContent.scrollTo({top:0,left:0,behavior:'instant'});
         window.scrollTo({top:0,left:0,behavior:'instant'});
@@ -1479,11 +1482,20 @@
     const allPlayers = rosterModel.players.map(rosterPlayerView).sort((a,b) => (Number(b.overall)||0) - (Number(a.overall)||0) || String(a.name).localeCompare(String(b.name)));
     const positions = [...new Set(allPlayers.map(player => player.position).filter(Boolean))].sort();
     const devTraits = [...new Set(allPlayers.map(player => player.dev).filter(Boolean))].sort();
+    const sortKey=state.rosterSortKey||'overall';
+    const sortDirection=state.rosterSortDirection||'desc';
     const filtered = allPlayers.filter(player => {
       if (state.rosterGroup !== 'All' && rosterGroupForPlayer(player) !== state.rosterGroup) return false;
       if (state.rosterPosition !== 'All' && player.position !== state.rosterPosition) return false;
       if (state.rosterDev !== 'All' && player.dev !== state.rosterDev) return false;
       return true;
+    }).sort((a,b)=>{
+      const av=rosterSortValue(a,sortKey);
+      const bv=rosterSortValue(b,sortKey);
+      const comparison=(typeof av==='number'&&typeof bv==='number')
+        ? av-bv
+        : String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:'base'});
+      return (sortDirection==='asc'?comparison:-comparison)||String(a.name).localeCompare(String(b.name));
     });
     return `<div class="roster-experience roster-experience--clean">
       <div class="filter-bar roster-table-filters">
@@ -2800,7 +2812,7 @@
           break;
         }
         const account=tradeService.getCurrentAccount();
-        if(account?.teamId) renderTeamDetail(liveOwnedTeamId()||account.teamId);
+        if(account?.teamId){state.teamTab='roster';renderTeamDetail(liveOwnedTeamId()||account.teamId);}
         else { showToast('My Team unavailable','Switch to an owner or commissioner identity with an assigned franchise.'); setRoute('teams'); }
         break;
       }
@@ -2948,6 +2960,7 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     const teamId=teamCard.dataset.teamId;
+    state.teamTab='roster';
     const route=`teams/${teamId}`;
     history.pushState(null,'',`#${route}`);
     renderTeamDetail(teamId);
@@ -3062,6 +3075,7 @@
       event.preventDefault();
       const route=routeTarget.dataset.route;
       if(/^teams\//.test(route)){
+        state.teamTab='roster';
         const hash=`#${route}`;
         if(location.hash===hash) renderRoute(route);
         else location.hash=hash;
@@ -3250,6 +3264,7 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     const teamId=teamCard.dataset.teamId;
+    state.teamTab='roster';
     const route=`teams/${teamId}`;
     history.pushState(null,'',`#${route}`);
     renderTeamDetail(teamId);
