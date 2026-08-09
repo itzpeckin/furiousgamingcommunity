@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.4.1a';
+  const VERSION = '5.9.4.1b';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
