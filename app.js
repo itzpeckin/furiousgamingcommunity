@@ -563,8 +563,8 @@
 
       <div class="league-home-main">
         <div class="league-home-primary">
-          <section class="featured-game featured-game--opens-matchup card" data-game-id="${featured.id}" role="button" tabindex="0" aria-label="Open matchup card" style="--away-primary:${away.primary};--away-secondary:${away.secondary||away.primary};--home-primary:${home.primary};--home-secondary:${home.secondary||home.primary};background:linear-gradient(135deg, ${away.primary}, ${away.secondary||away.primary}) left top / 50% 100% no-repeat, linear-gradient(225deg, ${home.primary}, ${home.secondary||home.primary}) right top / 50% 100% no-repeat !important;background-image:linear-gradient(135deg, ${away.primary}, ${away.secondary||away.primary}), linear-gradient(225deg, ${home.primary}, ${home.secondary||home.primary}) !important;background-position:left top,right top !important;background-size:50% 100%,50% 100% !important;background-repeat:no-repeat,no-repeat !important;">
-          <div class="featured-game-label" style="background:transparent !important;background-image:none !important;position:relative;z-index:5;">
+          <section class="featured-game featured-game--opens-matchup card" data-game-id="${featured.id}" role="button" tabindex="0" aria-label="Open matchup card" style="--away-primary:${away.primary};--away-secondary:${away.secondary||away.primary};--home-primary:${home.primary};--home-secondary:${home.secondary||home.primary};background:linear-gradient(90deg, ${away.primary} 0%, ${away.secondary||away.primary} 49.9%, ${home.primary} 50.1%, ${home.secondary||home.primary} 100%) !important;background-image:linear-gradient(90deg, ${away.primary} 0%, ${away.secondary||away.primary} 49.9%, ${home.primary} 50.1%, ${home.secondary||home.primary} 100%) !important;">
+          <div class="featured-game-label" style="background:linear-gradient(90deg, ${away.primary} 0%, ${away.secondary||away.primary} 49.9%, ${home.primary} 50.1%, ${home.secondary||home.primary} 100%) !important;background-image:linear-gradient(90deg, ${away.primary} 0%, ${away.secondary||away.primary} 49.9%, ${home.primary} 50.1%, ${home.secondary||home.primary} 100%) !important;position:relative;z-index:5;">
             <span>${isOfficialGotw?'★ Game of the Week':'Selected Matchup'}</span>
             <small>${featured.day} · ${featured.time} · ${featured.network} · ${featured.stadium}</small>
           </div>
@@ -984,7 +984,7 @@
 
         <div class="league-home-main">
           <div class="league-home-primary">
-            <section class="featured-game card" data-game-id="${escapeHtml(featured.id)}" style="--away:${escapeHtml(away.primary||'#333')};--home:${escapeHtml(home.primary||'#555')}">
+            <section class="featured-game featured-game--live-gotw card" data-game-id="${escapeHtml(featured.id)}" style="--away:${escapeHtml(away.primary||'#333')};--home:${escapeHtml(home.primary||'#555')};--away-secondary:${escapeHtml(away.secondary||away.primary||'#333')};--home-secondary:${escapeHtml(home.secondary||home.primary||'#555')};background:linear-gradient(135deg, ${escapeHtml(away.primary||'#333')}, ${escapeHtml(away.secondary||away.primary||'#333')}) left / 50% 100% no-repeat, linear-gradient(225deg, ${escapeHtml(home.primary||'#555')}, ${escapeHtml(home.secondary||home.primary||'#555')}) right / 50% 100% no-repeat !important;">
               <div class="featured-game-label">
                 <span>★ Game of the Week</span>
                 <small>Week ${featured.week} · ${featured.completed?'Final':'Upcoming'} · ${escapeHtml(String(featured.stage||'Regular Season'))}</small>
