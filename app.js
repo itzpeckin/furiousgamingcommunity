@@ -1209,12 +1209,20 @@
 
 
   function assignedAccountForLiveTeam(team={}) {
+    const id=String(team.id||'');
+    const direct=window.FGC_TRADE?.getTeamOwnerAssignment?.(id);
+    if(direct) return direct;
+
+    const abbr=String(team.abbr||team.abbreviation||'');
+    const byAbbr=window.FGC_TRADE?.getTeamOwnerAssignment?.(abbr);
+    if(byAbbr) return byAbbr;
+
     const accounts=window.FGC_TRADE?.accounts||[];
-    const id=String(team.id||'').toLowerCase();
-    const abbr=String(team.abbr||team.abbreviation||'').toLowerCase();
+    const idLower=id.toLowerCase();
+    const abbrLower=abbr.toLowerCase();
     return accounts.find(account=>{
       const assigned=String(account?.teamId||'').toLowerCase();
-      return assigned && (assigned===id || assigned===abbr);
+      return assigned && (assigned===idLower || assigned===abbrLower);
     }) || null;
   }
 

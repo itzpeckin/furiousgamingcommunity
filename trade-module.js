@@ -1317,7 +1317,30 @@ document.addEventListener('keydown',e=>{
 
 let builderNavigationGuard=false,pendingBuilderRoute=null,builderScrollPosition=0,builderHistoryArmed=false;function armBuilderHistoryGuard(){if(!ui.builder||!builderHasWork()||builderHistoryArmed)return;try{history.replaceState({...history.state,fgcTradeBuilderBase:true},'',location.href);history.pushState({fgcTradeBuilderGuard:true},'',location.href);builderHistoryArmed=true}catch{}}function showBuilderLeavePrompt(target){pendingBuilderRoute=target||'trade-center';builderScrollPosition=window.scrollY;persistBuilderRecovery();requestAnimationFrame(()=>{document.querySelector('[data-builder-leave-modal]')?.classList.add('is-open');window.scrollTo({top:builderScrollPosition,behavior:'auto'})})}window.addEventListener('popstate',()=>{if(ui.builder&&builderHasWork()){builderHistoryArmed=false;try{history.pushState({fgcTradeBuilderGuard:true},'',location.href);builderHistoryArmed=true}catch{}showBuilderLeavePrompt('trade-center')}});window.addEventListener('hashchange',()=>{const route=location.hash.slice(1);if(builderNavigationGuard){builderNavigationGuard=false;return}if(ui.builder&&builderHasWork()&&!route.startsWith('trade-center/new')){builderNavigationGuard=true;const target=route||'trade-center';try{history.replaceState({fgcTradeBuilderGuard:true},'','#trade-center/new')}catch{}showBuilderLeavePrompt(target)}});window.addEventListener('beforeunload',event=>{if(ui.builder&&builderHasWork()){persistBuilderRecovery();event.preventDefault();event.returnValue=''}});
 
-window.FGC_TRADE={renderTradeCenter,renderMultiTradeBuilder,renderMultiTradeDetail,multiTrades,renderTradeBlock,renderCommissioner,renderPlatformWorkspace:()=>renderCommissioner('platform-workspace'),getApprovedNews,getActivitySnapshot,accounts,getCurrentAccount:me,setUser,openLogin,resetDemo:()=>{{const fresh=seed();store={...fresh,negotiations:fresh.trades.map(normalizeNegotiation)};delete store.trades;}save();ui.builder=null;renderRoute();},playerValuation,pickValuation,packageValuation,tradeValueSettings,defaultTradeValueSettings,tradeCalculatorEnabled,tradeRules,defaultTradeRules,freeTradeAssetCheck,freeTradePackageCheck,legacyFreeTradeCheck,multiFreeTradeCheck,builderFreeTradeCheck,toggleFreeTradeDesignation,tradeLimitReviewRows,committedTradeUnits,remainingTradeCredits,approvedTradeRecords,assetUnitCost,resetAllTradeData,tradeDataDiagnostics,currentReviewers,openValueCard,openPickCard,renderProjectionEditor,leagueYear,draftDistance,saveDraft,submit,accept,decline,withdraw,revise:(tradeId)=>{const t=trade(tradeId);if(t){initBuilder(t);setRoute('trade-center/new')}},replay:(tradeId)=>{const t=trade(tradeId);if(t)renderReplay(t)},sendMessage:sendChat,isWatched,toggleWatch,togglePlayerBlock,addPlayerToTrade,onBlock,openBlockManager,renderAISuggestions,generateAISuggestions,modifyMultiTrade,counterMultiTrade,declineMultiTrade,getRosterPlayerForQa,teamBlockNeeds,listedAssetsForTeam,getTeamTradeHistory,getPlayerTransactionHistory,allTradeRecords,completedTradeAnalytics,renderTradeAnalytics};
+
+function getTeamOwnerAssignment(teamId){
+ const assignment=assignmentFor(teamId);
+ if(!assignment||assignment.control==='cpu'||!assignment.ownerId)return null;
+ const user=directoryUser(assignment.ownerId);
+ return {
+   teamId:String(teamId||''),
+   ownerId:assignment.ownerId,
+   control:assignment.control,
+   role:assignment.role,
+   tradeCommittee:Boolean(assignment.tradeCommittee),
+   id:user?.id||assignment.ownerId,
+   handle:user?.handle||user?.name||'Unassigned',
+   name:user?.name||user?.handle||'Unassigned'
+ };
+}
+function getTeamOwnerAssignments(){
+ const result={};
+ Object.keys(ownershipState.assignments||{}).forEach(teamId=>{
+   result[teamId]=getTeamOwnerAssignment(teamId);
+ });
+ return result;
+}
+window.FGC_TRADE={renderTradeCenter,renderMultiTradeBuilder,renderMultiTradeDetail,multiTrades,renderTradeBlock,renderCommissioner,renderPlatformWorkspace:()=>renderCommissioner('platform-workspace'),getApprovedNews,getActivitySnapshot,accounts,getCurrentAccount:me,getTeamOwnerAssignment,getTeamOwnerAssignments,setUser,openLogin,resetDemo:()=>{{const fresh=seed();store={...fresh,negotiations:fresh.trades.map(normalizeNegotiation)};delete store.trades;}save();ui.builder=null;renderRoute();},playerValuation,pickValuation,packageValuation,tradeValueSettings,defaultTradeValueSettings,tradeCalculatorEnabled,tradeRules,defaultTradeRules,freeTradeAssetCheck,freeTradePackageCheck,legacyFreeTradeCheck,multiFreeTradeCheck,builderFreeTradeCheck,toggleFreeTradeDesignation,tradeLimitReviewRows,committedTradeUnits,remainingTradeCredits,approvedTradeRecords,assetUnitCost,resetAllTradeData,tradeDataDiagnostics,currentReviewers,openValueCard,openPickCard,renderProjectionEditor,leagueYear,draftDistance,saveDraft,submit,accept,decline,withdraw,revise:(tradeId)=>{const t=trade(tradeId);if(t){initBuilder(t);setRoute('trade-center/new')}},replay:(tradeId)=>{const t=trade(tradeId);if(t)renderReplay(t)},sendMessage:sendChat,isWatched,toggleWatch,togglePlayerBlock,addPlayerToTrade,onBlock,openBlockManager,renderAISuggestions,generateAISuggestions,modifyMultiTrade,counterMultiTrade,declineMultiTrade,getRosterPlayerForQa,teamBlockNeeds,listedAssetsForTeam,getTeamTradeHistory,getPlayerTransactionHistory,allTradeRecords,completedTradeAnalytics,renderTradeAnalytics};
 window.FranchiseHQ?.trade?.attachLegacy?.(window.FGC_TRADE);
 window.FranchiseHQ?.getService?.('trade.negotiations')?.attachLegacy?.(window.FGC_TRADE);
 window.FranchiseHQ?.ui?.registerAdapter?.('legacy-trade', {
