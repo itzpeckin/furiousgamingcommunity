@@ -2265,31 +2265,110 @@
     };
   }
 
-  function gameSideBoxScore(game={},side='away') {
-    const raw={...(game.source||{}),...game};
+  function gameStatField(raw={},side='away',aliases=[]) {
     const prefix=side==='home'?'home':'away';
     const cap=prefix[0].toUpperCase()+prefix.slice(1);
-    const metric=(suffixes=[])=>numericMetric(raw,suffixes.flatMap(name=>[
-      `${prefix}${name}`,`${prefix}_${name}`,`${name}${cap}`,`${name}_${prefix}`
-    ]));
-    const textMetric=(suffixes=[])=>metricValue(raw,suffixes.flatMap(name=>[
-      `${prefix}${name}`,`${prefix}_${name}`,`${name}${cap}`,`${name}_${prefix}`
-    ]));
-    const totalOffense=metric(['TotalOffense','TotalYards','OffenseYards','OffYds']);
-    const passingYards=metric(['PassingYards','PassYards','PassYds','NetPassingYards']);
-    const rushingYards=metric(['RushingYards','RushYards','RushYds']);
-    const firstDowns=metric(['FirstDowns','Firstdowns']);
-    const turnovers=metric(['Turnovers','Giveaways']);
-    const penalties=metric(['Penalties','PenaltyCount']);
-    const penaltyYards=metric(['PenaltyYards','PenYds']);
-    const thirdCombined=textMetric(['ThirdDown','ThirdDownEfficiency']);
-    const redCombined=textMetric(['RedZone','RedZoneEfficiency']);
-    const possession=textMetric(['TimeOfPossession','PossessionTime','TimePossession']);
+    const keys=[];
+    aliases.forEach(name=>{
+      const n=String(name);
+      const nameCap=n[0]?.toUpperCase()+n.slice(1);
+      keys.push(
+        `${prefix}${nameCap}`,`${prefix}${n}`,
+        `${prefix}_${n}`,`${prefix}_${n.replace(/[A-Z]/g,m=>`_${m.toLowerCase()}`)}`,
+        `${n}${cap}`,`${n}_${prefix}`,
+        `${nameCap}${cap}`
+      );
+    });
+    return metricValue(raw,keys);
+  }
+
+  function numericGameStat(raw={},side='away',aliases=[]) {
+    const value=gameStatField(raw,side,aliases);
+    if(value===null||value===undefined||value==='') return null;
+    const number=Number(value);
+    return Number.isFinite(number)?number:null;
+  }
+
+  function ratioDisplay(made,attempted) {
+    if(made===null&&attempted===null) return null;
+    if(attempted===null||Number(attempted)===0) return made!==null?String(made):null;
+    const pct=(Number(made||0)/Number(attempted))*100;
+    return `${Number(made||0)}/${Number(attempted)} (${pct.toFixed(0)}%)`;
+  }
+
+  function possessionDisplay(value) {
+    if(value===null||value===undefined||value==='') return null;
+    if(typeof value==='string'&&value.includes(':')) return value;
+    const seconds=Number(value);
+    if(!Number.isFinite(seconds)) return String(value);
+    // Madden exports have used either seconds or clock-style integer values.
+    if(seconds>=60){
+      const minutes=Math.floor(seconds/60);
+      const remain=Math.round(seconds%60);
+      return `${minutes}:${String(remain).padStart(2,'0')}`;
+    }
+    return String(value);
+  }
+
+  function gameSideBoxScore(game={},side='away') {
+    const raw={...(game.source||{}),...game};
+
+    const totalOffense=numericGameStat(raw,side,[
+      'totalOffense','totalOffenseYards','totalYards','offenseYards','offYds','totalOffYds'
+    ]);
+    const passingYards=numericGameStat(raw,side,[
+      'passingYards','passYards','passYds','netPassingYards','netPassYards','passNetYds'
+    ]);
+    const rushingYards=numericGameStat(raw,side,[
+      'rushingYards','rushYards','rushYds','totalRushYards'
+    ]);
+    const firstDowns=numericGameStat(raw,side,[
+      'firstDowns','firstdowns','totalFirstDowns','firstDownTotal'
+    ]);
+    const turnovers=numericGameStat(raw,side,[
+      'turnovers','giveaways','totalTurnovers','turnoverCount'
+    ]);
+
+    const thirdPct=gameStatField(raw,side,[
+      'thirdDownPct','thirdDownPercentage','thirdDownPercent','thirdDownEfficiency'
+    ]);
+    const thirdMade=numericGameStat(raw,side,[
+      'thirdDownConversions','thirdDownConverts','thirdDownMade','thirdDownConv','thirdDownSuccesses'
+    ]);
+    const thirdAtt=numericGameStat(raw,side,[
+      'thirdDownAttempts','thirdDownAtt','thirdDownTries'
+    ]);
+
+    const redPct=gameStatField(raw,side,[
+      'redZonePct','redZonePercentage','redZonePercent','redZoneEfficiency'
+    ]);
+    const redMade=numericGameStat(raw,side,[
+      'redZoneTDs','redZoneTouchdowns','redZoneConversions','redZoneMade','redZoneScores'
+    ]);
+    const redAtt=numericGameStat(raw,side,[
+      'redZoneAttempts','redZoneAtt','redZoneTrips','redZonePossessions'
+    ]);
+
+    const possessionRaw=gameStatField(raw,side,[
+      'timeOfPossession','possessionTime','timePossession','possessionSeconds','timeOfPossessionSeconds','possession'
+    ]);
+
+    const penalties=numericGameStat(raw,side,[
+      'penalties','penaltyCount','totalPenalties'
+    ]);
+    const penaltyYards=numericGameStat(raw,side,[
+      'penaltyYards','penYds','penaltyYds','totalPenaltyYards'
+    ]);
+
     return {
-      totalOffense,passingYards,rushingYards,firstDowns,turnovers,
-      thirdDown:thirdCombined!==null?String(thirdCombined):null,
-      redZone:redCombined!==null?String(redCombined):null,
-      possession:possession!==null?String(possession):null,
+      totalOffense,
+      passingYards,
+      rushingYards,
+      firstDowns,
+      turnovers,
+      thirdDown:thirdPct!==null&&thirdPct!==undefined&&thirdPct!==''?String(thirdPct):ratioDisplay(thirdMade,thirdAtt),
+      redZone:redPct!==null&&redPct!==undefined&&redPct!==''?String(redPct):ratioDisplay(redMade,redAtt),
+      possession:possessionDisplay(possessionRaw),
       penalties:penalties!==null?(penaltyYards!==null?`${penalties}-${penaltyYards}`:String(penalties)):null
     };
   }
@@ -2354,7 +2433,10 @@
       awayPlayerRows:awayPlayerRows.length,
       homePlayerRows:homePlayerRows.length,
       populated,
-      rawGameFields:Object.keys({...game,...(game.source||{})}).filter(key=>/yard|down|turn|pen|poss|offen|rush|pass|red|score/i.test(key)).sort()
+      rawGameFields:Object.entries({...game,...(game.source||{})})
+        .filter(([key])=>/yard|down|turn|pen|poss|offen|rush|pass|red|score|first|third|time/i.test(key))
+        .sort(([a],[b])=>a.localeCompare(b))
+        .map(([key,value])=>`${key}=${String(value)}`)
     };
 
     if(key) matchupTeamStatsCache.set(key,model);
@@ -2378,7 +2460,7 @@
       const copy=status==='final'
         ? 'The completed game is joined correctly, but this export does not contain any supported box-score or player-game fields for the Team Stats panel.'
         : 'Game-specific team statistics will populate after Madden records statistics for this matchup.';
-      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Team Statistics</h3></div><span class="pill pill--neutral">${model.totalRows} joined records</span></div><div class="card-body matchup-team-stats-state"><strong>${status==='final'?'Statistics fields unavailable':'Upcoming matchup'}</strong><span>${copy}</span>${status==='final'?`<details class="matchup-stat-source-details"><summary>Captured game fields</summary><code>${escapeHtml(model.rawGameFields.join(', ')||'No box-score-like fields found')}</code></details>`:''}</div></section>`;
+      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Team Statistics</h3></div><span class="pill pill--neutral">${model.totalRows} joined records</span></div><div class="card-body matchup-team-stats-state"><strong>${status==='final'?'Statistics fields unavailable':'Upcoming matchup'}</strong><span>${copy}</span>${status==='final'?`<details class="matchup-stat-source-details"><summary>Captured game fields</summary><code>${escapeHtml(model.rawGameFields.join(' · ')||'No box-score-like fields found')}</code></details>`:''}</div></section>`;
     }
     const rows=[
       ['Total Offense','totalOffense'],['Passing Yards','passingYards'],['Rushing Yards','rushingYards'],['First Downs','firstDowns'],['Turnovers','turnovers'],['3rd Down','thirdDown'],['Red Zone','redZone'],['Time of Possession','possession'],['Penalties','penalties']
@@ -2489,9 +2571,20 @@
 
       liveMatchupGames.set(String(game.id||gameId),game);
       activeMatchupGame=game;
+
+      const awayTeamId=String(game.awayTeamId??game.awayId??'');
+      const homeTeamId=String(game.homeTeamId??game.homeId??'');
+      const teamDirectoryReady=Boolean(
+        liveTeamDirectory?.teamMap?.get(awayTeamId)
+        && liveTeamDirectory?.teamMap?.get(homeTeamId)
+      );
+      if(!teamDirectoryReady){
+        await loadLiveTeamDirectory(true);
+      }
+
       await hydrateMatchupTeamStatistics(game);
-      const away=matchupTeam(game.awayTeamId??game.awayId);
-      const home=matchupTeam(game.homeTeamId??game.homeId);
+      const away=matchupTeam(awayTeamId);
+      const home=matchupTeam(homeTeamId);
       const meta=gameMetadata(game);
       const status=game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null);
       const awayScore=game.awayScore??resolvedGameScore(game,'away');
