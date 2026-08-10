@@ -1435,7 +1435,7 @@
         )].sort();
 
         target.innerHTML=`<section class="game-state-join-inspector">
-          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.7.5.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
+          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.9.5.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
           <div class="summary-grid game-join-summary">
             ${summaryTile('Direct ID Join',directGames,'gameId or scheduleId')}
             ${summaryTile('Context Join',contextualGames,'phase + week + team')}
