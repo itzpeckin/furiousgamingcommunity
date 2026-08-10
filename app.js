@@ -996,7 +996,7 @@
                     <div class="featured-half-copy">
                       <span class="eyebrow">${escapeHtml(away.city||'')}</span>
                       <h2>${escapeHtml(away.name||away.fullName||'Away')}</h2>
-                      <p>${escapeHtml(recordForTeam(away))} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p>
+                      <p>${escapeHtml(recordForTeam(away))} · Owner: ${escapeHtml(liveTeamOwnerName(away))}</p>
                       <div class="previous-result"><span>${featured.completed?'Final score':'Previous game'}</span><strong>${featured.completed?`${Number(featured.awayScore||0)} points`:escapeHtml(livePreviousGameCopy(away.id,currentWeek,games,teamMap))}</strong></div>
                     </div>
                   </div>
@@ -1010,7 +1010,7 @@
                     <div class="featured-half-copy">
                       <span class="eyebrow">${escapeHtml(home.city||'')}</span>
                       <h2>${escapeHtml(home.name||home.fullName||'Home')}</h2>
-                      <p>${escapeHtml(recordForTeam(home))} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p>
+                      <p>${escapeHtml(recordForTeam(home))} · Owner: ${escapeHtml(liveTeamOwnerName(home))}</p>
                       <div class="previous-result"><span>${featured.completed?'Final score':'Previous game'}</span><strong>${featured.completed?`${Number(featured.homeScore||0)} points`:escapeHtml(livePreviousGameCopy(home.id,currentWeek,games,teamMap))}</strong></div>
                     </div>
                     ${renderTeamMark(home,'featured-team-logo')}
@@ -1224,6 +1224,16 @@
       const assigned=String(account?.teamId||'').toLowerCase();
       return assigned && (assigned===idLower || assigned===abbrLower);
     }) || null;
+  }
+
+  function liveTeamOwnerName(team={}) {
+    const assignment=assignedAccountForLiveTeam(team);
+    return assignment?.handle
+      || assignment?.name
+      || team.owner
+      || team.source?.userName
+      || team.source?.ownerName
+      || 'Unassigned';
   }
 
   function liveOwnedTeamId() {
