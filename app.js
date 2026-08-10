@@ -2148,8 +2148,10 @@
   }
 
   function statisticDirectGameId(row={}) {
-    const raw=statisticRaw(row);
-    return String(raw.gameId??raw.game_id??raw.scheduleId??raw.schedule_id??raw.gameExternalId??raw.game_external_id??'');
+    const raw=statisticRaw(row), metrics=row?.metrics||{};
+    const value=raw.gameId??raw.game_id??raw.scheduleId??raw.schedule_id??raw.eventId
+      ??metrics.__gameId??metrics.scheduleId??metrics.gameId??metrics.game_id??metrics.schedule_id??null;
+    return value===null||value===undefined||value===''?'':String(value);
   }
 
   function gameDirectIds(game={}) {
@@ -2396,15 +2398,13 @@
   }
 
   function teamGameRowsFor(game={},statistics=[],teamId='') {
+    const gameIds=gameDirectIds(game);
     const gameContext=stageWeekContext(game.source||{},game.week,game.stage);
-    const phase=normalizedGamePhase(gameContext.phase);
-    const week=Number(gameContext.week);
-    return (statistics||[]).filter(row=>{
-      if(String(row.category||'').toLowerCase()!=='team-game') return false;
-      if(rowTeamId(row)!==String(teamId)) return false;
-      const rowContext=stageWeekContext(row.source||{},row.week,row.stage);
-      return normalizedGamePhase(rowContext.phase)===phase && Number(rowContext.week)===week;
-    });
+    const phase=normalizedGamePhase(gameContext.phase), week=Number(gameContext.week);
+    const candidates=(statistics||[]).filter(row=>String(row.category||'').toLowerCase()==='team-game'&&rowTeamId(row)===String(teamId));
+    const direct=candidates.filter(row=>{const id=statisticDirectGameId(row);return Boolean(id&&gameIds.has(id));});
+    if(direct.length)return direct;
+    return candidates.filter(row=>{const c=stageWeekContext(row.source||{},row.week,row.stage);return normalizedGamePhase(c.phase)===phase&&Number(c.week)===week;});
   }
 
   function teamSummaryMetrics(rows=[]) {
@@ -2414,35 +2414,25 @@
   }
 
   function mappedTeamSummaryStats(rows=[]) {
-    const raw=teamSummaryMetrics(rows);
-    const num=aliases=>numericMetric(raw,aliases);
-    const value=aliases=>metricValue(raw,aliases);
-
-    const thirdPct=value(['thirdDownPct','thirdDownPercentage','thirdDownPercent','thirdDownEfficiency','off3rdDownPct']);
-    const thirdMade=num(['thirdDownConversions','thirdDownConverts','thirdDownMade','thirdDownConv','off3rdDownConv']);
-    const thirdAtt=num(['thirdDownAttempts','thirdDownAtt','thirdDownTries','off3rdDownAtt']);
-
-    const redPct=value(['redZonePct','redZonePercentage','redZonePercent','redZoneEfficiency','offRedZonePct']);
-    const redMade=num(['redZoneTDs','redZoneTouchdowns','redZoneConversions','redZoneMade','redZoneScores','offRedZoneTDs']);
-    const redAtt=num(['redZoneAttempts','redZoneAtt','redZoneTrips','redZonePossessions','offRedZoneAtt']);
-
-    const possession=value(['timeOfPossession','possessionTime','timePossession','possessionSeconds','timeOfPossessionSeconds','possession','timeOfPossessionSecs']);
-
-    const penalties=num(['penalties','penaltyCount','totalPenalties','penaltiesCount']);
-    const penaltyYards=num(['penaltyYards','penYds','penaltyYds','totalPenaltyYards']);
-
+    const raw=teamSummaryMetrics(rows), num=a=>numericMetric(raw,a), value=a=>metricValue(raw,a);
+    const thirdMade=num(['off3rdDownConv']), thirdAtt=num(['off3rdDownAtt']), thirdPct=value(['off3rdDownConvPct']);
+    const redPct=value(['offRedZonePct']), redZones=num(['offRedZones']), redTDs=num(['offRedZoneTDs']), redFGs=num(['offRedZoneFGs']);
+    const giveaways=num(['tOGiveaways']);
+    const turnovers=giveaways!==null?giveaways:((num(['offIntsLost'])||0)+(num(['offFumLost'])||0));
+    const penalties=num(['penalties']), penaltyYards=num(['penaltyYds']);
     return {
-      totalOffense:num(['totalOffense','totalOffenseYards','totalYards','offenseYards','offYds','totalOffYds']),
-      passingYards:num(['passingYards','passYards','passYds','netPassingYards','netPassYards','passNetYds']),
-      rushingYards:num(['rushingYards','rushYards','rushYds','totalRushYards']),
-      firstDowns:num(['firstDowns','firstdowns','totalFirstDowns','firstDownTotal','offFirstDowns']),
-      turnovers:num(['turnovers','giveaways','totalTurnovers','turnoverCount','offTurnovers']),
-      thirdDown:thirdPct!==null&&thirdPct!==undefined&&thirdPct!==''?String(thirdPct):ratioDisplay(thirdMade,thirdAtt),
-      redZone:redPct!==null&&redPct!==undefined&&redPct!==''?String(redPct):ratioDisplay(redMade,redAtt),
-      possession:possessionDisplay(possession),
+      totalOffense:num(['offTotalYds','offTotalYdsGained']),
+      passingYards:num(['offPassYds']),
+      rushingYards:num(['offRushYds']),
+      firstDowns:num(['off1stDowns']),
+      turnovers,
+      thirdDown:thirdPct!==null?`${thirdMade??'—'}/${thirdAtt??'—'} (${Number(thirdPct).toFixed(1)}%)`:ratioDisplay(thirdMade,thirdAtt),
+      redZone:redPct!==null?`${redTDs??0}${redFGs!==null?` TD / ${redFGs} FG`:''} · ${Number(redPct).toFixed(1)}%`:(redZones!==null?`${redTDs??0}/${redZones}`:null),
+      possession:value(['timeOfPossession','timePossession','possessionTime','timeOfPossessionSeconds']),
       penalties:penalties!==null?(penaltyYards!==null?`${penalties}-${penaltyYards}`:String(penalties)):null
     };
   }
+
 
   async function hydrateMatchupTeamStatistics(game={}) {
     const key=String(game.id||game.gameId||game.scheduleId||'');
