@@ -2472,6 +2472,7 @@
         ${rows.map(([label,key])=>`<div class="matchup-team-stat-row"><strong>${matchupStatDisplay(model.away[key])}</strong><span>${label}</span><strong>${matchupStatDisplay(model.home[key])}</strong></div>`).join('')}
       </div>
       <div class="matchup-stat-footnote">Values come from the selected game record first, then directly joined player game stats are aggregated by team. Missing fields remain — and season totals are never substituted.</div>
+      ${status==='final'?`<details class="matchup-stat-source-details matchup-stat-source-details--always"><summary>Captured game fields</summary><code>${escapeHtml(model.rawGameFields.join(' · ')||'No box-score-like fields found')}</code></details>`:''}
     </section>`;
   }
 
@@ -2628,6 +2629,33 @@
       console.error('[Matchup Card]',error);
       showToast('Matchup unavailable',error?.message||'The active snapshot schedule could not be loaded.');
     }
+  }
+
+  let scheduleMatchupPreloadPromise=null;
+  function preloadScheduleMatchupData() {
+    if(scheduleMatchupPreloadPromise) return scheduleMatchupPreloadPromise;
+    scheduleMatchupPreloadPromise=(async()=>{
+      try{
+        const service=liveReadModel();
+        if(!service) return;
+        const [directory,statistics]=await Promise.all([
+          loadLiveTeamDirectory(true),
+          service.getStatistics()
+        ]);
+        if(directory?.games){
+          const current=window.FranchiseHQ?.currentSeasonContext||null;
+          const normalized=directory.games.map(game=>liveGameShape(game,directory.teamMap,current));
+          normalized.forEach(game=>liveMatchupGames.set(String(game.id||''),game));
+          directory.games=normalized;
+        }
+        // Warm the browser/read-model cache for statistics so first matchup click is immediate.
+        void statistics;
+      }catch(error){
+        console.warn('[Schedule Preload]',error);
+        scheduleMatchupPreloadPromise=null;
+      }
+    })();
+    return scheduleMatchupPreloadPromise;
   }
 
   function liveTeamScheduleGame(game={}) {
@@ -3012,6 +3040,7 @@
   }
 
   async function renderSchedule() {
+    preloadScheduleMatchupData();
     pageContent.innerHTML='<section class="empty-state"><strong>Loading live schedule…</strong><p>Reading the active franchise snapshot.</p></section>';
     try{
       const service=liveReadModel();
