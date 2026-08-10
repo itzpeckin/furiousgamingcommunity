@@ -990,7 +990,7 @@
                 <small>Week ${featured.week} · ${featured.completed?'Final':'Upcoming'} · ${escapeHtml(String(featured.stage||'Regular Season'))}</small>
               </div>
               <div class="featured-split featured-split--clickable" aria-label="Open Game Center">
-                <div class="featured-half featured-half--away">
+                <div class="featured-half featured-half--away" style="background:linear-gradient(135deg, ${away.primary}, ${away.secondary||away.primary}) !important;">
                   <div class="featured-half-hero">
                     ${renderTeamMark(away,'featured-team-logo')}
                     <div class="featured-half-copy">
@@ -1005,7 +1005,7 @@
                     <div class="featured-unit"><span class="eyebrow">Top Defense</span>${topUnit(away.id,'defense').map(featuredPlayerRow).join('')||'<p>No defensive players available.</p>'}</div>
                   </div>
                 </div>
-                <div class="featured-half featured-half--home">
+                <div class="featured-half featured-half--home" style="background:linear-gradient(225deg, ${home.primary}, ${home.secondary||home.primary}) !important;">
                   <div class="featured-half-hero featured-half-hero--home">
                     <div class="featured-half-copy">
                       <span class="eyebrow">${escapeHtml(home.city||'')}</span>
@@ -1435,7 +1435,7 @@
         )].sort();
 
         target.innerHTML=`<section class="game-state-join-inspector">
-          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.5.5.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
+          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.6.5.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
           <div class="summary-grid game-join-summary">
             ${summaryTile('Direct ID Join',directGames,'gameId or scheduleId')}
             ${summaryTile('Context Join',contextualGames,'phase + week + team')}
