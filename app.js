@@ -2140,13 +2140,164 @@
     return {id,abbr:'TBD',fullName:'Team',owner:'Unassigned',record:'—',primary:'#27364f',secondary:'#8fa4c4'};
   }
 
-  function matchupTabPanel(tab) {
-    const panels={
-      team:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Game comparison</span><h3>Team Statistics</h3></div></div><div class="card-body"><p>Game-specific team-stat mapping will populate here after the schedule/statistics join is certified.</p></div></section>`,
-      player:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Game leaders</span><h3>Player Statistics</h3></div></div><div class="card-body"><p>Passing, rushing, receiving, defense, and kicking records will populate after game-ID joins are certified.</p></div></section>`,
-      advanced:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Verified calculations</span><h3>Advanced Statistics</h3></div></div><div class="card-body"><p>Advanced rates will appear only when all required source fields are available.</p></div></section>`
+  const matchupTeamStatsCache=new Map();
+  let activeMatchupGame=null;
+
+  function statisticRaw(row={}) {
+    return {...(row.source||{}),...(row.metrics||{}),...row};
+  }
+
+  function statisticDirectGameId(row={}) {
+    const raw=statisticRaw(row);
+    return String(raw.gameId??raw.game_id??raw.scheduleId??raw.schedule_id??raw.gameExternalId??raw.game_external_id??'');
+  }
+
+  function gameDirectIds(game={}) {
+    const raw={...(game.source||{}),...game};
+    return [...new Set([
+      raw.id,raw.gameId,raw.game_id,raw.scheduleId,raw.schedule_id,raw.external_id
+    ].filter(value=>value!==undefined&&value!==null&&String(value)!=='').map(String))];
+  }
+
+  function metricValue(raw={},keys=[]) {
+    const all={...(raw.source||{}),...(raw.metrics||{}),...raw};
+    for(const key of keys){
+      const value=all[key];
+      if(value!==undefined&&value!==null&&value!=='') return value;
+    }
+    return null;
+  }
+
+  function numericMetric(raw={},keys=[]) {
+    const value=metricValue(raw,keys);
+    if(value===null) return null;
+    const number=Number(value);
+    return Number.isFinite(number)?number:null;
+  }
+
+  function fractionMetric(raw={},madeKeys=[],attKeys=[],combinedKeys=[]) {
+    const combined=metricValue(raw,combinedKeys);
+    if(combined!==null){
+      const text=String(combined).trim();
+      const match=text.match(/(\d+)\s*[-\/]\s*(\d+)/);
+      if(match) return `${Number(match[1])}/${Number(match[2])}`;
+    }
+    const made=numericMetric(raw,madeKeys),att=numericMetric(raw,attKeys);
+    return made!==null&&att!==null?`${made}/${att}`:null;
+  }
+
+  function possessionMetric(raw={}) {
+    const text=metricValue(raw,['timeOfPossession','timePossession','possessionTime','time_of_possession','possession_time']);
+    if(text!==null){
+      if(typeof text==='string'&&text.includes(':')) return text;
+      const seconds=Number(text);
+      if(Number.isFinite(seconds)&&seconds>=0){
+        const mins=Math.floor(seconds/60),secs=Math.floor(seconds%60);
+        return `${mins}:${String(secs).padStart(2,'0')}`;
+      }
+    }
+    const mins=numericMetric(raw,['topMin','topmin','possessionMinutes','timePossessionMinutes']);
+    const secs=numericMetric(raw,['topSec','topsec','possessionSeconds','timePossessionSeconds']);
+    return mins!==null?`${mins}:${String(secs||0).padStart(2,'0')}`:null;
+  }
+
+  function mergeTeamStatisticRows(rows=[]) {
+    const merged={};
+    rows.forEach(row=>{
+      Object.assign(merged,row.source||{},row.metrics||{},row);
+    });
+    return merged;
+  }
+
+  function teamGameStatisticModel(rows=[]) {
+    const raw=mergeTeamStatisticRows(rows);
+    const turnovers=numericMetric(raw,['turnovers','totalTurnovers','giveaways','turnoverTotal','teamTurnovers']);
+    const interceptions=numericMetric(raw,['interceptionsThrown','passInterceptions','intsThrown']);
+    const fumblesLost=numericMetric(raw,['fumblesLost','fumbleLost']);
+    const derivedTurnovers=turnovers!==null?turnovers:(interceptions!==null||fumblesLost!==null?(interceptions||0)+(fumblesLost||0):null);
+    const penalties=numericMetric(raw,['penalties','penaltyCount','totalPenalties']);
+    const penaltyYards=numericMetric(raw,['penaltyYards','penYds','penalty_yards']);
+    return {
+      totalOffense:numericMetric(raw,['totalOffense','totalOffenseYards','totalYards','offenseYards','teamOffYds','teamoff','total_offense_yards']),
+      passingYards:numericMetric(raw,['passingYards','passYards','passYds','netPassingYards','teamPassYds','teampass','passing_yards']),
+      rushingYards:numericMetric(raw,['rushingYards','rushYards','rushYds','teamRushYds','teamrush','rushing_yards']),
+      firstDowns:numericMetric(raw,['firstDowns','totalFirstDowns','firstdowns','first_downs']),
+      turnovers:derivedTurnovers,
+      thirdDown:fractionMetric(raw,['thirdDownMade','thirdDownConversions','thirdDownsMade','thirdmade','third_down_made'],['thirdDownAttempts','thirdDownAtt','thirdDownsAttempted','thirdatt','third_down_attempts'],['thirdDown','thirdDownEfficiency','third_down']),
+      redZone:fractionMetric(raw,['redZoneMade','redZoneTDs','redZoneConversions','rzmade','red_zone_made'],['redZoneAttempts','redZoneAtt','rzatt','red_zone_attempts'],['redZone','redZoneEfficiency','red_zone']),
+      possession:possessionMetric(raw),
+      penalties:penalties!==null?(penaltyYards!==null?`${penalties}-${penaltyYards}`:String(penalties)):null,
+      rowCount:rows.length,
+      raw
     };
-    return panels[tab]||panels.team;
+  }
+
+  async function hydrateMatchupTeamStatistics(game={}) {
+    const key=String(game.id||game.gameId||game.scheduleId||'');
+    if(key&&matchupTeamStatsCache.has(key)) return matchupTeamStatsCache.get(key);
+    const service=liveReadModel();
+    if(!service) return null;
+    const statistics=await service.getStatistics();
+    const ids=new Set(gameDirectIds(game));
+    const awayId=String(game.awayTeamId??game.awayId??'');
+    const homeId=String(game.homeTeamId??game.homeId??'');
+    const direct=(statistics||[]).filter(row=>{
+      const rowGameId=statisticDirectGameId(row);
+      if(!rowGameId||!ids.has(rowGameId)) return false;
+      const playerId=String(row.playerId??row.source?.playerId??row.source?.player_id??'');
+      return !playerId;
+    });
+    const byTeam=teamId=>direct.filter(row=>String(row.teamId??row.source?.teamId??row.source?.team_id??'')===String(teamId));
+    const model={
+      join:'direct-id',
+      gameIds:[...ids],
+      away:teamGameStatisticModel(byTeam(awayId)),
+      home:teamGameStatisticModel(byTeam(homeId)),
+      totalRows:direct.length
+    };
+    if(key) matchupTeamStatsCache.set(key,model);
+    return model;
+  }
+
+  function matchupStatDisplay(value) {
+    return value===null||value===undefined||value===''?'—':escapeHtml(String(value));
+  }
+
+  function renderMatchupTeamStats(game={}) {
+    const key=String(game.id||game.gameId||game.scheduleId||'');
+    const model=matchupTeamStatsCache.get(key);
+    const away=matchupTeam(game.awayTeamId??game.awayId);
+    const home=matchupTeam(game.homeTeamId??game.homeId);
+    const status=String(game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null)||'').toLowerCase();
+    if(!model){
+      return `<section class="matchup-tab-panel"><div class="card-body matchup-team-stats-state"><strong>Loading team statistics…</strong><span>Reading direct game statistics from the active snapshot.</span></div></section>`;
+    }
+    if(!model.totalRows){
+      const copy=status==='final'
+        ? 'No game-specific team-stat records were found for this completed game. Season totals are intentionally not substituted.'
+        : 'Game-specific team statistics will populate after Madden records statistics for this matchup.';
+      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Team Statistics</h3></div><span class="pill pill--neutral">0 records</span></div><div class="card-body matchup-team-stats-state"><strong>${status==='final'?'Statistics unavailable':'Upcoming matchup'}</strong><span>${copy}</span></div></section>`;
+    }
+    const rows=[
+      ['Total Offense','totalOffense'],['Passing Yards','passingYards'],['Rushing Yards','rushingYards'],['First Downs','firstDowns'],['Turnovers','turnovers'],['3rd Down','thirdDown'],['Red Zone','redZone'],['Time of Possession','possession'],['Penalties','penalties']
+    ];
+    return `<section class="matchup-tab-panel matchup-team-stats-panel">
+      <div class="card-header"><div><span class="eyebrow">Direct game join · ${model.totalRows} records</span><h3>Team Statistics</h3></div><span class="pill pill--success">Game Specific</span></div>
+      <div class="matchup-team-stat-board">
+        <div class="matchup-team-stat-head"><span>${renderTeamMark(away,'team-logo')}<strong>${escapeHtml(away.abbr||away.fullName)}</strong></span><b>TEAM STATS</b><span><strong>${escapeHtml(home.abbr||home.fullName)}</strong>${renderTeamMark(home,'team-logo')}</span></div>
+        ${rows.map(([label,key])=>`<div class="matchup-team-stat-row"><strong>${matchupStatDisplay(model.away[key])}</strong><span>${label}</span><strong>${matchupStatDisplay(model.home[key])}</strong></div>`).join('')}
+      </div>
+      <div class="matchup-stat-footnote">Penalties display as count-yards when Madden supplies both values. Missing fields remain blank rather than using season totals.</div>
+    </section>`;
+  }
+
+  function matchupTabPanel(tab) {
+    if(tab==='team') return renderMatchupTeamStats(activeMatchupGame||{});
+    const panels={
+      player:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Game leaders</span><h3>Player Statistics</h3></div></div><div class="card-body"><p>Player Statistics integration is scheduled for v5.9.5.2.</p></div></section>`,
+      advanced:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Verified calculations</span><h3>Advanced Statistics</h3></div></div><div class="card-body"><p>Advanced Statistics integration follows player-stat certification.</p></div></section>`
+    };
+    return panels[tab]||renderMatchupTeamStats(activeMatchupGame||{});
   }
 
   function matchupGameContext(game={}) {
@@ -2235,6 +2386,8 @@
       }
 
       liveMatchupGames.set(String(game.id||gameId),game);
+      activeMatchupGame=game;
+      await hydrateMatchupTeamStatistics(game);
       const away=matchupTeam(game.awayTeamId??game.awayId);
       const home=matchupTeam(game.homeTeamId??game.homeId);
       const meta=gameMetadata(game);
