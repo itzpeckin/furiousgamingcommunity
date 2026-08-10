@@ -563,14 +563,14 @@
 
       <div class="league-home-main">
         <div class="league-home-primary">
-          <section class="featured-game featured-game--opens-matchup card" data-game-id="${featured.id}" role="button" tabindex="0" aria-label="Open matchup card" style="--away-primary:${away.primary};--away-secondary:${away.secondary||away.primary};--home-primary:${home.primary};--home-secondary:${home.secondary||home.primary}">
-          <div class="featured-game-label">
+          <section class="featured-game featured-game--opens-matchup card" data-game-id="${featured.id}" role="button" tabindex="0" aria-label="Open matchup card" style="--away-primary:${away.primary};--away-secondary:${away.secondary||away.primary};--home-primary:${home.primary};--home-secondary:${home.secondary||home.primary};background:#0b1018 !important;background-image:none !important;">
+          <div class="featured-game-label" style="background:#0b1018 !important;background-image:none !important;position:relative;z-index:5;">
             <span>${isOfficialGotw?'★ Game of the Week':'Selected Matchup'}</span>
             <small>${featured.day} · ${featured.time} · ${featured.network} · ${featured.stadium}</small>
           </div>
 
           <div class="featured-split featured-split--clickable" aria-label="Open Game Center">
-            <div class="featured-half featured-half--away team-gradient-card" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
+            <div class="featured-half featured-half--away team-gradient-card" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary};background:linear-gradient(135deg, ${away.primary}, ${away.secondary||away.primary}) !important;background-image:linear-gradient(135deg, ${away.primary}, ${away.secondary||away.primary}) !important;">
               <div class="featured-half-hero">
                 ${renderTeamMark(away,'featured-team-logo')}
                 <div class="featured-half-copy">
@@ -591,7 +591,7 @@
                 </div>
               </div>
             </div>
-<div class="featured-half featured-half--home team-gradient-card team-gradient-card--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
+<div class="featured-half featured-half--home team-gradient-card team-gradient-card--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary};background:linear-gradient(225deg, ${home.primary}, ${home.secondary||home.primary}) !important;background-image:linear-gradient(225deg, ${home.primary}, ${home.secondary||home.primary}) !important;">
               <div class="featured-half-hero featured-half-hero--home">
                 <div class="featured-half-copy">
                   <span class="eyebrow">${home.city}</span>
@@ -1435,7 +1435,7 @@
         )].sort();
 
         target.innerHTML=`<section class="game-state-join-inspector">
-          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.9.5.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
+          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.10.5.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
           <div class="summary-grid game-join-summary">
             ${summaryTile('Direct ID Join',directGames,'gameId or scheduleId')}
             ${summaryTile('Context Join',contextualGames,'phase + week + team')}
