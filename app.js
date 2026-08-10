@@ -2232,29 +2232,131 @@
     };
   }
 
+  function rowTeamId(row={}) {
+    const raw=statisticRaw(row);
+    return String(raw.teamId??raw.team_id??raw.teamExternalId??raw.team_external_id??raw.clubId??raw.club_id??'');
+  }
+
+  function rowPlayerId(row={}) {
+    const raw=statisticRaw(row);
+    return String(raw.playerId??raw.player_id??raw.playerExternalId??raw.player_external_id??raw.rosterId??raw.roster_id??'');
+  }
+
+  function sumMetric(rows=[],keys=[]) {
+    let found=false,total=0;
+    rows.forEach(row=>{
+      const value=numericMetric(row,keys);
+      if(value!==null){found=true;total+=value;}
+    });
+    return found?total:null;
+  }
+
+  function aggregatePlayerGameStats(rows=[]) {
+    const passingYards=sumMetric(rows,['passingYards','passYards','passYds','pass_yds']);
+    const rushingYards=sumMetric(rows,['rushingYards','rushYards','rushYds','rush_yds']);
+    const interceptions=sumMetric(rows,['interceptions','passInterceptions','interceptionsThrown','intsThrown']);
+    const fumblesLost=sumMetric(rows,['fumblesLost','fumbleLost','fumbles_lost']);
+    return {
+      passingYards,
+      rushingYards,
+      totalOffense:passingYards!==null||rushingYards!==null?(passingYards||0)+(rushingYards||0):null,
+      turnovers:interceptions!==null||fumblesLost!==null?(interceptions||0)+(fumblesLost||0):null,
+      rowCount:rows.length
+    };
+  }
+
+  function gameSideBoxScore(game={},side='away') {
+    const raw={...(game.source||{}),...game};
+    const prefix=side==='home'?'home':'away';
+    const cap=prefix[0].toUpperCase()+prefix.slice(1);
+    const metric=(suffixes=[])=>numericMetric(raw,suffixes.flatMap(name=>[
+      `${prefix}${name}`,`${prefix}_${name}`,`${name}${cap}`,`${name}_${prefix}`
+    ]));
+    const textMetric=(suffixes=[])=>metricValue(raw,suffixes.flatMap(name=>[
+      `${prefix}${name}`,`${prefix}_${name}`,`${name}${cap}`,`${name}_${prefix}`
+    ]));
+    const totalOffense=metric(['TotalOffense','TotalYards','OffenseYards','OffYds']);
+    const passingYards=metric(['PassingYards','PassYards','PassYds','NetPassingYards']);
+    const rushingYards=metric(['RushingYards','RushYards','RushYds']);
+    const firstDowns=metric(['FirstDowns','Firstdowns']);
+    const turnovers=metric(['Turnovers','Giveaways']);
+    const penalties=metric(['Penalties','PenaltyCount']);
+    const penaltyYards=metric(['PenaltyYards','PenYds']);
+    const thirdCombined=textMetric(['ThirdDown','ThirdDownEfficiency']);
+    const redCombined=textMetric(['RedZone','RedZoneEfficiency']);
+    const possession=textMetric(['TimeOfPossession','PossessionTime','TimePossession']);
+    return {
+      totalOffense,passingYards,rushingYards,firstDowns,turnovers,
+      thirdDown:thirdCombined!==null?String(thirdCombined):null,
+      redZone:redCombined!==null?String(redCombined):null,
+      possession:possession!==null?String(possession):null,
+      penalties:penalties!==null?(penaltyYards!==null?`${penalties}-${penaltyYards}`:String(penalties)):null
+    };
+  }
+
+  function combineGameTeamStats(gameStats={},playerStats={}) {
+    const value=key=>gameStats[key]!==null&&gameStats[key]!==undefined&&gameStats[key]!==''?gameStats[key]:playerStats[key];
+    return {
+      totalOffense:value('totalOffense'),
+      passingYards:value('passingYards'),
+      rushingYards:value('rushingYards'),
+      firstDowns:value('firstDowns'),
+      turnovers:value('turnovers'),
+      thirdDown:value('thirdDown'),
+      redZone:value('redZone'),
+      possession:value('possession'),
+      penalties:value('penalties')
+    };
+  }
+
   async function hydrateMatchupTeamStatistics(game={}) {
     const key=String(game.id||game.gameId||game.scheduleId||'');
     if(key&&matchupTeamStatsCache.has(key)) return matchupTeamStatsCache.get(key);
     const service=liveReadModel();
     if(!service) return null;
+
     const statistics=await service.getStatistics();
     const ids=new Set(gameDirectIds(game));
     const awayId=String(game.awayTeamId??game.awayId??'');
     const homeId=String(game.homeTeamId??game.homeId??'');
+
+    // The active statistics domain is player-stat oriented. Keep ALL directly
+    // joined game rows and aggregate only records belonging to the selected teams.
     const direct=(statistics||[]).filter(row=>{
       const rowGameId=statisticDirectGameId(row);
-      if(!rowGameId||!ids.has(rowGameId)) return false;
-      const playerId=String(row.playerId??row.source?.playerId??row.source?.player_id??'');
-      return !playerId;
+      return Boolean(rowGameId&&ids.has(rowGameId));
     });
-    const byTeam=teamId=>direct.filter(row=>String(row.teamId??row.source?.teamId??row.source?.team_id??'')===String(teamId));
+
+    const byTeam=teamId=>direct.filter(row=>rowTeamId(row)===String(teamId));
+    const awayRows=byTeam(awayId);
+    const homeRows=byTeam(homeId);
+
+    const awayPlayerRows=awayRows.filter(row=>rowPlayerId(row));
+    const homePlayerRows=homeRows.filter(row=>rowPlayerId(row));
+
+    const awayGame=gameSideBoxScore(game,'away');
+    const homeGame=gameSideBoxScore(game,'home');
+    const awayAggregate=aggregatePlayerGameStats(awayPlayerRows);
+    const homeAggregate=aggregatePlayerGameStats(homePlayerRows);
+
+    const away=combineGameTeamStats(awayGame,awayAggregate);
+    const home=combineGameTeamStats(homeGame,homeAggregate);
+
+    const populated=[...Object.values(away),...Object.values(home)].filter(value=>value!==null&&value!==undefined&&value!=='').length;
     const model={
       join:'direct-id',
+      source:'game-record+player-game-aggregate',
       gameIds:[...ids],
-      away:teamGameStatisticModel(byTeam(awayId)),
-      home:teamGameStatisticModel(byTeam(homeId)),
-      totalRows:direct.length
+      away,home,
+      totalRows:direct.length,
+      awayRows:awayRows.length,
+      homeRows:homeRows.length,
+      awayPlayerRows:awayPlayerRows.length,
+      homePlayerRows:homePlayerRows.length,
+      populated,
+      rawGameFields:Object.keys({...game,...(game.source||{})}).filter(key=>/yard|down|turn|pen|poss|offen|rush|pass|red|score/i.test(key)).sort()
     };
+
     if(key) matchupTeamStatsCache.set(key,model);
     return model;
   }
@@ -2272,11 +2374,11 @@
     if(!model){
       return `<section class="matchup-tab-panel"><div class="card-body matchup-team-stats-state"><strong>Loading team statistics…</strong><span>Reading direct game statistics from the active snapshot.</span></div></section>`;
     }
-    if(!model.totalRows){
+    if(!model.populated){
       const copy=status==='final'
-        ? 'No game-specific team-stat records were found for this completed game. Season totals are intentionally not substituted.'
+        ? 'The completed game is joined correctly, but this export does not contain any supported box-score or player-game fields for the Team Stats panel.'
         : 'Game-specific team statistics will populate after Madden records statistics for this matchup.';
-      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Team Statistics</h3></div><span class="pill pill--neutral">0 records</span></div><div class="card-body matchup-team-stats-state"><strong>${status==='final'?'Statistics unavailable':'Upcoming matchup'}</strong><span>${copy}</span></div></section>`;
+      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Team Statistics</h3></div><span class="pill pill--neutral">${model.totalRows} joined records</span></div><div class="card-body matchup-team-stats-state"><strong>${status==='final'?'Statistics fields unavailable':'Upcoming matchup'}</strong><span>${copy}</span>${status==='final'?`<details class="matchup-stat-source-details"><summary>Captured game fields</summary><code>${escapeHtml(model.rawGameFields.join(', ')||'No box-score-like fields found')}</code></details>`:''}</div></section>`;
     }
     const rows=[
       ['Total Offense','totalOffense'],['Passing Yards','passingYards'],['Rushing Yards','rushingYards'],['First Downs','firstDowns'],['Turnovers','turnovers'],['3rd Down','thirdDown'],['Red Zone','redZone'],['Time of Possession','possession'],['Penalties','penalties']
@@ -2287,7 +2389,7 @@
         <div class="matchup-team-stat-head"><span>${renderTeamMark(away,'team-logo')}<strong>${escapeHtml(away.abbr||away.fullName)}</strong></span><b>TEAM STATS</b><span><strong>${escapeHtml(home.abbr||home.fullName)}</strong>${renderTeamMark(home,'team-logo')}</span></div>
         ${rows.map(([label,key])=>`<div class="matchup-team-stat-row"><strong>${matchupStatDisplay(model.away[key])}</strong><span>${label}</span><strong>${matchupStatDisplay(model.home[key])}</strong></div>`).join('')}
       </div>
-      <div class="matchup-stat-footnote">Penalties display as count-yards when Madden supplies both values. Missing fields remain blank rather than using season totals.</div>
+      <div class="matchup-stat-footnote">Values come from the selected game record first, then directly joined player game stats are aggregated by team. Missing fields remain — and season totals are never substituted.</div>
     </section>`;
   }
 
