@@ -2388,6 +2388,62 @@
     };
   }
 
+  function normalizedGamePhase(value) {
+    const text=String(value??'').toLowerCase();
+    if(text.includes('pre')) return 'preseason';
+    if(text.includes('post')||text.includes('playoff')) return 'playoffs';
+    return 'regular-season';
+  }
+
+  function teamGameRowsFor(game={},statistics=[],teamId='') {
+    const gameContext=stageWeekContext(game.source||{},game.week,game.stage);
+    const phase=normalizedGamePhase(gameContext.phase);
+    const week=Number(gameContext.week);
+    return (statistics||[]).filter(row=>{
+      if(String(row.category||'').toLowerCase()!=='team-game') return false;
+      if(rowTeamId(row)!==String(teamId)) return false;
+      const rowContext=stageWeekContext(row.source||{},row.week,row.stage);
+      return normalizedGamePhase(rowContext.phase)===phase && Number(rowContext.week)===week;
+    });
+  }
+
+  function teamSummaryMetrics(rows=[]) {
+    const merged={};
+    rows.forEach(row=>Object.assign(merged,row.metrics||{},row.source||{}));
+    return merged;
+  }
+
+  function mappedTeamSummaryStats(rows=[]) {
+    const raw=teamSummaryMetrics(rows);
+    const num=aliases=>numericMetric(raw,aliases);
+    const value=aliases=>metricValue(raw,aliases);
+
+    const thirdPct=value(['thirdDownPct','thirdDownPercentage','thirdDownPercent','thirdDownEfficiency','off3rdDownPct']);
+    const thirdMade=num(['thirdDownConversions','thirdDownConverts','thirdDownMade','thirdDownConv','off3rdDownConv']);
+    const thirdAtt=num(['thirdDownAttempts','thirdDownAtt','thirdDownTries','off3rdDownAtt']);
+
+    const redPct=value(['redZonePct','redZonePercentage','redZonePercent','redZoneEfficiency','offRedZonePct']);
+    const redMade=num(['redZoneTDs','redZoneTouchdowns','redZoneConversions','redZoneMade','redZoneScores','offRedZoneTDs']);
+    const redAtt=num(['redZoneAttempts','redZoneAtt','redZoneTrips','redZonePossessions','offRedZoneAtt']);
+
+    const possession=value(['timeOfPossession','possessionTime','timePossession','possessionSeconds','timeOfPossessionSeconds','possession','timeOfPossessionSecs']);
+
+    const penalties=num(['penalties','penaltyCount','totalPenalties','penaltiesCount']);
+    const penaltyYards=num(['penaltyYards','penYds','penaltyYds','totalPenaltyYards']);
+
+    return {
+      totalOffense:num(['totalOffense','totalOffenseYards','totalYards','offenseYards','offYds','totalOffYds']),
+      passingYards:num(['passingYards','passYards','passYds','netPassingYards','netPassYards','passNetYds']),
+      rushingYards:num(['rushingYards','rushYards','rushYds','totalRushYards']),
+      firstDowns:num(['firstDowns','firstdowns','totalFirstDowns','firstDownTotal','offFirstDowns']),
+      turnovers:num(['turnovers','giveaways','totalTurnovers','turnoverCount','offTurnovers']),
+      thirdDown:thirdPct!==null&&thirdPct!==undefined&&thirdPct!==''?String(thirdPct):ratioDisplay(thirdMade,thirdAtt),
+      redZone:redPct!==null&&redPct!==undefined&&redPct!==''?String(redPct):ratioDisplay(redMade,redAtt),
+      possession:possessionDisplay(possession),
+      penalties:penalties!==null?(penaltyYards!==null?`${penalties}-${penaltyYards}`:String(penalties)):null
+    };
+  }
+
   async function hydrateMatchupTeamStatistics(game={}) {
     const key=String(game.id||game.gameId||game.scheduleId||'');
     if(key&&matchupTeamStatsCache.has(key)) return matchupTeamStatsCache.get(key);
@@ -2413,13 +2469,27 @@
     const awayPlayerRows=awayRows.filter(row=>rowPlayerId(row));
     const homePlayerRows=homeRows.filter(row=>rowPlayerId(row));
 
+    // Team-summary records usually do not include a direct gameId. A team can only
+    // play once in a given franchise stage/week, so phase + week + team is the
+    // deterministic game-specific join for category=team-game.
+    const awayTeamGameRows=teamGameRowsFor(game,statistics,awayId);
+    const homeTeamGameRows=teamGameRowsFor(game,statistics,homeId);
+
     const awayGame=gameSideBoxScore(game,'away');
     const homeGame=gameSideBoxScore(game,'home');
+    const awayTeamSummary=mappedTeamSummaryStats(awayTeamGameRows);
+    const homeTeamSummary=mappedTeamSummaryStats(homeTeamGameRows);
     const awayAggregate=aggregatePlayerGameStats(awayPlayerRows);
     const homeAggregate=aggregatePlayerGameStats(homePlayerRows);
 
-    const away=combineGameTeamStats(awayGame,awayAggregate);
-    const home=combineGameTeamStats(homeGame,homeAggregate);
+    const away=combineGameTeamStats(
+      combineGameTeamStats(awayGame,awayTeamSummary),
+      awayAggregate
+    );
+    const home=combineGameTeamStats(
+      combineGameTeamStats(homeGame,homeTeamSummary),
+      homeAggregate
+    );
 
     const populated=[...Object.values(away),...Object.values(home)].filter(value=>value!==null&&value!==undefined&&value!=='').length;
     const model={
@@ -2432,6 +2502,8 @@
       homeRows:homeRows.length,
       awayPlayerRows:awayPlayerRows.length,
       homePlayerRows:homePlayerRows.length,
+      awayTeamGameRows:awayTeamGameRows.length,
+      homeTeamGameRows:homeTeamGameRows.length,
       populated,
       rawGameFields:Object.entries({...game,...(game.source||{})})
         .filter(([key])=>/yard|down|turn|pen|poss|offen|rush|pass|red|score|first|third|time/i.test(key))
@@ -2460,19 +2532,18 @@
       const copy=status==='final'
         ? 'The completed game is joined correctly, but this export does not contain any supported box-score or player-game fields for the Team Stats panel.'
         : 'Game-specific team statistics will populate after Madden records statistics for this matchup.';
-      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Team Statistics</h3></div><span class="pill pill--neutral">${model.totalRows} joined records</span></div><div class="card-body matchup-team-stats-state"><strong>${status==='final'?'Statistics fields unavailable':'Upcoming matchup'}</strong><span>${copy}</span>${status==='final'?`<details class="matchup-stat-source-details"><summary>Captured game fields</summary><code>${escapeHtml(model.rawGameFields.join(' · ')||'No box-score-like fields found')}</code></details>`:''}</div></section>`;
+      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Team Statistics</h3></div><span class="pill pill--neutral">${model.totalRows} joined records</span></div><div class="card-body matchup-team-stats-state"><strong>${status==='final'?'Statistics fields unavailable':'Upcoming matchup'}</strong><span>${copy}</span></div></section>`;
     }
     const rows=[
       ['Total Offense','totalOffense'],['Passing Yards','passingYards'],['Rushing Yards','rushingYards'],['First Downs','firstDowns'],['Turnovers','turnovers'],['3rd Down','thirdDown'],['Red Zone','redZone'],['Time of Possession','possession'],['Penalties','penalties']
     ];
     return `<section class="matchup-tab-panel matchup-team-stats-panel">
-      <div class="card-header"><div><span class="eyebrow">Direct game join · ${model.totalRows} records</span><h3>Team Statistics</h3></div><span class="pill pill--success">Game Specific</span></div>
+      <div class="card-header"><div><span class="eyebrow">Game-specific join · ${model.totalRows + (model.awayTeamGameRows||0) + (model.homeTeamGameRows||0)} records</span><h3>Team Statistics</h3></div><span class="pill pill--success">Game Specific</span></div>
       <div class="matchup-team-stat-board">
         <div class="matchup-team-stat-head"><span>${renderTeamMark(away,'team-logo')}<strong>${escapeHtml(away.abbr||away.fullName)}</strong></span><b>TEAM STATS</b><span><strong>${escapeHtml(home.abbr||home.fullName)}</strong>${renderTeamMark(home,'team-logo')}</span></div>
         ${rows.map(([label,key])=>`<div class="matchup-team-stat-row"><strong>${matchupStatDisplay(model.away[key])}</strong><span>${label}</span><strong>${matchupStatDisplay(model.home[key])}</strong></div>`).join('')}
       </div>
       <div class="matchup-stat-footnote">Values come from the selected game record first, then directly joined player game stats are aggregated by team. Missing fields remain — and season totals are never substituted.</div>
-      ${status==='final'?`<details class="matchup-stat-source-details matchup-stat-source-details--always"><summary>Captured game fields</summary><code>${escapeHtml(model.rawGameFields.join(' · ')||'No box-score-like fields found')}</code></details>`:''}
     </section>`;
   }
 
