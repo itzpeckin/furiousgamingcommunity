@@ -570,7 +570,7 @@
           </div>
 
           <div class="featured-split featured-split--clickable" aria-label="Open Game Center">
-            <div class="featured-half featured-half--away">
+            <div class="featured-half featured-half--away team-gradient-card" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
               <div class="featured-half-hero">
                 ${renderTeamMark(away,'featured-team-logo')}
                 <div class="featured-half-copy">
@@ -591,7 +591,7 @@
                 </div>
               </div>
             </div>
-<div class="featured-half featured-half--home">
+<div class="featured-half featured-half--home team-gradient-card team-gradient-card--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
               <div class="featured-half-hero featured-half-hero--home">
                 <div class="featured-half-copy">
                   <span class="eyebrow">${home.city}</span>
@@ -1435,7 +1435,7 @@
         )].sort();
 
         target.innerHTML=`<section class="game-state-join-inspector">
-          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.4.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
+          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.5.5.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
           <div class="summary-grid game-join-summary">
             ${summaryTile('Direct ID Join',directGames,'gameId or scheduleId')}
             ${summaryTile('Context Join',contextualGames,'phase + week + team')}
@@ -2231,7 +2231,7 @@
           <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span>
         </div>
         <div class="matchup-gotw-board">
-          <section class="matchup-gotw-half matchup-gotw-half--away" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
+          <section class="matchup-gotw-half matchup-gotw-half--away team-gradient-card" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
             <div class="matchup-gotw-identity">
               ${renderTeamMark(away,'matchup-team-logo')}
               <div><span class="eyebrow">${escapeHtml(away.city||away.abbr||'Away')}</span><h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p></div>
@@ -2243,7 +2243,7 @@
             <strong>${escapeHtml(score)}</strong>
             <small>${info?escapeHtml(info):(status==='final'?'Final':'Scheduled')}</small>
           </div>
-          <section class="matchup-gotw-half matchup-gotw-half--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
+          <section class="matchup-gotw-half matchup-gotw-half--home team-gradient-card team-gradient-card--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
             <div class="matchup-gotw-identity matchup-gotw-identity--home">
               <div><span class="eyebrow">${escapeHtml(home.city||home.abbr||'Home')}</span><h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p></div>
               ${renderTeamMark(home,'matchup-team-logo')}
