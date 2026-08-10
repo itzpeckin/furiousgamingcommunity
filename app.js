@@ -563,7 +563,7 @@
 
       <div class="league-home-main">
         <div class="league-home-primary">
-          <section class="featured-game featured-game--opens-matchup card" data-game-id="${featured.id}" role="button" tabindex="0" aria-label="Open matchup card" style="--away:${away.primary};--home:${home.primary}">
+          <section class="featured-game featured-game--opens-matchup card" data-game-id="${featured.id}" role="button" tabindex="0" aria-label="Open matchup card" style="--away-primary:${away.primary};--away-secondary:${away.secondary||away.primary};--home-primary:${home.primary};--home-secondary:${home.secondary||home.primary}">
           <div class="featured-game-label">
             <span>${isOfficialGotw?'★ Game of the Week':'Selected Matchup'}</span>
             <small>${featured.day} · ${featured.time} · ${featured.network} · ${featured.stadium}</small>
@@ -885,9 +885,19 @@
     if(!service){renderLeagueHomeLegacy();return;}
     pageContent.setAttribute('aria-busy','true');
     try{
-      const [stateValue,snapshot,teamRows,standingRows,gameRows,statRows,playerRows]=await Promise.all([
+      const homeCacheKey='fhq:live-home:v5.9.5';
+      let cachedHome=null;
+      try{
+        const stored=JSON.parse(sessionStorage.getItem(homeCacheKey)||'null');
+        if(stored&&Date.now()-Number(stored.savedAt||0)<15000) cachedHome=stored.payload;
+      }catch{}
+      const homePayload=cachedHome||await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),service.getStatistics(),service.getPlayers()
       ]);
+      if(!cachedHome){
+        try{sessionStorage.setItem(homeCacheKey,JSON.stringify({savedAt:Date.now(),payload:homePayload}));}catch{}
+      }
+      const [stateValue,snapshot,teamRows,standingRows,gameRows,statRows,playerRows]=homePayload;
       pageContent.removeAttribute('aria-busy');
       if(routeBase(location.hash.slice(1))!=='home')return;
       if(stateValue!=='live'||!snapshot){renderLiveState('No live franchise connected','Activate a validated snapshot to populate League Home.');return;}
@@ -909,11 +919,13 @@
         return row?.record || ((Number(row?.wins)||0)+'-'+(Number(row?.losses)||0)+(Number(row?.ties)?'-'+Number(row.ties):'')) || '0-0';
       };
       liveTeams.forEach(team=>{const row=standingForTeam(team);if(row)Object.assign(team,{wins:row.wins,losses:row.losses,ties:row.ties,record:recordForTeam(team)});});
+      liveTeams.forEach(team=>liveMatchupTeams.set(String(team.id),team));
       const provisionalGames=gameRows.map(game=>liveGameShape(game,teamMap));
       const seasonContext=authoritativeSeasonContext(snapshot,standingRows,provisionalGames);
       window.FranchiseHQ=window.FranchiseHQ||{};
       window.FranchiseHQ.currentSeasonContext=seasonContext;
       const games=gameRows.map(game=>liveGameShape(game,teamMap,seasonContext));
+      games.forEach(game=>liveMatchupGames.set(String(game.id||''),game));
       const currentWeek=seasonContext.week;
       const availableGames=games.filter(game=>{
         const sameWeek=Number(game.week)===Number(currentWeek);
@@ -1423,7 +1435,7 @@
         )].sort();
 
         target.innerHTML=`<section class="game-state-join-inspector">
-          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.3.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
+          <div class="card-header"><div><span class="eyebrow">v5.9.5.0.4.4.3.2.0.1.1 · Data Certification</span><h3>Game-State Join Inspector</h3><p>Determines whether schedule, team-stat, and player-stat records can be joined through direct IDs or stage/week/team context.</p></div><span class="pill pill--neutral">${summaries.length} games</span></div>
           <div class="summary-grid game-join-summary">
             ${summaryTile('Direct ID Join',directGames,'gameId or scheduleId')}
             ${summaryTile('Context Join',contextualGames,'phase + week + team')}
@@ -2054,6 +2066,7 @@
   }
 
   const liveMatchupGames=new Map();
+  const liveMatchupTeams=new Map();
 
   function gameMetadata(game={}) {
     const source=game.source||{};
@@ -2095,7 +2108,8 @@
 
   function matchupTeam(teamId) {
     const id=String(teamId??'');
-    const directoryMatch=liveTeamDirectory?.teamMap?.get(id)
+    const directoryMatch=liveMatchupTeams.get(id)
+      || liveTeamDirectory?.teamMap?.get(id)
       || liveTeamDirectory?.teams?.find(team=>String(team.id)===id||String(team.source?.teamId??'')===id);
     const team=directoryMatch||teamById(teamId);
     if(team){
@@ -2171,6 +2185,7 @@
     const normalized=(directory.games||[]).map(game=>liveGameShape(game,directory.teamMap,current));
 
     normalized.forEach(game=>liveMatchupGames.set(String(game.id||''),game));
+    (directory.teams||[]).forEach(team=>liveMatchupTeams.set(String(team.id),team));
     directory.games=normalized;
 
     return normalized;
@@ -2353,7 +2368,7 @@
 
   function renderTeamTradeHistory(team) {
     const rows = window.FGC_TRADE?.getTeamTradeHistory?.(team.id) || [];
-    return `<div class="team-trade-history-view"><div class="section-heading"><div><span class="eyebrow">Permanent franchise transaction record</span><h2>${escapeHtml(team.fullName)} Trade History</h2><p>Committee-approved Franchise HQ transactions involving this team.</p></div><span class="pill pill--neutral">${rows.length} trade${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-trade-history-list">${rows.map(row=>{const partners=row.teamIds.filter(id=>id!==team.id).map(id=>teamById(id)?.fullName||id).join(', ');return `<button type="button" class="team-trade-history-row card" ${row.kind==='multi'?`data-route="trade-center/multi-${escapeHtml(row.id)}"`:`data-route="trade-center/${escapeHtml(row.id)}"`}><span><strong>Trade #${escapeHtml(row.id)}</strong><small>${escapeHtml(row.date||'Date unavailable')} · ${escapeHtml(partners||'League transaction')}</small><em>${escapeHtml(row.summary||'No asset summary available')}</em></span><span class="pill pill--success">Approved</span></button>`}).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No completed trade history</h3><p>This franchise has not appeared in an approved Franchise HQ trade record.</p></div></article>`}</div>`;
+    return `<div class="team-trade-history-view"><div class="section-heading"><div><h2>${escapeHtml(team.fullName)} Trade History</h2></div><span class="pill pill--neutral">${rows.length} trade${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-trade-history-list">${rows.map(row=>{const partners=row.teamIds.filter(id=>id!==team.id).map(id=>teamById(id)?.fullName||id).join(', ');return `<button type="button" class="team-trade-history-row card" ${row.kind==='multi'?`data-route="trade-center/multi-${escapeHtml(row.id)}"`:`data-route="trade-center/${escapeHtml(row.id)}"`}><span><strong>Trade #${escapeHtml(row.id)}</strong><small>${escapeHtml(row.date||'Date unavailable')} · ${escapeHtml(partners||'League transaction')}</small><em>${escapeHtml(row.summary||'No asset summary available')}</em></span><span class="pill pill--success">Approved</span></button>`}).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No completed trade history</h3><p>This franchise has not appeared in an approved Franchise HQ trade record.</p></div></article>`}</div>`;
   }
 
   function renderPlayers() {
