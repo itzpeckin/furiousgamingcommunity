@@ -1,14 +1,14 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.5.1.5';
+const RELEASE='5.9.5.1.6';
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 
 // Madden Companion weekly export tables:
 // schedules, defense, kicking, punting, passing, receiving, rushing, teamstats.
-const WEEKLY_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/(defense|kicking|punting|passing|receiving|rushing|teamstats)\/?$/i;
+const WEEKLY_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/(defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
 const PLAYER_CATEGORIES=new Set(['passing','rushing','receiving','defense','kicking','punting']);
-const TEAMSTATS_CATEGORY='teamstats';
+const TEAMSTATS_CATEGORY='team';
 
 const IDS=['playerId','playerID','rosterId','player_id','id'];
 const TEAM=['teamId','teamID','team_id','teamExternalId','team_external_id'];
@@ -306,11 +306,11 @@ export async function onRequestPost(context){
           const values=flattenMetrics(record);
 
           // Explicitly retain identifying context inside metrics as well.
-          if(gameId)values.__gameId=gameId;
-          values.__sourceCategory='teamstats';
+          if(gameId){values.__gameId=gameId;values.scheduleId=gameId;}
+          values.__sourceCategory='team';
 
           output.push({
-            externalKey:`teamstats:${stage(meta.stage)}:${meta.week}:${teamId}:${gameId||index}`,
+            externalKey:`team:${stage(meta.stage)}:${meta.week}:${teamId}:${gameId||index}`,
             category:'team-game',
             seasonYear:year,
             stage:stage(meta.stage),
@@ -330,7 +330,7 @@ export async function onRequestPost(context){
 
         routeDiagnostics.push({
           route:capture.route_path,
-          sourceCategory:'teamstats',
+          sourceCategory:'team',
           canonicalCategory:'team-game',
           collectionPath:collection.path,
           sourceRecords:collection.objects.length,
@@ -463,8 +463,8 @@ export async function onRequestPost(context){
       previewAvailable:true,
       ...preview,
       teamStats:{
-        route:'/week/{stage}/{week}/teamstats',
-        capturedRouteCount:routeDiagnostics.filter(x=>x.sourceCategory==='teamstats').length,
+        route:'/week/{stage}/{week}/team',
+        capturedRouteCount:routeDiagnostics.filter(x=>x.sourceCategory==='team').length,
         recordCount:teamGameRows.length
       },
       routeDiagnostics,
