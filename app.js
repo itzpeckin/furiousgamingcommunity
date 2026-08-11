@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.1f.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.1f.2b.1ba.1',
+        version:'5.9.6.2.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -3669,10 +3669,188 @@ function canonicalPlayerDashboardStats(playerId='') {
     </section>`;
   }
 
+  function matchupPlayerRows(game={}) {
+    const ids=new Set(gameDirectIds(game));
+    const context=matchupGameContext(game);
+    const gameYear=Number(game.seasonYear??game.calendarYear??game.source?.seasonYear??game.source?.calendarYear??canonicalCurrentSeasonYear());
+    return (playerStatisticsState.rows||[]).filter(row=>{
+      const raw=statisticRaw(row);
+      const direct=statisticDirectGameId(row);
+      if(direct&&ids.has(direct))return true;
+
+      // Safe fallback for exports where the player-stat row does not carry scheduleId.
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
+      const rowContext=stageWeekContext(raw,week,row.stage||raw.stage||raw.seasonStage);
+      const year=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+      const yearMatches=!Number.isFinite(gameYear)||!Number.isFinite(year)||year===gameYear;
+      return yearMatches&&Number(rowContext.week)===Number(context.week)&&rowContext.phase===context.phase;
+    });
+  }
+
+  function matchupPlayerIdentity(playerId='') {
+    const id=String(playerId||'');
+    const player=rosterService()?.findPlayer?.(id)||liveRosterPlayers.get(id)||(liveTeamDirectory?.players||[]).find(item=>String(item.id||item.playerId)===id);
+    if(!player)return {id,name:`Player ${id}`,position:'',teamId:''};
+    const view=rosterPlayerView(player);
+    return {
+      id,
+      name:view?.name||player.name||player.fullName||`${player.firstName||''} ${player.lastName||''}`.trim()||`Player ${id}`,
+      position:String(view?.position||player.position||'').toUpperCase(),
+      teamId:String(view?.teamId||player.teamId||'')
+    };
+  }
+
+  function matchupPlayerMetric(row,aliases=[],fallback='—') {
+    const value=metricValue(row,aliases);
+    return value===null||value===undefined||value===''?fallback:value;
+  }
+
+  function matchupPlayerCategory(row={}) {
+    const raw=statisticRaw(row);
+    const explicit=String(row.category||raw.category||raw.statType||raw.type||'').toLowerCase();
+    for(const category of ['passing','rushing','receiving','defense','kicking','punting']){
+      if(explicit.includes(category))return category;
+    }
+    return explicit;
+  }
+
+  const MATCHUP_PLAYER_COLUMNS={
+    passing:[
+      ['CMP',['passCompletions','completions','passComp','cmp']],
+      ['ATT',['passAttempts','attempts','passAtt','att']],
+      ['YDS',['passYds','passingYards','passYards','yards']],
+      ['TD',['passTDs','passingTDs','passTouchdowns','touchdowns']],
+      ['INT',['passInts','interceptionsThrown','interceptions','ints']],
+      ['SACK',['passSacks','sacksTaken','sacked']]
+    ],
+    rushing:[
+      ['ATT',['rushAtt','rushingAttempts','carries','attempts']],
+      ['YDS',['rushYds','rushingYards','yards']],
+      ['AVG',['rushAvg','rushingAverage','yardsPerCarry','avg']],
+      ['TD',['rushTDs','rushingTDs','touchdowns']],
+      ['FUM',['rushFumbles','fumbles']]
+    ],
+    receiving:[
+      ['REC',['recCatches','receptions','catches','rec']],
+      ['YDS',['recYds','receivingYards','yards']],
+      ['AVG',['recAvg','receivingAverage','yardsPerReception','avg']],
+      ['TD',['recTDs','receivingTDs','touchdowns']],
+      ['DROP',['drops','recDrops']]
+    ],
+    defense:[
+      ['TKL',['defTotalTackles','totalTackles','tackles','tacklesTotal']],
+      ['TFL',['tacklesForLoss','defTacklesForLoss','tfl']],
+      ['SACK',['defSacks','sacks']],
+      ['INT',['defInts','defInterceptions','interceptions']],
+      ['FF',['defForcedFum','forcedFumbles','ff']],
+      ['PD',['passDeflections','deflections','passesDefended']]
+    ],
+    kicking:[
+      ['FGM',['kickFGMade','fieldGoalsMade','fgMade']],
+      ['FGA',['kickFGAttempts','fieldGoalsAttempted','fgAtt']],
+      ['FG%',['kickFGPct','fieldGoalPct','fgPct']],
+      ['XPM',['extraPointsMade','xpMade']],
+      ['XPA',['extraPointsAttempted','xpAtt']]
+    ],
+    punting:[
+      ['PUNTS',['puntAttempts','punts','puntAtt']],
+      ['YDS',['puntYds','puntingYards','yards']],
+      ['AVG',['puntAvg','puntingAverage','avg']],
+      ['IN 20',['puntsInside20','inside20']]
+    ]
+  };
+
+  function renderMatchupPlayerCategory(title,category,rows,awayId,homeId) {
+    const columns=MATCHUP_PLAYER_COLUMNS[category]||[];
+    const merged=new Map();
+
+    rows.forEach(row=>{
+      const playerId=rowPlayerId(row);
+      if(!playerId)return;
+      const key=`${playerId}:${category}`;
+      const existing=merged.get(key);
+      if(!existing){
+        merged.set(key,{playerId,rows:[row]});
+      }else{
+        existing.rows.push(row);
+      }
+    });
+
+    const players=[...merged.values()].map(entry=>{
+      const identity=matchupPlayerIdentity(entry.playerId);
+      const combined=mergeTeamStatisticRows(entry.rows);
+      const teamId=rowTeamId(entry.rows[0])||identity.teamId;
+      return {identity,teamId,combined};
+    }).filter(item=>item.teamId===String(awayId)||item.teamId===String(homeId));
+
+    if(!players.length)return '';
+
+    const sideTable=(teamId,label)=>{
+      const side=players.filter(item=>String(item.teamId)===String(teamId));
+      if(!side.length)return `<div class="matchup-player-side"><h4>${escapeHtml(label)}</h4><div class="matchup-player-empty">No ${escapeHtml(title.toLowerCase())} records.</div></div>`;
+      return `<div class="matchup-player-side"><h4>${escapeHtml(label)}</h4><div class="matchup-player-table-wrap"><table class="matchup-player-table">
+        <thead><tr><th>Player</th>${columns.map(([name])=>`<th>${escapeHtml(name)}</th>`).join('')}</tr></thead>
+        <tbody>${side.map(item=>`<tr>
+          <td><button type="button" class="matchup-player-link" data-roster-player-detail="${escapeHtml(item.identity.id)}">${escapeHtml(item.identity.name)}</button><small>${escapeHtml(item.identity.position)}</small></td>
+          ${columns.map(([,aliases])=>`<td>${escapeHtml(matchupPlayerMetric(item.combined,aliases,'0'))}</td>`).join('')}
+        </tr>`).join('')}</tbody>
+      </table></div></div>`;
+    };
+
+    const away=matchupTeam(awayId),home=matchupTeam(homeId);
+    return `<section class="matchup-player-category">
+      <div class="matchup-player-category__head"><h4>${escapeHtml(title)}</h4></div>
+      <div class="matchup-player-sides">
+        ${sideTable(awayId,away.abbr||away.fullName||'Away')}
+        ${sideTable(homeId,home.abbr||home.fullName||'Home')}
+      </div>
+    </section>`;
+  }
+
+  function renderMatchupPlayerStats(game={}) {
+    const status=game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null);
+    if(status!=='final'){
+      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Game-specific player data</span><h3>Player Statistics</h3></div></div><div class="card-body matchup-player-empty"><strong>Upcoming matchup</strong><span>Player box-score statistics will populate after this game is completed and imported.</span></div></section>`;
+    }
+
+    if(!playerStatisticsState.loaded){
+      hydratePlayerStatistics(false).then(()=>{
+        const modal=document.querySelector('[data-matchup-modal]');
+        const active=modal?.querySelector('[data-matchup-tab="player"].is-active');
+        const target=modal?.querySelector('[data-matchup-tab-content]');
+        if(active&&target)target.innerHTML=renderMatchupPlayerStats(activeMatchupGame||{});
+      });
+      return `<section class="matchup-tab-panel"><div class="card-body matchup-player-loading"><span class="spinner"></span><strong>Loading player box score…</strong></div></section>`;
+    }
+
+    const rows=matchupPlayerRows(game);
+    const awayId=String(game.awayTeamId??game.awayId??game.source?.awayTeamId??'');
+    const homeId=String(game.homeTeamId??game.homeId??game.source?.homeTeamId??'');
+    const categories=[
+      ['Passing','passing'],['Rushing','rushing'],['Receiving','receiving'],
+      ['Defense','defense'],['Kicking','kicking'],['Punting','punting']
+    ];
+
+    const sections=categories.map(([title,category])=>{
+      const categoryRows=rows.filter(row=>matchupPlayerCategory(row)===category);
+      return renderMatchupPlayerCategory(title,category,categoryRows,awayId,homeId);
+    }).filter(Boolean).join('');
+
+    if(!sections){
+      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Player Statistics</h3></div><span class="pill pill--neutral">0 joined records</span></div><div class="card-body matchup-player-empty"><strong>Player box score unavailable</strong><span>No game-specific player-stat records were joined to this completed game. Season totals are not substituted.</span></div></section>`;
+    }
+
+    return `<section class="matchup-tab-panel matchup-player-stats-panel">
+      <div class="card-header"><div><span class="eyebrow">Game-specific box score</span><h3>Player Statistics</h3></div><span class="pill pill--success">${rows.length} joined records</span></div>
+      <div class="matchup-player-stat-stack">${sections}</div>
+      <div class="matchup-stat-footnote">Player Statistics use game-specific Madden records only. Click any player name to open the live Player Card.</div>
+    </section>`;
+  }
+
   function matchupTabPanel(tab) {
     if(tab==='team') return renderMatchupTeamStats(activeMatchupGame||{});
     const panels={
-      player:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Game leaders</span><h3>Player Statistics</h3></div></div><div class="card-body"><p>Player Statistics integration is scheduled for v5.9.5.2.</p></div></section>`,
+      player:renderMatchupPlayerStats(activeMatchupGame||{}),
       advanced:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Verified calculations</span><h3>Advanced Statistics</h3></div></div><div class="card-body"><p>Advanced Statistics integration follows player-stat certification.</p></div></section>`
     };
     return panels[tab]||renderMatchupTeamStats(activeMatchupGame||{});
@@ -3776,7 +3954,10 @@ function canonicalPlayerDashboardStats(playerId='') {
         await loadLiveTeamDirectory(true);
       }
 
-      await hydrateMatchupTeamStatistics(game);
+      await Promise.all([
+        hydrateMatchupTeamStatistics(game),
+        hydratePlayerStatistics(false)
+      ]);
       const away=matchupTeam(awayTeamId);
       const home=matchupTeam(homeTeamId);
       const meta=gameMetadata(game);
