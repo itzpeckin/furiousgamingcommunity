@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2ccb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2dcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2ccb.2b.1ba.1',
+        version:'5.9.6.2dcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -4211,76 +4211,100 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function openMatchupCard(gameId) {
-    try{
-      let game=await resolveMatchupGame(gameId);
-      if(!game){
-        showToast('Matchup unavailable','The selected game could not be resolved from the active snapshot.');
-        return;
-      }
+    const gameIdText=String(gameId||'');
+    const immediateGame=
+      liveMatchupGames.get(gameIdText)
+      ||liveTeamDirectory?.games?.find(game=>String(game.id||game.gameId||game.scheduleId||'')===gameIdText)
+      ||null;
 
-      liveMatchupGames.set(String(game.id||gameId),game);
-      activeMatchupGame=game;
+    if(immediateGame){
+      try{
+        activeMatchupGame=immediateGame;
 
-      const awayTeamId=String(game.awayTeamId??game.awayId??'');
-      const homeTeamId=String(game.homeTeamId??game.homeId??'');
-      const teamDirectoryReady=Boolean(
-        liveTeamDirectory?.teamMap?.get(awayTeamId)
-        && liveTeamDirectory?.teamMap?.get(homeTeamId)
-      );
-      if(!teamDirectoryReady){
-        await loadLiveTeamDirectory(true);
-      }
+        const awayTeamId=String(immediateGame.awayTeamId??immediateGame.awayId??immediateGame.source?.awayTeamId??'');
+        const homeTeamId=String(immediateGame.homeTeamId??immediateGame.homeId??immediateGame.source?.homeTeamId??'');
+        const away=matchupTeam(awayTeamId);
+        const home=matchupTeam(homeTeamId);
+        const meta=gameMetadata(immediateGame);
+        const status=immediateGame.status||resolvedGameStatus(immediateGame,window.FranchiseHQ?.currentSeasonContext||null);
+        const awayScore=immediateGame.awayScore??resolvedGameScore(immediateGame,'away');
+        const homeScore=immediateGame.homeScore??resolvedGameScore(immediateGame,'home');
+        const score=(awayScore!==null&&homeScore!==null)?`${awayScore} – ${homeScore}`:(status==='final'?'Score unavailable':'Upcoming');
+        const info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
 
-      await Promise.all([
-        hydrateMatchupTeamStatistics(game),
-        hydratePlayerStatistics(false)
-      ]);
-      clearMatchupPanelCache(game);
-      // With the compact per-game model already built, eagerly cache both
-      // non-default panels now. Clicking tabs becomes a pure innerHTML swap.
-      matchupPanelCache.set(matchupPanelCacheKey(game,'player'),buildMatchupPanel('player',game));
-      matchupPanelCache.set(matchupPanelCacheKey(game,'advanced'),buildMatchupPanel('advanced',game));
-      const away=matchupTeam(awayTeamId);
-      const home=matchupTeam(homeTeamId);
-      const meta=gameMetadata(game);
-      const status=game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null);
-      const awayScore=game.awayScore??resolvedGameScore(game,'away');
-      const homeScore=game.homeScore??resolvedGameScore(game,'home');
-      const score=(awayScore!==null&&homeScore!==null)?`${awayScore} – ${homeScore}`:(status==='final'?'Score unavailable':'Upcoming');
-      const info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
-      openDetail(`<div class="matchup-modal matchup-modal--gotw" data-matchup-modal>
-        <div class="matchup-modal__header">
-          <span class="eyebrow matchup-modal__week">${escapeHtml(canonicalScheduleLabel(game))}</span>
-          <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span>
-        </div>
-        <div class="matchup-gotw-board">
-          <section class="matchup-gotw-half matchup-gotw-half--away team-gradient-card" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
-            <div class="matchup-gotw-identity">
-              ${renderTeamMark(away,'matchup-team-logo')}
-              <div><span class="eyebrow">${escapeHtml(away.city||away.abbr||'Away')}</span><h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p></div>
-            </div>
-            ${previousMatchupMarkup(away.id,game)}
-          </section>
-          <div class="matchup-gotw-center">
-            <span>${escapeHtml(canonicalScheduleLabel(game))}</span>
-            <strong>${escapeHtml(score)}</strong>
-            <small>${info?escapeHtml(info):(status==='final'?'Final':'Scheduled')}</small>
+        // Render immediately with cached/available Team Stats.
+        openDetail(`<div class="matchup-modal matchup-modal--gotw" data-matchup-modal>
+          <div class="matchup-modal__header">
+            <span class="eyebrow matchup-modal__week">${escapeHtml(canonicalScheduleLabel(immediateGame))}</span>
+            <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span>
           </div>
-          <section class="matchup-gotw-half matchup-gotw-half--home team-gradient-card team-gradient-card--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
-            <div class="matchup-gotw-identity matchup-gotw-identity--home">
-              <div><span class="eyebrow">${escapeHtml(home.city||home.abbr||'Home')}</span><h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p></div>
-              ${renderTeamMark(home,'matchup-team-logo')}
+          <div class="matchup-gotw-board">
+            <section class="matchup-gotw-half matchup-gotw-half--away team-gradient-card" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
+              <div class="matchup-gotw-identity">
+                ${renderTeamMark(away,'matchup-team-logo')}
+                <div><span class="eyebrow">${escapeHtml(away.city||away.abbr||'Away')}</span><h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p></div>
+              </div>
+              ${previousMatchupMarkup(away.id,immediateGame)}
+            </section>
+            <div class="matchup-gotw-center">
+              <span>${escapeHtml(canonicalScheduleLabel(immediateGame))}</span>
+              <strong>${escapeHtml(score)}</strong>
+              <small>${info?escapeHtml(info):(status==='final'?'Final':'Scheduled')}</small>
             </div>
-            ${previousMatchupMarkup(home.id,game)}
-          </section>
-        </div>
-        <div class="matchup-stat-tabs" role="tablist" aria-label="Matchup statistics">
-          <button type="button" class="is-active" data-matchup-tab="team" role="tab" aria-selected="true">Team Stats</button>
-          <button type="button" data-matchup-tab="player" role="tab" aria-selected="false">Player Stats</button>
-          <button type="button" data-matchup-tab="advanced" role="tab" aria-selected="false">Advanced Stats</button>
-        </div>
-        <div class="matchup-tab-content" data-matchup-tab-content>${matchupTabPanel('team')}</div>
-      </div>`);
+            <section class="matchup-gotw-half matchup-gotw-half--home team-gradient-card team-gradient-card--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
+              <div class="matchup-gotw-identity matchup-gotw-identity--home">
+                <div><span class="eyebrow">${escapeHtml(home.city||home.abbr||'Home')}</span><h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p></div>
+                ${renderTeamMark(home,'matchup-team-logo')}
+              </div>
+              ${previousMatchupMarkup(home.id,immediateGame)}
+            </section>
+          </div>
+          <div class="matchup-stat-tabs" role="tablist" aria-label="Matchup statistics">
+            <button type="button" class="is-active" data-matchup-tab="team" role="tab" aria-selected="true">Team Stats</button>
+            <button type="button" data-matchup-tab="player" role="tab" aria-selected="false">Player Stats</button>
+            <button type="button" data-matchup-tab="advanced" role="tab" aria-selected="false">Advanced Stats</button>
+          </div>
+          <div class="matchup-tab-content" data-matchup-tab-content>${cachedMatchupPanel('team',immediateGame)}</div>
+        </div>`);
+
+        // Finish any missing hydration AFTER the card is visible.
+        Promise.all([
+          loadLiveTeamDirectory(false),
+          hydrateMatchupTeamStatistics(immediateGame),
+          hydratePlayerStatistics(false)
+        ]).then(()=>{
+          clearMatchupPanelCache(immediateGame);
+          matchupPanelCache.set(matchupPanelCacheKey(immediateGame,'team'),buildMatchupPanel('team',immediateGame));
+          matchupPanelCache.set(matchupPanelCacheKey(immediateGame,'player'),buildMatchupPanel('player',immediateGame));
+          matchupPanelCache.set(matchupPanelCacheKey(immediateGame,'advanced'),buildMatchupPanel('advanced',immediateGame));
+
+          const modal=document.querySelector('[data-matchup-modal]');
+          const activeTab=modal?.querySelector('[data-matchup-tab].is-active')?.dataset.matchupTab||'team';
+          const target=modal?.querySelector('[data-matchup-tab-content]');
+          if(target)target.innerHTML=cachedMatchupPanel(activeTab,immediateGame);
+        }).catch(error=>console.warn('[Matchup Background Hydration]',error));
+
+        return;
+      }catch(error){
+        console.error('[Matchup Immediate Open]',error);
+      }
+    }
+
+    // Fallback only when the game itself is not already present in memory.
+    try{
+      const service=liveReadModel();
+      if(!service)throw new Error('Live Read Model service is unavailable.');
+
+      const directory=await loadLiveTeamDirectory(false);
+      const game=
+        liveMatchupGames.get(gameIdText)
+        ||directory?.games?.find(item=>String(item.id||item.gameId||item.scheduleId||'')===gameIdText);
+
+      if(!game)throw new Error('Selected game is unavailable in the active snapshot.');
+
+      activeMatchupGame=game;
+      // Re-enter now that game is loaded; second pass renders synchronously.
+      return openMatchupCard(gameIdText);
     }catch(error){
       console.error('[Matchup Card]',error);
       showToast('Matchup unavailable',error?.message||'The active snapshot schedule could not be loaded.');
@@ -4312,6 +4336,12 @@ function canonicalPlayerDashboardStats(playerId='') {
       }
     })();
     return scheduleMatchupPreloadPromise;
+  }
+
+  if(typeof requestIdleCallback==='function'){
+    requestIdleCallback(()=>{preloadScheduleMatchupData();},{timeout:1200});
+  }else{
+    setTimeout(()=>{preloadScheduleMatchupData();},250);
   }
 
   function liveTeamScheduleGame(game={}) {
