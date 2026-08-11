@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2a.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2bb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2a.2b.1ba.1',
+        version:'5.9.6.2bb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2011,6 +2011,9 @@
         if(force)await service.refresh();
         playerStatisticsState.rows=await service.getStatistics()||[];
         playerStatisticsState.loaded=true;
+        // Build matchup lookup once while data is hydrating so opening/clicking
+        // Matchup tabs never scans the full statistics collection.
+        rebuildMatchupPlayerStatIndex(true);
         return playerStatisticsState.rows;
       }catch(error){
         playerStatisticsState.error=error?.message||'Unable to load player statistics.';
@@ -3669,22 +3672,94 @@ function canonicalPlayerDashboardStats(playerId='') {
     </section>`;
   }
 
-  function matchupPlayerRows(game={}) {
-    const ids=new Set(gameDirectIds(game));
-    const context=matchupGameContext(game);
-    const gameYear=Number(game.seasonYear??game.calendarYear??game.source?.seasonYear??game.source?.calendarYear??canonicalCurrentSeasonYear());
-    return (playerStatisticsState.rows||[]).filter(row=>{
+  const matchupPlayerStatIndex={
+    sourceRef:null,
+    byGameId:new Map(),
+    byContext:new Map()
+  };
+
+  function matchupStatStageKey(value='regular') {
+    const text=String(value||'').toLowerCase();
+    if(text.includes('pre'))return 'preseason';
+    if(text.includes('post')||text.includes('playoff'))return 'playoffs';
+    return 'regular';
+  }
+
+  function matchupStatContextKey(season,stage,week) {
+    const year=Number(season);
+    const safeYear=Number.isFinite(year)?String(year):'any';
+    return `${safeYear}:${matchupStatStageKey(stage)}:${Number(week)||0}`;
+  }
+
+  function rebuildMatchupPlayerStatIndex(force=false) {
+    const rows=playerStatisticsState.rows||[];
+    if(!force && matchupPlayerStatIndex.sourceRef===rows) return matchupPlayerStatIndex;
+
+    const byGameId=new Map();
+    const byContext=new Map();
+
+    rows.forEach(row=>{
       const raw=statisticRaw(row);
       const direct=statisticDirectGameId(row);
-      if(direct&&ids.has(direct))return true;
+      if(direct){
+        const bucket=byGameId.get(direct)||[];
+        bucket.push(row);
+        byGameId.set(direct,bucket);
+      }
 
-      // Safe fallback for exports where the player-stat row does not carry scheduleId.
       const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
-      const rowContext=stageWeekContext(raw,week,row.stage||raw.stage||raw.seasonStage);
-      const year=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
-      const yearMatches=!Number.isFinite(gameYear)||!Number.isFinite(year)||year===gameYear;
-      return yearMatches&&Number(rowContext.week)===Number(context.week)&&rowContext.phase===context.phase;
+      if(!Number.isFinite(week)) return;
+
+      const stage=row.stage||raw.stage||raw.seasonStage||'regular';
+      const season=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+      const key=matchupStatContextKey(season,stage,week);
+      const bucket=byContext.get(key)||[];
+      bucket.push(row);
+      byContext.set(key,bucket);
+
+      // Also maintain an "any year" key for exports that omit a season year.
+      const anyKey=matchupStatContextKey(null,stage,week);
+      if(anyKey!==key){
+        const anyBucket=byContext.get(anyKey)||[];
+        anyBucket.push(row);
+        byContext.set(anyKey,anyBucket);
+      }
     });
+
+    matchupPlayerStatIndex.sourceRef=rows;
+    matchupPlayerStatIndex.byGameId=byGameId;
+    matchupPlayerStatIndex.byContext=byContext;
+    return matchupPlayerStatIndex;
+  }
+
+  function matchupPlayerRows(game={}) {
+    const index=rebuildMatchupPlayerStatIndex(false);
+    const directIds=gameDirectIds(game);
+
+    // Fastest path: exact game/schedule ID.
+    const directRows=[];
+    directIds.forEach(id=>{
+      const rows=index.byGameId.get(String(id));
+      if(rows?.length) directRows.push(...rows);
+    });
+    if(directRows.length){
+      return [...new Set(directRows)];
+    }
+
+    // Fallback: season/stage/week only when the export omitted the game ID.
+    const context=matchupGameContext(game);
+    const year=Number(
+      game.seasonYear??
+      game.calendarYear??
+      game.source?.seasonYear??
+      game.source?.calendarYear??
+      canonicalCurrentSeasonYear()
+    );
+
+    const exact=index.byContext.get(matchupStatContextKey(year,context.phase,context.week));
+    if(exact?.length) return exact;
+
+    return index.byContext.get(matchupStatContextKey(null,context.phase,context.week))||[];
   }
 
   function matchupPlayerIdentity(playerId='') {
@@ -3896,24 +3971,11 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function warmMatchupPanels(game={}) {
-    // Team is already visible. Warm the expensive tabs once data is ready.
-    requestIdleCallback?.(()=>{
-      try{
-        cachedMatchupPanel('player',game);
-        cachedMatchupPanel('advanced',game);
-      }catch(error){
-        console.warn('[Matchup Panel Warm]',error);
-      }
-    },{timeout:800});
-    if(typeof requestIdleCallback!=='function'){
-      setTimeout(()=>{
-        try{
-          cachedMatchupPanel('player',game);
-          cachedMatchupPanel('advanced',game);
-        }catch(error){
-          console.warn('[Matchup Panel Warm]',error);
-        }
-      },0);
+    // Only cache the trivial Advanced panel. Player Stats now uses the indexed
+    // statistics lookup and renders quickly on its first click.
+    const key=matchupPanelCacheKey(game,'advanced');
+    if(!matchupPanelCache.has(key)){
+      matchupPanelCache.set(key,buildMatchupPanel('advanced',game));
     }
   }
 
