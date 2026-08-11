@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.1bba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.1b.1b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.1bba.1',
+        version:'5.9.6.1b.1b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2461,9 +2461,8 @@
 
   function playerCardMoney(value) {
     const amount=Number(value);
-    if(!Number.isFinite(amount)) return '—';
-    const millions=Math.abs(amount)>=100000?amount/1000000:amount;
-    return `${millions<0?'-$':'$'}${Math.abs(millions).toFixed(3)}M`;
+    if(!Number.isFinite(amount))return '—';
+    return `$${(amount/1000000).toFixed(3)}M`;
   }
 
   function playerCardRatingEntries(player={}) {
@@ -2568,49 +2567,75 @@
     const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId);
     const categories=model?.categories||{};
     const weeks=new Map();
+
     Object.entries(categories).forEach(([category,data])=>{
       (data?.rows||[]).forEach(row=>{
-        const key=`${row.stage||'regular-season'}:${row.week??row.weekIndex??'—'}`;
-        const entry=weeks.get(key)||{stage:row.stage||'regular-season',week:row.week??row.weekIndex??'—',metrics:{}};
-        const values=row.metrics||{};
-        Object.entries(values).forEach(([metric,value])=>{
-          if(value===null||value===undefined||value===''||String(metric).startsWith('__'))return;
-          entry.metrics[`${category}:${metric}`]=value;
-        });
+        const weekValue=row.week??row.weekIndex??row.source?.weekIndex??row.source?.week??'—';
+        const stageValue=row.stage||row.source?.stage||row.source?.seasonStage||'regular-season';
+        const key=`${String(stageValue)}:${String(weekValue)}`;
+        const entry=weeks.get(key)||{stage:stageValue,week:weekValue,metrics:[],sourceRows:[]};
+        entry.metrics.push({category,metrics:row.metrics||{}});
+        entry.sourceRows.push(row);
         weeks.set(key,entry);
       });
     });
-    const rows=[...weeks.values()].sort((a,b)=>Number(a.week||0)-Number(b.week||0));
-    const fmtKey=key=>String(key).split(':').pop().replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
-    const priority=['Yds','TD','Att','Comp','Rec','Sacks','Ints','Tackles','Fum'];
-    const keys=[...new Set(rows.flatMap(row=>Object.keys(row.metrics)))].sort((a,b)=>{
-      const ai=priority.findIndex(p=>a.toLowerCase().includes(p.toLowerCase()));
-      const bi=priority.findIndex(p=>b.toLowerCase().includes(p.toLowerCase()));
-      return (ai<0?99:ai)-(bi<0?99:bi)||a.localeCompare(b);
-    }).slice(0,8);
-    return `<div class="canonical-game-log-head"><label class="field"><span>Season</span><select><option>Current Season</option></select></label><span class="pill pill--neutral">${rows.length} game week${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="table-wrap canonical-game-log-table"><table><thead><tr><th>Week</th><th>Stage</th>${keys.map(key=>`<th>${escapeHtml(fmtKey(key))}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr><td><strong>Week ${escapeHtml(row.week)}</strong></td><td>${escapeHtml(titleCase(String(row.stage).replace(/-/g,' ')))}</td>${keys.map(key=>`<td>${escapeHtml(row.metrics[key]??'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:`<div class="canonical-player-empty">No weekly game statistics are available for this player in the active snapshot.</div>`}`;
+
+    const rows=[...weeks.values()].sort((a,b)=>{
+      const stageOrder={preseason:0,'regular-season':1,regular:1,playoffs:2,postseason:2};
+      const sa=stageOrder[String(a.stage).toLowerCase()]??1;
+      const sb=stageOrder[String(b.stage).toLowerCase()]??1;
+      return sa-sb||Number(a.week||0)-Number(b.week||0);
+    });
+
+    const metricSummary=(entry)=>{
+      const merged={};
+      entry.metrics.forEach(item=>Object.assign(merged,item.metrics||{}));
+      const pairs=[
+        ['PASS YDS',['passYds','passingYards','passYards']],
+        ['RUSH YDS',['rushYds','rushingYards']],
+        ['REC YDS',['recYds','receivingYards']],
+        ['TD',['passTDs','rushTDs','recTDs','touchdowns']],
+        ['INT',['passInts','interceptions','ints']],
+        ['TKL',['defTotalTackles','tackles']],
+        ['SACK',['defSacks','sacks']]
+      ];
+      return pairs.map(([label,aliases])=>{
+        for(const alias of aliases){
+          const key=Object.keys(merged).find(k=>k.toLowerCase()===alias.toLowerCase());
+          if(key!==undefined&&merged[key]!==null&&merged[key]!=='')return `${label}: ${merged[key]}`;
+        }
+        return null;
+      }).filter(Boolean).join(' · ')||'Stat record available';
+    };
+
+    return `<div class="canonical-game-log-head"><span class="pill pill--neutral">${rows.length} game week${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="canonical-game-log-table-wrap"><table class="canonical-game-log-table"><thead><tr><th>Week</th><th>Stage</th><th>Summary</th></tr></thead><tbody>${rows.map(row=>`<tr><td>Week ${escapeHtml(row.week)}</td><td>${escapeHtml(String(row.stage).replace(/-/g,' '))}</td><td>${escapeHtml(metricSummary(row))}</td></tr>`).join('')}</tbody></table></div>`:`<div class="canonical-player-empty">No weekly game statistics are available for this player in the active snapshot.</div>`}`;
   }
 
   function canonicalContractPanel(player={}) {
     const raw=player.raw||{};
     const contract=player.contract||{};
-    const source={...raw,...contract};
-    const yearsLeft=Number(contract.yearsRemaining??contract.years??raw.yearsRemaining??raw.years??raw.contractYears??player.years??0)||0;
+    const merged={...raw,...contract};
+
+    const yearsLeft=Number(contract.yearsRemaining??contract.years??raw.years??raw.contractYears??player.years??0)||0;
     const length=Number(contract.length??contract.contractLength??raw.contractLength??raw.contractYears??yearsLeft)||yearsLeft;
+
     const capHit=contract.capHit??raw.capHit??raw.salaryCapHit??player.capHit;
     const salary=contract.currentYearSalary??contract.salary??raw.currentYearSalary??raw.currentSalary??raw.salary??player.salary;
     const bonus=contract.currentYearBonus??contract.bonus??raw.currentYearBonus??raw.bonus??raw.signingBonus;
-    const netSavings=playerCardField(source,['capReleaseNetSavings']);
-    const totalPenalty=playerCardField(source,['capReleasePenalty']);
-    const rows=[
-      ['Cap Hit',playerCardMoney(capHit),''],
-      ['Salary',playerCardMoney(salary),''],
-      ['Bonus',playerCardMoney(bonus),''],
-      ['Years Left / Length',`${yearsLeft||'—'} / ${length||'—'}`,''],
-      ['Net Release Savings',playerCardMoney(netSavings),'is-positive'],
-      ['Total Release Penalty',playerCardMoney(totalPenalty),'is-negative']
-    ];
-    return `<div class="canonical-contract-grid canonical-contract-grid--single-row">${rows.map(([label,value,tone])=>`<div><span>${escapeHtml(label)}</span><strong class="${tone}">${escapeHtml(value)}</strong></div>`).join('')}</div>`;
+
+    const netSavings=playerCardField(merged,['capReleaseNetSavings','releaseNetSavings','netSavings','releaseSavings']);
+    const totalPenalty=playerCardField(merged,['capReleasePenalty','totalReleasePenalty','releasePenalty','totalPenalty']);
+
+    return `<div class="canonical-contract-grid canonical-contract-grid--compact">
+      ${[
+        ['Cap Hit',playerCardMoney(capHit)],
+        ['Salary',playerCardMoney(salary)],
+        ['Bonus',playerCardMoney(bonus)],
+        ['Years Left / Length',`${yearsLeft||'—'} / ${length||'—'}`],
+        ['Net Release Savings',playerCardMoney(netSavings)],
+        ['Total Release Penalty',playerCardMoney(totalPenalty)]
+      ].map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
+    </div>`;
   }
 
   function canonicalTransactionHistory(playerId='') {
@@ -2648,9 +2673,42 @@
     </section>`;
   }
 
+  function canonicalPlayerImageCandidates(player={}) {
+    const raw=player.raw||player.source||{};
+    const candidates=[
+      player.imageUrl,
+      raw.imageUrl,raw.image_url,raw.headshot,raw.headshotUrl,raw.portraitUrl,
+      raw.portrait_id,raw.portraitid,raw.presentationid,
+      raw.portraitId,raw.presentationId,
+      player.portrait_id,player.portraitid,player.presentationid,
+      player.portraitId,player.presentationId
+    ].filter(v=>v!==null&&v!==undefined&&String(v).trim()!=='').map(v=>String(v).trim());
+
+    const urls=[];
+    for(const value of candidates){
+      if(/^https?:\/\//i.test(value)){
+        urls.push(value);
+        continue;
+      }
+      // Keep common EA/Madden portrait identifier strategies as deterministic fallbacks.
+      if(/^\d+$/.test(value)){
+        urls.push(
+          `https://ratings-images-prod.pulse.ea.com/FC25/components/items/${value}.png`,
+          `https://media.contentapi.ea.com/content/dam/eacom/madden-nfl/common/player-headshots/${value}.png`
+        );
+      }
+    }
+    return [...new Set(urls)];
+  }
+
   function renderCanonicalPlayerImage(player={}) {
-    const url=String(player.imageUrl||'').trim();
-    if(url)return `<img src="${escapeHtml(url)}" alt="${escapeHtml(player.name||'Player')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('is-placeholder')">`;
+    const candidates=canonicalPlayerImageCandidates(player);
+    if(candidates.length){
+      const encoded=escapeHtml(JSON.stringify(candidates));
+      return `<img src="${escapeHtml(candidates[0])}" alt="${escapeHtml(player.name||'Player')}" loading="lazy" referrerpolicy="no-referrer"
+        data-player-image-candidates='${encoded}'
+        onerror="const list=JSON.parse(this.dataset.playerImageCandidates||'[]');const current=list.indexOf(this.src);const next=list[current+1]||list.find(x=>x!==this.src);if(next){this.src=next}else{this.remove();this.parentElement.classList.add('is-placeholder')}">`;
+    }
     return `<span class="canonical-player-image-placeholder">${escapeHtml(player.initials||'?')}</span>`;
   }
 
@@ -2698,7 +2756,7 @@
       </section>
 
       <div class="canonical-player-tabs canonical-player-tabs--approved" role="tablist">
-        ${[['ratings','Ratings'],['statistics','Statistics'],['game-log','Game Log'],['contract','Contract'],['transactions','Transaction History']].map(([id,label],index)=>`<button type="button" class="${index===0?'is-active':''}" data-canonical-player-tab="${id}">${label}</button>`).join('')}
+        ${[['ratings','Ratings'],['statistics','Statistics'],['transactions','Transaction History']].map(([id,label],index)=>`<button type="button" class="${index===0?'is-active':''}" data-canonical-player-tab="${id}">${label}</button>`).join('')}
       </div>
 
       <div class="canonical-player-panels canonical-player-panels--approved">
@@ -5325,3 +5383,31 @@
     window.FGC_APP?.renderGlobalLeagueDataBanner?.();
   });
 
+
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-statistics-preview-category]');
+  if(!button)return;
+  event.preventDefault();
+  event.stopPropagation();
+  const root=button.closest('[data-statistics-preview-root]');
+  if(!root)return;
+  const category=button.getAttribute('data-statistics-preview-category');
+  root.querySelectorAll('[data-statistics-preview-category]').forEach(b=>b.classList.toggle('is-active',b===button));
+  root.querySelectorAll('[data-statistics-preview-panel]').forEach(panel=>panel.classList.toggle('is-active',panel.getAttribute('data-statistics-preview-panel')===category));
+});
+
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-team-tab],[data-team-detail-nav]');
+  if(!button)return;
+  const teamPage=button.closest('[data-team-detail],[data-team-page]');
+  if(!teamPage)return;
+  const tab=button.getAttribute('data-team-tab')||button.getAttribute('data-team-detail-nav');
+  if(!tab)return;
+  event.preventDefault();
+  event.stopPropagation();
+  document.querySelectorAll('[data-team-tab],[data-team-detail-nav]').forEach(b=>b.classList.toggle('is-active',(b.getAttribute('data-team-tab')||b.getAttribute('data-team-detail-nav'))===tab));
+  teamPage.querySelectorAll('[data-team-panel],[data-team-detail-panel]').forEach(panel=>{
+    const id=panel.getAttribute('data-team-panel')||panel.getAttribute('data-team-detail-panel');
+    panel.classList.toggle('is-active',id===tab);
+  });
+});
