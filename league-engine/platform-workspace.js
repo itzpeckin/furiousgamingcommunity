@@ -2,12 +2,12 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.5.0.12.5.4.3.2.0.1.1';
+  const VERSION = '5.9.6.0';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
     'overview','route-discovery','classification','team-mapper','player-mapper',
-    'payload-inspector','schedule-source-inspector','game-detail-inspector','game-state-join-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle','snapshot-verification','live-read-model',
+    'payload-inspector','player-data-inspector','schedule-source-inspector','game-detail-inspector','game-state-join-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle','snapshot-verification','live-read-model',
     'certification','diagnostics'
   ]);
 
@@ -68,6 +68,7 @@
       case 'team-mapper': return servicePanel('leagueCompanionTeamMapper','Team Mapper');
       case 'player-mapper': return servicePanel('leagueCompanionPlayerMapper','Player Mapper');
       case 'payload-inspector': return servicePanel('leagueDataExplorer','Data Explorer & Payload Inspector');
+      case 'player-data-inspector': return servicePanel('playerDataInspector','Player Data Inspector');
       case 'schedule-source-inspector': return servicePanel('scheduleSourceInspector','Schedule Source Inspector');
       case 'game-detail-inspector': return servicePanel('gameDetailInspector','Game Detail Inspector');
       case 'game-state-join-inspector': return servicePanel('gameStateJoinInspector','Game-State Join Inspector');
@@ -85,7 +86,7 @@
 
   const tabs = [
     ['overview','Overview'],['route-discovery','Route Discovery'],['classification','Dataset Classification'],
-    ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],['schedule-source-inspector','Schedule Source Inspector'],['game-detail-inspector','Game Detail Inspector'],['game-state-join-inspector','Game-State Join Inspector'],
+    ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],['player-data-inspector','Player Data Inspector'],['schedule-source-inspector','Schedule Source Inspector'],['game-detail-inspector','Game Detail Inspector'],['game-state-join-inspector','Game-State Join Inspector'],
     ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],['snapshot-lifecycle','Validation & Activation'],['snapshot-verification','Snapshot Verification'],['live-read-model','Live Read Model'],
     ['certification','Certification'],['diagnostics','Diagnostics']
   ];
