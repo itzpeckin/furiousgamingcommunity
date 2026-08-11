@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2bb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2ccb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2bb.2b.1ba.1',
+        version:'5.9.6.2ccb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2014,6 +2014,7 @@
         // Build matchup lookup once while data is hydrating so opening/clicking
         // Matchup tabs never scans the full statistics collection.
         rebuildMatchupPlayerStatIndex(true);
+        rebuildMatchupPlayerGameModelCache(true);
         return playerStatisticsState.rows;
       }catch(error){
         playerStatisticsState.error=error?.message||'Unable to load player statistics.';
@@ -3672,6 +3673,110 @@ function canonicalPlayerDashboardStats(playerId='') {
     </section>`;
   }
 
+  const matchupPlayerGameModelCache={
+    sourceRef:null,
+    byDirectGame:new Map(),
+    byContext:new Map()
+  };
+
+  function buildCompactPlayerGameModel(rows=[]) {
+    const categoryMap=new Map();
+
+    rows.forEach(row=>{
+      const category=matchupPlayerCategory(row);
+      if(!MATCHUP_PLAYER_COLUMNS[category])return;
+
+      const playerId=rowPlayerId(row);
+      if(!playerId)return;
+
+      const teamId=rowTeamId(row);
+      const key=`${category}:${teamId}:${playerId}`;
+      let entry=categoryMap.get(key);
+      if(!entry){
+        entry={category,teamId,playerId,combined:{}};
+        categoryMap.set(key,entry);
+      }
+      Object.assign(entry.combined,row.source||{},row.metrics||{},row);
+    });
+
+    const grouped={};
+    categoryMap.forEach(entry=>{
+      if(!grouped[entry.category])grouped[entry.category]=[];
+      grouped[entry.category].push(entry);
+    });
+
+    return grouped;
+  }
+
+  function rebuildMatchupPlayerGameModelCache(force=false) {
+    const rows=playerStatisticsState.rows||[];
+    if(!force && matchupPlayerGameModelCache.sourceRef===rows)return matchupPlayerGameModelCache;
+
+    const directBuckets=new Map();
+    const contextBuckets=new Map();
+
+    rows.forEach(row=>{
+      const raw=statisticRaw(row);
+      const direct=statisticDirectGameId(row);
+
+      if(direct){
+        const bucket=directBuckets.get(direct)||[];
+        bucket.push(row);
+        directBuckets.set(direct,bucket);
+      }
+
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
+      if(!Number.isFinite(week))return;
+
+      const stage=row.stage||raw.stage||raw.seasonStage||'regular';
+      const season=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+      const key=matchupStatContextKey(season,stage,week);
+      const bucket=contextBuckets.get(key)||[];
+      bucket.push(row);
+      contextBuckets.set(key,bucket);
+
+      const anyKey=matchupStatContextKey(null,stage,week);
+      if(anyKey!==key){
+        const anyBucket=contextBuckets.get(anyKey)||[];
+        anyBucket.push(row);
+        contextBuckets.set(anyKey,anyBucket);
+      }
+    });
+
+    const byDirectGame=new Map();
+    directBuckets.forEach((rows,key)=>byDirectGame.set(key,buildCompactPlayerGameModel(rows)));
+
+    const byContext=new Map();
+    contextBuckets.forEach((rows,key)=>byContext.set(key,buildCompactPlayerGameModel(rows)));
+
+    matchupPlayerGameModelCache.sourceRef=rows;
+    matchupPlayerGameModelCache.byDirectGame=byDirectGame;
+    matchupPlayerGameModelCache.byContext=byContext;
+    return matchupPlayerGameModelCache;
+  }
+
+  function matchupCompactGameModel(game={}) {
+    const cache=rebuildMatchupPlayerGameModelCache(false);
+
+    for(const id of gameDirectIds(game)){
+      const model=cache.byDirectGame.get(String(id));
+      if(model)return model;
+    }
+
+    const context=matchupGameContext(game);
+    const year=Number(
+      game.seasonYear??
+      game.calendarYear??
+      game.source?.seasonYear??
+      game.source?.calendarYear??
+      canonicalCurrentSeasonYear()
+    );
+
+    return cache.byContext.get(matchupStatContextKey(year,context.phase,context.week))
+      ||cache.byContext.get(matchupStatContextKey(null,context.phase,context.week))
+      ||{};
+  }
+
   const matchupPlayerStatIndex={
     sourceRef:null,
     byGameId:new Map(),
@@ -3835,6 +3940,53 @@ function canonicalPlayerDashboardStats(playerId='') {
     ]
   };
 
+  function renderCompactMatchupPlayerCategory(title,category,entries=[],awayId='',homeId='') {
+    const columns=MATCHUP_PLAYER_COLUMNS[category]||[];
+    const players=(entries||[]).map(entry=>{
+      const identity=matchupPlayerIdentity(entry.playerId);
+      return {identity,teamId:String(entry.teamId||identity.teamId||''),combined:entry.combined||{}};
+    }).filter(item=>item.teamId===String(awayId)||item.teamId===String(homeId));
+
+    const sortMetricByCategory={
+      passing:['passYds','passingYards','passYards','yards'],
+      rushing:['rushAtt','rushingAttempts','carries','attempts'],
+      receiving:['recCatches','receptions','catches','rec'],
+      defense:['defTotalTackles','totalTackles','tackles','tacklesTotal']
+    };
+    const sortAliases=sortMetricByCategory[category]||[];
+    if(sortAliases.length){
+      players.sort((a,b)=>{
+        const av=Number(matchupPlayerMetric(a.combined,sortAliases,0))||0;
+        const bv=Number(matchupPlayerMetric(b.combined,sortAliases,0))||0;
+        return bv-av||String(a.identity.name).localeCompare(String(b.identity.name));
+      });
+    }
+
+    if(!players.length)return '';
+
+    const sideTable=(teamId,label)=>{
+      const side=players.filter(item=>String(item.teamId)===String(teamId));
+      if(!side.length)return `<div class="matchup-player-side"><h4>${escapeHtml(label)}</h4><div class="matchup-player-empty">No ${escapeHtml(title.toLowerCase())} records.</div></div>`;
+
+      return `<div class="matchup-player-side"><h4>${escapeHtml(label)}</h4><div class="matchup-player-table-wrap"><table class="matchup-player-table">
+        <thead><tr><th>Player</th>${columns.map(([name])=>`<th>${escapeHtml(name)}</th>`).join('')}</tr></thead>
+        <tbody>${side.map(item=>`<tr>
+          <td><button type="button" class="matchup-player-link" data-roster-player-detail="${escapeHtml(item.identity.id)}">${escapeHtml(item.identity.name)}</button><small>${escapeHtml(item.identity.position)}</small></td>
+          ${columns.map(([,aliases])=>`<td>${escapeHtml(matchupPlayerMetric(item.combined,aliases,'0'))}</td>`).join('')}
+        </tr>`).join('')}</tbody>
+      </table></div></div>`;
+    };
+
+    const away=matchupTeam(awayId),home=matchupTeam(homeId);
+    return `<section class="matchup-player-category">
+      <div class="matchup-player-category__head"><h4>${escapeHtml(title)}</h4></div>
+      <div class="matchup-player-sides">
+        ${sideTable(awayId,away.abbr||away.fullName||'Away')}
+        ${sideTable(homeId,home.abbr||home.fullName||'Home')}
+      </div>
+    </section>`;
+  }
+
   function renderMatchupPlayerCategory(title,category,rows,awayId,homeId) {
     const columns=MATCHUP_PLAYER_COLUMNS[category]||[];
     const merged=new Map();
@@ -3899,42 +4051,40 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   function renderMatchupPlayerStats(game={}) {
     const status=game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null);
+
     if(status!=='final'){
       return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Game-specific player data</span><h3>Player Statistics</h3></div></div><div class="card-body matchup-player-empty"><strong>Upcoming matchup</strong><span>Player box-score statistics will populate after this game is completed and imported.</span></div></section>`;
     }
 
     if(!playerStatisticsState.loaded){
-      hydratePlayerStatistics(false).then(()=>{
-        const modal=document.querySelector('[data-matchup-modal]');
-        const active=modal?.querySelector('[data-matchup-tab="player"].is-active');
-        const target=modal?.querySelector('[data-matchup-tab-content]');
-        if(active&&target){
-          clearMatchupPanelCache(activeMatchupGame||{});
-          target.innerHTML=cachedMatchupPanel('player',activeMatchupGame||{});
-        }
-      });
       return `<section class="matchup-tab-panel"><div class="card-body matchup-player-loading"><span class="spinner"></span><strong>Loading player box score…</strong></div></section>`;
     }
 
-    const rows=matchupPlayerRows(game);
+    const model=matchupCompactGameModel(game);
     const awayId=String(game.awayTeamId??game.awayId??game.source?.awayTeamId??'');
     const homeId=String(game.homeTeamId??game.homeId??game.source?.homeTeamId??'');
+
     const categories=[
-      ['Passing','passing'],['Rushing','rushing'],['Receiving','receiving'],
-      ['Defense','defense'],['Kicking','kicking'],['Punting','punting']
+      ['Passing','passing'],
+      ['Rushing','rushing'],
+      ['Receiving','receiving'],
+      ['Defense','defense'],
+      ['Kicking','kicking'],
+      ['Punting','punting']
     ];
 
-    const sections=categories.map(([title,category])=>{
-      const categoryRows=rows.filter(row=>matchupPlayerCategory(row)===category);
-      return renderMatchupPlayerCategory(title,category,categoryRows,awayId,homeId);
-    }).filter(Boolean).join('');
+    const sections=categories.map(([title,category])=>
+      renderCompactMatchupPlayerCategory(title,category,model[category]||[],awayId,homeId)
+    ).filter(Boolean).join('');
 
     if(!sections){
       return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Direct game join</span><h3>Player Statistics</h3></div><span class="pill pill--neutral">0 joined records</span></div><div class="card-body matchup-player-empty"><strong>Player box score unavailable</strong><span>No game-specific player-stat records were joined to this completed game. Season totals are not substituted.</span></div></section>`;
     }
 
+    const joinedCount=Object.values(model).reduce((sum,entries)=>sum+(entries?.length||0),0);
+
     return `<section class="matchup-tab-panel matchup-player-stats-panel">
-      <div class="card-header"><div><span class="eyebrow">Game-specific box score</span><h3>Player Statistics</h3></div><span class="pill pill--success">${rows.length} joined records</span></div>
+      <div class="card-header"><div><span class="eyebrow">Game-specific box score</span><h3>Player Statistics</h3></div><span class="pill pill--success">${joinedCount} joined players</span></div>
       <div class="matchup-player-stat-stack">${sections}</div>
       <div class="matchup-stat-footnote">Player Statistics use game-specific Madden records only. Click any player name to open the live Player Card.</div>
     </section>`;
@@ -4086,7 +4236,10 @@ function canonicalPlayerDashboardStats(playerId='') {
         hydratePlayerStatistics(false)
       ]);
       clearMatchupPanelCache(game);
-      warmMatchupPanels(game);
+      // With the compact per-game model already built, eagerly cache both
+      // non-default panels now. Clicking tabs becomes a pure innerHTML swap.
+      matchupPanelCache.set(matchupPanelCacheKey(game,'player'),buildMatchupPanel('player',game));
+      matchupPanelCache.set(matchupPanelCacheKey(game,'advanced'),buildMatchupPanel('advanced',game));
       const away=matchupTeam(awayTeamId);
       const home=matchupTeam(homeTeamId);
       const meta=gameMetadata(game);
