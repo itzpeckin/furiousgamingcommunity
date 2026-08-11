@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.1a · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.1',
+        version:'5.9.6.1a',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2452,32 +2452,280 @@
     return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Select a backup to bring it forward. Click the selected front card again to open the full player card.</p></div></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div></div></article>`;
   }
 
+
+  function playerCardField(raw={},aliases=[],fallback=null) {
+    for(const alias of aliases){
+      if(raw?.[alias]!==undefined&&raw?.[alias]!==null&&raw?.[alias]!=='') return raw[alias];
+      const key=Object.keys(raw||{}).find(k=>k.toLowerCase()===String(alias).toLowerCase());
+      if(key&&raw[key]!==null&&raw[key]!=='') return raw[key];
+    }
+    return fallback;
+  }
+
+  function playerCardMoney(value) {
+    const amount=Number(value);
+    return Number.isFinite(amount)&&amount!==0?formatMoney(amount):'—';
+  }
+
+  function playerCardRatingEntries(player={}) {
+    const raw=player.raw||{};
+    const bags=[player.ratings||{},raw.ratings||{},raw];
+    const merged={};
+    bags.forEach(bag=>{
+      Object.entries(bag||{}).forEach(([key,value])=>{
+        const number=Number(value);
+        if(Number.isFinite(number)&&number>=0&&number<=100) merged[key]=number;
+      });
+    });
+    return merged;
+  }
+
+  const PLAYER_CARD_RATING_GROUPS=[
+    ['Core Ratings',[
+      ['Speed',['spd','speedRating','speed']],
+      ['Acceleration',['acc','accelerationRating','acceleration']],
+      ['Agility',['agi','agilityRating','agility']],
+      ['Strength',['str','strengthRating','strength']],
+      ['Awareness',['awr','awarenessRating','awareness']],
+      ['Jump',['jmp','jumpingRating','jumpRating','jump']],
+      ['Stamina',['sta','staminaRating','stamina']],
+      ['Toughness',['tgh','toughnessRating','toughness']],
+      ['Injury',['inj','injuryRating','injury']]
+    ]],
+    ['Passing',[
+      ['Throw Power',['throwPowerRating','throwPower','thp']],
+      ['Short Accuracy',['throwAccuracyShortRating','shortAccuracy','sac']],
+      ['Medium Accuracy',['throwAccuracyMidRating','mediumAccuracy','mac']],
+      ['Deep Accuracy',['throwAccuracyDeepRating','deepAccuracy','dac']],
+      ['Throw on Run',['throwOnRunRating','throwOnRun','tor']],
+      ['Play Action',['playActionRating','playAction','pac']],
+      ['Under Pressure',['throwUnderPressureRating','throwUnderPressure','tup']],
+      ['Break Sack',['breakSackRating','breakSack','bsk']]
+    ]],
+    ['Rushing',[
+      ['Carrying',['carryingRating','carrying','car']],
+      ['Ball Carrier Vision',['bcVisionRating','ballCarrierVision','bcv']],
+      ['Break Tackle',['breakTackleRating','breakTackle','btk']],
+      ['Trucking',['truckingRating','trucking','trk']],
+      ['Change of Direction',['changeOfDirectionRating','changeOfDirection','cod']],
+      ['Juke Move',['jukeMoveRating','jukeMove','jkm']],
+      ['Spin Move',['spinMoveRating','spinMove','spm']],
+      ['Stiff Arm',['stiffArmRating','stiffArm','sfa']]
+    ]],
+    ['Receiving',[
+      ['Catching',['catchingRating','catching','cth']],
+      ['Catch in Traffic',['catchInTrafficRating','catchInTraffic','cit']],
+      ['Spectacular Catch',['spectacularCatchRating','spectacularCatch','spc']],
+      ['Short Route',['routeRunShortRating','shortRouteRunning','srr']],
+      ['Medium Route',['routeRunMedRating','mediumRouteRunning','mrr']],
+      ['Deep Route',['routeRunDeepRating','deepRouteRunning','drr']],
+      ['Release',['releaseRating','release','rls']]
+    ]],
+    ['Blocking',[
+      ['Pass Block',['passBlockRating','passBlock','pbk']],
+      ['Pass Block Power',['passBlockPowerRating','passBlockPower','pbp']],
+      ['Pass Block Finesse',['passBlockFinesseRating','passBlockFinesse','pbf']],
+      ['Run Block',['runBlockRating','runBlock','rbk']],
+      ['Run Block Power',['runBlockPowerRating','runBlockPower','rbp']],
+      ['Run Block Finesse',['runBlockFinesseRating','runBlockFinesse','rbf']],
+      ['Impact Block',['impactBlockRating','impactBlock','ibl']]
+    ]],
+    ['Defense',[
+      ['Tackle',['tackleRating','tackle','tak']],
+      ['Hit Power',['hitPowerRating','hitPower','pow']],
+      ['Pursuit',['pursuitRating','pursuit','pur']],
+      ['Play Recognition',['playRecognitionRating','playRecognition','prc']],
+      ['Block Shed',['blockSheddingRating','blockShedding','bsh']],
+      ['Power Moves',['powerMovesRating','powerMoves','pmv']],
+      ['Finesse Moves',['finesseMovesRating','finesseMoves','fmv']],
+      ['Man Coverage',['manCoverageRating','manCoverage','mcv']],
+      ['Zone Coverage',['zoneCoverageRating','zoneCoverage','zcv']],
+      ['Press',['pressRating','press','prs']]
+    ]],
+    ['Kicking',[
+      ['Kick Power',['kickPowerRating','kickPower','kpw']],
+      ['Kick Accuracy',['kickAccuracyRating','kickAccuracy','kac']]
+    ]]
+  ];
+
+  function canonicalRatingValue(player={},aliases=[]) {
+    const merged=playerCardRatingEntries(player);
+    for(const alias of aliases){
+      if(merged[alias]!==undefined) return merged[alias];
+      const key=Object.keys(merged).find(k=>k.toLowerCase()===String(alias).toLowerCase());
+      if(key) return merged[key];
+    }
+    return null;
+  }
+
+  function renderCanonicalRatings(player={}) {
+    return `<div class="canonical-rating-groups">${PLAYER_CARD_RATING_GROUPS.map(([group,ratings])=>{
+      const rows=ratings.map(([label,aliases])=>[label,canonicalRatingValue(player,aliases)]).filter(([,value])=>value!==null);
+      return `<section class="canonical-rating-group"><div class="canonical-rating-group__heading"><h4>${escapeHtml(group)}</h4><span>${rows.length} mapped</span></div>${rows.length?`<div class="canonical-rating-list">${rows.map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`).join('')}</div>`:`<div class="canonical-player-empty">No mapped ${escapeHtml(group.toLowerCase())} ratings in the current player source.</div>`}</section>`;
+    }).join('')}</div>`;
+  }
+
+  function canonicalGameLog(playerId='') {
+    const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId);
+    const categories=model?.categories||{};
+    const weeks=new Map();
+    Object.entries(categories).forEach(([category,data])=>{
+      (data?.rows||[]).forEach(row=>{
+        const key=`${row.stage||'regular-season'}:${row.week??row.weekIndex??'—'}`;
+        const entry=weeks.get(key)||{stage:row.stage||'regular-season',week:row.week??row.weekIndex??'—',metrics:[]};
+        entry.metrics.push({category,metrics:row.metrics||{}});
+        weeks.set(key,entry);
+      });
+    });
+    const rows=[...weeks.values()].sort((a,b)=>Number(a.week||0)-Number(b.week||0));
+    return `<div class="canonical-game-log-head"><label class="field"><span>Season</span><select disabled><option>Current Season</option></select></label><span class="pill pill--neutral">${rows.length} game week${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="canonical-game-log-list">${rows.map(row=>`<details><summary><span>Week ${escapeHtml(row.week)}</span><small>${escapeHtml(row.stage)}</small><b>${row.metrics.length} stat categor${row.metrics.length===1?'y':'ies'}</b></summary><pre>${escapeHtml(JSON.stringify(row.metrics,null,2))}</pre></details>`).join('')}</div>`:`<div class="canonical-player-empty">No weekly game statistics are available for this player in the active snapshot.</div>`}`;
+  }
+
+  function canonicalContractPanel(player={}) {
+    const raw=player.raw||{};
+    const contract=player.contract||{};
+    const yearsLeft=Number(contract.yearsRemaining??contract.years??raw.years??raw.contractYears??player.years??0)||0;
+    const length=Number(contract.length??contract.contractLength??raw.contractLength??raw.contractYears??yearsLeft)||yearsLeft;
+    const capHit=contract.capHit??raw.capHit??raw.salaryCapHit??player.capHit;
+    const salary=contract.currentYearSalary??contract.salary??raw.currentYearSalary??raw.currentSalary??raw.salary??player.salary;
+    const bonus=contract.currentYearBonus??contract.bonus??raw.currentYearBonus??raw.bonus??raw.signingBonus;
+    const netSavings=playerCardField({...contract,...raw},['releaseNetSavings','netSavings','releaseSavings']);
+    const totalPenalty=playerCardField({...contract,...raw},['totalReleasePenalty','releasePenalty','totalPenalty']);
+    const currentYear=Number(window.FranchiseHQ?.currentSeasonContext?.calendarYear||2026);
+    const year1=playerCardField({...contract,...raw},[`${currentYear+1}Penalty`,'nextYearPenalty','year2Penalty']);
+    const year2=playerCardField({...contract,...raw},[`${currentYear+2}Penalty`,'secondYearPenalty','year3Penalty']);
+    return `<div class="canonical-contract-grid">
+      ${[
+        ['Cap Hit',playerCardMoney(capHit)],['Salary',playerCardMoney(salary)],['Bonus',playerCardMoney(bonus)],
+        ['Years Left / Length',`${yearsLeft||'—'} / ${length||'—'}`],
+        ['Release Net Savings',playerCardMoney(netSavings)],['Total Release Penalty',playerCardMoney(totalPenalty)],
+        [`${currentYear+1} Year Penalty`,playerCardMoney(year1)],[`${currentYear+2} Year Penalty`,playerCardMoney(year2)]
+      ].map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
+    </div>`;
+  }
+
+  function canonicalTransactionHistory(playerId='') {
+    const rows=window.FGC_TRADE?.getPlayerTransactionHistory?.(playerId)||[];
+    if(!rows.length)return `<div class="canonical-player-empty"><strong>No transaction history</strong><span>This player has not appeared in a saved Franchise HQ trade record.</span></div>`;
+    return `<div class="canonical-transaction-list">${rows.map(row=>`<button type="button" class="canonical-transaction-row" ${row.kind==='multi'?`data-open-multi-trade="${escapeHtml(row.tradeId)}"`:`data-open-trade="${escapeHtml(row.tradeId)}"`}><span><strong>Trade #${escapeHtml(row.tradeId)} · ${escapeHtml(row.movement||'Player movement')}</strong><small>${escapeHtml(row.date||'')} · ${escapeHtml(String(row.status||'recorded').replace(/-/g,' '))}</small></span><span class="pill ${row.status==='approved'?'pill--success':'pill--neutral'}">${escapeHtml(row.status==='approved'?'Approved':'Recorded')}</span></button>`).join('')}</div>`;
+  }
+
+  function canonicalTradePlayer(player={}) {
+    return {
+      id:String(player.id||''),
+      name:player.name||player.displayName||'Player',
+      teamId:String(player.teamId||''),
+      position:String(player.position||''),
+      overall:Number(player.overall)||0,
+      age:Number(player.age)||21,
+      dev:player.dev||normalizeLiveDevelopment(player.developmentTrait||player.raw?.developmentTrait),
+      years:Number(player.years)||Number(player.contract?.yearsRemaining)||0,
+      salary:Number(player.salary)||0,
+      capHit:Number(player.capHit)||0,
+      injury:player.injury||'Healthy',
+      passingYards:Number(player.stats?.passingYards||0),
+      rushingYards:Number(player.stats?.rushingYards||0),
+      receivingYards:Number(player.stats?.receivingYards||0),
+      touchdowns:Number(player.stats?.touchdowns||0)
+    };
+  }
+
+  function canonicalTradeBreakdown(player={}) {
+    const valuation=window.FGC_TRADE?.playerValuation?.(canonicalTradePlayer(player));
+    if(!valuation||!window.FGC_TRADE?.tradeCalculatorEnabled?.())return '';
+    return `<section class="canonical-player-trade-breakdown value-card-box value-card-breakdown">
+      <div class="box-heading box-heading--inline"><div><h3>Trade Calculator Breakdown</h3></div><div class="value-total"><span>Total Trade Value</span><strong>${Number(valuation.total||0).toLocaleString()}</strong></div></div>
+      <div class="breakdown-grid">${(valuation.breakdown||[]).map(([label,val,note])=>`<div class="breakdown-tile"><span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(note)}</small></span><b class="${Number(val)<0?'is-negative':''}">${Number(val)>=0?'+':''}${Number(val||0).toLocaleString()}</b></div>`).join('')}</div>
+    </section>`;
+  }
+
+  function renderCanonicalPlayerImage(player={}) {
+    const url=String(player.imageUrl||'').trim();
+    if(url)return `<img src="${escapeHtml(url)}" alt="${escapeHtml(player.name||'Player')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('is-placeholder')">`;
+    return `<span class="canonical-player-image-placeholder">${escapeHtml(player.initials||'?')}</span>`;
+  }
+
+  function openCanonicalLivePlayerCard(playerId='') {
+    const normalized=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId));
+    if(!normalized)return false;
+    const player=rosterPlayerView(normalized);
+    const team=rosterTeamView(player.teamId)||{id:player.teamId,abbr:'FA',fullName:'Free Agent',primary:'#27364f',secondary:'#8fa4c4'};
+    const modal=document.querySelector('[data-value-card-modal]');
+    const content=document.querySelector('[data-value-card-content]');
+    if(!modal||!content)return false;
+
+    const logo=renderTeamMark(team,'canonical-player-team-logo');
+    const stats=window.FranchiseHQ?.playerStatistics?.render?.(player.id)||'<div class="canonical-player-empty">Statistics service unavailable.</div>';
+
+    content.innerHTML=`<div class="value-card-context"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>${escapeHtml(playerCardReturnLabel?.()||'Back')}</span></button><span>Player Card</span></div>
+      <section class="canonical-player-hero" style="--player-team-primary:${escapeHtml(team.primary||'#27364f')};--player-team-secondary:${escapeHtml(team.secondary||team.primary||'#8fa4c4')}">
+        <div class="canonical-player-hero__shade" aria-hidden="true"></div>
+        <div class="canonical-player-hero__identity">
+          <div class="canonical-player-teamline">${logo}<div><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><span>#${escapeHtml(player.number||'—')} · ${escapeHtml(player.position||'—')}</span></div></div>
+          <div class="canonical-player-nameblock"><h2>${escapeHtml(player.name||'Player')}</h2><p>${escapeHtml(player.height||'—')} · ${escapeHtml(player.weight||'—')} lbs · ${escapeHtml(player.college||'—')}</p></div>
+        </div>
+        <div class="canonical-player-hero__image">${renderCanonicalPlayerImage(player)}</div>
+        <div class="canonical-player-hero__overall"><strong>${player.overall??'—'}</strong><span>OVERALL</span></div>
+      </section>
+
+      <div class="canonical-player-tabs" role="tablist">
+        ${[['ratings','Ratings'],['statistics','Statistics'],['game-log','Game Log'],['contract','Contract'],['transactions','Transaction History']].map(([id,label],index)=>`<button type="button" class="${index===0?'is-active':''}" data-canonical-player-tab="${id}">${label}</button>`).join('')}
+      </div>
+
+      <div class="canonical-player-panels">
+        <section class="canonical-player-panel is-active" data-canonical-player-panel="ratings">${renderCanonicalRatings(player)}</section>
+        <section class="canonical-player-panel" data-canonical-player-panel="statistics">${stats}</section>
+        <section class="canonical-player-panel" data-canonical-player-panel="game-log">${canonicalGameLog(player.id)}</section>
+        <section class="canonical-player-panel" data-canonical-player-panel="contract">${canonicalContractPanel(player)}</section>
+        <section class="canonical-player-panel" data-canonical-player-panel="transactions">${canonicalTransactionHistory(player.id)}</section>
+      </div>
+
+      ${canonicalTradeBreakdown(player)}`;
+
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+    return true;
+  }
+
+  document.addEventListener('click',event=>{
+    const tab=event.target.closest('[data-canonical-player-tab]');
+    if(!tab)return;
+    event.preventDefault();
+    const root=tab.closest('[data-value-card-content]')||document.querySelector('[data-value-card-content]');
+    if(!root)return;
+    const target=tab.getAttribute('data-canonical-player-tab');
+    root.querySelectorAll('[data-canonical-player-tab]').forEach(button=>button.classList.toggle('is-active',button===tab));
+    root.querySelectorAll('[data-canonical-player-panel]').forEach(panel=>panel.classList.toggle('is-active',panel.getAttribute('data-canonical-player-panel')===target));
+  });
+
   function openRosterPlayerDetail(playerId) {
     const scrollingElement=document.scrollingElement;
     const savedWindowScroll=scrollingElement?.scrollTop??window.scrollY;
     const savedMainScroll=mainContent?.scrollTop||0;
     const restorePlayerScroll=()=>{
       const restore=()=>{
-        if(scrollingElement) scrollingElement.scrollTop=savedWindowScroll;
+        if(scrollingElement)scrollingElement.scrollTop=savedWindowScroll;
         window.scrollTo(0,savedWindowScroll);
-        if(mainContent) mainContent.scrollTop=savedMainScroll;
+        if(mainContent)mainContent.scrollTop=savedMainScroll;
       };
       restore();
       requestAnimationFrame(()=>{restore();requestAnimationFrame(restore);});
     };
-    const legacy = playerById(playerId);
-    if (legacy && window.FGC_TRADE?.openValueCard) {
-      window.FGC_TRADE.openValueCard(playerId);
+
+    // Live Madden roster players use the canonical Player Card 2.0 foundation.
+    if(openCanonicalLivePlayerCard(playerId)){
       restorePlayerScroll();
       return;
     }
-    const normalized = rosterService()?.findPlayer?.(playerId) || liveRosterPlayers.get(String(playerId));
-    if (!normalized) return;
-    const player = rosterPlayerView(normalized);
-    const team = rosterTeamView(player.teamId);
-    const ratings = Object.entries(player.ratings || {}).sort((a,b)=>Number(b[1])-Number(a[1]));
-    openDetail(`<div class="modal-hero"><div><span class="eyebrow">${escapeHtml(team?.fullName || 'Free Agent')} · ${escapeHtml(player.position || '—')}</span><h2>${escapeHtml(player.name)}</h2><div class="player-profile-meta"><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'} OVR</span><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span><span>Age ${player.age ?? '—'}</span></div></div></div><div class="modal-body"><div class="modal-summary-grid"><div><span>Contract</span><strong>${escapeHtml(formatRosterContract(player))}</strong></div><div><span>Injury</span><strong>${escapeHtml(player.injury)}</strong></div><div><span>Depth</span><strong>${player.depth ?? 'Not provided'}</strong></div><div><span>Roster Status</span><strong>${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</strong></div></div>${ratings.length?`<div class="rating-bars roster-detail-ratings">${ratings.map(([label,value])=>`<div class="rating-row"><span>${escapeHtml(label)}</span><div class="rating-track"><div class="rating-fill" style="width:${Math.max(0,Math.min(100,Number(value)||0))}%"></div></div><strong>${escapeHtml(String(value))}</strong></div>`).join('')}</div>`:''}<div class="heading-actions" style="justify-content:flex-start"><button class="button button--primary" data-close-detail>Close</button>${player.teamId?`<button class="button button--ghost" data-modal-team="${escapeHtml(player.teamId)}">View Team</button>`:''}</div></div>`);
-    restorePlayerScroll();
+
+    // Development/demo players continue using the rich legacy card until
+    // Player Database universal integration in 5.9.6.6.
+    const legacy=playerById(playerId);
+    if(legacy&&window.FGC_TRADE?.openValueCard){
+      window.FGC_TRADE.openValueCard(playerId);
+      restorePlayerScroll();
+    }
   }
 
   function renderTeamDetailLegacy(teamId) {
@@ -4792,7 +5040,6 @@
       event.preventDefault();
       state.teamTab=teamTab.dataset.teamTab;
       renderRoute(location.hash.slice(1));
-      scrollTeamTabsToTop();
       return;
     }
 
