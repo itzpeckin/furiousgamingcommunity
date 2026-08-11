@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.1c.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.1d.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.1c.2b.1ba.1',
+        version:'5.9.6.1d.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2655,42 +2655,59 @@
     return pieces.length?pieces.join(' · '):'Stat record available';
   }
 
+  const CANONICAL_STAT_COLUMNS={
+    passing:[['Cmp',['passCompletions','completions','passComp','cmp']],['Att',['passAttempts','attempts','passAtt','att']],['P Yards',['passYds','passingYards','passYards']],['P TDs',['passTDs','passingTDs','passTouchdowns']],['INT',['passInts','interceptionsThrown']]],
+    rushing:[['R Att',['rushAtt','rushingAttempts','carries']],['R Yds',['rushYds','rushingYards']],['R TD',['rushTDs','rushingTDs']]],
+    receiving:[['Rec',['recCatches','receptions','catches','rec']],['Rec Yds',['recYds','receivingYards']],['Rec TD',['recTDs','receivingTDs']]],
+    defense:[['Tkls',['defTotalTackles','totalTackles','tackles','tacklesTotal']],['Sack',['defSacks','sacks']],['INT',['defInts','defInterceptions']],['FF',['defForcedFum','forcedFumbles','ff']]],
+    kicking:[['FGM',['kickFGMade','fieldGoalsMade','fgMade']],['FGA',['kickFGAttempts','fieldGoalsAttempted','fgAtt']]],
+    punting:[['Punts',['puntAttempts','punts','puntAtt']],['P Yds',['puntYds','puntingYards','yards']]]
+  };
+
+  function canonicalMetricValue(metricsByCategory=[],aliases=[]){
+    for(const item of metricsByCategory){
+      const bag=item.metrics||{};
+      for(const alias of aliases){
+        const key=Object.keys(bag).find(k=>k.toLowerCase()===alias.toLowerCase());
+        if(key&&bag[key]!==null&&bag[key]!==undefined&&bag[key]!=='')return bag[key];
+      }
+    }
+    return '—';
+  }
+
+  function canonicalColumnsForCategories(categories=[]){
+    const out=[],seen=new Set();
+    categories.forEach(category=>(CANONICAL_STAT_COLUMNS[category]||[]).forEach(col=>{
+      const key=col[0];
+      if(!seen.has(key)){seen.add(key);out.push(col);}
+    }));
+    return out;
+  }
+
+  function canonicalSortableTable(tableId,headers,rows){
+    return `<div class="canonical-flat-table-wrap"><table id="${tableId}" class="canonical-flat-table">
+      <thead><tr>${headers.map((h,i)=>`<th><button type="button" data-sort-table="${tableId}" data-sort-col="${i}">${escapeHtml(h)} <span>↕</span></button></th>`).join('')}</tr></thead>
+      <tbody>${rows.map(row=>`<tr>${row.map((cell,i)=>`<td${i===1&&cell?.className?` class="${escapeHtml(cell.className)}"`:''}>${escapeHtml(cell?.value??cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>`;
+  }
+
   function canonicalGameLog(playerId='') {
     const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId);
-    const categories=model?.categories||{};
-    const weeks=new Map();
-
-    Object.entries(categories).forEach(([category,data])=>{
-      (data?.rows||[]).forEach(row=>{
-        const source=row.source||{};
-        const season=Number(row.seasonYear??source.seasonYear??source.calendarYear??canonicalCurrentSeasonYear());
-        const week=row.week??row.weekIndex??source.weekIndex??source.week??'—';
-        const stage=row.stage||source.stage||source.seasonStage||'regular-season';
-        const key=`${season}:${String(stage)}:${String(week)}`;
-        const entry=weeks.get(key)||{season,stage,week,metrics:[]};
-        entry.metrics.push({category,metrics:row.metrics||{}});
-        weeks.set(key,entry);
-      });
+    const categories=model?.categories||{}, weeks=new Map();
+    Object.entries(categories).forEach(([category,data])=>(data?.rows||[]).forEach(row=>{
+      const source=row.source||{},season=Number(row.seasonYear??source.seasonYear??source.calendarYear??canonicalCurrentSeasonYear());
+      const week=row.week??row.weekIndex??source.weekIndex??source.week??'—',stage=row.stage||source.stage||source.seasonStage||'regular-season';
+      const key=`${season}:${stage}:${week}`,entry=weeks.get(key)||{season,stage,week,metrics:[],categories:[]};
+      entry.metrics.push({category,metrics:row.metrics||{}}); if(!entry.categories.includes(category))entry.categories.push(category); weeks.set(key,entry);
+    }));
+    const year=canonicalCurrentSeasonYear(),rows=[...weeks.values()].filter(r=>!Number.isFinite(r.season)||r.season===year).sort((a,b)=>Number(a.week)-Number(b.week));
+    const cols=canonicalColumnsForCategories([...new Set(rows.flatMap(r=>r.categories))]);
+    const body=rows.map(row=>{
+      const result=canonicalGameResultFor(playerId,row.week,row.stage);
+      const opponent=result?`${result.opponent} - ${result.score}`:`${String(row.stage).replace(/-/g,' ')} Week ${row.week}`;
+      return [row.week,{value:opponent,className:result?.className||'is-neutral'},...cols.map(([,aliases])=>canonicalMetricValue(row.metrics,aliases))];
     });
-
-    const currentYear=canonicalCurrentSeasonYear();
-    const rows=[...weeks.values()]
-      .filter(row=>!Number.isFinite(row.season)||row.season===currentYear)
-      .sort((a,b)=>Number(a.week||0)-Number(b.week||0));
-
-    return rows.length?`<div class="canonical-game-log-table-wrap"><table class="canonical-game-log-table canonical-game-log-table--compact">
-      <colgroup><col class="game-log-col-week"><col class="game-log-col-result"><col class="game-log-col-stats"></colgroup>
-      <thead><tr><th>Week</th><th>Opponent / Result</th><th>Stats</th></tr></thead>
-      <tbody>${rows.map(row=>{
-        const result=canonicalGameResultFor(playerId,row.week,row.stage);
-        const opponent=result?`${result.opponent} ${result.score}`:`${String(row.stage).replace(/-/g,' ')} Week ${row.week}`;
-        return `<tr>
-          <td>${escapeHtml(row.week)}</td>
-          <td><span class="canonical-game-result ${escapeHtml(result?.className||'is-neutral')}">${escapeHtml(opponent)}</span></td>
-          <td>${escapeHtml(canonicalCompactStatSummary(row.metrics))}</td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table></div>`:`<div class="canonical-player-empty">No game-log records are available for the ${currentYear} season.</div>`;
+    return rows.length?canonicalSortableTable(`game-log-${String(playerId).replace(/\W/g,'')}`,['Week','Opponent / Result',...cols.map(c=>c[0])],body):`<div class="canonical-player-empty">No game-log records are available for the ${year} season.</div>`;
   }
 
   function canonicalContractPanel(player={}) {
@@ -2867,19 +2884,19 @@
   }
 
   function renderCanonicalHistoricalStatistics(playerId='') {
-    const seasons=canonicalPlayerSeasonHistory(playerId);
-    const career=canonicalCareerTotals(playerId);
-    const player=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId));
-    const view=player?rosterPlayerView(player):{};
-    const team=rosterTeamView(view.teamId)||{};
-
-    return `<div class="canonical-career-stats">
-      <div class="canonical-career-stat-tiles">${career.length?career.map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(playerStatFormat(label,value))}</strong></div>`).join(''):'<div class="canonical-player-empty">No franchise career totals available.</div>'}</div>
-      <div class="canonical-season-history-table-wrap"><table class="canonical-season-history-table">
-        <thead><tr><th>Year</th><th>Team</th><th>Statistics</th></tr></thead>
-        <tbody>${seasons.length?seasons.map(season=>`<tr><td>${season.year}</td><td>${escapeHtml(team.abbr||team.abbreviation||'—')}</td><td>${escapeHtml(canonicalSeasonSummary(season))}</td></tr>`).join(''):`<tr><td colspan="3">No historical season statistics available.</td></tr>`}</tbody>
-      </table></div>
-    </div>`;
+    const seasons=canonicalPlayerSeasonHistory(playerId),career=canonicalCareerTotals(playerId);
+    const player=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId)),view=player?rosterPlayerView(player):{},team=rosterTeamView(view.teamId)||{};
+    const cats=[...new Set(seasons.flatMap(s=>Object.keys(s.categories||{})))],cols=canonicalColumnsForCategories(cats);
+    const rows=seasons.map(season=>{
+      const metricRows=[];
+      Object.entries(season.categories||{}).forEach(([category,rs])=>{
+        const totals=playerStatCategoryTotals(rs,category)||{};
+        metricRows.push({category,metrics:Object.fromEntries((CANONICAL_STAT_COLUMNS[category]||[]).map(([label])=>[label,totals[label.replace('P Yards','YDS').replace('P TDs','TD').replace('R Att','ATT').replace('R Yds','YDS').replace('R TD','TD').replace('Rec Yds','YDS').replace('Rec TD','TD').replace('Tkls','TKL').replace('Sack','SACK').replace('Punts','PUNTS')]]))});
+      });
+      const valueFor=([label])=>{for(const item of metricRows){if(item.metrics[label]!==undefined&&item.metrics[label]!==null)return item.metrics[label];}return '—';};
+      return [season.year,team.abbr||team.abbreviation||'—',...cols.map(valueFor)];
+    });
+    return `<div class="canonical-career-stats"><div class="canonical-career-stat-tiles">${career.length?career.map(([l,v])=>`<div><span>${escapeHtml(l)}</span><strong>${escapeHtml(playerStatFormat(l,v))}</strong></div>`).join(''):'<div class="canonical-player-empty">No franchise career totals available.</div>'}</div>${canonicalSortableTable(`season-stats-${String(playerId).replace(/\W/g,'')}`,['Year','Team',...cols.map(c=>c[0])],rows)}</div>`;
   }
 
 function canonicalPlayerDashboardStats(playerId='') {
@@ -2917,7 +2934,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     content.innerHTML=`<div class="value-card-context canonical-player-topbar"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>Back to Roster</span></button><span>Player Card</span></div>
       <section class="canonical-player-hero canonical-player-hero--approved" style="--player-team-primary:${escapeHtml(teamPrimary)};--player-team-secondary:${escapeHtml(teamSecondary)};background:linear-gradient(118deg,${escapeHtml(teamPrimary)} 0%,${escapeHtml(teamPrimary)} 43%,color-mix(in srgb,${escapeHtml(teamPrimary)} 55%,${escapeHtml(teamSecondary)}) 62%,${escapeHtml(teamSecondary)} 100%)">
         <div class="canonical-player-hero__stripe" aria-hidden="true"></div>
-        <div class="canonical-player-hero__watermark">${escapeHtml(team.abbr||'')}</div>
+        <div class="canonical-player-hero__watermark canonical-player-hero__watermark--logo">${logo}</div>
         <div class="canonical-player-hero__image">${renderCanonicalPlayerImage(player)}</div>
         <div class="canonical-player-hero__identity">
           <div class="canonical-player-teamline">${logo}<div><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><span>#${escapeHtml(player.number||'—')} &nbsp;•&nbsp; ${escapeHtml(player.position||'—')}</span></div></div>
@@ -5582,4 +5599,20 @@ document.addEventListener('click',event=>{
     const id=panel.getAttribute('data-team-panel')||panel.getAttribute('data-team-detail-panel');
     panel.classList.toggle('is-active',id===tab);
   });
+});
+
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-sort-table]');
+  if(!button)return;
+  event.preventDefault();
+  const table=document.getElementById(button.dataset.sortTable); if(!table)return;
+  const col=Number(button.dataset.sortCol),body=table.tBodies[0],rows=[...body.rows];
+  const next=button.dataset.sortDir==='asc'?'desc':'asc'; button.dataset.sortDir=next;
+  rows.sort((a,b)=>{
+    const av=a.cells[col]?.textContent.trim()||'',bv=b.cells[col]?.textContent.trim()||'';
+    const an=Number(av.replace(/[^0-9.-]/g,'')),bn=Number(bv.replace(/[^0-9.-]/g,''));
+    const cmp=Number.isFinite(an)&&Number.isFinite(bn)?an-bn:av.localeCompare(bv,undefined,{numeric:true});
+    return next==='asc'?cmp:-cmp;
+  });
+  rows.forEach(row=>body.appendChild(row));
 });
