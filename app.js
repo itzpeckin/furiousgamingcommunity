@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.1d.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.1e.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.1d.2b.1ba.1',
+        version:'5.9.6.1e.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2565,57 +2565,32 @@
 
   function canonicalCurrentSeasonYear() {
     const context=window.FranchiseHQ?.currentSeasonContext||{};
-    const candidates=[context.calendarYear,context.seasonYear,context.year,window.FGC_APP?.league?.currentSeasonYear];
-    for(const value of candidates){
-      const year=Number(value);
-      if(Number.isFinite(year)&&year>=2000&&year<=2100)return year;
-    }
-    return 2025;
+    const candidates=[context.calendarYear,context.seasonYear,context.year,window.FGC_APP?.league?.currentSeasonYear,window.FGC_APP?.league?.seasonYear];
+    for(const value of candidates){const year=Number(value);if(Number.isFinite(year)&&year>=2000&&year<=2100)return year;}
+    const years=[];
+    (playerStatisticsState?.rows||[]).forEach(row=>{const source=row.source||{};const year=Number(row.seasonYear??source.seasonYear??source.calendarYear);if(Number.isFinite(year)&&year>=2000&&year<=2100)years.push(year);});
+    canonicalScheduleUniverse().forEach(game=>{const year=Number(game.seasonYear??game.calendarYear??game.source?.seasonYear??game.source?.calendarYear);if(Number.isFinite(year)&&year>=2000&&year<=2100)years.push(year);});
+    return years.length?Math.max(...years):null;
   }
 
   function canonicalScheduleUniverse() {
-    const rows=[];
-    const add=list=>{ if(Array.isArray(list)) rows.push(...list); };
-    add(window.FranchiseHQ?.liveScheduleGames);
-    add(window.FGC_APP?.schedule);
-    add(window.FranchiseHQ?.schedule);
-    return rows;
+    const rows=[]; const add=list=>{if(Array.isArray(list))rows.push(...list);};
+    add(window.FranchiseHQ?.liveScheduleGames); add(window.FranchiseHQ?.schedule); add(window.FGC_APP?.schedule);
+    add(window.FranchiseHQ?.liveReadModelCache?.games); add(window.FranchiseHQ?.liveTeamDirectory?.games);
+    const seen=new Set();
+    return rows.filter(game=>{const id=String(game.id||game.gameId||game.scheduleId||game.source?.scheduleId||'');const key=id||[game.seasonYear??game.source?.seasonYear??'',game.stage??game.source?.stage??'',game.week??game.weekIndex??game.source?.weekIndex??'',game.homeTeamId??game.homeId??game.source?.homeTeamId??'',game.awayTeamId??game.awayId??game.source?.awayTeamId??''].join(':');if(seen.has(key))return false;seen.add(key);return true;});
   }
 
-  function canonicalGameResultFor(playerId='',week='—',stage='regular-season') {
+  function canonicalGameResultFor(playerId='',week='—',stage='regular-season',seasonYear=null) {
     const player=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId));
-    const view=player?rosterPlayerView(player):null;
-    const teamId=String(view?.teamId||player?.teamId||'');
-    if(!teamId)return null;
-
-    const wantedStage=String(stage||'').toLowerCase().replace('-season','');
-    const match=canonicalScheduleUniverse().find(game=>{
-      const gw=Number(game.week??game.weekIndex??game.source?.weekIndex??game.source?.week);
-      const gs=String(game.stage||game.stageLabel||game.source?.stage||game.source?.seasonStage||'').toLowerCase().replace('-season','');
-      const home=String(game.homeTeamId||game.homeId||game.home?.id||'');
-      const away=String(game.awayTeamId||game.awayId||game.away?.id||'');
-      return gw===Number(week) && (home===teamId||away===teamId) && (!gs||gs.includes(wantedStage)||wantedStage.includes(gs));
-    });
+    const view=player?rosterPlayerView(player):null; const teamId=String(view?.teamId||player?.teamId||''); if(!teamId)return null;
+    const normalizeStage=value=>{const text=String(value||'').toLowerCase();if(text.includes('pre'))return 'pre';if(text.includes('post')||text.includes('playoff'))return 'post';return 'reg';};
+    const wantedStage=normalizeStage(stage);
+    const match=canonicalScheduleUniverse().find(game=>{const source=game.source||{};const gw=Number(game.week??game.weekIndex??source.weekIndex??source.week);const gs=normalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage??source.stageIndex);const gy=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear);const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');const yearMatch=!Number.isFinite(Number(seasonYear))||!Number.isFinite(gy)||gy===Number(seasonYear);return gw===Number(week)&&gs===wantedStage&&yearMatch&&(home===teamId||away===teamId);});
     if(!match)return null;
-
-    const home=String(match.homeTeamId||match.homeId||match.home?.id||'');
-    const away=String(match.awayTeamId||match.awayId||match.away?.id||'');
-    const isHome=home===teamId;
-    const opponentId=isHome?away:home;
-    const opponent=rosterTeamView(opponentId)||{};
-    const homeScore=Number(match.homeScore??match.home?.score??match.source?.homeScore);
-    const awayScore=Number(match.awayScore??match.away?.score??match.source?.awayScore);
-    const played=Number.isFinite(homeScore)&&Number.isFinite(awayScore);
-    const teamScore=isHome?homeScore:awayScore;
-    const oppScore=isHome?awayScore:homeScore;
-    const result=played?(teamScore>oppScore?'W':teamScore<oppScore?'L':'T'):'';
-
-    return {
-      opponent:`${isHome?'vs.':'@'} ${opponent.abbr||opponent.abbreviation||opponent.nickname||'OPP'}`,
-      score:played?`${teamScore}-${oppScore}`:'',
-      result,
-      className:result==='W'?'is-win':result==='L'?'is-loss':'is-neutral'
-    };
+    const source=match.source||{}; const home=String(match.homeTeamId??match.homeId??match.home?.id??source.homeTeamId??''); const away=String(match.awayTeamId??match.awayId??match.away?.id??source.awayTeamId??''); const isHome=home===teamId; const opponentId=isHome?away:home; const opponent=rosterTeamView(opponentId)||{};
+    const homeScore=Number(match.homeScore??match.home?.score??source.homeScore??source.homeScoreTotal??source.homePoints); const awayScore=Number(match.awayScore??match.away?.score??source.awayScore??source.awayScoreTotal??source.awayPoints); const played=Number.isFinite(homeScore)&&Number.isFinite(awayScore); const teamScore=isHome?homeScore:awayScore; const oppScore=isHome?awayScore:homeScore; const result=played?(teamScore>oppScore?'W':teamScore<oppScore?'L':'T'):'';
+    return {opponent:`${isHome?'vs.':'@'} ${opponent.abbr||opponent.abbreviation||opponent.nickname||opponent.fullName||'OPP'}`,score:played?`${teamScore}-${oppScore}`:'',result,className:result==='W'?'is-win':result==='L'?'is-loss':'is-neutral'};
   }
 
   function canonicalCompactStatSummary(metricsByCategory=[]) {
@@ -2692,22 +2667,16 @@
   }
 
   function canonicalGameLog(playerId='') {
-    const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId);
-    const categories=model?.categories||{}, weeks=new Map();
-    Object.entries(categories).forEach(([category,data])=>(data?.rows||[]).forEach(row=>{
-      const source=row.source||{},season=Number(row.seasonYear??source.seasonYear??source.calendarYear??canonicalCurrentSeasonYear());
-      const week=row.week??row.weekIndex??source.weekIndex??source.week??'—',stage=row.stage||source.stage||source.seasonStage||'regular-season';
-      const key=`${season}:${stage}:${week}`,entry=weeks.get(key)||{season,stage,week,metrics:[],categories:[]};
-      entry.metrics.push({category,metrics:row.metrics||{}}); if(!entry.categories.includes(category))entry.categories.push(category); weeks.set(key,entry);
-    }));
-    const year=canonicalCurrentSeasonYear(),rows=[...weeks.values()].filter(r=>!Number.isFinite(r.season)||r.season===year).sort((a,b)=>Number(a.week)-Number(b.week));
-    const cols=canonicalColumnsForCategories([...new Set(rows.flatMap(r=>r.categories))]);
-    const body=rows.map(row=>{
-      const result=canonicalGameResultFor(playerId,row.week,row.stage);
-      const opponent=result?`${result.opponent} - ${result.score}`:`${String(row.stage).replace(/-/g,' ')} Week ${row.week}`;
-      return [row.week,{value:opponent,className:result?.className||'is-neutral'},...cols.map(([,aliases])=>canonicalMetricValue(row.metrics,aliases))];
-    });
-    return rows.length?canonicalSortableTable(`game-log-${String(playerId).replace(/\W/g,'')}`,['Week','Opponent / Result',...cols.map(c=>c[0])],body):`<div class="canonical-player-empty">No game-log records are available for the ${year} season.</div>`;
+    const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId); const categories=model?.categories||{}; const currentYear=canonicalCurrentSeasonYear();
+    const player=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId)); const view=player?rosterPlayerView(player):null; const teamId=String(view?.teamId||player?.teamId||'');
+    const statWeeks=new Map();
+    Object.entries(categories).forEach(([category,data])=>(data?.rows||[]).forEach(row=>{const source=row.source||{};const season=Number(row.seasonYear??source.seasonYear??source.calendarYear??currentYear);const week=row.week??row.weekIndex??source.weekIndex??source.week??'—';const stage=row.stage||source.stage||source.seasonStage||'regular-season';const key=`${season}:${String(stage)}:${String(week)}`;const entry=statWeeks.get(key)||{season,stage,week,metrics:[],categories:[]};entry.metrics.push({category,metrics:row.metrics||{}});if(!entry.categories.includes(category))entry.categories.push(category);statWeeks.set(key,entry);}));
+    const normalizeStage=value=>{const text=String(value||'').toLowerCase();if(text.includes('pre'))return 'preseason';if(text.includes('post')||text.includes('playoff'))return 'playoffs';return 'regular-season';};
+    const scheduleRows=canonicalScheduleUniverse().filter(game=>{const source=game.source||{};const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');const year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear);return (home===teamId||away===teamId)&&(!Number.isFinite(Number(currentYear))||!Number.isFinite(year)||year===Number(currentYear));}).map(game=>{const source=game.source||{};const week=game.week??game.weekIndex??source.weekIndex??source.week??'—';const stage=normalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);const season=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??currentYear);const stat=[...statWeeks.values()].find(row=>Number(row.season)===season&&Number(row.week)===Number(week)&&normalizeStage(row.stage)===stage);return {season,stage,week,metrics:stat?.metrics||[],categories:stat?.categories||[]};});
+    const rows=(scheduleRows.length?scheduleRows:[...statWeeks.values()]).sort((a,b)=>Number(a.week||0)-Number(b.week||0));
+    const activeCategories=[...new Set(Object.keys(categories).filter(c=>(categories[c]?.rows||[]).length))]; const cols=canonicalColumnsForCategories(activeCategories.length?activeCategories:['passing','rushing','receiving','defense']); const zeroOrMetric=(metrics,aliases)=>{const value=canonicalMetricValue(metrics,aliases);return value==='—'?0:value;};
+    const body=rows.map(row=>{const result=canonicalGameResultFor(playerId,row.week,row.stage,row.season);const opponent=result?`${result.opponent} - ${result.score}`:`Week ${row.week}`;return [row.week,{value:opponent,className:result?.className||'is-neutral'},...cols.map(([,aliases])=>zeroOrMetric(row.metrics,aliases))];});
+    return rows.length?canonicalSortableTable(`game-log-${String(playerId).replace(/\W/g,'')}`,['Week','Opponent / Result',...cols.map(c=>c[0])],body):`<div class="canonical-player-empty">No game-log records are available${currentYear?` for the ${currentYear} season`:''}.</div>`;
   }
 
   function canonicalContractPanel(player={}) {
@@ -2975,36 +2944,10 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   function openRosterPlayerDetail(playerId) {
-    const scrollingElement=document.scrollingElement;
-    const savedWindowScroll=scrollingElement?.scrollTop??window.scrollY;
-    const savedMainScroll=mainContent?.scrollTop||0;
-    const restorePlayerScroll=()=>{
-      const restore=()=>{
-        if(scrollingElement)scrollingElement.scrollTop=savedWindowScroll;
-        window.scrollTo(0,savedWindowScroll);
-        if(mainContent)mainContent.scrollTop=savedMainScroll;
-      };
-      restore();
-      requestAnimationFrame(()=>{restore();requestAnimationFrame(restore);});
-    };
-
-    // Live Madden roster players use the canonical Player Card 2.0 foundation.
-    try {
-      if(openCanonicalLivePlayerCard(playerId)){
-        restorePlayerScroll();
-        return;
-      }
-    } catch (error) {
-      console.error('[Canonical Player Card]', error);
-    }
-
-    // Development/demo players continue using the rich legacy card until
-    // Player Database universal integration in 5.9.6.6.
-    const legacy=playerById(playerId);
-    if(legacy&&window.FGC_TRADE?.openValueCard){
-      window.FGC_TRADE.openValueCard(playerId);
-      restorePlayerScroll();
-    }
+    const scrollingElement=document.scrollingElement; const savedWindowScroll=scrollingElement?.scrollTop??window.scrollY; const savedMainScroll=mainContent?.scrollTop||0;
+    const restorePlayerScroll=()=>{const restore=()=>{if(scrollingElement)scrollingElement.scrollTop=savedWindowScroll;window.scrollTo(0,savedWindowScroll);if(mainContent)mainContent.scrollTop=savedMainScroll;};restore();requestAnimationFrame(()=>{restore();requestAnimationFrame(restore);});};
+    const open=()=>{try{if(openCanonicalLivePlayerCard(playerId)){restorePlayerScroll();return true;}}catch(error){console.error('[Canonical Player Card]',error);}const legacy=playerById(playerId);if(legacy&&window.FGC_TRADE?.openValueCard){window.FGC_TRADE.openValueCard(playerId);restorePlayerScroll();return true;}return false;};
+    if(!playerStatisticsState.loaded){hydratePlayerStatistics(false).then(()=>open());return;} open();
   }
 
   function renderTeamDetailLegacy(teamId) {
