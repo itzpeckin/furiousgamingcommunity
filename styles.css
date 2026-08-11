@@ -5260,7 +5260,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.1b.1b — Player Data Inspector
+   Franchise HQ v5.9.6.1b.2.2b.1b — Player Data Inspector
    ============================================================ */
 .player-data-inspector{display:grid;gap:16px}
 .player-inspector-heading{margin-bottom:0}
@@ -5319,7 +5319,7 @@ table td{
 }
 
 
-/* Franchise HQ v5.9.6.1b.1b.1b — Player Data Inspector interaction fix */
+/* Franchise HQ v5.9.6.1b.2.2b.1b — Player Data Inspector interaction fix */
 .player-inspector-controls select[data-player-inspector-select]{
   cursor:pointer;
 }
@@ -5329,7 +5329,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.1b.1b — Live Player Statistics Integration
+   Franchise HQ v5.9.6.1b.2.2b.1b — Live Player Statistics Integration
    ============================================================ */
 .value-card-live-statistics{grid-column:1/-1}
 .player-live-statistics{display:grid;gap:14px}
@@ -5364,7 +5364,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.1b.1b — Canonical Player Card 2.0 Foundation
+   Franchise HQ v5.9.6.1b.2.2b.1b — Canonical Player Card 2.0 Foundation
    ============================================================ */
 .canonical-player-hero{
   position:relative;
@@ -5507,7 +5507,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.1b.1 — Approved Player Card UI
+   Franchise HQ v5.9.6.1b.2.2b.1 — Approved Player Card UI
    Direct implementation of approved design target.
    ============================================================ */
 [data-value-card-modal] .value-card-dialog{max-width:min(1540px,96vw)!important;width:min(1540px,96vw)!important}
@@ -5602,7 +5602,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.1b.1.1 — Player Card polish hotfix
+   Franchise HQ v5.9.6.1b.2.2b.1.1 — Player Card polish hotfix
    ============================================================ */
 
 /* Player image */
@@ -5762,4 +5762,135 @@ table td{
   .canonical-contract-grid--compact{grid-template-columns:1fr 1fr!important}
   .canonical-player-trade-breakdown{margin:12px!important}
   .canonical-player-trade-breakdown .breakdown-grid{grid-template-columns:1fr!important}
+}
+
+
+/* ============================================================
+   Franchise HQ v5.9.6.1b.2.2
+   Restore APPROVED Player Card dashboard layout.
+   Do not redesign markup; only restore 3-column geometry and alignment.
+
+   Ratings | Current Statistics | Contract Info
+   Ratings | Game Log           | Transaction History
+   Ratings |                    |
+   ------------------------------------------------------------
+   Trade Value Calculations
+   ============================================================ */
+
+/* Restore the approved three-column dashboard proportions. */
+.canonical-player-panels--approved .canonical-player-dashboard{
+  display:grid!important;
+  grid-template-columns:minmax(420px,1.35fr) minmax(360px,.9fr) minmax(280px,.66fr)!important;
+  gap:10px!important;
+  padding:0!important;
+  align-items:stretch!important;
+}
+
+/* All three dashboard columns stretch to the same bottom edge. */
+.canonical-player-dashboard__ratings,
+.canonical-player-dashboard__center,
+.canonical-player-dashboard__rail{
+  min-width:0!important;
+  height:100%!important;
+  align-self:stretch!important;
+}
+
+/* Ratings stays one full-height left column. */
+.canonical-player-dashboard__ratings{
+  display:flex!important;
+}
+.canonical-player-dashboard__ratings > .canonical-dashboard-card{
+  flex:1 1 auto!important;
+  height:100%!important;
+}
+
+/* Center:
+   Current Statistics on top.
+   Game Log grows to consume all remaining height. */
+.canonical-player-dashboard__center > .canonical-dashboard-stack{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr)!important;
+  gap:10px!important;
+  height:100%!important;
+  align-content:stretch!important;
+}
+.canonical-player-dashboard__center > .canonical-dashboard-stack > .canonical-dashboard-card:nth-child(2){
+  min-height:0!important;
+  height:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+}
+.canonical-player-dashboard__center > .canonical-dashboard-stack > .canonical-dashboard-card:nth-child(2) .canonical-game-log-table-wrap{
+  flex:1 1 auto!important;
+  min-height:0!important;
+}
+
+/* Right:
+   Contract Info on top.
+   Transaction History grows to consume all remaining height. */
+.canonical-player-dashboard__rail{
+  display:block!important;
+}
+.canonical-player-dashboard__rail > .canonical-dashboard-stack{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr)!important;
+  gap:10px!important;
+  height:100%!important;
+  align-content:stretch!important;
+}
+.canonical-player-dashboard__rail > .canonical-dashboard-stack > .canonical-dashboard-card:nth-child(2){
+  min-height:0!important;
+  height:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+}
+.canonical-player-dashboard__rail > .canonical-dashboard-stack > .canonical-dashboard-card:nth-child(2) .canonical-transaction-list,
+.canonical-player-dashboard__rail > .canonical-dashboard-stack > .canonical-dashboard-card:nth-child(2) .canonical-player-empty{
+  flex:1 1 auto!important;
+}
+
+/* Keep the Trade Calculator immediately beneath the common dashboard bottom. */
+.canonical-player-panels--approved{
+  padding-bottom:0!important;
+}
+.canonical-player-trade-breakdown{
+  margin-top:10px!important;
+}
+
+/* Explicitly override the prior b.1 two-column experimental layout. */
+.canonical-player-dashboard__main,
+.canonical-player-dashboard__side{
+  display:initial;
+}
+
+/* Preserve approved responsive behavior. */
+@media(max-width:1180px){
+  .canonical-player-panels--approved .canonical-player-dashboard{
+    grid-template-columns:minmax(360px,1.15fr) minmax(330px,.9fr)!important;
+  }
+  .canonical-player-dashboard__rail{
+    grid-column:1/-1!important;
+    height:auto!important;
+  }
+  .canonical-player-dashboard__rail > .canonical-dashboard-stack{
+    grid-template-columns:1fr 1fr!important;
+    grid-template-rows:auto!important;
+    height:auto!important;
+  }
+}
+@media(max-width:850px){
+  .canonical-player-panels--approved .canonical-player-dashboard{
+    grid-template-columns:1fr!important;
+  }
+  .canonical-player-dashboard__ratings,
+  .canonical-player-dashboard__center,
+  .canonical-player-dashboard__rail{
+    height:auto!important;
+  }
+  .canonical-player-dashboard__center > .canonical-dashboard-stack,
+  .canonical-player-dashboard__rail > .canonical-dashboard-stack{
+    grid-template-columns:1fr!important;
+    grid-template-rows:auto!important;
+    height:auto!important;
+  }
 }
