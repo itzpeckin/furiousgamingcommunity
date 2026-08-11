@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.0a · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.0a',
+        version:'5.9.6.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1889,6 +1889,159 @@
       loadPlayerDataInspector(true);
     }
   });
+
+
+  const playerStatisticsState={loaded:false,loading:false,rows:[],error:null,promise:null};
+  const PLAYER_STAT_CATEGORIES=['passing','rushing','receiving','defense','kicking','punting'];
+
+  function playerStatIdentity(row={}) {
+    const source=row.source||{};
+    return String(row.playerId||source.player_external_id||source.playerId||source.player_id||'');
+  }
+  function playerStatValue(row={},aliases=[]) {
+    const metrics=row.metrics||{}, source=row.source||{};
+    for(const alias of aliases){
+      for(const bag of [metrics,source]){
+        if(bag[alias]!==undefined&&bag[alias]!==null&&bag[alias]!=='')return bag[alias];
+        const key=Object.keys(bag).find(k=>k.toLowerCase()===String(alias).toLowerCase());
+        if(key&&bag[key]!==null&&bag[key]!=='')return bag[key];
+      }
+    }
+    return null;
+  }
+  function playerStatNum(row={},aliases=[]) {
+    const value=playerStatValue(row,aliases);
+    if(value===null||value===undefined||value==='')return null;
+    const number=Number(value);
+    return Number.isFinite(number)?number:null;
+  }
+  function playerStatSum(rows=[],aliases=[]) {
+    let found=false,total=0;
+    rows.forEach(row=>{const n=playerStatNum(row,aliases);if(n!==null){found=true;total+=n;}});
+    return found?total:null;
+  }
+  function playerStatLast(rows=[],aliases=[]) {
+    for(let index=rows.length-1;index>=0;index--){
+      const value=playerStatValue(rows[index],aliases);
+      if(value!==null&&value!==undefined&&value!=='')return value;
+    }
+    return null;
+  }
+  function playerStatCategoryTotals(rows=[],category='') {
+    const sum=aliases=>playerStatSum(rows,aliases);
+    if(category==='passing'){
+      const cmp=sum(['passCompletions','completions','passComp','cmp']);
+      const att=sum(['passAttempts','attempts','passAtt','att']);
+      return {CMP:cmp,ATT:att,'CMP%':att?((cmp||0)/att)*100:null,YDS:sum(['passYds','passingYards','passYards','yards']),TD:sum(['passTDs','passingTDs','passTouchdowns','touchdowns','tds']),INT:sum(['passInts','interceptions','ints','interceptionsThrown']),SACK:sum(['passSacks','sacksTaken','sacked']),RTG:playerStatLast(rows,['passerRating','qbRating','rating'])};
+    }
+    if(category==='rushing'){
+      const att=sum(['rushAtt','rushingAttempts','carries','attempts']), yds=sum(['rushYds','rushingYards','yards']);
+      return {ATT:att,YDS:yds,AVG:att?yds/att:null,TD:sum(['rushTDs','rushingTDs','touchdowns','tds']),FUM:sum(['rushFumbles','fumbles']),LONG:sum(['rushLong','longRush','long'])};
+    }
+    if(category==='receiving'){
+      const rec=sum(['recCatches','receptions','catches','rec']), yds=sum(['recYds','receivingYards','yards']);
+      return {REC:rec,TAR:sum(['recTargets','targets','tar']),YDS:yds,AVG:rec?yds/rec:null,TD:sum(['recTDs','receivingTDs','touchdowns','tds']),DROP:sum(['recDrops','drops']),LONG:sum(['recLong','longReception','long'])};
+    }
+    if(category==='defense'){
+      return {TKL:sum(['defTotalTackles','totalTackles','tackles','tacklesTotal']),SOLO:sum(['defSoloTackles','soloTackles','solo']),AST:sum(['defAssistTackles','assistTackles','assists']),SACK:sum(['defSacks','sacks']),INT:sum(['defInts','defInterceptions','interceptions','ints']),FF:sum(['defForcedFum','forcedFumbles','ff']),FR:sum(['defFumRec','fumbleRecoveries','fr']),PD:sum(['defPassDef','passesDefended','passDeflections','pd']),TD:sum(['defTDs','defensiveTDs','touchdowns','tds'])};
+    }
+    if(category==='kicking'){
+      const fgm=sum(['kickFGMade','fieldGoalsMade','fgMade']), fga=sum(['kickFGAtt','fieldGoalAttempts','fgAtt']);
+      return {FGM:fgm,FGA:fga,'FG%':fga?((fgm||0)/fga)*100:null,XPM:sum(['kickXPMade','extraPointsMade','xpMade']),XPA:sum(['kickXPAtt','extraPointAttempts','xpAtt']),LONG:sum(['kickLongFG','longFieldGoal','fgLong'])};
+    }
+    if(category==='punting'){
+      const punts=sum(['puntAttempts','punts','puntAtt']), yds=sum(['puntYds','puntingYards','yards']);
+      return {PUNTS:punts,YDS:yds,AVG:punts?yds/punts:null,IN20:sum(['puntsInside20','inside20','in20']),TB:sum(['puntTouchbacks','touchbacks']),LONG:sum(['puntLong','longPunt','long'])};
+    }
+    return {};
+  }
+  function playerStatRows(playerId='') {
+    const id=String(playerId||'');
+    return playerStatisticsState.rows.filter(row=>playerStatIdentity(row)===id&&PLAYER_STAT_CATEGORIES.includes(String(row.category||'').toLowerCase()));
+  }
+  function playerStatModel(playerId='') {
+    const rows=playerStatRows(playerId);
+    const categories={};
+    PLAYER_STAT_CATEGORIES.forEach(category=>{
+      const items=rows.filter(row=>String(row.category||'').toLowerCase()===category).sort((a,b)=>Number(a.week||a.weekIndex||0)-Number(b.week||b.weekIndex||0));
+      categories[category]={rows:items,totals:playerStatCategoryTotals(items,category)};
+    });
+    return {playerId:String(playerId||''),rows,categories};
+  }
+  function playerStatFormat(label,value){
+    if(value===null||value===undefined||value===''||Number.isNaN(value))return '—';
+    if(typeof value==='number'){
+      if(label.includes('%'))return `${value.toFixed(1)}%`;
+      if(['AVG','RTG'].includes(label))return value.toFixed(1);
+      return Number.isInteger(value)?String(value):value.toFixed(1);
+    }
+    return String(value);
+  }
+  function playerStatLabel(category){return ({passing:'Passing',rushing:'Rushing',receiving:'Receiving',defense:'Defense',kicking:'Kicking',punting:'Punting'})[category]||category;}
+  function renderPlayerStatsReady(playerId=''){
+    const model=playerStatModel(playerId);
+    const available=PLAYER_STAT_CATEGORIES.filter(category=>model.categories[category].rows.length);
+    if(!available.length)return `<div class="player-live-stats-empty"><strong>No live statistics yet</strong><span>No mapped Madden player-stat records exist for this player in the active snapshot.</span></div>`;
+    return `<div class="player-live-statistics" data-live-player-stats="${escapeHtml(playerId)}">
+      <div class="player-live-stat-nav">${available.map((category,index)=>`<button type="button" class="player-live-stat-tab ${index===0?'is-active':''}" data-player-stat-tab="${category}">${playerStatLabel(category)}</button>`).join('')}</div>
+      ${available.map((category,index)=>{
+        const data=model.categories[category], totals=data.totals;
+        return `<div class="player-live-stat-panel ${index===0?'is-active':''}" data-player-stat-panel="${category}">
+          <div class="player-live-stat-season-heading"><div><span class="eyebrow">${playerStatLabel(category)}</span><h4>Current Season</h4></div><small>${data.rows.length} weekly record${data.rows.length===1?'':'s'}</small></div>
+          <div class="player-live-stat-grid">${Object.entries(totals).map(([label,value])=>`<div><span>${label}</span><strong>${playerStatFormat(label,value)}</strong></div>`).join('')}</div>
+          <div class="player-live-game-log table-wrap"><table><thead><tr><th>Week</th><th>Stage</th><th>Game Metrics</th></tr></thead><tbody>${data.rows.map(row=>`<tr><td>${escapeHtml(row.week??row.weekIndex??'—')}</td><td>${escapeHtml(row.stage||'—')}</td><td><details><summary>View</summary><pre>${escapeHtml(JSON.stringify(row.metrics||{},null,2))}</pre></details></td></tr>`).join('')}</tbody></table></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  function rerenderPlayerStatHosts(){
+    document.querySelectorAll('[data-player-stat-host]').forEach(host=>{
+      const id=host.getAttribute('data-player-stat-host')||'';
+      host.innerHTML=playerStatisticsState.error?`<div class="player-live-stats-empty"><strong>Statistics unavailable</strong><span>${escapeHtml(playerStatisticsState.error)}</span></div>`:renderPlayerStatsReady(id);
+    });
+  }
+  async function hydratePlayerStatistics(force=false){
+    if(playerStatisticsState.loaded&&!force)return playerStatisticsState.rows;
+    if(playerStatisticsState.promise&&!force)return playerStatisticsState.promise;
+    playerStatisticsState.loading=true;playerStatisticsState.error=null;
+    playerStatisticsState.promise=(async()=>{
+      try{
+        const service=liveReadModel();
+        if(!service)throw new Error('Live Read Model service is unavailable.');
+        if(force)await service.refresh();
+        playerStatisticsState.rows=await service.getStatistics()||[];
+        playerStatisticsState.loaded=true;
+        return playerStatisticsState.rows;
+      }catch(error){
+        playerStatisticsState.error=error?.message||'Unable to load player statistics.';
+        return [];
+      }finally{
+        playerStatisticsState.loading=false;playerStatisticsState.promise=null;rerenderPlayerStatHosts();
+      }
+    })();
+    return playerStatisticsState.promise;
+  }
+  function renderLivePlayerStatistics(playerId=''){
+    if(!playerStatisticsState.loaded&&!playerStatisticsState.loading)hydratePlayerStatistics(false);
+    if(!playerStatisticsState.loaded){
+      return `<div data-player-stat-host="${escapeHtml(playerId)}"><div class="player-live-stats-loading"><span class="spinner" aria-hidden="true"></span><strong>Loading live Madden statistics…</strong></div></div>`;
+    }
+    return `<div data-player-stat-host="${escapeHtml(playerId)}">${renderPlayerStatsReady(playerId)}</div>`;
+  }
+  document.addEventListener('click',event=>{
+    const tab=event.target.closest('[data-player-stat-tab]');
+    if(!tab)return;
+    const root=tab.closest('.player-live-statistics');if(!root)return;
+    const category=tab.getAttribute('data-player-stat-tab');
+    root.querySelectorAll('[data-player-stat-tab]').forEach(button=>button.classList.toggle('is-active',button===tab));
+    root.querySelectorAll('[data-player-stat-panel]').forEach(panel=>panel.classList.toggle('is-active',panel.getAttribute('data-player-stat-panel')===category));
+  });
+  window.FranchiseHQ.playerStatistics={
+    get(playerId){return playerStatModel(playerId);},
+    render(playerId){return renderLivePlayerStatistics(playerId);},
+    refresh(){return hydratePlayerStatistics(true);},
+    diagnostics(playerId){const model=playerStatModel(playerId);return Object.freeze({playerId:String(playerId||''),loaded:playerStatisticsState.loaded,totalRecords:model.rows.length,categories:Object.fromEntries(PLAYER_STAT_CATEGORIES.map(category=>[category,model.categories[category].rows.length])),lastError:playerStatisticsState.error});}
+  };
 
   function stageWeekContext(source={},fallbackWeek=0,fallbackStage='reg') {
     const route=String(source.routePath||source.route_path||source.sourceRoutePath||source.source_route_path||'');
