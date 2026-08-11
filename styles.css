@@ -5260,7 +5260,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.2.2b.1b — Player Data Inspector
+   Franchise HQ v5.9.6.1c.2b.1b — Player Data Inspector
    ============================================================ */
 .player-data-inspector{display:grid;gap:16px}
 .player-inspector-heading{margin-bottom:0}
@@ -5319,7 +5319,7 @@ table td{
 }
 
 
-/* Franchise HQ v5.9.6.1b.2.2b.1b — Player Data Inspector interaction fix */
+/* Franchise HQ v5.9.6.1c.2b.1b — Player Data Inspector interaction fix */
 .player-inspector-controls select[data-player-inspector-select]{
   cursor:pointer;
 }
@@ -5329,7 +5329,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.2.2b.1b — Live Player Statistics Integration
+   Franchise HQ v5.9.6.1c.2b.1b — Live Player Statistics Integration
    ============================================================ */
 .value-card-live-statistics{grid-column:1/-1}
 .player-live-statistics{display:grid;gap:14px}
@@ -5364,7 +5364,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.2.2b.1b — Canonical Player Card 2.0 Foundation
+   Franchise HQ v5.9.6.1c.2b.1b — Canonical Player Card 2.0 Foundation
    ============================================================ */
 .canonical-player-hero{
   position:relative;
@@ -5507,7 +5507,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.2.2b.1 — Approved Player Card UI
+   Franchise HQ v5.9.6.1c.2b.1 — Approved Player Card UI
    Direct implementation of approved design target.
    ============================================================ */
 [data-value-card-modal] .value-card-dialog{max-width:min(1540px,96vw)!important;width:min(1540px,96vw)!important}
@@ -5602,7 +5602,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.2.2b.1.1 — Player Card polish hotfix
+   Franchise HQ v5.9.6.1c.2b.1.1 — Player Card polish hotfix
    ============================================================ */
 
 /* Player image */
@@ -5766,7 +5766,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1b.2.2
+   Franchise HQ v5.9.6.1c.2
    Restore APPROVED Player Card dashboard layout.
    Do not redesign markup; only restore 3-column geometry and alignment.
 
@@ -5893,4 +5893,56 @@ table td{
     grid-template-rows:auto!important;
     height:auto!important;
   }
+}
+
+
+/* ============================================================
+   Franchise HQ v5.9.6.1c — Game Log / Career Stats / Portraits
+   ============================================================ */
+.canonical-game-log-table-wrap{overflow:visible!important;max-height:none!important}
+.canonical-game-log-table--compact{table-layout:fixed;width:100%}
+.canonical-game-log-table--compact .game-log-col-week{width:54px}
+.canonical-game-log-table--compact .game-log-col-result{width:180px}
+.canonical-game-log-table--compact .game-log-col-stats{width:auto}
+.canonical-game-log-table--compact th,
+.canonical-game-log-table--compact td{
+  padding:8px 9px!important;vertical-align:middle;white-space:normal;line-height:1.25
+}
+.canonical-game-log-table--compact td:first-child{text-align:center;font-weight:900}
+.canonical-game-result{display:inline-block;font-weight:800}
+.canonical-game-result.is-win{color:#58d982}
+.canonical-game-result.is-loss{color:#ff6b6b}
+.canonical-game-result.is-neutral{color:var(--text)}
+.canonical-contract-grid--compact strong{
+  font-size:12px!important;white-space:nowrap!important;letter-spacing:-.015em
+}
+
+.canonical-career-stats{display:grid;gap:14px;padding:12px}
+.canonical-career-stat-tiles{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px
+}
+.canonical-career-stat-tiles>div{
+  border:1px solid #2b3e55;border-radius:8px;background:#0a1724;padding:11px 12px
+}
+.canonical-career-stat-tiles span{
+  display:block;color:#9eacbd;font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase
+}
+.canonical-career-stat-tiles strong{display:block;margin-top:4px;color:#fff;font-size:18px}
+.canonical-season-history-table-wrap{border:1px solid #293c52;border-radius:8px;overflow:hidden}
+.canonical-season-history-table{width:100%;border-collapse:collapse}
+.canonical-season-history-table th,
+.canonical-season-history-table td{
+  padding:10px 12px;border-bottom:1px solid #26384d;border-right:1px solid #26384d;text-align:left
+}
+.canonical-season-history-table th:last-child,
+.canonical-season-history-table td:last-child{border-right:0}
+.canonical-season-history-table tr:last-child td{border-bottom:0}
+.canonical-season-history-table th{
+  background:#0e1d2d;color:#9eacbd;font-size:10px;text-transform:uppercase;letter-spacing:.05em
+}
+.canonical-season-history-table td{color:#edf3fb;font-size:12px}
+
+@media(max-width:900px){
+  .canonical-game-log-table--compact .game-log-col-result{width:150px}
+  .canonical-contract-grid--compact strong{font-size:11px!important}
 }
