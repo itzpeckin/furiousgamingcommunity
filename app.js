@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.1a · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.1a.1a.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.1a',
+        version:'5.9.6.1a.1a.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2657,7 +2657,7 @@
     const logo=renderTeamMark(team,'canonical-player-team-logo');
     const stats=window.FranchiseHQ?.playerStatistics?.render?.(player.id)||'<div class="canonical-player-empty">Statistics service unavailable.</div>';
 
-    content.innerHTML=`<div class="value-card-context"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>${escapeHtml(playerCardReturnLabel?.()||'Back')}</span></button><span>Player Card</span></div>
+    content.innerHTML=`<div class="value-card-context"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>${escapeHtml('Back')}</span></button><span>Player Card</span></div>
       <section class="canonical-player-hero" style="--player-team-primary:${escapeHtml(team.primary||'#27364f')};--player-team-secondary:${escapeHtml(team.secondary||team.primary||'#8fa4c4')}">
         <div class="canonical-player-hero__shade" aria-hidden="true"></div>
         <div class="canonical-player-hero__identity">
@@ -2714,9 +2714,13 @@
     };
 
     // Live Madden roster players use the canonical Player Card 2.0 foundation.
-    if(openCanonicalLivePlayerCard(playerId)){
-      restorePlayerScroll();
-      return;
+    try {
+      if(openCanonicalLivePlayerCard(playerId)){
+        restorePlayerScroll();
+        return;
+      }
+    } catch (error) {
+      console.error('[Canonical Player Card]', error);
     }
 
     // Development/demo players continue using the rich legacy card until
