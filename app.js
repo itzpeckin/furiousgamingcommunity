@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2ecb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2fcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2ecb.2b.1ba.1',
+        version:'5.9.6.2fcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -4274,7 +4274,31 @@ function canonicalPlayerDashboardStats(playerId='') {
         </div>
       </div>`);
 
-      // Fill expensive content only after browser has painted the modal.
+      // Start Player Stats hydration immediately after the shell is opened.
+      // This runs in parallel with the first paint instead of waiting two frames.
+      const playerReadyPromise=(async()=>{
+        try{
+          await hydratePlayerStatistics(false);
+          rebuildMatchupPlayerStatIndex(false);
+          rebuildMatchupPlayerGameModelCache(false);
+          matchupPanelCache.set(
+            matchupPanelCacheKey(game,'player'),
+            buildMatchupPanel('player',game)
+          );
+          return true;
+        }catch(error){
+          console.warn('[Matchup Player Warm]',error);
+          return false;
+        }
+      })();
+
+      // Advanced is static/lightweight, so cache it immediately.
+      matchupPanelCache.set(
+        matchupPanelCacheKey(game,'advanced'),
+        buildMatchupPanel('advanced',game)
+      );
+
+      // Header enrichment and Team Stats hydrate after browser paints the modal.
       requestAnimationFrame(()=>{
         requestAnimationFrame(()=>{
           const modal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');
@@ -4297,12 +4321,14 @@ function canonicalPlayerDashboardStats(playerId='') {
           Promise.all([
             loadLiveTeamDirectory(false),
             hydrateMatchupTeamStatistics(game),
-            hydratePlayerStatistics(false)
+            playerReadyPromise
           ]).then(()=>{
-            clearMatchupPanelCache(game);
             matchupPanelCache.set(matchupPanelCacheKey(game,'team'),buildMatchupPanel('team',game));
-            matchupPanelCache.set(matchupPanelCacheKey(game,'player'),buildMatchupPanel('player',game));
-            matchupPanelCache.set(matchupPanelCacheKey(game,'advanced'),buildMatchupPanel('advanced',game));
+
+            // Rebuild player panel only if early warm failed.
+            if(!matchupPanelCache.has(matchupPanelCacheKey(game,'player'))){
+              matchupPanelCache.set(matchupPanelCacheKey(game,'player'),buildMatchupPanel('player',game));
+            }
 
             const liveModal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');
             if(!liveModal)return;
@@ -5837,7 +5863,28 @@ function canonicalPlayerDashboardStats(playerId='') {
         button.setAttribute('aria-selected',String(active));
       });
       const tabName=matchupTab.dataset.matchupTab;
-      target.innerHTML=cachedMatchupPanel(tabName,activeMatchupGame||{});
+      const game=activeMatchupGame||{};
+      const key=matchupPanelCacheKey(game,tabName);
+
+      if(matchupPanelCache.has(key)){
+        target.innerHTML=matchupPanelCache.get(key);
+      }else if(tabName==='player'){
+        // Avoid a visible loading flash. Keep the current panel until the
+        // warmed Player Stats panel is ready, then swap once.
+        const waitForPlayer=()=>{
+          if(matchupPanelCache.has(key)){
+            const liveModal=document.querySelector('[data-matchup-modal]');
+            const stillActive=liveModal?.querySelector('[data-matchup-tab="player"].is-active');
+            const liveTarget=liveModal?.querySelector('[data-matchup-tab-content]');
+            if(stillActive&&liveTarget)liveTarget.innerHTML=matchupPanelCache.get(key);
+            return;
+          }
+          requestAnimationFrame(waitForPlayer);
+        };
+        requestAnimationFrame(waitForPlayer);
+      }else{
+        target.innerHTML=cachedMatchupPanel(tabName,game);
+      }
       return;
     }
 
