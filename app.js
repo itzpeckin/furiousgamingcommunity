@@ -1539,6 +1539,334 @@
     }
   };
 
+
+  const playerInspectorState = {
+    loaded:false,
+    loading:false,
+    error:null,
+    players:[],
+    teams:[],
+    statistics:[],
+    snapshot:null,
+    selectedId:'',
+    query:'',
+    imageFieldCoverage:[]
+  };
+
+  function playerInspectorPrimitiveEntries(record={}) {
+    return Object.entries(record||{}).filter(([,value]) =>
+      value!==null && value!==undefined &&
+      (typeof value==='string' || typeof value==='number' || typeof value==='boolean')
+    );
+  }
+
+  function playerInspectorFieldRows(record={},pattern=null) {
+    const source=record?.source||{};
+    const merged={...source,...record};
+    return playerInspectorPrimitiveEntries(merged)
+      .filter(([key])=>!pattern || pattern.test(key))
+      .sort(([a],[b])=>a.localeCompare(b))
+      .map(([key,value])=>({key,value}));
+  }
+
+  function playerInspectorRatingRows(player={}) {
+    const pattern=/(rating|overall|ovr|speed|accel|agil|aware|strength|throw|catch|route|block|tackle|coverage|kick|power|move|pursuit|play.?recog|stamina|injury|toughness|jump|carrying|break.?tackle|trucking|elusive|press|man.?cov|zone.?cov)/i;
+    return playerInspectorFieldRows(player,pattern)
+      .filter(row=>Number.isFinite(Number(row.value)))
+      .slice(0,180);
+  }
+
+  function playerInspectorContractRows(player={}) {
+    const pattern=/(contract|salary|bonus|cap|year.*remain|years.*left|signing)/i;
+    return playerInspectorFieldRows(player,pattern).slice(0,120);
+  }
+
+  function playerInspectorBioRows(player={}) {
+    const pattern=/(height|weight|college|school|age|birth|experience|years.?pro|draft|jersey|handed|hand|position|first.?name|last.?name|display.?name|team.?id)/i;
+    return playerInspectorFieldRows(player,pattern).slice(0,120);
+  }
+
+  function playerInspectorImageRows(player={}) {
+    const pattern=/(image|portrait|headshot|head.?shot|photo|asset|face|render|picture|(^|_)pic($|_)|presentation|avatar|thumb)/i;
+    return playerInspectorFieldRows(player,pattern).slice(0,120);
+  }
+
+  function playerInspectorStatsFor(playerId='') {
+    const id=String(playerId||'');
+    return (playerInspectorState.statistics||[]).filter(row=>{
+      const raw=row?.source||{};
+      return String(row.playerId||raw.player_external_id||raw.playerId||raw.player_id||'')===id;
+    });
+  }
+
+  function playerInspectorTeam(player={}) {
+    const id=String(player.teamId||player.source?.team_external_id||player.source?.teamId||'');
+    return (playerInspectorState.teams||[]).find(team=>String(team.id||'')===id)||null;
+  }
+
+  function playerInspectorFieldTable(rows=[],empty='No matching fields were found.') {
+    if(!rows.length) return `<div class="player-inspector-empty">${escapeHtml(empty)}</div>`;
+    return `<div class="table-wrap player-inspector-table-wrap"><table class="player-inspector-table"><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>${rows.map(row=>`<tr><td><code>${escapeHtml(row.key)}</code></td><td>${escapeHtml(typeof row.value==='object'?JSON.stringify(row.value):row.value)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function playerInspectorImageCoverage(players=[]) {
+    const coverage=new Map();
+    players.forEach(player=>{
+      const seen=new Set();
+      playerInspectorImageRows(player).forEach(({key,value})=>{
+        if(seen.has(key))return;
+        seen.add(key);
+        const entry=coverage.get(key)||{key,count:0,samples:[]};
+        entry.count++;
+        const text=String(value);
+        if(text && entry.samples.length<4 && !entry.samples.includes(text)) entry.samples.push(text);
+        coverage.set(key,entry);
+      });
+    });
+    return [...coverage.values()].sort((a,b)=>b.count-a.count||a.key.localeCompare(b.key));
+  }
+
+  function playerInspectorCategorySummary(rows=[]) {
+    const result={};
+    rows.forEach(row=>{
+      const category=String(row.category||row.source?.category||'unknown').toLowerCase();
+      result[category]=(result[category]||0)+1;
+    });
+    return result;
+  }
+
+  function playerInspectorHasOverall(player={}) {
+    return Number.isFinite(Number(player.overall)) ||
+      playerInspectorRatingRows(player).some(row=>/overall|ovr/i.test(row.key));
+  }
+
+  function playerInspectorHasContract(player={}) {
+    const c=player.contract||{};
+    return Object.values(c).some(v=>v!==null&&v!==undefined&&v!=='') || playerInspectorContractRows(player).length>0;
+  }
+
+  function playerInspectorSourceRoute(player={}) {
+    const source=player.source||{};
+    return String(source.routePath||source.route_path||source.sourceRoutePath||source.source_route_path||source.route||'—');
+  }
+
+  function renderPlayerInspectorSelected(player={}) {
+    const team=playerInspectorTeam(player);
+    const stats=playerInspectorStatsFor(player.id);
+    const categories=playerInspectorCategorySummary(stats);
+    const bio=playerInspectorBioRows(player);
+    const ratings=playerInspectorRatingRows(player);
+    const contracts=playerInspectorContractRows(player);
+    const images=playerInspectorImageRows(player);
+    const normalized={
+      id:player.id,
+      displayName:player.displayName,
+      firstName:player.firstName,
+      lastName:player.lastName,
+      position:player.position,
+      teamId:player.teamId,
+      team:team?.displayName||team?.nickname||null,
+      overall:player.overall,
+      age:player.age,
+      devTrait:player.devTrait,
+      jerseyNumber:player.jerseyNumber,
+      contract:player.contract
+    };
+    const joinChecks=[
+      ['Player ID',Boolean(player.id),player.id||'Missing'],
+      ['Team Join',Boolean(team),team?(team.displayName||team.nickname||team.id):'No matching team'],
+      ['Overall / Ratings',playerInspectorHasOverall(player),ratings.length?`${ratings.length} rating-like fields`:'No rating-like fields'],
+      ['Contract',playerInspectorHasContract(player),contracts.length?`${contracts.length} contract/cap fields`:'No contract/cap fields'],
+      ['Statistics',stats.length>0,stats.length?`${stats.length} statistic records`:'No statistic records'],
+      ['Image Candidate',images.length>0,images.length?`${images.length} image/asset fields`:'No image/asset fields']
+    ];
+
+    return `<section class="player-inspector-selected">
+      <article class="card player-inspector-identity">
+        <div class="card-header">
+          <div><span class="eyebrow">Selected Player</span><h3>${escapeHtml(player.displayName||`${player.firstName||''} ${player.lastName||''}`.trim()||player.id||'Unknown Player')}</h3><p>${escapeHtml([player.position,team?.displayName||team?.nickname].filter(Boolean).join(' · ')||'No team/position context')}</p></div>
+          <span class="pill ${team?'pill--success':'pill--warning'}">${escapeHtml(player.overall!==null&&player.overall!==undefined?`${player.overall} OVR`:'OVR —')}</span>
+        </div>
+        <div class="player-inspector-join-grid">${joinChecks.map(([label,ok,detail])=>`<div class="player-inspector-join ${ok?'is-pass':'is-missing'}"><span>${escapeHtml(label)}</span><strong>${ok?'✓':'—'}</strong><small>${escapeHtml(detail)}</small></div>`).join('')}</div>
+        <div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>Player source route: <code>${escapeHtml(playerInspectorSourceRoute(player))}</code></span></div>
+      </article>
+
+      <div class="player-inspector-detail-grid">
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Identity / Physical / Draft</span><h3>Bio Fields</h3></div><span class="pill pill--neutral">${bio.length}</span></div>${playerInspectorFieldTable(bio,'No additional bio or physical fields were found.')}</article>
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Ratings Discovery</span><h3>Ratings Fields</h3></div><span class="pill pill--neutral">${ratings.length}</span></div>${playerInspectorFieldTable(ratings,'No numeric rating fields were found in this player record.')}</article>
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Contract Discovery</span><h3>Contract / Cap Fields</h3></div><span class="pill pill--neutral">${contracts.length}</span></div>${playerInspectorFieldTable(contracts,'No contract or cap fields were found in this player record.')}</article>
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Visual Asset Discovery</span><h3>Image / Portrait Candidates</h3></div><span class="pill ${images.length?'pill--success':'pill--neutral'}">${images.length}</span></div>${playerInspectorFieldTable(images,'No portrait, image, headshot, asset, face, render, or presentation fields were found on this player record.')}</article>
+      </div>
+
+      <article class="card">
+        <div class="card-header"><div><span class="eyebrow">Statistics Join</span><h3>Player Statistic Coverage</h3><p>Categories linked to this exact player ID in the active snapshot.</p></div><span class="pill ${stats.length?'pill--success':'pill--neutral'}">${stats.length} records</span></div>
+        <div class="stats-preview-summary player-inspector-stats-summary">${['passing','rushing','receiving','defense','kicking','punting'].map(category=>`<div><span>${escapeHtml(category)}</span><strong>${categories[category]||0}</strong></div>`).join('')}</div>
+        ${stats.length?`<div class="table-wrap"><table class="player-inspector-table"><thead><tr><th>Category</th><th>Stage</th><th>Week</th><th>Team</th><th>Source</th><th>Metrics</th></tr></thead><tbody>${stats.slice(0,100).map(row=>`<tr><td>${escapeHtml(row.category||'—')}</td><td>${escapeHtml(row.stage||'—')}</td><td>${escapeHtml(row.week??'—')}</td><td><code>${escapeHtml(row.teamId||'—')}</code></td><td><code>${escapeHtml(row.source?.source_route_path||row.source?.sourceRoutePath||row.source?.routePath||'—')}</code></td><td><details><summary>JSON</summary><pre>${escapeHtml(JSON.stringify(row.metrics||{},null,2))}</pre></details></td></tr>`).join('')}</tbody></table></div>`:'<div class="player-inspector-empty">No statistics are linked to this player in the active snapshot.</div>'}
+      </article>
+
+      <div class="player-inspector-json-grid">
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Application Contract</span><h3>Normalized Player JSON</h3></div></div><div class="card-body"><details open><summary>Normalized record</summary><pre>${escapeHtml(JSON.stringify(normalized,null,2))}</pre></details></div></article>
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Madden Source</span><h3>Raw Player Source JSON</h3></div></div><div class="card-body"><details><summary>Raw source record</summary><pre>${escapeHtml(JSON.stringify(player.source||{},null,2))}</pre></details></div></article>
+      </div>
+    </section>`;
+  }
+
+  function renderPlayerDataInspector() {
+    const state=playerInspectorState;
+    if(state.loading) return `<article class="card roadmap-state"><div class="roadmap-state__inner"><div class="spinner" aria-hidden="true"></div><h3>Inspecting player sources…</h3><p>Loading players, teams, statistics, and active snapshot metadata.</p></div></article>`;
+    if(state.error) return `<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Player inspection failed</h3><p>${escapeHtml(state.error)}</p><button type="button" class="button button--primary" data-player-inspector-reload>Retry</button></div></article>`;
+    if(!state.loaded) return `<article class="card roadmap-state"><div class="roadmap-state__inner"><div class="spinner" aria-hidden="true"></div><h3>Preparing Player Data Inspector…</h3></div></article>`;
+
+    const query=String(state.query||'').trim().toLowerCase();
+    const filtered=(state.players||[])
+      .filter(player=>{
+        if(!query)return true;
+        const team=playerInspectorTeam(player);
+        return [player.displayName,player.firstName,player.lastName,player.position,player.id,team?.displayName,team?.nickname,team?.abbreviation]
+          .some(value=>String(value||'').toLowerCase().includes(query));
+      })
+      .sort((a,b)=>String(a.displayName||'').localeCompare(String(b.displayName||'')));
+
+    let selected=(state.players||[]).find(player=>String(player.id)===String(state.selectedId));
+    if(!selected) selected=filtered[0]||state.players[0]||null;
+    if(selected) state.selectedId=String(selected.id);
+
+    const playerCount=state.players.length;
+    const teamJoined=state.players.filter(player=>Boolean(playerInspectorTeam(player))).length;
+    const ratingsCount=state.players.filter(player=>playerInspectorHasOverall(player)).length;
+    const contractsCount=state.players.filter(player=>playerInspectorHasContract(player)).length;
+    const statsLinked=new Set((state.statistics||[]).map(row=>String(row.playerId||row.source?.player_external_id||'')).filter(Boolean));
+    const imagePlayers=state.players.filter(player=>playerInspectorImageRows(player).length).length;
+
+    return `<section class="player-data-inspector" data-player-data-inspector>
+      <div class="card-header player-inspector-heading">
+        <div><span class="eyebrow">v5.9.6.0 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <span class="pill pill--success">Active Snapshot</span>
+      </div>
+
+      <div class="summary-grid player-inspector-summary">
+        ${summaryTile('Players',playerCount,'active snapshot')}
+        ${summaryTile('Team Joins',teamJoined,`${playerCount?Math.round(teamJoined/playerCount*100):0}% resolved`)}
+        ${summaryTile('Ratings',ratingsCount,`${playerCount?Math.round(ratingsCount/playerCount*100):0}% with OVR/rating data`)}
+        ${summaryTile('Contracts',contractsCount,`${playerCount?Math.round(contractsCount/playerCount*100):0}% with contract/cap data`)}
+        ${summaryTile('Stats Linked',statsLinked.size,'unique player IDs')}
+        ${summaryTile('Image Candidates',imagePlayers,'players with candidate fields')}
+      </div>
+
+      <article class="card player-inspector-controls">
+        <div class="card-header"><div><span class="eyebrow">Player Selection</span><h3>Inspect a Player</h3></div><button type="button" class="button button--ghost" data-player-inspector-reload>Refresh Inspector</button></div>
+        <div class="player-inspector-filter-row">
+          <label class="field"><span>Search</span><input type="search" value="${escapeHtml(state.query)}" placeholder="Name, team, position, or player ID" data-player-inspector-search></label>
+          <label class="field"><span>Player</span><select data-player-inspector-select>${filtered.slice(0,1000).map(player=>{const team=playerInspectorTeam(player);return `<option value="${escapeHtml(player.id)}" ${String(player.id)===String(state.selectedId)?'selected':''}>${escapeHtml(`${player.displayName||player.id} · ${player.position||'—'} · ${team?.abbreviation||team?.nickname||'Unassigned'}`)}</option>`}).join('')}</select></label>
+        </div>
+        <small>${filtered.length} matching players${filtered.length>1000?' · first 1,000 shown':''}</small>
+      </article>
+
+      <article class="card">
+        <div class="card-header"><div><span class="eyebrow">League-Wide Visual Scan</span><h3>Image / Portrait Field Coverage</h3><p>Candidate source fields found across every active player record. This does not assume that any field is a usable image URL.</p></div><span class="pill ${state.imageFieldCoverage.length?'pill--success':'pill--neutral'}">${state.imageFieldCoverage.length} candidate fields</span></div>
+        ${state.imageFieldCoverage.length?`<div class="table-wrap"><table class="player-inspector-table"><thead><tr><th>Field</th><th>Players</th><th>Coverage</th><th>Sample Values</th></tr></thead><tbody>${state.imageFieldCoverage.map(row=>`<tr><td><code>${escapeHtml(row.key)}</code></td><td>${row.count}</td><td>${playerCount?Math.round(row.count/playerCount*100):0}%</td><td>${row.samples.map(sample=>`<code>${escapeHtml(sample)}</code>`).join('<br>')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="player-inspector-empty">No image-, portrait-, headshot-, asset-, face-, render-, avatar-, or presentation-like fields were detected in the active player records.</div>'}
+      </article>
+
+      ${selected?renderPlayerInspectorSelected(selected):'<article class="card"><div class="card-body"><p>No players are available in the active snapshot.</p></div></article>'}
+    </section>`;
+  }
+
+  async function loadPlayerDataInspector(force=false) {
+    if(playerInspectorState.loading)return;
+    playerInspectorState.loading=true;
+    playerInspectorState.error=null;
+    rerenderPlayerDataInspector();
+    try{
+      const service=liveReadModel();
+      if(!service)throw new Error('Live Read Model service is unavailable.');
+      if(force) await service.refresh();
+      const [players,teams,statistics,snapshot]=await Promise.all([
+        service.getPlayers(),
+        service.getTeams(),
+        service.getStatistics(),
+        service.getSnapshot()
+      ]);
+      playerInspectorState.players=players||[];
+      playerInspectorState.teams=teams||[];
+      playerInspectorState.statistics=statistics||[];
+      playerInspectorState.snapshot=snapshot||null;
+      playerInspectorState.imageFieldCoverage=playerInspectorImageCoverage(playerInspectorState.players);
+      if(!playerInspectorState.selectedId && playerInspectorState.players[0]){
+        playerInspectorState.selectedId=String(playerInspectorState.players[0].id||'');
+      }
+      playerInspectorState.loaded=true;
+    }catch(error){
+      playerInspectorState.error=error?.message||'Unable to inspect active player data.';
+    }finally{
+      playerInspectorState.loading=false;
+      rerenderPlayerDataInspector();
+    }
+  }
+
+  function rerenderPlayerDataInspector() {
+    const target=document.querySelector('[data-player-inspector-host]');
+    if(target)target.innerHTML=renderPlayerDataInspector();
+  }
+
+  window.FranchiseHQ.playerDataInspector = {
+    async load(targetId) {
+      const target=document.getElementById(targetId);
+      if(!target)return;
+      target.setAttribute('data-player-inspector-host','');
+      if(!playerInspectorState.loaded&&!playerInspectorState.loading){
+        await loadPlayerDataInspector(false);
+      }else{
+        target.innerHTML=renderPlayerDataInspector();
+      }
+    },
+    renderPanel() {
+      const id=`player-data-inspector-${Date.now()}`;
+      setTimeout(()=>this.load(id),0);
+      return `<section id="${id}" data-player-inspector-host><article class="card roadmap-state"><div class="roadmap-state__inner"><div class="spinner" aria-hidden="true"></div><h3>Loading Player Data Inspector…</h3><p>Reading player, team, statistics, and source records from the active snapshot.</p></div></article></section>`;
+    },
+    diagnostics() {
+      return Object.freeze({
+        service:'playerDataInspector',
+        version:'5.9.6.0',
+        loaded:playerInspectorState.loaded,
+        playerCount:playerInspectorState.players.length,
+        teamCount:playerInspectorState.teams.length,
+        statisticCount:playerInspectorState.statistics.length,
+        imageCandidateFieldCount:playerInspectorState.imageFieldCoverage.length,
+        selectedPlayerId:playerInspectorState.selectedId||null,
+        lastError:playerInspectorState.error
+      });
+    }
+  };
+
+  document.addEventListener('input',event=>{
+    const input=event.target.closest('[data-player-inspector-search]');
+    if(!input)return;
+    playerInspectorState.query=input.value||'';
+    rerenderPlayerDataInspector();
+    requestAnimationFrame(()=>{
+      const next=document.querySelector('[data-player-inspector-search]');
+      if(next){
+        next.focus();
+        try{next.setSelectionRange(next.value.length,next.value.length);}catch{}
+      }
+    });
+  });
+
+  document.addEventListener('change',event=>{
+    const select=event.target.closest('[data-player-inspector-select]');
+    if(!select)return;
+    playerInspectorState.selectedId=String(select.value||'');
+    rerenderPlayerDataInspector();
+  });
+
+  document.addEventListener('click',event=>{
+    if(event.target.closest('[data-player-inspector-reload]')){
+      event.preventDefault();
+      loadPlayerDataInspector(true);
+    }
+  });
+
   function stageWeekContext(source={},fallbackWeek=0,fallbackStage='reg') {
     const route=String(source.routePath||source.route_path||source.sourceRoutePath||source.source_route_path||'');
     const routeMatch=route.match(/\/week\/(pre|reg|post|playoffs?)\/(\d+)/i);
