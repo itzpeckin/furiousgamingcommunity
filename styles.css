@@ -5260,7 +5260,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1a — Player Data Inspector
+   Franchise HQ v5.9.6.1bb — Player Data Inspector
    ============================================================ */
 .player-data-inspector{display:grid;gap:16px}
 .player-inspector-heading{margin-bottom:0}
@@ -5319,7 +5319,7 @@ table td{
 }
 
 
-/* Franchise HQ v5.9.6.1aa — Player Data Inspector interaction fix */
+/* Franchise HQ v5.9.6.1bb — Player Data Inspector interaction fix */
 .player-inspector-controls select[data-player-inspector-select]{
   cursor:pointer;
 }
@@ -5329,7 +5329,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1a — Live Player Statistics Integration
+   Franchise HQ v5.9.6.1bb — Live Player Statistics Integration
    ============================================================ */
 .value-card-live-statistics{grid-column:1/-1}
 .player-live-statistics{display:grid;gap:14px}
@@ -5364,7 +5364,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.1aa — Canonical Player Card 2.0 Foundation
+   Franchise HQ v5.9.6.1bb — Canonical Player Card 2.0 Foundation
    ============================================================ */
 .canonical-player-hero{
   position:relative;
@@ -5504,3 +5504,98 @@ table td{
   .canonical-player-trade-breakdown{margin:12px}
   .canonical-player-trade-breakdown .breakdown-grid{grid-template-columns:1fr}
 }
+
+
+/* ============================================================
+   Franchise HQ v5.9.6.1b — Approved Player Card UI
+   Direct implementation of approved design target.
+   ============================================================ */
+[data-value-card-modal] .value-card-dialog{max-width:min(1540px,96vw)!important;width:min(1540px,96vw)!important}
+[data-value-card-content]{background:#07111d;color:#eef4ff}
+.canonical-player-topbar{background:#07111d!important;border-bottom:1px solid #203145!important;padding:10px 14px!important}
+.canonical-player-hero--approved{min-height:242px!important;border:1px solid rgba(138,166,202,.3);border-radius:12px 12px 0 0!important;padding:22px 28px 18px!important;color:#fff!important;position:relative;overflow:hidden;isolation:isolate}
+.canonical-player-hero--approved::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.18),rgba(0,0,0,.03) 55%,rgba(0,0,0,.22));z-index:-1}
+.canonical-player-hero__stripe{position:absolute;inset:-20% 18% -20% 58%;transform:skewX(-34deg);border-left:5px solid color-mix(in srgb,var(--player-team-secondary) 92%,#fff);border-right:2px solid rgba(255,255,255,.12);opacity:.64;z-index:-1}
+.canonical-player-hero__watermark{position:absolute;right:38px;top:-10px;font-size:210px;font-weight:950;line-height:1;color:rgba(255,255,255,.07);letter-spacing:-.08em;z-index:-1}
+.canonical-player-hero--approved .canonical-player-hero__image{left:34px;bottom:-2px;width:286px;height:248px;opacity:1;filter:drop-shadow(0 15px 25px rgba(0,0,0,.45))}
+.canonical-player-hero--approved .canonical-player-image-placeholder{width:210px;height:220px;background:rgba(4,10,18,.34);border-color:rgba(255,255,255,.18)}
+.canonical-player-hero--approved .canonical-player-hero__identity{padding-left:320px;justify-content:center;gap:17px;max-width:980px}
+.canonical-player-hero--approved .canonical-player-teamline{gap:13px;text-shadow:0 2px 7px rgba(0,0,0,.8)}
+.canonical-player-hero--approved .canonical-player-team-logo{width:58px;height:58px;flex-basis:58px}
+.canonical-player-hero--approved .canonical-player-teamline strong{font-size:18px;text-transform:uppercase;letter-spacing:.02em}
+.canonical-player-hero--approved .canonical-player-teamline span{font-size:13px}
+.canonical-player-hero--approved .canonical-player-nameblock h2{font-size:44px;margin:0 0 3px;line-height:1;letter-spacing:-.035em}
+.canonical-player-hero--approved .canonical-player-nameblock p{font-size:14px;color:rgba(255,255,255,.88)}
+.canonical-player-bio-strip{display:flex;gap:0;align-items:stretch;max-width:620px}
+.canonical-player-bio-strip>div{display:grid;gap:2px;padding:0 20px;border-right:1px solid rgba(255,255,255,.15)}
+.canonical-player-bio-strip>div:first-child{padding-left:0}
+.canonical-player-bio-strip>div:last-child{border-right:0}
+.canonical-player-bio-strip span{font-size:9px;text-transform:uppercase;color:rgba(255,255,255,.7);font-weight:800;letter-spacing:.06em}
+.canonical-player-bio-strip strong{font-size:13px;color:#fff}
+.canonical-player-hero--approved .canonical-player-hero__overall{position:absolute;right:30px;top:31px;bottom:26px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding:0;min-width:225px}
+.canonical-player-hero--approved .canonical-player-hero__overall strong{font-size:126px;line-height:.75;color:rgba(255,255,255,.9)}
+.canonical-player-hero--approved .canonical-player-hero__overall span{font-size:17px;margin-top:18px;letter-spacing:.04em}
+.canonical-player-hero--approved .canonical-player-hero__overall b{font-size:13px;text-transform:uppercase;color:#fff;margin-top:3px}
+.canonical-player-tabs--approved{display:flex!important;gap:0!important;padding:0 12px!important;background:#081522;border-bottom:1px solid #24364b}
+.canonical-player-tabs--approved button{border:0!important;border-radius:0!important;background:transparent!important;color:#aeb8c7!important;padding:14px 28px!important;text-transform:uppercase;font-size:11px;letter-spacing:.04em;position:relative}
+.canonical-player-tabs--approved button.is-active{color:#fff!important}
+.canonical-player-tabs--approved button.is-active::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:3px;background:var(--player-card-active,#5c8fff);border-radius:3px 3px 0 0}
+.canonical-player-panels--approved{padding:10px 12px 4px!important;background:linear-gradient(180deg,#081522,#07111d)!important}
+.canonical-player-dashboard{display:grid;grid-template-columns:minmax(420px,1.35fr) minmax(360px,.9fr) minmax(280px,.66fr);gap:10px}
+.canonical-dashboard-stack{display:grid;gap:10px;align-content:start}
+.canonical-dashboard-card{background:linear-gradient(180deg,#0d1b2a,#091522);border:1px solid #2a3b50;border-radius:8px;overflow:hidden;box-shadow:inset 0 1px rgba(255,255,255,.025)}
+.canonical-dashboard-card__head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px 8px;border-bottom:1px solid #26374a}
+.canonical-dashboard-card__head h3{margin:0;font-size:15px;color:#fff}
+.canonical-dashboard-card--ratings .canonical-rating-groups{padding:5px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;background:transparent}
+.canonical-dashboard-card--ratings .canonical-rating-group{border:1px solid #26384d;border-radius:5px;background:#0b1826}
+.canonical-dashboard-card--ratings .canonical-rating-group__heading{padding:8px 9px;border-bottom:1px solid #203147}
+.canonical-dashboard-card--ratings .canonical-rating-group__heading h4{font-size:12px}
+.canonical-dashboard-card--ratings .canonical-rating-group__heading span{display:none}
+.canonical-dashboard-card--ratings .canonical-rating-list{grid-template-columns:1fr}
+.canonical-dashboard-card--ratings .canonical-rating-list>div{padding:4px 8px;border:0!important;font-size:11px;min-height:22px}
+.canonical-dashboard-card--ratings .canonical-rating-list span{font-size:10px;color:#aeb8c7}
+.canonical-dashboard-card--ratings .canonical-rating-list strong{font-size:11px;color:#fff}
+.canonical-dashboard-card--ratings .canonical-rating-group:nth-child(5),.canonical-dashboard-card--ratings .canonical-rating-group:nth-child(6),.canonical-dashboard-card--ratings .canonical-rating-group:nth-child(7){grid-column:span 1}
+.canonical-dashboard-card .player-live-statistics{padding:7px 8px 10px;gap:8px}
+.canonical-dashboard-card .player-live-stat-nav{gap:4px}
+.canonical-dashboard-card .player-live-stat-tab{padding:5px 8px;border-radius:5px;background:#101f30;color:#aeb8c7;border-color:#293d54;font-size:10px}
+.canonical-dashboard-card .player-live-stat-tab.is-active{background:#19314c;color:#fff;border-color:#416996}
+.canonical-dashboard-card .player-live-stat-season-heading{padding:0 2px}
+.canonical-dashboard-card .player-live-stat-season-heading h4{font-size:12px}
+.canonical-dashboard-card .player-live-stat-grid{grid-template-columns:repeat(auto-fit,minmax(55px,1fr));gap:4px}
+.canonical-dashboard-card .player-live-stat-grid>div{padding:6px;border-color:#26384d;border-radius:5px;background:#0a1724}
+.canonical-dashboard-card .player-live-stat-grid span{font-size:8px}
+.canonical-dashboard-card .player-live-stat-grid strong{font-size:13px}
+.canonical-dashboard-card .player-live-game-log{display:none}
+.canonical-dashboard-card .canonical-game-log-head{padding:8px 9px 4px;margin:0}
+.canonical-game-log-table{max-height:290px;overflow:auto;padding:4px 7px 8px}
+.canonical-game-log-table table{border-collapse:collapse;width:100%;font-size:10px}
+.canonical-game-log-table th,.canonical-game-log-table td{border:1px solid #26384d!important;padding:6px 7px!important;white-space:nowrap}
+.canonical-game-log-table th{background:#0a1724!important;color:#aeb8c7!important;font-size:9px!important;text-transform:uppercase}
+.canonical-game-log-table td{background:#0c1927;color:#eaf1fb}
+.canonical-contract-grid--single-row{display:grid!important;grid-template-columns:1fr!important;gap:0!important;padding:4px 8px 9px}
+.canonical-contract-grid--single-row>div{display:flex!important;justify-content:space-between;align-items:center;gap:12px;padding:7px 4px!important;border:0!important;border-bottom:1px solid #26384d!important;border-radius:0!important;background:transparent!important}
+.canonical-contract-grid--single-row>div:last-child{border-bottom:0!important}
+.canonical-contract-grid--single-row span{font-size:11px;color:#c1cad7}
+.canonical-contract-grid--single-row strong{font-size:11px;margin:0;color:#fff}
+.canonical-contract-grid--single-row strong.is-positive{color:#52d379}.canonical-contract-grid--single-row strong.is-negative{color:#ff5d62}
+.canonical-transaction-list{padding:7px;gap:6px}
+.canonical-transaction-row{padding:8px;border-color:#26384d;border-radius:5px;background:#0a1724;font-size:10px}
+.canonical-full-tab-card{min-height:380px;padding-bottom:10px}
+.canonical-full-tab-card>.player-live-statistics,.canonical-full-tab-card>.canonical-game-log-head,.canonical-full-tab-card>.canonical-contract-grid,.canonical-full-tab-card>.canonical-transaction-list{margin:10px}
+.canonical-player-trade-breakdown{margin:8px 12px 12px!important;background:linear-gradient(180deg,#0d1a29,#091522)!important;border:1px solid #2a3b50!important;border-radius:8px!important}
+.canonical-player-trade-breakdown .box-heading{padding:12px 14px!important}
+.canonical-player-trade-breakdown .box-heading h3{font-size:16px!important}
+.canonical-player-trade-breakdown .value-total strong{font-size:30px!important;color:#5a90ff!important}
+.canonical-player-trade-breakdown .breakdown-grid{display:grid!important;grid-template-columns:repeat(8,minmax(0,1fr))!important;gap:6px!important;padding:6px 8px 10px!important}
+.canonical-player-trade-breakdown .breakdown-tile{min-height:76px!important;background:#0a1724!important;border:1px solid #2a3b50!important;border-radius:5px!important;padding:9px 10px!important}
+.canonical-player-trade-breakdown .breakdown-tile strong{font-size:11px!important}.canonical-player-trade-breakdown .breakdown-tile small{font-size:9px!important}.canonical-player-trade-breakdown .breakdown-tile b{font-size:13px!important;color:#54d27b}.canonical-player-trade-breakdown .breakdown-tile b.is-negative{color:#ff5d62!important}
+.team-hero--matchup-colors{color:#fff!important;text-shadow:0 2px 8px rgba(0,0,0,.8);border-color:rgba(255,255,255,.22)!important}
+.team-hero--matchup-colors::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.18),rgba(0,0,0,.02) 60%,rgba(0,0,0,.22));pointer-events:none}
+.team-hero--matchup-colors .team-hero__content{position:relative;z-index:2}
+.team-hero--matchup-colors .eyebrow,.team-hero--matchup-colors .team-hero__record span{color:rgba(255,255,255,.9)!important}
+.team-hero--matchup-colors h1,.team-hero--matchup-colors .team-hero__record strong{color:#fff!important}
+.team-hero--matchup-colors::after{color:rgba(255,255,255,.09)!important;text-shadow:none}
+@media(max-width:1200px){.canonical-player-dashboard{grid-template-columns:1fr 1fr}.canonical-player-dashboard__rail{grid-column:1/-1}.canonical-dashboard-card--ratings .canonical-rating-groups{grid-template-columns:repeat(3,minmax(0,1fr))}.canonical-player-trade-breakdown .breakdown-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+@media(max-width:850px){.canonical-player-hero--approved .canonical-player-hero__identity{padding-left:0;padding-top:145px}.canonical-player-hero--approved .canonical-player-hero__image{width:190px;height:175px}.canonical-player-dashboard{grid-template-columns:1fr}.canonical-dashboard-card--ratings .canonical-rating-groups{grid-template-columns:repeat(2,minmax(0,1fr))}.canonical-player-tabs--approved{overflow-x:auto}.canonical-player-tabs--approved button{padding:12px 16px!important;white-space:nowrap}}
+@media(max-width:600px){.canonical-player-hero--approved{min-height:360px}.canonical-player-hero--approved .canonical-player-hero__overall strong{font-size:70px}.canonical-player-hero--approved .canonical-player-hero__overall{top:25px;right:18px}.canonical-player-bio-strip{display:grid;grid-template-columns:1fr 1fr}.canonical-player-bio-strip>div{padding:5px 10px!important;border:0}.canonical-dashboard-card--ratings .canonical-rating-groups{grid-template-columns:1fr}.canonical-player-trade-breakdown .breakdown-grid{grid-template-columns:1fr 1fr!important}}

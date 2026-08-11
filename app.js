@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.1a.1a.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.1bba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.1a.1a.1',
+        version:'5.9.6.1bba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2255,8 +2255,10 @@
   function rosterPlayerView(player) {
     const raw = player?.raw || {};
     const contract = player?.contract || {};
+    const resolvedTeamId = String(player?.teamId ?? raw.teamId ?? raw.team_id ?? raw.teamExternalId ?? raw.team_external_id ?? '');
     return {
       ...player,
+      teamId: resolvedTeamId,
       dev: normalizeLiveDevelopment(player?.developmentTrait ?? raw.dev ?? raw.developmentTrait),
       injury: player?.injuryStatus || raw.injury || 'Healthy',
       years: Number(contract.yearsRemaining ?? contract.years ?? raw.years ?? raw.contractYears ?? 0) || 0,
@@ -2277,22 +2279,17 @@
   }
 
   function rosterTeamView(teamId) {
-    const legacy = teamById(teamId);
+    const id=String(teamId??'');
+    const directoryTeam=liveTeamDirectory?.teamMap?.get(id)
+      || liveTeamDirectory?.teams?.find(team=>String(team.id)===id||String(team.source?.teamId??team.source?.team_id??team.source?.teamExternalId??team.source?.team_external_id??'')===id);
+    if(directoryTeam) return directoryTeam;
+    const legacy = teamById(id);
     if (legacy) return legacy;
     const current = window.FranchiseHQ?.leagueData?.current?.();
-    const team = (current?.teams || []).find(item => String(item.id) === String(teamId));
+    const team = (current?.teams || []).find(item => String(item.id) === id || String(item.source?.teamId??item.source?.team_id??item.source?.team_external_id??'')===id);
     if (!team) return null;
-    const city = team.city || team.location || '';
-    const name = team.name || team.nickname || team.abbr || team.id;
-    return {
-      ...team,
-      id: String(team.id),
-      abbr: team.abbr || team.shortName || String(team.id).toUpperCase(),
-      fullName: team.fullName || [city, name].filter(Boolean).join(' ') || name,
-      record: team.record || '—',
-      primary: team.primary || '#27364f',
-      secondary: team.secondary || '#8fa4c4'
-    };
+    const standing=liveTeamDirectory?.standingMap?.get(String(team.id))||null;
+    return liveTeamUiShape(team,standing);
   }
 
   function rosterSourceLabel(provenance) {
@@ -2464,7 +2461,9 @@
 
   function playerCardMoney(value) {
     const amount=Number(value);
-    return Number.isFinite(amount)&&amount!==0?formatMoney(amount):'—';
+    if(!Number.isFinite(amount)) return '—';
+    const millions=Math.abs(amount)>=100000?amount/1000000:amount;
+    return `${millions<0?'-$':'$'}${Math.abs(millions).toFixed(3)}M`;
   }
 
   function playerCardRatingEntries(player={}) {
@@ -2572,36 +2571,46 @@
     Object.entries(categories).forEach(([category,data])=>{
       (data?.rows||[]).forEach(row=>{
         const key=`${row.stage||'regular-season'}:${row.week??row.weekIndex??'—'}`;
-        const entry=weeks.get(key)||{stage:row.stage||'regular-season',week:row.week??row.weekIndex??'—',metrics:[]};
-        entry.metrics.push({category,metrics:row.metrics||{}});
+        const entry=weeks.get(key)||{stage:row.stage||'regular-season',week:row.week??row.weekIndex??'—',metrics:{}};
+        const values=row.metrics||{};
+        Object.entries(values).forEach(([metric,value])=>{
+          if(value===null||value===undefined||value===''||String(metric).startsWith('__'))return;
+          entry.metrics[`${category}:${metric}`]=value;
+        });
         weeks.set(key,entry);
       });
     });
     const rows=[...weeks.values()].sort((a,b)=>Number(a.week||0)-Number(b.week||0));
-    return `<div class="canonical-game-log-head"><label class="field"><span>Season</span><select disabled><option>Current Season</option></select></label><span class="pill pill--neutral">${rows.length} game week${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="canonical-game-log-list">${rows.map(row=>`<details><summary><span>Week ${escapeHtml(row.week)}</span><small>${escapeHtml(row.stage)}</small><b>${row.metrics.length} stat categor${row.metrics.length===1?'y':'ies'}</b></summary><pre>${escapeHtml(JSON.stringify(row.metrics,null,2))}</pre></details>`).join('')}</div>`:`<div class="canonical-player-empty">No weekly game statistics are available for this player in the active snapshot.</div>`}`;
+    const fmtKey=key=>String(key).split(':').pop().replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    const priority=['Yds','TD','Att','Comp','Rec','Sacks','Ints','Tackles','Fum'];
+    const keys=[...new Set(rows.flatMap(row=>Object.keys(row.metrics)))].sort((a,b)=>{
+      const ai=priority.findIndex(p=>a.toLowerCase().includes(p.toLowerCase()));
+      const bi=priority.findIndex(p=>b.toLowerCase().includes(p.toLowerCase()));
+      return (ai<0?99:ai)-(bi<0?99:bi)||a.localeCompare(b);
+    }).slice(0,8);
+    return `<div class="canonical-game-log-head"><label class="field"><span>Season</span><select><option>Current Season</option></select></label><span class="pill pill--neutral">${rows.length} game week${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="table-wrap canonical-game-log-table"><table><thead><tr><th>Week</th><th>Stage</th>${keys.map(key=>`<th>${escapeHtml(fmtKey(key))}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr><td><strong>Week ${escapeHtml(row.week)}</strong></td><td>${escapeHtml(titleCase(String(row.stage).replace(/-/g,' ')))}</td>${keys.map(key=>`<td>${escapeHtml(row.metrics[key]??'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:`<div class="canonical-player-empty">No weekly game statistics are available for this player in the active snapshot.</div>`}`;
   }
 
   function canonicalContractPanel(player={}) {
     const raw=player.raw||{};
     const contract=player.contract||{};
-    const yearsLeft=Number(contract.yearsRemaining??contract.years??raw.years??raw.contractYears??player.years??0)||0;
+    const source={...raw,...contract};
+    const yearsLeft=Number(contract.yearsRemaining??contract.years??raw.yearsRemaining??raw.years??raw.contractYears??player.years??0)||0;
     const length=Number(contract.length??contract.contractLength??raw.contractLength??raw.contractYears??yearsLeft)||yearsLeft;
     const capHit=contract.capHit??raw.capHit??raw.salaryCapHit??player.capHit;
     const salary=contract.currentYearSalary??contract.salary??raw.currentYearSalary??raw.currentSalary??raw.salary??player.salary;
     const bonus=contract.currentYearBonus??contract.bonus??raw.currentYearBonus??raw.bonus??raw.signingBonus;
-    const netSavings=playerCardField({...contract,...raw},['releaseNetSavings','netSavings','releaseSavings']);
-    const totalPenalty=playerCardField({...contract,...raw},['totalReleasePenalty','releasePenalty','totalPenalty']);
-    const currentYear=Number(window.FranchiseHQ?.currentSeasonContext?.calendarYear||2026);
-    const year1=playerCardField({...contract,...raw},[`${currentYear+1}Penalty`,'nextYearPenalty','year2Penalty']);
-    const year2=playerCardField({...contract,...raw},[`${currentYear+2}Penalty`,'secondYearPenalty','year3Penalty']);
-    return `<div class="canonical-contract-grid">
-      ${[
-        ['Cap Hit',playerCardMoney(capHit)],['Salary',playerCardMoney(salary)],['Bonus',playerCardMoney(bonus)],
-        ['Years Left / Length',`${yearsLeft||'—'} / ${length||'—'}`],
-        ['Release Net Savings',playerCardMoney(netSavings)],['Total Release Penalty',playerCardMoney(totalPenalty)],
-        [`${currentYear+1} Year Penalty`,playerCardMoney(year1)],[`${currentYear+2} Year Penalty`,playerCardMoney(year2)]
-      ].map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
-    </div>`;
+    const netSavings=playerCardField(source,['capReleaseNetSavings']);
+    const totalPenalty=playerCardField(source,['capReleasePenalty']);
+    const rows=[
+      ['Cap Hit',playerCardMoney(capHit),''],
+      ['Salary',playerCardMoney(salary),''],
+      ['Bonus',playerCardMoney(bonus),''],
+      ['Years Left / Length',`${yearsLeft||'—'} / ${length||'—'}`,''],
+      ['Net Release Savings',playerCardMoney(netSavings),'is-positive'],
+      ['Total Release Penalty',playerCardMoney(totalPenalty),'is-negative']
+    ];
+    return `<div class="canonical-contract-grid canonical-contract-grid--single-row">${rows.map(([label,value,tone])=>`<div><span>${escapeHtml(label)}</span><strong class="${tone}">${escapeHtml(value)}</strong></div>`).join('')}</div>`;
   }
 
   function canonicalTransactionHistory(playerId='') {
@@ -2645,6 +2654,22 @@
     return `<span class="canonical-player-image-placeholder">${escapeHtml(player.initials||'?')}</span>`;
   }
 
+  function canonicalPlayerBio(player={}) {
+    const raw=player.raw||{};
+    const age=player.age??raw.age??'—';
+    const exp=raw.yearsPro??raw.experience??raw.yearsExperience??(Number(age)?Math.max(0,Number(age)-21):'—');
+    const birth=raw.birthDate??raw.birthdate??raw.dateOfBirth??raw.dob??'—';
+    return {age,exp,birth};
+  }
+
+  function canonicalPlayerDashboardStats(playerId='') {
+    return `<div class="canonical-dashboard-stack"><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Statistics (Current Season)</h3><span class="pill pill--neutral">Live Madden</span></div>${window.FranchiseHQ?.playerStatistics?.render?.(playerId)||'<div class="canonical-player-empty">Statistics service unavailable.</div>'}</section><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Game Log</h3><span class="pill pill--neutral">Current Season</span></div>${canonicalGameLog(playerId)}</section></div>`;
+  }
+
+  function canonicalPlayerSideRail(player={}) {
+    return `<div class="canonical-dashboard-stack"><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Contract</h3></div>${canonicalContractPanel(player)}</section><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Transaction History</h3></div>${canonicalTransactionHistory(player.id)}</section></div>`;
+  }
+
   function openCanonicalLivePlayerCard(playerId='') {
     const normalized=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId));
     if(!normalized)return false;
@@ -2653,33 +2678,36 @@
     const modal=document.querySelector('[data-value-card-modal]');
     const content=document.querySelector('[data-value-card-content]');
     if(!modal||!content)return false;
-
     const logo=renderTeamMark(team,'canonical-player-team-logo');
     const stats=window.FranchiseHQ?.playerStatistics?.render?.(player.id)||'<div class="canonical-player-empty">Statistics service unavailable.</div>';
+    const bio=canonicalPlayerBio(player);
+    const dev=normalizeLiveDevelopment(player.developmentTrait||player.dev||player.raw?.developmentTrait);
+    const teamPrimary=team.primary||'#27364f', teamSecondary=team.secondary||teamPrimary||'#8fa4c4';
 
-    content.innerHTML=`<div class="value-card-context"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>${escapeHtml('Back')}</span></button><span>Player Card</span></div>
-      <section class="canonical-player-hero" style="--player-team-primary:${escapeHtml(team.primary||'#27364f')};--player-team-secondary:${escapeHtml(team.secondary||team.primary||'#8fa4c4')}">
-        <div class="canonical-player-hero__shade" aria-hidden="true"></div>
-        <div class="canonical-player-hero__identity">
-          <div class="canonical-player-teamline">${logo}<div><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><span>#${escapeHtml(player.number||'—')} · ${escapeHtml(player.position||'—')}</span></div></div>
-          <div class="canonical-player-nameblock"><h2>${escapeHtml(player.name||'Player')}</h2><p>${escapeHtml(player.height||'—')} · ${escapeHtml(player.weight||'—')} lbs · ${escapeHtml(player.college||'—')}</p></div>
-        </div>
+    content.innerHTML=`<div class="value-card-context canonical-player-topbar"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>Back to Roster</span></button><span>Player Card</span></div>
+      <section class="canonical-player-hero canonical-player-hero--approved" style="--player-team-primary:${escapeHtml(teamPrimary)};--player-team-secondary:${escapeHtml(teamSecondary)};background:linear-gradient(118deg,${escapeHtml(teamPrimary)} 0%,${escapeHtml(teamPrimary)} 43%,color-mix(in srgb,${escapeHtml(teamPrimary)} 55%,${escapeHtml(teamSecondary)}) 62%,${escapeHtml(teamSecondary)} 100%)">
+        <div class="canonical-player-hero__stripe" aria-hidden="true"></div>
+        <div class="canonical-player-hero__watermark">${escapeHtml(team.abbr||'')}</div>
         <div class="canonical-player-hero__image">${renderCanonicalPlayerImage(player)}</div>
-        <div class="canonical-player-hero__overall"><strong>${player.overall??'—'}</strong><span>OVERALL</span></div>
+        <div class="canonical-player-hero__identity">
+          <div class="canonical-player-teamline">${logo}<div><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><span>#${escapeHtml(player.number||'—')} &nbsp;•&nbsp; ${escapeHtml(player.position||'—')}</span></div></div>
+          <div class="canonical-player-nameblock"><h2>${escapeHtml(player.name||'Player')}</h2><p>${escapeHtml(player.height||'—')} &nbsp;•&nbsp; ${escapeHtml(player.weight||'—')} lbs &nbsp;•&nbsp; ${escapeHtml(player.college||'—')}</p></div>
+          <div class="canonical-player-bio-strip"><div><span>Age</span><strong>${escapeHtml(bio.age)}</strong></div><div><span>Exp</span><strong>${escapeHtml(bio.exp==='—'?'—':`${bio.exp} Year${Number(bio.exp)===1?'':'s'}`)}</strong></div><div><span>College</span><strong>${escapeHtml(player.college||'—')}</strong></div><div><span>Birthdate</span><strong>${escapeHtml(bio.birth)}</strong></div></div>
+        </div>
+        <div class="canonical-player-hero__overall"><strong>${player.overall??'—'}</strong><span>OVR</span><b>${escapeHtml(dev)}</b></div>
       </section>
 
-      <div class="canonical-player-tabs" role="tablist">
+      <div class="canonical-player-tabs canonical-player-tabs--approved" role="tablist">
         ${[['ratings','Ratings'],['statistics','Statistics'],['game-log','Game Log'],['contract','Contract'],['transactions','Transaction History']].map(([id,label],index)=>`<button type="button" class="${index===0?'is-active':''}" data-canonical-player-tab="${id}">${label}</button>`).join('')}
       </div>
 
-      <div class="canonical-player-panels">
-        <section class="canonical-player-panel is-active" data-canonical-player-panel="ratings">${renderCanonicalRatings(player)}</section>
-        <section class="canonical-player-panel" data-canonical-player-panel="statistics">${stats}</section>
-        <section class="canonical-player-panel" data-canonical-player-panel="game-log">${canonicalGameLog(player.id)}</section>
-        <section class="canonical-player-panel" data-canonical-player-panel="contract">${canonicalContractPanel(player)}</section>
-        <section class="canonical-player-panel" data-canonical-player-panel="transactions">${canonicalTransactionHistory(player.id)}</section>
+      <div class="canonical-player-panels canonical-player-panels--approved">
+        <section class="canonical-player-panel is-active" data-canonical-player-panel="ratings"><div class="canonical-player-dashboard"><div class="canonical-player-dashboard__ratings"><section class="canonical-dashboard-card canonical-dashboard-card--ratings"><div class="canonical-dashboard-card__head"><h3>Ratings</h3></div>${renderCanonicalRatings(player)}</section></div><div class="canonical-player-dashboard__center">${canonicalPlayerDashboardStats(player.id)}</div><aside class="canonical-player-dashboard__rail">${canonicalPlayerSideRail(player)}</aside></div></section>
+        <section class="canonical-player-panel" data-canonical-player-panel="statistics"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Statistics</h3><span class="pill pill--neutral">Current Season</span></div>${stats}</section></section>
+        <section class="canonical-player-panel" data-canonical-player-panel="game-log"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Game Log</h3></div>${canonicalGameLog(player.id)}</section></section>
+        <section class="canonical-player-panel" data-canonical-player-panel="contract"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Contract</h3></div>${canonicalContractPanel(player)}</section></section>
+        <section class="canonical-player-panel" data-canonical-player-panel="transactions"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Transaction History</h3></div>${canonicalTransactionHistory(player.id)}</section></section>
       </div>
-
       ${canonicalTradeBreakdown(player)}`;
 
     modal.classList.add('is-open');
@@ -2775,7 +2803,7 @@
 
       pageContent.innerHTML=`
         <div class="page-heading"><div><button class="text-button" data-route="teams"><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>All teams</button></div><div class="heading-actions">${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?`<button class="button button--ghost" data-open-block-drawer><svg><use href="#icon-tag"></use></svg>Manage Trade Block</button>`:''}<button class="button button--primary" data-start-team-trade="${team.id}"><svg><use href="#icon-swap"></use></svg>${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?'Start Trade Proposal':`Start Trade w/ ${escapeHtml(team.fullName)}`}</button></div></div>
-        <section class="team-hero team-hero--watermark" style="${teamStyle(team)}" data-abbr="${escapeHtml(team.abbr)}">
+        <section class="team-hero team-hero--watermark team-hero--matchup-colors" style="${teamStyle(team)};background:linear-gradient(125deg,${escapeHtml(team.primary)},${escapeHtml(team.secondary||team.primary)}) !important" data-abbr="${escapeHtml(team.abbr)}">
           ${team.logo?`<img class="team-hero__watermark" src="${escapeHtml(team.logo)}" alt="" aria-hidden="true" loading="lazy">`:''}
           <div class="team-hero__content"><div class="team-hero__copy"><span class="eyebrow">${escapeHtml(team.conference)} ${escapeHtml(team.division)} · Owner ${escapeHtml(team.owner)}</span><h1>${escapeHtml(team.fullName)}</h1></div><div class="team-hero__record"><strong>${escapeHtml(team.record)}</strong><span>${escapeHtml(team.conference)} ${escapeHtml(team.division)}</span></div></div>
         </section>
