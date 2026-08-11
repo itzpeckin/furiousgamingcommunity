@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2a.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2.2b.1ba.1',
+        version:'5.9.6.2a.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -3783,6 +3783,21 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {identity,teamId,combined};
     }).filter(item=>item.teamId===String(awayId)||item.teamId===String(homeId));
 
+    const sortMetricByCategory={
+      passing:['passYds','passingYards','passYards','yards'],
+      rushing:['rushAtt','rushingAttempts','carries','attempts'],
+      receiving:['recCatches','receptions','catches','rec'],
+      defense:['defTotalTackles','totalTackles','tackles','tacklesTotal']
+    };
+    const sortAliases=sortMetricByCategory[category]||[];
+    if(sortAliases.length){
+      players.sort((a,b)=>{
+        const av=Number(matchupPlayerMetric(a.combined,sortAliases,0))||0;
+        const bv=Number(matchupPlayerMetric(b.combined,sortAliases,0))||0;
+        return bv-av||String(a.identity.name).localeCompare(String(b.identity.name));
+      });
+    }
+
     if(!players.length)return '';
 
     const sideTable=(teamId,label)=>{
@@ -3818,7 +3833,10 @@ function canonicalPlayerDashboardStats(playerId='') {
         const modal=document.querySelector('[data-matchup-modal]');
         const active=modal?.querySelector('[data-matchup-tab="player"].is-active');
         const target=modal?.querySelector('[data-matchup-tab-content]');
-        if(active&&target)target.innerHTML=renderMatchupPlayerStats(activeMatchupGame||{});
+        if(active&&target){
+          clearMatchupPanelCache(activeMatchupGame||{});
+          target.innerHTML=cachedMatchupPanel('player',activeMatchupGame||{});
+        }
       });
       return `<section class="matchup-tab-panel"><div class="card-body matchup-player-loading"><span class="spinner"></span><strong>Loading player box score…</strong></div></section>`;
     }
@@ -3847,13 +3865,60 @@ function canonicalPlayerDashboardStats(playerId='') {
     </section>`;
   }
 
+  const matchupPanelCache=new Map();
+
+  function matchupPanelCacheKey(game={},tab='team') {
+    return `${String(game.id||game.gameId||game.scheduleId||'')}:${tab}`;
+  }
+
+  function clearMatchupPanelCache(game={}) {
+    const prefix=`${String(game.id||game.gameId||game.scheduleId||'')}:`;
+    [...matchupPanelCache.keys()].forEach(key=>{
+      if(key.startsWith(prefix)) matchupPanelCache.delete(key);
+    });
+  }
+
+  function buildMatchupPanel(tab,game={}) {
+    if(tab==='team') return renderMatchupTeamStats(game);
+    if(tab==='player') return renderMatchupPlayerStats(game);
+    if(tab==='advanced') {
+      return `<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Verified calculations</span><h3>Advanced Statistics</h3></div></div><div class="card-body"><p>Advanced Statistics integration follows player-stat certification.</p></div></section>`;
+    }
+    return renderMatchupTeamStats(game);
+  }
+
+  function cachedMatchupPanel(tab,game={}) {
+    const key=matchupPanelCacheKey(game,tab);
+    if(matchupPanelCache.has(key)) return matchupPanelCache.get(key);
+    const html=buildMatchupPanel(tab,game);
+    matchupPanelCache.set(key,html);
+    return html;
+  }
+
+  function warmMatchupPanels(game={}) {
+    // Team is already visible. Warm the expensive tabs once data is ready.
+    requestIdleCallback?.(()=>{
+      try{
+        cachedMatchupPanel('player',game);
+        cachedMatchupPanel('advanced',game);
+      }catch(error){
+        console.warn('[Matchup Panel Warm]',error);
+      }
+    },{timeout:800});
+    if(typeof requestIdleCallback!=='function'){
+      setTimeout(()=>{
+        try{
+          cachedMatchupPanel('player',game);
+          cachedMatchupPanel('advanced',game);
+        }catch(error){
+          console.warn('[Matchup Panel Warm]',error);
+        }
+      },0);
+    }
+  }
+
   function matchupTabPanel(tab) {
-    if(tab==='team') return renderMatchupTeamStats(activeMatchupGame||{});
-    const panels={
-      player:renderMatchupPlayerStats(activeMatchupGame||{}),
-      advanced:`<section class="matchup-tab-panel"><div class="card-header"><div><span class="eyebrow">Verified calculations</span><h3>Advanced Statistics</h3></div></div><div class="card-body"><p>Advanced Statistics integration follows player-stat certification.</p></div></section>`
-    };
-    return panels[tab]||renderMatchupTeamStats(activeMatchupGame||{});
+    return cachedMatchupPanel(tab,activeMatchupGame||{});
   }
 
   function matchupGameContext(game={}) {
@@ -3958,6 +4023,8 @@ function canonicalPlayerDashboardStats(playerId='') {
         hydrateMatchupTeamStatistics(game),
         hydratePlayerStatistics(false)
       ]);
+      clearMatchupPanelCache(game);
+      warmMatchupPanels(game);
       const away=matchupTeam(awayTeamId);
       const home=matchupTeam(homeTeamId);
       const meta=gameMetadata(game);
@@ -5490,7 +5557,8 @@ function canonicalPlayerDashboardStats(playerId='') {
         button.classList.toggle('is-active',active);
         button.setAttribute('aria-selected',String(active));
       });
-      target.innerHTML=matchupTabPanel(matchupTab.dataset.matchupTab);
+      const tabName=matchupTab.dataset.matchupTab;
+      target.innerHTML=cachedMatchupPanel(tabName,activeMatchupGame||{});
       return;
     }
 
