@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.1e.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.1f.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.1e.2b.1ba.1',
+        version:'5.9.6.1f.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2123,8 +2123,8 @@
     try{
       const service=liveReadModel();
       if(!service) return null;
-      const [stateValue,teamRows,standingRows,playerRows,gameRows]=await Promise.all([
-        service.getState(),service.getTeams(),service.getStandings(),service.getPlayers(),service.getSchedule()
+      const [stateValue,snapshotValue,teamRows,standingRows,playerRows,gameRows]=await Promise.all([
+        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getPlayers(),service.getSchedule()
       ]);
       if(stateValue!=='live') return null;
       const rawTeamMap=new Map(teamRows.map(team=>[String(team.id),team]));
@@ -2142,7 +2142,21 @@
         playersByTeam.get(key).push(player);
       });
       playersByTeam.forEach(list=>list.sort((a,b)=>(Number(a.depthOrder)||99)-(Number(b.depthOrder)||99)||(Number(b.overall)||0)-(Number(a.overall)||0)||a.name.localeCompare(b.name)));
-      liveTeamDirectory={teams:teamsLive,teamMap:new Map(teamsLive.map(team=>[String(team.id),team])),standingMap,players:playersLive,playersByTeam,games:gameRows};
+      const provisionalGames=gameRows.map(game=>liveGameShape(game,new Map(teamsLive.map(team=>[String(team.id),team]))));
+      const currentContext=authoritativeSeasonContext(snapshotValue,standingRows,provisionalGames);
+      const normalizedGames=gameRows.map(game=>liveGameShape(game,new Map(teamsLive.map(team=>[String(team.id),team])),currentContext));
+      liveTeamDirectory={
+        snapshot:snapshotValue,
+        currentContext,
+        teams:teamsLive,
+        teamMap:new Map(teamsLive.map(team=>[String(team.id),team])),
+        standingMap,
+        players:playersLive,
+        playersByTeam,
+        games:normalizedGames
+      };
+      window.FranchiseHQ=window.FranchiseHQ||{};
+      window.FranchiseHQ.currentSeasonContext=currentContext;
       return liveTeamDirectory;
     } finally {
       liveTeamDirectoryLoading=false;
@@ -2564,33 +2578,127 @@
   }
 
   function canonicalCurrentSeasonYear() {
-    const context=window.FranchiseHQ?.currentSeasonContext||{};
-    const candidates=[context.calendarYear,context.seasonYear,context.year,window.FGC_APP?.league?.currentSeasonYear,window.FGC_APP?.league?.seasonYear];
-    for(const value of candidates){const year=Number(value);if(Number.isFinite(year)&&year>=2000&&year<=2100)return year;}
+    const context=window.FranchiseHQ?.currentSeasonContext||liveTeamDirectory?.currentContext||{};
+    const candidates=[
+      context.season,
+      context.calendarYear,
+      context.seasonYear,
+      context.year,
+      liveTeamDirectory?.snapshot?.seasonYear,
+      liveTeamDirectory?.snapshot?.calendarYear,
+      window.FGC_APP?.league?.currentSeasonYear,
+      window.FGC_APP?.league?.seasonYear
+    ];
+
+    for(const value of candidates){
+      const year=Number(value);
+      if(Number.isFinite(year)&&year>=2000&&year<=2100)return year;
+    }
+
     const years=[];
-    (playerStatisticsState?.rows||[]).forEach(row=>{const source=row.source||{};const year=Number(row.seasonYear??source.seasonYear??source.calendarYear);if(Number.isFinite(year)&&year>=2000&&year<=2100)years.push(year);});
-    canonicalScheduleUniverse().forEach(game=>{const year=Number(game.seasonYear??game.calendarYear??game.source?.seasonYear??game.source?.calendarYear);if(Number.isFinite(year)&&year>=2000&&year<=2100)years.push(year);});
+    (playerStatisticsState?.rows||[]).forEach(row=>{
+      const source=row.source||{};
+      const year=Number(row.seasonYear??source.seasonYear??source.calendarYear);
+      if(Number.isFinite(year)&&year>=2000&&year<=2100)years.push(year);
+    });
+
+    (liveTeamDirectory?.games||[]).forEach(game=>{
+      const source=game.source||{};
+      const year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear);
+      if(Number.isFinite(year)&&year>=2000&&year<=2100)years.push(year);
+    });
+
     return years.length?Math.max(...years):null;
   }
 
   function canonicalScheduleUniverse() {
-    const rows=[]; const add=list=>{if(Array.isArray(list))rows.push(...list);};
-    add(window.FranchiseHQ?.liveScheduleGames); add(window.FranchiseHQ?.schedule); add(window.FGC_APP?.schedule);
-    add(window.FranchiseHQ?.liveReadModelCache?.games); add(window.FranchiseHQ?.liveTeamDirectory?.games);
+    const rows=[];
+    const add=list=>{if(Array.isArray(list))rows.push(...list);};
+
+    // The live team directory is the authoritative schedule source on Team pages.
+    add(liveTeamDirectory?.games);
+
+    // Supplemental public/global caches.
+    add(window.FranchiseHQ?.liveScheduleGames);
+    add(window.FranchiseHQ?.schedule);
+    add(window.FGC_APP?.schedule);
+    add(window.FranchiseHQ?.liveReadModelCache?.games);
+
     const seen=new Set();
-    return rows.filter(game=>{const id=String(game.id||game.gameId||game.scheduleId||game.source?.scheduleId||'');const key=id||[game.seasonYear??game.source?.seasonYear??'',game.stage??game.source?.stage??'',game.week??game.weekIndex??game.source?.weekIndex??'',game.homeTeamId??game.homeId??game.source?.homeTeamId??'',game.awayTeamId??game.awayId??game.source?.awayTeamId??''].join(':');if(seen.has(key))return false;seen.add(key);return true;});
+    return rows.filter(game=>{
+      const source=game.source||{};
+      const id=String(game.id||game.gameId||game.scheduleId||source.scheduleId||'');
+      const key=id||[
+        game.seasonYear??source.seasonYear??'',
+        game.stage??source.stage??'',
+        game.week??game.weekIndex??source.weekIndex??'',
+        game.homeTeamId??game.homeId??source.homeTeamId??'',
+        game.awayTeamId??game.awayId??source.awayTeamId??''
+      ].join(':');
+      if(seen.has(key))return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   function canonicalGameResultFor(playerId='',week='—',stage='regular-season',seasonYear=null) {
     const player=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId));
-    const view=player?rosterPlayerView(player):null; const teamId=String(view?.teamId||player?.teamId||''); if(!teamId)return null;
-    const normalizeStage=value=>{const text=String(value||'').toLowerCase();if(text.includes('pre'))return 'pre';if(text.includes('post')||text.includes('playoff'))return 'post';return 'reg';};
+    const view=player?rosterPlayerView(player):null;
+    const teamId=String(view?.teamId||player?.teamId||'');
+    if(!teamId)return null;
+
+    const normalizeStage=value=>{
+      const text=String(value||'').toLowerCase();
+      if(text.includes('pre'))return 'preseason';
+      if(text.includes('post')||text.includes('playoff'))return 'playoffs';
+      return 'regular';
+    };
     const wantedStage=normalizeStage(stage);
-    const match=canonicalScheduleUniverse().find(game=>{const source=game.source||{};const gw=Number(game.week??game.weekIndex??source.weekIndex??source.week);const gs=normalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage??source.stageIndex);const gy=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear);const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');const yearMatch=!Number.isFinite(Number(seasonYear))||!Number.isFinite(gy)||gy===Number(seasonYear);return gw===Number(week)&&gs===wantedStage&&yearMatch&&(home===teamId||away===teamId);});
+
+    const match=canonicalScheduleUniverse().find(game=>{
+      const source=game.source||{};
+      const gw=Number(game.week??game.weekIndex??source.weekIndex??source.week);
+      const gs=normalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
+      const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');
+      const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');
+
+      const gy=Number(
+        game.seasonYear??
+        game.calendarYear??
+        source.seasonYear??
+        source.calendarYear??
+        liveTeamDirectory?.snapshot?.seasonYear
+      );
+      const yearMatch=
+        !Number.isFinite(Number(seasonYear))||
+        !Number.isFinite(gy)||
+        gy===Number(seasonYear);
+
+      return gw===Number(week)&&gs===wantedStage&&yearMatch&&(home===teamId||away===teamId);
+    });
+
     if(!match)return null;
-    const source=match.source||{}; const home=String(match.homeTeamId??match.homeId??match.home?.id??source.homeTeamId??''); const away=String(match.awayTeamId??match.awayId??match.away?.id??source.awayTeamId??''); const isHome=home===teamId; const opponentId=isHome?away:home; const opponent=rosterTeamView(opponentId)||{};
-    const homeScore=Number(match.homeScore??match.home?.score??source.homeScore??source.homeScoreTotal??source.homePoints); const awayScore=Number(match.awayScore??match.away?.score??source.awayScore??source.awayScoreTotal??source.awayPoints); const played=Number.isFinite(homeScore)&&Number.isFinite(awayScore); const teamScore=isHome?homeScore:awayScore; const oppScore=isHome?awayScore:homeScore; const result=played?(teamScore>oppScore?'W':teamScore<oppScore?'L':'T'):'';
-    return {opponent:`${isHome?'vs.':'@'} ${opponent.abbr||opponent.abbreviation||opponent.nickname||opponent.fullName||'OPP'}`,score:played?`${teamScore}-${oppScore}`:'',result,className:result==='W'?'is-win':result==='L'?'is-loss':'is-neutral'};
+
+    const source=match.source||{};
+    const home=String(match.homeTeamId??match.homeId??match.home?.id??source.homeTeamId??'');
+    const away=String(match.awayTeamId??match.awayId??match.away?.id??source.awayTeamId??'');
+    const isHome=home===teamId;
+    const opponentId=isHome?away:home;
+    const opponent=rosterTeamView(opponentId)||liveTeamDirectory?.teamMap?.get(opponentId)||{};
+
+    const homeScore=Number(match.homeScore??match.home?.score??source.homeScore??source.homeScoreTotal??source.homePoints);
+    const awayScore=Number(match.awayScore??match.away?.score??source.awayScore??source.awayScoreTotal??source.awayPoints);
+    const played=Number.isFinite(homeScore)&&Number.isFinite(awayScore);
+    const teamScore=isHome?homeScore:awayScore;
+    const oppScore=isHome?awayScore:homeScore;
+    const result=played?(teamScore>oppScore?'W':teamScore<oppScore?'L':'T'):'';
+
+    return {
+      opponent:`${isHome?'vs.':'@'} ${opponent.abbr||opponent.abbreviation||opponent.nickname||opponent.fullName||'OPP'}`,
+      score:played?`${teamScore}-${oppScore}`:'',
+      result,
+      className:result==='W'?'is-win':result==='L'?'is-loss':'is-neutral'
+    };
   }
 
   function canonicalCompactStatSummary(metricsByCategory=[]) {
@@ -2672,7 +2780,7 @@
     const statWeeks=new Map();
     Object.entries(categories).forEach(([category,data])=>(data?.rows||[]).forEach(row=>{const source=row.source||{};const season=Number(row.seasonYear??source.seasonYear??source.calendarYear??currentYear);const week=row.week??row.weekIndex??source.weekIndex??source.week??'—';const stage=row.stage||source.stage||source.seasonStage||'regular-season';const key=`${season}:${String(stage)}:${String(week)}`;const entry=statWeeks.get(key)||{season,stage,week,metrics:[],categories:[]};entry.metrics.push({category,metrics:row.metrics||{}});if(!entry.categories.includes(category))entry.categories.push(category);statWeeks.set(key,entry);}));
     const normalizeStage=value=>{const text=String(value||'').toLowerCase();if(text.includes('pre'))return 'preseason';if(text.includes('post')||text.includes('playoff'))return 'playoffs';return 'regular-season';};
-    const scheduleRows=canonicalScheduleUniverse().filter(game=>{const source=game.source||{};const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');const year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear);return (home===teamId||away===teamId)&&(!Number.isFinite(Number(currentYear))||!Number.isFinite(year)||year===Number(currentYear));}).map(game=>{const source=game.source||{};const week=game.week??game.weekIndex??source.weekIndex??source.week??'—';const stage=normalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);const season=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??currentYear);const stat=[...statWeeks.values()].find(row=>Number(row.season)===season&&Number(row.week)===Number(week)&&normalizeStage(row.stage)===stage);return {season,stage,week,metrics:stat?.metrics||[],categories:stat?.categories||[]};});
+    const scheduleRows=canonicalScheduleUniverse().filter(game=>{const source=game.source||{};const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');const year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear);return (home===teamId||away===teamId)&&(!Number.isFinite(Number(currentYear))||!Number.isFinite(year)||year===Number(currentYear));}).map(game=>{const source=game.source||{};const week=game.week??game.weekIndex??source.weekIndex??source.week??'—';const stage=normalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);const season=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??liveTeamDirectory?.snapshot?.seasonYear??currentYear);const stat=[...statWeeks.values()].find(row=>Number(row.season)===season&&Number(row.week)===Number(week)&&normalizeStage(row.stage)===stage);return {season,stage,week,metrics:stat?.metrics||[],categories:stat?.categories||[]};});
     const rows=(scheduleRows.length?scheduleRows:[...statWeeks.values()]).sort((a,b)=>Number(a.week||0)-Number(b.week||0));
     const activeCategories=[...new Set(Object.keys(categories).filter(c=>(categories[c]?.rows||[]).length))]; const cols=canonicalColumnsForCategories(activeCategories.length?activeCategories:['passing','rushing','receiving','defense']); const zeroOrMetric=(metrics,aliases)=>{const value=canonicalMetricValue(metrics,aliases);return value==='—'?0:value;};
     const body=rows.map(row=>{const result=canonicalGameResultFor(playerId,row.week,row.stage,row.season);const opponent=result?`${result.opponent} - ${result.score}`:`Week ${row.week}`;return [row.week,{value:opponent,className:result?.className||'is-neutral'},...cols.map(([,aliases])=>zeroOrMetric(row.metrics,aliases))];});
@@ -2895,6 +3003,9 @@ function canonicalPlayerDashboardStats(playerId='') {
     const content=document.querySelector('[data-value-card-content]');
     if(!modal||!content)return false;
     const logo=renderTeamMark(team,'canonical-player-team-logo');
+    const watermarkLogo=team.logo
+      ? `<img class="canonical-player-watermark-image" src="${escapeHtml(team.logo)}" alt="" aria-hidden="true" loading="lazy">`
+      : renderTeamMark(team,'canonical-player-watermark-fallback');
     const stats=window.FranchiseHQ?.playerStatistics?.render?.(player.id)||'<div class="canonical-player-empty">Statistics service unavailable.</div>';
     const bio=canonicalPlayerBio(player);
     const dev=normalizeLiveDevelopment(player.developmentTrait||player.dev||player.raw?.developmentTrait);
@@ -2903,7 +3014,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     content.innerHTML=`<div class="value-card-context canonical-player-topbar"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>Back to Roster</span></button><span>Player Card</span></div>
       <section class="canonical-player-hero canonical-player-hero--approved" style="--player-team-primary:${escapeHtml(teamPrimary)};--player-team-secondary:${escapeHtml(teamSecondary)};background:linear-gradient(118deg,${escapeHtml(teamPrimary)} 0%,${escapeHtml(teamPrimary)} 43%,color-mix(in srgb,${escapeHtml(teamPrimary)} 55%,${escapeHtml(teamSecondary)}) 62%,${escapeHtml(teamSecondary)} 100%)">
         <div class="canonical-player-hero__stripe" aria-hidden="true"></div>
-        <div class="canonical-player-hero__watermark canonical-player-hero__watermark--logo">${logo}</div>
+        <div class="canonical-player-hero__watermark canonical-player-hero__watermark--logo">${watermarkLogo}</div>
         <div class="canonical-player-hero__image">${renderCanonicalPlayerImage(player)}</div>
         <div class="canonical-player-hero__identity">
           <div class="canonical-player-teamline">${logo}<div><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><span>#${escapeHtml(player.number||'—')} &nbsp;•&nbsp; ${escapeHtml(player.position||'—')}</span></div></div>
@@ -2914,7 +3025,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       </section>
 
       <div class="canonical-player-tabs canonical-player-tabs--approved" role="tablist">
-        ${[['ratings','Ratings'],['statistics','Statistics'],['transactions','Transaction History']].map(([id,label],index)=>`<button type="button" class="${index===0?'is-active':''}" data-canonical-player-tab="${id}">${label}</button>`).join('')}
+        ${[['ratings','Details'],['statistics','Statistics'],['transactions','Transaction History']].map(([id,label],index)=>`<button type="button" class="${index===0?'is-active':''}" data-canonical-player-tab="${id}">${label}</button>`).join('')}
       </div>
 
       <div class="canonical-player-panels canonical-player-panels--approved">
@@ -2944,10 +3055,48 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   function openRosterPlayerDetail(playerId) {
-    const scrollingElement=document.scrollingElement; const savedWindowScroll=scrollingElement?.scrollTop??window.scrollY; const savedMainScroll=mainContent?.scrollTop||0;
-    const restorePlayerScroll=()=>{const restore=()=>{if(scrollingElement)scrollingElement.scrollTop=savedWindowScroll;window.scrollTo(0,savedWindowScroll);if(mainContent)mainContent.scrollTop=savedMainScroll;};restore();requestAnimationFrame(()=>{restore();requestAnimationFrame(restore);});};
-    const open=()=>{try{if(openCanonicalLivePlayerCard(playerId)){restorePlayerScroll();return true;}}catch(error){console.error('[Canonical Player Card]',error);}const legacy=playerById(playerId);if(legacy&&window.FGC_TRADE?.openValueCard){window.FGC_TRADE.openValueCard(playerId);restorePlayerScroll();return true;}return false;};
-    if(!playerStatisticsState.loaded){hydratePlayerStatistics(false).then(()=>open());return;} open();
+    const scrollingElement=document.scrollingElement;
+    const savedWindowScroll=scrollingElement?.scrollTop??window.scrollY;
+    const savedMainScroll=mainContent?.scrollTop||0;
+
+    const restorePlayerScroll=()=>{
+      const restore=()=>{
+        if(scrollingElement)scrollingElement.scrollTop=savedWindowScroll;
+        window.scrollTo(0,savedWindowScroll);
+        if(mainContent)mainContent.scrollTop=savedMainScroll;
+      };
+      restore();
+      requestAnimationFrame(()=>{restore();requestAnimationFrame(restore);});
+    };
+
+    const open=()=>{
+      try{
+        if(openCanonicalLivePlayerCard(playerId)){
+          restorePlayerScroll();
+          return true;
+        }
+      }catch(error){
+        console.error('[Canonical Player Card]',error);
+      }
+
+      const legacy=playerById(playerId);
+      if(legacy&&window.FGC_TRADE?.openValueCard){
+        window.FGC_TRADE.openValueCard(playerId);
+        restorePlayerScroll();
+        return true;
+      }
+      return false;
+    };
+
+    // Both statistics and schedule/team context must be ready before the card
+    // renders, otherwise the first-open game log has no opponent/result rows.
+    Promise.all([
+      playerStatisticsState.loaded ? Promise.resolve(playerStatisticsState.rows) : hydratePlayerStatistics(false),
+      loadLiveTeamDirectory(false)
+    ]).then(open).catch(error=>{
+      console.error('[Canonical Player Card Hydration]',error);
+      open();
+    });
   }
 
   function renderTeamDetailLegacy(teamId) {
