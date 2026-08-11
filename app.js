@@ -2398,7 +2398,7 @@
   }
 
   function teamGameRowsFor(game={},statistics=[],teamId='') {
-    const gameIds=gameDirectIds(game);
+    const gameIds=new Set(gameDirectIds(game));
     const gameContext=stageWeekContext(game.source||{},game.week,game.stage);
     const phase=normalizedGamePhase(gameContext.phase), week=Number(gameContext.week);
     const candidates=(statistics||[]).filter(row=>String(row.category||'').toLowerCase()==='team-game'&&rowTeamId(row)===String(teamId));
