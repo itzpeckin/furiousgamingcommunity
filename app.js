@@ -1727,9 +1727,9 @@
       })
       .sort((a,b)=>String(a.displayName||'').localeCompare(String(b.displayName||'')));
 
-    let selected=(state.players||[]).find(player=>String(player.id)===String(state.selectedId));
+    let selected=(state.players||[]).find(player=>String(player.id||player.source?.player_external_id||player.source?.playerId||'')===String(state.selectedId));
     if(!selected) selected=filtered[0]||state.players[0]||null;
-    if(selected) state.selectedId=String(selected.id);
+    if(selected) state.selectedId=String(selected.id||selected.source?.player_external_id||selected.source?.playerId||'');
 
     const playerCount=state.players.length;
     const teamJoined=state.players.filter(player=>Boolean(playerInspectorTeam(player))).length;
@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.0 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.0a · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1757,7 +1757,7 @@
         <div class="card-header"><div><span class="eyebrow">Player Selection</span><h3>Inspect a Player</h3></div><button type="button" class="button button--ghost" data-player-inspector-reload>Refresh Inspector</button></div>
         <div class="player-inspector-filter-row">
           <label class="field"><span>Search</span><input type="search" value="${escapeHtml(state.query)}" placeholder="Name, team, position, or player ID" data-player-inspector-search></label>
-          <label class="field"><span>Player</span><select data-player-inspector-select>${filtered.slice(0,1000).map(player=>{const team=playerInspectorTeam(player);return `<option value="${escapeHtml(player.id)}" ${String(player.id)===String(state.selectedId)?'selected':''}>${escapeHtml(`${player.displayName||player.id} · ${player.position||'—'} · ${team?.abbreviation||team?.nickname||'Unassigned'}`)}</option>`}).join('')}</select></label>
+          <label class="field"><span>Player</span><select data-player-inspector-select>${filtered.slice(0,1000).map(player=>{const team=playerInspectorTeam(player);const pid=String(player.id||player.source?.player_external_id||player.source?.playerId||'');return `<option value="${escapeHtml(pid)}" ${pid===String(state.selectedId)?'selected':''}>${escapeHtml(`${player.displayName||pid||'Unknown Player'} · ${player.position||'—'} · ${team?.abbreviation||team?.nickname||'Unassigned'}`)}</option>`}).join('')}</select></label>
         </div>
         <small>${filtered.length} matching players${filtered.length>1000?' · first 1,000 shown':''}</small>
       </article>
@@ -1792,7 +1792,7 @@
       playerInspectorState.snapshot=snapshot||null;
       playerInspectorState.imageFieldCoverage=playerInspectorImageCoverage(playerInspectorState.players);
       if(!playerInspectorState.selectedId && playerInspectorState.players[0]){
-        playerInspectorState.selectedId=String(playerInspectorState.players[0].id||'');
+        playerInspectorState.selectedId=String(playerInspectorState.players[0].id||playerInspectorState.players[0].source?.player_external_id||playerInspectorState.players[0].source?.playerId||'');
       }
       playerInspectorState.loaded=true;
     }catch(error){
@@ -1803,9 +1803,32 @@
     }
   }
 
-  function rerenderPlayerDataInspector() {
+  function rerenderPlayerDataInspector({preserveScroll=false,focusSearch=false}={}) {
     const target=document.querySelector('[data-player-inspector-host]');
-    if(target)target.innerHTML=renderPlayerDataInspector();
+    if(!target)return;
+
+    const scrollY=preserveScroll?window.scrollY:null;
+    const active=document.activeElement;
+    const searchWasActive=Boolean(active?.matches?.('[data-player-inspector-search]'));
+    const selectionStart=searchWasActive?active.selectionStart:null;
+    const selectionEnd=searchWasActive?active.selectionEnd:null;
+
+    target.innerHTML=renderPlayerDataInspector();
+
+    requestAnimationFrame(()=>{
+      if(preserveScroll && scrollY!==null){
+        window.scrollTo({top:scrollY,left:0,behavior:'auto'});
+      }
+      if(focusSearch || searchWasActive){
+        const next=document.querySelector('[data-player-inspector-search]');
+        if(next){
+          next.focus({preventScroll:true});
+          if(selectionStart!==null){
+            try{next.setSelectionRange(selectionStart,selectionEnd);}catch{}
+          }
+        }
+      }
+    });
   }
 
   window.FranchiseHQ.playerDataInspector = {
@@ -1827,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.0',
+        version:'5.9.6.0a',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1843,21 +1866,21 @@
     const input=event.target.closest('[data-player-inspector-search]');
     if(!input)return;
     playerInspectorState.query=input.value||'';
-    rerenderPlayerDataInspector();
-    requestAnimationFrame(()=>{
-      const next=document.querySelector('[data-player-inspector-search]');
-      if(next){
-        next.focus();
-        try{next.setSelectionRange(next.value.length,next.value.length);}catch{}
-      }
-    });
+    rerenderPlayerDataInspector({preserveScroll:true,focusSearch:true});
   });
 
   document.addEventListener('change',event=>{
     const select=event.target.closest('[data-player-inspector-select]');
     if(!select)return;
-    playerInspectorState.selectedId=String(select.value||'');
-    rerenderPlayerDataInspector();
+
+    const selectedId=String(select.value||'');
+    if(!selectedId)return;
+
+    const exists=(playerInspectorState.players||[]).some(player=>String(player.id||'')===selectedId);
+    if(!exists)return;
+
+    playerInspectorState.selectedId=selectedId;
+    rerenderPlayerDataInspector({preserveScroll:true});
   });
 
   document.addEventListener('click',event=>{

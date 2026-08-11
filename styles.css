@@ -5260,7 +5260,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.0 — Player Data Inspector
+   Franchise HQ v5.9.6.0a — Player Data Inspector
    ============================================================ */
 .player-data-inspector{display:grid;gap:16px}
 .player-inspector-heading{margin-bottom:0}
@@ -5316,4 +5316,13 @@ table td{
   .player-inspector-summary,.player-inspector-join-grid,.player-inspector-stats-summary,
   .player-inspector-detail-grid,.player-inspector-json-grid,
   .player-inspector-controls .player-inspector-filter-row{grid-template-columns:1fr}
+}
+
+
+/* Franchise HQ v5.9.6.0aa — Player Data Inspector interaction fix */
+.player-inspector-controls select[data-player-inspector-select]{
+  cursor:pointer;
+}
+.player-inspector-controls input[data-player-inspector-search]{
+  scroll-margin-top:0;
 }
