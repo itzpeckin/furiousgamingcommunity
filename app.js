@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2kcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2l-diagcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2kcb.2b.1ba.1',
+        version:'5.9.6.2l-diagcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1882,6 +1882,32 @@
     playerInspectorState.selectedId=selectedId;
     rerenderPlayerDataInspector({preserveScroll:true});
   });
+
+  let lastMatchupInputTiming=null;
+
+  document.addEventListener('pointerdown',event=>{
+    const target=event.target.closest?.('[data-game-id]');
+    if(!target)return;
+    lastMatchupInputTiming={
+      gameId:String(target.dataset.gameId||''),
+      pointerEventTime:performance.now(),
+      nativeEventTimestamp:Number(event.timeStamp)||null
+    };
+  },true);
+
+  document.addEventListener('click',event=>{
+    const target=event.target.closest?.('[data-game-id]');
+    if(!target)return;
+    const now=performance.now();
+    if(!lastMatchupInputTiming||lastMatchupInputTiming.gameId!==String(target.dataset.gameId||'')){
+      lastMatchupInputTiming={
+        gameId:String(target.dataset.gameId||''),
+        pointerEventTime:now,
+        nativeEventTimestamp:Number(event.timeStamp)||null
+      };
+    }
+    lastMatchupInputTiming.clickCaptureTime=now;
+  },true);
 
   document.addEventListener('click',event=>{
     if(event.target.closest('[data-player-inspector-reload]')){
@@ -4283,10 +4309,19 @@ function canonicalPlayerDashboardStats(playerId='') {
     return game||null;
   }
 
-  function matchupPerfMark(label=''){try{performance.mark(`fhq-matchup-${label}`)}catch{}}
-
   async function openMatchupCard(gameId){
-    matchupPerfMark('click-start');
+    const handlerStart=performance.now();
+    const input=lastMatchupInputTiming&&lastMatchupInputTiming.gameId===String(gameId||'')
+      ? {...lastMatchupInputTiming}
+      : null;
+
+    const inputToHandler=input?.pointerEventTime!=null
+      ? handlerStart-input.pointerEventTime
+      : null;
+
+    console.info(
+      `[Matchup Performance] input→handler ${inputToHandler==null?'n/a':inputToHandler.toFixed(1)+'ms'}`
+    );
     const gameIdText=String(gameId||'');
     let game=findCachedMatchupGame(gameIdText);
 
@@ -4331,14 +4366,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       </div>
       <div class="matchup-tab-content" data-matchup-tab-content>${initialPanel}</div>
     </div>`);
-    matchupPerfMark('after-open');
-    try{
-      performance.measure('FHQ Matchup click→modal','fhq-matchup-click-start','fhq-matchup-after-open');
-      const e=performance.getEntriesByName('FHQ Matchup click→modal').at(-1);
-      if(e)console.info(`[Matchup Performance] click→modal ${e.duration.toFixed(1)}ms`);
-    }catch{}
-
-    requestAnimationFrame(()=>{
+requestAnimationFrame(()=>{
       const modal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');if(!modal)return;
       try{
         const meta=gameMetadata(game),info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
