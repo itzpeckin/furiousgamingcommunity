@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.4bbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.4ccbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.4bbcb.2b.1ba.1',
+        version:'5.9.6.4ccbcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2984,7 +2984,7 @@
             ${seasons.map(year=>`<option value="${year}" ${year===selected?'selected':''}>${year}</option>`).join('')}
           </select>
         </label>
-        <small>Regular season and playoffs only. Preseason games are excluded.</small>
+        <small>Historical game logs by season. Regular season and playoffs only; preseason is excluded.</small>
       </div>
       <div data-player-game-log-content="${escapeHtml(playerId)}">
         ${canonicalGameLog(playerId,selected)}
@@ -3183,10 +3183,24 @@
 
 function canonicalPlayerDashboardStats(playerId='') {
     const year=canonicalCurrentSeasonYear();
+
     return `<div class="canonical-dashboard-stack">
       <section class="canonical-dashboard-card">
-        <div class="canonical-dashboard-card__head"><h3>Statistics (${year||'Current Season'})</h3><span class="pill pill--neutral">Live Madden</span></div>
+        <div class="canonical-dashboard-card__head">
+          <h3>Statistics (${year||'Current Season'})</h3>
+          <span class="pill pill--neutral">Live Madden</span>
+        </div>
         ${window.FranchiseHQ?.playerStatistics?.render?.(playerId)||'<div class="canonical-player-empty">Statistics service unavailable.</div>'}
+      </section>
+
+      <section class="canonical-dashboard-card canonical-current-game-log-card">
+        <div class="canonical-dashboard-card__head">
+          <h3>Game Log${year?` (${year})`:''}</h3>
+          <span class="pill pill--neutral">Current Season</span>
+        </div>
+        <div class="canonical-current-game-log-body">
+          ${canonicalGameLog(playerId,year)}
+        </div>
       </section>
     </div>`;
   }
@@ -5064,7 +5078,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.6.4bb',
+      release:'5.9.6.4ccb',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
