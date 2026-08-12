@@ -1140,7 +1140,7 @@
 
     pageContent.innerHTML = `
       <div class="page-heading activity-heading">
-        <div><span class="eyebrow">TC-010 · League Activity</span><h1>League Activity</h1><p>The live heartbeat of Franchise HQ—transactions, games, announcements, milestones, and the activity that matters to your franchise.</p></div>
+        <div><h1>League Activity</h1></div>
         <div class="heading-actions"><button class="button button--ghost" data-route="news"><svg><use href="#icon-news"></use></svg>League News</button><button class="button button--primary" data-route="trade-center"><svg><use href="#icon-swap"></use></svg>Start a Trade</button></div>
       </div>
 
@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.4ccbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.5cbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.4ccbcb.2b.1ba.1',
+        version:'5.9.6.5cbcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1904,6 +1904,10 @@
       nativeEventTimestamp:Number(event.timeStamp)||null
     };
   },true);
+
+  document.addEventListener('click',event=>{
+    const tab=event.target.closest?.('[data-player-career-stat-tab]');if(!tab)return;const root=tab.closest('.canonical-career-stats');if(!root)return;const category=tab.dataset.playerCareerStatTab;root.querySelectorAll('[data-player-career-stat-tab]').forEach(button=>button.classList.toggle('is-active',button===tab));root.querySelectorAll('[data-player-career-stat-panel]').forEach(panel=>panel.classList.toggle('is-active',panel.dataset.playerCareerStatPanel===category));
+  });
 
   document.addEventListener('click',event=>{
     const openCert=event.target.closest?.('[data-open-player-stats-certification]');
@@ -1996,29 +2000,30 @@
   }
   function playerStatCategoryTotals(rows=[],category='') {
     const sum=aliases=>playerStatSum(rows,aliases);
+    const max=aliases=>{const values=rows.map(row=>playerStatNum(row,aliases)).filter(v=>v!==null);return values.length?Math.max(...values):null;};
+    const avg=aliases=>{const values=rows.map(row=>playerStatNum(row,aliases)).filter(v=>v!==null);return values.length?values.reduce((a,b)=>a+b,0)/values.length:null;};
     if(category==='passing'){
-      const cmp=sum(['passCompletions','completions','passComp','cmp']);
-      const att=sum(['passAttempts','attempts','passAtt','att']);
-      return {CMP:cmp,ATT:att,'CMP%':att?((cmp||0)/att)*100:null,YDS:sum(['passYds','passingYards','passYards','yards']),TD:sum(['passTDs','passingTDs','passTouchdowns','touchdowns','tds']),INT:sum(['passInts','interceptions','ints','interceptionsThrown']),SACK:sum(['passSacks','sacksTaken','sacked']),RTG:playerStatLast(rows,['passerRating','qbRating','rating'])};
+      const cmp=sum(['passComp','passCompletions','completions','cmp']),att=sum(['passAtt','passAttempts','attempts','att']),yds=sum(['passYds','passYards','passingYards']);
+      return {CMP:cmp,ATT:att,'CMP%':att?((cmp||0)/att)*100:null,YDS:yds,TD:sum(['passTDs','passingTDs','passTouchdowns']),INT:sum(['passInts','interceptionsThrown','ints']),'Y/A':att?yds/att:null,RTG:avg(['passRating','passerRating','qbRating','rating']),LONG:max(['passLongest','passLong','longPass']),SACK:sum(['passSacks','sacksTaken','sacked'])};
     }
     if(category==='rushing'){
-      const att=sum(['rushAtt','rushingAttempts','carries','attempts']), yds=sum(['rushYds','rushingYards','yards']);
-      return {ATT:att,YDS:yds,AVG:att?yds/att:null,TD:sum(['rushTDs','rushingTDs','touchdowns','tds']),FUM:sum(['rushFumbles','fumbles']),LONG:sum(['rushLong','longRush','long'])};
+      const att=sum(['rushAtt','rushingAttempts','carries']),yds=sum(['rushYds','rushYards','rushingYards']);
+      return {ATT:att,YDS:yds,TD:sum(['rushTDs','rushingTDs']),'Y/A':att?yds/att:null,FUM:sum(['rushFum','rushFumbles','fumbles']),YACON:sum(['rushYdsAfterContact','rushYardsAfterContact']),'20+':sum(['rush20PlusYds','rush20Plus']),LONG:max(['rushLongest','rushLong','longRush']),BTK:sum(['rushBrokenTackles','brokenTackles'])};
     }
     if(category==='receiving'){
-      const rec=sum(['recCatches','receptions','catches','rec']), yds=sum(['recYds','receivingYards','yards']);
-      return {REC:rec,TAR:sum(['recTargets','targets','tar']),YDS:yds,AVG:rec?yds/rec:null,TD:sum(['recTDs','receivingTDs','touchdowns','tds']),DROP:sum(['recDrops','drops']),LONG:sum(['recLong','longReception','long'])};
+      const rec=sum(['recCatches','receptions','catches','rec']),yds=sum(['recYards','recYds','receivingYards']);
+      return {REC:rec,YDS:yds,TD:sum(['recTDs','receivingTDs']),DROP:sum(['recDrops','drops']),YAC:sum(['recYdsAfterCatch','recYdsAfterCatc','recYardsAfterCatch']),'Y/R':rec?yds/rec:null,LONG:max(['recLongest','recLong','longReception'])};
     }
-    if(category==='defense'){
-      return {TKL:sum(['defTotalTackles','totalTackles','tackles','tacklesTotal']),SOLO:sum(['defSoloTackles','soloTackles','solo']),AST:sum(['defAssistTackles','assistTackles','assists']),SACK:sum(['defSacks','sacks']),INT:sum(['defInts','defInterceptions','interceptions','ints']),FF:sum(['defForcedFum','forcedFumbles','ff']),FR:sum(['defFumRec','fumbleRecoveries','fr']),PD:sum(['defPassDef','passesDefended','passDeflections','pd']),TD:sum(['defTDs','defensiveTDs','touchdowns','tds'])};
-    }
+    if(category==='defense')return {TKL:sum(['defTotalTackles','totalTackles','tackles']),SACK:sum(['defSacks','sacks']),INT:sum(['defInts','defInterceptions']),FF:sum(['defForcedFum','forcedFumbles']),FR:sum(['defFumRec','fumbleRecoveries']),DEF:sum(['defDeflections','passDeflections','passesDefended']),'INT YDS':sum(['defIntReturnYds','interceptionReturnYards']),TD:sum(['defTDs','defensiveTDs'])};
     if(category==='kicking'){
-      const fgm=sum(['kickFGMade','fieldGoalsMade','fgMade']), fga=sum(['kickFGAtt','fieldGoalAttempts','fgAtt']);
-      return {FGM:fgm,FGA:fga,'FG%':fga?((fgm||0)/fga)*100:null,XPM:sum(['kickXPMade','extraPointsMade','xpMade']),XPA:sum(['kickXPAtt','extraPointAttempts','xpAtt']),LONG:sum(['kickLongFG','longFieldGoal','fgLong'])};
+      const fga=sum(['fGAtt','kickFGAtt','fieldGoalAttempts']),fgm=sum(['fGMade','kickFGMade','fieldGoalsMade']);
+      return {FGA:fga,FGM:fgm,'FG%':fga?((fgm||0)/fga)*100:null,'50+ ATT':sum(['fG50PlusAtt']),'50+ MADE':sum(['fG50PlusMade']),XPA:sum(['xPAtt','kickXPAtt','extraPointAttempts']),XPM:sum(['xPMade','kickXPMade','extraPointsMade']),LONG:max(['fGLongest','kickLongFG','longFieldGoal']),PTS:sum(['kickPts','points'])};
     }
     if(category==='punting'){
-      const punts=sum(['puntAttempts','punts','puntAtt']), yds=sum(['puntYds','puntingYards','yards']);
-      return {PUNTS:punts,YDS:yds,AVG:punts?yds/punts:null,IN20:sum(['puntsInside20','inside20','in20']),TB:sum(['puntTouchbacks','touchbacks']),LONG:sum(['puntLong','longPunt','long'])};
+      const punts=sum(['puntAtt','puntAttempts','punts']);
+      const weighted=rows.map(row=>{const att=playerStatNum(row,['puntAtt','puntAttempts','punts']),rate=playerStatNum(row,['puntNetYdsPerAtt']);return att!==null&&rate!==null?{att,rate}:null;}).filter(Boolean);
+      const denom=weighted.reduce((s,x)=>s+x.att,0);const netPerAtt=weighted.length&&denom?weighted.reduce((s,x)=>s+x.att*x.rate,0)/denom:avg(['puntNetYdsPerAtt']);
+      return {PUNTS:punts,'NET Y/P':netPerAtt,IN20:sum(['puntsIn20','puntsInside20','inside20']),TB:sum(['puntTBs','puntTouchbacks','touchbacks']),LONG:max(['puntLongest','puntLong','longPunt'])};
     }
     return {};
   }
@@ -2039,27 +2044,22 @@
     if(value===null||value===undefined||value===''||Number.isNaN(value))return '—';
     if(typeof value==='number'){
       if(label.includes('%'))return `${value.toFixed(1)}%`;
-      if(['AVG','RTG'].includes(label))return value.toFixed(1);
+      if(['AVG','RTG','Y/A','Y/R','Y/G','NET Y/P'].includes(label))return value.toFixed(1);
       return Number.isInteger(value)?String(value):value.toFixed(1);
     }
     return String(value);
   }
   function playerStatLabel(category){return ({passing:'Passing',rushing:'Rushing',receiving:'Receiving',defense:'Defense',kicking:'Kicking',punting:'Punting'})[category]||category;}
+  function playerStatCategoryOrderForPosition(position='',available=PLAYER_STAT_CATEGORIES){
+    const pos=String(position||'').toUpperCase();let preferred;
+    if(pos==='QB')preferred=['passing','rushing']; else if(['RB','FB'].includes(pos))preferred=['rushing','receiving']; else if(['WR','TE'].includes(pos))preferred=['receiving','rushing']; else if(pos==='K')preferred=['kicking']; else if(pos==='P')preferred=['punting']; else preferred=['defense'];
+    return [...preferred,...PLAYER_STAT_CATEGORIES].filter((c,i,a)=>a.indexOf(c)===i&&available.includes(c));
+  }
   function renderPlayerStatsReady(playerId=''){
-    const model=playerStatModel(playerId);
-    const available=PLAYER_STAT_CATEGORIES.filter(category=>model.categories[category].rows.length);
+    const model=playerStatModel(playerId);const normalized=liveRosterPlayers.get(String(playerId))||rosterService()?.findPlayer?.(playerId);const view=normalized?rosterPlayerView(normalized):{};
+    const availableRaw=PLAYER_STAT_CATEGORIES.filter(category=>model.categories[category].rows.length);const available=playerStatCategoryOrderForPosition(view.position,availableRaw);const year=canonicalCurrentSeasonYear();
     if(!available.length)return `<div class="player-live-stats-empty"><strong>No live statistics yet</strong><span>No mapped Madden player-stat records exist for this player in the active snapshot.</span></div>`;
-    return `<div class="player-live-statistics" data-live-player-stats="${escapeHtml(playerId)}">
-      <div class="player-live-stat-nav">${available.map((category,index)=>`<button type="button" class="player-live-stat-tab ${index===0?'is-active':''}" data-player-stat-tab="${category}">${playerStatLabel(category)}</button>`).join('')}</div>
-      ${available.map((category,index)=>{
-        const data=model.categories[category], totals=data.totals;
-        return `<div class="player-live-stat-panel ${index===0?'is-active':''}" data-player-stat-panel="${category}">
-          <div class="player-live-stat-season-heading"><div><span class="eyebrow">${playerStatLabel(category)}</span><h4>Current Season</h4></div><small>${data.rows.length} weekly record${data.rows.length===1?'':'s'}</small></div>
-          <div class="player-live-stat-grid">${Object.entries(totals).map(([label,value])=>`<div><span>${label}</span><strong>${playerStatFormat(label,value)}</strong></div>`).join('')}</div>
-          <div class="player-live-game-log table-wrap"><table><thead><tr><th>Week</th><th>Stage</th><th>Game Metrics</th></tr></thead><tbody>${data.rows.map(row=>`<tr><td>${escapeHtml(row.week??row.weekIndex??'—')}</td><td>${escapeHtml(row.stage||'—')}</td><td><details><summary>View</summary><pre>${escapeHtml(JSON.stringify(row.metrics||{},null,2))}</pre></details></td></tr>`).join('')}</tbody></table></div>
-        </div>`;
-      }).join('')}
-    </div>`;
+    return `<div class="player-live-statistics" data-live-player-stats="${escapeHtml(playerId)}"><div class="player-live-stat-nav">${available.map((category,index)=>`<button type="button" class="player-live-stat-tab ${index===0?'is-active':''}" data-player-stat-tab="${category}">${playerStatLabel(category)}</button>`).join('')}</div>${available.map((category,index)=>{const data=model.categories[category],totals=data.totals,columns=CANONICAL_STAT_COLUMNS[category]||[];return `<div class="player-live-stat-panel ${index===0?'is-active':''}" data-player-stat-panel="${category}"><div class="player-live-stat-season-heading"><div><span class="eyebrow">${playerStatLabel(category)}</span><h4>${escapeHtml(year||'Season')}</h4></div></div><div class="player-live-stat-grid">${columns.map(([label])=>`<div><span>${label}</span><strong>${playerStatFormat(label,totals[label])}</strong></div>`).join('')}</div></div>`;}).join('')}</div>`;
   }
   function rerenderPlayerStatHosts(){
     document.querySelectorAll('[data-player-stat-host]').forEach(host=>{
@@ -2172,7 +2172,7 @@
       teamId:String(player.teamId||source.teamId||source.team_id||source.rosterTeamId||''),
       position:String(player.position||source.position||source.positionName||source.pos||'').toUpperCase(),
       overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall','overall_rating','playerOverall','ovr']),
-      age:Number(player.age||source.age||0)||null,
+      age:Number(player.age??source.age??0)||null,
       yearsPro:Number(source.yearsPro||source.experience||0)||null,
       developmentTrait:normalizeLiveDevelopment(player.devTrait??source.devTrait??source.developmentTrait??source.dev),
       injuryStatus:source.injuryStatus||source.injury||'Healthy',
@@ -2182,7 +2182,8 @@
       ratings,
       raw:{...source,
         college:source.college||source.school||source.collegeName||'—',
-        jerseyNumber:player.jerseyNumber||source.jerseyNumber||source.number||'—',
+        jersey_number:player.jersey_number||source.jersey_number||player.jerseyNumber||source.jerseyNumber||source.number||'—',
+        jerseyNumber:player.jersey_number||source.jersey_number||player.jerseyNumber||source.jerseyNumber||source.number||'—',
         imageUrl:source.imageUrl||source.playerImageUrl||source.headshotUrl||source.portraitUrl||null
       }
     };
@@ -2260,7 +2261,7 @@
       }
       liveTeamDirectory=directory;
       pageContent.innerHTML=`
-        <div class="page-heading"><div><span class="eyebrow">League directory</span><h1>Teams</h1><p>Browse every live franchise, owner, record, rating, roster, and depth chart.</p></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Team comparison remains planned for a later release."><svg><use href="#icon-chart"></use></svg>Compare teams</button></div></div>
+        <div class="page-heading"><div><h1>Teams</h1></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Team comparison remains planned for a later release."><svg><use href="#icon-chart"></use></svg>Compare teams</button></div></div>
         <div class="filter-bar">
           <label class="field field--grow"><span>Search teams or owners</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-team-search value="${escapeHtml(state.teamSearch)}" placeholder="Ravens, owner, Baltimore..." /></div></label>
           <label class="field"><span>Conference</span><select data-team-conference><option ${state.teamConference==='All'?'selected':''}>All</option><option ${state.teamConference==='AFC'?'selected':''}>AFC</option><option ${state.teamConference==='NFC'?'selected':''}>NFC</option></select></label>
@@ -2280,7 +2281,7 @@
     renderTeamsLive();
     return;
     pageContent.innerHTML = `
-      <div class="page-heading"><div><span class="eyebrow">League directory</span><h1>Teams</h1><p>Browse every franchise, owner, record, rating, cap situation, roster, schedule, and team profile.</p></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Team comparison will be added after the core league pages are complete."><svg><use href="#icon-chart"></use></svg>Compare teams</button></div></div>
+      <div class="page-heading"><div><h1>Teams</h1></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Team comparison will be added after the core league pages are complete."><svg><use href="#icon-chart"></use></svg>Compare teams</button></div></div>
       <div class="filter-bar">
         <label class="field field--grow"><span>Search teams or owners</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-team-search value="${escapeHtml(state.teamSearch)}" placeholder="Cowboys, Peckin, Dallas..." /></div></label>
         <label class="field"><span>Conference</span><select data-team-conference><option ${state.teamConference==='All'?'selected':''}>All</option><option ${state.teamConference==='AFC'?'selected':''}>AFC</option><option ${state.teamConference==='NFC'?'selected':''}>NFC</option></select></label>
@@ -2357,7 +2358,8 @@
       college: raw.college || raw.school || '—',
       imageUrl: raw.imageUrl || raw.playerImageUrl || raw.headshotUrl || raw.headshot || raw.photoUrl || raw.photo || raw.portraitUrl || raw.portrait || player?.imageUrl || player?.headshotUrl || null,
       imageAssetId: raw.imageAssetId || raw.portraitId || raw.headshotId || null,
-      number: raw.number || raw.jerseyNumber || '—',
+      number: raw.jersey_number || raw.jerseyNumber || raw.number || player?.jersey_number || player?.jerseyNumber || '—',
+      age: Number(player?.age ?? raw.age ?? 0) || null,
       height: raw.height || '—',
       weight: raw.weight || '—',
       tradeBlock: Boolean(raw.tradeBlock),
@@ -2816,12 +2818,12 @@
   }
 
   const CANONICAL_STAT_COLUMNS={
-    passing:[['Cmp',['passCompletions','completions','passComp','cmp']],['Att',['passAttempts','attempts','passAtt','att']],['P Yards',['passYds','passingYards','passYards']],['P TDs',['passTDs','passingTDs','passTouchdowns']],['INT',['passInts','interceptionsThrown']]],
-    rushing:[['R Att',['rushAtt','rushingAttempts','carries']],['R Yds',['rushYds','rushingYards']],['R TD',['rushTDs','rushingTDs']]],
-    receiving:[['Rec',['recCatches','receptions','catches','rec']],['Rec Yds',['recYds','receivingYards']],['Rec TD',['recTDs','receivingTDs']]],
-    defense:[['Tkls',['defTotalTackles','totalTackles','tackles','tacklesTotal']],['Sack',['defSacks','sacks']],['INT',['defInts','defInterceptions']],['FF',['defForcedFum','forcedFumbles','ff']]],
-    kicking:[['FGM',['kickFGMade','fieldGoalsMade','fgMade']],['FGA',['kickFGAttempts','fieldGoalsAttempted','fgAtt']]],
-    punting:[['Punts',['puntAttempts','punts','puntAtt']],['P Yds',['puntYds','puntingYards','yards']]]
+    passing:[['CMP',['passComp']],['ATT',['passAtt']],['CMP%',['passCompPct']],['YDS',['passYds','passYards']],['TD',['passTDs']],['INT',['passInts']],['Y/A',['passYdsPerAtt']],['RTG',['passRating']],['LONG',['passLongest']],['SACK',['passSacks']]],
+    rushing:[['ATT',['rushAtt']],['YDS',['rushYds','rushYards']],['TD',['rushTDs']],['Y/A',['rushYdsPerAtt']],['FUM',['rushFum']],['YACON',['rushYdsAfterContact']],['20+',['rush20PlusYds']],['LONG',['rushLongest']],['BTK',['rushBrokenTackles']]],
+    receiving:[['REC',['recCatches']],['YDS',['recYards','recYds']],['TD',['recTDs']],['DROP',['recDrops']],['YAC',['recYdsAfterCatch','recYdsAfterCatc']],['Y/R',['recYdsPerCatch']],['LONG',['recLongest']]],
+    defense:[['TKL',['defTotalTackles']],['SACK',['defSacks']],['INT',['defInts']],['FF',['defForcedFum']],['FR',['defFumRec']],['DEF',['defDeflections']],['INT YDS',['defIntReturnYds']],['TD',['defTDs']]],
+    kicking:[['FGA',['fGAtt']],['FGM',['fGMade']],['FG%',['fGCompPct']],['50+ ATT',['fG50PlusAtt']],['50+ MADE',['fG50PlusMade']],['XPA',['xPAtt']],['XPM',['xPMade']],['LONG',['fGLongest']],['PTS',['kickPts']]],
+    punting:[['PUNTS',['puntAtt']],['NET Y/P',['puntNetYdsPerAtt']],['IN20',['puntsIn20']],['TB',['puntTBs']],['LONG',['puntLongest']]]
   };
 
   function canonicalMetricValue(metricsByCategory=[],aliases=[]){
@@ -2882,93 +2884,12 @@
   }
 
   function canonicalGameLog(playerId='',seasonOverride=null) {
-    const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId);
-    const categories=model?.categories||{};
-    const player=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId));
-    const view=player?rosterPlayerView(player):null;
-    const teamId=String(view?.teamId||player?.teamId||'');
-
-    const currentYear=canonicalCurrentSeasonYear();
-    const selectedYear=Number.isFinite(Number(seasonOverride))
-      ? Number(seasonOverride)
-      : Number(currentYear);
-
-    const statWeeks=new Map();
-
-    Object.entries(categories).forEach(([category,data])=>{
-      (data?.rows||[]).forEach(row=>{
-        const source=row.source||{};
-        const season=Number(row.seasonYear??source.seasonYear??source.calendarYear??selectedYear);
-        const week=row.week??row.weekIndex??source.weekIndex??source.week??'—';
-        const stage=canonicalNormalizeStage(row.stage||source.stage||source.seasonStage||'regular-season');
-
-        // Player Cards intentionally exclude preseason.
-        if(stage==='preseason')return;
-        if(Number.isFinite(selectedYear)&&Number.isFinite(season)&&season!==selectedYear)return;
-
-        const key=`${season}:${stage}:${week}`;
-        const entry=statWeeks.get(key)||{season,stage,week,metrics:[],categories:[]};
-        entry.metrics.push({category,metrics:row.metrics||{}});
-        if(!entry.categories.includes(category))entry.categories.push(category);
-        statWeeks.set(key,entry);
-      });
-    });
-
-    // Schedule is authoritative so zero-stat games still appear.
-    const scheduleRows=canonicalScheduleUniverse()
-      .filter(game=>{
-        const source=game.source||{};
-        const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');
-        const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');
-        const year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??selectedYear);
-        const stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
-
-        return (home===teamId||away===teamId)
-          &&stage!=='preseason'
-          &&(!Number.isFinite(selectedYear)||!Number.isFinite(year)||year===selectedYear);
-      })
-      .map(game=>{
-        const source=game.source||{};
-        const week=game.week??game.weekIndex??source.weekIndex??source.week??'—';
-        const stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
-        const season=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??selectedYear);
-        const statKey=`${season}:${stage}:${week}`;
-        const stat=statWeeks.get(statKey)
-          ||[...statWeeks.values()].find(row=>Number(row.season)===season&&Number(row.week)===Number(week)&&row.stage===stage);
-
-        return {season,stage,week,metrics:stat?.metrics||[],categories:stat?.categories||[]};
-      });
-
-    const rows=(scheduleRows.length?scheduleRows:[...statWeeks.values()])
-      .filter(row=>canonicalNormalizeStage(row.stage)!=='preseason')
-      .sort((a,b)=>{
-        const stageOrder={'regular-season':0,'playoffs':1};
-        return (stageOrder[a.stage]-stageOrder[b.stage])||Number(a.week||0)-Number(b.week||0);
-      });
-
-    const activeCategories=[...new Set(Object.keys(categories).filter(c=>(categories[c]?.rows||[]).length))];
-    const cols=canonicalColumnsForCategories(activeCategories.length?activeCategories:['passing','rushing','receiving','defense']);
-
-    const zeroOrMetric=(metrics,aliases)=>{
-      const value=canonicalMetricValue(metrics,aliases);
-      return value==='—'?0:value;
-    };
-
-    const body=rows.map(row=>{
-      const result=canonicalGameResultFor(playerId,row.week,row.stage,row.season);
-      const opponent=result
-        ? `${result.opponent}${result.score?` - ${result.score}`:''}`
-        : `${row.stage==='playoffs'?'Playoffs':'Week'} ${row.week}`;
-      return [
-        row.week,
-        {value:opponent,className:result?.className||'is-neutral'},
-        ...cols.map(([,aliases])=>zeroOrMetric(row.metrics,aliases))
-      ];
-    });
-
-    return rows.length
-      ? canonicalSortableTable(`game-log-${String(playerId).replace(/\W/g,'')}-${selectedYear}`,['Week','Opponent / Result',...cols.map(c=>c[0])],body)
-      : `<div class="canonical-player-empty">No regular-season or playoff game-log records are available${selectedYear?` for ${selectedYear}`:''}.</div>`;
+    const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId),categories=model?.categories||{},player=liveRosterPlayers.get(String(playerId))||rosterService()?.findPlayer?.(playerId),view=player?rosterPlayerView(player):{},teamId=String(view.teamId||player?.teamId||'');
+    const currentYear=canonicalCurrentSeasonYear(),selectedYear=Number.isFinite(Number(seasonOverride))?Number(seasonOverride):Number(currentYear);
+    const availableRaw=PLAYER_STAT_CATEGORIES.filter(category=>(categories[category]?.rows||[]).some(row=>{const raw=row.source||{},stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage),year=Number(row.seasonYear??raw.seasonYear??raw.calendarYear??selectedYear);return stage!=='preseason'&&(!Number.isFinite(selectedYear)||!Number.isFinite(year)||year===selectedYear);}));
+    const available=playerStatCategoryOrderForPosition(view.position,availableRaw);if(!available.length)return `<div class="canonical-player-empty">No regular-season or playoff game-log records are available${selectedYear?` for ${selectedYear}`:''}.</div>`;
+    const scheduleRows=canonicalScheduleUniverse().filter(game=>{const source=game.source||{},home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??''),away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??''),year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??selectedYear),stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);return (home===teamId||away===teamId)&&stage!=='preseason'&&(!Number.isFinite(selectedYear)||!Number.isFinite(year)||year===selectedYear);}).sort((a,b)=>{const sa=canonicalNormalizeStage(a.stage??a.stageLabel??a.source?.stage),sb=canonicalNormalizeStage(b.stage??b.stageLabel??b.source?.stage);const aw=Number(a.week??a.weekIndex??a.source?.weekIndex??0),bw=Number(b.week??b.weekIndex??b.source?.weekIndex??0);return (sa==='playoffs')-(sb==='playoffs')||aw-bw;});
+    return `<div class="canonical-game-log-category-stack">${available.map(category=>{const cols=CANONICAL_STAT_COLUMNS[category]||[],statRows=(categories[category]?.rows||[]).filter(row=>{const raw=row.source||{},stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage),year=Number(row.seasonYear??raw.seasonYear??raw.calendarYear??selectedYear);return stage!=='preseason'&&(!Number.isFinite(selectedYear)||!Number.isFinite(year)||year===selectedYear);});const body=scheduleRows.map(game=>{const source=game.source||{},week=game.week??game.weekIndex??source.weekIndex??source.week??'—',stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage),year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??selectedYear),row=statRows.find(r=>Number(r.week??r.weekIndex??r.source?.weekIndex)===Number(week)&&canonicalNormalizeStage(r.stage||r.source?.stage||r.source?.seasonStage)===stage),metrics=[{category,metrics:row?.metrics||{}}],result=canonicalGameResultFor(playerId,week,stage,year),opponent=result?`${result.opponent}${result.score?` - ${result.score}`:''}`:`${stage==='playoffs'?'Playoffs':'Week'} ${week}`;return [week,{value:opponent,className:result?.className||'is-neutral'},...cols.map(([,aliases])=>{const value=canonicalMetricValue(metrics,aliases);return value==='—'?0:value;})];});return `<section class="canonical-game-log-category"><div class="canonical-game-log-category__head"><h4>${playerStatLabel(category)}</h4></div>${canonicalSortableTable(`game-log-${String(playerId).replace(/\W/g,'')}-${selectedYear}-${category}`,['Week','Opponent / Result',...cols.map(c=>c[0])],body)}</section>`;}).join('')}</div>`;
   }
 
   function renderCanonicalGameLogTab(playerId='') {
@@ -3100,8 +3021,7 @@
     const raw=player.raw||{};
     const age=player.age??raw.age??'—';
     const exp=raw.yearsPro??raw.experience??raw.yearsExperience??(Number(age)?Math.max(0,Number(age)-21):'—');
-    const birth=raw.birthDate??raw.birthdate??raw.dateOfBirth??raw.dob??'—';
-    return {age,exp,birth};
+    return {age,exp};
   }
 
     function canonicalPlayerSeasonHistory(playerId='') {
@@ -3166,19 +3086,9 @@
   }
 
   function renderCanonicalHistoricalStatistics(playerId='') {
-    const seasons=canonicalPlayerSeasonHistory(playerId),career=canonicalCareerTotals(playerId);
-    const player=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId)),view=player?rosterPlayerView(player):{},team=rosterTeamView(view.teamId)||{};
-    const cats=[...new Set(seasons.flatMap(s=>Object.keys(s.categories||{})))],cols=canonicalColumnsForCategories(cats);
-    const rows=seasons.map(season=>{
-      const metricRows=[];
-      Object.entries(season.categories||{}).forEach(([category,rs])=>{
-        const totals=playerStatCategoryTotals(rs,category)||{};
-        metricRows.push({category,metrics:Object.fromEntries((CANONICAL_STAT_COLUMNS[category]||[]).map(([label])=>[label,totals[label.replace('P Yards','YDS').replace('P TDs','TD').replace('R Att','ATT').replace('R Yds','YDS').replace('R TD','TD').replace('Rec Yds','YDS').replace('Rec TD','TD').replace('Tkls','TKL').replace('Sack','SACK').replace('Punts','PUNTS')]]))});
-      });
-      const valueFor=([label])=>{for(const item of metricRows){if(item.metrics[label]!==undefined&&item.metrics[label]!==null)return item.metrics[label];}return '—';};
-      return [season.year,team.abbr||team.abbreviation||'—',...cols.map(valueFor)];
-    });
-    return `<div class="canonical-career-stats"><div class="canonical-career-stat-tiles">${career.length?career.map(([l,v])=>`<div><span>${escapeHtml(l)}</span><strong>${escapeHtml(playerStatFormat(l,v))}</strong></div>`).join(''):'<div class="canonical-player-empty">No franchise career totals available.</div>'}</div>${canonicalSortableTable(`season-stats-${String(playerId).replace(/\W/g,'')}`,['Year','Team',...cols.map(c=>c[0])],rows)}</div>`;
+    const seasons=canonicalPlayerSeasonHistory(playerId),player=liveRosterPlayers.get(String(playerId))||rosterService()?.findPlayer?.(playerId),view=player?rosterPlayerView(player):{},rawAvailable=[...new Set(seasons.flatMap(s=>Object.keys(s.categories||{})))].filter(c=>PLAYER_STAT_CATEGORIES.includes(c)),available=playerStatCategoryOrderForPosition(view.position,rawAvailable);
+    if(!available.length)return `<div class="canonical-player-empty">No franchise career statistics are available.</div>`;
+    return `<div class="canonical-career-stats"><div class="player-live-stat-nav canonical-career-stat-nav">${available.map((category,index)=>`<button type="button" class="player-live-stat-tab ${index===0?'is-active':''}" data-player-career-stat-tab="${category}">${playerStatLabel(category)}</button>`).join('')}</div>${available.map((category,index)=>{const cols=CANONICAL_STAT_COLUMNS[category]||[],allRows=seasons.flatMap(season=>season.categories?.[category]||[]),career=playerStatCategoryTotals(allRows,category),careerTiles=cols.map(([label])=>`<div><span>${label}</span><strong>${playerStatFormat(label,career[label])}</strong></div>`).join(''),seasonRows=seasons.filter(s=>(s.categories?.[category]||[]).length).map(season=>{const totals=playerStatCategoryTotals(season.categories[category],category);return [season.year,...cols.map(([label])=>playerStatFormat(label,totals[label]))];});return `<section class="canonical-career-stat-panel ${index===0?'is-active':''}" data-player-career-stat-panel="${category}"><div class="canonical-career-stat-tiles">${careerTiles}</div>${canonicalSortableTable(`season-stats-${String(playerId).replace(/\W/g,'')}-${category}`,['Year',...cols.map(c=>c[0])],seasonRows)}</section>`;}).join('')}</div>`;
   }
 
 function canonicalPlayerDashboardStats(playerId='') {
@@ -3186,18 +3096,12 @@ function canonicalPlayerDashboardStats(playerId='') {
 
     return `<div class="canonical-dashboard-stack">
       <section class="canonical-dashboard-card">
-        <div class="canonical-dashboard-card__head">
-          <h3>Statistics (${year||'Current Season'})</h3>
-          <span class="pill pill--neutral">Live Madden</span>
-        </div>
+        <div class="canonical-dashboard-card__head"><h3>Statistics (${year||'Season'})</h3></div>
         ${window.FranchiseHQ?.playerStatistics?.render?.(playerId)||'<div class="canonical-player-empty">Statistics service unavailable.</div>'}
       </section>
 
       <section class="canonical-dashboard-card canonical-current-game-log-card">
-        <div class="canonical-dashboard-card__head">
-          <h3>Game Log${year?` (${year})`:''}</h3>
-          <span class="pill pill--neutral">Current Season</span>
-        </div>
+        <div class="canonical-dashboard-card__head"><h3>Game Log${year?` (${year})`:''}</h3></div>
         <div class="canonical-current-game-log-body">
           ${canonicalGameLog(playerId,year)}
         </div>
@@ -3234,7 +3138,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         <div class="canonical-player-hero__identity">
           <div class="canonical-player-teamline">${logo}<div><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><span>#${escapeHtml(player.number||'—')} &nbsp;•&nbsp; ${escapeHtml(player.position||'—')}</span></div></div>
           <div class="canonical-player-nameblock"><h2>${escapeHtml(player.name||'Player')}</h2><p>${escapeHtml(player.height||'—')} &nbsp;•&nbsp; ${escapeHtml(player.weight||'—')} lbs &nbsp;•&nbsp; ${escapeHtml(player.college||'—')}</p></div>
-          <div class="canonical-player-bio-strip"><div><span>Age</span><strong>${escapeHtml(bio.age)}</strong></div><div><span>Exp</span><strong>${escapeHtml(bio.exp==='—'?'—':`${bio.exp} Year${Number(bio.exp)===1?'':'s'}`)}</strong></div><div><span>College</span><strong>${escapeHtml(player.college||'—')}</strong></div><div><span>Birthdate</span><strong>${escapeHtml(bio.birth)}</strong></div></div>
+          <div class="canonical-player-bio-strip"><div><span>Age</span><strong>${escapeHtml(bio.age)}</strong></div><div><span>Exp</span><strong>${escapeHtml(bio.exp==='—'?'—':`${bio.exp} Year${Number(bio.exp)===1?'':'s'}`)}</strong></div><div><span>College</span><strong>${escapeHtml(player.college||'—')}</strong></div></div>
         </div>
         <div class="canonical-player-hero__overall"><strong>${player.overall??'—'}</strong><span>OVR</span><b>${escapeHtml(dev)}</b></div>
       </section>
@@ -4175,49 +4079,12 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   const MATCHUP_PLAYER_COLUMNS={
-    passing:[
-      ['CMP',['passCompletions','completions','passComp','cmp']],
-      ['ATT',['passAttempts','attempts','passAtt','att']],
-      ['YDS',['passYds','passingYards','passYards','yards']],
-      ['TD',['passTDs','passingTDs','passTouchdowns','touchdowns']],
-      ['INT',['passInts','interceptionsThrown','interceptions','ints']],
-      ['SACK',['passSacks','sacksTaken','sacked']]
-    ],
-    rushing:[
-      ['ATT',['rushAtt','rushingAttempts','carries','attempts']],
-      ['YDS',['rushYds','rushingYards','yards']],
-      ['AVG',['rushAvg','rushingAverage','yardsPerCarry','avg']],
-      ['TD',['rushTDs','rushingTDs','touchdowns']],
-      ['FUM',['rushFumbles','fumbles']]
-    ],
-    receiving:[
-      ['REC',['recCatches','receptions','catches','rec']],
-      ['YDS',['recYds','receivingYards','yards']],
-      ['AVG',['recAvg','receivingAverage','yardsPerReception','avg']],
-      ['TD',['recTDs','receivingTDs','touchdowns']],
-      ['DROP',['drops','recDrops']]
-    ],
-    defense:[
-      ['TKL',['defTotalTackles','totalTackles','tackles','tacklesTotal']],
-      ['TFL',['tacklesForLoss','defTacklesForLoss','tfl']],
-      ['SACK',['defSacks','sacks']],
-      ['INT',['defInts','defInterceptions','interceptions']],
-      ['FF',['defForcedFum','forcedFumbles','ff']],
-      ['PD',['passDeflections','deflections','passesDefended']]
-    ],
-    kicking:[
-      ['FGM',['kickFGMade','fieldGoalsMade','fgMade']],
-      ['FGA',['kickFGAttempts','fieldGoalsAttempted','fgAtt']],
-      ['FG%',['kickFGPct','fieldGoalPct','fgPct']],
-      ['XPM',['extraPointsMade','xpMade']],
-      ['XPA',['extraPointsAttempted','xpAtt']]
-    ],
-    punting:[
-      ['PUNTS',['puntAttempts','punts','puntAtt']],
-      ['YDS',['puntYds','puntingYards','yards']],
-      ['AVG',['puntAvg','puntingAverage','avg']],
-      ['IN 20',['puntsInside20','inside20']]
-    ]
+    passing:[['CMP',['passComp']],['ATT',['passAtt']],['CMP%',['passCompPct']],['YDS',['passYds','passYards']],['TD',['passTDs']],['INT',['passInts']],['Y/A',['passYdsPerAtt']],['RTG',['passRating']],['LONG',['passLongest']],['SACK',['passSacks']]],
+    rushing:[['ATT',['rushAtt']],['YDS',['rushYds','rushYards']],['TD',['rushTDs']],['Y/A',['rushYdsPerAtt']],['FUM',['rushFum']],['YACON',['rushYdsAfterContact']],['20+',['rush20PlusYds']],['LONG',['rushLongest']],['BTK',['rushBrokenTackles']]],
+    receiving:[['REC',['recCatches']],['YDS',['recYards','recYds']],['TD',['recTDs']],['DROP',['recDrops']],['YAC',['recYdsAfterCatch','recYdsAfterCatc']],['Y/R',['recYdsPerCatch']],['LONG',['recLongest']]],
+    defense:[['TKL',['defTotalTackles']],['SACK',['defSacks']],['INT',['defInts']],['FF',['defForcedFum']],['FR',['defFumRec']],['DEF',['defDeflections']],['INT YDS',['defIntReturnYds']],['TD',['defTDs']]],
+    kicking:[['FGA',['fGAtt']],['FGM',['fGMade']],['FG%',['fGCompPct']],['50+ ATT',['fG50PlusAtt']],['50+ MADE',['fG50PlusMade']],['XPA',['xPAtt']],['XPM',['xPMade']],['LONG',['fGLongest']],['PTS',['kickPts']]],
+    punting:[['PUNTS',['puntAtt']],['NET Y/P',['puntNetYdsPerAtt']],['IN20',['puntsIn20']],['TB',['puntTBs']],['LONG',['puntLongest']]]
   };
 
   function renderCompactMatchupPlayerCategory(title,category,entries=[],awayId='',homeId='') {
@@ -4228,10 +4095,10 @@ function canonicalPlayerDashboardStats(playerId='') {
     }).filter(item=>item.teamId===String(awayId)||item.teamId===String(homeId));
 
     const sortMetricByCategory={
-      passing:['passYds','passingYards','passYards','yards'],
-      rushing:['rushAtt','rushingAttempts','carries','attempts'],
-      receiving:['recCatches','receptions','catches','rec'],
-      defense:['defTotalTackles','totalTackles','tackles','tacklesTotal']
+      passing:['passYds','passYards'],
+      rushing:['rushAtt'],
+      receiving:['recCatches'],
+      defense:['defTotalTackles']
     };
     const sortAliases=sortMetricByCategory[category]||[];
     if(sortAliases.length){
@@ -4771,55 +4638,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     return `<div class="team-trade-history-view"><div class="section-heading"><div><h2>${escapeHtml(team.fullName)} Trade History</h2></div><span class="pill pill--neutral">${rows.length} trade${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-trade-history-list">${rows.map(row=>{const partners=row.teamIds.filter(id=>id!==team.id).map(id=>teamById(id)?.fullName||id).join(', ');return `<button type="button" class="team-trade-history-row card" ${row.kind==='multi'?`data-route="trade-center/multi-${escapeHtml(row.id)}"`:`data-route="trade-center/${escapeHtml(row.id)}"`}><span><strong>Trade #${escapeHtml(row.id)}</strong><small>${escapeHtml(row.date||'Date unavailable')} · ${escapeHtml(partners||'League transaction')}</small><em>${escapeHtml(row.summary||'No asset summary available')}</em></span><span class="pill pill--success">Approved</span></button>`}).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No completed trade history</h3><p>This franchise has not appeared in an approved Franchise HQ trade record.</p></div></article>`}</div>`;
   }
 
-  function renderPlayers() {
-    const sourceTeams = (window.FranchiseHQ?.leagueData?.current?.()?.teams || []).map(team => rosterTeamView(team.id)).filter(Boolean);
-    const positions = [...new Set((rosterService()?.searchPlayers?.('') || []).map(player => player.position).filter(Boolean))].sort();
-    pageContent.innerHTML = `
-      <div class="page-heading"><div><span class="eyebrow">League Data roster directory</span><h1>Players</h1><p>Search the league by player name, team, position, status, development trait, age, and overall rating.</p></div><div class="heading-actions"><button class="button button--ghost" data-player-clear-filters><svg><use href="#icon-refresh"></use></svg>Clear filters</button></div></div>
-      <div class="filter-bar roster-filter-bar">
-        <label class="field field--grow"><span>Player search</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-player-search value="${escapeHtml(state.playerSearch)}" placeholder="Search player name, team, or position..." /></div></label>
-        <label class="field"><span>Position</span><select data-player-position><option value="All">All</option>${positions.map(pos=>`<option value="${pos}" ${state.playerPosition===pos?'selected':''}>${pos}</option>`).join('')}</select></label>
-        <label class="field"><span>Team</span><select data-player-team><option value="All">All teams</option><option value="__free_agents__" ${state.playerTeam==='__free_agents__'?'selected':''}>Free Agents / Unassigned</option>${sourceTeams.map(team=>`<option value="${escapeHtml(team.id)}" ${state.playerTeam===team.id?'selected':''}>${escapeHtml(team.abbr)} — ${escapeHtml(team.fullName)}</option>`).join('')}</select></label>
-        <label class="field"><span>Status</span><select data-player-status>${['All','active','injured-reserve','practice-squad','free-agent','unassigned','other'].map(value=>`<option value="${value}" ${state.playerStatus===value?'selected':''}>${value==='All'?'All statuses':titleCase(value.replace(/-/g,' '))}</option>`).join('')}</select></label>
-        <label class="field"><span>Development</span><select data-player-dev>${['All','Normal','Star','Superstar','X-Factor'].map(value=>`<option value="${value}" ${state.playerDev===value?'selected':''}>${value==='All'?'All traits':value}</option>`).join('')}</select></label>
-        <label class="field"><span>OVR</span><div class="range-pair"><input type="number" min="0" max="99" data-player-min-ovr value="${state.playerMinOvr}" aria-label="Minimum overall"><span>to</span><input type="number" min="0" max="99" data-player-max-ovr value="${state.playerMaxOvr}" aria-label="Maximum overall"></div></label>
-        <label class="field"><span>Age</span><div class="range-pair"><input type="number" min="18" max="60" data-player-min-age value="${state.playerMinAge}" aria-label="Minimum age"><span>to</span><input type="number" min="18" max="60" data-player-max-age value="${state.playerMaxAge}" aria-label="Maximum age"></div></label>
-        <label class="field"><span>Sort</span><select data-player-sort><option value="overall-desc" ${state.playerSort==='overall-desc'?'selected':''}>Overall: High to Low</option><option value="age-asc" ${state.playerSort==='age-asc'?'selected':''}>Age: Youngest</option><option value="depth-asc" ${state.playerSort==='depth-asc'?'selected':''}>Depth Order</option><option value="name-asc" ${state.playerSort==='name-asc'?'selected':''}>Name: A–Z</option></select></label>
-        <span class="result-count" data-player-count></span>
-      </div>
-      <article class="card"><div class="table-wrap"><table class="player-directory-table"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Age</th><th>Development</th><th>Team</th><th>Status</th><th>Contract / Cap</th></tr></thead><tbody data-player-table></tbody></table></div></article>`;
-    refreshPlayerTable();
+  async function renderPlayers() {
+    pageContent.innerHTML='<section class="empty-state"><strong>Loading live players…</strong><p>Reading the active franchise snapshot.</p></section>';await loadLiveTeamDirectory(false);if(routeBase(location.hash.slice(1))!=='players')return;
+    const sourceTeams=liveTeamDirectory?.teams||[],sourcePlayers=liveTeamDirectory?.players||[],positions=[...new Set(sourcePlayers.map(player=>player.position).filter(Boolean))].sort();
+    pageContent.innerHTML=`<div class="page-heading"><div><h1>Players</h1></div><div class="heading-actions"><button class="button button--ghost" data-player-clear-filters><svg><use href="#icon-refresh"></use></svg>Clear filters</button></div></div><div class="filter-bar roster-filter-bar"><label class="field field--grow"><span>Player search</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-player-search value="${escapeHtml(state.playerSearch)}" placeholder="Search player name, team, or position..." /></div></label><label class="field"><span>Position</span><select data-player-position><option value="All">All</option>${positions.map(pos=>`<option value="${pos}" ${state.playerPosition===pos?'selected':''}>${pos}</option>`).join('')}</select></label><label class="field"><span>Team</span><select data-player-team><option value="All">All teams</option><option value="__free_agents__" ${state.playerTeam==='__free_agents__'?'selected':''}>Free Agents / Unassigned</option>${sourceTeams.map(team=>`<option value="${escapeHtml(team.id)}" ${state.playerTeam===team.id?'selected':''}>${escapeHtml(team.abbr)} — ${escapeHtml(team.fullName)}</option>`).join('')}</select></label><label class="field"><span>Status</span><select data-player-status>${['All','active','injured-reserve','practice-squad','free-agent','unassigned','other'].map(value=>`<option value="${value}" ${state.playerStatus===value?'selected':''}>${value==='All'?'All statuses':titleCase(value.replace(/-/g,' '))}</option>`).join('')}</select></label><label class="field"><span>Development</span><select data-player-dev>${['All','Normal','Star','Superstar','X-Factor'].map(value=>`<option value="${value}" ${state.playerDev===value?'selected':''}>${value==='All'?'All traits':value}</option>`).join('')}</select></label><label class="field"><span>OVR</span><div class="range-pair"><input type="number" min="0" max="99" data-player-min-ovr value="${state.playerMinOvr}"><span>to</span><input type="number" min="0" max="99" data-player-max-ovr value="${state.playerMaxOvr}"></div></label><label class="field"><span>Age</span><div class="range-pair"><input type="number" min="18" max="60" data-player-min-age value="${state.playerMinAge}"><span>to</span><input type="number" min="18" max="60" data-player-max-age value="${state.playerMaxAge}"></div></label><label class="field"><span>Sort</span><select data-player-sort><option value="overall-desc" ${state.playerSort==='overall-desc'?'selected':''}>Overall: High to Low</option><option value="age-asc" ${state.playerSort==='age-asc'?'selected':''}>Age: Youngest</option><option value="depth-asc" ${state.playerSort==='depth-asc'?'selected':''}>Depth Order</option><option value="name-asc" ${state.playerSort==='name-asc'?'selected':''}>Name: A–Z</option></select></label><span class="result-count" data-player-count></span></div><article class="card"><div class="table-wrap"><table class="player-directory-table"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Age</th><th>Development</th><th>Team</th><th>Status</th><th>Contract / Cap</th></tr></thead><tbody data-player-table></tbody></table></div></article>`;refreshPlayerTable();
   }
 
   function refreshPlayerTable() {
-    const tbody = document.querySelector('[data-player-table]');
-    if (!tbody) return;
-    const service = rosterService();
-    let filtered = service?.searchPlayers?.({ query: state.playerSearch }) || [];
-    filtered = filtered.filter(normalized => {
-      const player = rosterPlayerView(normalized);
-      if (state.playerPosition !== 'All' && player.position !== state.playerPosition) return false;
-      if (state.playerTeam === '__free_agents__' && !['free-agent','unassigned'].includes(player.rosterStatus)) return false;
-      if (state.playerTeam !== 'All' && state.playerTeam !== '__free_agents__' && player.teamId !== state.playerTeam) return false;
-      if (state.playerStatus !== 'All' && player.rosterStatus !== state.playerStatus) return false;
-      if (state.playerDev !== 'All' && player.dev !== state.playerDev) return false;
-      if ((player.overall ?? 0) < state.playerMinOvr || (player.overall ?? 0) > state.playerMaxOvr) return false;
-      if (player.age != null && (player.age < state.playerMinAge || player.age > state.playerMaxAge)) return false;
-      return true;
-    });
-    const sorters = {
-      'overall-desc': (a,b)=>(b.overall??-1)-(a.overall??-1)||a.name.localeCompare(b.name),
-      'age-asc': (a,b)=>(a.age??999)-(b.age??999)||(b.overall??-1)-(a.overall??-1),
-      'depth-asc': (a,b)=>(a.depthOrder??999)-(b.depthOrder??999)||(b.overall??-1)-(a.overall??-1),
-      'name-asc': (a,b)=>a.name.localeCompare(b.name)
-    };
-    filtered.sort(sorters[state.playerSort] || sorters['overall-desc']);
-    document.querySelector('[data-player-count]').textContent = `${filtered.length.toLocaleString()} result${filtered.length===1?'':'s'}`;
-    tbody.innerHTML = filtered.slice(0,300).map(normalized => {
-      const player = rosterPlayerView(normalized);
-      const team = rosterTeamView(player.teamId);
-      return `<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-name roster-player-name--single"><strong>${escapeHtml(player.name)}</strong></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(team.abbr)}</strong><small>${escapeHtml(team.fullName)}</small></div></div>`:'<span class="pill pill--warning">Free Agent</span>'}</td><td><span class="pill ${player.rosterStatus==='active'?'pill--success':player.rosterStatus==='injured-reserve'?'pill--warning':'pill--neutral'}">${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td><td>${escapeHtml(formatRosterContract(player))}</td></tr>`;
-    }).join('') || `<tr><td colspan="7"><div class="roadmap-state"><div class="roadmap-state__inner"><h2>No matching players</h2><p>Change or clear the roster filters to see more records from the active snapshot.</p></div></div></td></tr>`;
+    const tbody=document.querySelector('[data-player-table]');if(!tbody)return;let filtered=(liveTeamDirectory?.players||[]).map(player=>rosterPlayerView(player));const q=String(state.playerSearch||'').trim().toLowerCase();if(q)filtered=filtered.filter(player=>{const team=rosterTeamView(player.teamId);return [player.name,player.position,team?.abbr,team?.fullName].some(value=>String(value||'').toLowerCase().includes(q));});filtered=filtered.filter(player=>{if(state.playerPosition!=='All'&&player.position!==state.playerPosition)return false;if(state.playerTeam==='__free_agents__'&&!['free-agent','unassigned'].includes(player.rosterStatus))return false;if(state.playerTeam!=='All'&&state.playerTeam!=='__free_agents__'&&String(player.teamId)!==String(state.playerTeam))return false;if(state.playerStatus!=='All'&&player.rosterStatus!==state.playerStatus)return false;if(state.playerDev!=='All'&&player.dev!==state.playerDev)return false;if((player.overall??0)<state.playerMinOvr||(player.overall??0)>state.playerMaxOvr)return false;if(player.age!=null&&(player.age<state.playerMinAge||player.age>state.playerMaxAge))return false;return true;});const sorters={'overall-desc':(a,b)=>(b.overall??-1)-(a.overall??-1)||a.name.localeCompare(b.name),'age-asc':(a,b)=>(a.age??999)-(b.age??999)||(b.overall??-1)-(a.overall??-1),'depth-asc':(a,b)=>(a.depthOrder??a.depth??999)-(b.depthOrder??b.depth??999)||(b.overall??-1)-(a.overall??-1),'name-asc':(a,b)=>a.name.localeCompare(b.name)};filtered.sort(sorters[state.playerSort]||sorters['overall-desc']);const count=document.querySelector('[data-player-count]');if(count)count.textContent=`${filtered.length.toLocaleString()} result${filtered.length===1?'':'s'}`;tbody.innerHTML=filtered.slice(0,500).map(player=>{const team=rosterTeamView(player.teamId);return `<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-name roster-player-name--single"><strong>${escapeHtml(player.name)}</strong></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall??'—'}</span></td><td>${player.age??'—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(team.abbr)}</strong><small>${escapeHtml(team.fullName)}</small></div></div>`:'<span class="pill pill--warning">Free Agent</span>'}</td><td><span class="pill ${player.rosterStatus==='active'?'pill--success':player.rosterStatus==='injured-reserve'?'pill--warning':'pill--neutral'}">${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td><td>${escapeHtml(formatRosterContract(player))}</td></tr>`;}).join('')||`<tr><td colspan="8"><div class="roadmap-state"><div class="roadmap-state__inner"><h2>No matching players</h2><p>Change or clear the filters to see more live players.</p></div></div></td></tr>`;
   }
 
   function renderPlayerProfile(playerId) {
@@ -5078,7 +4904,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.6.4ccb',
+      release:'5.9.6.5cb',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -5165,12 +4991,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
     pageContent.innerHTML=`
       <div class="page-heading">
-        <div>
-          <span class="eyebrow">Live Madden snapshot${year?` · ${escapeHtml(year)}`:''}</span>
-          <h1>Stats & Leaders</h1>
-          <p>League-wide leaders from the active Franchise HQ statistics snapshot.</p>
-          <button type="button" class="btn btn-ghost stats-certification-link" data-open-player-stats-certification>Run 5.9.6 Certification</button>
-        </div>
+        <div><h1>Stats & Leaders</h1></div>
       </div>
       <div class="stats-category-tabs segmented-tabs stats-category-tabs--wrap">
         ${categories.map(([key,label])=>`<button data-stats-category="${key}" class="${state.statsCategory===key?'is-active':''}">${label}</button>`).join('')}
@@ -5210,103 +5031,23 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   const LIVE_LEADER_COLUMNS={
-    passing:[
-      ['CMP',['passCompletions','completions','passComp','cmp']],
-      ['ATT',['passAttempts','attempts','passAtt','att']],
-      ['YDS',['passYds','passingYards','passYards','yards']],
-      ['TD',['passTDs','passingTDs','passTouchdowns','touchdowns']],
-      ['INT',['passInts','interceptionsThrown','interceptions','ints']]
-    ],
-    rushing:[
-      ['ATT',['rushAtt','rushingAttempts','carries','attempts']],
-      ['YDS',['rushYds','rushingYards','yards']],
-      ['AVG',['rushAvg','rushingAverage','yardsPerCarry','avg']],
-      ['TD',['rushTDs','rushingTDs','touchdowns']]
-    ],
-    receiving:[
-      ['REC',['recCatches','receptions','catches','rec']],
-      ['YDS',['recYds','receivingYards','yards']],
-      ['AVG',['recAvg','receivingAverage','yardsPerReception','avg']],
-      ['TD',['recTDs','receivingTDs','touchdowns']]
-    ],
-    defense:[
-      ['TKL',['defTotalTackles','totalTackles','tackles','tacklesTotal']],
-      ['TFL',['tacklesForLoss','defTacklesForLoss','tfl']],
-      ['SACK',['defSacks','sacks']],
-      ['INT',['defInts','defInterceptions','interceptions']],
-      ['FF',['defForcedFum','forcedFumbles','ff']]
-    ],
-    kicking:[
-      ['FGM',['kickFGMade','fieldGoalsMade','fgMade']],
-      ['FGA',['kickFGAttempts','fieldGoalsAttempted','fgAtt']],
-      ['FG%',['kickFGPct','fieldGoalPct','fgPct']],
-      ['XPM',['extraPointsMade','xpMade']],
-      ['PTS',['points','kickPoints']]
-    ],
-    punting:[
-      ['PUNTS',['puntAttempts','punts','puntAtt']],
-      ['YDS',['puntYds','puntingYards','yards']],
-      ['AVG',['puntAvg','puntingAverage','avg']],
-      ['IN20',['puntsInside20','inside20']]
-    ]
+    passing:[['CMP',['passComp']],['ATT',['passAtt']],['CMP%',['passCompPct']],['YDS',['passYds','passYards']],['TD',['passTDs']],['INT',['passInts']],['Y/A',['passYdsPerAtt']],['Y/G',['__passYdsPerGame']],['RTG',['passRating']],['LONG',['passLongest']],['SACK',['passSacks']]],
+    rushing:[['ATT',['rushAtt']],['YDS',['rushYds','rushYards']],['TD',['rushTDs']],['Y/A',['rushYdsPerAtt']],['Y/G',['__rushYdsPerGame']],['FUM',['rushFum']],['YACON',['rushYdsAfterContact']],['20+',['rush20PlusYds']],['LONG',['rushLongest']],['BTK',['rushBrokenTackles']]],
+    receiving:[['REC',['recCatches']],['YDS',['recYards','recYds']],['TD',['recTDs']],['DROP',['recDrops']],['YAC',['recYdsAfterCatch','recYdsAfterCatc']],['Y/R',['recYdsPerCatch']],['Y/G',['__recYdsPerGame']],['LONG',['recLongest']]],
+    defense:[['TKL',['defTotalTackles']],['SACK',['defSacks']],['INT',['defInts']],['FF',['defForcedFum']],['FR',['defFumRec']],['DEF',['defDeflections']],['INT YDS',['defIntReturnYds']],['TD',['defTDs']]],
+    kicking:[['FGA',['fGAtt']],['FGM',['fGMade']],['FG%',['fGCompPct']],['50+ ATT',['fG50PlusAtt']],['50+ MADE',['fG50PlusMade']],['XPA',['xPAtt']],['XPM',['xPMade']],['LONG',['fGLongest']],['PTS',['kickPts']]],
+    punting:[['PUNTS',['puntAtt']],['NET Y/P',['puntNetYdsPerAtt']],['IN20',['puntsIn20']],['TB',['puntTBs']],['LONG',['puntLongest']]]
   };
 
   function liveLeaderDefaultSort(category){
-    return {passing:'YDS',rushing:'ATT',receiving:'REC',defense:'TKL',kicking:'PTS',punting:'AVG'}[category]||'YDS';
+    return {passing:'YDS',rushing:'ATT',receiving:'REC',defense:'TKL',kicking:'PTS',punting:'PUNTS'}[category]||'YDS';
   }
 
   function aggregateLiveLeaderboard(category='passing'){
-    const columns=LIVE_LEADER_COLUMNS[category]||[];
-    const rows=liveStatsRowsForCategory(category);
-    const players=new Map();
-
-    rows.forEach(row=>{
-      const playerId=rowPlayerId(row);
-      if(!playerId)return;
-      const identity=matchupPlayerIdentity(playerId);
-      const teamId=rowTeamId(row)||identity.teamId;
-      let entry=players.get(playerId);
-      if(!entry){
-        entry={id:playerId,identity,teamId,values:{},games:new Set()};
-        players.set(playerId,entry);
-      }
-      const raw=statisticRaw(row);
-      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
-      if(Number.isFinite(week))entry.games.add(week);
-
-      columns.forEach(([label,aliases])=>{
-        const value=Number(matchupPlayerMetric({...row.source,...row.metrics,...row},aliases,0))||0;
-        if(label==='AVG'||label==='FG%'){
-          // Derived rates are recalculated later when possible.
-          entry.values[label]=(entry.values[label]||0)+value;
-        }else{
-          entry.values[label]=(entry.values[label]||0)+value;
-        }
-      });
-    });
-
-    const list=[...players.values()].filter(entry=>entry.games.size>=Number(state.statsMinimumGames||0));
-
-    // Recalculate common averages from totals.
-    list.forEach(entry=>{
-      if(category==='rushing'&&entry.values.ATT)entry.values.AVG=entry.values.YDS/entry.values.ATT;
-      if(category==='receiving'&&entry.values.REC)entry.values.AVG=entry.values.YDS/entry.values.REC;
-      if(category==='punting'&&entry.values.PUNTS)entry.values.AVG=entry.values.YDS/entry.values.PUNTS;
-      if(category==='kicking'&&entry.values.FGA)entry.values['FG%']=entry.values.FGM/entry.values.FGA*100;
-    });
-
-    const validLabels=new Set(columns.map(([label])=>label));
-    const requestedSort=state.statsSortKey;
-    const sortLabel=requestedSort&&validLabels.has(requestedSort)
-      ? requestedSort
-      : liveLeaderDefaultSort(category);
-    const direction=state.statsSortDirection==='asc'?1:-1;
-    list.sort((a,b)=>{
-      const av=Number(a.values[sortLabel]||0),bv=Number(b.values[sortLabel]||0);
-      return (av-bv)*direction||String(a.identity.name).localeCompare(String(b.identity.name));
-    });
-
-    return {list,columns,sortLabel};
+    const columns=LIVE_LEADER_COLUMNS[category]||[],rows=liveStatsRowsForCategory(category),players=new Map();
+    rows.forEach(row=>{const playerId=rowPlayerId(row);if(!playerId)return;const identity=matchupPlayerIdentity(playerId),teamId=rowTeamId(row)||identity.teamId;let entry=players.get(playerId);if(!entry){entry={id:playerId,identity,teamId,rows:[],games:new Set(),values:{}};players.set(playerId,entry);}entry.rows.push(row);const raw=statisticRaw(row),stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage),week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);if(stage!=='preseason'&&Number.isFinite(week))entry.games.add(`${stage}:${week}`);});
+    const list=[...players.values()].filter(entry=>entry.games.size>=Number(state.statsMinimumGames||0));list.forEach(entry=>{const totals=playerStatCategoryTotals(entry.rows,category);columns.forEach(([label])=>entry.values[label]=totals[label]??0);if(['passing','rushing','receiving'].includes(category))entry.values['Y/G']=entry.games.size?(Number(totals.YDS)||0)/entry.games.size:0;});
+    const validLabels=new Set(columns.map(([label])=>label)),requestedSort=state.statsSortKey,sortLabel=requestedSort&&validLabels.has(requestedSort)?requestedSort:liveLeaderDefaultSort(category),direction=state.statsSortDirection==='asc'?1:-1;list.sort((a,b)=>((Number(a.values[sortLabel]||0)-Number(b.values[sortLabel]||0))*direction)||String(a.identity.name).localeCompare(String(b.identity.name)));return {list,columns,sortLabel};
   }
 
   function renderLivePlayerStatisticsLeaderboard(){
@@ -5346,7 +5087,8 @@ function canonicalPlayerDashboardStats(playerId='') {
   function formatLiveLeaderboardValue(label,value){
     const n=Number(value);
     if(!Number.isFinite(n))return '—';
-    if(label==='AVG'||label==='FG%')return label==='FG%'?`${n.toFixed(1)}%`:n.toFixed(1);
+    if(label.includes('%'))return `${n.toFixed(1)}%`;
+    if(['Y/A','Y/R','Y/G','RTG','NET Y/P'].includes(label))return n.toFixed(1);
     return Math.round(n).toLocaleString();
   }
 
