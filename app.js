@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.4acb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.4bbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.4acb.2b.1ba.1',
+        version:'5.9.6.4bbcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2690,10 +2690,7 @@
     const rows=[];
     const add=list=>{if(Array.isArray(list))rows.push(...list);};
 
-    // The live team directory is the authoritative schedule source on Team pages.
     add(liveTeamDirectory?.games);
-
-    // Supplemental public/global caches.
     add(window.FranchiseHQ?.liveScheduleGames);
     add(window.FranchiseHQ?.schedule);
     add(window.FGC_APP?.schedule);
@@ -2705,7 +2702,7 @@
       const id=String(game.id||game.gameId||game.scheduleId||source.scheduleId||'');
       const key=id||[
         game.seasonYear??source.seasonYear??'',
-        game.stage??source.stage??'',
+        game.stage??game.phase??source.stage??'',
         game.week??game.weekIndex??source.weekIndex??'',
         game.homeTeamId??game.homeId??source.homeTeamId??'',
         game.awayTeamId??game.awayId??source.awayTeamId??''
@@ -2717,7 +2714,8 @@
   }
 
   function canonicalGameResultFor(playerId='',week='—',stage='regular-season',seasonYear=null) {
-    const player=rosterService()?.findPlayer?.(playerId)||liveRosterPlayers.get(String(playerId));
+    const player=liveRosterPlayers.get(String(playerId))
+      ||rosterService()?.findPlayer?.(playerId);
     const view=player?rosterPlayerView(player):null;
     const teamId=String(view?.teamId||player?.teamId||'');
     if(!teamId)return null;
@@ -2726,14 +2724,14 @@
       const text=String(value||'').toLowerCase();
       if(text.includes('pre'))return 'preseason';
       if(text.includes('post')||text.includes('playoff'))return 'playoffs';
-      return 'regular';
+      return 'regular-season';
     };
     const wantedStage=normalizeStage(stage);
 
     const match=canonicalScheduleUniverse().find(game=>{
       const source=game.source||{};
       const gw=Number(game.week??game.weekIndex??source.weekIndex??source.week);
-      const gs=normalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
+      const gs=normalizeStage(game.stage??game.stageLabel??game.phase??source.stage??source.seasonStage);
       const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');
       const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');
 
@@ -2744,12 +2742,16 @@
         source.calendarYear??
         liveTeamDirectory?.snapshot?.seasonYear
       );
-      const yearMatch=
-        !Number.isFinite(Number(seasonYear))||
-        !Number.isFinite(gy)||
-        gy===Number(seasonYear);
 
-      return gw===Number(week)&&gs===wantedStage&&yearMatch&&(home===teamId||away===teamId);
+      const yearMatch=
+        !Number.isFinite(Number(seasonYear))
+        ||!Number.isFinite(gy)
+        ||gy===Number(seasonYear);
+
+      return gw===Number(week)
+        &&gs===wantedStage
+        &&yearMatch
+        &&(home===teamId||away===teamId);
     });
 
     if(!match)return null;
@@ -2759,7 +2761,7 @@
     const away=String(match.awayTeamId??match.awayId??match.away?.id??source.awayTeamId??'');
     const isHome=home===teamId;
     const opponentId=isHome?away:home;
-    const opponent=rosterTeamView(opponentId)||liveTeamDirectory?.teamMap?.get(opponentId)||{};
+    const opponent=matchupTeam(opponentId)||{};
 
     const homeScore=Number(match.homeScore??match.home?.score??source.homeScore??source.homeScoreTotal??source.homePoints);
     const awayScore=Number(match.awayScore??match.away?.score??source.awayScore??source.awayScoreTotal??source.awayPoints);
@@ -2954,7 +2956,9 @@
 
     const body=rows.map(row=>{
       const result=canonicalGameResultFor(playerId,row.week,row.stage,row.season);
-      const opponent=result?`${result.opponent} - ${result.score}`:`${row.stage==='playoffs'?'Playoffs':'Week'} ${row.week}`;
+      const opponent=result
+        ? `${result.opponent}${result.score?` - ${result.score}`:''}`
+        : `${row.stage==='playoffs'?'Playoffs':'Week'} ${row.week}`;
       return [
         row.week,
         {value:opponent,className:result?.className||'is-neutral'},
@@ -3181,12 +3185,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     const year=canonicalCurrentSeasonYear();
     return `<div class="canonical-dashboard-stack">
       <section class="canonical-dashboard-card">
-        <div class="canonical-dashboard-card__head"><h3>Statistics (${year})</h3><span class="pill pill--neutral">Live Madden</span></div>
+        <div class="canonical-dashboard-card__head"><h3>Statistics (${year||'Current Season'})</h3><span class="pill pill--neutral">Live Madden</span></div>
         ${window.FranchiseHQ?.playerStatistics?.render?.(playerId)||'<div class="canonical-player-empty">Statistics service unavailable.</div>'}
-      </section>
-      <section class="canonical-dashboard-card">
-        <div class="canonical-dashboard-card__head"><h3>Game Log (${year})</h3></div>
-        ${canonicalGameLog(playerId)}
       </section>
     </div>`;
   }
@@ -3238,7 +3238,7 @@ function canonicalPlayerDashboardStats(playerId='') {
             ${renderCanonicalGameLogTab(player.id)}
           </section>
         </section>
-        <section class="canonical-player-panel" data-canonical-player-panel="game-log"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Game Log</h3></div>${canonicalGameLog(player.id)}</section></section>
+        
         <section class="canonical-player-panel" data-canonical-player-panel="contract"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Contract</h3></div>${canonicalContractPanel(player)}</section></section>
         <section class="canonical-player-panel" data-canonical-player-panel="transactions"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Transaction History</h3></div>${canonicalTransactionHistory(player.id)}</section></section>
       </div>
@@ -5064,7 +5064,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.6.4a',
+      release:'5.9.6.4bb',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
