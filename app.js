@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2l-diagcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2m-diagcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2l-diagcb.2b.1ba.1',
+        version:'5.9.6.2m-diagcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -4309,26 +4309,31 @@ function canonicalPlayerDashboardStats(playerId='') {
     return game||null;
   }
 
+  const matchupColdDiagnostics=new Map();
+
   async function openMatchupCard(gameId){
-    const handlerStart=performance.now();
-    const input=lastMatchupInputTiming&&lastMatchupInputTiming.gameId===String(gameId||'')
-      ? {...lastMatchupInputTiming}
-      : null;
-
-    const inputToHandler=input?.pointerEventTime!=null
-      ? handlerStart-input.pointerEventTime
-      : null;
-
-    console.info(
-      `[Matchup Performance] input→handler ${inputToHandler==null?'n/a':inputToHandler.toFixed(1)+'ms'}`
-    );
     const gameIdText=String(gameId||'');
+    const openCount=(matchupColdDiagnostics.get(gameIdText)||0)+1;
+    matchupColdDiagnostics.set(gameIdText,openCount);
+    const t0=performance.now();
+
+    const log=(label,start,end=performance.now())=>{
+      console.info(`[Matchup ColdRender] ${gameIdText} open#${openCount} ${label} ${(end-start).toFixed(1)}ms`);
+    };
+
+    const lookupStart=performance.now();
     let game=findCachedMatchupGame(gameIdText);
+    log('game lookup',lookupStart);
 
     if(!game){
+      const placeholderStart=performance.now();
       openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal><div class="matchup-instant-placeholder"><span class="spinner"></span><strong>Opening matchup…</strong></div></div>`);
+      log('placeholder openDetail',placeholderStart);
+
+      const dirStart=performance.now();
       try{
         await loadLiveTeamDirectory(false);
+        log('loadLiveTeamDirectory wait',dirStart);
         game=findCachedMatchupGame(gameIdText);
         if(!game)throw new Error('Selected game is unavailable in the active snapshot.');
       }catch(error){
@@ -4339,24 +4344,38 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
 
     activeMatchupGame=game;
-    const awayTeamId=String(game.awayTeamId??game.awayId??game.source?.awayTeamId??''),homeTeamId=String(game.homeTeamId??game.homeId??game.source?.homeTeamId??'');
+
+    const identityStart=performance.now();
+    const awayTeamId=String(game.awayTeamId??game.awayId??game.source?.awayTeamId??''),
+          homeTeamId=String(game.homeTeamId??game.homeId??game.source?.homeTeamId??'');
     const away=matchupTeam(awayTeamId),home=matchupTeam(homeTeamId);
     const status=game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null);
-    const awayScore=game.awayScore??resolvedGameScore(game,'away'),homeScore=game.homeScore??resolvedGameScore(game,'home');
+    const awayScore=game.awayScore??resolvedGameScore(game,'away'),
+          homeScore=game.homeScore??resolvedGameScore(game,'home');
     const score=(awayScore!==null&&homeScore!==null)?`${awayScore} – ${homeScore}`:(status==='final'?'Score unavailable':'Upcoming');
+    log('team identity + score prep',identityStart);
+
+    const panelStart=performance.now();
     const teamKey=matchupPanelCacheKey(game,'team');
     const initialPanel=matchupPanelCache.get(teamKey)||`<section class="matchup-tab-panel matchup-tab-panel--loading"><div class="matchup-instant-loading"><span class="spinner"></span><strong>Loading matchup statistics…</strong></div></section>`;
+    log('initial Team Stats panel lookup',panelStart);
 
+    const logoStart=performance.now();
+    const awayLogoMarkup=renderTeamMark(away,'matchup-team-logo');
+    const homeLogoMarkup=renderTeamMark(home,'matchup-team-logo');
+    log('team logo markup',logoStart);
+
+    const domStart=performance.now();
     openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal data-matchup-shell="${escapeHtml(gameIdText)}">
       <div class="matchup-modal__header"><span class="eyebrow matchup-modal__week">${escapeHtml(canonicalScheduleLabel(game))}</span>
       <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span></div>
       <div class="matchup-gotw-board">
         <section class="matchup-gotw-half matchup-gotw-half--away team-gradient-card" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
-          <div class="matchup-gotw-identity">${renderTeamMark(away,'matchup-team-logo')}<div><span class="eyebrow">${escapeHtml(away.city||away.abbr||'Away')}</span><h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p></div></div>
+          <div class="matchup-gotw-identity">${awayLogoMarkup}<div><span class="eyebrow">${escapeHtml(away.city||away.abbr||'Away')}</span><h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p></div></div>
           <div class="matchup-previous-shell" data-matchup-previous="away"></div></section>
         <div class="matchup-gotw-center"><span>${escapeHtml(canonicalScheduleLabel(game))}</span><strong>${escapeHtml(score)}</strong><small data-matchup-meta></small></div>
         <section class="matchup-gotw-half matchup-gotw-half--home team-gradient-card team-gradient-card--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
-          <div class="matchup-gotw-identity matchup-gotw-identity--home"><div><span class="eyebrow">${escapeHtml(home.city||home.abbr||'Home')}</span><h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p></div>${renderTeamMark(home,'matchup-team-logo')}</div>
+          <div class="matchup-gotw-identity matchup-gotw-identity--home"><div><span class="eyebrow">${escapeHtml(home.city||home.abbr||'Home')}</span><h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p></div>${homeLogoMarkup}</div>
           <div class="matchup-previous-shell" data-matchup-previous="home"></div></section>
       </div>
       <div class="matchup-stat-tabs" role="tablist" aria-label="Matchup statistics">
@@ -4366,21 +4385,55 @@ function canonicalPlayerDashboardStats(playerId='') {
       </div>
       <div class="matchup-tab-content" data-matchup-tab-content>${initialPanel}</div>
     </div>`);
-requestAnimationFrame(()=>{
+    const domEnd=performance.now();
+    log('openDetail DOM insertion',domStart,domEnd);
+    console.info(`[Matchup ColdRender] ${gameIdText} open#${openCount} handler→DOM total ${(domEnd-t0).toFixed(1)}ms`);
+
+    requestAnimationFrame(()=>{
+      const frame1=performance.now();
+      log('DOM→frame1',domEnd,frame1);
+
+      requestAnimationFrame(()=>{
+        const frame2=performance.now();
+        log('frame1→frame2',frame1,frame2);
+        console.info(`[Matchup ColdRender] ${gameIdText} open#${openCount} handler→frame2 TOTAL ${(frame2-t0).toFixed(1)}ms`);
+      });
+
       const modal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');if(!modal)return;
+
       try{
+        const metaStart=performance.now();
         const meta=gameMetadata(game),info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
         const metaTarget=modal.querySelector('[data-matchup-meta]');if(metaTarget)metaTarget.textContent=info||(status==='final'?'Final':'Scheduled');
-        const awayPrev=modal.querySelector('[data-matchup-previous="away"]'),homePrev=modal.querySelector('[data-matchup-previous="home"]');
+        log('metadata',metaStart);
+
+        const prevStart=performance.now();
+        const awayPrev=modal.querySelector('[data-matchup-previous="away"]'),
+              homePrev=modal.querySelector('[data-matchup-previous="home"]');
         if(awayPrev)awayPrev.outerHTML=previousMatchupMarkup(away.id,game);
         if(homePrev)homePrev.outerHTML=previousMatchupMarkup(home.id,game);
+        log('previous matchup render',prevStart);
       }catch(error){console.warn('[Matchup Header Enrichment]',error);}
+
+      const statsStart=performance.now();
       Promise.resolve(hydrateMatchupTeamStatistics(game)).then(()=>{
+        const statsEnd=performance.now();
+        log('team stats hydrate',statsStart,statsEnd);
+
+        const runtimeStart=performance.now();
         prepareMatchupRuntime(game);
+        const runtimeEnd=performance.now();
+        log('panel build/cache',runtimeStart,runtimeEnd);
+
         const liveModal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');if(!liveModal)return;
         const activeTab=liveModal.querySelector('[data-matchup-tab].is-active')?.dataset.matchupTab||'team';
         const target=liveModal.querySelector('[data-matchup-tab-content]'),key=matchupPanelCacheKey(game,activeTab);
+
+        const swapStart=performance.now();
         if(target&&matchupPanelCache.has(key))target.innerHTML=matchupPanelCache.get(key);
+        const swapEnd=performance.now();
+        log('active panel DOM swap',swapStart,swapEnd);
+        console.info(`[Matchup ColdRender] ${gameIdText} open#${openCount} COMPLETE async work ${(swapEnd-t0).toFixed(1)}ms`);
       });
     });
   }
