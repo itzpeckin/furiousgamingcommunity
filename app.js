@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2m-diagcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2ncb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2m-diagcb.2b.1ba.1',
+        version:'5.9.6.2ncb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2037,6 +2037,7 @@
         if(force)await service.refresh();
         playerStatisticsState.rows=await service.getStatistics()||[];
         playerStatisticsState.loaded=true;
+        matchupCompactModelCache.clear();
         // Build matchup lookup once while data is hydrating so opening/clicking
         // Matchup tabs never scans the full statistics collection.
         // Build indexes cooperatively after rows are available. Do not block
@@ -3281,19 +3282,11 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function matchupTeam(teamId) {
-    const id=String(teamId??'');
-    const directoryMatch=liveMatchupTeams.get(id)
-      || liveTeamDirectory?.teamMap?.get(id)
-      || liveTeamDirectory?.teams?.find(team=>String(team.id)===id||String(team.source?.teamId??'')===id);
-    const team=directoryMatch||teamById(teamId);
-    if(team){
-      return {
-        ...team,
-        primary:team.primary||team.primaryColor||team.source?.primaryColor||'#27364f',
-        secondary:team.secondary||team.secondaryColor||team.source?.secondaryColor||team.primary||'#8fa4c4'
-      };
-    }
-    return {id,abbr:'TBD',fullName:'Team',owner:'Unassigned',record:'—',primary:'#27364f',secondary:'#8fa4c4'};
+    const id=String(teamId||'');
+    const live=liveTeamDirectory?.teamMap?.get(id);
+    if(live)return live;
+    const fallback=teamById(id);
+    return fallback||{id,abbr:'TBD',fullName:'Team',city:'',primary:'#27364f',secondary:'#8fa4c4',record:'—',owner:'Unassigned'};
   }
 
   const matchupTeamStatsCache=new Map();
@@ -3741,7 +3734,11 @@ function canonicalPlayerDashboardStats(playerId='') {
     return matchupPlayerGameModelCache;
   }
 
+  const matchupCompactModelCache=new Map();
+
   function matchupCompactGameModel(game={}) {
+    const cacheKey=String(game.id||game.gameId||game.scheduleId||'');
+    if(cacheKey&&matchupCompactModelCache.has(cacheKey))return matchupCompactModelCache.get(cacheKey);
     const rows=canonicalGameRows(game);
     const categoryMap=new Map();
     rows.forEach(row=>{
@@ -3758,6 +3755,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(!grouped[entry.category])grouped[entry.category]=[];
       grouped[entry.category].push(entry);
     });
+    if(cacheKey)matchupCompactModelCache.set(cacheKey,grouped);
     return grouped;
   }
 
@@ -3956,8 +3954,16 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   function matchupPlayerIdentity(playerId='') {
     const id=String(playerId||'');
-    const player=rosterService()?.findPlayer?.(id)||liveRosterPlayers.get(id)||(liveTeamDirectory?.players||[]).find(item=>String(item.id||item.playerId)===id);
+
+    // O(1) lookup first. The prior order called rosterService.findPlayer()
+    // for every row, which can scan the entire roster repeatedly.
+    const player=
+      liveRosterPlayers.get(id)
+      ||(liveTeamDirectory?.players||[]).find(item=>String(item.id||item.playerId)===id)
+      ||rosterService()?.findPlayer?.(id);
+
     if(!player)return {id,name:`Player ${id}`,position:'',teamId:''};
+
     const view=rosterPlayerView(player);
     return {
       id,
@@ -4222,10 +4228,28 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function prepareMatchupRuntime(game={}){
-    const teamKey=matchupPanelCacheKey(game,'team'),playerKey=matchupPanelCacheKey(game,'player'),advancedKey=matchupPanelCacheKey(game,'advanced');
-    if(!matchupPanelCache.has(teamKey))matchupPanelCache.set(teamKey,buildMatchupPanel('team',game));
-    if(!matchupPanelCache.has(playerKey))matchupPanelCache.set(playerKey,buildMatchupPanel('player',game));
-    if(!matchupPanelCache.has(advancedKey))matchupPanelCache.set(advancedKey,buildMatchupPanel('advanced',game));
+    const teamKey=matchupPanelCacheKey(game,'team');
+    const playerKey=matchupPanelCacheKey(game,'player');
+    const advancedKey=matchupPanelCacheKey(game,'advanced');
+    const gameKey=String(game.id||game.gameId||game.scheduleId||'');
+
+    if(!matchupPanelCache.has(teamKey)){
+      const start=performance.now();
+      matchupPanelCache.set(teamKey,buildMatchupPanel('team',game));
+      console.info(`[Matchup PanelBuild] ${gameKey} Team ${(performance.now()-start).toFixed(1)}ms`);
+    }
+
+    if(!matchupPanelCache.has(playerKey)){
+      const start=performance.now();
+      matchupPanelCache.set(playerKey,buildMatchupPanel('player',game));
+      console.info(`[Matchup PanelBuild] ${gameKey} Player ${(performance.now()-start).toFixed(1)}ms`);
+    }
+
+    if(!matchupPanelCache.has(advancedKey)){
+      const start=performance.now();
+      matchupPanelCache.set(advancedKey,buildMatchupPanel('advanced',game));
+      console.info(`[Matchup PanelBuild] ${gameKey} Advanced ${(performance.now()-start).toFixed(1)}ms`);
+    }
   }
 
   function matchupTabPanel(tab) {
