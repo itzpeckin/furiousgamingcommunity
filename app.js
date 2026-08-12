@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2hcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2icb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2hcb.2b.1ba.1',
+        version:'5.9.6.2icb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1882,27 +1882,6 @@
     playerInspectorState.selectedId=selectedId;
     rerenderPlayerDataInspector({preserveScroll:true});
   });
-
-  document.addEventListener('pointerenter',event=>{
-    const target=event.target.closest?.('[data-game-id]');
-    if(!target)return;
-    const game=findCachedMatchupGame(target.dataset.gameId);
-    if(game)prepareTargetedMatchup(game);
-  },true);
-
-  document.addEventListener('focusin',event=>{
-    const target=event.target.closest?.('[data-game-id]');
-    if(!target)return;
-    const game=findCachedMatchupGame(target.dataset.gameId);
-    if(game)prepareTargetedMatchup(game);
-  });
-
-  document.addEventListener('pointerdown',event=>{
-    const target=event.target.closest?.('[data-game-id]');
-    if(!target)return;
-    const game=findCachedMatchupGame(target.dataset.gameId);
-    if(game)prepareTargetedMatchup(game);
-  },true);
 
   document.addEventListener('click',event=>{
     if(event.target.closest('[data-player-inspector-reload]')){
@@ -2034,6 +2013,7 @@
         playerStatisticsState.loaded=true;
         // Build matchup lookup once while data is hydrating so opening/clicking
         // Matchup tabs never scans the full statistics collection.
+        rebuildCanonicalStatisticsIndex(true);
         rebuildMatchupPlayerStatIndex(true);
         rebuildMatchupPlayerGameModelCache(true);
         return playerStatisticsState.rows;
@@ -3591,74 +3571,31 @@ function canonicalPlayerDashboardStats(playerId='') {
     };
   }
 
-  async function hydrateMatchupTeamStatistics(game={}) {
+  async function hydrateMatchupTeamStatistics(game={}){
     const key=String(game.id||game.gameId||game.scheduleId||'');
-    if(key&&matchupTeamStatsCache.has(key)) return matchupTeamStatsCache.get(key);
-    const service=liveReadModel();
-    if(!service) return null;
+    if(key&&matchupTeamStatsCache.has(key))return matchupTeamStatsCache.get(key);
+    if(!playerStatisticsState.loaded)await hydratePlayerStatistics(false);
 
-    const statistics=await service.getStatistics();
-    const ids=new Set(gameDirectIds(game));
-    const awayId=String(game.awayTeamId??game.awayId??'');
-    const homeId=String(game.homeTeamId??game.homeId??'');
-
-    // The active statistics domain is player-stat oriented. Keep ALL directly
-    // joined game rows and aggregate only records belonging to the selected teams.
-    const direct=(statistics||[]).filter(row=>{
-      const rowGameId=statisticDirectGameId(row);
-      return Boolean(rowGameId&&ids.has(rowGameId));
-    });
-
+    const statistics=playerStatisticsState.rows||[],ids=new Set(gameDirectIds(game));
+    const awayId=String(game.awayTeamId??game.awayId??''),homeId=String(game.homeTeamId??game.homeId??'');
+    const direct=canonicalGameRows(game);
     const byTeam=teamId=>direct.filter(row=>rowTeamId(row)===String(teamId));
-    const awayRows=byTeam(awayId);
-    const homeRows=byTeam(homeId);
-
-    const awayPlayerRows=awayRows.filter(row=>rowPlayerId(row));
-    const homePlayerRows=homeRows.filter(row=>rowPlayerId(row));
-
-    // Team-summary records usually do not include a direct gameId. A team can only
-    // play once in a given franchise stage/week, so phase + week + team is the
-    // deterministic game-specific join for category=team-game.
-    const awayTeamGameRows=teamGameRowsFor(game,statistics,awayId);
-    const homeTeamGameRows=teamGameRowsFor(game,statistics,homeId);
-
-    const awayGame=gameSideBoxScore(game,'away');
-    const homeGame=gameSideBoxScore(game,'home');
-    const awayTeamSummary=mappedTeamSummaryStats(awayTeamGameRows);
-    const homeTeamSummary=mappedTeamSummaryStats(homeTeamGameRows);
-    const awayAggregate=aggregatePlayerGameStats(awayPlayerRows);
-    const homeAggregate=aggregatePlayerGameStats(homePlayerRows);
-
-    const away=combineGameTeamStats(
-      awayTeamSummary,
-      combineGameTeamStats(awayGame,awayAggregate)
-    );
-    const home=combineGameTeamStats(
-      homeTeamSummary,
-      combineGameTeamStats(homeGame,homeAggregate)
-    );
-
-    const populated=[...Object.values(away),...Object.values(home)].filter(value=>value!==null&&value!==undefined&&value!=='').length;
-    const model={
-      join:'direct-id',
-      source:'game-record+player-game-aggregate',
-      gameIds:[...ids],
-      away,home,
-      totalRows:direct.length,
-      awayRows:awayRows.length,
-      homeRows:homeRows.length,
-      awayPlayerRows:awayPlayerRows.length,
-      homePlayerRows:homePlayerRows.length,
-      awayTeamGameRows:awayTeamGameRows.length,
-      homeTeamGameRows:homeTeamGameRows.length,
-      populated,
-      rawGameFields:Object.entries({...game,...(game.source||{})})
-        .filter(([key])=>/yard|down|turn|pen|poss|offen|rush|pass|red|score|first|third|time/i.test(key))
-        .sort(([a],[b])=>a.localeCompare(b))
-        .map(([key,value])=>`${key}=${String(value)}`)
+    const awayRows=byTeam(awayId),homeRows=byTeam(homeId);
+    const awayPlayerRows=awayRows.filter(row=>rowPlayerId(row)),homePlayerRows=homeRows.filter(row=>rowPlayerId(row));
+    const awayTeamGameRows=teamGameRowsFor(game,statistics,awayId),homeTeamGameRows=teamGameRowsFor(game,statistics,homeId);
+    const awayGame=gameSideBoxScore(game,'away'),homeGame=gameSideBoxScore(game,'home');
+    const awayTeamSummary=mappedTeamSummaryStats(awayTeamGameRows),homeTeamSummary=mappedTeamSummaryStats(homeTeamGameRows);
+    const awayAggregate=aggregatePlayerGameStats(awayPlayerRows),homeAggregate=aggregatePlayerGameStats(homePlayerRows);
+    const away=combineGameTeamStats(awayTeamSummary,combineGameTeamStats(awayGame,awayAggregate));
+    const home=combineGameTeamStats(homeTeamSummary,combineGameTeamStats(homeGame,homeAggregate));
+    const populated=[...Object.values(away),...Object.values(home)].filter(v=>v!==null&&v!==undefined&&v!=='').length;
+    const model={join:direct.length?'canonical-index':'stage-week-team',source:'canonical-statistics-index',gameIds:[...ids],away,home,totalRows:direct.length,
+      awayRows:awayRows.length,homeRows:homeRows.length,awayPlayerRows:awayPlayerRows.length,homePlayerRows:homePlayerRows.length,
+      awayTeamGameRows:awayTeamGameRows.length,homeTeamGameRows:homeTeamGameRows.length,populated,
+      rawGameFields:Object.entries({...game,...(game.source||{})}).filter(([key])=>/yard|down|turn|pen|poss|offen|rush|pass|red|score|first|third|time/i.test(key))
+        .sort(([a],[b])=>a.localeCompare(b)).map(([key,value])=>`${key}=${String(value)}`)
     };
-
-    if(key) matchupTeamStatsCache.set(key,model);
+    if(key)matchupTeamStatsCache.set(key,model);
     return model;
   }
 
@@ -3796,6 +3733,53 @@ function canonicalPlayerDashboardStats(playerId='') {
     return cache.byContext.get(matchupStatContextKey(year,context.phase,context.week))
       ||cache.byContext.get(matchupStatContextKey(null,context.phase,context.week))
       ||{};
+  }
+
+  const canonicalStatisticsIndex={sourceRef:null,byGameId:new Map(),byContext:new Map(),byPlayerId:new Map(),byTeamId:new Map(),byCategory:new Map()};
+
+  function canonicalStatContextKey(season,stage,week){
+    const year=Number(season),safeYear=Number.isFinite(year)?String(year):'any';
+    const text=String(stage||'').toLowerCase();
+    const phase=text.includes('pre')?'preseason':text.includes('post')||text.includes('playoff')?'playoffs':'regular';
+    return `${safeYear}:${phase}:${Number(week)||0}`;
+  }
+
+  function pushStatIndex(map,key,row){
+    const safe=String(key??'');if(!safe)return;
+    const bucket=map.get(safe)||[];bucket.push(row);map.set(safe,bucket);
+  }
+
+  function rebuildCanonicalStatisticsIndex(force=false){
+    const rows=playerStatisticsState.rows||[];
+    if(!force&&canonicalStatisticsIndex.sourceRef===rows)return canonicalStatisticsIndex;
+    const byGameId=new Map(),byContext=new Map(),byPlayerId=new Map(),byTeamId=new Map(),byCategory=new Map();
+    rows.forEach(row=>{
+      const raw=statisticRaw(row),direct=statisticDirectGameId(row);
+      if(direct)pushStatIndex(byGameId,direct,row);
+      const playerId=rowPlayerId(row);if(playerId)pushStatIndex(byPlayerId,playerId,row);
+      const teamId=rowTeamId(row);if(teamId)pushStatIndex(byTeamId,teamId,row);
+      const category=String(row.category||raw.category||raw.statType||raw.type||'').toLowerCase();
+      if(category)pushStatIndex(byCategory,category,row);
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
+      if(Number.isFinite(week)){
+        const stage=row.stage||raw.stage||raw.seasonStage||'regular';
+        const season=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+        const exact=canonicalStatContextKey(season,stage,week);pushStatIndex(byContext,exact,row);
+        const any=canonicalStatContextKey(null,stage,week);if(any!==exact)pushStatIndex(byContext,any,row);
+      }
+    });
+    Object.assign(canonicalStatisticsIndex,{sourceRef:rows,byGameId,byContext,byPlayerId,byTeamId,byCategory});
+    return canonicalStatisticsIndex;
+  }
+
+  function canonicalGameRows(game={}){
+    const index=rebuildCanonicalStatisticsIndex(false),directRows=[];
+    gameDirectIds(game).forEach(id=>{const bucket=index.byGameId.get(String(id));if(bucket?.length)directRows.push(...bucket);});
+    if(directRows.length)return [...new Set(directRows)];
+    const context=matchupGameContext(game);
+    const year=Number(game.seasonYear??game.calendarYear??game.source?.seasonYear??game.source?.calendarYear??canonicalCurrentSeasonYear());
+    return index.byContext.get(canonicalStatContextKey(year,context.phase,context.week))
+      ||index.byContext.get(canonicalStatContextKey(null,context.phase,context.week))||[];
   }
 
   const matchupPlayerStatIndex={
@@ -4150,49 +4134,16 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   }
 
-  const targetedMatchupPrep=new Map();
-
-  function targetedMatchupKey(game={}) {
-    return String(game.id||game.gameId||game.scheduleId||'');
-  }
-
-  async function prepareTargetedMatchup(game={}) {
-    const key=targetedMatchupKey(game);
-    if(!key)return null;
-    if(targetedMatchupPrep.has(key))return targetedMatchupPrep.get(key);
-
-    const promise=(async()=>{
-      try{
-        // Do only the selected game's work.
-        await Promise.all([
-          hydrateMatchupTeamStatistics(game),
-          hydratePlayerStatistics(false)
-        ]);
-
-        rebuildMatchupPlayerStatIndex(false);
-        rebuildMatchupPlayerGameModelCache(false);
-
-        matchupPanelCache.set(matchupPanelCacheKey(game,'team'),buildMatchupPanel('team',game));
-        matchupPanelCache.set(matchupPanelCacheKey(game,'player'),buildMatchupPanel('player',game));
-        matchupPanelCache.set(matchupPanelCacheKey(game,'advanced'),buildMatchupPanel('advanced',game));
-
-        return true;
-      }catch(error){
-        console.warn('[Targeted Matchup Prep]',error);
-        return false;
-      }
-    })();
-
-    targetedMatchupPrep.set(key,promise);
-    promise.finally(()=>targetedMatchupPrep.delete(key));
-    return promise;
-  }
-
-  function findCachedMatchupGame(gameId='') {
+  function findCachedMatchupGame(gameId=''){
     const key=String(gameId||'');
-    return liveMatchupGames.get(key)
-      ||liveTeamDirectory?.games?.find(game=>String(game.id||game.gameId||game.scheduleId||'')===key)
-      ||null;
+    return liveMatchupGames.get(key)||liveTeamDirectory?.games?.find(game=>String(game.id||game.gameId||game.scheduleId||'')===key)||null;
+  }
+
+  function prepareMatchupRuntime(game={}){
+    const teamKey=matchupPanelCacheKey(game,'team'),playerKey=matchupPanelCacheKey(game,'player'),advancedKey=matchupPanelCacheKey(game,'advanced');
+    if(!matchupPanelCache.has(teamKey))matchupPanelCache.set(teamKey,buildMatchupPanel('team',game));
+    if(!matchupPanelCache.has(playerKey))matchupPanelCache.set(playerKey,buildMatchupPanel('player',game));
+    if(!matchupPanelCache.has(advancedKey))matchupPanelCache.set(advancedKey,buildMatchupPanel('advanced',game));
   }
 
   function matchupTabPanel(tab) {
@@ -4276,20 +4227,15 @@ function canonicalPlayerDashboardStats(playerId='') {
     return game||null;
   }
 
-  async function openMatchupCard(gameId) {
+  async function openMatchupCard(gameId){
     const gameIdText=String(gameId||'');
     let game=findCachedMatchupGame(gameIdText);
 
     if(!game){
-      // Immediate visible feedback even if registry has not hydrated yet.
-      openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal>
-        <div class="matchup-instant-placeholder"><span class="spinner"></span><strong>Opening matchup…</strong></div>
-      </div>`);
-
+      openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal><div class="matchup-instant-placeholder"><span class="spinner"></span><strong>Opening matchup…</strong></div></div>`);
       try{
-        const directory=await loadLiveTeamDirectory(false);
-        game=findCachedMatchupGame(gameIdText)
-          ||directory?.games?.find(item=>String(item.id||item.gameId||item.scheduleId||'')===gameIdText);
+        await loadLiveTeamDirectory(false);
+        game=findCachedMatchupGame(gameIdText);
         if(!game)throw new Error('Selected game is unavailable in the active snapshot.');
       }catch(error){
         console.error('[Matchup Card]',error);
@@ -4299,96 +4245,58 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
 
     activeMatchupGame=game;
-
-    const awayTeamId=String(game.awayTeamId??game.awayId??game.source?.awayTeamId??'');
-    const homeTeamId=String(game.homeTeamId??game.homeId??game.source?.homeTeamId??'');
-    const away=matchupTeam(awayTeamId);
-    const home=matchupTeam(homeTeamId);
+    const awayTeamId=String(game.awayTeamId??game.awayId??game.source?.awayTeamId??''),homeTeamId=String(game.homeTeamId??game.homeId??game.source?.homeTeamId??'');
+    const away=matchupTeam(awayTeamId),home=matchupTeam(homeTeamId);
     const status=game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null);
-    const awayScore=game.awayScore??resolvedGameScore(game,'away');
-    const homeScore=game.homeScore??resolvedGameScore(game,'home');
+    const awayScore=game.awayScore??resolvedGameScore(game,'away'),homeScore=game.homeScore??resolvedGameScore(game,'home');
     const score=(awayScore!==null&&homeScore!==null)?`${awayScore} – ${homeScore}`:(status==='final'?'Score unavailable':'Upcoming');
-
-    // Open the card immediately. Use cache if hover/pointerdown prep already completed.
-    const teamPanelKey=matchupPanelCacheKey(game,'team');
-    const immediateTeamPanel=matchupPanelCache.get(teamPanelKey)
-      ||`<section class="matchup-tab-panel matchup-tab-panel--loading"><div class="matchup-instant-loading"><span class="spinner"></span><strong>Loading matchup statistics…</strong></div></section>`;
+    const teamKey=matchupPanelCacheKey(game,'team');
+    const initialPanel=matchupPanelCache.get(teamKey)||`<section class="matchup-tab-panel matchup-tab-panel--loading"><div class="matchup-instant-loading"><span class="spinner"></span><strong>Loading matchup statistics…</strong></div></section>`;
 
     openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal data-matchup-shell="${escapeHtml(gameIdText)}">
-      <div class="matchup-modal__header">
-        <span class="eyebrow matchup-modal__week">${escapeHtml(canonicalScheduleLabel(game))}</span>
-        <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span>
-      </div>
-
+      <div class="matchup-modal__header"><span class="eyebrow matchup-modal__week">${escapeHtml(canonicalScheduleLabel(game))}</span>
+      <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span></div>
       <div class="matchup-gotw-board">
         <section class="matchup-gotw-half matchup-gotw-half--away team-gradient-card" style="--team-primary:${away.primary};--team-secondary:${away.secondary||away.primary}">
-          <div class="matchup-gotw-identity">
-            ${renderTeamMark(away,'matchup-team-logo')}
-            <div><span class="eyebrow">${escapeHtml(away.city||away.abbr||'Away')}</span><h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p></div>
-          </div>
-          <div class="matchup-previous-shell" data-matchup-previous="away"></div>
-        </section>
-
-        <div class="matchup-gotw-center">
-          <span>${escapeHtml(canonicalScheduleLabel(game))}</span>
-          <strong>${escapeHtml(score)}</strong>
-          <small data-matchup-meta></small>
-        </div>
-
+          <div class="matchup-gotw-identity">${renderTeamMark(away,'matchup-team-logo')}<div><span class="eyebrow">${escapeHtml(away.city||away.abbr||'Away')}</span><h2>${escapeHtml(away.fullName)}</h2><p>${escapeHtml(away.record||'—')} · Owner: ${escapeHtml(away.owner||'Unassigned')}</p></div></div>
+          <div class="matchup-previous-shell" data-matchup-previous="away"></div></section>
+        <div class="matchup-gotw-center"><span>${escapeHtml(canonicalScheduleLabel(game))}</span><strong>${escapeHtml(score)}</strong><small data-matchup-meta></small></div>
         <section class="matchup-gotw-half matchup-gotw-half--home team-gradient-card team-gradient-card--home" style="--team-primary:${home.primary};--team-secondary:${home.secondary||home.primary}">
-          <div class="matchup-gotw-identity matchup-gotw-identity--home">
-            <div><span class="eyebrow">${escapeHtml(home.city||home.abbr||'Home')}</span><h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p></div>
-            ${renderTeamMark(home,'matchup-team-logo')}
-          </div>
-          <div class="matchup-previous-shell" data-matchup-previous="home"></div>
-        </section>
+          <div class="matchup-gotw-identity matchup-gotw-identity--home"><div><span class="eyebrow">${escapeHtml(home.city||home.abbr||'Home')}</span><h2>${escapeHtml(home.fullName)}</h2><p>${escapeHtml(home.record||'—')} · Owner: ${escapeHtml(home.owner||'Unassigned')}</p></div>${renderTeamMark(home,'matchup-team-logo')}</div>
+          <div class="matchup-previous-shell" data-matchup-previous="home"></div></section>
       </div>
-
       <div class="matchup-stat-tabs" role="tablist" aria-label="Matchup statistics">
         <button type="button" class="is-active" data-matchup-tab="team" role="tab" aria-selected="true">Team Stats</button>
         <button type="button" data-matchup-tab="player" role="tab" aria-selected="false">Player Stats</button>
         <button type="button" data-matchup-tab="advanced" role="tab" aria-selected="false">Advanced Stats</button>
       </div>
-
-      <div class="matchup-tab-content" data-matchup-tab-content>${immediateTeamPanel}</div>
+      <div class="matchup-tab-content" data-matchup-tab-content>${initialPanel}</div>
     </div>`);
 
-    // Lightweight header enrichment on next frame.
     requestAnimationFrame(()=>{
-      const modal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');
-      if(!modal)return;
-
+      const modal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');if(!modal)return;
       try{
-        const meta=gameMetadata(game);
-        const info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
-        const metaTarget=modal.querySelector('[data-matchup-meta]');
-        if(metaTarget)metaTarget.textContent=info||(status==='final'?'Final':'Scheduled');
-
-        const awayPrev=modal.querySelector('[data-matchup-previous="away"]');
-        const homePrev=modal.querySelector('[data-matchup-previous="home"]');
+        const meta=gameMetadata(game),info=[meta.dayLabel,meta.timeLabel,meta.stadium].filter(Boolean).join(' · ');
+        const metaTarget=modal.querySelector('[data-matchup-meta]');if(metaTarget)metaTarget.textContent=info||(status==='final'?'Final':'Scheduled');
+        const awayPrev=modal.querySelector('[data-matchup-previous="away"]'),homePrev=modal.querySelector('[data-matchup-previous="home"]');
         if(awayPrev)awayPrev.outerHTML=previousMatchupMarkup(away.id,game);
         if(homePrev)homePrev.outerHTML=previousMatchupMarkup(home.id,game);
-      }catch(error){
-        console.warn('[Matchup Header Enrichment]',error);
-      }
-    });
-
-    // Finish ONLY this game's prep, never the entire league.
-    prepareTargetedMatchup(game).then(()=>{
-      const modal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');
-      if(!modal)return;
-      const activeTab=modal.querySelector('[data-matchup-tab].is-active')?.dataset.matchupTab||'team';
-      const target=modal.querySelector('[data-matchup-tab-content]');
-      const key=matchupPanelCacheKey(game,activeTab);
-      if(target&&matchupPanelCache.has(key))target.innerHTML=matchupPanelCache.get(key);
+      }catch(error){console.warn('[Matchup Header Enrichment]',error);}
+      Promise.resolve(hydrateMatchupTeamStatistics(game)).then(()=>{
+        prepareMatchupRuntime(game);
+        const liveModal=document.querySelector('[data-matchup-shell="'+CSS.escape(gameIdText)+'"]');if(!liveModal)return;
+        const activeTab=liveModal.querySelector('[data-matchup-tab].is-active')?.dataset.matchupTab||'team';
+        const target=liveModal.querySelector('[data-matchup-tab-content]'),key=matchupPanelCacheKey(game,activeTab);
+        if(target&&matchupPanelCache.has(key))target.innerHTML=matchupPanelCache.get(key);
+      });
     });
   }
 
   let scheduleMatchupPreloadPromise=null;
-  function preloadScheduleMatchupData() {
+  function preloadScheduleMatchupData(){
     if(scheduleMatchupPreloadPromise)return scheduleMatchupPreloadPromise;
-    scheduleMatchupPreloadPromise=loadLiveTeamDirectory(false)
-      .catch(error=>{console.warn('[Schedule Preload]',error);})
+    scheduleMatchupPreloadPromise=Promise.all([loadLiveTeamDirectory(false),hydratePlayerStatistics(false)])
+      .catch(error=>console.warn('[Schedule Preload]',error))
       .finally(()=>{scheduleMatchupPreloadPromise=null;});
     return scheduleMatchupPreloadPromise;
   }
@@ -5861,18 +5769,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const game=activeMatchupGame||{};
       const key=matchupPanelCacheKey(game,tabName);
 
-      if(matchupPanelCache.has(key)){
-        target.innerHTML=matchupPanelCache.get(key);
-      }else{
-        prepareTargetedMatchup(game).then(()=>{
-          const liveModal=document.querySelector('[data-matchup-modal]');
-          const stillActive=liveModal?.querySelector(`[data-matchup-tab="${tabName}"].is-active`);
-          const liveTarget=liveModal?.querySelector('[data-matchup-tab-content]');
-          if(stillActive&&liveTarget&&matchupPanelCache.has(key)){
-            liveTarget.innerHTML=matchupPanelCache.get(key);
-          }
-        });
-      }
+      if(matchupPanelCache.has(key))target.innerHTML=matchupPanelCache.get(key);
       return;
     }
 
