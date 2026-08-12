@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2icb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.2jcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2icb.2b.1ba.1',
+        version:'5.9.6.2jcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -2013,9 +2013,14 @@
         playerStatisticsState.loaded=true;
         // Build matchup lookup once while data is hydrating so opening/clicking
         // Matchup tabs never scans the full statistics collection.
-        rebuildCanonicalStatisticsIndex(true);
-        rebuildMatchupPlayerStatIndex(true);
-        rebuildMatchupPlayerGameModelCache(true);
+        // Build indexes cooperatively after rows are available. Do not block
+        // the browser's main thread or delay first user interaction.
+        rebuildCanonicalStatisticsIndexCooperative(true).then(()=>{
+          // Legacy matchup indexes are retained for compatibility but are built
+          // only after the canonical index has yielded through startup.
+          rebuildMatchupPlayerStatIndex(true);
+          rebuildMatchupPlayerGameModelCache(true);
+        });
         return playerStatisticsState.rows;
       }catch(error){
         playerStatisticsState.error=error?.message||'Unable to load player statistics.';
@@ -3772,14 +3777,96 @@ function canonicalPlayerDashboardStats(playerId='') {
     return canonicalStatisticsIndex;
   }
 
+  let canonicalStatisticsIndexPromise=null;
+
+  async function rebuildCanonicalStatisticsIndexCooperative(force=false){
+    const rows=playerStatisticsState.rows||[];
+    if(!force&&canonicalStatisticsIndex.sourceRef===rows)return canonicalStatisticsIndex;
+    if(canonicalStatisticsIndexPromise&&!force)return canonicalStatisticsIndexPromise;
+
+    canonicalStatisticsIndexPromise=(async()=>{
+      const byGameId=new Map(),byContext=new Map(),byPlayerId=new Map(),byTeamId=new Map(),byCategory=new Map();
+      const chunkSize=250;
+
+      for(let start=0;start<rows.length;start+=chunkSize){
+        const end=Math.min(rows.length,start+chunkSize);
+        for(let i=start;i<end;i++){
+          const row=rows[i];
+          const raw=statisticRaw(row),direct=statisticDirectGameId(row);
+          if(direct)pushStatIndex(byGameId,direct,row);
+          const playerId=rowPlayerId(row);if(playerId)pushStatIndex(byPlayerId,playerId,row);
+          const teamId=rowTeamId(row);if(teamId)pushStatIndex(byTeamId,teamId,row);
+          const category=String(row.category||raw.category||raw.statType||raw.type||'').toLowerCase();
+          if(category)pushStatIndex(byCategory,category,row);
+          const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
+          if(Number.isFinite(week)){
+            const stage=row.stage||raw.stage||raw.seasonStage||'regular';
+            const season=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+            const exact=canonicalStatContextKey(season,stage,week);pushStatIndex(byContext,exact,row);
+            const any=canonicalStatContextKey(null,stage,week);if(any!==exact)pushStatIndex(byContext,any,row);
+          }
+        }
+
+        // Yield to browser between chunks so clicks, scrolling and modal opens
+        // are never queued behind statistics indexing.
+        if(end<rows.length){
+          await new Promise(resolve=>{
+            if(typeof scheduler!=='undefined'&&typeof scheduler.yield==='function'){
+              scheduler.yield().then(resolve);
+            }else{
+              setTimeout(resolve,0);
+            }
+          });
+        }
+      }
+
+      Object.assign(canonicalStatisticsIndex,{sourceRef:rows,byGameId,byContext,byPlayerId,byTeamId,byCategory});
+      return canonicalStatisticsIndex;
+    })().finally(()=>{canonicalStatisticsIndexPromise=null;});
+
+    return canonicalStatisticsIndexPromise;
+  }
+
+
   function canonicalGameRows(game={}){
-    const index=rebuildCanonicalStatisticsIndex(false),directRows=[];
-    gameDirectIds(game).forEach(id=>{const bucket=index.byGameId.get(String(id));if(bucket?.length)directRows.push(...bucket);});
-    if(directRows.length)return [...new Set(directRows)];
+    const rows=playerStatisticsState.rows||[];
+    const index=canonicalStatisticsIndex.sourceRef===rows?canonicalStatisticsIndex:null;
+
+    if(index){
+      const directRows=[];
+      gameDirectIds(game).forEach(id=>{
+        const bucket=index.byGameId.get(String(id));
+        if(bucket?.length)directRows.push(...bucket);
+      });
+      if(directRows.length)return [...new Set(directRows)];
+
+      const context=matchupGameContext(game);
+      const year=Number(game.seasonYear??game.calendarYear??game.source?.seasonYear??game.source?.calendarYear??canonicalCurrentSeasonYear());
+      return index.byContext.get(canonicalStatContextKey(year,context.phase,context.week))
+        ||index.byContext.get(canonicalStatContextKey(null,context.phase,context.week))||[];
+    }
+
+    // Rare first-interaction fallback while cooperative index is still building:
+    // scan only until direct game matches are found, then return. This preserves
+    // responsiveness because it does not build/rebuild global maps.
+    const ids=new Set(gameDirectIds(game));
+    const direct=[];
+    for(const row of rows){
+      const directId=statisticDirectGameId(row);
+      if(directId&&ids.has(directId))direct.push(row);
+    }
+    if(direct.length)return direct;
+
     const context=matchupGameContext(game);
     const year=Number(game.seasonYear??game.calendarYear??game.source?.seasonYear??game.source?.calendarYear??canonicalCurrentSeasonYear());
-    return index.byContext.get(canonicalStatContextKey(year,context.phase,context.week))
-      ||index.byContext.get(canonicalStatContextKey(null,context.phase,context.week))||[];
+    return rows.filter(row=>{
+      const raw=statisticRaw(row);
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
+      if(week!==Number(context.week))return false;
+      const rowContext=stageWeekContext(raw,week,row.stage||raw.stage||raw.seasonStage);
+      const rowYear=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+      return rowContext.phase===context.phase&&(!Number.isFinite(year)||!Number.isFinite(rowYear)||rowYear===year);
+    });
   }
 
   const matchupPlayerStatIndex={
