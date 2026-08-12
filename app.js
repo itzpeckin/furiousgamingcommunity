@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.3cb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.3acb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.3cb.2b.1ba.1',
+        version:'5.9.6.3acb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -4900,7 +4900,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   };
 
   function liveLeaderDefaultSort(category){
-    return {passing:'YDS',rushing:'YDS',receiving:'YDS',defense:'TKL',kicking:'PTS',punting:'AVG'}[category]||'YDS';
+    return {passing:'YDS',rushing:'ATT',receiving:'REC',defense:'TKL',kicking:'PTS',punting:'AVG'}[category]||'YDS';
   }
 
   function aggregateLiveLeaderboard(category='passing'){
@@ -4943,7 +4943,11 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(category==='kicking'&&entry.values.FGA)entry.values['FG%']=entry.values.FGM/entry.values.FGA*100;
     });
 
-    const sortLabel=state.statsSortKey||liveLeaderDefaultSort(category);
+    const validLabels=new Set(columns.map(([label])=>label));
+    const requestedSort=state.statsSortKey;
+    const sortLabel=requestedSort&&validLabels.has(requestedSort)
+      ? requestedSort
+      : liveLeaderDefaultSort(category);
     const direction=state.statsSortDirection==='asc'?1:-1;
     list.sort((a,b)=>{
       const av=Number(a.values[sortLabel]||0),bv=Number(b.values[sortLabel]||0);
@@ -6264,7 +6268,16 @@ function canonicalPlayerDashboardStats(playerId='') {
     if(confidenceStandingsWeek){state.confidenceStandingsWeek=clamp(state.confidenceStandingsWeek+Number(confidenceStandingsWeek.dataset.confidenceStandingsWeek),1,Math.max(1,...schedule.map(w=>w.week)));renderStandings();return;}
 
     const statsCategory=event.target.closest('[data-stats-category]');
-    if (statsCategory) { state.statsCategory=statsCategory.dataset.statsCategory; renderStats(); return; }
+    if (statsCategory) {
+      const nextCategory=statsCategory.dataset.statsCategory;
+      if(nextCategory!==state.statsCategory){
+        state.statsCategory=nextCategory;
+        state.statsSortKey=nextCategory==='team'?null:liveLeaderDefaultSort(nextCategory);
+        state.statsSortDirection='desc';
+      }
+      renderStats();
+      return;
+    }
     const statsSort=event.target.closest('[data-stats-sort]');
     if(statsSort){const key=statsSort.dataset.statsSort;if(state.statsSortKey===key)state.statsSortDirection=state.statsSortDirection==='desc'?'asc':'desc';else{state.statsSortKey=key;state.statsSortDirection='desc';}renderStats();return;}
 
