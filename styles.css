@@ -5260,7 +5260,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb.2b.1b — Player Data Inspector
+   Franchise HQ v5.9.6.4cb.2b.1b — Player Data Inspector
    ============================================================ */
 .player-data-inspector{display:grid;gap:16px}
 .player-inspector-heading{margin-bottom:0}
@@ -5319,7 +5319,7 @@ table td{
 }
 
 
-/* Franchise HQ v5.9.6.3acb.2b.1b — Player Data Inspector interaction fix */
+/* Franchise HQ v5.9.6.4cb.2b.1b — Player Data Inspector interaction fix */
 .player-inspector-controls select[data-player-inspector-select]{
   cursor:pointer;
 }
@@ -5329,7 +5329,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb.2b.1b — Live Player Statistics Integration
+   Franchise HQ v5.9.6.4cb.2b.1b — Live Player Statistics Integration
    ============================================================ */
 .value-card-live-statistics{grid-column:1/-1}
 .player-live-statistics{display:grid;gap:14px}
@@ -5364,7 +5364,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb.2b.1b — Canonical Player Card 2.0 Foundation
+   Franchise HQ v5.9.6.4cb.2b.1b — Canonical Player Card 2.0 Foundation
    ============================================================ */
 .canonical-player-hero{
   position:relative;
@@ -5507,7 +5507,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb.2b.1 — Approved Player Card UI
+   Franchise HQ v5.9.6.4cb.2b.1 — Approved Player Card UI
    Direct implementation of approved design target.
    ============================================================ */
 [data-value-card-modal] .value-card-dialog{max-width:min(1540px,96vw)!important;width:min(1540px,96vw)!important}
@@ -5602,7 +5602,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb.2b.1.1 — Player Card polish hotfix
+   Franchise HQ v5.9.6.4cb.2b.1.1 — Player Card polish hotfix
    ============================================================ */
 
 /* Player image */
@@ -5766,7 +5766,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb.2
+   Franchise HQ v5.9.6.4cb.2
    Restore APPROVED Player Card dashboard layout.
    Do not redesign markup; only restore 3-column geometry and alignment.
 
@@ -5897,7 +5897,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb — Game Log / Career Stats / Portraits
+   Franchise HQ v5.9.6.4cb — Game Log / Career Stats / Portraits
    ============================================================ */
 .canonical-game-log-table-wrap{overflow:visible!important;max-height:none!important}
 .canonical-game-log-table--compact{table-layout:fixed;width:100%}
@@ -5947,7 +5947,7 @@ table td{
   .canonical-contract-grid--compact strong{font-size:11px!important}
 }
 
-/* v5.9.6.3acb */
+/* v5.9.6.4cb */
 .canonical-player-hero__watermark--logo{position:absolute!important;left:18px!important;top:50%!important;transform:translateY(-50%)!important;width:235px!important;height:235px!important;opacity:.11!important;display:flex!important;align-items:center!important;justify-content:center!important;pointer-events:none!important}
 .canonical-player-hero__watermark--logo img{width:100%!important;height:100%!important;object-fit:contain!important;filter:none!important}
 .canonical-flat-table-wrap{width:100%;overflow-x:auto;overflow-y:visible}
@@ -5964,7 +5964,7 @@ table td{
 .canonical-flat-table td.is-neutral{color:var(--text)}
 .canonical-career-stats .canonical-flat-table-wrap{border:1px solid #293c52;border-radius:8px}
 
-/* Franchise HQ v5.9.6.3acb */
+/* Franchise HQ v5.9.6.4cb */
 .canonical-player-hero__watermark--logo{left:22px!important;top:52%!important;width:285px!important;height:285px!important;opacity:.16!important;z-index:1!important;transform:translateY(-50%)!important}
 .canonical-player-hero__watermark--logo img,.canonical-player-hero__watermark--logo svg{width:100%!important;height:100%!important;object-fit:contain!important}
 .canonical-player-hero__image{z-index:2!important;left:34px!important;width:250px!important}
@@ -5974,7 +5974,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb — Player Card schedule / season / watermark fix
+   Franchise HQ v5.9.6.4cb — Player Card schedule / season / watermark fix
    ============================================================ */
 
 .canonical-player-hero__watermark--logo{
@@ -6021,7 +6021,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3acb — Completed Matchup Player Statistics
+   Franchise HQ v5.9.6.4cb — Completed Matchup Player Statistics
    ============================================================ */
 .matchup-player-stat-stack{display:grid;gap:16px;padding:14px}
 .matchup-player-category{border:1px solid rgba(142,164,190,.2);border-radius:10px;overflow:hidden;background:rgba(7,17,28,.48)}
@@ -6045,16 +6045,16 @@ table td{
 @media(max-width:900px){.matchup-player-sides{grid-template-columns:1fr}.matchup-player-side+ .matchup-player-side{border-left:0;border-top:1px solid rgba(142,164,190,.18)}}
 
 
-/* Franchise HQ v5.9.6.3acba — instant matchup tabs */
+/* Franchise HQ v5.9.6.4cba — instant matchup tabs */
 .matchup-stat-tabs button{transition:background-color .12s ease,color .12s ease,border-color .12s ease}
 
 
-/* Franchise HQ v5.9.6.3a — instant Matchup Card open */
+/* Franchise HQ v5.9.6.4 — instant Matchup Card open */
 [data-matchup-modal]{content-visibility:auto}
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3a — zero-wait Matchup Card shell
+   Franchise HQ v5.9.6.4 — zero-wait Matchup Card shell
    ============================================================ */
 
 .matchup-modal--instant{
@@ -6097,25 +6097,25 @@ table td{
 
 
 
-/* Franchise HQ v5.9.6.3a — prewarmed Matchup Player Stats */
+/* Franchise HQ v5.9.6.4 — prewarmed Matchup Player Stats */
 .matchup-tab-content{
   min-height:160px;
 }
 
 
-/* Franchise HQ v5.9.6.3a — targeted matchup prewarm only */
+/* Franchise HQ v5.9.6.4 — targeted matchup prewarm only */
 .matchup-modal--instant{will-change:auto}
 
-/* Franchise HQ v5.9.6.3a — Canonical Statistics Index Runtime */
+/* Franchise HQ v5.9.6.4 — Canonical Statistics Index Runtime */
 .matchup-stat-tabs button{touch-action:manipulation}
 
 
-/* Franchise HQ v5.9.6.3a — cooperative statistics startup */
+/* Franchise HQ v5.9.6.4 — cooperative statistics startup */
 .matchup-modal--instant{transform:translateZ(0)}
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.3a — Live Stats & Leaders
+   Franchise HQ v5.9.6.4 — Live Stats & Leaders
    ============================================================ */
 .live-leader-card{position:relative;display:grid;grid-template-columns:auto auto 1fr auto;gap:12px;align-items:center;padding:16px;cursor:pointer}
 .live-leader-rank{font-size:24px;font-weight:900;color:#8fa2b9}
@@ -6141,3 +6141,48 @@ table td{
 .live-leaderboard-table td small{display:block;color:#7f91a8;font-size:9px}
 .stats-team-cell{display:inline-flex;align-items:center;gap:7px}
 .stats-team-cell .mini-team{width:24px;height:24px}
+
+
+/* ============================================================
+   Franchise HQ v5.9.6.4 — Player Statistics Certification
+   ============================================================ */
+.stats-certification-link{margin-top:12px}
+.player-stats-certification{display:grid;gap:14px}
+.certification-summary-card{
+  display:flex;align-items:center;justify-content:space-between;gap:20px;
+  padding:20px;border:1px solid rgba(143,162,185,.25);border-radius:14px;
+  background:linear-gradient(180deg,rgba(17,30,45,.96),rgba(10,20,31,.98))
+}
+.certification-summary-card h2{margin:4px 0 6px;font-size:26px}
+.certification-summary-card p{margin:0;color:#91a3b9}
+.certification-metrics{
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px
+}
+.certification-metrics>div{
+  padding:13px;border:1px solid rgba(143,162,185,.2);border-radius:10px;background:#0b1724
+}
+.certification-metrics span{display:block;color:#8497ae;font-size:9px;text-transform:uppercase;letter-spacing:.07em}
+.certification-metrics strong{display:block;margin-top:4px;color:#fff;font-size:20px}
+.certification-check-list{display:grid;gap:8px}
+.certification-check{
+  display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:12px;
+  padding:12px 14px;border:1px solid rgba(143,162,185,.18);border-radius:9px;background:#0a1521
+}
+.certification-check__icon{
+  display:grid;place-items:center;width:28px;height:28px;border-radius:50%;font-weight:900
+}
+.certification-check strong{color:#fff}
+.certification-check p{margin:2px 0 0;color:#899bb0;font-size:11px}
+.certification-check>span{font-size:9px;font-weight:900;letter-spacing:.08em}
+.certification-check.is-pass{border-color:rgba(75,201,122,.3)}
+.certification-check.is-pass .certification-check__icon{background:rgba(75,201,122,.14);color:#58d982}
+.certification-check.is-pass>span{color:#58d982}
+.certification-check.is-warning{border-color:rgba(235,181,65,.35)}
+.certification-check.is-warning .certification-check__icon{background:rgba(235,181,65,.13);color:#f0c761}
+.certification-check.is-warning>span{color:#f0c761}
+.certification-check.is-fail{border-color:rgba(255,107,107,.35)}
+.certification-check.is-fail .certification-check__icon{background:rgba(255,107,107,.13);color:#ff6b6b}
+.certification-check.is-fail>span{color:#ff6b6b}
+.certification-actions{display:flex;justify-content:flex-end}
+@media(max-width:1000px){.certification-metrics{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:650px){.certification-metrics{grid-template-columns:repeat(2,1fr)}.certification-summary-card{align-items:flex-start;flex-direction:column}}

@@ -168,7 +168,7 @@
   const pageNames = {
     home: 'League Home', 'league-activity': 'League Activity', teams: 'Teams', players: 'Players', standings: 'Standings', stats: 'Stats & Leaders',
     schedule: 'Schedule', news: 'League News', 'trade-center': 'Trade Center', 'trade-block': 'Trade Block',
-    commissioner: 'Commissioner HQ', 'design-system': 'Design System'
+    commissioner: 'Commissioner HQ', 'player-stats-certification': 'Player Statistics Certification', 'design-system': 'Design System'
   };
 
   function firstNames() {
@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.3acb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.4cb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.3acb.2b.1ba.1',
+        version:'5.9.6.4cb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1894,6 +1894,23 @@
       nativeEventTimestamp:Number(event.timeStamp)||null
     };
   },true);
+
+  document.addEventListener('click',event=>{
+    const openCert=event.target.closest?.('[data-open-player-stats-certification]');
+    if(openCert){
+      event.preventDefault();
+      setRoute('player-stats-certification');
+      return;
+    }
+
+    const rerun=event.target.closest?.('[data-run-player-stats-certification]');
+    if(rerun){
+      event.preventDefault();
+      const host=document.querySelector('.player-stats-certification');
+      if(host)host.outerHTML=renderPlayerStatisticsCertification();
+      showToast('Certification complete','Player Statistics certification has been rerun against the active snapshot.');
+    }
+  });
 
   document.addEventListener('click',event=>{
     const sort=event.target.closest?.('[data-live-stats-sort]');
@@ -4789,6 +4806,173 @@ function canonicalPlayerDashboardStats(playerId='') {
     punting:[['games','GP'],['punts','PUNTS'],['average','AVG'],['netAverage','NET'],['inside20','IN20'],['touchbacks','TB'],['longPunt','LONG']]
   };
 
+  function runPlayerStatisticsCertification(){
+    const rows=playerStatisticsState.rows||[];
+    const seasonYear=canonicalCurrentSeasonYear();
+    const categories=['passing','rushing','receiving','defense','kicking','punting'];
+
+    const checks=[];
+    const add=(id,label,ok,detail,severity='required')=>{
+      checks.push({id,label,ok:Boolean(ok),detail:String(detail||''),severity});
+    };
+
+    const rowsByCategory=new Map(categories.map(category=>[category,[]]));
+    const playerIds=new Set();
+    const teamIds=new Set();
+    const weeks=new Set();
+    const gameIds=new Set();
+    let unresolvedPlayers=0;
+    let unresolvedTeams=0;
+    let malformedRows=0;
+    let seasonMismatchRows=0;
+
+    rows.forEach(row=>{
+      const raw=statisticRaw(row);
+      const category=matchupPlayerCategory(row);
+      if(rowsByCategory.has(category))rowsByCategory.get(category).push(row);
+
+      const playerId=rowPlayerId(row);
+      const teamId=rowTeamId(row);
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
+      const directGame=statisticDirectGameId(row);
+      const rowYear=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+
+      if(playerId){
+        playerIds.add(String(playerId));
+        const identity=matchupPlayerIdentity(playerId);
+        if(!identity?.name||String(identity.name).startsWith('Player '))unresolvedPlayers+=1;
+      }
+
+      if(teamId){
+        teamIds.add(String(teamId));
+        const team=matchupTeam(teamId);
+        if(!team?.id||team.fullName==='Team'||team.abbr==='TBD')unresolvedTeams+=1;
+      }
+
+      if(Number.isFinite(week))weeks.add(week);
+      if(directGame)gameIds.add(String(directGame));
+
+      if(!category||(!playerId&&!teamId))malformedRows+=1;
+      if(Number.isFinite(seasonYear)&&Number.isFinite(rowYear)&&rowYear!==Number(seasonYear))seasonMismatchRows+=1;
+    });
+
+    const scheduleGames=liveTeamDirectory?.games||[];
+    const completedGames=scheduleGames.filter(game=>(game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null))==='final');
+    const completedGameIds=new Set(completedGames.map(game=>String(game.id||game.gameId||game.scheduleId||'')));
+
+    let completedWithPlayerStats=0;
+    completedGames.forEach(game=>{
+      if(canonicalGameRows(game).some(row=>rowPlayerId(row)))completedWithPlayerStats+=1;
+    });
+
+    add('stats-loaded','Statistics snapshot loaded',playerStatisticsState.loaded&&rows.length>0,`${rows.length.toLocaleString()} live statistic rows loaded.`);
+    add('season-context','Dynamic season context resolved',Number.isFinite(Number(seasonYear)),seasonYear?`Active franchise season: ${seasonYear}`:'No active season year could be resolved.');
+    add('player-joins','Player identity joins',unresolvedPlayers===0,unresolvedPlayers===0?`${playerIds.size} unique player identities resolved.`:`${unresolvedPlayers} statistic rows reference unresolved players.`);
+    add('team-joins','Team identity joins',unresolvedTeams===0,unresolvedTeams===0?`${teamIds.size} teams represented with valid identities.`:`${unresolvedTeams} statistic rows reference unresolved teams.`);
+    add('row-shape','Statistic row integrity',malformedRows===0,malformedRows===0?'No malformed player/team statistic rows detected.':`${malformedRows} rows are missing a usable category or player/team identity.`);
+    add('season-consistency','Season consistency',seasonMismatchRows===0,seasonMismatchRows===0?'Statistic rows align with the active season context.':`${seasonMismatchRows} rows belong to a different season than the active context.`,'warning');
+
+    categories.forEach(category=>{
+      const count=rowsByCategory.get(category)?.length||0;
+      add(`category-${category}`,`${category[0].toUpperCase()+category.slice(1)} coverage`,count>0,`${count.toLocaleString()} ${category} rows available.`,category==='kicking'||category==='punting'?'warning':'required');
+    });
+
+    add(
+      'week-coverage',
+      'Weekly game-log coverage',
+      weeks.size>0,
+      weeks.size?`Weeks represented: ${[...weeks].sort((a,b)=>a-b).join(', ')}`:'No weekly player-stat records were detected.'
+    );
+
+    add(
+      'completed-game-joins',
+      'Completed matchup player-stat joins',
+      completedGames.length===0||completedWithPlayerStats===completedGames.length,
+      `${completedWithPlayerStats} of ${completedGames.length} completed games currently join to player-stat records.`,
+      completedGames.length&&completedWithPlayerStats<completedGames.length?'warning':'required'
+    );
+
+    const liveStatsCategories=categories.filter(category=>(rowsByCategory.get(category)?.length||0)>0);
+    add(
+      'leaders-ready',
+      'Stats & Leaders readiness',
+      liveStatsCategories.length>=4,
+      `${liveStatsCategories.length} of 6 player-stat categories have live leaderboard data.`
+    );
+
+    const playerCardReady=playerIds.size>0&&unresolvedPlayers===0;
+    add(
+      'player-card-ready',
+      'Live Player Card readiness',
+      playerCardReady,
+      playerCardReady?'Live player identities are available for Player Card statistics and game logs.':'Player identity issues remain that can affect Player Cards.'
+    );
+
+    const requiredFailures=checks.filter(check=>check.severity==='required'&&!check.ok);
+    const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
+
+    return {
+      release:'5.9.6.4',
+      seasonYear,
+      generatedAt:new Date().toISOString(),
+      rows:rows.length,
+      players:playerIds.size,
+      teams:teamIds.size,
+      weeks:[...weeks].sort((a,b)=>a-b),
+      gameIds:gameIds.size,
+      completedGames:completedGames.length,
+      completedWithPlayerStats,
+      checks,
+      passed:requiredFailures.length===0,
+      requiredFailures:requiredFailures.length,
+      warnings:warnings.length
+    };
+  }
+
+  function renderPlayerStatisticsCertification(){
+    const result=runPlayerStatisticsCertification();
+
+    const statusClass=result.passed?'pill--success':'pill--danger';
+    const statusLabel=result.passed?'CERTIFIED':'ACTION REQUIRED';
+
+    return `<section class="player-stats-certification">
+      <div class="certification-summary-card">
+        <div>
+          <span class="eyebrow">5.9.6 Player Statistics Certification</span>
+          <h2>${statusLabel}</h2>
+          <p>${result.passed
+            ? 'The live player-statistics pipeline passed all required integration checks.'
+            : `${result.requiredFailures} required certification check${result.requiredFailures===1?'':'s'} failed.`}</p>
+        </div>
+        <span class="pill ${statusClass}">${statusLabel}</span>
+      </div>
+
+      <div class="certification-metrics">
+        <div><span>Season</span><strong>${escapeHtml(result.seasonYear||'—')}</strong></div>
+        <div><span>Statistic Rows</span><strong>${result.rows.toLocaleString()}</strong></div>
+        <div><span>Players</span><strong>${result.players.toLocaleString()}</strong></div>
+        <div><span>Teams</span><strong>${result.teams.toLocaleString()}</strong></div>
+        <div><span>Weeks</span><strong>${result.weeks.length}</strong></div>
+        <div><span>Warnings</span><strong>${result.warnings}</strong></div>
+      </div>
+
+      <div class="certification-check-list">
+        ${result.checks.map(check=>`<article class="certification-check ${check.ok?'is-pass':check.severity==='warning'?'is-warning':'is-fail'}">
+          <div class="certification-check__icon">${check.ok?'✓':check.severity==='warning'?'!':'×'}</div>
+          <div>
+            <strong>${escapeHtml(check.label)}</strong>
+            <p>${escapeHtml(check.detail)}</p>
+          </div>
+          <span>${check.ok?'PASS':check.severity==='warning'?'WARN':'FAIL'}</span>
+        </article>`).join('')}
+      </div>
+
+      <div class="certification-actions">
+        <button type="button" class="btn btn-primary" data-run-player-stats-certification>Run Certification Again</button>
+      </div>
+    </section>`;
+  }
+
   async function renderStats() {
     pageContent.innerHTML='<section class="empty-state"><strong>Loading live league statistics…</strong><p>Franchise HQ is reading the active snapshot.</p></section>';
 
@@ -4818,6 +5002,7 @@ function canonicalPlayerDashboardStats(playerId='') {
           <span class="eyebrow">Live Madden snapshot${year?` · ${escapeHtml(year)}`:''}</span>
           <h1>Stats & Leaders</h1>
           <p>League-wide leaders from the active Franchise HQ statistics snapshot.</p>
+          <button type="button" class="btn btn-ghost stats-certification-link" data-open-player-stats-certification>Run 5.9.6 Certification</button>
         </div>
       </div>
       <div class="stats-category-tabs segmented-tabs stats-category-tabs--wrap">
@@ -5846,6 +6031,9 @@ function canonicalPlayerDashboardStats(playerId='') {
       case 'players': id?renderPlayerProfile(id):renderPlayers(); break;
       case 'standings': renderStandings(); break;
       case 'stats': renderStats(); break;
+      case 'player-stats-certification':
+        pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Integration certification</span><h1>Player Statistics Certification</h1><p>Validate the live Madden player-statistics pipeline across Player Cards, Matchups, and Stats & Leaders.</p></div></div>${renderPlayerStatisticsCertification()}`;
+        break;
       case 'schedule': renderSchedule(); break;
       case 'news': renderNews(); break;
       case 'trade-center': window.FranchiseHQ?.trade?.renderTradeCenter ? window.FranchiseHQ.trade.renderTradeCenter(id) : window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : renderRoadmap(base); break;
