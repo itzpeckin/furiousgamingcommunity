@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.5cbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.5bcbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.5cbcb.2b.1ba.1',
+        version:'5.9.6.5bcbcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -3091,6 +3091,171 @@
     return `<div class="canonical-career-stats"><div class="player-live-stat-nav canonical-career-stat-nav">${available.map((category,index)=>`<button type="button" class="player-live-stat-tab ${index===0?'is-active':''}" data-player-career-stat-tab="${category}">${playerStatLabel(category)}</button>`).join('')}</div>${available.map((category,index)=>{const cols=CANONICAL_STAT_COLUMNS[category]||[],allRows=seasons.flatMap(season=>season.categories?.[category]||[]),career=playerStatCategoryTotals(allRows,category),careerTiles=cols.map(([label])=>`<div><span>${label}</span><strong>${playerStatFormat(label,career[label])}</strong></div>`).join(''),seasonRows=seasons.filter(s=>(s.categories?.[category]||[]).length).map(season=>{const totals=playerStatCategoryTotals(season.categories[category],category);return [season.year,...cols.map(([label])=>playerStatFormat(label,totals[label]))];});return `<section class="canonical-career-stat-panel ${index===0?'is-active':''}" data-player-career-stat-panel="${category}"><div class="canonical-career-stat-tiles">${careerTiles}</div>${canonicalSortableTable(`season-stats-${String(playerId).replace(/\W/g,'')}-${category}`,['Year',...cols.map(c=>c[0])],seasonRows)}</section>`;}).join('')}</div>`;
   }
 
+  const PLAYER_DETAILS_GAMELOG_COLUMNS={
+    QB:[
+      ['P Yds',['passYds','passYards']],
+      ['P TDs',['passTDs']],
+      ['P INTs',['passInts']],
+      ['P CMP %',['passCompPct']],
+      ['R ATT',['rushAtt']],
+      ['R Yds',['rushYds','rushYards']],
+      ['R TDs',['rushTDs']]
+    ],
+    HB:[
+      ['R ATT',['rushAtt']],
+      ['R Yds',['rushYds','rushYards']],
+      ['R TDs',['rushTDs']],
+      ['R Fum',['rushFum']],
+      ['Rec',['recCatches']],
+      ['Rec Yds',['recYards','recYds']],
+      ['Rec TDs',['recTDs']]
+    ],
+    FB:[
+      ['R ATT',['rushAtt']],
+      ['R Yds',['rushYds','rushYards']],
+      ['R TDs',['rushTDs']],
+      ['R Fum',['rushFum']],
+      ['Rec',['recCatches']],
+      ['Rec Yds',['recYards','recYds']],
+      ['Rec TDs',['recTDs']]
+    ],
+    RB:[
+      ['R ATT',['rushAtt']],
+      ['R Yds',['rushYds','rushYards']],
+      ['R TDs',['rushTDs']],
+      ['R Fum',['rushFum']],
+      ['Rec',['recCatches']],
+      ['Rec Yds',['recYards','recYds']],
+      ['Rec TDs',['recTDs']]
+    ],
+    WR:[
+      ['Rec',['recCatches']],
+      ['Rec Yds',['recYards','recYds']],
+      ['Rec TDs',['recTDs']],
+      ['R ATT',['rushAtt']],
+      ['R Yds',['rushYds','rushYards']],
+      ['R TDs',['rushTDs']],
+      ['R Fum',['rushFum']]
+    ],
+    TE:[
+      ['Rec',['recCatches']],
+      ['Rec Yds',['recYards','recYds']],
+      ['Rec TDs',['recTDs']],
+      ['R ATT',['rushAtt']],
+      ['R Yds',['rushYds','rushYards']],
+      ['R TDs',['rushTDs']],
+      ['R Fum',['rushFum']]
+    ],
+    DEFENSE:[
+      ['Tackles',['defTotalTackles']],
+      ['Sacks',['defSacks']],
+      ['INTs',['defInts']],
+      ['FF',['defForcedFum']],
+      ['FR',['defFumRec']],
+      ['TDs',['defTDs']]
+    ],
+    K:[
+      ['FG Att',['fGAtt']],
+      ['FG Made',['fGMade']],
+      ['XP Att',['xPAtt']],
+      ['XP Made',['xPMade']]
+    ],
+    P:[
+      ['Punts Att',['puntAtt']],
+      ['Punt Net Yds / Att',['puntNetYdsPerAtt']],
+      ['Punt Longest',['puntLongest']]
+    ]
+  };
+
+  function playerDetailsGameLogColumns(position=''){
+    const pos=String(position||'').toUpperCase();
+    if(PLAYER_DETAILS_GAMELOG_COLUMNS[pos])return PLAYER_DETAILS_GAMELOG_COLUMNS[pos];
+    if(['LE','RE','DT','DL','LOLB','ROLB','MLB','LB','CB','FS','SS','DB'].includes(pos))return PLAYER_DETAILS_GAMELOG_COLUMNS.DEFENSE;
+    return [];
+  }
+
+  function canonicalDetailsGameLog(playerId=''){
+    const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId);
+    const categories=model?.categories||{};
+    const normalized=liveRosterPlayers.get(String(playerId))||rosterService()?.findPlayer?.(playerId);
+    const view=normalized?rosterPlayerView(normalized):{};
+    const teamId=String(view.teamId||normalized?.teamId||'');
+    const year=Number(canonicalCurrentSeasonYear());
+    const columns=playerDetailsGameLogColumns(view.position);
+
+    if(!columns.length){
+      return `<div class="canonical-player-empty">No game-log layout is configured for this position.</div>`;
+    }
+
+    const scheduleRows=canonicalScheduleUniverse().filter(game=>{
+      const source=game.source||{};
+      const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');
+      const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');
+      const gameYear=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??year);
+      const stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
+      return (home===teamId||away===teamId)
+        &&stage!=='preseason'
+        &&(!Number.isFinite(year)||!Number.isFinite(gameYear)||gameYear===year);
+    }).sort((a,b)=>{
+      const sourceA=a.source||{},sourceB=b.source||{};
+      const stageA=canonicalNormalizeStage(a.stage??a.stageLabel??sourceA.stage??sourceA.seasonStage);
+      const stageB=canonicalNormalizeStage(b.stage??b.stageLabel??sourceB.stage??sourceB.seasonStage);
+      const order={'regular-season':0,'playoffs':1};
+      const wa=Number(a.week??a.weekIndex??sourceA.weekIndex??0);
+      const wb=Number(b.week??b.weekIndex??sourceB.weekIndex??0);
+      return (order[stageA]-order[stageB])||wa-wb;
+    });
+
+    const metricFor=(week,stage,aliases)=>{
+      for(const category of PLAYER_STAT_CATEGORIES){
+        const row=(categories[category]?.rows||[]).find(item=>{
+          const raw=item.source||{};
+          const rowStage=canonicalNormalizeStage(item.stage||raw.stage||raw.seasonStage);
+          const rowWeek=Number(item.week??item.weekIndex??raw.weekIndex??raw.week);
+          const rowYear=Number(item.seasonYear??raw.seasonYear??raw.calendarYear??year);
+          return rowStage===stage
+            &&rowWeek===Number(week)
+            &&(!Number.isFinite(year)||!Number.isFinite(rowYear)||rowYear===year);
+        });
+        if(!row)continue;
+        const value=canonicalMetricValue([{category,metrics:row.metrics||{}}],aliases);
+        if(value!=='—')return value;
+      }
+      return 0;
+    };
+
+    const rows=scheduleRows.map(game=>{
+      const source=game.source||{};
+      const week=game.week??game.weekIndex??source.weekIndex??source.week??'—';
+      const stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
+      const gameYear=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??year);
+      const result=canonicalGameResultFor(playerId,week,stage,gameYear);
+      const opponent=result
+        ? `${result.opponent}${result.score?` - ${result.score}`:''}`
+        : `${stage==='playoffs'?'Playoffs':'Week'} ${week}`;
+
+      const metricCells=columns.map(([label,aliases])=>{
+        const value=metricFor(week,stage,aliases);
+        const formatted=label.includes('%')
+          ? `${Number(value||0).toFixed(1)}%`
+          : ['Punt Net Yds / Att'].includes(label)
+            ? Number(value||0).toFixed(1)
+            : Number(value||0).toLocaleString();
+        return formatted;
+      });
+
+      return [week,{value:opponent,className:result?.className||'is-neutral'},...metricCells];
+    });
+
+    return rows.length
+      ? canonicalSortableTable(
+          `details-game-log-${String(playerId).replace(/\W/g,'')}-${year}`,
+          ['Week','Opponent / Result',...columns.map(([label])=>label)],
+          rows
+        )
+      : `<div class="canonical-player-empty">No current-season game-log records are available.</div>`;
+  }
+
 function canonicalPlayerDashboardStats(playerId='') {
     const year=canonicalCurrentSeasonYear();
 
@@ -3103,7 +3268,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       <section class="canonical-dashboard-card canonical-current-game-log-card">
         <div class="canonical-dashboard-card__head"><h3>Game Log${year?` (${year})`:''}</h3></div>
         <div class="canonical-current-game-log-body">
-          ${canonicalGameLog(playerId,year)}
+          ${canonicalDetailsGameLog(playerId)}
         </div>
       </section>
     </div>`;
@@ -4904,7 +5069,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.6.5cb',
+      release:'5.9.6.5bcb',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
