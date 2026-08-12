@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.2ncb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.3cb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.2ncb.2b.1ba.1',
+        version:'5.9.6.3cb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1894,6 +1894,20 @@
       nativeEventTimestamp:Number(event.timeStamp)||null
     };
   },true);
+
+  document.addEventListener('click',event=>{
+    const sort=event.target.closest?.('[data-live-stats-sort]');
+    if(!sort)return;
+    event.preventDefault();
+    const key=sort.dataset.liveStatsSort;
+    if(state.statsSortKey===key){
+      state.statsSortDirection=state.statsSortDirection==='asc'?'desc':'asc';
+    }else{
+      state.statsSortKey=key;
+      state.statsSortDirection='desc';
+    }
+    renderStats();
+  });
 
   document.addEventListener('click',event=>{
     const target=event.target.closest?.('[data-game-id]');
@@ -4775,35 +4789,220 @@ function canonicalPlayerDashboardStats(playerId='') {
     punting:[['games','GP'],['punts','PUNTS'],['average','AVG'],['netAverage','NET'],['inside20','IN20'],['touchbacks','TB'],['longPunt','LONG']]
   };
 
-  function renderStats() {
-    const service=statisticsService();
-    if(!service){ pageContent.innerHTML='<article class="card"><div class="card-body"><h2>Statistics unavailable</h2><p>The Statistics service has not loaded.</p></div></article>'; return; }
+  async function renderStats() {
+    pageContent.innerHTML='<section class="empty-state"><strong>Loading live league statistics…</strong><p>Franchise HQ is reading the active snapshot.</p></section>';
+
+    try{
+      await Promise.all([
+        loadLiveTeamDirectory(false),
+        hydratePlayerStatistics(false)
+      ]);
+    }catch(error){
+      console.warn('[Stats & Leaders Hydration]',error);
+    }
+
     const categories=[['passing','Passing'],['rushing','Rushing'],['receiving','Receiving'],['defense','Defense'],['kicking','Kicking'],['punting','Punting'],['team','Team Rankings']];
-    const maxWeek=Math.max(1,...(scheduleService()?.getAllGames?.()||[]).map(game=>Number(game.week)||1));
-    const teamOptions=['<option value="All">All teams</option>',...teams.map(team=>`<option value="${team.id}" ${state.statsTeam===team.id?'selected':''}>${escapeHtml(team.fullName)}</option>`)].join('');
-    const content=state.statsCategory==='team'?renderTeamStatisticsLeaderboard(service):renderPlayerStatisticsLeaderboard(service);
+    const year=canonicalCurrentSeasonYear();
+    const games=liveTeamDirectory?.games||[];
+    const maxWeek=Math.max(1,...games.map(game=>Number(game.week??game.weekIndex??game.source?.weekIndex)||1));
+    const liveTeams=liveTeamDirectory?.teams||[];
+    const teamOptions=['<option value="All">All teams</option>',...liveTeams.map(team=>`<option value="${escapeHtml(team.id)}" ${String(state.statsTeam)===String(team.id)?'selected':''}>${escapeHtml(team.fullName||team.name||team.abbr||'Team')}</option>`)].join('');
+
+    const content=state.statsCategory==='team'
+      ? renderTeamStatisticsLeaderboard(statisticsService())
+      : renderLivePlayerStatisticsLeaderboard();
+
     pageContent.innerHTML=`
-      <div class="page-heading"><div><span class="eyebrow">League performance</span><h1>Stats & Leaders</h1><p>Service-backed season totals, weekly leaders, specialists, and team rankings.</p></div></div>
-      <div class="stats-category-tabs segmented-tabs stats-category-tabs--wrap">${categories.map(([key,label])=>`<button data-stats-category="${key}" class="${state.statsCategory===key?'is-active':''}">${label}</button>`).join('')}</div>
-      <article class="card stats-filter-card"><div class="stats-filter-grid">
-        <label><span>View</span><select data-stats-scope ${state.statsCategory==='team'?'disabled':''}><option value="season" ${state.statsScope==='season'?'selected':''}>Full Season</option><option value="week" ${state.statsScope==='week'?'selected':''}>Weekly Leaders</option></select></label>
-        <label><span>Week</span><select data-stats-week ${state.statsScope!=='week'||state.statsCategory==='team'?'disabled':''}>${Array.from({length:maxWeek},(_,i)=>`<option value="${i+1}" ${state.statsWeek===i+1?'selected':''}>Week ${i+1}</option>`).join('')}</select></label>
-        <label><span>Team</span><select data-stats-team ${state.statsCategory==='team'?'disabled':''}>${teamOptions}</select></label>
-        <label><span>Minimum games</span><select data-stats-min-games ${state.statsCategory==='team'?'disabled':''}>${[0,1,3,5,8].map(n=>`<option value="${n}" ${state.statsMinimumGames===n?'selected':''}>${n||'Any'}</option>`).join('')}</select></label>
-      </div></article>
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">Live Madden snapshot${year?` · ${escapeHtml(year)}`:''}</span>
+          <h1>Stats & Leaders</h1>
+          <p>League-wide leaders from the active Franchise HQ statistics snapshot.</p>
+        </div>
+      </div>
+      <div class="stats-category-tabs segmented-tabs stats-category-tabs--wrap">
+        ${categories.map(([key,label])=>`<button data-stats-category="${key}" class="${state.statsCategory===key?'is-active':''}">${label}</button>`).join('')}
+      </div>
+      <article class="card stats-filter-card">
+        <div class="stats-filter-grid">
+          <label><span>View</span><select data-stats-scope ${state.statsCategory==='team'?'disabled':''}><option value="season" ${state.statsScope==='season'?'selected':''}>Full Season</option><option value="week" ${state.statsScope==='week'?'selected':''}>Weekly Leaders</option></select></label>
+          <label><span>Week</span><select data-stats-week ${state.statsScope!=='week'||state.statsCategory==='team'?'disabled':''}>${Array.from({length:maxWeek},(_,i)=>`<option value="${i+1}" ${Number(state.statsWeek)===i+1?'selected':''}>Week ${i+1}</option>`).join('')}</select></label>
+          <label><span>Team</span><select data-stats-team ${state.statsCategory==='team'?'disabled':''}>${teamOptions}</select></label>
+          <label><span>Minimum games</span><select data-stats-min-games ${state.statsCategory==='team'?'disabled':''}>${[0,1,3,5,8].map(n=>`<option value="${n}" ${Number(state.statsMinimumGames)===n?'selected':''}>${n||'Any'}</option>`).join('')}</select></label>
+        </div>
+      </article>
       ${content}`;
   }
 
-  function renderPlayerStatisticsLeaderboard(service){
-    const category=state.statsCategory;
-    const supportedFields=service.getSupportedFields?.(category)||null;
-    const columns=(statsColumnMap[category]||statsColumnMap.passing).filter(([key])=>!supportedFields||supportedFields.includes(key));
-    const sortKey=state.statsSortKey||({passing:'passingYards',rushing:'rushingYards',receiving:'receivingYards',defense:'tackles',kicking:'points',punting:'average'}[category]);
-    const options={teamId:state.statsTeam,minimumGames:state.statsMinimumGames,sortKey,direction:state.statsSortDirection,limit:100};
-    const rows=state.statsScope==='week'?service.getWeeklyLeaders(state.statsWeek,category,options):service.getLeagueLeaders(category,options);
-    const leaders=rows.slice(0,3);
-    return `<div class="leader-grid">${leaders.map((row,index)=>renderLeaderCard({player:playerById(row.id)||row,value:formatStatValue(sortKey,row.stats?.[sortKey]),label:(columns.find(([key])=>key===sortKey)||columns[0])[1]},index+1,{})).join('')}</div>
-      <article class="card"><div class="card-header"><div><span class="eyebrow">${state.statsScope==='week'?`Week ${state.statsWeek}`:'Season'} leaderboard</span><h3>${titleCase(category)} leaders</h3></div><span class="pill pill--neutral">${rows.length} players</span></div><div class="table-wrap"><table class="statistics-table"><thead><tr><th>Rank</th><th>Player</th><th>Team</th>${columns.map(([key,label])=>`<th><button class="stat-sort-button ${sortKey===key?'is-active':''}" data-stats-sort="${key}">${label}${sortKey===key?(state.statsSortDirection==='desc'?' ↓':' ↑'):''}</button></th>`).join('')}<th>OVR</th></tr></thead><tbody>${rows.map(row=>`<tr class="clickable-row" data-player-id="${escapeHtml(row.id)}"><td><span class="seed">${row.rank}</span></td><td><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.position)}</small></td><td>${escapeHtml(row.teamAbbr||'FA')}</td>${columns.map(([key])=>`<td class="cell-number">${formatStatValue(key,row.stats?.[key])}</td>`).join('')}<td><span class="rating-chip">${row.overall||'—'}</span></td></tr>`).join('')||`<tr><td colspan="${columns.length+4}">No ${category} statistics are available for these filters.</td></tr>`}</tbody></table></div></article>`;
+  function liveStatsRowsForCategory(category='passing') {
+    const rows=playerStatisticsState.rows||[];
+    const currentYear=canonicalCurrentSeasonYear();
+    const scopeWeek=state.statsScope==='week'?Number(state.statsWeek):null;
+
+    return rows.filter(row=>{
+      const raw=statisticRaw(row);
+      const cat=matchupPlayerCategory(row);
+      if(cat!==category)return false;
+
+      const rowYear=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+      if(Number.isFinite(currentYear)&&Number.isFinite(rowYear)&&rowYear!==Number(currentYear))return false;
+
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
+      if(scopeWeek&&week!==scopeWeek)return false;
+
+      const teamId=rowTeamId(row);
+      if(state.statsTeam&&state.statsTeam!=='All'&&String(teamId)!==String(state.statsTeam))return false;
+
+      return true;
+    });
+  }
+
+  const LIVE_LEADER_COLUMNS={
+    passing:[
+      ['CMP',['passCompletions','completions','passComp','cmp']],
+      ['ATT',['passAttempts','attempts','passAtt','att']],
+      ['YDS',['passYds','passingYards','passYards','yards']],
+      ['TD',['passTDs','passingTDs','passTouchdowns','touchdowns']],
+      ['INT',['passInts','interceptionsThrown','interceptions','ints']]
+    ],
+    rushing:[
+      ['ATT',['rushAtt','rushingAttempts','carries','attempts']],
+      ['YDS',['rushYds','rushingYards','yards']],
+      ['AVG',['rushAvg','rushingAverage','yardsPerCarry','avg']],
+      ['TD',['rushTDs','rushingTDs','touchdowns']]
+    ],
+    receiving:[
+      ['REC',['recCatches','receptions','catches','rec']],
+      ['YDS',['recYds','receivingYards','yards']],
+      ['AVG',['recAvg','receivingAverage','yardsPerReception','avg']],
+      ['TD',['recTDs','receivingTDs','touchdowns']]
+    ],
+    defense:[
+      ['TKL',['defTotalTackles','totalTackles','tackles','tacklesTotal']],
+      ['TFL',['tacklesForLoss','defTacklesForLoss','tfl']],
+      ['SACK',['defSacks','sacks']],
+      ['INT',['defInts','defInterceptions','interceptions']],
+      ['FF',['defForcedFum','forcedFumbles','ff']]
+    ],
+    kicking:[
+      ['FGM',['kickFGMade','fieldGoalsMade','fgMade']],
+      ['FGA',['kickFGAttempts','fieldGoalsAttempted','fgAtt']],
+      ['FG%',['kickFGPct','fieldGoalPct','fgPct']],
+      ['XPM',['extraPointsMade','xpMade']],
+      ['PTS',['points','kickPoints']]
+    ],
+    punting:[
+      ['PUNTS',['puntAttempts','punts','puntAtt']],
+      ['YDS',['puntYds','puntingYards','yards']],
+      ['AVG',['puntAvg','puntingAverage','avg']],
+      ['IN20',['puntsInside20','inside20']]
+    ]
+  };
+
+  function liveLeaderDefaultSort(category){
+    return {passing:'YDS',rushing:'YDS',receiving:'YDS',defense:'TKL',kicking:'PTS',punting:'AVG'}[category]||'YDS';
+  }
+
+  function aggregateLiveLeaderboard(category='passing'){
+    const columns=LIVE_LEADER_COLUMNS[category]||[];
+    const rows=liveStatsRowsForCategory(category);
+    const players=new Map();
+
+    rows.forEach(row=>{
+      const playerId=rowPlayerId(row);
+      if(!playerId)return;
+      const identity=matchupPlayerIdentity(playerId);
+      const teamId=rowTeamId(row)||identity.teamId;
+      let entry=players.get(playerId);
+      if(!entry){
+        entry={id:playerId,identity,teamId,values:{},games:new Set()};
+        players.set(playerId,entry);
+      }
+      const raw=statisticRaw(row);
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
+      if(Number.isFinite(week))entry.games.add(week);
+
+      columns.forEach(([label,aliases])=>{
+        const value=Number(matchupPlayerMetric({...row.source,...row.metrics,...row},aliases,0))||0;
+        if(label==='AVG'||label==='FG%'){
+          // Derived rates are recalculated later when possible.
+          entry.values[label]=(entry.values[label]||0)+value;
+        }else{
+          entry.values[label]=(entry.values[label]||0)+value;
+        }
+      });
+    });
+
+    const list=[...players.values()].filter(entry=>entry.games.size>=Number(state.statsMinimumGames||0));
+
+    // Recalculate common averages from totals.
+    list.forEach(entry=>{
+      if(category==='rushing'&&entry.values.ATT)entry.values.AVG=entry.values.YDS/entry.values.ATT;
+      if(category==='receiving'&&entry.values.REC)entry.values.AVG=entry.values.YDS/entry.values.REC;
+      if(category==='punting'&&entry.values.PUNTS)entry.values.AVG=entry.values.YDS/entry.values.PUNTS;
+      if(category==='kicking'&&entry.values.FGA)entry.values['FG%']=entry.values.FGM/entry.values.FGA*100;
+    });
+
+    const sortLabel=state.statsSortKey||liveLeaderDefaultSort(category);
+    const direction=state.statsSortDirection==='asc'?1:-1;
+    list.sort((a,b)=>{
+      const av=Number(a.values[sortLabel]||0),bv=Number(b.values[sortLabel]||0);
+      return (av-bv)*direction||String(a.identity.name).localeCompare(String(b.identity.name));
+    });
+
+    return {list,columns,sortLabel};
+  }
+
+  function renderLivePlayerStatisticsLeaderboard(){
+    const category=state.statsCategory||'passing';
+    const {list,columns,sortLabel}=aggregateLiveLeaderboard(category);
+    const leaders=list.slice(0,3);
+
+    const leaderCards=leaders.length?`<div class="leader-grid">${leaders.map((entry,index)=>{
+      const team=matchupTeam(entry.teamId);
+      return `<article class="card live-leader-card" data-roster-player-detail="${escapeHtml(entry.id)}">
+        <div class="live-leader-rank">#${index+1}</div>
+        <div class="live-leader-team">${renderTeamMark(team,'mini-team')}</div>
+        <div class="live-leader-copy"><span>${escapeHtml(team.abbr||'')}</span><button type="button" data-roster-player-detail="${escapeHtml(entry.id)}">${escapeHtml(entry.identity.name)}</button><small>${escapeHtml(entry.identity.position)}</small></div>
+        <strong>${escapeHtml(formatLiveLeaderboardValue(sortLabel,entry.values[sortLabel]))}</strong>
+        <em>${escapeHtml(sortLabel)}</em>
+      </article>`;
+    }).join('')}</div>`:'';
+
+    const headers=['RK','Player','Team',...columns.map(([label])=>label)];
+    const tableRows=list.map((entry,index)=>{
+      const team=matchupTeam(entry.teamId);
+      return [
+        index+1,
+        {html:`<button type="button" class="stats-player-link" data-roster-player-detail="${escapeHtml(entry.id)}">${escapeHtml(entry.identity.name)}</button><small>${escapeHtml(entry.identity.position)}</small>`},
+        {html:`<span class="stats-team-cell">${renderTeamMark(team,'mini-team')}<strong>${escapeHtml(team.abbr||'—')}</strong></span>`},
+        ...columns.map(([label])=>formatLiveLeaderboardValue(label,entry.values[label]))
+      ];
+    });
+
+    return `${leaderCards}
+      <article class="card live-leaderboard-card">
+        <div class="card-header"><div><span class="eyebrow">${state.statsScope==='week'?`Week ${escapeHtml(state.statsWeek)}`:'Season'} leaderboard</span><h3>${escapeHtml(category[0].toUpperCase()+category.slice(1))}</h3></div><span class="pill pill--neutral">${list.length} players</span></div>
+        ${renderLiveLeaderboardTable(`league-leaders-${category}`,headers,tableRows,columns)}
+      </article>`;
+  }
+
+  function formatLiveLeaderboardValue(label,value){
+    const n=Number(value);
+    if(!Number.isFinite(n))return '—';
+    if(label==='AVG'||label==='FG%')return label==='FG%'?`${n.toFixed(1)}%`:n.toFixed(1);
+    return Math.round(n).toLocaleString();
+  }
+
+  function renderLiveLeaderboardTable(tableId,headers,rows,columns){
+    return `<div class="table-wrap live-leaderboard-wrap"><table id="${tableId}" class="live-leaderboard-table">
+      <thead><tr>${headers.map((header,index)=>{
+        const sortable=index>=3;
+        const label=sortable?columns[index-3][0]:header;
+        return `<th>${sortable?`<button type="button" data-live-stats-sort="${escapeHtml(label)}">${escapeHtml(header)} <span>↕</span></button>`:escapeHtml(header)}</th>`;
+      }).join('')}</tr></thead>
+      <tbody>${rows.length?rows.map(row=>`<tr>${row.map(cell=>`<td>${cell&&typeof cell==='object'&&cell.html?cell.html:escapeHtml(cell)}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}">No live ${escapeHtml(state.statsCategory)} statistics are available for the selected filters.</td></tr>`}</tbody>
+    </table></div>`;
   }
 
   function renderTeamStatisticsLeaderboard(service){
