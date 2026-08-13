@@ -5260,7 +5260,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb.2b.1b — Player Data Inspector
+   Franchise HQ v5.9.6.6edccbcb.2b.1b — Player Data Inspector
    ============================================================ */
 .player-data-inspector{display:grid;gap:16px}
 .player-inspector-heading{margin-bottom:0}
@@ -5319,7 +5319,7 @@ table td{
 }
 
 
-/* Franchise HQ v5.9.6.5eedccbcb.2b.1b — Player Data Inspector interaction fix */
+/* Franchise HQ v5.9.6.6edccbcb.2b.1b — Player Data Inspector interaction fix */
 .player-inspector-controls select[data-player-inspector-select]{
   cursor:pointer;
 }
@@ -5329,7 +5329,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb.2b.1b — Live Player Statistics Integration
+   Franchise HQ v5.9.6.6edccbcb.2b.1b — Live Player Statistics Integration
    ============================================================ */
 .value-card-live-statistics{grid-column:1/-1}
 .player-live-statistics{display:grid;gap:14px}
@@ -5364,7 +5364,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb.2b.1b — Canonical Player Card 2.0 Foundation
+   Franchise HQ v5.9.6.6edccbcb.2b.1b — Canonical Player Card 2.0 Foundation
    ============================================================ */
 .canonical-player-hero{
   position:relative;
@@ -5507,7 +5507,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb.2b.1 — Approved Player Card UI
+   Franchise HQ v5.9.6.6edccbcb.2b.1 — Approved Player Card UI
    Direct implementation of approved design target.
    ============================================================ */
 [data-value-card-modal] .value-card-dialog{max-width:min(1540px,96vw)!important;width:min(1540px,96vw)!important}
@@ -5602,7 +5602,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb.2b.1.1 — Player Card polish hotfix
+   Franchise HQ v5.9.6.6edccbcb.2b.1.1 — Player Card polish hotfix
    ============================================================ */
 
 /* Player image */
@@ -5766,7 +5766,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb.2
+   Franchise HQ v5.9.6.6edccbcb.2
    Restore APPROVED Player Card dashboard layout.
    Do not redesign markup; only restore 3-column geometry and alignment.
 
@@ -5897,7 +5897,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb — Game Log / Career Stats / Portraits
+   Franchise HQ v5.9.6.6edccbcb — Game Log / Career Stats / Portraits
    ============================================================ */
 .canonical-game-log-table-wrap{overflow:visible!important;max-height:none!important}
 .canonical-game-log-table--compact{table-layout:fixed;width:100%}
@@ -5947,7 +5947,7 @@ table td{
   .canonical-contract-grid--compact strong{font-size:11px!important}
 }
 
-/* v5.9.6.5eedccbcb */
+/* v5.9.6.6edccbcb */
 .canonical-player-hero__watermark--logo{position:absolute!important;left:18px!important;top:50%!important;transform:translateY(-50%)!important;width:235px!important;height:235px!important;opacity:.11!important;display:flex!important;align-items:center!important;justify-content:center!important;pointer-events:none!important}
 .canonical-player-hero__watermark--logo img{width:100%!important;height:100%!important;object-fit:contain!important;filter:none!important}
 .canonical-flat-table-wrap{width:100%;overflow-x:auto;overflow-y:visible}
@@ -5964,7 +5964,7 @@ table td{
 .canonical-flat-table td.is-neutral{color:var(--text)}
 .canonical-career-stats .canonical-flat-table-wrap{border:1px solid #293c52;border-radius:8px}
 
-/* Franchise HQ v5.9.6.5eedccbcb */
+/* Franchise HQ v5.9.6.6edccbcb */
 .canonical-player-hero__watermark--logo{left:22px!important;top:52%!important;width:285px!important;height:285px!important;opacity:.16!important;z-index:1!important;transform:translateY(-50%)!important}
 .canonical-player-hero__watermark--logo img,.canonical-player-hero__watermark--logo svg{width:100%!important;height:100%!important;object-fit:contain!important}
 .canonical-player-hero__image{z-index:2!important;left:34px!important;width:250px!important}
@@ -5974,7 +5974,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb — Player Card schedule / season / watermark fix
+   Franchise HQ v5.9.6.6edccbcb — Player Card schedule / season / watermark fix
    ============================================================ */
 
 .canonical-player-hero__watermark--logo{
@@ -6021,7 +6021,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccbcb — Completed Matchup Player Statistics
+   Franchise HQ v5.9.6.6edccbcb — Completed Matchup Player Statistics
    ============================================================ */
 .matchup-player-stat-stack{display:grid;gap:16px;padding:14px}
 .matchup-player-category{border:1px solid rgba(142,164,190,.2);border-radius:10px;overflow:hidden;background:rgba(7,17,28,.48)}
@@ -6045,16 +6045,16 @@ table td{
 @media(max-width:900px){.matchup-player-sides{grid-template-columns:1fr}.matchup-player-side+ .matchup-player-side{border-left:0;border-top:1px solid rgba(142,164,190,.18)}}
 
 
-/* Franchise HQ v5.9.6.5eedccbcba — instant matchup tabs */
+/* Franchise HQ v5.9.6.6edccbcba — instant matchup tabs */
 .matchup-stat-tabs button{transition:background-color .12s ease,color .12s ease,border-color .12s ease}
 
 
-/* Franchise HQ v5.9.6.5eedccb — instant Matchup Card open */
+/* Franchise HQ v5.9.6.6edccb — instant Matchup Card open */
 [data-matchup-modal]{content-visibility:auto}
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccb — zero-wait Matchup Card shell
+   Franchise HQ v5.9.6.6edccb — zero-wait Matchup Card shell
    ============================================================ */
 
 .matchup-modal--instant{
@@ -6097,25 +6097,25 @@ table td{
 
 
 
-/* Franchise HQ v5.9.6.5eedccb — prewarmed Matchup Player Stats */
+/* Franchise HQ v5.9.6.6edccb — prewarmed Matchup Player Stats */
 .matchup-tab-content{
   min-height:160px;
 }
 
 
-/* Franchise HQ v5.9.6.5eedccb — targeted matchup prewarm only */
+/* Franchise HQ v5.9.6.6edccb — targeted matchup prewarm only */
 .matchup-modal--instant{will-change:auto}
 
-/* Franchise HQ v5.9.6.5eedccb — Canonical Statistics Index Runtime */
+/* Franchise HQ v5.9.6.6edccb — Canonical Statistics Index Runtime */
 .matchup-stat-tabs button{touch-action:manipulation}
 
 
-/* Franchise HQ v5.9.6.5eedccb — cooperative statistics startup */
+/* Franchise HQ v5.9.6.6edccb — cooperative statistics startup */
 .matchup-modal--instant{transform:translateZ(0)}
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccb — Live Stats & Leaders
+   Franchise HQ v5.9.6.6edccb — Live Stats & Leaders
    ============================================================ */
 .live-leader-card{position:relative;display:grid;grid-template-columns:auto auto 1fr auto;gap:12px;align-items:center;padding:16px;cursor:pointer}
 .live-leader-rank{font-size:24px;font-weight:900;color:#8fa2b9}
@@ -6144,7 +6144,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccb — Player Statistics Certification
+   Franchise HQ v5.9.6.6edccb — Player Statistics Certification
    ============================================================ */
 .stats-certification-link{margin-top:12px}
 .player-stats-certification{display:grid;gap:14px}
@@ -6189,7 +6189,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedccba — Game Log history + certification scope
+   Franchise HQ v5.9.6.6edccba — Game Log history + certification scope
    ============================================================ */
 .canonical-game-log-tab{display:grid;gap:12px;padding:12px}
 .canonical-game-log-controls{
@@ -6210,7 +6210,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedcc — Current + Historical Game Logs
+   Franchise HQ v5.9.6.6edcc — Current + Historical Game Logs
    ============================================================ */
 .canonical-current-game-log-card{
   margin-top:0;
@@ -6222,12 +6222,12 @@ table td{
   margin-top:0;
 }
 
-/* Franchise HQ v5.9.6.5eedc — Player & Statistics Standardization */
+/* Franchise HQ v5.9.6.6edc — Player & Statistics Standardization */
 .canonical-game-log-category-stack{display:grid;gap:18px}.canonical-game-log-category{display:grid;gap:8px;min-width:0}.canonical-game-log-category__head h4{margin:0;font-size:14px}.canonical-career-stat-panel{display:none}.canonical-career-stat-panel.is-active{display:grid;gap:12px}.canonical-career-stat-nav{margin:0 0 12px}.canonical-player-bio-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.live-leaderboard-table th,.live-leaderboard-table td{font-variant-numeric:tabular-nums}
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedcb — Compact Details Game Log
+   Franchise HQ v5.9.6.6edcb — Compact Details Game Log
    ============================================================ */
 .canonical-current-game-log-body .canonical-flat-table-wrap{
   overflow-x:auto;
@@ -6244,7 +6244,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eedc — Combined Historical Game Logs
+   Franchise HQ v5.9.6.6edc — Combined Historical Game Logs
    ============================================================ */
 .canonical-history-game-log-wrap{
   width:100%;
@@ -6306,7 +6306,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5eed — Historical Game Log Header Alignment
+   Franchise HQ v5.9.6.6ed — Historical Game Log Header Alignment
    ============================================================ */
 .canonical-history-game-log thead th{
   vertical-align:middle;
@@ -6331,7 +6331,7 @@ table td{
 
 
 /* ============================================================
-   Franchise HQ v5.9.6.5ee — Game Log Metric Header Alignment Fix
+   Franchise HQ v5.9.6.6e — Game Log Metric Header Alignment Fix
    ============================================================ */
 
 /* All metric headers in the second header row align consistently right. */
@@ -6389,3 +6389,67 @@ table td{
 .canonical-history-game-log tbody > tr > td:nth-child(n+3){
   text-align:right;
 }
+
+
+/* ============================================================
+   Franchise HQ v5.9.6.6 — Season Team Statistics
+   ============================================================ */
+.season-team-statistics-card{overflow:hidden}
+.season-team-stat-table-wrap{
+  width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.season-team-stat-table{
+  width:max-content;
+  min-width:100%;
+  border-collapse:collapse;
+  font-variant-numeric:tabular-nums;
+}
+.season-team-stat-table th,
+.season-team-stat-table td{
+  padding:9px 10px;
+  border-bottom:1px solid rgba(143,162,185,.14);
+  white-space:nowrap;
+  text-align:right;
+  font-size:11px;
+}
+.season-team-stat-table thead th{
+  background:#0c1926;
+  color:#9aacbf;
+  text-transform:uppercase;
+  letter-spacing:.045em;
+  font-size:9px;
+  vertical-align:middle;
+}
+.season-team-stat-table thead tr:nth-child(2)>th{text-align:right}
+.season-team-stat-table th button{
+  appearance:none;border:0;background:transparent;color:inherit;
+  font:inherit;font-weight:900;text-transform:uppercase;cursor:pointer;padding:0;
+}
+.season-team-stat-table th button:hover,
+.season-team-stat-table th button.is-active{color:#fff}
+.season-team-stat-table th button span{opacity:.7}
+.season-team-stat-table .season-team-group{
+  text-align:center;
+  color:#d9e3ed;
+  background:#102131;
+  border-left:1px solid rgba(143,162,185,.22);
+}
+.season-team-stat-table thead tr:first-child>th:first-child,
+.season-team-stat-table tbody td:first-child{
+  position:sticky;left:0;z-index:3;min-width:48px;text-align:center;background:#0b1724;
+}
+.season-team-stat-table thead tr:first-child>th:nth-child(2),
+.season-team-stat-table tbody td:nth-child(2){
+  position:sticky;left:48px;z-index:3;min-width:205px;text-align:left;background:#0b1724;
+}
+.season-team-stat-table thead tr:first-child>th:first-child,
+.season-team-stat-table thead tr:first-child>th:nth-child(2){z-index:5}
+.season-team-team button{
+  display:flex;align-items:center;gap:9px;appearance:none;border:0;background:transparent;
+  color:#fff;font:inherit;text-align:left;cursor:pointer;padding:0;
+}
+.season-team-team button>span{display:flex;flex-direction:column}
+.season-team-team small{color:#7f91a8;font-size:9px}
+.season-team-rank{font-weight:900;color:#93a5ba}

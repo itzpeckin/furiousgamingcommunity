@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.5eedccbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.6edccbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.5eedccbcb.2b.1ba.1',
+        version:'5.9.6.6edccbcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1904,6 +1904,20 @@
       nativeEventTimestamp:Number(event.timeStamp)||null
     };
   },true);
+
+  document.addEventListener('click',event=>{
+    const sort=event.target.closest?.('[data-season-team-sort]');
+    if(!sort)return;
+    event.preventDefault();
+    const key=sort.dataset.seasonTeamSort;
+    if(state.teamStatsSortKey===key){
+      state.teamStatsSortDirection=state.teamStatsSortDirection==='asc'?'desc':'asc';
+    }else{
+      state.teamStatsSortKey=key;
+      state.teamStatsSortDirection='desc';
+    }
+    renderStats();
+  });
 
   document.addEventListener('click',event=>{
     const tab=event.target.closest?.('[data-player-career-stat-tab]');if(!tab)return;const root=tab.closest('.canonical-career-stats');if(!root)return;const category=tab.dataset.playerCareerStatTab;root.querySelectorAll('[data-player-career-stat-tab]').forEach(button=>button.classList.toggle('is-active',button===tab));root.querySelectorAll('[data-player-career-stat-panel]').forEach(panel=>panel.classList.toggle('is-active',panel.dataset.playerCareerStatPanel===category));
@@ -4586,7 +4600,6 @@ function canonicalPlayerDashboardStats(playerId='') {
   function prepareMatchupRuntime(game={}){
     const teamKey=matchupPanelCacheKey(game,'team');
     const playerKey=matchupPanelCacheKey(game,'player');
-    const advancedKey=matchupPanelCacheKey(game,'advanced');
     const gameKey=String(game.id||game.gameId||game.scheduleId||'');
 
     if(!matchupPanelCache.has(teamKey)){
@@ -4599,12 +4612,6 @@ function canonicalPlayerDashboardStats(playerId='') {
       const start=performance.now();
       matchupPanelCache.set(playerKey,buildMatchupPanel('player',game));
       console.info(`[Matchup PanelBuild] ${gameKey} Player ${(performance.now()-start).toFixed(1)}ms`);
-    }
-
-    if(!matchupPanelCache.has(advancedKey)){
-      const start=performance.now();
-      matchupPanelCache.set(advancedKey,buildMatchupPanel('advanced',game));
-      console.info(`[Matchup PanelBuild] ${gameKey} Advanced ${(performance.now()-start).toFixed(1)}ms`);
     }
   }
 
@@ -4761,7 +4768,6 @@ function canonicalPlayerDashboardStats(playerId='') {
       <div class="matchup-stat-tabs" role="tablist" aria-label="Matchup statistics">
         <button type="button" class="is-active" data-matchup-tab="team" role="tab" aria-selected="true">Team Stats</button>
         <button type="button" data-matchup-tab="player" role="tab" aria-selected="false">Player Stats</button>
-        <button type="button" data-matchup-tab="advanced" role="tab" aria-selected="false">Advanced Stats</button>
       </div>
       <div class="matchup-tab-content" data-matchup-tab-content>${initialPanel}</div>
     </div>`);
@@ -5206,7 +5212,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.6.5eedccb',
+      release:'5.9.6.6edccb',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -5280,7 +5286,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       console.warn('[Stats & Leaders Hydration]',error);
     }
 
-    const categories=[['passing','Passing'],['rushing','Rushing'],['receiving','Receiving'],['defense','Defense'],['kicking','Kicking'],['punting','Punting'],['team','Team Rankings']];
+    const categories=[['passing','Passing'],['rushing','Rushing'],['receiving','Receiving'],['defense','Defense'],['kicking','Kicking'],['punting','Punting'],['team','Team Statistics']];
     const year=canonicalCurrentSeasonYear();
     const games=liveTeamDirectory?.games||[];
     const maxWeek=Math.max(1,...games.map(game=>Number(game.week??game.weekIndex??game.source?.weekIndex)||1));
@@ -5288,7 +5294,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const teamOptions=['<option value="All">All teams</option>',...liveTeams.map(team=>`<option value="${escapeHtml(team.id)}" ${String(state.statsTeam)===String(team.id)?'selected':''}>${escapeHtml(team.fullName||team.name||team.abbr||'Team')}</option>`)].join('');
 
     const content=state.statsCategory==='team'
-      ? renderTeamStatisticsLeaderboard(statisticsService())
+      ? renderSeasonTeamStatistics()
       : renderLivePlayerStatisticsLeaderboard();
 
     pageContent.innerHTML=`
@@ -5298,14 +5304,14 @@ function canonicalPlayerDashboardStats(playerId='') {
       <div class="stats-category-tabs segmented-tabs stats-category-tabs--wrap">
         ${categories.map(([key,label])=>`<button data-stats-category="${key}" class="${state.statsCategory===key?'is-active':''}">${label}</button>`).join('')}
       </div>
-      <article class="card stats-filter-card">
+      ${state.statsCategory==='team'?'':`<article class="card stats-filter-card">
         <div class="stats-filter-grid">
-          <label><span>View</span><select data-stats-scope ${state.statsCategory==='team'?'disabled':''}><option value="season" ${state.statsScope==='season'?'selected':''}>Full Season</option><option value="week" ${state.statsScope==='week'?'selected':''}>Weekly Leaders</option></select></label>
-          <label><span>Week</span><select data-stats-week ${state.statsScope!=='week'||state.statsCategory==='team'?'disabled':''}>${Array.from({length:maxWeek},(_,i)=>`<option value="${i+1}" ${Number(state.statsWeek)===i+1?'selected':''}>Week ${i+1}</option>`).join('')}</select></label>
-          <label><span>Team</span><select data-stats-team ${state.statsCategory==='team'?'disabled':''}>${teamOptions}</select></label>
-          <label><span>Minimum games</span><select data-stats-min-games ${state.statsCategory==='team'?'disabled':''}>${[0,1,3,5,8].map(n=>`<option value="${n}" ${Number(state.statsMinimumGames)===n?'selected':''}>${n||'Any'}</option>`).join('')}</select></label>
+          <label><span>View</span><select data-stats-scope><option value="season" ${state.statsScope==='season'?'selected':''}>Full Season</option><option value="week" ${state.statsScope==='week'?'selected':''}>Weekly Leaders</option></select></label>
+          <label><span>Week</span><select data-stats-week ${state.statsScope!=='week'?'disabled':''}>${Array.from({length:maxWeek},(_,i)=>`<option value="${i+1}" ${Number(state.statsWeek)===i+1?'selected':''}>Week ${i+1}</option>`).join('')}</select></label>
+          <label><span>Team</span><select data-stats-team>${teamOptions}</select></label>
+          <label><span>Minimum games</span><select data-stats-min-games>${[0,1,3,5,8].map(n=>`<option value="${n}" ${Number(state.statsMinimumGames)===n?'selected':''}>${n||'Any'}</option>`).join('')}</select></label>
         </div>
-      </article>
+      </article>`}
       ${content}`;
   }
 
@@ -5403,6 +5409,178 @@ function canonicalPlayerDashboardStats(playerId='') {
       }).join('')}</tr></thead>
       <tbody>${rows.length?rows.map(row=>`<tr>${row.map(cell=>`<td>${cell&&typeof cell==='object'&&cell.html?cell.html:escapeHtml(cell)}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}">No live ${escapeHtml(state.statsCategory)} statistics are available for the selected filters.</td></tr>`}</tbody>
     </table></div>`;
+  }
+
+  const SEASON_TEAM_STAT_GROUPS=[
+    {
+      label:'Offense',
+      columns:[
+        ['PPG','offPtsPerGame','decimal'],
+        ['Total Yds','offTotalYds','integer'],
+        ['Yds Gained','offTotalYdsGained','integer'],
+        ['Pass Yds','offPassYds','integer'],
+        ['Pass TD','offPassTDs','integer'],
+        ['Rush Yds','offRushYds','integer'],
+        ['Rush TD','offRushTDs','integer'],
+        ['1st Downs','off1stDowns','integer'],
+        ['Sacks Allowed','offSacks','integer']
+      ]
+    },
+    {
+      label:'Situational Offense',
+      columns:[
+        ['3D ATT','off3rdDownAtt','integer'],
+        ['3D CONV','off3rdDownConv','integer'],
+        ['3D %','off3rdDownConvPct','percent'],
+        ['4D ATT','off4thDownAtt','integer'],
+        ['4D CONV','off4thDownConv','integer'],
+        ['4D %','off4thDownConvPct','percent'],
+        ['RZ ATT','offRedZones','integer'],
+        ['RZ TD','offRedZoneTDs','integer'],
+        ['RZ FG','offRedZoneFGs','integer'],
+        ['RZ %','offRedZonePct','percent'],
+        ['2PT ATT','off2PtAtt','integer'],
+        ['2PT CONV','off2PtConv','integer'],
+        ['2PT %','off2PtConvPct','percent']
+      ]
+    },
+    {
+      label:'Defense',
+      columns:[
+        ['PPG','defPtsPerGame','decimal'],
+        ['Total Yds','defTotalYds','integer'],
+        ['Pass Yds','defPassYds','integer'],
+        ['Rush Yds','defRushYds','integer'],
+        ['Sacks','defSacks','integer'],
+        ['INT','defIntsRec','integer'],
+        ['FF','defForcedFum','integer'],
+        ['FR','defFumRec','integer'],
+        ['RZ ATT','defRedZones','integer'],
+        ['RZ TD','defRedZoneTDs','integer'],
+        ['RZ FG','defRedZoneFGs','integer'],
+        ['RZ %','defRedZonePct','percent']
+      ]
+    },
+    {
+      label:'Turnovers & Penalties',
+      columns:[
+        ['FUM Lost','offFumLost','integer'],
+        ['INT Lost','offIntsLost','integer'],
+        ['Giveaways','tOGiveaways','integer'],
+        ['Takeaways','tOTakeaways','integer'],
+        ['TO Diff','tODiff','signed'],
+        ['Penalties','penalties','integer'],
+        ['Penalty Yds','penaltyYds','integer']
+      ]
+    }
+  ];
+
+  function seasonTeamStatRows(){
+    const currentYear=Number(canonicalCurrentSeasonYear());
+    const rows=(playerStatisticsState.rows||[]).filter(row=>{
+      if(String(row.category||'').toLowerCase()!=='team-game')return false;
+      const raw=statisticRaw(row);
+      const year=Number(row.seasonYear??raw.seasonYear??raw.calendarYear);
+      const stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage);
+      if(stage==='preseason')return false;
+      if(Number.isFinite(currentYear)&&Number.isFinite(year)&&year!==currentYear)return false;
+      return Boolean(rowTeamId(row));
+    });
+
+    // Madden team records are season-to-date snapshots. Select the newest
+    // available snapshot per team rather than summing weekly cumulative rows.
+    const latest=new Map();
+    rows.forEach(row=>{
+      const teamId=rowTeamId(row);
+      const raw=statisticRaw(row);
+      const stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage);
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex)||0;
+      const stageRank=stage==='playoffs'?2:1;
+      const current=latest.get(teamId);
+      if(!current||stageRank>current.stageRank||(stageRank===current.stageRank&&week>current.week)){
+        latest.set(teamId,{row,week,stageRank,stage});
+      }
+    });
+
+    return [...latest.entries()].map(([teamId,item])=>{
+      const row=item.row;
+      const raw={...(row.source||{}),...(row.metrics||{}),...row};
+      const team=matchupTeam(teamId);
+      return {teamId,team,raw,week:item.week,stage:item.stage};
+    });
+  }
+
+  function seasonTeamStatValue(raw={},field=''){
+    const value=raw[field];
+    if(value===undefined||value===null||value==='')return null;
+    const number=Number(value);
+    return Number.isFinite(number)?number:value;
+  }
+
+  function formatSeasonTeamStat(value,type='integer'){
+    if(value===null||value===undefined||value==='')return '—';
+    const n=Number(value);
+    if(!Number.isFinite(n))return String(value);
+    if(type==='percent')return `${n.toFixed(1)}%`;
+    if(type==='decimal')return n.toFixed(1);
+    if(type==='signed')return `${n>0?'+':''}${Math.round(n)}`;
+    return Math.round(n).toLocaleString();
+  }
+
+  function renderSeasonTeamStatistics(){
+    const allColumns=SEASON_TEAM_STAT_GROUPS.flatMap(group=>group.columns);
+    const defaultKey='offPtsPerGame';
+    const requested=state.teamStatsSortKey;
+    const valid=new Set(allColumns.map(([,field])=>field));
+    const sortKey=valid.has(requested)?requested:defaultKey;
+    const direction=state.teamStatsSortDirection==='asc'?1:-1;
+
+    const rows=seasonTeamStatRows();
+    rows.sort((a,b)=>{
+      const av=Number(seasonTeamStatValue(a.raw,sortKey));
+      const bv=Number(seasonTeamStatValue(b.raw,sortKey));
+      const aSafe=Number.isFinite(av)?av:(direction===1?Infinity:-Infinity);
+      const bSafe=Number.isFinite(bv)?bv:(direction===1?Infinity:-Infinity);
+      return (aSafe-bSafe)*direction||String(a.team.fullName||'').localeCompare(String(b.team.fullName||''));
+    });
+
+    const groupHeaders=SEASON_TEAM_STAT_GROUPS.map(group=>
+      `<th class="season-team-group" colspan="${group.columns.length}">${escapeHtml(group.label)}</th>`
+    ).join('');
+
+    const headers=SEASON_TEAM_STAT_GROUPS.flatMap(group=>group.columns.map(([label,field])=>
+      `<th><button type="button" class="${field===sortKey?'is-active':''}" data-season-team-sort="${escapeHtml(field)}">${escapeHtml(label)} <span>${field===sortKey?(direction===-1?'↓':'↑'):'↕'}</span></button></th>`
+    )).join('');
+
+    const body=rows.map((entry,index)=>{
+      const team=entry.team;
+      return `<tr>
+        <td class="season-team-rank">${index+1}</td>
+        <td class="season-team-team"><button type="button" data-team-id="${escapeHtml(entry.teamId)}">${renderTeamMark(team,'mini-team')}<span><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><small>${escapeHtml(team.record||'—')}</small></span></button></td>
+        ${SEASON_TEAM_STAT_GROUPS.flatMap(group=>group.columns.map(([,field,type])=>
+          `<td>${escapeHtml(formatSeasonTeamStat(seasonTeamStatValue(entry.raw,field),type))}</td>`
+        )).join('')}
+      </tr>`;
+    }).join('');
+
+    const year=canonicalCurrentSeasonYear();
+    const latestWeek=rows.length?Math.max(...rows.map(row=>Number(row.week)||0)):0;
+
+    return `<article class="card season-team-statistics-card">
+      <div class="card-header">
+        <div><span class="eyebrow">${escapeHtml(year||'Current Season')} Team Statistics</span><h3>Season Team Statistics</h3></div>
+        <span class="pill pill--neutral">${rows.length} teams${latestWeek?` · Through Week ${latestWeek}`:''}</span>
+      </div>
+      <div class="season-team-stat-table-wrap">
+        <table class="season-team-stat-table">
+          <thead>
+            <tr><th rowspan="2">RK</th><th rowspan="2">Team</th>${groupHeaders}</tr>
+            <tr>${headers}</tr>
+          </thead>
+          <tbody>${body||`<tr><td colspan="${2+allColumns.length}">No season team-statistics snapshot is available yet.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </article>`;
   }
 
   function renderTeamStatisticsLeaderboard(service){
