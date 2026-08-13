@@ -2208,7 +2208,8 @@
       yearsPro:Number(source.yearsPro||source.experience||0)||null,
       developmentTrait:normalizeLiveDevelopment(player.devTrait??source.devTrait??source.developmentTrait??source.dev),
       injuryStatus:source.injuryStatus||source.injury||'Healthy',
-      depthOrder:Number(source.depthOrder??source.depthChartOrder??source.depth??99),
+      depthOrder:Number(source.depthOrder??source.depthChartOrder??source.depth_chart_order??source.depth??source.depthPositionOrder??source.positionOrder??99),
+      depthPosition:String(source.depthPosition??source.depthChartPosition??source.depth_chart_position??source.depthSlot??source.depthChartSlot??source.positionDepth??source.position||player.position||'').toUpperCase(),
       rosterStatus:String(source.rosterStatus||source.status||'active').toLowerCase(),
       contract,
       ratings,
@@ -2386,7 +2387,8 @@
       years: Number(contract.yearsRemaining ?? contract.years ?? raw.years ?? raw.contractYears ?? 0) || 0,
       salary: Number(contract.currentYearSalary ?? contract.salary ?? contract.totalSalary ?? raw.currentYearSalary ?? raw.currentSalary ?? raw.salary ?? 0) || 0,
       capHit: Number(contract.capHit ?? raw.capHit ?? raw.salaryCapHit ?? 0) || 0,
-      depth: player?.depthOrder ?? raw.depth ?? null,
+      depth: player?.depthOrder ?? raw.depthOrder ?? raw.depthChartOrder ?? raw.depth_chart_order ?? raw.depth ?? null,
+      depthPosition: String(player?.depthPosition ?? raw.depthPosition ?? raw.depthChartPosition ?? raw.depth_chart_position ?? raw.depthSlot ?? raw.depthChartSlot ?? player?.position ?? raw.position ?? '').toUpperCase(),
       college: raw.college || raw.school || '—',
       imageUrl: raw.imageUrl || raw.playerImageUrl || raw.headshotUrl || raw.headshot || raw.photoUrl || raw.photo || raw.portraitUrl || raw.portrait || player?.imageUrl || player?.headshotUrl || null,
       imageAssetId: raw.imageAssetId || raw.portraitId || raw.headshotId || null,
@@ -2529,13 +2531,32 @@
   }
 
   function renderRosterDepthChart(rosterModel) {
-    const players = rosterModel.players.map(rosterPlayerView).sort((a,b)=>(Number(a.depth)||99)-(Number(b.depth)||99)||(Number(b.overall)||0)-(Number(a.overall)||0));
-    const byPosition = position => players.filter(player => player.position === position);
-    const byPositions = (...positions) => players.filter(player => positions.includes(player.position));
-    const split = (list, parity) => list.filter((_,index)=>index % 2 === parity);
+    const devRank = value => ({'X-Factor':4,'Superstar':3,'Star':2,'Normal':1}[normalizeLiveDevelopment(value)] || 0);
+    const depthValue = player => {
+      const value=Number(player?.depth);
+      return Number.isFinite(value) && value >= 0 ? value : 999;
+    };
+    const sortDepth = (a,b) => depthValue(a)-depthValue(b) || (Number(b.overall)||0)-(Number(a.overall)||0) || devRank(b.dev)-devRank(a.dev) || String(a.name||'').localeCompare(String(b.name||''));
+    const players = rosterModel.players.map(rosterPlayerView).filter(player=>player.rosterStatus==='active'||!player.rosterStatus).sort(sortDepth);
+    const slotName = player => String(player.depthPosition || player.position || '').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const aliases = {
+      QB:['QB'], HB:['HB','RB'], FB:['FB'],
+      WR1:['WR1','WRX','XWR'], WR2:['WR2','WRZ','ZWR'], SLWR:['SLWR','SLOTWR','SWR'], WR:['WR'],
+      TE:['TE'], LT:['LT'], LG:['LG'], C:['C'], RG:['RG'], RT:['RT'],
+      CB1:['CB1','LCB'], CB2:['CB2','RCB'], SCB:['SCB','SLOTCB'], CB:['CB'],
+      FS:['FS'], SS:['SS'], S:['S'],
+      LEDGE:['LEDGE','LE','LEDT'], REDGE:['REDGE','RE','REDT'], DT:['DT','DT1','DT2'],
+      SAM:['SAM','LOLB'], MIKE:['MIKE','MLB'], WILL:['WILL','ROLB'],
+      K:['K'], P:['P']
+    };
+    const explicit = key => players.filter(player => (aliases[key]||[key]).includes(slotName(player))).sort(sortDepth);
+    const position = (...names) => players.filter(player => names.includes(String(player.position||'').toUpperCase())).sort(sortDepth);
+    const unique = list => { const seen=new Set(); return list.filter(player=>{const id=String(player.id||player.name); if(seen.has(id))return false; seen.add(id); return true;}); };
+    const prefer = (key, fallback=[]) => unique([...explicit(key), ...fallback]).sort(sortDepth);
+    const distribute = (list,index,total) => list.filter((_,i)=>i%total===index);
     const stackMarkup = (label, list, area) => {
       if (!list.length) return `<div class="formation-position formation-position--empty" data-depth-area="${area}" style="grid-area:${area}"><span>${label}</span></div>`;
-      const ordered = [...list];
+      const ordered = [...list].sort(sortDepth);
       const selectedIndex = ordered.findIndex(player => player.id === state.depthSelectedPlayer);
       if (selectedIndex > 0) ordered.unshift(...ordered.splice(selectedIndex,1));
       const visible = ordered.slice(0,3);
@@ -2559,19 +2580,32 @@
         </div>
       </section>`;
     };
-    const wr = byPosition('WR');
-    const cb = byPosition('CB');
-    const dt = byPosition('DT');
-    const safeties = [...byPosition('FS'), ...byPosition('SS')].sort((a,b)=>(Number(a.depth)||99)-(Number(b.depth)||99)||(Number(b.overall)||0)-(Number(a.overall)||0));
+
+    // Prefer explicit Madden depth-chart slot labels. If the export only supplies a base
+    // position, fall back to Madden depth order, then OVR, dev trait and player name.
+    const wrBase=position('WR');
+    const cbBase=position('CB');
+    const dtBase=position('DT');
+    const wr1=prefer('WR1',distribute(wrBase,0,3));
+    const wr2=prefer('WR2',distribute(wrBase,1,3));
+    const slotWr=prefer('SLWR',distribute(wrBase,2,3));
+    const cb1=prefer('CB1',distribute(cbBase,0,3));
+    const cb2=prefer('CB2',distribute(cbBase,1,3));
+    const slotCb=prefer('SCB',distribute(cbBase,2,3));
+    const dt1=prefer('DT',distribute(dtBase,0,2));
+    const dt2=prefer('DT',distribute(dtBase,1,2));
+
     const offense = [
-      stackMarkup('WR1', split(wr,0), 'wr1'), stackMarkup('LT',byPosition('LT'),'lt'), stackMarkup('LG',byPosition('LG'),'lg'), stackMarkup('C',byPosition('C'),'c'), stackMarkup('RG',byPosition('RG'),'rg'), stackMarkup('RT',byPosition('RT'),'rt'), stackMarkup('TE',byPosition('TE'),'te'), stackMarkup('WR2',split(wr,1),'wr2'), stackMarkup('QB',byPosition('QB'),'qb'), stackMarkup('HB',byPositions('HB','RB'),'rb'), stackMarkup('FB',byPosition('FB'),'fb')
+      stackMarkup('WR1',wr1,'wr1'), stackMarkup('LT',prefer('LT',position('LT')),'lt'), stackMarkup('LG',prefer('LG',position('LG')),'lg'), stackMarkup('C',prefer('C',position('C')),'c'), stackMarkup('RG',prefer('RG',position('RG')),'rg'), stackMarkup('RT',prefer('RT',position('RT')),'rt'), stackMarkup('TE',prefer('TE',position('TE')),'te'), stackMarkup('WR2',wr2,'wr2'), stackMarkup('SLOT',slotWr,'slot'), stackMarkup('QB',prefer('QB',position('QB')),'qb'), stackMarkup('HB',prefer('HB',position('HB','RB')),'rb'), stackMarkup('FB',prefer('FB',position('FB')),'fb')
     ].join('');
     const defense = [
-      stackMarkup('S',safeties,'s'), stackMarkup('SAM',byPositions('SAM','LOLB'),'lolb'), stackMarkup('MIKE',byPositions('MIKE','MLB'),'mlb'), stackMarkup('WILL',byPositions('WILL','ROLB'),'rolb'), stackMarkup('CB1',split(cb,0),'cb1'), stackMarkup('REDGE',byPositions('REDGE','RE'),'le'), stackMarkup('DT1',split(dt,0),'dt1'), stackMarkup('DT2',split(dt,1),'dt2'), stackMarkup('LEDGE',byPositions('LEDGE','LE'),'re'), stackMarkup('CB2',split(cb,1),'cb2')
+      stackMarkup('FS',prefer('FS',position('FS')),'fs'), stackMarkup('SS',prefer('SS',position('SS')),'ss'), stackMarkup('SAM',prefer('SAM',position('SAM','LOLB')),'lolb'), stackMarkup('MIKE',prefer('MIKE',position('MIKE','MLB')),'mlb'), stackMarkup('WILL',prefer('WILL',position('WILL','ROLB')),'rolb'), stackMarkup('CB1',cb1,'cb1'), stackMarkup('SCB',slotCb,'scb'), stackMarkup('REDGE',prefer('REDGE',position('REDGE','RE')),'redge'), stackMarkup('DT1',dt1,'dt1'), stackMarkup('DT2',dt2,'dt2'), stackMarkup('LEDGE',prefer('LEDGE',position('LEDGE','LE')),'ledge'), stackMarkup('CB2',cb2,'cb2')
     ].join('');
-    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Interactive lineup</span><h3>Depth Chart</h3><p>Select a backup to bring it forward. Click the selected front card again to open the full player card.</p></div></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div></div></article>`;
+    const special = [stackMarkup('K',prefer('K',position('K')),'k'),stackMarkup('P',prefer('P',position('P')),'p')].join('');
+    const explicitCount=players.filter(player=>{const slot=slotName(player); return slot && slot!==String(player.position||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}).length;
+    const sourceLabel=explicitCount ? 'Madden depth-chart slots' : 'Madden roster depth order';
+    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Live Madden lineup</span><h3>Depth Chart</h3><p>Built from the active snapshot using ${sourceLabel}. When an explicit Madden slot is unavailable, Franchise HQ falls back to depth order, OVR, development trait, then player name.</p></div><span class="pill pill--success">LIVE</span></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div><div class="formation-section"><h4>Special Teams</h4><div class="football-formation football-formation--special">${special}</div></div></div></article>`;
   }
-
 
   function playerCardField(raw={},aliases=[],fallback=null) {
     for(const alias of aliases){
