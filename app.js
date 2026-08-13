@@ -2294,7 +2294,7 @@
     }));
 
     return {
-      release:'5.9.9.2',
+      release:'5.9.9.2a',
       playerCount:rows.length,
       playersWithAnyContract:rows.filter(row=>row.contract.hasAnyData).length,
       playersComplete:rows.filter(row=>row.contract.completeness.percent===100).length,
@@ -2614,7 +2614,7 @@
 
   function renderRosterExperience(team, rosterModel) {
     const allPlayers = rosterModel.players.map(rosterPlayerView).sort((a,b) => (Number(b.overall)||0) - (Number(a.overall)||0) || String(a.name).localeCompare(String(b.name)));
-    const positions = [...new Set(allPlayers.map(player => player.position).filter(Boolean))].sort();
+    const positions = sortPositionFilterValues(allPlayers.map(player => player.position));
     const devTraits = [...new Set(allPlayers.map(player => player.dev).filter(Boolean))].sort();
     const sortKey=state.rosterSortKey||'overall';
     const sortDirection=state.rosterSortDirection||'desc';
@@ -2634,11 +2634,11 @@
     return `<div class="roster-experience roster-experience--clean">
       <div class="filter-bar roster-table-filters">
         <label class="field"><span>Roster Group</span><select data-roster-group><option value="All">Full Roster</option>${['Offense','Defense','Special Teams','Injured Reserve','Practice Squad / Other','Other'].map(value=>`<option value="${value}" ${state.rosterGroup===value?'selected':''}>${value}</option>`).join('')}</select></label>
-        <label class="field"><span>Position</span><select data-roster-position><option value="All">All Positions</option>${positions.map(value=>`<option value="${escapeHtml(value)}" ${canonicalFilterPosition(state.rosterPosition)===value?'selected':''}>${escapeHtml(positionFilterLabel(value))}</option>`).join('')}</select></label>
+        <label class="field"><span>Position</span><select data-roster-position><option value="All">All Positions</option>${positions.map(value=>`<option value="${escapeHtml(canonicalFilterPosition(value))}" ${canonicalFilterPosition(state.rosterPosition)===canonicalFilterPosition(value)?'selected':''}>${escapeHtml(positionFilterLabel(value))}</option>`).join('')}</select></label>
         <label class="field"><span>Development</span><select data-roster-dev><option value="All">All Traits</option>${devTraits.map(value=>`<option value="${escapeHtml(value)}" ${state.rosterDev===value?'selected':''}>${escapeHtml(value)}</option>`).join('')}</select></label>
         <span class="result-count">${filtered.length} player${filtered.length===1?'':'s'} · sorted by ${escapeHtml(state.rosterSortKey||'overall')}</span>
       </div>
-      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>${rosterSortButton('player','Player')}</th><th>${rosterSortButton('position','Pos')}</th><th>${rosterSortButton('overall','OVR')}</th><th>${rosterSortButton('age','Age')}</th><th>${rosterSortButton('development','Development')}</th><th>${rosterSortButton('spd','SPD')}</th><th>${rosterSortButton('str','STR')}</th><th>${rosterSortButton('agi','AGI')}</th><th>${rosterSortButton('acc','ACC')}</th><th>${rosterSortButton('awr','AWR')}</th><th>${rosterSortButton('salary','Years Remaining / Current Year Salary')}</th><th>${rosterSortButton('status','Status')}</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td class="roster-core-rating">${player.ratings?.spd??'—'}</td><td class="roster-core-rating">${player.ratings?.str??'—'}</td><td class="roster-core-rating">${player.ratings?.agi??'—'}</td><td class="roster-core-rating">${player.ratings?.acc??'—'}</td><td class="roster-core-rating">${player.ratings?.awr??'—'}</td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="12"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
+      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>${rosterSortButton('player','Player')}</th><th>${rosterSortButton('position','Pos')}</th><th>${rosterSortButton('overall','OVR')}</th><th>${rosterSortButton('age','Age')}</th><th>${rosterSortButton('development','Development')}</th><th>${rosterSortButton('spd','SPD')}</th><th>${rosterSortButton('str','STR')}</th><th>${rosterSortButton('agi','AGI')}</th><th>${rosterSortButton('acc','ACC')}</th><th>${rosterSortButton('awr','AWR')}</th><th>${rosterSortButton('salary','Contract')}</th><th>${rosterSortButton('status','Status')}</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td class="roster-core-rating">${player.ratings?.spd??'—'}</td><td class="roster-core-rating">${player.ratings?.str??'—'}</td><td class="roster-core-rating">${player.ratings?.agi??'—'}</td><td class="roster-core-rating">${player.ratings?.acc??'—'}</td><td class="roster-core-rating">${player.ratings?.awr??'—'}</td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="12"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
     </div>`;
   }
 
@@ -2649,6 +2649,28 @@
       return `<span class="formation-player-card__image"><img src="${escapeHtml(candidates[0])}" alt="" loading="lazy" referrerpolicy="no-referrer" data-player-image-candidates='${encoded}' onerror="const list=JSON.parse(this.dataset.playerImageCandidates||'[]');const current=list.indexOf(this.src);const next=list[current+1]||list.find(x=>x!==this.src);if(next){this.src=next}else{this.remove();this.parentElement.classList.add('is-placeholder')}"></span>`;
     }
     return `<span class="formation-player-card__image is-placeholder" aria-hidden="true"><svg><use href="#icon-user"></use></svg></span>`;
+  }
+
+  function activeTeamIdForTeamPage() {
+    const route=String(location.hash.slice(1)||'');
+    const [base,id]=route.split('/');
+    if(base==='teams' && id) return String(id);
+    if(base==='my-team'){
+      const account=window.FGC_TRADE?.getCurrentAccount?.();
+      return String(liveOwnedTeamId?.()||account?.teamId||'');
+    }
+    return '';
+  }
+
+  function refreshActiveRosterTab() {
+    const teamId=activeTeamIdForTeamPage();
+    const team=liveTeamDirectory?.teamMap?.get(teamId);
+    const players=liveTeamDirectory?.playersByTeam?.get(teamId)||[];
+    const target=pageContent?.querySelector?.('[data-team-tab-content]');
+    if(!team||!target||state.teamTab!=='roster') return false;
+    const rosterModel=liveRosterModel(team,players);
+    target.innerHTML=renderRosterExperience(team,rosterModel);
+    return true;
   }
 
   function scrollTeamTabsToTop() {
@@ -7120,7 +7142,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       // Team tabs are local UI state. Do not re-run the async team route just to
       // switch panels; rebuild only the active panel from the already-loaded
       // LIVE directory/roster model.
-      const teamId=String(location.hash.split('/')[1]||'');
+      const teamId=activeTeamIdForTeamPage();
       const team=liveTeamDirectory?.teamMap?.get(teamId);
       const players=liveTeamDirectory?.playersByTeam?.get(teamId)||[];
       const target=pageContent?.querySelector?.('[data-team-tab-content]');
@@ -7334,9 +7356,18 @@ function canonicalPlayerDashboardStats(playerId='') {
   document.addEventListener('change', event => {
     if (event.target.matches('[data-team-conference]')) { state.teamConference=event.target.value; refreshTeamGrid(); }
     if (event.target.matches('[data-team-division]')) { state.teamDivision=event.target.value; refreshTeamGrid(); }
-    if (event.target.matches('[data-roster-group]')) { state.rosterGroup=event.target.value; renderRoute(location.hash.slice(1)); }
-    if (event.target.matches('[data-roster-position]')) { state.rosterPosition=event.target.value; renderRoute(location.hash.slice(1)); }
-    if (event.target.matches('[data-roster-dev]')) { state.rosterDev=event.target.value; renderRoute(location.hash.slice(1)); }
+    if (event.target.matches('[data-roster-group]')) {
+      state.rosterGroup=event.target.value;
+      if(!refreshActiveRosterTab()) renderRoute(location.hash.slice(1));
+    }
+    if (event.target.matches('[data-roster-position]')) {
+      state.rosterPosition=event.target.value==='All'?'All':canonicalFilterPosition(event.target.value);
+      if(!refreshActiveRosterTab()) renderRoute(location.hash.slice(1));
+    }
+    if (event.target.matches('[data-roster-dev]')) {
+      state.rosterDev=event.target.value;
+      if(!refreshActiveRosterTab()) renderRoute(location.hash.slice(1));
+    }
     if (event.target.matches('[data-player-position]')) { state.playerPosition=event.target.value; refreshPlayerTable(); }
     if (event.target.matches('[data-player-team]')) { state.playerTeam=event.target.value; refreshPlayerTable(); }
     if (event.target.matches('[data-player-status]')) { state.playerStatus=event.target.value; refreshPlayerTable(); }
@@ -7415,9 +7446,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.9.2';
+      node.textContent = 'Current Release - 5.9.9.2a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.9.2';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.9.2a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -7429,7 +7460,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.contracts={
-    release:'5.9.9.2',
+    release:'5.9.9.2a',
     normalize:player=>canonicalContract(player),
     forPlayer:playerId=>{
       const id=String(playerId||'');
