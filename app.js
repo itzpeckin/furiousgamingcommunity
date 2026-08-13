@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.0',
+      release:'5.9.10.1',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -7729,9 +7729,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.0';
+      node.textContent = 'Current Release - 5.9.10.1';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.0';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -7767,9 +7767,196 @@ function canonicalPlayerDashboardStats(playerId='') {
   };
 
 
+
+  function transactionLeagueSlug(){
+    const routeMatch=location.pathname.match(/\/leagues\/([^/]+)/i);
+    if(routeMatch?.[1])return decodeURIComponent(routeMatch[1]).toLowerCase();
+    return String(
+      window.FranchiseHQ?.leagueSlug ||
+      window.FranchiseHQ?.liveData?.leagueSlug ||
+      window.FranchiseHQ?.leagueData?.currentSource?.()?.leagueSlug ||
+      'furious-gaming-community'
+    ).trim().toLowerCase();
+  }
+
+  function transactionEndpoint(){
+    return `/api/leagues/${encodeURIComponent(transactionLeagueSlug())}/transactions/canonical`;
+  }
+
+  function transactionPrimitive(value){
+    return value===null || ['string','number','boolean'].includes(typeof value);
+  }
+
+  function firstTransactionValue(source={},keys=[]){
+    for(const key of keys){
+      const value=source?.[key];
+      if(value!==undefined&&value!==null&&value!=='')return value;
+    }
+    return null;
+  }
+
+  function normalizedTransactionType(value=''){
+    const text=String(value||'').trim().toLowerCase();
+    if(/trade|traded/.test(text))return 'trade';
+    if(/waiv.*claim|claim/.test(text))return 'waiver-claim';
+    if(/waiv/.test(text))return 'waived';
+    if(/release|released|cut/.test(text))return 'release';
+    if(/sign|signed|acquire|acquired/.test(text))return 'signing';
+    return '';
+  }
+
+  function explicitTransactionEventsFromPlayers(players=[]){
+    const grouped=new Map();
+
+    (players||[]).forEach(player=>{
+      const raw=player?.raw||player?.source||{};
+      const candidates=[];
+      const visit=(value,path='root',depth=0)=>{
+        if(!value||typeof value!=='object'||depth>3)return;
+        Object.entries(value).forEach(([key,child])=>{
+          const keyType=normalizedTransactionType(key);
+          const valueType=transactionPrimitive(child)?normalizedTransactionType(child):'';
+          const looksExplicit=/(transactionType|transaction_type|lastTransaction|tradeType|trade_type|rosterTransaction|movementType)/i.test(key);
+          if((looksExplicit&&valueType) || (keyType&&typeof child==='boolean'&&child===true)){
+            candidates.push({container:value,path:`${path}.${key}`,type:valueType||keyType});
+          }
+          if(child&&typeof child==='object')visit(child,`${path}.${key}`,depth+1);
+        });
+      };
+      visit(raw);
+
+      candidates.forEach((candidate,index)=>{
+        const container=candidate.container||raw;
+        const type=candidate.type;
+        if(!type)return;
+
+        const fromTeam=String(firstTransactionValue(container,[
+          'fromTeamId','from_team_id','previousTeamId','previous_team_id','formerTeamId','oldTeamId'
+        ]) ?? firstTransactionValue(raw,[
+          'fromTeamId','from_team_id','previousTeamId','previous_team_id','formerTeamId','oldTeamId'
+        ]) ?? '');
+        const toTeam=String(firstTransactionValue(container,[
+          'toTeamId','to_team_id','newTeamId','new_team_id','teamId','team_id'
+        ]) ?? firstTransactionValue(raw,['toTeamId','to_team_id','teamId','team_id']) ?? player.teamId ?? '');
+        const eventId=String(firstTransactionValue(container,[
+          'transactionId','transaction_id','tradeId','trade_id','eventId','event_id'
+        ]) ?? firstTransactionValue(raw,[
+          'transactionId','transaction_id','tradeId','trade_id','eventId','event_id'
+        ]) ?? '');
+        const season=Number(firstTransactionValue(container,['season','seasonYear','transactionSeason','transaction_season'])
+          ?? firstTransactionValue(raw,['season','seasonYear','transactionSeason','transaction_season']));
+        const week=Number(firstTransactionValue(container,['week','weekIndex','transactionWeek','transaction_week'])
+          ?? firstTransactionValue(raw,['week','weekIndex','transactionWeek','transaction_week']));
+        const date=String(firstTransactionValue(container,['date','transactionDate','transaction_date','createdAt','created_at'])
+          ?? firstTransactionValue(raw,['transactionDate','transaction_date','createdAt','created_at']) ?? '');
+
+        // Prefer an explicit Madden event ID. Otherwise group players that share the same
+        // type/team pair/season/week/date so a multi-player trade becomes one evidence event.
+        const pair=[fromTeam,toTeam].filter(Boolean).sort().join('|');
+        const sourceKey=eventId
+          ? `madden:${eventId}`
+          : `madden:${type}:${pair}:${Number.isFinite(season)?season:''}:${Number.isFinite(week)?week:''}:${date||candidate.path}`;
+
+        const current=grouped.get(sourceKey)||{
+          sourceKey,
+          sourceType:'madden-explicit',
+          eventType:type,
+          fromTeamId:fromTeam||null,
+          toTeamId:toTeam||null,
+          teamIds:[...new Set([fromTeam,toTeam].filter(Boolean))],
+          playerIds:[],
+          season:Number.isFinite(season)?season:null,
+          week:Number.isFinite(week)?week:null,
+          occurredAt:date||null,
+          confidence:'explicit',
+          rawEvidence:[]
+        };
+        if(player.id&&!current.playerIds.includes(String(player.id)))current.playerIds.push(String(player.id));
+        if(current.rawEvidence.length<12)current.rawEvidence.push({playerId:String(player.id||''),path:candidate.path,type});
+        grouped.set(sourceKey,current);
+      });
+    });
+
+    return [...grouped.values()];
+  }
+
+  function workflowTransactionEvents(teams=[]){
+    const records=franchiseTradeRecords(teams);
+    return records.map((record,index)=>{
+      const raw=record||{};
+      const playerIds=[...new Set([
+        ...(raw.playerIds||[]),
+        ...(raw.players||[]).map(value=>typeof value==='object'?(value.id||value.playerId):value),
+        ...(raw.assets||[]).filter(value=>String(value?.type||'').toLowerCase()==='player').map(value=>value.playerId||value.id)
+      ].filter(Boolean).map(String))];
+      return {
+        sourceKey:`workflow:${raw.id||raw.tradeId||index}`,
+        sourceType:'franchisehq-workflow',
+        workflowTradeId:String(raw.id||raw.tradeId||'')||null,
+        eventType:'trade',
+        teamIds:[...new Set((raw.teamIds||[]).filter(Boolean).map(String))],
+        playerIds,
+        status:String(raw.status||'approved').toLowerCase(),
+        occurredAt:raw.date||raw.updatedAt||raw.createdAt||null,
+        confidence:'workflow',
+        rawEvidence:raw
+      };
+    }).filter(row=>['approved','complete','completed'].includes(row.status));
+  }
+
+  function currentRosterState(players=[]){
+    return (players||[]).map(player=>({
+      playerId:String(player.id||''),
+      playerName:String(player.name||'Unknown Player'),
+      teamId:String(player.teamId||''),
+      rosterStatus:String(player.rosterStatus||'active'),
+      position:String(player.position||'')
+    })).filter(row=>row.playerId);
+  }
+
+  async function canonicalTransactionRequest(method='GET',body=null){
+    const response=await fetch(transactionEndpoint(),{
+      method,
+      credentials:'include',
+      headers:body?{'content-type':'application/json'}:undefined,
+      body:body?JSON.stringify(body):undefined
+    });
+    let payload=null;
+    try{payload=await response.json()}catch{}
+    if(!response.ok || payload?.ok===false){
+      const error=new Error(payload?.detail||payload?.error||`Transaction engine request failed (${response.status}).`);
+      error.status=response.status;
+      error.payload=payload;
+      throw error;
+    }
+    return payload;
+  }
+
+  async function syncCanonicalTransactions(){
+    await loadLiveTeamDirectory(false);
+    const snapshot=liveTeamDirectory?.snapshot||{};
+    const snapshotId=String(snapshot.id||snapshot.snapshotId||snapshot.snapshot_id||'');
+    if(!snapshotId)throw new Error('No active LIVE snapshot ID is available.');
+
+    const players=liveTeamDirectory?.players||[];
+    const teams=liveTeamDirectory?.teams||[];
+    const explicitEvents=explicitTransactionEventsFromPlayers(players);
+    const workflowEvents=workflowTransactionEvents(teams);
+
+    return canonicalTransactionRequest('POST',{
+      action:'sync',
+      snapshotId,
+      season:Number(snapshot.seasonYear??snapshot.season??0)||null,
+      week:Number(snapshot.week??snapshot.currentWeek??0)||null,
+      roster:currentRosterState(players),
+      explicitEvents,
+      workflowEvents
+    });
+  }
+
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.0',
+    release:'5.9.10.1',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -7782,7 +7969,18 @@ function canonicalPlayerDashboardStats(playerId='') {
     tradeCenterRecords:async()=>{
       await loadLiveTeamDirectory(false);
       return franchiseTradeRecords(liveTeamDirectory?.teams||[]);
-    }
+    },
+    explicitEvents:async()=>{
+      await loadLiveTeamDirectory(false);
+      return explicitTransactionEventsFromPlayers(liveTeamDirectory?.players||[]);
+    },
+    workflowEvents:async()=>{
+      await loadLiveTeamDirectory(false);
+      return workflowTransactionEvents(liveTeamDirectory?.teams||[]);
+    },
+    syncCanonical:()=>syncCanonicalTransactions(),
+    canonical:()=>canonicalTransactionRequest('GET'),
+    dedupeTest:()=>canonicalTransactionRequest('POST',{action:'dedupe-test'})
   };
 
 })();
