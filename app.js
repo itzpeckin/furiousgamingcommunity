@@ -5264,7 +5264,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.8b',
+      release:'5.9.8c',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -7157,6 +7157,21 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
   applyRole(window.FranchiseHQ?.simulation?.getRole?.() || state.role,false);
   window.FranchiseHQ?.appRouter?.render?.(location.hash.slice(1)||'home',{source:'startup'}) || renderRoute();
+
+  // v5.9.8c — authoritative visible release marker.
+  function syncVisibleReleaseMarker() {
+    document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
+      node.textContent = 'Current Release - 5.9.8c';
+    });
+    document.documentElement.dataset.franchiseHqRelease = '5.9.8c';
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
+  } else {
+    syncVisibleReleaseMarker();
+  }
+  window.addEventListener('load', syncVisibleReleaseMarker, { once:true });
+
 })();
 
   window.addEventListener('franchisehq:league-data-state-changed', () => {
