@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.1d',
+      release:'5.9.10.1e',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -7010,8 +7010,8 @@ function canonicalPlayerDashboardStats(playerId='') {
         break;
       case 'schedule': renderSchedule(); break;
       case 'news': renderNews(); break;
-      case 'trade-center': window.FranchiseHQ?.trade?.renderTradeCenter ? window.FranchiseHQ.trade.renderTradeCenter(id) : window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : renderRoadmap(base); break;
-      case 'trade-block': window.FranchiseHQ?.trade?.renderTradeBlock ? window.FranchiseHQ.trade.renderTradeBlock() : window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : renderRoadmap(base); break;
+      case 'trade-center': window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : window.FranchiseHQ?.trade?.renderTradeCenter ? window.FranchiseHQ.trade.renderTradeCenter(id) : renderRoadmap(base); break;
+      case 'trade-block': window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : window.FranchiseHQ?.trade?.renderTradeBlock ? window.FranchiseHQ.trade.renderTradeBlock() : renderRoadmap(base); break;
       case 'design-system': renderDesignSystem(); break;
       case 'commissioner': {
         const access=commissionerAccessState();
@@ -7024,7 +7024,17 @@ function canonicalPlayerDashboardStats(playerId='') {
           setRoute('home');
           return;
         }
-        window.FranchiseHQ?.trade?.renderCommissioner ? window.FranchiseHQ.trade.renderCommissioner() : window.FGC_TRADE?.renderCommissioner ? window.FGC_TRADE.renderCommissioner() : renderRoadmap(base);
+        if(id==='platform-workspace'){
+          if(window.FGC_TRADE?.renderPlatformWorkspace) window.FGC_TRADE.renderPlatformWorkspace();
+          else if(window.FranchiseHQ?.platformWorkspace?.renderWorkspace) pageContent.innerHTML=`<div data-platform-workspace-host>${window.FranchiseHQ.platformWorkspace.renderWorkspace()}</div>`;
+          else renderRoadmap(base);
+        }else if(window.FGC_TRADE?.renderCommissioner){
+          window.FGC_TRADE.renderCommissioner();
+        }else if(window.FranchiseHQ?.trade?.renderCommissioner){
+          window.FranchiseHQ.trade.renderCommissioner();
+        }else{
+          renderRoadmap(base);
+        }
         break;
       }
       case 'schedule-source-inspector': renderScheduleSourceInspector(); break;
@@ -7813,7 +7823,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       removeOriginalTradeDemoSeeds();
 
       window.FGC_TRADE_LIVE={
-        release:'5.9.10.1d',
+        release:'5.9.10.1e',
         status:()=>({...tradeCenterLiveBridgeState}),
         resync:()=>syncTradeCenterLiveBridge({rerender:true})
       };
@@ -7901,9 +7911,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.1d';
+      node.textContent = 'Current Release - 5.9.10.1e';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1d';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1e';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8128,7 +8138,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.1d',
+    release:'5.9.10.1e',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
