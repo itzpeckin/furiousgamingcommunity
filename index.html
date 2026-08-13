@@ -973,7 +973,7 @@
           <span class="status-dot status-dot--success"></span>
           <div><strong>Live Franchise</strong><span>Powered by the active Madden snapshot</span></div>
         </div>
-        <span class="version-label">Current Release - 5.9.10.1c</span>
+        <span class="version-label">Current Release - 5.9.10.1d</span>
       </div>
     </aside>
 
@@ -1368,11 +1368,73 @@
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=5.7.1b"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=5.9.10.1c"></script>
+<script src="app.js?v=5.9.10.1d"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
-<script src="trade-module.js?v=5.9.10.1c"></script>
+<script src="trade-module.js?v=5.9.10.1d"></script>
 <script src="auth-ui.js"></script>
 <script src="dev-mode.js"></script>
+
+<script id="v591011d-special-route-rescue">
+(function(){
+  'use strict';
+
+  const SPECIAL_ROUTES=new Set([
+    'trade-center',
+    'trade-block',
+    'commissioner',
+    'commissioner/platform-workspace'
+  ]);
+
+  function routeFromTarget(target){
+    const link=target?.closest?.('[data-route]');
+    if(!link)return null;
+    const route=String(link.getAttribute('data-route')||'').replace(/^#\/?/,'').replace(/^\//,'');
+    return SPECIAL_ROUTES.has(route)?{link,route}:null;
+  }
+
+  function navigate(route){
+    const fn=window.FranchiseHQ?.navigateSpecialRoute || window.FGC_APP?.navigateSpecialRoute;
+    if(typeof fn==='function'){
+      fn(route);
+      return true;
+    }
+    // Last-resort fallback if app initialization is still finishing.
+    const hash=`#${route}`;
+    if(location.hash!==hash)location.hash=hash;
+    else window.FGC_APP?.renderRoute?.(route);
+    return true;
+  }
+
+  // pointerup is intentionally used instead of click. The existing navigation
+  // controller currently prevents the click event for these legacy/special routes.
+  document.addEventListener('pointerup',function(event){
+    if(event.button!==0)return;
+    const match=routeFromTarget(event.target);
+    if(!match)return;
+    event.preventDefault();
+    event.stopPropagation();
+    navigate(match.route);
+  },true);
+
+  // Keyboard accessibility for Enter/Space on the same links.
+  document.addEventListener('keydown',function(event){
+    if(!['Enter',' '].includes(event.key))return;
+    const match=routeFromTarget(event.target);
+    if(!match)return;
+    event.preventDefault();
+    event.stopPropagation();
+    navigate(match.route);
+  },true);
+
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.specialRouteRescue={
+    release:'5.9.10.1d',
+    routes:[...SPECIAL_ROUTES],
+    navigate
+  };
+})();
+</script>
+
 </body>
 </html>

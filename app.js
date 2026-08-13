@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.1c',
+      release:'5.9.10.1d',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -7813,7 +7813,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       removeOriginalTradeDemoSeeds();
 
       window.FGC_TRADE_LIVE={
-        release:'5.9.10.1c',
+        release:'5.9.10.1d',
         status:()=>({...tradeCenterLiveBridgeState}),
         resync:()=>syncTradeCenterLiveBridge({rerender:true})
       };
@@ -7831,12 +7831,40 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   }
 
+  // v5.9.10.1d — direct special-route navigation rescue.
+  // These routes use legacy Trade/Commissioner renderers and should not be blocked
+  // by the platform navigation handoff.
+  function navigateSpecialRoute(route='') {
+    const normalized=String(route||'').replace(/^#\/?/,'').replace(/^\//,'');
+    if(!['trade-center','trade-block','commissioner','commissioner/platform-workspace'].includes(normalized)) return false;
+
+    const hash=`#${normalized}`;
+    if(location.hash!==hash){
+      history.pushState(null,'',hash);
+    }
+
+    // Render synchronously. This avoids relying on a hashchange/navigation bridge
+    // which is the exact layer currently swallowing these routes.
+    renderRoute(normalized);
+
+    // Keep sidebar selection in sync without requiring a second navigation event.
+    document.querySelectorAll('[data-route]').forEach(node=>{
+      node.classList.toggle('is-active',node.getAttribute('data-route')===normalized);
+    });
+
+    return true;
+  }
+
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.navigateSpecialRoute=navigateSpecialRoute;
+
   window.FGC_APP = {
     teams, players, schedule, newsArticles, state, pageContent,
     teamById, playerById, teamStyle, renderTeamMark, renderPlayerIdentity,
     devClass, formatMoney, escapeHtml, setRoute, renderRoute, showToast,
     openDetail, closeDetail, applyRole, closeProfileMenu,
     commissionerAccessState, syncCommissionerAccess, renderGlobalLeagueDataBanner,
+    navigateSpecialRoute,
     rosterService, rosterPlayerView, renderRosterExperience, openRosterPlayerDetail,
     syncTradeCenterLiveBridge,
     getTradeCenterLiveBridgeStatus:()=>({...tradeCenterLiveBridgeState}),
@@ -7873,9 +7901,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.1c';
+      node.textContent = 'Current Release - 5.9.10.1d';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1c';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1d';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8100,7 +8128,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.1c',
+    release:'5.9.10.1d',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
