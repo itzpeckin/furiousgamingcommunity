@@ -5264,7 +5264,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.8a',
+      release:'5.9.8b',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -6872,8 +6872,35 @@ function canonicalPlayerDashboardStats(playerId='') {
     const teamTab=event.target.closest('[data-team-tab]');
     if (teamTab) {
       event.preventDefault();
-      state.teamTab=teamTab.dataset.teamTab;
-      renderRoute(location.hash.slice(1));
+      event.stopPropagation();
+      const nextTab=teamTab.dataset.teamTab;
+      state.teamTab=nextTab;
+
+      // Team tabs are local UI state. Do not re-run the async team route just to
+      // switch panels; rebuild only the active panel from the already-loaded
+      // LIVE directory/roster model.
+      const teamId=String(location.hash.split('/')[1]||'');
+      const team=liveTeamDirectory?.teamMap?.get(teamId);
+      const players=liveTeamDirectory?.playersByTeam?.get(teamId)||[];
+      const target=pageContent?.querySelector?.('[data-team-tab-content]');
+
+      if(team && target){
+        const rosterModel=liveRosterModel(team,players);
+        const roster=players.map(rosterPlayerView);
+        const leaders=[...roster].sort((a,b)=>(Number(b.overall)||0)-(Number(a.overall)||0)).slice(0,5);
+        const teamGames=(liveTeamDirectory?.games||[])
+          .filter(game=>String(game.homeTeamId)===teamId||String(game.awayTeamId)===teamId)
+          .map(game=>liveTeamScheduleGame(game));
+
+        pageContent.querySelectorAll('[data-team-tab]').forEach(button=>{
+          button.classList.toggle('is-active',button.dataset.teamTab===nextTab);
+        });
+        target.innerHTML=renderTeamTab(team,rosterModel,roster,teamGames,leaders);
+        scrollTeamTabsToTop();
+      } else {
+        // Safe fallback if the directory was cleared unexpectedly.
+        renderRoute(location.hash.slice(1));
+      }
       return;
     }
 
