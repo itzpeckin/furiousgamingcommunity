@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.9.3',
+      release:'5.9.10.0',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2374,7 +2374,7 @@
     }));
 
     return {
-      release:'5.9.9.3',
+      release:'5.9.10.0',
       playerCount:rows.length,
       playersWithAnyContract:rows.filter(row=>row.contract.hasAnyData).length,
       playersComplete:rows.filter(row=>row.contract.completeness.percent===100).length,
@@ -2400,6 +2400,191 @@
       if(ai>=0||bi>=0){if(ai<0)return 1;if(bi<0)return -1;return ai-bi;}
       return a.localeCompare(b);
     });
+  }
+
+  // v5.9.10.0 — Madden transaction source audit and discovery.
+  const TRANSACTION_KEY_PATTERN=/(transaction|trade|traded|sign|signed|release|released|waiver|waived|claim|claimed|acquire|acquired|formerteam|previousteam|oldteam|fromteam|toteam|movement|rosterchange)/i;
+  const TRANSACTION_TYPE_PATTERN=/(trade|sign|release|waiver|claim|acquire|move|transaction)/i;
+
+  function transactionScalar(value){
+    return value===null || ['string','number','boolean'].includes(typeof value);
+  }
+
+  function scanTransactionEvidence(value,{path='root',depth=0,maxDepth=5,rows=[]}={}){
+    if(value===null||value===undefined||depth>maxDepth)return rows;
+    if(Array.isArray(value)){
+      if(TRANSACTION_KEY_PATTERN.test(path)){
+        rows.push({path,kind:'array',count:value.length,sample:value.slice(0,2)});
+      }
+      value.slice(0,250).forEach((item,index)=>scanTransactionEvidence(item,{path:`${path}[${index}]`,depth:depth+1,maxDepth,rows}));
+      return rows;
+    }
+    if(typeof value!=='object')return rows;
+
+    Object.entries(value).forEach(([key,child])=>{
+      const childPath=`${path}.${key}`;
+      if(TRANSACTION_KEY_PATTERN.test(key)){
+        rows.push({
+          path:childPath,
+          key,
+          kind:Array.isArray(child)?'array':typeof child,
+          count:Array.isArray(child)?child.length:1,
+          sample:transactionScalar(child)?child:Array.isArray(child)?child.slice(0,2):Object.fromEntries(Object.entries(child||{}).slice(0,8))
+        });
+      }
+      if(child && typeof child==='object'){
+        scanTransactionEvidence(child,{path:childPath,depth:depth+1,maxDepth,rows});
+      }
+    });
+    return rows;
+  }
+
+  function transactionFieldCoverage(players=[]){
+    const map=new Map();
+    (players||[]).forEach(player=>{
+      const source=player?.raw||player?.source||player||{};
+      const seen=new Set();
+      const walk=(value,path='',depth=0)=>{
+        if(!value||typeof value!=='object'||depth>4)return;
+        Object.entries(value).forEach(([key,child])=>{
+          const fieldPath=path?`${path}.${key}`:key;
+          if(TRANSACTION_KEY_PATTERN.test(key)){
+            const identity=fieldPath.toLowerCase();
+            if(!seen.has(identity)){
+              seen.add(identity);
+              const row=map.get(fieldPath)||{field:fieldPath,count:0,samples:[]};
+              row.count+=1;
+              const sample=transactionScalar(child)?child:(Array.isArray(child)?`Array(${child.length})`:'Object');
+              if(row.samples.length<4 && !row.samples.some(value=>String(value)===String(sample)))row.samples.push(sample);
+              map.set(fieldPath,row);
+            }
+          }
+          if(child&&typeof child==='object')walk(child,fieldPath,depth+1);
+        });
+      };
+      walk(source);
+    });
+    return [...map.values()].sort((a,b)=>b.count-a.count||a.field.localeCompare(b.field));
+  }
+
+  function transactionRosterInferenceCoverage(players=[]){
+    const aliases={
+      currentTeam:['teamId','team_id','teamExternalId','team_external_id'],
+      rosterStatus:['rosterStatus','status','roster_status'],
+      previousTeam:['previousTeamId','previous_team_id','formerTeamId','former_team_id','oldTeamId','fromTeamId'],
+      transactionType:['transactionType','transaction_type','lastTransactionType','last_transaction_type','movementType'],
+      transactionDate:['transactionDate','transaction_date','lastTransactionDate','last_transaction_date','signedDate','releaseDate'],
+      transactionWeek:['transactionWeek','transaction_week','lastTransactionWeek','last_transaction_week'],
+      transactionSeason:['transactionSeason','transaction_season','lastTransactionSeason','last_transaction_season']
+    };
+    const coverage={};
+    Object.entries(aliases).forEach(([label,keys])=>{
+      let count=0;
+      const sourceFields={};
+      (players||[]).forEach(player=>{
+        const source=player?.raw||player?.source||player||{};
+        const found=keys.find(key=>source?.[key]!==undefined&&source?.[key]!==null&&source?.[key]!=='');
+        if(found){count+=1;sourceFields[found]=(sourceFields[found]||0)+1;}
+      });
+      coverage[label]={count,total:(players||[]).length,percent:(players||[]).length?Math.round(count/(players||[]).length*100):0,sourceFields};
+    });
+    return coverage;
+  }
+
+  function franchiseTradeRecords(teams=[]){
+    const seen=new Set(),rows=[];
+    (teams||[]).forEach(team=>{
+      const history=window.FGC_TRADE?.getTeamTradeHistory?.(team.id)||[];
+      history.forEach(row=>{
+        const id=String(row.id||row.tradeId||'');
+        const key=id||JSON.stringify([row.date,row.summary,row.teamIds]);
+        if(seen.has(key))return;
+        seen.add(key);
+        rows.push({
+          id:id||null,
+          date:row.date||null,
+          status:row.status||'approved',
+          teamIds:row.teamIds||[],
+          summary:row.summary||null,
+          kind:row.kind||'trade'
+        });
+      });
+    });
+    return rows;
+  }
+
+  async function transactionDiscoveryAudit(){
+    await loadLiveTeamDirectory(false);
+    const directory=liveTeamDirectory;
+    const players=directory?.players||[];
+    const teams=directory?.teams||[];
+    const snapshot=directory?.snapshot||null;
+
+    const playerFieldCoverage=transactionFieldCoverage(players);
+    const playerEvidence=players.flatMap(player=>
+      scanTransactionEvidence(player?.raw||{},{
+        path:`player:${player.id||player.name||'unknown'}`,
+        maxDepth:4,
+        rows:[]
+      }).slice(0,40)
+    );
+    const snapshotEvidence=scanTransactionEvidence(snapshot||{},{
+      path:'snapshot',
+      maxDepth:6,
+      rows:[]
+    });
+
+    const explicitPlayerEvidence=playerEvidence.filter(row=>
+      TRANSACTION_TYPE_PATTERN.test(row.path) && !/rosterStatus|status/i.test(row.path)
+    );
+    const explicitSnapshotEvidence=snapshotEvidence.filter(row=>TRANSACTION_TYPE_PATTERN.test(row.path));
+    const inferenceCoverage=transactionRosterInferenceCoverage(players);
+    const tradeCenterRecords=franchiseTradeRecords(teams);
+
+    const previousTeamCoverage=inferenceCoverage.previousTeam?.percent||0;
+    const transactionTypeCoverage=inferenceCoverage.transactionType?.percent||0;
+    const hasExplicit=explicitSnapshotEvidence.length>0 || explicitPlayerEvidence.length>0 || transactionTypeCoverage>0;
+
+    let recommendedArchitecture='snapshot-diff-required';
+    if(hasExplicit && previousTeamCoverage>0)recommendedArchitecture='hybrid-explicit-plus-snapshot-diff';
+    else if(hasExplicit)recommendedArchitecture='explicit-first-with-snapshot-diff-fallback';
+
+    const cautions=[];
+    if(!hasExplicit)cautions.push('No reliable explicit Madden transaction event source was discovered in the currently loaded snapshot.');
+    if(previousTeamCoverage===0)cautions.push('Current player rows do not preserve a previous-team field, so historical movement cannot be reconstructed from one snapshot alone.');
+    cautions.push('Franchise HQ Trade Center records are application workflow records and must remain distinct from Madden-origin transactions.');
+
+    return {
+      release:'5.9.10.0',
+      snapshotId:snapshot?.id||snapshot?.snapshotId||snapshot?.snapshot_id||null,
+      playerCount:players.length,
+      teamCount:teams.length,
+      recommendedArchitecture,
+      explicitMaddenEvidence:{
+        found:hasExplicit,
+        snapshotEvidence:explicitSnapshotEvidence.slice(0,100),
+        playerEvidence:explicitPlayerEvidence.slice(0,100),
+        candidateFieldCoverage:playerFieldCoverage
+      },
+      inferenceReadiness:{
+        coverage:inferenceCoverage,
+        canDiffCurrentRoster:Boolean(inferenceCoverage.currentTeam?.count),
+        canClassifyStatusMovement:Boolean(inferenceCoverage.rosterStatus?.count),
+        canInferHistoricalMovementFromSingleSnapshot:previousTeamCoverage>0
+      },
+      franchiseHQTradeCenter:{
+        recordCount:tradeCenterRecords.length,
+        records:tradeCenterRecords.slice(0,100),
+        authority:'franchisehq-workflow-not-madden'
+      },
+      snapshotDiff:{
+        required:recommendedArchitecture!=='explicit-only',
+        previousSnapshotAvailableInCurrentClient:false,
+        note:'5.9.10.0 audits the active snapshot. If prior roster state is not embedded in Madden data, 5.9.10.1 must compare persisted snapshots server-side.'
+      },
+      cautions,
+      generatedAt:new Date().toISOString()
+    };
   }
 
   function liveRosterPlayerShape(player={}) {
@@ -7544,9 +7729,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.9.3';
+      node.textContent = 'Current Release - 5.9.10.0';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.9.3';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.0';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -7558,7 +7743,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.contracts={
-    release:'5.9.9.3',
+    release:'5.9.10.0',
     normalize:player=>canonicalContract(player),
     forPlayer:playerId=>{
       const id=String(playerId||'');
@@ -7579,6 +7764,25 @@ function canonicalPlayerDashboardStats(playerId='') {
       return certifyContracts(allPlayers||[],teams);
     },
     aliases:()=>JSON.parse(JSON.stringify(CONTRACT_FIELD_ALIASES))
+  };
+
+
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.transactions={
+    release:'5.9.10.0',
+    audit:()=>transactionDiscoveryAudit(),
+    fieldCoverage:async()=>{
+      await loadLiveTeamDirectory(false);
+      return transactionFieldCoverage(liveTeamDirectory?.players||[]);
+    },
+    inferenceCoverage:async()=>{
+      await loadLiveTeamDirectory(false);
+      return transactionRosterInferenceCoverage(liveTeamDirectory?.players||[]);
+    },
+    tradeCenterRecords:async()=>{
+      await loadLiveTeamDirectory(false);
+      return franchiseTradeRecords(liveTeamDirectory?.teams||[]);
+    }
   };
 
 })();
