@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.1a',
+      release:'5.9.10.1b',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -7694,18 +7694,21 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ?.sidebar?.init?.({ sidebar, overlay: mobileOverlay });
 
-  // v5.9.10.1a — Trade Center LIVE-data adapter.
-  function tradeCenterTeamId(team={}) {
-    const abbr=String(team.abbr||team.abbreviation||team.source?.abbrName||'').trim().toLowerCase();
-    return abbr || String(team.id||'').trim().toLowerCase();
+  // v5.9.10.1b — SAFE Trade Center LIVE-data bridge.
+  // The Trade Center keeps its original module and references these same arrays.
+  // We mutate them in place after LIVE data loads instead of replacing/re-writing the module.
+  let tradeCenterLiveBridgeState={mode:'development',snapshotId:null,teamCount:teams.length,playerCount:players.length};
+
+  function tradeCenterStableTeamId(team={}) {
+    return String(team.abbr||team.abbreviation||team.source?.abbrName||team.id||'').trim().toLowerCase();
   }
 
-  function tradeCenterTeamShape(team={}) {
-    const id=tradeCenterTeamId(team);
+  function tradeCenterLiveTeamShape(team={}) {
+    const id=tradeCenterStableTeamId(team);
     return {
       ...team,
-      liveTeamId:String(team.id||''),
       id,
+      liveTeamId:String(team.id||''),
       abbr:String(team.abbr||team.abbreviation||id).toUpperCase(),
       fullName:team.fullName||team.displayName||[team.city,team.name].filter(Boolean).join(' ')||id.toUpperCase(),
       logo:team.logo||team.source?.logo_url||team.source?.logoUrl||null,
@@ -7713,15 +7716,16 @@ function canonicalPlayerDashboardStats(playerId='') {
     };
   }
 
-  function tradeCenterPlayerShape(player={},teamIdMap=new Map()) {
+  function tradeCenterLivePlayerShape(player={},teamMap=new Map()) {
     const view=rosterPlayerView(player);
     const raw=player.raw||player.source||{};
-    const mappedTeamId=teamIdMap.get(String(view.teamId||player.teamId||'')) || String(view.teamId||player.teamId||'').toLowerCase();
-    const name=view.name||player.name||'Unknown Player';
-    const parts=String(name).trim().split(/\s+/);
-    const first=parts.shift()||'';
-    const last=parts.join(' ');
-    const imageCandidates=playerCardImageCandidates?.({...player,...view,raw})||[];
+    const sourceTeamId=String(view.teamId||player.teamId||'');
+    const stableTeamId=teamMap.get(sourceTeamId)||String(liveTeamDirectory?.teamMap?.get(sourceTeamId)?.abbr||sourceTeamId).toLowerCase();
+    const name=String(view.name||player.name||'Unknown Player');
+    const nameParts=name.trim().split(/\s+/);
+    const first=nameParts.shift()||'';
+    const last=nameParts.join(' ');
+    const imageCandidates=playerCardImageCandidates({...player,...view,raw});
     return {
       ...view,
       id:String(view.id||player.id||''),
@@ -7729,8 +7733,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       first,
       last,
       initials:`${first[0]||''}${last[0]||''}`.toUpperCase()||'—',
-      teamId:mappedTeamId,
-      teamAbbr:String(liveTeamDirectory?.teamMap?.get(String(view.teamId||player.teamId||''))?.abbr||'').toUpperCase(),
+      teamId:stableTeamId,
       position:String(view.position||player.position||'').toUpperCase(),
       overall:Number(view.overall||player.overall||0)||0,
       age:Number(view.age||player.age||0)||0,
@@ -7749,31 +7752,83 @@ function canonicalPlayerDashboardStats(playerId='') {
     };
   }
 
-  function currentTradeCenterDataSync() {
-    if(!liveTeamDirectory?.teams?.length || !liveTeamDirectory?.players?.length){
-      return {mode:'development',snapshotId:null,teams:[...teams],players:[...players]};
+  function removeOriginalTradeDemoSeeds() {
+    try{
+      const keys=['fgc-negotiations-v3','fgc-m1-trades-v2'];
+      const seedIds=new Set(['101','102','104','105']);
+      keys.forEach(key=>{
+        const parsed=JSON.parse(localStorage.getItem(key)||'null');
+        if(!parsed||typeof parsed!=='object')return;
+        let changed=false;
+        if(Array.isArray(parsed.negotiations)){
+          const next=parsed.negotiations.filter(row=>!seedIds.has(String(row?.id||row?.negotiationId||'')));
+          changed=next.length!==parsed.negotiations.length;
+          parsed.negotiations=next;
+        }
+        if(Array.isArray(parsed.trades)){
+          const next=parsed.trades.filter(row=>!seedIds.has(String(row?.id||row?.negotiationId||'')));
+          changed=changed||next.length!==parsed.trades.length;
+          parsed.trades=next;
+        }
+        if(changed)localStorage.setItem(key,JSON.stringify(parsed));
+      });
+    }catch(error){
+      console.warn('[Trade Center LIVE Bridge] Demo cleanup skipped.',error);
     }
-    const liveTeams=liveTeamDirectory.teams.map(tradeCenterTeamShape);
-    const teamIdMap=new Map();
-    liveTeamDirectory.teams.forEach(team=>{
-      const tradeId=tradeCenterTeamId(team);
-      teamIdMap.set(String(team.id||''),tradeId);
-      teamIdMap.set(String(team.abbr||'').toLowerCase(),tradeId);
-    });
-    const livePlayers=liveTeamDirectory.players
-      .filter(player=>String(player.rosterStatus||'active').toLowerCase()!=='free-agent')
-      .map(player=>tradeCenterPlayerShape(player,teamIdMap));
-    return {
-      mode:'live',
-      snapshotId:String(liveTeamDirectory.snapshot?.id||liveTeamDirectory.snapshot?.snapshotId||liveTeamDirectory.snapshot?.snapshot_id||''),
-      teams:liveTeams,
-      players:livePlayers
-    };
   }
 
-  async function loadTradeCenterData() {
-    await loadLiveTeamDirectory(false);
-    return currentTradeCenterDataSync();
+  async function syncTradeCenterLiveBridge({rerender=true}={}) {
+    try{
+      await loadLiveTeamDirectory(false);
+      if(!liveTeamDirectory?.teams?.length||!liveTeamDirectory?.players?.length)return false;
+
+      const liveTeams=liveTeamDirectory.teams.map(tradeCenterLiveTeamShape);
+      const teamMap=new Map();
+      liveTeamDirectory.teams.forEach(team=>{
+        const stable=tradeCenterStableTeamId(team);
+        teamMap.set(String(team.id||''),stable);
+        teamMap.set(String(team.abbr||'').toLowerCase(),stable);
+      });
+
+      const livePlayers=liveTeamDirectory.players
+        .filter(player=>{
+          const teamId=String(player.teamId||'');
+          return Boolean(teamMap.get(teamId)||liveTeamDirectory?.teamMap?.get(teamId));
+        })
+        .map(player=>tradeCenterLivePlayerShape(player,teamMap));
+
+      // Critical safety choice: preserve the ORIGINAL array references.
+      // trade-module.js destructures `teams` and `players` once at startup.
+      // splice() updates what it sees without replacing its variables or handlers.
+      teams.splice(0,teams.length,...liveTeams);
+      players.splice(0,players.length,...livePlayers);
+
+      tradeCenterLiveBridgeState={
+        mode:'live',
+        snapshotId:String(liveTeamDirectory.snapshot?.id||liveTeamDirectory.snapshot?.snapshotId||liveTeamDirectory.snapshot?.snapshot_id||''),
+        teamCount:teams.length,
+        playerCount:players.length
+      };
+
+      removeOriginalTradeDemoSeeds();
+
+      window.FGC_TRADE_LIVE={
+        release:'5.9.10.1b',
+        status:()=>({...tradeCenterLiveBridgeState}),
+        resync:()=>syncTradeCenterLiveBridge({rerender:true})
+      };
+
+      if(rerender){
+        const base=(location.hash.slice(1)||'').split('/')[0];
+        if(['trade-center','trade-block','commissioner'].includes(base)){
+          renderRoute(location.hash.slice(1));
+        }
+      }
+      return true;
+    }catch(error){
+      console.error('[Trade Center LIVE Bridge]',error);
+      return false;
+    }
   }
 
   window.FGC_APP = {
@@ -7783,8 +7838,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     openDetail, closeDetail, applyRole, closeProfileMenu,
     commissionerAccessState, syncCommissionerAccess, renderGlobalLeagueDataBanner,
     rosterService, rosterPlayerView, renderRosterExperience, openRosterPlayerDetail,
-    getTradeCenterData: loadTradeCenterData,
-    getTradeCenterDataSync: currentTradeCenterDataSync,
+    syncTradeCenterLiveBridge,
+    getTradeCenterLiveBridgeStatus:()=>({...tradeCenterLiveBridgeState}),
     gotw: { getWeekModel:gotwWeekModel, getOfficialGameId:officialGotwId, saveOfficial:saveOfficialGotw, currentWeek:currentHomeWeek }
   };
 
@@ -7810,12 +7865,17 @@ function canonicalPlayerDashboardStats(playerId='') {
   applyRole(window.FranchiseHQ?.simulation?.getRole?.() || state.role,false);
   window.FranchiseHQ?.appRouter?.render?.(location.hash.slice(1)||'home',{source:'startup'}) || renderRoute();
 
+  // Load LIVE Trade Center data without modifying the Trade Center module itself.
+  setTimeout(()=>syncTradeCenterLiveBridge({rerender:true}),0);
+  document.addEventListener('franchisehq:league-data-state-changed',()=>syncTradeCenterLiveBridge({rerender:true}));
+  window.addEventListener('franchisehq:live-snapshot-booted',()=>syncTradeCenterLiveBridge({rerender:true}));
+
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.1a';
+      node.textContent = 'Current Release - 5.9.10.1b';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1b';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8040,7 +8100,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.1a',
+    release:'5.9.10.1b',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
