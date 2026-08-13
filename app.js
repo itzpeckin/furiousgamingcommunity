@@ -2209,7 +2209,7 @@
       developmentTrait:normalizeLiveDevelopment(player.devTrait??source.devTrait??source.developmentTrait??source.dev),
       injuryStatus:source.injuryStatus||source.injury||'Healthy',
       depthOrder:Number(source.depthOrder??source.depthChartOrder??source.depth_chart_order??source.depth??source.depthPositionOrder??source.positionOrder??99),
-      depthPosition:String(source.depthPosition??source.depthChartPosition??source.depth_chart_position??source.depthSlot??source.depthChartSlot??source.positionDepth??source.position||player.position||'').toUpperCase(),
+      depthPosition:String(source.depthPosition??source.depthChartPosition??source.depth_chart_position??source.depthSlot??source.depthChartSlot??source.positionDepth??source.position??player.position??'').toUpperCase(),
       rosterStatus:String(source.rosterStatus||source.status||'active').toLowerCase(),
       contract,
       ratings,
@@ -5264,7 +5264,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.6.6aedccb',
+      release:'5.9.8a',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
