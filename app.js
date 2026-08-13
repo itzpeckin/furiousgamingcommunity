@@ -2507,9 +2507,10 @@
   }
 
   function depthPlayerImageMarkup(player) {
-    const imageUrl = String(player?.imageUrl || '').trim();
-    if (imageUrl) {
-      return `<span class="formation-player-card__image"><img src="${escapeHtml(imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.classList.add('is-placeholder');this.remove();"></span>`;
+    const candidates=canonicalPlayerImageCandidates(player||{});
+    if(candidates.length){
+      const encoded=escapeHtml(JSON.stringify(candidates));
+      return `<span class="formation-player-card__image"><img src="${escapeHtml(candidates[0])}" alt="" loading="lazy" referrerpolicy="no-referrer" data-player-image-candidates='${encoded}' onerror="const list=JSON.parse(this.dataset.playerImageCandidates||'[]');const current=list.indexOf(this.src);const next=list[current+1]||list.find(x=>x!==this.src);if(next){this.src=next}else{this.remove();this.parentElement.classList.add('is-placeholder')}"></span>`;
     }
     return `<span class="formation-player-card__image is-placeholder" aria-hidden="true"><svg><use href="#icon-user"></use></svg></span>`;
   }
@@ -2557,15 +2558,13 @@
     const stackMarkup = (label, list, area) => {
       if (!list.length) return `<div class="formation-position formation-position--empty" data-depth-area="${area}" style="grid-area:${area}"><span>${label}</span></div>`;
       const ordered = [...list].sort(sortDepth);
-      const selectedIndex = ordered.findIndex(player => player.id === state.depthSelectedPlayer);
-      if (selectedIndex > 0) ordered.unshift(...ordered.splice(selectedIndex,1));
       const visible = ordered.slice(0,3);
       const front = visible[0];
       const backups = visible.slice(1);
       return `<section class="formation-position" data-depth-area="${area}" style="grid-area:${area}">
         <span class="formation-position__label">${label}</span>
         <div class="formation-depth-card">
-          <button type="button" class="formation-depth-card__starter ${depthDevelopmentClass(front.dev)} ${state.depthSelectedPlayer===front.id?'is-selected':''}" data-depth-player-id="${escapeHtml(front.id||'')}" aria-label="Show ${escapeHtml(front.name)}">
+          <button type="button" class="formation-depth-card__starter ${depthDevelopmentClass(front.dev)} is-selected" data-depth-player-id="${escapeHtml(front.id||'')}" aria-label="Show ${escapeHtml(front.name)}">
             ${depthPlayerImageMarkup(front)}
             <span class="formation-player-card__ovr">${front.overall ?? '—'}</span>
             <strong>${escapeHtml(front.name)}</strong>
@@ -5264,7 +5263,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.8c',
+      release:'5.9.8d',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -6720,12 +6719,10 @@ function canonicalPlayerDashboardStats(playerId='') {
       const playerId=depthPlayerTarget.dataset.depthPlayerId;
 
       if(depthPlayerTarget===starter){
-        if(state.depthSelectedPlayer===playerId) openRosterPlayerDetail(playerId);
-        else {
-          state.depthSelectedPlayer=playerId;
-          section?.querySelectorAll('[data-depth-player-id].is-selected').forEach(node=>node.classList.remove('is-selected'));
-          starter.classList.add('is-selected');
-        }
+        // The visible starter is already the focused player for this position.
+        // One click opens its canonical Player Card. A backup must first be
+        // promoted into this focused slot, then a second click opens the card.
+        openRosterPlayerDetail(playerId);
         return;
       }
 
@@ -7161,9 +7158,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.8c';
+      node.textContent = 'Current Release - 5.9.8d';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.8c';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.8d';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
