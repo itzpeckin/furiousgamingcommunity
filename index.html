@@ -865,6 +865,33 @@
     }
   </style>
 
+
+  <style id="v5991-cap-table">
+    .cap-roster-card .card-header{align-items:flex-end}
+    .cap-position-filter{min-width:150px;margin:0}
+    .cap-position-filter span{font-size:10px}
+    .cap-position-filter select{min-height:36px}
+    .cap-roster-table th{white-space:nowrap}
+    .table-sort-button{
+      appearance:none;
+      border:0;
+      background:transparent;
+      color:inherit;
+      font:inherit;
+      font-weight:inherit;
+      padding:0;
+      cursor:pointer;
+      text-align:left;
+      white-space:nowrap;
+    }
+    .table-sort-button:hover,
+    .table-sort-button.is-active{color:var(--accent)}
+    @media(max-width:760px){
+      .cap-roster-card .card-header{align-items:stretch}
+      .cap-roster-card .heading-actions{width:100%;justify-content:space-between}
+    }
+  </style>
+
 </head>
 <body data-density="comfortable">
   <div class="app-shell" data-app-shell>
@@ -925,7 +952,7 @@
           <span class="status-dot status-dot--success"></span>
           <div><strong>Live Franchise</strong><span>Powered by the active Madden snapshot</span></div>
         </div>
-        <span class="version-label">Current Release - 5.9.9.0a</span>
+        <span class="version-label">Current Release - 5.9.9.1</span>
       </div>
     </aside>
 
@@ -1320,7 +1347,7 @@
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=5.7.1b"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=5.9.9.0a"></script>
+<script src="app.js?v=5.9.9.1"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
 <script src="trade-module.js?v=5.9.6.6aedccbcb.2"></script>

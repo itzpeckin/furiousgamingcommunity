@@ -63,6 +63,9 @@
     rosterDev: 'All',
     depthSelectedPlayer: null,
     teamSchedulePhase: 'regular',
+    capPosition: 'All',
+    capSortKey: 'capHit',
+    capSortDirection: 'desc',
     activityFilter: 'all',
     featuredGameId: null,
     homeLeaderMetrics: {
@@ -2291,7 +2294,7 @@
     }));
 
     return {
-      release:'5.9.9.0a',
+      release:'5.9.9.1',
       playerCount:rows.length,
       playersWithAnyContract:rows.filter(row=>row.contract.hasAnyData).length,
       playersComplete:rows.filter(row=>row.contract.completeness.percent===100).length,
@@ -5083,63 +5086,92 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   function renderTeamCap(team, roster) {
     try{
-      const audit=contractAudit(roster);
-      const mappedPct=audit.playerCount
-        ? Math.round((audit.playersWithAnyContract/audit.playerCount)*100)
-        : 0;
-
-      const rows=[...roster].map(player=>{
+      const allRows=[...roster].map(player=>{
         const contract=canonicalContract(player);
         return {...player,contract};
-      }).sort((a,b)=>(Number(b.contract.capHit)||0)-(Number(a.contract.capHit)||0)
-        ||(Number(b.contract.currentYearSalary)||0)-(Number(a.contract.currentYearSalary)||0)
-        ||String(a.name||'').localeCompare(String(b.name||'')));
+      });
 
-      const totalSalary=rows.reduce((sum,p)=>sum+(Number(p.contract.currentYearSalary)||0),0);
-      const totalCapHit=rows.reduce((sum,p)=>sum+(Number(p.contract.capHit)||0),0);
-      const largestCapHit=rows.reduce((max,p)=>Math.max(max,Number(p.contract.capHit)||0),0);
-      const expiring=rows.filter(p=>Number(p.contract.yearsRemaining)===1).length;
+      const positions=[...new Set(allRows.map(player=>String(player.position||'').toUpperCase()).filter(Boolean))].sort();
+      if(state.capPosition!=='All' && !positions.includes(state.capPosition)) state.capPosition='All';
+
+      const filtered=allRows.filter(player=>
+        state.capPosition==='All' || String(player.position||'').toUpperCase()===state.capPosition
+      );
+
+      const sortKey=state.capSortKey||'capHit';
+      const direction=state.capSortDirection==='asc'?1:-1;
+      const valueFor=(player,key)=>{
+        if(key==='player') return String(player.name||'').toLowerCase();
+        if(key==='position') return String(player.position||'').toLowerCase();
+        if(key==='years') return player.contract.yearsRemaining;
+        if(key==='salary') return player.contract.currentYearSalary;
+        if(key==='capHit') return player.contract.capHit;
+        if(key==='bonus') return player.contract.currentYearBonus;
+        return null;
+      };
+      const sorted=[...filtered].sort((a,b)=>{
+        const av=valueFor(a,sortKey), bv=valueFor(b,sortKey);
+        const aMissing=av===null||av===undefined||av==='';
+        const bMissing=bv===null||bv===undefined||bv==='';
+        if(aMissing&&bMissing) return String(a.name||'').localeCompare(String(b.name||''));
+        if(aMissing) return 1;
+        if(bMissing) return -1;
+        if(typeof av==='number' && typeof bv==='number'){
+          const result=av-bv;
+          return result===0?String(a.name||'').localeCompare(String(b.name||'')):result*direction;
+        }
+        const result=String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:'base'});
+        return result===0?String(a.name||'').localeCompare(String(b.name||'')):result*direction;
+      });
+
+      const totalSalary=allRows.reduce((sum,p)=>sum+(Number(p.contract.currentYearSalary)||0),0);
+      const totalCapHit=allRows.reduce((sum,p)=>sum+(Number(p.contract.capHit)||0),0);
+      const largestCapHit=allRows.reduce((max,p)=>Math.max(max,Number(p.contract.capHit)||0),0);
+      const upcomingFA=allRows.filter(p=>Number(p.contract.yearsRemaining)===1).length;
+
+      const sortHeader=(label,key)=>{
+        const active=sortKey===key;
+        const arrow=active?(state.capSortDirection==='asc'?' ↑':' ↓'):'';
+        return `<button type="button" class="table-sort-button ${active?'is-active':''}" data-cap-sort="${key}" aria-label="Sort by ${escapeHtml(label)}">${escapeHtml(label)}${arrow}</button>`;
+      };
 
       return `<div class="content-grid content-grid--cap">
-        <article class="card contract-audit-card">
-          <div class="card-header">
-            <div>
-              <span class="eyebrow">5.9.9.0a Contract Data Audit</span>
-              <h3>Canonical Contract Coverage</h3>
-              <p>This audit shows what the current LIVE snapshot actually contains. Missing values are not fabricated.</p>
-            </div>
-            <span class="pill ${mappedPct===100?'pill--success':'pill--warning'}">${mappedPct}% mapped</span>
-          </div>
-          <div class="card-body">
-            <div class="stat-box-grid">
-              ${summaryStatBox('Roster Players',audit.playerCount)}
-              ${summaryStatBox('Any Contract Data',audit.playersWithAnyContract)}
-              ${summaryStatBox('Core Contract Complete',audit.playersComplete)}
-              ${summaryStatBox('Missing Core Fields',audit.incompletePlayers.length)}
-            </div>
-          </div>
-        </article>
-
         <article class="card">
-          <div class="card-header"><div><span class="eyebrow">Canonical contract model</span><h3>Financial Overview</h3></div></div>
+          <div class="card-header"><div><h3>Financial Overview</h3></div></div>
           <div class="card-body"><div class="stat-box-grid">
             ${summaryStatBox('Team Cap Space',team.cap!=null?compactMoney(team.cap):'—')}
             ${summaryStatBox('Current Salaries',totalSalary?compactMoney(totalSalary):'—')}
             ${summaryStatBox('Current Cap Hits',totalCapHit?compactMoney(totalCapHit):'—')}
             ${summaryStatBox('Largest Cap Hit',largestCapHit?compactMoney(largestCapHit):'—')}
-            ${summaryStatBox('Expiring Deals',expiring)}
+            ${summaryStatBox('Upcoming FA',upcomingFA)}
           </div></div>
         </article>
 
         <article class="card cap-roster-card">
           <div class="card-header">
-            <div><span class="eyebrow">Active contracts</span><h3>Player Contract Audit</h3></div>
-            <span class="pill pill--neutral">${rows.length} players</span>
+            <div><span class="eyebrow">Active contracts</span><h3>Player Contracts</h3></div>
+            <div class="heading-actions">
+              <label class="field cap-position-filter">
+                <span>Position</span>
+                <select data-cap-position>
+                  <option value="All" ${state.capPosition==='All'?'selected':''}>All Positions</option>
+                  ${positions.map(position=>`<option value="${escapeHtml(position)}" ${state.capPosition===position?'selected':''}>${escapeHtml(position)}</option>`).join('')}
+                </select>
+              </label>
+              <span class="pill pill--neutral">${sorted.length} player${sorted.length===1?'':'s'}</span>
+            </div>
           </div>
           <div class="table-wrap">
             <table class="cap-roster-table">
-              <thead><tr><th>Player</th><th>Pos</th><th>Years</th><th>Salary</th><th>Cap Hit</th><th>Bonus</th><th>Mapping</th></tr></thead>
-              <tbody>${rows.map(player=>`
+              <thead><tr>
+                <th>${sortHeader('Player','player')}</th>
+                <th>${sortHeader('Pos','position')}</th>
+                <th>${sortHeader('Years','years')}</th>
+                <th>${sortHeader('Salary','salary')}</th>
+                <th>${sortHeader('Cap Hit','capHit')}</th>
+                <th>${sortHeader('Bonus','bonus')}</th>
+              </tr></thead>
+              <tbody>${sorted.length?sorted.map(player=>`
                 <tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}">
                   <td><strong>${escapeHtml(player.name||'Unknown Player')}</strong></td>
                   <td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td>
@@ -5147,20 +5179,29 @@ function canonicalPlayerDashboardStats(playerId='') {
                   <td>${player.contract.currentYearSalary!=null?compactMoney(player.contract.currentYearSalary):'—'}</td>
                   <td><strong>${player.contract.capHit!=null?compactMoney(player.contract.capHit):'—'}</strong></td>
                   <td>${player.contract.currentYearBonus!=null?compactMoney(player.contract.currentYearBonus):'—'}</td>
-                  <td><span class="pill ${player.contract.completeness.percent===100?'pill--success':'pill--warning'}">${player.contract.completeness.percent}%</span></td>
-                </tr>`).join('')}
+                </tr>`).join(''):`<tr><td colspan="6">No players match the selected position.</td></tr>`}
               </tbody>
             </table>
           </div>
         </article>
       </div>`;
     }catch(error){
-      console.error('[Contract Audit / Team Cap]',error);
+      console.error('[Team Cap]',error);
       return `<article class="card roadmap-state"><div class="roadmap-state__inner">
-        <h2>Contract audit could not render</h2>
-        <p>${escapeHtml(error?.message||'Unknown contract rendering error.')}</p>
+        <h2>Salary cap could not render</h2>
+        <p>${escapeHtml(error?.message||'Unexpected salary-cap rendering error.')}</p>
       </div></article>`;
     }
+  }
+
+  function refreshActiveCapTab() {
+    const teamId=String(location.hash.split('/')[1]||'');
+    const team=liveTeamDirectory?.teamMap?.get(teamId);
+    const players=liveTeamDirectory?.playersByTeam?.get(teamId)||[];
+    const target=pageContent?.querySelector?.('[data-team-tab-content]');
+    if(!team||!target||state.teamTab!=='cap') return;
+    const roster=players.map(rosterPlayerView);
+    target.innerHTML=renderTeamCap(team,roster);
   }
 
   function renderTeamTradeHistory(team) {
@@ -7037,6 +7078,21 @@ function canonicalPlayerDashboardStats(playerId='') {
     const modalTeam=event.target.closest('[data-modal-team]');
     if (modalTeam) { const id=modalTeam.dataset.modalTeam; closeDetail(); setRoute(`teams/${id}`); return; }
 
+    const capSort=event.target.closest('[data-cap-sort]');
+    if(capSort){
+      event.preventDefault();
+      event.stopPropagation();
+      const key=capSort.dataset.capSort;
+      if(state.capSortKey===key){
+        state.capSortDirection=state.capSortDirection==='asc'?'desc':'asc';
+      }else{
+        state.capSortKey=key;
+        state.capSortDirection=['player','position'].includes(key)?'asc':'desc';
+      }
+      refreshActiveCapTab();
+      return;
+    }
+
     const teamTab=event.target.closest('[data-team-tab]');
     if (teamTab) {
       event.preventDefault();
@@ -7209,6 +7265,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
 
+
+  document.addEventListener('change', event => {
+    const positionFilter=event.target.closest('[data-cap-position]');
+    if(!positionFilter) return;
+    state.capPosition=positionFilter.value||'All';
+    refreshActiveCapTab();
+  });
+
   document.addEventListener('keydown', event => {
     const gameTarget=event.target.closest('[data-game-id]');
     if(gameTarget&&['Enter',' '].includes(event.key)){
@@ -7334,9 +7398,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.9.0a';
+      node.textContent = 'Current Release - 5.9.9.1';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.9.0a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.9.1';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -7348,7 +7412,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.contracts={
-    release:'5.9.9.0a',
+    release:'5.9.9.1',
     normalize:player=>canonicalContract(player),
     forPlayer:playerId=>{
       const id=String(playerId||'');
