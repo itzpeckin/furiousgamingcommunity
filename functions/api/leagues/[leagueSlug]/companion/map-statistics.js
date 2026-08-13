@@ -1,7 +1,9 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.7.0a';
+const RELEASE='5.9.7.0b';
+const RECORD_CHUNK_SIZE=40;
+const MAX_STORED_WARNINGS_PER_BATCH=25;
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const WEEKLY_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/(defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
 const TEAMSTATS_CATEGORY='team';
@@ -44,6 +46,8 @@ async function ensureStatisticsSchema(db){
     unresolved_player_count INTEGER NOT NULL DEFAULT 0,
     warning_count INTEGER NOT NULL DEFAULT 0,
     warnings_json TEXT NOT NULL DEFAULT '[]',
+    record_offset INTEGER NOT NULL DEFAULT 0,
+    record_total INTEGER,
     error_json TEXT,
     started_at TEXT,
     completed_at TEXT,
@@ -55,6 +59,10 @@ async function ensureStatisticsSchema(db){
   )`).run();
   await db.prepare(`CREATE INDEX IF NOT EXISTS idx_statistics_batches_run_status ON companion_statistics_mapping_batches (mapping_run_id, status, route_path)`).run();
   await db.prepare(`CREATE INDEX IF NOT EXISTS idx_statistics_batches_league_created ON companion_statistics_mapping_batches (league_id, created_at DESC)`).run();
+  const columns=await db.prepare(`PRAGMA table_info(companion_statistics_mapping_batches)`).all();
+  const names=new Set((columns.results||[]).map(row=>String(row.name||'')));
+  if(!names.has('record_offset'))await db.prepare(`ALTER TABLE companion_statistics_mapping_batches ADD COLUMN record_offset INTEGER NOT NULL DEFAULT 0`).run();
+  if(!names.has('record_total'))await db.prepare(`ALTER TABLE companion_statistics_mapping_batches ADD COLUMN record_total INTEGER`).run();
   statisticsSchemaReady=true;
 }
 
@@ -115,30 +123,34 @@ async function capturedRoutes(db,leagueId){
   for(const row of result.results||[]){if(!WEEKLY_ROUTE.test(row.route_path))continue;if(!latest.has(row.route_path))latest.set(row.route_path,row)}
   return[...latest.values()].sort((a,b)=>a.route_path.localeCompare(b.route_path));
 }
-async function playerIndex(db,leagueId){
+async function playerIndexForRecords(db,leagueId,records){
   const run=await db.prepare(`SELECT id FROM companion_player_mapping_runs WHERE league_id=? AND status='pending-preview' ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
   const byId=new Map(),byName=new Map();if(!run)return{byId,byName};
-  const result=await db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=?`).bind(leagueId,run.id).all();
-  for(const p of result.results||[]){byId.set(String(p.external_id),p);const n=String(p.display_name||`${p.first_name||''} ${p.last_name||''}`).trim().toLowerCase();if(n&&!byName.has(n))byName.set(n,p)}
+  const ids=[...new Set((records||[]).map(record=>text(first(record,IDS))).filter(Boolean))].slice(0,100);
+  const names=[...new Set((records||[]).map(record=>{const f=text(first(record,FIRST)),l=text(first(record,LAST));return (text(first(record,NAME))||[f,l].filter(Boolean).join(' ')||'').trim().toLowerCase()}).filter(Boolean))].slice(0,100);
+  const rows=[];
+  if(ids.length){const marks=ids.map(()=>'?').join(',');const result=await db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND external_id IN (${marks})`).bind(leagueId,run.id,...ids).all();rows.push(...(result.results||[]))}
+  if(names.length){const marks=names.map(()=>'?').join(',');const result=await db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND lower(COALESCE(display_name, trim(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')))) IN (${marks})`).bind(leagueId,run.id,...names).all();rows.push(...(result.results||[]))}
+  for(const p of rows){byId.set(String(p.external_id),p);const n=String(p.display_name||`${p.first_name||''} ${p.last_name||''}`).trim().toLowerCase();if(n&&!byName.has(n))byName.set(n,p)}
   return{byId,byName};
 }
 async function progress(db,runId){
   const result=await db.prepare(`SELECT status,COUNT(*) count FROM companion_statistics_mapping_batches WHERE mapping_run_id=? GROUP BY status`).bind(runId).all();
   const counts={pending:0,processing:0,complete:0,failed:0};for(const row of result.results||[])counts[row.status]=Number(row.count||0);
   const total=Object.values(counts).reduce((a,b)=>a+b,0),done=counts.complete+counts.failed;
-  const next=await db.prepare(`SELECT route_path,source_category,stage,week_index FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status='pending' ORDER BY route_path LIMIT 1`).bind(runId).first();
-  return{...counts,total,done,percent:total?Math.round((done/total)*100):0,next:next?{routePath:next.route_path,category:next.source_category,stage:next.stage,weekIndex:next.week_index}:null};
+  const next=await db.prepare(`SELECT route_path,source_category,stage,week_index,record_offset,record_total,status FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status IN ('pending','processing') ORDER BY CASE status WHEN 'processing' THEN 0 ELSE 1 END,route_path LIMIT 1`).bind(runId).first();
+  return{...counts,total,done,percent:total?Math.round((done/total)*100):0,next:next?{routePath:next.route_path,category:next.source_category,stage:next.stage,weekIndex:next.week_index,recordOffset:Number(next.record_offset||0),recordTotal:next.record_total==null?null:Number(next.record_total),status:next.status}:null};
 }
 async function runPublic(db,run){
   if(!run)return null;
   return{mappingRun:{id:run.id,status:run.status,routeCount:Number(run.route_count||0),recordCount:Number(run.record_count||0),resolvedPlayerCount:Number(run.resolved_player_count||0),unresolvedPlayerCount:Number(run.unresolved_player_count||0),categorySummary:safeParse(run.category_summary_json,{}),warningCount:Number(run.warning_count||0),warnings:safeParse(run.warnings_json,[]),createdAt:run.created_at,updatedAt:run.updated_at},progress:await progress(db,run.id)};
 }
-async function latestRun(db,leagueId,includeRows=true){
+async function latestRun(db,leagueId,includeRows=false){
   const run=await db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
   if(!run)return null;
   const pub=await runPublic(db,run);
   if(!includeRows)return pub;
-  const result=await db.prepare(`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=? ORDER BY category,stage,week_index,player_name,team_external_id,external_key`).bind(leagueId,run.id).all();
+  const result=await db.prepare(`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=? ORDER BY category,stage,week_index,player_name,team_external_id,external_key LIMIT 500`).bind(leagueId,run.id).all();
   return{...pub,statistics:(result.results||[]).map(row=>({externalKey:row.external_key,category:row.category,seasonYear:row.season_year,stage:row.stage,weekIndex:row.week_index,playerExternalId:row.player_external_id,teamExternalId:row.team_external_id,playerName:row.player_name,position:row.position,metrics:safeParse(row.metrics_json,{}),sourceRoutePath:row.source_route_path}))};
 }
 async function startRun(db,leagueId){
@@ -171,25 +183,23 @@ async function rebuildRunSummary(db,runId){
 async function processNext(db,env,leagueId,runId){
   const run=await db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=? AND league_id=?`).bind(runId,leagueId).first();
   if(!run)throw Object.assign(new Error('Statistics mapping run not found.'),{status:404});
-  if(run.status==='pending-preview')return{complete:true};
-  // A previous Worker may have been terminated after marking a route processing.
-  // Because the browser sends these sequentially, any leftover processing batch is stale and safe to retry.
-  await db.prepare(`UPDATE companion_statistics_mapping_batches SET status='pending',started_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE mapping_run_id=? AND status='processing'`).bind(runId).run();
-  const batch=await db.prepare(`SELECT * FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status='pending' ORDER BY route_path LIMIT 1`).bind(runId).first();
+  if(run.status==='pending-preview'||run.status==='partial-preview')return{complete:true};
+  const batch=await db.prepare(`SELECT * FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status IN ('processing','pending') ORDER BY CASE status WHEN 'processing' THEN 0 ELSE 1 END,route_path LIMIT 1`).bind(runId).first();
   if(!batch){
     const failed=Number((await db.prepare(`SELECT COUNT(*) c FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status='failed'`).bind(runId).first())?.c||0);
     await rebuildRunSummary(db,runId);
     await db.prepare(`UPDATE companion_statistics_mapping_runs SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(failed?'partial-preview':'pending-preview',runId).run();
     return{complete:true,failed};
   }
-  await db.prepare(`UPDATE companion_statistics_mapping_batches SET status='processing',started_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(batch.id).run();
+  if(batch.status==='pending')await db.prepare(`UPDATE companion_statistics_mapping_batches SET status='processing',started_at=COALESCE(started_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(batch.id).run();
   try{
-    const meta=routeMeta(batch.route_path),payload=await readPayload(env,batch),collection=choose(payload,meta.category),warnings=[],output=[];
+    const meta=routeMeta(batch.route_path),payload=await readPayload(env,batch),collection=choose(payload,meta.category),allRecords=collection?.objects||[],warnings=[];
     if(!collection)warnings.push(`No ${meta.category} collection found in ${batch.route_path}`);
-    const players=meta.category===TEAMSTATS_CATEGORY?{byId:new Map(),byName:new Map()}:await playerIndex(db,leagueId);
+    const offset=Number(batch.record_offset||0),chunk=allRecords.slice(offset,offset+RECORD_CHUNK_SIZE),output=[];
+    const players=meta.category===TEAMSTATS_CATEGORY?{byId:new Map(),byName:new Map()}:await playerIndexForRecords(db,leagueId,chunk);
     let resolved=0,unresolved=0;
-    for(let index=0;index<(collection?.objects||[]).length;index++){
-      const record=collection.objects[index];
+    for(let localIndex=0;localIndex<chunk.length;localIndex++){
+      const index=offset+localIndex,record=chunk[localIndex];
       if(meta.category===TEAMSTATS_CATEGORY){
         const teamId=text(first(record,TEAM));if(!teamId)continue;
         const values=flattenMetrics(record),gameId=text(first(record,GAME_IDS));if(gameId){values.__gameId=gameId;values.scheduleId=gameId}values.__sourceCategory='team';
@@ -198,23 +208,22 @@ async function processNext(db,env,leagueId,runId){
       }
       const sourceId=text(first(record,IDS)),firstName=text(first(record,FIRST)),lastName=text(first(record,LAST)),sourceName=text(first(record,NAME))||[firstName,lastName].filter(Boolean).join(' ')||null;
       let player=sourceId?players.byId.get(sourceId):null;if(!player&&sourceName)player=players.byName.get(sourceName.toLowerCase());
-      if(player)resolved++;else{unresolved++;warnings.push(`Unresolved ${meta.category} player ${sourceId||sourceName||`record ${index+1}`} in ${batch.route_path}`)}
+      if(player)resolved++;else{unresolved++;if(warnings.length<MAX_STORED_WARNINGS_PER_BATCH)warnings.push(`Unresolved ${meta.category} player ${sourceId||sourceName||`record ${index+1}`} in ${batch.route_path}`)}
       const teamId=text(first(record,TEAM))||text(player?.team_external_id);
       output.push({externalKey:`${meta.category}:${canonicalStage(meta.stage)}:${meta.week}:${player?.external_id||sourceId||sourceName||index}:${teamId||'none'}`,category:meta.category,seasonYear:int(first(record,['calendarYear','seasonYear','year'])),stage:canonicalStage(meta.stage),weekIndex:meta.week,playerExternalId:text(player?.external_id)||sourceId,teamExternalId:teamId,playerName:text(player?.display_name)||sourceName,position:text(first(record,POS))||text(player?.position),metrics:flattenMetrics(record),route:batch.route_path,source:record});
     }
     const unique=[...new Map(output.map(row=>[row.externalKey,row])).values()];
     await insertRows(db,runId,leagueId,unique);
-    await db.prepare(`UPDATE companion_statistics_mapping_batches SET status='complete',record_count=?,resolved_player_count=?,unresolved_player_count=?,warning_count=?,warnings_json=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(unique.length,resolved,unresolved,warnings.length,JSON.stringify(warnings),batch.id).run();
-    await rebuildRunSummary(db,runId);
-    const remaining=Number((await db.prepare(`SELECT COUNT(*) c FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status='pending'`).bind(runId).first())?.c||0);
-    if(!remaining){
-      const failed=Number((await db.prepare(`SELECT COUNT(*) c FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status='failed'`).bind(runId).first())?.c||0);
-      await db.prepare(`UPDATE companion_statistics_mapping_runs SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(failed?'partial-preview':'pending-preview',runId).run();
+    const nextOffset=Math.min(offset+chunk.length,allRecords.length),routeComplete=nextOffset>=allRecords.length;
+    const existingWarnings=safeParse(batch.warnings_json,[]),mergedWarnings=[...existingWarnings,...warnings].slice(0,MAX_STORED_WARNINGS_PER_BATCH);
+    await db.prepare(`UPDATE companion_statistics_mapping_batches SET status=?,record_offset=?,record_total=?,record_count=record_count+?,resolved_player_count=resolved_player_count+?,unresolved_player_count=unresolved_player_count+?,warning_count=warning_count+?,warnings_json=?,completed_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(routeComplete?'complete':'processing',nextOffset,allRecords.length,unique.length,resolved,unresolved,warnings.length,JSON.stringify(mergedWarnings),routeComplete?new Date().toISOString():null,batch.id).run();
+    if(routeComplete){
+      const remaining=Number((await db.prepare(`SELECT COUNT(*) c FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status IN ('pending','processing')`).bind(runId).first())?.c||0);
+      if(!remaining){const failed=Number((await db.prepare(`SELECT COUNT(*) c FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status='failed'`).bind(runId).first())?.c||0);await rebuildRunSummary(db,runId);await db.prepare(`UPDATE companion_statistics_mapping_runs SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(failed?'partial-preview':'pending-preview',runId).run();return{complete:true,processed:{routePath:batch.route_path,category:meta.category,records:unique.length,routeComplete:true,recordOffset:nextOffset,recordTotal:allRecords.length}}}
     }
-    return{complete:remaining===0,processed:{routePath:batch.route_path,category:meta.category,records:unique.length,warnings:warnings.length}};
+    return{complete:false,processed:{routePath:batch.route_path,category:meta.category,records:unique.length,routeComplete,recordOffset:nextOffset,recordTotal:allRecords.length}};
   }catch(error){
-    await db.prepare(`UPDATE companion_statistics_mapping_batches SET status='failed',warning_count=1,warnings_json=?,error_json=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(JSON.stringify([`Failed ${batch.route_path}: ${error?.message||String(error)}`]),JSON.stringify({message:error?.message||String(error)}),batch.id).run();
-    await rebuildRunSummary(db,runId);
+    await db.prepare(`UPDATE companion_statistics_mapping_batches SET status='failed',warning_count=warning_count+1,warnings_json=?,error_json=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(JSON.stringify([`Failed ${batch.route_path}: ${error?.message||String(error)}`]),JSON.stringify({message:error?.message||String(error)}),batch.id).run();
     throw error;
   }
 }
@@ -228,8 +237,14 @@ async function authorizedContext(context){
 }
 export async function onRequestGet(context){
   const state=await authorizedContext(context);if(state.response)return state.response;
-  const preview=await latestRun(state.db,state.league.id,true);
-  return json({ok:true,release:RELEASE,previewAvailable:Boolean(preview?.mappingRun?.recordCount),...(preview||{}),activeSnapshotChanged:false,activationPerformed:false});
+  const preview=await latestRun(state.db,state.league.id,false);
+  const requestedCategory=String(new URL(context.request.url).searchParams.get('category')||'').trim().toLowerCase();
+  let statistics;
+  if(requestedCategory&&preview?.mappingRun?.id){
+    const result=await state.db.prepare(`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=? AND category=? ORDER BY stage,week_index,player_name,team_external_id,external_key LIMIT 1000`).bind(state.league.id,preview.mappingRun.id,requestedCategory).all();
+    statistics=(result.results||[]).map(row=>({externalKey:row.external_key,category:row.category,seasonYear:row.season_year,stage:row.stage,weekIndex:row.week_index,playerExternalId:row.player_external_id,teamExternalId:row.team_external_id,playerName:row.player_name,position:row.position,metrics:safeParse(row.metrics_json,{}),sourceRoutePath:row.source_route_path}));
+  }
+  return json({ok:true,release:RELEASE,previewAvailable:Boolean(preview?.mappingRun?.recordCount),...(preview||{}),...(statistics?{statistics}:{}),activeSnapshotChanged:false,activationPerformed:false});
 }
 export async function onRequestPost(context){
   const state=await authorizedContext(context);if(state.response)return state.response;
