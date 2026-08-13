@@ -5273,7 +5273,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.8e',
+      release:'5.9.8f',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -7168,9 +7168,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.8e';
+      node.textContent = 'Current Release - 5.9.8f';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.8e';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.8f';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });

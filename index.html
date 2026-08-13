@@ -696,6 +696,175 @@
     }
   </style>
 
+
+  <style id="v598f-formation-alignment">
+    /* v5.9.8f — compact fixed formation based on commissioner-approved geometry. */
+    .football-formation--offense,
+    .football-formation--defense{
+      display:grid!important;
+      grid-template-columns:repeat(16,minmax(0,1fr))!important;
+      grid-template-rows:repeat(3,auto)!important;
+      grid-template-areas:none!important;
+      column-gap:7px!important;
+      row-gap:12px!important;
+      width:100%!important;
+      max-width:1180px!important;
+      min-width:0!important;
+      margin:0 auto!important;
+      align-items:start!important;
+      justify-items:stretch!important;
+      padding-left:8px!important;
+      padding-right:8px!important;
+      box-sizing:border-box!important;
+    }
+
+    .football-formation--offense > .formation-position,
+    .football-formation--defense > .formation-position{
+      grid-area:auto!important;
+      width:100%!important;
+      min-width:0!important;
+      max-width:none!important;
+      justify-self:stretch!important;
+    }
+
+    /* OFFENSE
+             LT | LG | C | RG | RT | TE
+       WR1 | SLOT |      | QB |        | WR2
+                         | HB | FB |
+    */
+    .football-formation--offense [data-depth-area="lt"]{grid-column:3 / span 2!important;grid-row:1!important}
+    .football-formation--offense [data-depth-area="lg"]{grid-column:5 / span 2!important;grid-row:1!important}
+    .football-formation--offense [data-depth-area="c"]{grid-column:7 / span 2!important;grid-row:1!important}
+    .football-formation--offense [data-depth-area="rg"]{grid-column:9 / span 2!important;grid-row:1!important}
+    .football-formation--offense [data-depth-area="rt"]{grid-column:11 / span 2!important;grid-row:1!important}
+    .football-formation--offense [data-depth-area="te"]{grid-column:13 / span 2!important;grid-row:1!important}
+
+    .football-formation--offense [data-depth-area="wr1"]{grid-column:1 / span 2!important;grid-row:2!important}
+    .football-formation--offense [data-depth-area="slot"]{grid-column:4 / span 2!important;grid-row:2!important}
+    .football-formation--offense [data-depth-area="qb"]{grid-column:8 / span 2!important;grid-row:2!important}
+    .football-formation--offense [data-depth-area="wr2"]{grid-column:15 / span 2!important;grid-row:2!important}
+
+    .football-formation--offense [data-depth-area="rb"]{grid-column:8 / span 2!important;grid-row:3!important}
+    .football-formation--offense [data-depth-area="fb"]{grid-column:10 / span 2!important;grid-row:3!important}
+
+    /* DEFENSE
+                              FS | SS
+       CB1 | SCB      SAM | MIKE | WILL        CB2
+                    REDGE | DT1 | DT2 | LEDGE
+       MIKE center = midpoint of both safety pair and DT pair.
+    */
+    .football-formation--defense [data-depth-area="fs"]{grid-column:7 / span 2!important;grid-row:1!important}
+    .football-formation--defense [data-depth-area="ss"]{grid-column:9 / span 2!important;grid-row:1!important}
+
+    .football-formation--defense [data-depth-area="cb1"]{grid-column:1 / span 2!important;grid-row:2!important}
+    .football-formation--defense [data-depth-area="scb"]{grid-column:3 / span 2!important;grid-row:2!important}
+    .football-formation--defense [data-depth-area="lolb"]{grid-column:6 / span 2!important;grid-row:2!important}
+    .football-formation--defense [data-depth-area="mlb"]{grid-column:8 / span 2!important;grid-row:2!important}
+    .football-formation--defense [data-depth-area="rolb"]{grid-column:10 / span 2!important;grid-row:2!important}
+    .football-formation--defense [data-depth-area="cb2"]{grid-column:15 / span 2!important;grid-row:2!important}
+
+    .football-formation--defense [data-depth-area="redge"]{grid-column:5 / span 2!important;grid-row:3!important}
+    .football-formation--defense [data-depth-area="dt1"]{grid-column:7 / span 2!important;grid-row:3!important}
+    .football-formation--defense [data-depth-area="dt2"]{grid-column:9 / span 2!important;grid-row:3!important}
+    .football-formation--defense [data-depth-area="ledge"]{grid-column:11 / span 2!important;grid-row:3!important}
+
+    /* Compact card footprint: no position is allowed to widen the formation. */
+    .formation-depth-card{
+      width:100%!important;
+      min-width:0!important;
+      max-width:none!important;
+    }
+
+    .formation-depth-card__starter{
+      width:100%!important;
+      min-width:0!important;
+      max-width:none!important;
+      height:88px!important;
+      min-height:88px!important;
+      padding:6px 7px!important;
+      padding-top:42px!important;
+      overflow:hidden!important;
+      box-sizing:border-box!important;
+    }
+
+    .formation-depth-card__starter .formation-player-card__image{
+      top:6px!important;
+      left:7px!important;
+      width:32px!important;
+      height:32px!important;
+      border-radius:7px!important;
+    }
+
+    .formation-depth-card__starter .formation-player-card__ovr{
+      top:6px!important;
+      right:7px!important;
+      font-size:13px!important;
+    }
+
+    /* Focus name: intentionally smaller and lighter than earlier patches. */
+    .formation-depth-card__starter .depth-focus-name{
+      display:flex!important;
+      flex-direction:column!important;
+      justify-content:flex-end!important;
+      gap:0!important;
+      width:100%!important;
+      min-width:0!important;
+      min-height:30px!important;
+      margin:0!important;
+      padding:0!important;
+      font-size:11.5px!important;
+      font-weight:600!important;
+      line-height:1.08!important;
+      letter-spacing:0!important;
+      white-space:normal!important;
+      overflow:visible!important;
+      text-overflow:clip!important;
+    }
+
+    .depth-focus-name__line{
+      display:block!important;
+      width:100%!important;
+      min-width:0!important;
+      white-space:nowrap!important;
+      overflow:visible!important;
+      text-overflow:clip!important;
+      font-size:inherit!important;
+      font-weight:inherit!important;
+    }
+
+    .formation-depth-card__backup{
+      min-height:30px!important;
+      height:30px!important;
+      padding:5px 7px!important;
+      gap:5px!important;
+      box-sizing:border-box!important;
+    }
+
+    .formation-depth-card__backup strong{
+      font-size:10.5px!important;
+      font-weight:600!important;
+      white-space:nowrap!important;
+      overflow:hidden!important;
+      text-overflow:ellipsis!important;
+    }
+
+    .formation-depth-card__backup b{
+      font-size:10.5px!important;
+    }
+
+    .formation-position__label{
+      margin-bottom:5px!important;
+    }
+
+    @media(max-width:1100px){
+      .football-formation--offense,
+      .football-formation--defense{
+        min-width:900px!important;
+        overflow:visible!important;
+      }
+    }
+  </style>
+
 </head>
 <body data-density="comfortable">
   <div class="app-shell" data-app-shell>
@@ -756,7 +925,7 @@
           <span class="status-dot status-dot--success"></span>
           <div><strong>Live Franchise</strong><span>Powered by the active Madden snapshot</span></div>
         </div>
-        <span class="version-label">Current Release - 5.9.8e</span>
+        <span class="version-label">Current Release - 5.9.8f</span>
       </div>
     </aside>
 
@@ -1151,7 +1320,7 @@
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=5.7.1b"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=5.9.8e"></script>
+<script src="app.js?v=5.9.8f"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
 <script src="trade-module.js?v=5.9.6.6aedccbcb.2"></script>
