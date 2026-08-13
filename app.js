@@ -2291,7 +2291,7 @@
     }));
 
     return {
-      release:'5.9.9.0',
+      release:'5.9.9.0a',
       playerCount:rows.length,
       playersWithAnyContract:rows.filter(row=>row.contract.hasAnyData).length,
       playersComplete:rows.filter(row=>row.contract.completeness.percent===100).length,
@@ -5082,28 +5082,85 @@ function canonicalPlayerDashboardStats(playerId='') {
   function summaryStatBox(label,value) { return `<div class="stat-box"><span>${label}</span><strong>${value}</strong></div>`; }
 
   function renderTeamCap(team, roster) {
-    const sorted=[...roster].sort((a,b)=>(Number(b.salary)||0)-(Number(a.salary)||0)||String(a.name).localeCompare(String(b.name)));
-    const total=roster.reduce((sum,p)=>sum+(Number(p.salary)||0),0);
-    const largest=sorted[0]?.salary||0;
-    return `<div class="content-grid content-grid--cap">
-      <article class="card"><div class="card-header"><div><span class="eyebrow">Financial overview</span><h3>Salary cap</h3></div></div><div class="card-body"><div class="stat-box-grid">
-        ${summaryStatBox('Cap Space',compactMoney(team.cap))}
-        ${summaryStatBox('Current Salaries',compactMoney(total))}
-        ${summaryStatBox('Largest Salary',compactMoney(largest))}
-        ${summaryStatBox('Expiring Deals',roster.filter(p=>Number(p.years)===1).length)}
-      </div></div></article>
-      <article class="card cap-roster-card"><div class="card-header"><div><span class="eyebrow">Active contracts</span><h3>Player contracts</h3></div><span class="pill pill--neutral">${sorted.length} players</span></div>
-        <div class="table-wrap"><table class="cap-roster-table"><thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>Years Remaining</th><th>Current Year Salary</th><th>Cap Hit</th></tr></thead>
-        <tbody>${sorted.map(player=>`<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}">
-          <td><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(schoolAbbreviation(player.college))}</small></td>
-          <td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td>
-          <td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall??'—'}</span></td>
-          <td>${player.years||'—'}</td>
-          <td>${player.salary?compactMoney(player.salary):'—'}</td>
-          <td><strong>${player.capHit?compactMoney(player.capHit):'—'}</strong></td>
-        </tr>`).join('')}</tbody></table></div>
-      </article>
-    </div>`;
+    try{
+      const audit=contractAudit(roster);
+      const mappedPct=audit.playerCount
+        ? Math.round((audit.playersWithAnyContract/audit.playerCount)*100)
+        : 0;
+
+      const rows=[...roster].map(player=>{
+        const contract=canonicalContract(player);
+        return {...player,contract};
+      }).sort((a,b)=>(Number(b.contract.capHit)||0)-(Number(a.contract.capHit)||0)
+        ||(Number(b.contract.currentYearSalary)||0)-(Number(a.contract.currentYearSalary)||0)
+        ||String(a.name||'').localeCompare(String(b.name||'')));
+
+      const totalSalary=rows.reduce((sum,p)=>sum+(Number(p.contract.currentYearSalary)||0),0);
+      const totalCapHit=rows.reduce((sum,p)=>sum+(Number(p.contract.capHit)||0),0);
+      const largestCapHit=rows.reduce((max,p)=>Math.max(max,Number(p.contract.capHit)||0),0);
+      const expiring=rows.filter(p=>Number(p.contract.yearsRemaining)===1).length;
+
+      return `<div class="content-grid content-grid--cap">
+        <article class="card contract-audit-card">
+          <div class="card-header">
+            <div>
+              <span class="eyebrow">5.9.9.0a Contract Data Audit</span>
+              <h3>Canonical Contract Coverage</h3>
+              <p>This audit shows what the current LIVE snapshot actually contains. Missing values are not fabricated.</p>
+            </div>
+            <span class="pill ${mappedPct===100?'pill--success':'pill--warning'}">${mappedPct}% mapped</span>
+          </div>
+          <div class="card-body">
+            <div class="stat-box-grid">
+              ${summaryStatBox('Roster Players',audit.playerCount)}
+              ${summaryStatBox('Any Contract Data',audit.playersWithAnyContract)}
+              ${summaryStatBox('Core Contract Complete',audit.playersComplete)}
+              ${summaryStatBox('Missing Core Fields',audit.incompletePlayers.length)}
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-header"><div><span class="eyebrow">Canonical contract model</span><h3>Financial Overview</h3></div></div>
+          <div class="card-body"><div class="stat-box-grid">
+            ${summaryStatBox('Team Cap Space',team.cap!=null?compactMoney(team.cap):'—')}
+            ${summaryStatBox('Current Salaries',totalSalary?compactMoney(totalSalary):'—')}
+            ${summaryStatBox('Current Cap Hits',totalCapHit?compactMoney(totalCapHit):'—')}
+            ${summaryStatBox('Largest Cap Hit',largestCapHit?compactMoney(largestCapHit):'—')}
+            ${summaryStatBox('Expiring Deals',expiring)}
+          </div></div>
+        </article>
+
+        <article class="card cap-roster-card">
+          <div class="card-header">
+            <div><span class="eyebrow">Active contracts</span><h3>Player Contract Audit</h3></div>
+            <span class="pill pill--neutral">${rows.length} players</span>
+          </div>
+          <div class="table-wrap">
+            <table class="cap-roster-table">
+              <thead><tr><th>Player</th><th>Pos</th><th>Years</th><th>Salary</th><th>Cap Hit</th><th>Bonus</th><th>Mapping</th></tr></thead>
+              <tbody>${rows.map(player=>`
+                <tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}">
+                  <td><strong>${escapeHtml(player.name||'Unknown Player')}</strong></td>
+                  <td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td>
+                  <td>${player.contract.yearsRemaining??'—'}</td>
+                  <td>${player.contract.currentYearSalary!=null?compactMoney(player.contract.currentYearSalary):'—'}</td>
+                  <td><strong>${player.contract.capHit!=null?compactMoney(player.contract.capHit):'—'}</strong></td>
+                  <td>${player.contract.currentYearBonus!=null?compactMoney(player.contract.currentYearBonus):'—'}</td>
+                  <td><span class="pill ${player.contract.completeness.percent===100?'pill--success':'pill--warning'}">${player.contract.completeness.percent}%</span></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>`;
+    }catch(error){
+      console.error('[Contract Audit / Team Cap]',error);
+      return `<article class="card roadmap-state"><div class="roadmap-state__inner">
+        <h2>Contract audit could not render</h2>
+        <p>${escapeHtml(error?.message||'Unknown contract rendering error.')}</p>
+      </div></article>`;
+    }
   }
 
   function renderTeamTradeHistory(team) {
@@ -7006,7 +7063,12 @@ function canonicalPlayerDashboardStats(playerId='') {
         pageContent.querySelectorAll('[data-team-tab]').forEach(button=>{
           button.classList.toggle('is-active',button.dataset.teamTab===nextTab);
         });
-        target.innerHTML=renderTeamTab(team,rosterModel,roster,teamGames,leaders);
+        try{
+          target.innerHTML=renderTeamTab(team,rosterModel,roster,teamGames,leaders);
+        }catch(error){
+          console.error('[Team Tab Render]',nextTab,error);
+          target.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>${escapeHtml(titleCase(nextTab))} could not render</h2><p>${escapeHtml(error?.message||'Unexpected team-tab rendering error.')}</p></div></article>`;
+        }
         scrollTeamTabsToTop();
       } else {
         // Safe fallback if the directory was cleared unexpectedly.
@@ -7272,9 +7334,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.9.0';
+      node.textContent = 'Current Release - 5.9.9.0a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.9.0';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.9.0a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -7286,7 +7348,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.contracts={
-    release:'5.9.9.0',
+    release:'5.9.9.0a',
     normalize:player=>canonicalContract(player),
     forPlayer:playerId=>{
       const id=String(playerId||'');
