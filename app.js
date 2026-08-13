@@ -1740,7 +1740,7 @@
 
     return `<section class="player-data-inspector" data-player-data-inspector>
       <div class="card-header player-inspector-heading">
-        <div><span class="eyebrow">v5.9.6.6edccbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
+        <div><span class="eyebrow">v5.9.6.6aedccbcb.2b.1ba.1 · Player Source Discovery</span><h3>Player Data Inspector</h3><p>Certify player identity, team, ratings, contract, statistics, and visual-asset sources before Player Card 2.0.</p></div>
         <span class="pill pill--success">Active Snapshot</span>
       </div>
 
@@ -1850,7 +1850,7 @@
     diagnostics() {
       return Object.freeze({
         service:'playerDataInspector',
-        version:'5.9.6.6edccbcb.2b.1ba.1',
+        version:'5.9.6.6aedccbcb.2b.1ba.1',
         loaded:playerInspectorState.loaded,
         playerCount:playerInspectorState.players.length,
         teamCount:playerInspectorState.teams.length,
@@ -1905,10 +1905,18 @@
     };
   },true);
 
-  document.addEventListener('click',event=>{
+  document.addEventListener('click',async event=>{
     const sort=event.target.closest?.('[data-season-team-sort]');
     if(!sort)return;
     event.preventDefault();
+
+    const wrapper=document.querySelector('.season-team-stat-table-wrap');
+    const savedScroll={
+      pageY:window.scrollY,
+      left:wrapper?.scrollLeft||0,
+      top:wrapper?.scrollTop||0
+    };
+
     const key=sort.dataset.seasonTeamSort;
     if(state.teamStatsSortKey===key){
       state.teamStatsSortDirection=state.teamStatsSortDirection==='asc'?'desc':'asc';
@@ -1916,7 +1924,17 @@
       state.teamStatsSortKey=key;
       state.teamStatsSortDirection='desc';
     }
-    renderStats();
+
+    await renderStats();
+
+    requestAnimationFrame(()=>{
+      const next=document.querySelector('.season-team-stat-table-wrap');
+      if(next){
+        next.scrollLeft=savedScroll.left;
+        next.scrollTop=savedScroll.top;
+      }
+      window.scrollTo({top:savedScroll.pageY,left:0,behavior:'auto'});
+    });
   });
 
   document.addEventListener('click',event=>{
@@ -5212,7 +5230,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.6.6edccb',
+      release:'5.9.6.6aedccb',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -5571,6 +5589,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         <div><span class="eyebrow">${escapeHtml(year||'Current Season')} Team Statistics</span><h3>Season Team Statistics</h3></div>
         <span class="pill pill--neutral">${rows.length} teams${latestWeek?` · Through Week ${latestWeek}`:''}</span>
       </div>
+      <div class="season-team-stat-scroll-note">Showing 10 teams at a time · scroll vertically for the remaining teams · scroll horizontally for additional statistics</div>
       <div class="season-team-stat-table-wrap">
         <table class="season-team-stat-table">
           <thead>
