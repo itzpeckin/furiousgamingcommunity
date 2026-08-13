@@ -2531,6 +2531,16 @@
     });
   }
 
+  function depthFocusedNameMarkup(name='') {
+    const clean=String(name||'').trim().replace(/\s+/g,' ');
+    if(!clean) return '<span class="depth-focus-name__line">—</span>';
+    const parts=clean.split(' ');
+    if(parts.length===1) return `<span class="depth-focus-name__line">${escapeHtml(clean)}</span>`;
+    const first=parts.shift();
+    const last=parts.join(' ');
+    return `<span class="depth-focus-name__line depth-focus-name__first">${escapeHtml(first)}</span><span class="depth-focus-name__line depth-focus-name__last">${escapeHtml(last)}</span>`;
+  }
+
   function renderRosterDepthChart(rosterModel) {
     const devRank = value => ({'X-Factor':4,'Superstar':3,'Star':2,'Normal':1}[normalizeLiveDevelopment(value)] || 0);
     const depthValue = player => {
@@ -2567,7 +2577,7 @@
           <button type="button" class="formation-depth-card__starter ${depthDevelopmentClass(front.dev)} is-selected" data-depth-player-id="${escapeHtml(front.id||'')}" aria-label="Show ${escapeHtml(front.name)}">
             ${depthPlayerImageMarkup(front)}
             <span class="formation-player-card__ovr">${front.overall ?? '—'}</span>
-            <strong>${escapeHtml(front.name)}</strong>
+            <strong class="depth-focus-name">${depthFocusedNameMarkup(front.name)}</strong>
           </button>
           <div class="formation-depth-card__backups">
             ${[0,1].map(index=>{
@@ -5263,7 +5273,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.8d',
+      release:'5.9.8e',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -6735,7 +6745,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       starter.dataset.depthPlayerId=selected.id;
       starter.setAttribute('aria-label',`Show ${selected.name}`);
       starter.className=`formation-depth-card__starter ${depthDevelopmentClass(selected.dev)} is-selected`;
-      starter.innerHTML=`${depthPlayerImageMarkup(selected)}<span class="formation-player-card__ovr">${selected.overall??'—'}</span><strong>${escapeHtml(selected.name)}</strong>`;
+      starter.innerHTML=`${depthPlayerImageMarkup(selected)}<span class="formation-player-card__ovr">${selected.overall??'—'}</span><strong class="depth-focus-name">${depthFocusedNameMarkup(selected.name)}</strong>`;
 
       depthPlayerTarget.dataset.depthPlayerId=current.id;
       depthPlayerTarget.setAttribute('aria-label',`Show ${current.name}`);
@@ -7158,9 +7168,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.8d';
+      node.textContent = 'Current Release - 5.9.8e';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.8d';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.8e';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });

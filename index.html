@@ -600,6 +600,102 @@
     }
   </style>
 
+
+  <style id="v598e-compact-depth-tiles">
+    /* v5.9.8e — compact, uniform depth-chart tiles. */
+    .football-formation--offense,
+    .football-formation--defense{
+      grid-template-columns:repeat(12,minmax(64px,1fr))!important;
+      column-gap:8px!important;
+      row-gap:12px!important;
+      min-width:960px!important;
+      max-width:1220px!important;
+      margin-left:auto!important;
+      margin-right:auto!important;
+    }
+
+    .formation-depth-card__starter{
+      min-height:94px!important;
+      height:94px!important;
+      padding:7px!important;
+      padding-top:45px!important;
+      overflow:hidden!important;
+    }
+
+    .formation-depth-card__starter .formation-player-card__image{
+      top:7px!important;
+      left:7px!important;
+      width:34px!important;
+      height:34px!important;
+      border-radius:7px!important;
+    }
+
+    .formation-depth-card__starter .formation-player-card__ovr{
+      top:7px!important;
+      right:7px!important;
+    }
+
+    .formation-depth-card__starter .depth-focus-name{
+      display:flex!important;
+      flex-direction:column!important;
+      justify-content:flex-end!important;
+      gap:0!important;
+      min-height:32px!important;
+      width:100%!important;
+      line-height:1.02!important;
+      font-size:14px!important;
+      font-weight:800!important;
+      white-space:normal!important;
+      overflow:visible!important;
+      text-overflow:clip!important;
+      overflow-wrap:normal!important;
+      word-break:normal!important;
+    }
+
+    .depth-focus-name__line{
+      display:block!important;
+      width:100%!important;
+      white-space:nowrap!important;
+      overflow:hidden!important;
+      text-overflow:ellipsis!important;
+    }
+
+    /* Prefer First / Last stacking over widening the tile. */
+    .depth-focus-name__first,
+    .depth-focus-name__last{
+      min-height:14px!important;
+    }
+
+    .formation-depth-card__backup{
+      min-height:34px!important;
+      padding:7px 8px!important;
+      gap:6px!important;
+    }
+
+    .formation-depth-card__backup strong{
+      font-size:12px!important;
+      min-width:0!important;
+    }
+
+    /* Keep every position at the same physical width, including QB and HB. */
+    .football-formation--offense [data-depth-area="qb"],
+    .football-formation--offense [data-depth-area="rb"],
+    .football-formation--offense [data-depth-area="wr1"],
+    .football-formation--offense [data-depth-area="wr2"],
+    .football-formation--offense [data-depth-area="slot"],
+    .football-formation--defense > .formation-position{
+      width:100%!important;
+      max-width:none!important;
+    }
+
+    @media(max-width:900px){
+      .football-formation--offense,
+      .football-formation--defense{
+        min-width:960px!important;
+      }
+    }
+  </style>
+
 </head>
 <body data-density="comfortable">
   <div class="app-shell" data-app-shell>
@@ -660,7 +756,7 @@
           <span class="status-dot status-dot--success"></span>
           <div><strong>Live Franchise</strong><span>Powered by the active Madden snapshot</span></div>
         </div>
-        <span class="version-label">Current Release - 5.9.8d</span>
+        <span class="version-label">Current Release - 5.9.8e</span>
       </div>
     </aside>
 
@@ -1055,7 +1151,7 @@
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=5.7.1b"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=5.9.8d"></script>
+<script src="app.js?v=5.9.8e"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
 <script src="trade-module.js?v=5.9.6.6aedccbcb.2"></script>
