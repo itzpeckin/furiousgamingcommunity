@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.1b',
+      release:'5.9.10.1c',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -7725,7 +7725,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const nameParts=name.trim().split(/\s+/);
     const first=nameParts.shift()||'';
     const last=nameParts.join(' ');
-    const imageCandidates=playerCardImageCandidates({...player,...view,raw});
+    const imageCandidates=canonicalPlayerImageCandidates({...player,...view,raw});
     return {
       ...view,
       id:String(view.id||player.id||''),
@@ -7813,7 +7813,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       removeOriginalTradeDemoSeeds();
 
       window.FGC_TRADE_LIVE={
-        release:'5.9.10.1b',
+        release:'5.9.10.1c',
         status:()=>({...tradeCenterLiveBridgeState}),
         resync:()=>syncTradeCenterLiveBridge({rerender:true})
       };
@@ -7873,9 +7873,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.1b';
+      node.textContent = 'Current Release - 5.9.10.1c';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1b';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1c';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8100,7 +8100,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.1b',
+    release:'5.9.10.1c',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
