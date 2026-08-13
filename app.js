@@ -2181,15 +2181,130 @@
     return `${label} Week ${Number(game.week)||1}`;
   }
 
+  // v5.9.9.0 — authoritative Madden contract/cap normalization.
+  const CONTRACT_FIELD_ALIASES={
+    yearsRemaining:['yearsRemaining','years','contractYearsLeft','contractYearsRemaining','contractLengthRemaining','yearsLeft','remainingYears','contractYearsRemain','contractYearsRem'],
+    length:['length','contractLength','contractYears','totalContractYears','yearsTotal','contractTotalYears'],
+    currentYearSalary:['currentYearSalary','currentSalary','salary','capSalary','currentSeasonSalary','yearSalary','salaryCurrent','salaryThisYear','contractSalary'],
+    capHit:['capHit','salaryCapHit','currentCapHit','currentYearCapHit','capNumber','capCharge','currentCapCharge'],
+    currentYearBonus:['currentYearBonus','bonus','contractBonus','signingBonus','bonusCurrent','currentBonus'],
+    totalSalary:['totalSalary','contractTotalSalary','salaryTotal','totalContractValue','contractValue'],
+    releaseNetSavings:['capReleaseNetSavings','releaseNetSavings','netSavings','releaseSavings','capSavings','netReleaseSavings','capReleaseSavings'],
+    releasePenalty:['capReleasePenalty','totalReleasePenalty','releasePenalty','totalPenalty','deadCap','deadMoney','releaseDeadCap']
+  };
+
+  function contractCandidateSources(player={}) {
+    const raw=player.raw||{};
+    const source=player.source||raw||{};
+    return [
+      player.contract,
+      source.contract,
+      raw.contract,
+      source.contractInfo,
+      raw.contractInfo,
+      source,
+      raw,
+      player
+    ].filter(value=>value && typeof value==='object' && !Array.isArray(value));
+  }
+
+  function canonicalContractField(player={},field='') {
+    const aliases=CONTRACT_FIELD_ALIASES[field]||[field];
+    const sources=contractCandidateSources(player);
+    for(let sourceIndex=0;sourceIndex<sources.length;sourceIndex+=1){
+      const source=sources[sourceIndex];
+      for(const key of aliases){
+        const rawValue=source?.[key];
+        if(rawValue===undefined || rawValue===null || rawValue==='') continue;
+        const numeric=Number(rawValue);
+        return {value:Number.isFinite(numeric)?numeric:rawValue,sourceField:key,sourceIndex,rawValue};
+      }
+    }
+    return {value:null,sourceField:null,sourceIndex:null,rawValue:null};
+  }
+
+  function canonicalContract(player={}) {
+    const resolved={};
+    Object.keys(CONTRACT_FIELD_ALIASES).forEach(field=>resolved[field]=canonicalContractField(player,field));
+
+    const numericOrNull=field=>{
+      const numeric=Number(resolved[field].value);
+      return Number.isFinite(numeric)?numeric:null;
+    };
+
+    let yearsRemaining=numericOrNull('yearsRemaining');
+    let length=numericOrNull('length');
+    if(yearsRemaining!==null && yearsRemaining<0) yearsRemaining=null;
+    if(length!==null && length<0) length=null;
+    if(length===null && yearsRemaining!==null) length=yearsRemaining;
+
+    const contract={
+      yearsRemaining,
+      length,
+      currentYearSalary:numericOrNull('currentYearSalary'),
+      capHit:numericOrNull('capHit'),
+      currentYearBonus:numericOrNull('currentYearBonus'),
+      totalSalary:numericOrNull('totalSalary'),
+      releaseNetSavings:numericOrNull('releaseNetSavings'),
+      releasePenalty:numericOrNull('releasePenalty'),
+      provenance:Object.fromEntries(Object.entries(resolved).map(([field,result])=>[
+        field,result.sourceField?{sourceField:result.sourceField,rawValue:result.rawValue}:null
+      ]))
+    };
+
+    const required=['yearsRemaining','currentYearSalary','capHit'];
+    const available=required.filter(field=>contract[field]!==null).length;
+    contract.completeness={
+      available,
+      required:required.length,
+      percent:Math.round((available/required.length)*100),
+      missing:required.filter(field=>contract[field]===null)
+    };
+    contract.hasAnyData=['yearsRemaining','length','currentYearSalary','capHit','currentYearBonus','totalSalary','releaseNetSavings','releasePenalty']
+      .some(field=>contract[field]!==null);
+    return contract;
+  }
+
+  function contractAudit(players=[]) {
+    const rows=(players||[]).map(player=>{
+      const contract=canonicalContract(player);
+      return {
+        playerId:String(player.id||''),
+        playerName:player.name||player.displayName||'Unknown Player',
+        teamId:String(player.teamId||''),
+        position:String(player.position||''),
+        contract
+      };
+    });
+
+    const fields=Object.keys(CONTRACT_FIELD_ALIASES);
+    const coverage=Object.fromEntries(fields.map(field=>{
+      const count=rows.filter(row=>row.contract[field]!==null).length;
+      return [field,{count,total:rows.length,percent:rows.length?Math.round(count/rows.length*100):0}];
+    }));
+
+    const sourceFields={};
+    rows.forEach(row=>Object.entries(row.contract.provenance||{}).forEach(([field,meta])=>{
+      if(!meta?.sourceField)return;
+      sourceFields[field] ||= {};
+      sourceFields[field][meta.sourceField]=(sourceFields[field][meta.sourceField]||0)+1;
+    }));
+
+    return {
+      release:'5.9.9.0',
+      playerCount:rows.length,
+      playersWithAnyContract:rows.filter(row=>row.contract.hasAnyData).length,
+      playersComplete:rows.filter(row=>row.contract.completeness.percent===100).length,
+      coverage,
+      sourceFields,
+      incompletePlayers:rows.filter(row=>row.contract.completeness.percent<100),
+      rows
+    };
+  }
+
   function liveRosterPlayerShape(player={}) {
     const source=player.source||{};
-    const nested=source.contract||{};
-    const contract={
-      yearsRemaining:nested.yearsRemaining??nested.years??source.contractYearsLeft??source.contractYearsRemaining??source.contractLength??source.contractYears??source.yearsRemaining??source.yearsLeft??source.contractLengthRemaining??null,
-      currentYearSalary:nested.currentYearSalary??source.currentYearSalary??source.currentSalary??source.capSalary??source.currentSeasonSalary??null,
-      capHit:nested.capHit??source.capHit??source.salaryCapHit??source.currentCapHit??null,
-      bonus:nested.bonus??source.contractBonus??source.signingBonus??null
-    };
+    const contract=canonicalContract({...player,raw:source,source});
     const ratings={};
     Object.entries(source).forEach(([key,value])=>{
       const numeric=Number(value);
@@ -2377,16 +2492,17 @@
 
   function rosterPlayerView(player) {
     const raw = player?.raw || {};
-    const contract = player?.contract || {};
+    const contract = canonicalContract(player);
     const resolvedTeamId = String(player?.teamId ?? raw.teamId ?? raw.team_id ?? raw.teamExternalId ?? raw.team_external_id ?? '');
     return {
       ...player,
+      contract,
       teamId: resolvedTeamId,
       dev: normalizeLiveDevelopment(player?.developmentTrait ?? raw.dev ?? raw.developmentTrait),
       injury: player?.injuryStatus || raw.injury || 'Healthy',
-      years: Number(contract.yearsRemaining ?? contract.years ?? raw.years ?? raw.contractYears ?? 0) || 0,
-      salary: Number(contract.currentYearSalary ?? contract.salary ?? contract.totalSalary ?? raw.currentYearSalary ?? raw.currentSalary ?? raw.salary ?? 0) || 0,
-      capHit: Number(contract.capHit ?? raw.capHit ?? raw.salaryCapHit ?? 0) || 0,
+      years: Number(contract.yearsRemaining ?? 0) || 0,
+      salary: Number(contract.currentYearSalary ?? 0) || 0,
+      capHit: Number(contract.capHit ?? 0) || 0,
       depth: player?.depthOrder ?? raw.depthOrder ?? raw.depthChartOrder ?? raw.depth_chart_order ?? raw.depth ?? null,
       depthPosition: String(player?.depthPosition ?? raw.depthPosition ?? raw.depthChartPosition ?? raw.depth_chart_position ?? raw.depthSlot ?? raw.depthChartSlot ?? player?.position ?? raw.position ?? '').toUpperCase(),
       college: raw.college || raw.school || '—',
@@ -3126,28 +3242,16 @@
   }
 
   function canonicalContractPanel(player={}) {
-    const raw=player.raw||{};
-    const contract=player.contract||{};
-    const merged={...raw,...contract};
-
-    const yearsLeft=Number(contract.yearsRemaining??contract.years??raw.years??raw.contractYears??player.years??0)||0;
-    const length=Number(contract.length??contract.contractLength??raw.contractLength??raw.contractYears??yearsLeft)||yearsLeft;
-
-    const capHit=contract.capHit??raw.capHit??raw.salaryCapHit??player.capHit;
-    const salary=contract.currentYearSalary??contract.salary??raw.currentYearSalary??raw.currentSalary??raw.salary??player.salary;
-    const bonus=contract.currentYearBonus??contract.bonus??raw.currentYearBonus??raw.bonus??raw.signingBonus;
-
-    const netSavings=playerCardField(merged,['capReleaseNetSavings','releaseNetSavings','netSavings','releaseSavings']);
-    const totalPenalty=playerCardField(merged,['capReleasePenalty','totalReleasePenalty','releasePenalty','totalPenalty']);
-
+    const contract=canonicalContract(player);
+    const text=value=>value===null||value===undefined?'—':value;
     return `<div class="canonical-contract-grid canonical-contract-grid--compact">
       ${[
-        ['Cap Hit',playerCardMoney(capHit)],
-        ['Salary',playerCardMoney(salary)],
-        ['Bonus',playerCardMoney(bonus)],
-        ['Years Left / Length',`${yearsLeft||'—'} / ${length||'—'}`],
-        ['Net Release Savings',playerCardMoney(netSavings)],
-        ['Total Release Penalty',playerCardMoney(totalPenalty)]
+        ['Cap Hit',playerCardMoney(contract.capHit)],
+        ['Salary',playerCardMoney(contract.currentYearSalary)],
+        ['Bonus',playerCardMoney(contract.currentYearBonus)],
+        ['Years Left / Length',`${text(contract.yearsRemaining)} / ${text(contract.length)}`],
+        ['Net Release Savings',playerCardMoney(contract.releaseNetSavings)],
+        ['Total Release Penalty',playerCardMoney(contract.releasePenalty)]
       ].map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
     </div>`;
   }
@@ -5273,7 +5377,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const warnings=checks.filter(check=>check.severity==='warning'&&!check.ok);
 
     return {
-      release:'5.9.8f',
+      release:'5.9.9.0',
       seasonYear,
       generatedAt:new Date().toISOString(),
       rows:certRows.length,
@@ -7168,9 +7272,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.8f';
+      node.textContent = 'Current Release - 5.9.9.0';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.8f';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.9.0';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -7178,6 +7282,26 @@ function canonicalPlayerDashboardStats(playerId='') {
     syncVisibleReleaseMarker();
   }
   window.addEventListener('load', syncVisibleReleaseMarker, { once:true });
+
+
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.contracts={
+    release:'5.9.9.0',
+    normalize:player=>canonicalContract(player),
+    forPlayer:playerId=>{
+      const id=String(playerId||'');
+      const allPlayers=liveTeamDirectory?.players
+        || [...(liveTeamDirectory?.playersByTeam?.values?.()||[])].flat();
+      const player=(allPlayers||[]).find(row=>String(row.id)===id);
+      return player?canonicalContract(player):null;
+    },
+    audit:()=>{
+      const allPlayers=liveTeamDirectory?.players
+        || [...(liveTeamDirectory?.playersByTeam?.values?.()||[])].flat();
+      return contractAudit(allPlayers||[]);
+    },
+    aliases:()=>JSON.parse(JSON.stringify(CONTRACT_FIELD_ALIASES))
+  };
 
 })();
 
