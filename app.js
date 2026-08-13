@@ -2268,6 +2268,86 @@
     return contract;
   }
 
+  function certifyContracts(players=[],teams=[]) {
+    const audit=contractAudit(players);
+    const checks=[];
+    const add=(id,label,pass,detail,severity='error')=>checks.push({id,label,pass:Boolean(pass),detail,severity});
+
+    add('players-present','Players loaded',audit.playerCount>0,
+      `${audit.playerCount} player records available.`);
+
+    add('contract-coverage','Contract data present',audit.playersWithAnyContract>0,
+      `${audit.playersWithAnyContract}/${audit.playerCount} players contain at least one mapped contract field.`);
+
+    add('core-fields','Core contract fields mapped',audit.playersComplete===audit.playerCount,
+      `${audit.playersComplete}/${audit.playerCount} players have Years + Salary + Cap Hit.`,
+      audit.playersComplete===audit.playerCount?'error':'warning');
+
+    const negativeMoney=audit.rows.filter(row=>
+      ['currentYearSalary','capHit','currentYearBonus','totalSalary','releasePenalty']
+        .some(field=>Number(row.contract[field])<0)
+    );
+    add('no-negative-money','No invalid negative contract values',negativeMoney.length===0,
+      negativeMoney.length?`${negativeMoney.length} players contain negative money fields.`:'No invalid negative money values found.');
+
+    const negativeYears=audit.rows.filter(row=>Number(row.contract.yearsRemaining)<0 || Number(row.contract.length)<0);
+    add('no-negative-years','No invalid negative contract years',negativeYears.length===0,
+      negativeYears.length?`${negativeYears.length} players contain negative year values.`:'No invalid negative contract years found.');
+
+    const playerIds=new Set();
+    const duplicateIds=[];
+    audit.rows.forEach(row=>{
+      if(!row.playerId)return;
+      if(playerIds.has(row.playerId)) duplicateIds.push(row.playerId);
+      playerIds.add(row.playerId);
+    });
+    add('unique-player-contracts','One canonical contract per player',duplicateIds.length===0,
+      duplicateIds.length?`${duplicateIds.length} duplicate player IDs found.`:'Player IDs are unique.');
+
+    const rowsByTeam=new Map();
+    audit.rows.forEach(row=>{
+      const id=String(row.teamId||'');
+      if(!id)return;
+      if(!rowsByTeam.has(id))rowsByTeam.set(id,[]);
+      rowsByTeam.get(id).push(row);
+    });
+    const teamsWithPlayers=teams.filter(team=>rowsByTeam.has(String(team.id)));
+    add('team-coverage','Contracts resolve across loaded teams',teamsWithPlayers.length>0,
+      `${teamsWithPlayers.length}/${teams.length||teamsWithPlayers.length} loaded teams have player contract rows.`);
+
+    // UI consistency: roster view and canonical contract must agree because both are live consumers.
+    const inconsistent=[];
+    (players||[]).forEach(player=>{
+      const canonical=canonicalContract(player);
+      const roster=rosterPlayerView(player);
+      const sameYears=Number(roster.years||0)===Number(canonical.yearsRemaining||0);
+      const sameSalary=Number(roster.salary||0)===Number(canonical.currentYearSalary||0);
+      const sameCap=Number(roster.capHit||0)===Number(canonical.capHit||0);
+      if(!(sameYears&&sameSalary&&sameCap)) inconsistent.push(String(player.id||player.name||'unknown'));
+    });
+    add('consumer-consistency','Roster and canonical contract values agree',inconsistent.length===0,
+      inconsistent.length?`${inconsistent.length} players differ between roster and canonical contract values.`:'Roster consumer matches canonical contract values.');
+
+    const failures=checks.filter(check=>!check.pass && check.severity==='error');
+    const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
+    return {
+      release:'5.9.9.3',
+      passed:failures.length===0,
+      status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
+      checks,
+      failures,
+      warnings,
+      auditSummary:{
+        playerCount:audit.playerCount,
+        playersWithAnyContract:audit.playersWithAnyContract,
+        playersComplete:audit.playersComplete,
+        incompletePlayers:audit.incompletePlayers.length,
+        coverage:audit.coverage
+      },
+      generatedAt:new Date().toISOString()
+    };
+  }
+
   function contractAudit(players=[]) {
     const rows=(players||[]).map(player=>{
       const contract=canonicalContract(player);
@@ -2294,7 +2374,7 @@
     }));
 
     return {
-      release:'5.9.9.2b',
+      release:'5.9.9.3',
       playerCount:rows.length,
       playersWithAnyContract:rows.filter(row=>row.contract.hasAnyData).length,
       playersComplete:rows.filter(row=>row.contract.completeness.percent===100).length,
@@ -7464,9 +7544,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.9.2b';
+      node.textContent = 'Current Release - 5.9.9.3';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.9.2b';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.9.3';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -7478,7 +7558,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.contracts={
-    release:'5.9.9.2b',
+    release:'5.9.9.3',
     normalize:player=>canonicalContract(player),
     forPlayer:playerId=>{
       const id=String(playerId||'');
@@ -7491,6 +7571,12 @@ function canonicalPlayerDashboardStats(playerId='') {
       const allPlayers=liveTeamDirectory?.players
         || [...(liveTeamDirectory?.playersByTeam?.values?.()||[])].flat();
       return contractAudit(allPlayers||[]);
+    },
+    certify:()=>{
+      const allPlayers=liveTeamDirectory?.players
+        || [...(liveTeamDirectory?.playersByTeam?.values?.()||[])].flat();
+      const teams=liveTeamDirectory?.teams||[];
+      return certifyContracts(allPlayers||[],teams);
     },
     aliases:()=>JSON.parse(JSON.stringify(CONTRACT_FIELD_ALIASES))
   };
