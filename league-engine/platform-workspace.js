@@ -2,12 +2,12 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.6.1b.1b.1b';
+  const VERSION = '5.9.7.1';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
-    'overview','route-discovery','classification','team-mapper','player-mapper',
-    'payload-inspector','player-data-inspector','schedule-source-inspector','game-detail-inspector','game-state-join-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle','snapshot-verification','live-read-model',
+    'overview','one-click-import','route-discovery','classification','team-mapper','player-mapper',
+    'payload-inspector','schedule-source-inspector','game-detail-inspector','game-state-join-inspector','schedule-mapper','statistics-mapper','snapshot-builder','snapshot-lifecycle','snapshot-verification','live-read-model',
     'certification','diagnostics'
   ]);
 
@@ -50,7 +50,7 @@
     const player = HQ?.leagueCompanionPlayerMapper?.diagnostics?.() || {};
     const discovery = HQ?.leagueCompanionRouteDiscovery?.diagnostics?.() || {};
     const classification = HQ?.leagueCompanionDatasetClassification?.diagnostics?.() || {};
-    return `<section class="platform-overview-grid">
+    return `${servicePanel('oneClickImport','One-Click Import')}<section class="platform-overview-grid">
       <article class="card"><div class="card-header"><div><span class="eyebrow">Import Engine</span><h3>Workspace Overview</h3></div><span class="pill pill--success">Owner only</span></div><p>All mapper, discovery, certification, and diagnostic controls are isolated from Commissioner HQ.</p><div class="league-import-framework-grid"><div><span>Captured Routes</span><strong>${discovery.routeCount ?? '—'}</strong></div><div><span>Inspected Routes</span><strong>${classification.inspectedRouteCount ?? '—'}</strong></div><div><span>Mapped Teams</span><strong>${team.teamCount ?? '—'}</strong></div><div><span>Mapped Players</span><strong>${player.playerCount ?? '—'}</strong></div></div></article>
       <article class="card"><div class="card-header"><div><span class="eyebrow">Access Boundary</span><h3>Platform Owner</h3></div><span class="pill pill--success">${esc(account()?.handle || 'Verified')}</span></div><p>This workspace is rendered only when the active authenticated simulation resolves to the configured Platform Owner handle.</p><div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>Commissioners, committee members, and league members do not receive this navigation item or workspace content.</span></div></article>
       <article class="card"><div class="card-header"><div><span class="eyebrow">Product States</span><h3>League Experience</h3></div><span class="pill pill--neutral">Permanent model</span></div><div class="league-import-framework-grid"><div><span>Empty State</span><strong>Default onboarding</strong></div><div><span>Demo State</span><strong>Evaluation data</strong></div><div><span>Live Franchise</span><strong>Validated exports</strong></div></div></article>
@@ -63,12 +63,12 @@
 
   function contentFor(tab) {
     switch (tab) {
+      case 'one-click-import': return servicePanel('oneClickImport','One-Click Import');
       case 'route-discovery': return servicePanel('leagueCompanionRouteDiscovery','Route Discovery');
       case 'classification': return servicePanel('leagueCompanionDatasetClassification','Dataset Classification');
       case 'team-mapper': return servicePanel('leagueCompanionTeamMapper','Team Mapper');
       case 'player-mapper': return servicePanel('leagueCompanionPlayerMapper','Player Mapper');
       case 'payload-inspector': return servicePanel('leagueDataExplorer','Data Explorer & Payload Inspector');
-      case 'player-data-inspector': return servicePanel('playerDataInspector','Player Data Inspector');
       case 'schedule-source-inspector': return servicePanel('scheduleSourceInspector','Schedule Source Inspector');
       case 'game-detail-inspector': return servicePanel('gameDetailInspector','Game Detail Inspector');
       case 'game-state-join-inspector': return servicePanel('gameStateJoinInspector','Game-State Join Inspector');
@@ -85,8 +85,8 @@
   }
 
   const tabs = [
-    ['overview','Overview'],['route-discovery','Route Discovery'],['classification','Dataset Classification'],
-    ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],['player-data-inspector','Player Data Inspector'],['schedule-source-inspector','Schedule Source Inspector'],['game-detail-inspector','Game Detail Inspector'],['game-state-join-inspector','Game-State Join Inspector'],
+    ['overview','Overview'],['one-click-import','One-Click Import'],['route-discovery','Route Discovery'],['classification','Dataset Classification'],
+    ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],['schedule-source-inspector','Schedule Source Inspector'],['game-detail-inspector','Game Detail Inspector'],['game-state-join-inspector','Game-State Join Inspector'],
     ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],['snapshot-lifecycle','Validation & Activation'],['snapshot-verification','Snapshot Verification'],['live-read-model','Live Read Model'],
     ['certification','Certification'],['diagnostics','Diagnostics']
   ];
