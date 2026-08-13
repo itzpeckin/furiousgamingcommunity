@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.7.0';
+const RELEASE='5.9.7.0a';
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const WEEKLY_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/(defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
 const TEAMSTATS_CATEGORY='team';
@@ -24,6 +24,39 @@ const text=v=>v==null?null:(String(v).trim()||null);
 const int=v=>Number.isFinite(Number.parseInt(v,10))?Number.parseInt(v,10):null;
 const safeParse=(value,fallback)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
+let statisticsSchemaReady=false;
+async function ensureStatisticsSchema(db){
+  if(statisticsSchemaReady)return;
+  await db.prepare(`CREATE TABLE IF NOT EXISTS companion_statistics_mapping_batches (
+    id TEXT PRIMARY KEY,
+    mapping_run_id TEXT NOT NULL,
+    league_id TEXT NOT NULL,
+    capture_id TEXT NOT NULL,
+    discovery_session_id TEXT,
+    route_path TEXT NOT NULL,
+    r2_object_key TEXT NOT NULL,
+    source_category TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    week_index INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    record_count INTEGER NOT NULL DEFAULT 0,
+    resolved_player_count INTEGER NOT NULL DEFAULT 0,
+    unresolved_player_count INTEGER NOT NULL DEFAULT 0,
+    warning_count INTEGER NOT NULL DEFAULT 0,
+    warnings_json TEXT NOT NULL DEFAULT '[]',
+    error_json TEXT,
+    started_at TEXT,
+    completed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (mapping_run_id, route_path),
+    FOREIGN KEY (mapping_run_id) REFERENCES companion_statistics_mapping_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
+  )`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_statistics_batches_run_status ON companion_statistics_mapping_batches (mapping_run_id, status, route_path)`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_statistics_batches_league_created ON companion_statistics_mapping_batches (league_id, created_at DESC)`).run();
+  statisticsSchemaReady=true;
+}
 
 async function requirePlatformOwner(context){
   const auth=await requireCommissioner(context);
@@ -190,6 +223,7 @@ async function authorizedContext(context){
   const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return{response:json({ok:false,error:'Invalid league slug.'},400)};
   const auth=await requirePlatformOwner(context);if(!auth.authorized)return{response:auth.response};
   const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return{response:json({ok:false,error:'Not found.'},404)};
+  await ensureStatisticsSchema(db);
   return{db,league};
 }
 export async function onRequestGet(context){
