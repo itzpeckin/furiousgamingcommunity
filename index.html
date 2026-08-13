@@ -892,6 +892,27 @@
     }
   </style>
 
+
+  <style id="v5992b-roster-scroll-window">
+    /* v5.9.9.2b — keep the horizontal scrollbar within ~10 roster rows. */
+    .roster-table-card .roster-table-scroll-window{
+      overflow:auto!important;
+      max-height:610px;
+      scrollbar-gutter:stable;
+      overscroll-behavior:contain;
+    }
+    .roster-table-card .roster-table-scroll-window .team-roster-table{
+      margin:0;
+    }
+    .roster-table-card .roster-table-scroll-window thead th{
+      position:sticky;
+      top:0;
+      z-index:5;
+      background:var(--surface-1,#101827);
+      box-shadow:0 1px 0 rgba(255,255,255,.08);
+    }
+  </style>
+
 </head>
 <body data-density="comfortable">
   <div class="app-shell" data-app-shell>
@@ -952,7 +973,7 @@
           <span class="status-dot status-dot--success"></span>
           <div><strong>Live Franchise</strong><span>Powered by the active Madden snapshot</span></div>
         </div>
-        <span class="version-label">Current Release - 5.9.9.2a</span>
+        <span class="version-label">Current Release - 5.9.9.2b</span>
       </div>
     </aside>
 
@@ -1347,7 +1368,7 @@
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=5.7.1b"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=5.9.9.2a"></script>
+<script src="app.js?v=5.9.9.2b"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
 <script src="trade-module.js?v=5.9.6.6aedccbcb.2"></script>

@@ -2294,7 +2294,7 @@
     }));
 
     return {
-      release:'5.9.9.2a',
+      release:'5.9.9.2b',
       playerCount:rows.length,
       playersWithAnyContract:rows.filter(row=>row.contract.hasAnyData).length,
       playersComplete:rows.filter(row=>row.contract.completeness.percent===100).length,
@@ -2612,6 +2612,22 @@
     return `<button type="button" class="roster-sort-button ${active?'is-active':''}" data-roster-sort="${key}">${label}${active?` <span>${direction==='asc'?'▲':'▼'}</span>`:''}</button>`;
   }
 
+  function sizeRosterScrollWindow(root=document) {
+    requestAnimationFrame(()=>{
+      const wrapper=root?.querySelector?.('[data-roster-scroll-window]') || document.querySelector('[data-roster-scroll-window]');
+      if(!wrapper)return;
+      const table=wrapper.querySelector('table');
+      const head=table?.querySelector('thead');
+      const rows=[...(table?.querySelectorAll('tbody tr')||[])].slice(0,10);
+      if(!table||!head||!rows.length)return;
+      const headerHeight=Math.ceil(head.getBoundingClientRect().height);
+      const rowHeight=rows.reduce((sum,row)=>sum+Math.ceil(row.getBoundingClientRect().height),0);
+      const chrome=4;
+      wrapper.style.maxHeight=`${headerHeight+rowHeight+chrome}px`;
+      wrapper.style.height=rows.length>=10?`${headerHeight+rowHeight+chrome}px`:'auto';
+    });
+  }
+
   function renderRosterExperience(team, rosterModel) {
     const allPlayers = rosterModel.players.map(rosterPlayerView).sort((a,b) => (Number(b.overall)||0) - (Number(a.overall)||0) || String(a.name).localeCompare(String(b.name)));
     const positions = sortPositionFilterValues(allPlayers.map(player => player.position));
@@ -2638,7 +2654,7 @@
         <label class="field"><span>Development</span><select data-roster-dev><option value="All">All Traits</option>${devTraits.map(value=>`<option value="${escapeHtml(value)}" ${state.rosterDev===value?'selected':''}>${escapeHtml(value)}</option>`).join('')}</select></label>
         <span class="result-count">${filtered.length} player${filtered.length===1?'':'s'} · sorted by ${escapeHtml(state.rosterSortKey||'overall')}</span>
       </div>
-      <article class="card roster-table-card"><div class="table-wrap"><table class="team-roster-table team-roster-table--single"><thead><tr><th>${rosterSortButton('player','Player')}</th><th>${rosterSortButton('position','Pos')}</th><th>${rosterSortButton('overall','OVR')}</th><th>${rosterSortButton('age','Age')}</th><th>${rosterSortButton('development','Development')}</th><th>${rosterSortButton('spd','SPD')}</th><th>${rosterSortButton('str','STR')}</th><th>${rosterSortButton('agi','AGI')}</th><th>${rosterSortButton('acc','ACC')}</th><th>${rosterSortButton('awr','AWR')}</th><th>${rosterSortButton('salary','Contract')}</th><th>${rosterSortButton('status','Status')}</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td class="roster-core-rating">${player.ratings?.spd??'—'}</td><td class="roster-core-rating">${player.ratings?.str??'—'}</td><td class="roster-core-rating">${player.ratings?.agi??'—'}</td><td class="roster-core-rating">${player.ratings?.acc??'—'}</td><td class="roster-core-rating">${player.ratings?.awr??'—'}</td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="12"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
+      <article class="card roster-table-card"><div class="table-wrap roster-table-scroll-window" data-roster-scroll-window><table class="team-roster-table team-roster-table--single"><thead><tr><th>${rosterSortButton('player','Player')}</th><th>${rosterSortButton('position','Pos')}</th><th>${rosterSortButton('overall','OVR')}</th><th>${rosterSortButton('age','Age')}</th><th>${rosterSortButton('development','Development')}</th><th>${rosterSortButton('spd','SPD')}</th><th>${rosterSortButton('str','STR')}</th><th>${rosterSortButton('agi','AGI')}</th><th>${rosterSortButton('acc','ACC')}</th><th>${rosterSortButton('awr','AWR')}</th><th>${rosterSortButton('salary','Contract')}</th><th>${rosterSortButton('status','Status')}</th></tr></thead><tbody>${filtered.map(player=>`<tr class="clickable-row roster-player-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-inline"><span class="roster-player-inline__identity"><strong>${escapeHtml(player.name)}</strong><small>— ${escapeHtml(schoolAbbreviation(player.college))}</small></span><button type="button" class="roster-trade-button roster-trade-button--compact" data-add-player-trade="${escapeHtml(player.id||'')}">Trade</button></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall ?? '—'}</span></td><td>${player.age ?? '—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td class="roster-core-rating">${player.ratings?.spd??'—'}</td><td class="roster-core-rating">${player.ratings?.str??'—'}</td><td class="roster-core-rating">${player.ratings?.agi??'—'}</td><td class="roster-core-rating">${player.ratings?.acc??'—'}</td><td class="roster-core-rating">${player.ratings?.awr??'—'}</td><td>${escapeHtml(formatRosterContract(player))}</td><td><span class="pill ${player.injury==='Healthy'?'pill--success':'pill--warning'}">${escapeHtml(player.rosterStatus==='active'?player.injury:titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td></tr>`).join('') || `<tr><td colspan="12"><div class="roster-no-results"><strong>No players match these filters.</strong><span>Change a roster filter to see more players.</span></div></td></tr>`}</tbody></table></div></article>
     </div>`;
   }
 
@@ -2670,6 +2686,7 @@
     if(!team||!target||state.teamTab!=='roster') return false;
     const rosterModel=liveRosterModel(team,players);
     target.innerHTML=renderRosterExperience(team,rosterModel);
+    sizeRosterScrollWindow(target);
     return true;
   }
 
@@ -7160,6 +7177,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         });
         try{
           target.innerHTML=renderTeamTab(team,rosterModel,roster,teamGames,leaders);
+          if(nextTab==='roster') sizeRosterScrollWindow(target);
         }catch(error){
           console.error('[Team Tab Render]',nextTab,error);
           target.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>${escapeHtml(titleCase(nextTab))} could not render</h2><p>${escapeHtml(error?.message||'Unexpected team-tab rendering error.')}</p></div></article>`;
@@ -7446,9 +7464,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.9.2a';
+      node.textContent = 'Current Release - 5.9.9.2b';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.9.2a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.9.2b';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -7460,7 +7478,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.contracts={
-    release:'5.9.9.2a',
+    release:'5.9.9.2b',
     normalize:player=>canonicalContract(player),
     forPlayer:playerId=>{
       const id=String(playerId||'');
