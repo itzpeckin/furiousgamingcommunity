@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.0a';
+const RELEASE='5.9.10.6.0b';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -657,6 +657,88 @@ async function discoveryPayload(db,leagueId,activeSnapshotId=null){
   return{historicalSnapshots:snapshotDetails,sourcePlayerAudit,transactionBackfill};
 }
 
+async function safeTableColumns(db,table){
+  try{return (await db.prepare(`PRAGMA table_info("${String(table).replace(/"/g,'""')}")`).all()).results||[]}
+  catch{return[]}
+}
+function findColumn(columns,patterns=[]){
+  const names=columns.map(c=>String(c.name));
+  for(const pattern of patterns){const found=names.find(name=>pattern.test(name));if(found)return found}
+  return null;
+}
+async function inspectLeagueSnapshots(db,leagueId){
+  const columns=await safeTableColumns(db,'league_snapshots');
+  if(!columns.length)return{available:false,rows:[],columns:[]};
+  let rows=[];
+  try{rows=(await db.prepare(`SELECT * FROM league_snapshots WHERE league_id=? LIMIT 50`).bind(leagueId).all()).results||[]}
+  catch{rows=(await db.prepare(`SELECT * FROM league_snapshots LIMIT 50`).all()).results||[]}
+  return{available:true,count:rows.length,columns:columns.map(c=>({name:c.name,type:c.type,pk:c.pk})),rows:rows.map(summarizeRow)};
+}
+async function inspectSnapshotRecords(db,leagueId){
+  const table='league_snapshot_records',columns=await safeTableColumns(db,table);
+  if(!columns.length)return{available:false};
+  const snapshotCol=findColumn(columns,[/^snapshot_id$/i,/snapshot.*id/i]);
+  const typeCol=findColumn(columns,[/^record_type$/i,/^type$/i,/entity.*type/i,/dataset.*type/i,/kind/i]);
+  let rowCount=0,recordTypes=[],snapshotCounts=[],samples=[];
+  try{rowCount=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE league_id=?`).bind(leagueId).first())?.count||0)}catch{}
+  if(typeCol){try{recordTypes=(await db.prepare(`SELECT "${typeCol}" value,COUNT(*) count FROM league_snapshot_records WHERE league_id=? GROUP BY "${typeCol}" ORDER BY count DESC LIMIT 100`).bind(leagueId).all()).results||[]}catch{}}
+  if(snapshotCol){try{snapshotCounts=(await db.prepare(`SELECT "${snapshotCol}" snapshotId,COUNT(*) count FROM league_snapshot_records WHERE league_id=? GROUP BY "${snapshotCol}" ORDER BY count DESC LIMIT 50`).bind(leagueId).all()).results||[]}catch{}}
+  try{samples=((await db.prepare(`SELECT * FROM league_snapshot_records WHERE league_id=? LIMIT 40`).bind(leagueId).all()).results||[]).map(summarizeRow)}catch{}
+  return{available:true,rowCount,columns:columns.map(c=>({name:c.name,type:c.type,pk:c.pk})),detectedColumns:{snapshotCol,typeCol},recordTypes:recordTypes.map(r=>({value:r.value,count:Number(r.count||0)})),snapshotCounts:snapshotCounts.map(r=>({snapshotId:r.snapshotId,count:Number(r.count||0)})),samples};
+}
+async function inspectPlayerPreview(db,leagueId){
+  const table='companion_canonical_players_preview',columns=await safeTableColumns(db,table);
+  if(!columns.length)return{available:false};
+  const teamCol=findColumn(columns,[/^team_id$/i,/team.*id/i,/team/i]);
+  const runCol=findColumn(columns,[/mapping.*run.*id/i,/run.*id/i,/import.*id/i,/export.*id/i,/snapshot.*id/i]);
+  const playerCol=findColumn(columns,[/^player_id$/i,/player.*id/i]);
+  const statusCol=findColumn(columns,[/roster.*status/i,/^status$/i]);
+  let rowCount=0,teamDistribution=[],statusDistribution=[],runCounts=[],freeAgentCandidates=[],samples=[];
+  try{rowCount=Number((await db.prepare(`SELECT COUNT(*) count FROM companion_canonical_players_preview WHERE league_id=?`).bind(leagueId).first())?.count||0)}catch{}
+  if(teamCol){try{teamDistribution=(await db.prepare(`SELECT "${teamCol}" teamValue,COUNT(*) count FROM companion_canonical_players_preview WHERE league_id=? GROUP BY "${teamCol}" ORDER BY count DESC LIMIT 200`).bind(leagueId).all()).results||[]}catch{}}
+  if(statusCol){try{statusDistribution=(await db.prepare(`SELECT "${statusCol}" statusValue,COUNT(*) count FROM companion_canonical_players_preview WHERE league_id=? GROUP BY "${statusCol}" ORDER BY count DESC LIMIT 100`).bind(leagueId).all()).results||[]}catch{}}
+  if(runCol){try{runCounts=(await db.prepare(`SELECT "${runCol}" runId,COUNT(*) count FROM companion_canonical_players_preview WHERE league_id=? GROUP BY "${runCol}" ORDER BY count DESC LIMIT 50`).bind(leagueId).all()).results||[]}catch{}}
+  if(teamCol){
+    for(const v of ['0','-1','fa','free-agent','free_agent','unassigned','none','null']){
+      try{freeAgentCandidates.push(...((await db.prepare(`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND LOWER(CAST("${teamCol}" AS TEXT))=? LIMIT 30`).bind(leagueId,v).all()).results||[]).map(summarizeRow))}catch{}
+    }
+    try{freeAgentCandidates.push(...((await db.prepare(`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND "${teamCol}" IS NULL LIMIT 30`).bind(leagueId).all()).results||[]).map(summarizeRow))}catch{}
+  }
+  try{samples=((await db.prepare(`SELECT * FROM companion_canonical_players_preview WHERE league_id=? LIMIT 40`).bind(leagueId).all()).results||[]).map(summarizeRow)}catch{}
+  return{available:true,rowCount,columns:columns.map(c=>({name:c.name,type:c.type,pk:c.pk})),detectedColumns:{teamCol,runCol,playerCol,statusCol},teamDistribution:teamDistribution.map(r=>({teamValue:r.teamValue,count:Number(r.count||0)})),statusDistribution:statusDistribution.map(r=>({statusValue:r.statusValue,count:Number(r.count||0)})),runCounts:runCounts.map(r=>({runId:r.runId,count:Number(r.count||0)})),freeAgentCandidateCount:freeAgentCandidates.length,freeAgentCandidates:freeAgentCandidates.slice(0,50),samples};
+}
+async function inspectRouteCaptures(db,leagueId){
+  const table='companion_route_captures',columns=await safeTableColumns(db,table);
+  if(!columns.length)return{available:false};
+  const routeCol=findColumn(columns,[/^route$/i,/route.*name/i,/path/i,/endpoint/i,/resource/i]);
+  const typeCol=findColumn(columns,[/dataset.*type/i,/export.*type/i,/category/i,/kind/i,/type/i]);
+  const seasonCol=findColumn(columns,[/^season$/i,/season.*year/i]);
+  const weekCol=findColumn(columns,[/^week$/i,/week.*index/i]);
+  let rowCount=0,routeDistribution=[],typeDistribution=[],seasonWeek=[],samples=[];
+  try{rowCount=Number((await db.prepare(`SELECT COUNT(*) count FROM companion_route_captures WHERE league_id=?`).bind(leagueId).first())?.count||0)}catch{}
+  if(routeCol){try{routeDistribution=(await db.prepare(`SELECT "${routeCol}" routeValue,COUNT(*) count FROM companion_route_captures WHERE league_id=? GROUP BY "${routeCol}" ORDER BY count DESC LIMIT 200`).bind(leagueId).all()).results||[]}catch{}}
+  if(typeCol){try{typeDistribution=(await db.prepare(`SELECT "${typeCol}" typeValue,COUNT(*) count FROM companion_route_captures WHERE league_id=? GROUP BY "${typeCol}" ORDER BY count DESC LIMIT 100`).bind(leagueId).all()).results||[]}catch{}}
+  if(seasonCol||weekCol){
+    const se=seasonCol?`"${seasonCol}"`:'NULL',we=weekCol?`"${weekCol}"`:'NULL';
+    try{seasonWeek=(await db.prepare(`SELECT ${se} seasonValue,${we} weekValue,COUNT(*) count FROM companion_route_captures WHERE league_id=? GROUP BY ${se},${we} ORDER BY seasonValue,weekValue`).bind(leagueId).all()).results||[]}catch{}
+  }
+  try{samples=((await db.prepare(`SELECT * FROM companion_route_captures WHERE league_id=? LIMIT 60`).bind(leagueId).all()).results||[]).map(summarizeRow)}catch{}
+  return{available:true,rowCount,columns:columns.map(c=>({name:c.name,type:c.type,pk:c.pk})),detectedColumns:{routeCol,typeCol,seasonCol,weekCol},routeDistribution:routeDistribution.map(r=>({routeValue:r.routeValue,count:Number(r.count||0)})),typeDistribution:typeDistribution.map(r=>({typeValue:r.typeValue,count:Number(r.count||0)})),seasonWeek:seasonWeek.map(r=>({season:r.seasonValue==null?null:Number(r.seasonValue),week:r.weekValue==null?null:Number(r.weekValue),count:Number(r.count||0)})),samples};
+}
+function buildBackfillReadiness(ls,sr,pp,rc){
+  const playerRoutes=(rc?.routeDistribution||[]).filter(r=>/player|roster|free.?agent/i.test(String(r.routeValue||'')));
+  return{
+    leagueSnapshotCount:Number(ls?.count||0),
+    snapshotRecordSnapshotCount:(sr?.snapshotCounts||[]).length,
+    playerPreviewRows:Number(pp?.rowCount||0),
+    explicitFreeAgentCandidateRows:Number(pp?.freeAgentCandidateCount||0),
+    playerOrRosterRouteCount:playerRoutes.reduce((sum,r)=>sum+Number(r.count||0),0),
+    discoveredRouteWeeks:[...new Set((rc?.seasonWeek||[]).map(r=>r.week).filter(Number.isFinite))].sort((a,b)=>a-b),
+    canCompareHistoricalLeagueSnapshots:Number(ls?.count||0)>1&&(sr?.snapshotCounts||[]).length>1,
+    canInvestigateFreeAgents:Number(pp?.rowCount||0)>0,
+    likelyReadyForIntegration:Boolean(Number(pp?.rowCount||0)>0&&(Number(ls?.count||0)>1||playerRoutes.length>0))
+  };
+}
 export async function onRequestPost(context){
   const state=await requestState(context);
   if(state.response)return state.response;
@@ -679,14 +761,16 @@ export async function onRequestPost(context){
     const d1StorageInventory=await discoverD1Storage(state.db,state.league.id);
     const r2StorageInventory=await discoverR2Storage(context.env,state.league);
     const rawStorageDiscovery=rawStorageSummary(d1StorageInventory,r2StorageInventory);
-    return json({
-      ok:true,
-      release:RELEASE,
-      ...payload,
-      rawStorageDiscovery,
-      d1StorageInventory,
-      r2StorageInventory
-    });
+    return json({ok:true,release:RELEASE,...payload,rawStorageDiscovery,d1StorageInventory,r2StorageInventory});
+  }
+
+  if(action==='deep-inspection'){
+    const leagueSnapshots=await inspectLeagueSnapshots(state.db,state.league.id);
+    const snapshotRecordInventory=await inspectSnapshotRecords(state.db,state.league.id);
+    const playerPreviewAudit=await inspectPlayerPreview(state.db,state.league.id);
+    const routeCaptureAudit=await inspectRouteCaptures(state.db,state.league.id);
+    const historicalBackfillReadiness=buildBackfillReadiness(leagueSnapshots,snapshotRecordInventory,playerPreviewAudit,routeCaptureAudit);
+    return json({ok:true,release:RELEASE,leagueSnapshots,snapshotRecordInventory,playerPreviewAudit,routeCaptureAudit,historicalBackfillReadiness});
   }
 
   if(action!=='sync')return json({ok:false,error:`Unsupported action: ${action}`},400);
