@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.1i',
+      release:'5.9.10.1j',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -7823,10 +7823,18 @@ function canonicalPlayerDashboardStats(playerId='') {
       removeOriginalTradeDemoSeeds();
 
       window.FGC_TRADE_LIVE={
-        release:'5.9.10.1i',
+        release:'5.9.10.1j',
         status:()=>({...tradeCenterLiveBridgeState}),
         resync:()=>syncTradeCenterLiveBridge({rerender:true})
       };
+
+      // Remove the pre-render Trade LIVE boot curtain only after authoritative
+      // LIVE teams/players have replaced prototype data.
+      document.documentElement.classList.remove('trade-live-boot-pending');
+      document.querySelector('[data-trade-live-boot-curtain]')?.remove();
+      window.dispatchEvent(new CustomEvent('franchisehq:trade-live-ready',{
+        detail:{...tradeCenterLiveBridgeState}
+      }));
 
       if(rerender){
         const base=(location.hash.slice(1)||'').split('/')[0];
@@ -7911,9 +7919,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.1i';
+      node.textContent = 'Current Release - 5.9.10.1j';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1i';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1j';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8138,7 +8146,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.1i',
+    release:'5.9.10.1j',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);

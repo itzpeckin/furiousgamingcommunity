@@ -913,8 +913,73 @@
     }
   </style>
 
+
+<script id="v591011j-trade-live-preboot">
+(function(){
+  const route=String(location.hash||'').replace(/^#/,'').split('/')[0];
+  if(route==='trade-center'||route==='trade-block'){
+    document.documentElement.classList.add('trade-live-boot-pending');
+  }
+})();
+</script>
+<style id="v591011j-trade-live-preboot-style">
+  html.trade-live-boot-pending body{
+    overflow:hidden!important;
+  }
+  html.trade-live-boot-pending [data-page-content],
+  html.trade-live-boot-pending #page-content,
+  html.trade-live-boot-pending .page-content,
+  html.trade-live-boot-pending main{
+    visibility:hidden!important;
+  }
+  .trade-live-boot-curtain{
+    position:fixed;
+    inset:0 0 0 var(--sidebar-width,240px);
+    z-index:99999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--page-bg,#07101f);
+  }
+  .trade-live-boot-curtain__card{
+    width:min(520px,calc(100vw - 48px));
+    padding:28px;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:16px;
+    background:var(--surface-1,#101827);
+    box-shadow:0 18px 60px rgba(0,0,0,.35);
+    text-align:center;
+  }
+  .trade-live-boot-curtain__card strong{
+    display:block;
+    font-size:20px;
+    margin-bottom:8px;
+  }
+  .trade-live-boot-curtain__card p{
+    margin:0;
+    opacity:.72;
+  }
+  @media(max-width:900px){
+    .trade-live-boot-curtain{inset:0}
+  }
+</style>
+
 </head>
 <body data-density="comfortable">
+<div class="trade-live-boot-curtain" data-trade-live-boot-curtain>
+  <div class="trade-live-boot-curtain__card">
+    <strong>Loading LIVE league data…</strong>
+    <p>Franchise HQ is attaching the active Madden snapshot.</p>
+  </div>
+</div>
+<script>
+(function(){
+  if(!document.documentElement.classList.contains('trade-live-boot-pending')){
+    document.querySelector('[data-trade-live-boot-curtain]')?.remove();
+  }
+})();
+</script>
+
   <div class="app-shell" data-app-shell>
     <div class="mobile-overlay" data-mobile-overlay></div>
 
@@ -973,7 +1038,7 @@
           <span class="status-dot status-dot--success"></span>
           <div><strong>Live Franchise</strong><span>Powered by the active Madden snapshot</span></div>
         </div>
-        <span class="version-label">Current Release - 5.9.10.1i</span>
+        <span class="version-label">Current Release - 5.9.10.1j</span>
       </div>
     </aside>
 
@@ -1368,10 +1433,10 @@
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=5.7.1b"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=5.9.10.1i"></script>
+<script src="app.js?v=5.9.10.1j"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
-<script src="trade-module.js?v=5.9.10.1i"></script>
+<script src="trade-module.js?v=5.9.10.1j"></script>
 <script src="auth-ui.js"></script>
 <script src="dev-mode.js"></script>
 
@@ -1429,7 +1494,7 @@
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.specialRouteRescue={
-    release:'5.9.10.1i',
+    release:'5.9.10.1j',
     routes:[...SPECIAL_ROUTES],
     navigate
   };
