@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.0';
+const RELEASE='5.9.10.6.0a';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -452,6 +452,144 @@ export async function onRequestGet(context){
   });
 }
 
+const quoteIdentifier=value=>`"${String(value).replace(/"/g,'""')}"`;
+const compactValue=(value,max=1200)=>{
+  if(value===null||value===undefined)return value;
+  if(typeof value==='number'||typeof value==='boolean')return value;
+  const text=String(value);
+  if(text.length<=max)return text;
+  return `${text.slice(0,max)}… [${text.length} chars]`;
+};
+const summarizeRow=row=>Object.fromEntries(Object.entries(row||{}).map(([key,value])=>[key,compactValue(value)]));
+
+function likelyStorageTable(name=''){
+  return /(companion|snapshot|import|capture|export|fingerprint|player|roster|league.?data|payload|route)/i.test(name);
+}
+
+function weekSeasonFromText(text=''){
+  const value=String(text||'');
+  const seasonMatch=value.match(/(?:season|year|yr)[^0-9]{0,4}(20\d{2})/i)||value.match(/(?:^|[\/_-])(20\d{2})(?:[\/_-]|$)/);
+  const weekMatch=value.match(/(?:week|wk)[^0-9]{0,4}(\d{1,2})/i);
+  return{
+    season:seasonMatch?Number(seasonMatch[1]):null,
+    week:weekMatch?Number(weekMatch[1]):null
+  };
+}
+
+async function discoverD1Storage(db,leagueId){
+  let tables=[];
+  try{
+    const result=await db.prepare(`SELECT name,sql FROM sqlite_master WHERE type='table' ORDER BY name`).all();
+    tables=(result.results||[]).filter(row=>likelyStorageTable(row.name));
+  }catch(error){
+    return{error:error.message,tables:[]};
+  }
+
+  const inventory=[];
+  for(const table of tables.slice(0,40)){
+    const name=String(table.name);
+    let columns=[],sampleRows=[],rowCount=null;
+    try{
+      const colResult=await db.prepare(`PRAGMA table_info(${quoteIdentifier(name)})`).all();
+      columns=(colResult.results||[]).map(row=>({name:row.name,type:row.type,notnull:row.notnull,pk:row.pk}));
+    }catch{}
+    try{
+      const countResult=await db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(name)}`).first();
+      rowCount=Number(countResult?.count??0);
+    }catch{}
+    try{
+      const sampleResult=await db.prepare(`SELECT * FROM ${quoteIdentifier(name)} LIMIT 20`).all();
+      sampleRows=(sampleResult.results||[]).map(summarizeRow);
+    }catch{}
+
+    const leagueColumns=columns.filter(col=>/league(_id|id|slug)?$/i.test(col.name)).map(col=>col.name);
+    let leagueRows=[];
+    if(leagueColumns.length){
+      for(const column of leagueColumns.slice(0,2)){
+        try{
+          const result=await db.prepare(`SELECT * FROM ${quoteIdentifier(name)} WHERE ${quoteIdentifier(column)}=? LIMIT 30`).bind(leagueId).all();
+          if((result.results||[]).length){leagueRows=(result.results||[]).map(summarizeRow);break}
+        }catch{}
+      }
+    }
+
+    inventory.push({
+      name,
+      rowCount,
+      columns,
+      rowsForLeague:leagueRows,
+      sampleRows:leagueRows.length?[]:sampleRows,
+      schema:compactValue(table.sql,1800)
+    });
+  }
+  return{tableCount:inventory.length,tables:inventory};
+}
+
+function isR2Binding(value){
+  return value && typeof value==='object' && typeof value.list==='function' && typeof value.get==='function';
+}
+
+async function discoverR2Storage(env,league){
+  const bindings=Object.entries(env||{}).filter(([,value])=>isR2Binding(value));
+  const results=[];
+  for(const [name,bucket] of bindings){
+    let cursor=undefined,objects=[],truncated=false,error=null;
+    try{
+      for(let page=0;page<3;page++){
+        const listing=await bucket.list({limit:500,...(cursor?{cursor}:{})});
+        objects.push(...(listing.objects||[]));
+        if(!listing.truncated){truncated=false;break}
+        truncated=true;
+        cursor=listing.cursor;
+        if(!cursor)break;
+      }
+    }catch(err){
+      error=err.message;
+    }
+
+    const candidates=objects.filter(object=>{
+      const key=String(object.key||'');
+      return /(companion|export|capture|player|roster|snapshot|league)/i.test(key)
+        || key.toLowerCase().includes(String(league.slug||'').toLowerCase())
+        || key.toLowerCase().includes(String(league.id||'').toLowerCase());
+    });
+
+    results.push({
+      binding:name,
+      scannedObjects:objects.length,
+      truncated,
+      error,
+      candidateCount:candidates.length,
+      candidates:candidates.slice(0,300).map(object=>({
+        key:object.key,
+        size:object.size,
+        uploaded:object.uploaded||null,
+        etag:object.etag||null,
+        ...weekSeasonFromText(object.key)
+      }))
+    });
+  }
+  return{bindingCount:results.length,bindings:results};
+}
+
+function rawStorageSummary(d1Inventory,r2Inventory){
+  const d1Tables=d1Inventory?.tables||[];
+  const r2Bindings=r2Inventory?.bindings||[];
+  const likelyHistoricalTables=d1Tables.filter(table=>/(companion|export|capture|snapshot|import)/i.test(table.name));
+  const r2Candidates=r2Bindings.flatMap(binding=>(binding.candidates||[]).map(row=>({...row,binding:binding.binding})));
+  const weeks=[...new Set(r2Candidates.map(row=>row.week).filter(value=>value!==null))].sort((a,b)=>a-b);
+  const seasons=[...new Set(r2Candidates.map(row=>row.season).filter(value=>value!==null))].sort((a,b)=>a-b);
+
+  return{
+    likelyHistoricalD1Tables:likelyHistoricalTables.map(table=>({name:table.name,rowCount:table.rowCount})),
+    r2CandidateObjects:r2Candidates.length,
+    discoveredR2Weeks:weeks,
+    discoveredR2Seasons:seasons,
+    hasPotentialHistoricalStorage:Boolean(likelyHistoricalTables.length||r2Candidates.length),
+    note:'R2 discovery inventories object metadata only; it does not download large historical payloads in this diagnostic.'
+  };
+}
+
 async function discoveryPayload(db,leagueId,activeSnapshotId=null){
   const historical=await db.prepare(`SELECT league_id,snapshot_id,season,week,captured_at,player_count
     FROM canonical_roster_snapshots
@@ -534,6 +672,21 @@ export async function onRequestPost(context){
   if(action==='discovery'){
     const payload=await discoveryPayload(state.db,state.league.id,clean(body.activeSnapshotId));
     return json({ok:true,release:RELEASE,...payload});
+  }
+
+  if(action==='raw-discovery'){
+    const payload=await discoveryPayload(state.db,state.league.id,clean(body.activeSnapshotId));
+    const d1StorageInventory=await discoverD1Storage(state.db,state.league.id);
+    const r2StorageInventory=await discoverR2Storage(context.env,state.league);
+    const rawStorageDiscovery=rawStorageSummary(d1StorageInventory,r2StorageInventory);
+    return json({
+      ok:true,
+      release:RELEASE,
+      ...payload,
+      rawStorageDiscovery,
+      d1StorageInventory,
+      r2StorageInventory
+    });
   }
 
   if(action!=='sync')return json({ok:false,error:`Unsupported action: ${action}`},400);
