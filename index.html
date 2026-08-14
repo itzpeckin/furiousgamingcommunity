@@ -934,6 +934,20 @@ html.trade-live-first-load .page-content,
 html.trade-live-first-load main{visibility:hidden!important}
 </style>
 
+
+  <style id="v59102-team-transactions">
+    .team-transaction-list{display:grid;gap:12px}.team-transaction-row{padding:16px 18px}
+    .team-transaction-row__header,.team-transaction-row__footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .team-transaction-row__header>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.team-transaction-row__header strong{font-size:12px;font-weight:600;opacity:.8}
+    .team-transaction-row__body{display:grid;grid-template-columns:minmax(180px,.75fr) minmax(0,2fr);gap:18px;padding:14px 0}
+    .team-transaction-partners{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.team-transaction-partners>small{width:100%;font-size:10px;text-transform:uppercase;letter-spacing:.08em;opacity:.6}
+    .team-transaction-partner{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700}.team-transaction-partner .team-logo{width:28px;height:28px}
+    .team-transaction-assets{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.team-transaction-player{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:10px;padding:8px 10px;color:inherit;text-align:left;cursor:pointer}
+    .team-transaction-player:hover{border-color:var(--accent)}.team-transaction-player strong,.team-transaction-player small{display:block}.team-transaction-player small{margin-top:2px;font-size:10px;opacity:.65}
+    .team-transaction-summary{font-size:12px;line-height:1.45}.team-transaction-row__footer{border-top:1px solid rgba(255,255,255,.06);padding-top:10px}.team-transaction-row__footer small{font-size:10px;opacity:.55}
+    @media(max-width:760px){.team-transaction-row__body{grid-template-columns:1fr}.team-transaction-row__header,.team-transaction-row__footer{align-items:flex-start;flex-direction:column}}
+  </style>
+
 </head>
 <body data-density="comfortable">
 <div class="app-shell" data-app-shell>
@@ -994,7 +1008,7 @@ html.trade-live-first-load main{visibility:hidden!important}
           <span class="status-dot status-dot--success"></span>
           <div><strong>Live Franchise</strong><span>Powered by the active Madden snapshot</span></div>
         </div>
-        <span class="version-label">Current Release - 5.9.10.1k</span>
+        <span class="version-label">Current Release - 5.9.10.2</span>
       </div>
     </aside>
 
@@ -1389,10 +1403,10 @@ html.trade-live-first-load main{visibility:hidden!important}
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=5.7.1b"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=5.9.10.1k"></script>
+<script src="app.js?v=5.9.10.2"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
-<script src="trade-module.js?v=5.9.10.1k"></script>
+<script src="trade-module.js?v=5.9.10.2"></script>
 <script src="auth-ui.js"></script>
 <script src="dev-mode.js"></script>
 

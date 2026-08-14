@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.1k',
+      release:'5.9.10.2',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -4083,6 +4083,7 @@ function canonicalPlayerDashboardStats(playerId='') {
           ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Trade History':titleCase(tab)}</button>`).join('')}
         </div>
         <div data-team-tab-content>${renderTeamTab(team,rosterModel,roster,teamGames,leaders)}</div>`;
+      if(state.teamTab==='trade-history') refreshTeamTransactionHistory(team,pageContent.querySelector('[data-team-tab-content]'));
       requestAnimationFrame(()=>{
         if(mainContent?.scrollTo) mainContent.scrollTo({top:0,left:0,behavior:'instant'});
         window.scrollTo({top:0,left:0,behavior:'instant'});
@@ -5525,9 +5526,126 @@ function canonicalPlayerDashboardStats(playerId='') {
     target.innerHTML=renderTeamCap(team,roster);
   }
 
+  let canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+
+  async function loadCanonicalTransactionsForUi(force=false){
+    if(!force&&canonicalTransactionUiCache.payload&&Date.now()-canonicalTransactionUiCache.loadedAt<30000)return canonicalTransactionUiCache.payload;
+    if(!force&&canonicalTransactionUiCache.promise)return canonicalTransactionUiCache.promise;
+    canonicalTransactionUiCache.promise=(async()=>{
+      const payload=await window.FranchiseHQ?.transactions?.canonical?.();
+      canonicalTransactionUiCache.payload=payload||{transactions:[]};
+      canonicalTransactionUiCache.loadedAt=Date.now();
+      canonicalTransactionUiCache.promise=null;
+      return canonicalTransactionUiCache.payload;
+    })().catch(error=>{canonicalTransactionUiCache.promise=null;throw error});
+    return canonicalTransactionUiCache.promise;
+  }
+
+  function canonicalTeamAliases(team={}){
+    return new Set([team.id,team.liveTeamId,team.abbr,team.abbreviation,team.source?.teamId,team.source?.team_id]
+      .filter(value=>value!==undefined&&value!==null&&String(value)!=='').map(value=>String(value).toLowerCase()));
+  }
+
+  function transactionInvolvesTeam(transaction={},team={}){
+    const aliases=canonicalTeamAliases(team);
+    return (transaction.teamIds||[]).some(value=>aliases.has(String(value).toLowerCase()));
+  }
+
+  function transactionTeamByCanonicalId(id){
+    const wanted=String(id??'').toLowerCase();
+    return (liveTeamDirectory?.teams||[]).find(team=>canonicalTeamAliases(team).has(wanted))||null;
+  }
+
+  function transactionEventLabel(type=''){
+    const key=String(type||'').toLowerCase();
+    return ({trade:'Trade',signing:'Signing',release:'Release','waiver-claim':'Waiver Claim',waived:'Waived','team-change':'Team Change','roster-move':'Roster Move','roster-status-change':'Roster Status Change'})[key]||titleCase(key.replace(/-/g,' '))||'Transaction';
+  }
+
+  function transactionEventTone(type=''){
+    const key=String(type||'').toLowerCase();
+    if(key==='trade')return'accent';
+    if(['signing','waiver-claim'].includes(key))return'success';
+    if(['release','waived'].includes(key))return'danger';
+    return'neutral';
+  }
+
+  function transactionAuthorityLabel(transaction={}){
+    const authority=String(transaction.authority||'').toLowerCase();
+    if(authority==='franchisehq+madden')return'Madden Confirmed';
+    if(authority==='madden-explicit')return'Madden';
+    if(authority==='franchisehq+snapshot-confirmed')return'Roster Confirmed';
+    if(authority==='franchisehq-workflow')return transaction.executionStatus==='pending-madden-execution'?'Pending Madden':'Franchise HQ';
+    if(authority==='snapshot-inferred')return'Roster Detected';
+    return'Recorded';
+  }
+
+  function transactionTimeLabel(transaction={}){
+    const parts=[];
+    if(transaction.season!=null)parts.push(`Season ${transaction.season}`);
+    if(transaction.week!=null)parts.push(`Week ${transaction.week}`);
+    if(transaction.occurredAt){
+      const date=new Date(transaction.occurredAt);
+      parts.push(Number.isNaN(date.getTime())?String(transaction.occurredAt):date.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}));
+    }
+    return parts.join(' · ')||'Date unavailable';
+  }
+
+  function transactionPlayerRows(transaction={}){
+    const ids=[...new Set((transaction.playerIds||[]).map(String).filter(Boolean))];
+    const rows=ids.map(id=>{
+      const live=liveTeamDirectory?.playerMap?.get?.(id)||(liveTeamDirectory?.players||[]).find(player=>String(player.id)===id);
+      return live?rosterPlayerView(live):{id,name:`Player ${id}`,position:'—',overall:null};
+    });
+    if(rows.length)return rows;
+    const summaries=(transaction.evidence||[]).map(item=>item?.evidence?.summary).filter(Boolean);
+    return summaries.length?[{name:String(summaries[0]),summary:true}]:[];
+  }
+
+  function transactionPartnerTeams(transaction={},team={}){
+    const aliases=canonicalTeamAliases(team);
+    return (transaction.teamIds||[]).filter(id=>!aliases.has(String(id).toLowerCase()))
+      .map(id=>transactionTeamByCanonicalId(id)||{id,abbr:String(id).toUpperCase(),fullName:String(id).toUpperCase()});
+  }
+
+  function renderCanonicalTeamTransactionRow(transaction,team){
+    const partners=transactionPartnerTeams(transaction,team);
+    const txPlayers=transactionPlayerRows(transaction);
+    const evidenceCount=(transaction.evidence||[]).length;
+    const canOpenTrade=Boolean(transaction.workflowTradeId&&String(transaction.eventType).toLowerCase()==='trade');
+    const playersMarkup=txPlayers.length?`<div class="team-transaction-assets">${txPlayers.map(player=>player.summary
+      ?`<span class="team-transaction-summary">${escapeHtml(player.name)}</span>`
+      :`<button type="button" class="team-transaction-player" data-roster-player-detail="${escapeHtml(player.id)}"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position||'—')}${player.overall?` · ${player.overall} OVR`:''}</small></button>`).join('')}</div>`
+      :`<div class="team-transaction-assets"><span class="team-transaction-summary">Roster movement recorded</span></div>`;
+    const partnersMarkup=partners.length?partners.map(partner=>`<span class="team-transaction-partner">${renderTeamMark(partner,'team-logo')}<span>${escapeHtml(partner.abbr||partner.fullName||'Team')}</span></span>`).join(''):'<span class="team-transaction-partner">League transaction</span>';
+
+    return `<article class="card team-transaction-row">
+      <div class="team-transaction-row__header"><div><span class="pill pill--${transactionEventTone(transaction.eventType)}">${escapeHtml(transactionEventLabel(transaction.eventType))}</span><strong>${escapeHtml(transactionTimeLabel(transaction))}</strong></div><span class="pill pill--neutral">${escapeHtml(transactionAuthorityLabel(transaction))}</span></div>
+      <div class="team-transaction-row__body"><div class="team-transaction-partners"><small>${partners.length?'With / Against':'Team'}</small>${partnersMarkup}</div>${playersMarkup}</div>
+      <div class="team-transaction-row__footer"><small>${evidenceCount} source record${evidenceCount===1?'':'s'} merged into one canonical transaction</small>${canOpenTrade?`<button type="button" class="text-button" data-route="trade-center/${escapeHtml(transaction.workflowTradeId)}">View Trade Details <svg><use href="#icon-arrow"></use></svg></button>`:''}</div>
+    </article>`;
+  }
+
+  function renderTeamTransactionLoading(team){
+    return `<div class="team-trade-history-view"><div class="section-heading"><div><span class="eyebrow">LIVE transactions</span><h2>${escapeHtml(team.fullName)} Transaction History</h2></div></div><article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Loading transactions…</h3><p>Reading the canonical Franchise HQ transaction ledger.</p></div></article></div>`;
+  }
+
+  async function refreshTeamTransactionHistory(team,target=null){
+    const host=target||pageContent?.querySelector?.('[data-team-tab-content]');
+    if(!host||state.teamTab!=='trade-history')return;
+    try{
+      const payload=await loadCanonicalTransactionsForUi(false);
+      if(state.teamTab!=='trade-history')return;
+      const rows=(payload?.transactions||[]).filter(transaction=>transactionInvolvesTeam(transaction,team));
+      rows.sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
+      host.innerHTML=`<div class="team-trade-history-view"><div class="section-heading"><div><span class="eyebrow">LIVE canonical ledger</span><h2>${escapeHtml(team.fullName)} Transaction History</h2><p>Trades and roster movement confirmed by Madden, Franchise HQ workflow, or snapshot comparison.</p></div><span class="pill pill--neutral">${rows.length} transaction${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-transaction-list">${rows.map(row=>renderCanonicalTeamTransactionRow(row,team)).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No LIVE transactions recorded</h3><p>No canonical transaction currently involves ${escapeHtml(team.fullName)}.</p></div></article>`}</div>`;
+    }catch(error){
+      console.error('[Team Transaction History]',error);
+      host.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Transaction history unavailable</h3><p>${escapeHtml(error?.message||'The canonical transaction ledger could not be loaded.')}</p></div></article>`;
+    }
+  }
+
   function renderTeamTradeHistory(team) {
-    const rows = window.FGC_TRADE?.getTeamTradeHistory?.(team.id) || [];
-    return `<div class="team-trade-history-view"><div class="section-heading"><div><h2>${escapeHtml(team.fullName)} Trade History</h2></div><span class="pill pill--neutral">${rows.length} trade${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-trade-history-list">${rows.map(row=>{const partners=row.teamIds.filter(id=>id!==team.id).map(id=>teamById(id)?.fullName||id).join(', ');return `<button type="button" class="team-trade-history-row card" ${row.kind==='multi'?`data-route="trade-center/multi-${escapeHtml(row.id)}"`:`data-route="trade-center/${escapeHtml(row.id)}"`}><span><strong>Trade #${escapeHtml(row.id)}</strong><small>${escapeHtml(row.date||'Date unavailable')} · ${escapeHtml(partners||'League transaction')}</small><em>${escapeHtml(row.summary||'No asset summary available')}</em></span><span class="pill pill--success">Approved</span></button>`}).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No completed trade history</h3><p>This franchise has not appeared in an approved Franchise HQ trade record.</p></div></article>`}</div>`;
+    return renderTeamTransactionLoading(team);
   }
 
   async function renderPlayers() {
@@ -7453,6 +7571,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         try{
           target.innerHTML=renderTeamTab(team,rosterModel,roster,teamGames,leaders);
           if(nextTab==='roster') sizeRosterScrollWindow(target);
+          if(nextTab==='trade-history') refreshTeamTransactionHistory(team,target);
         }catch(error){
           console.error('[Team Tab Render]',nextTab,error);
           target.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>${escapeHtml(titleCase(nextTab))} could not render</h2><p>${escapeHtml(error?.message||'Unexpected team-tab rendering error.')}</p></div></article>`;
@@ -8019,9 +8138,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.1k';
+      node.textContent = 'Current Release - 5.9.10.2';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1k';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.2';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8246,7 +8365,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.1k',
+    release:'5.9.10.2',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
