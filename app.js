@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.2',
+      release:'5.9.10.3',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -5637,7 +5637,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(state.teamTab!=='trade-history')return;
       const rows=(payload?.transactions||[]).filter(transaction=>transactionInvolvesTeam(transaction,team));
       rows.sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
-      host.innerHTML=`<div class="team-trade-history-view"><div class="section-heading"><div><span class="eyebrow">LIVE canonical ledger</span><h2>${escapeHtml(team.fullName)} Transaction History</h2><p>Trades and roster movement confirmed by Madden, Franchise HQ workflow, or snapshot comparison.</p></div><span class="pill pill--neutral">${rows.length} transaction${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-transaction-list">${rows.map(row=>renderCanonicalTeamTransactionRow(row,team)).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No LIVE transactions recorded</h3><p>No canonical transaction currently involves ${escapeHtml(team.fullName)}.</p></div></article>`}</div>`;
+      host.innerHTML=`<div class="team-trade-history-view"><div class="section-heading"><div><h2>${escapeHtml(team.fullName)} Transaction History</h2></div><span class="pill pill--neutral">${rows.length} transaction${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-transaction-list">${rows.map(row=>renderCanonicalTeamTransactionRow(row,team)).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No LIVE transactions recorded</h3><p>No canonical transaction currently involves ${escapeHtml(team.fullName)}.</p></div></article>`}</div>`;
     }catch(error){
       console.error('[Team Transaction History]',error);
       host.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Transaction history unavailable</h3><p>${escapeHtml(error?.message||'The canonical transaction ledger could not be loaded.')}</p></div></article>`;
@@ -8138,9 +8138,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.2';
+      node.textContent = 'Current Release - 5.9.10.3';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.2';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.3';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8365,7 +8365,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.2',
+    release:'5.9.10.3',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
