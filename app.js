@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.4b',
+      release:'5.9.10.5',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -8287,9 +8287,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.4b';
+      node.textContent = 'Current Release - 5.9.10.5';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.4b';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.5';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8512,9 +8512,147 @@ function canonicalPlayerDashboardStats(playerId='') {
     });
   }
 
+  function transactionCertificationVisibilitySample(){
+    const rows=[
+      {name:'workflow-only trade',eventType:'trade',authority:'franchisehq-workflow',executionStatus:'pending-madden-execution',expected:false},
+      {name:'Madden-confirmed trade',eventType:'trade',authority:'franchisehq+madden',executionStatus:'confirmed-madden',expected:true},
+      {name:'snapshot-confirmed trade',eventType:'trade',authority:'franchisehq+snapshot-confirmed',executionStatus:'confirmed-roster',expected:true},
+      {name:'Madden signing',eventType:'signing',authority:'madden-explicit',executionStatus:'confirmed-madden',expected:true},
+      {name:'snapshot release',eventType:'release',authority:'snapshot-inferred',executionStatus:'observed-roster',expected:true}
+    ];
+    return rows.map(row=>({...row,actual:transactionIsPubliclyVisible(row),pass:transactionIsPubliclyVisible(row)===row.expected}));
+  }
+
+  async function certifyTransactionIntegration(){
+    await loadLiveTeamDirectory(false);
+    const checks=[];
+    const add=(id,label,pass,detail,severity='error')=>checks.push({id,label,pass:Boolean(pass),detail,severity});
+
+    const payload=await canonicalTransactionRequest('GET');
+    const transactions=Array.isArray(payload?.transactions)?payload.transactions:[];
+    const rosterSnapshots=Array.isArray(payload?.rosterSnapshots)?payload.rosterSnapshots:[];
+
+    add('canonical-api','Canonical transaction API available',payload?.ok===true,
+      payload?.ok===true?`${transactions.length} canonical transactions loaded.`:'Canonical transaction API did not return ok:true.');
+
+    add('roster-baseline','Roster snapshot baseline exists',rosterSnapshots.length>0,
+      rosterSnapshots.length?`${rosterSnapshots.length} roster snapshot baseline${rosterSnapshots.length===1?'':'s'} available.`:'No canonical roster snapshot baseline is stored.');
+
+    const duplicateIds=[];
+    const seenIds=new Set();
+    transactions.forEach(row=>{
+      const id=String(row.id||'');
+      if(!id)return;
+      if(seenIds.has(id))duplicateIds.push(id);
+      seenIds.add(id);
+    });
+    add('unique-canonical-ids','Canonical transaction IDs are unique',duplicateIds.length===0,
+      duplicateIds.length?`${duplicateIds.length} duplicate canonical IDs found.`:'No duplicate canonical transaction IDs found.');
+
+    const duplicateEvidence=[];
+    const seenEvidence=new Set();
+    transactions.forEach(row=>{
+      (row.evidence||[]).forEach(item=>{
+        const key=`${item.sourceType||''}:${item.sourceKey||''}`;
+        if(!item.sourceKey)return;
+        if(seenEvidence.has(key))duplicateEvidence.push(key);
+        seenEvidence.add(key);
+      });
+    });
+    add('unique-evidence','Evidence source keys are unique',duplicateEvidence.length===0,
+      duplicateEvidence.length?`${duplicateEvidence.length} duplicate evidence source keys found.`:'Evidence source keys are unique.');
+
+    const workflowOnlyPublic=transactions.filter(row=>{
+      const authority=String(row.authority||'').toLowerCase();
+      const execution=String(row.executionStatus||'').toLowerCase();
+      return transactionIsPubliclyVisible(row) &&
+        (authority==='franchisehq-workflow'||execution==='pending-madden-execution');
+    });
+    add('privacy-workflow','Private workflow-only trades stay private',workflowOnlyPublic.length===0,
+      workflowOnlyPublic.length?`${workflowOnlyPublic.length} workflow-only/pending records would leak into public history.`:'No workflow-only or pending-Madden records are publicly visible.');
+
+    const visibilitySample=transactionCertificationVisibilitySample();
+    const visibilityFailures=visibilitySample.filter(row=>!row.pass);
+    add('visibility-rules','Public transaction visibility rules behave correctly',visibilityFailures.length===0,
+      visibilityFailures.length?`${visibilityFailures.length} synthetic visibility rule checks failed.`:'Synthetic privacy/publication rules all passed.');
+
+    const players=liveTeamDirectory?.players||[];
+    const teams=liveTeamDirectory?.teams||[];
+    const playerIds=new Set(players.map(player=>String(player.id)));
+    const teamAliases=new Set();
+    teams.forEach(team=>canonicalTeamAliases(team).forEach(alias=>teamAliases.add(alias)));
+
+    const orphanPlayers=[];
+    const orphanTeams=[];
+    transactions.forEach(row=>{
+      (row.playerIds||[]).forEach(id=>{
+        if(id && !playerIds.has(String(id)))orphanPlayers.push({transactionId:row.id,playerId:String(id)});
+      });
+      (row.teamIds||[]).forEach(id=>{
+        if(id && !teamAliases.has(String(id).toLowerCase()))orphanTeams.push({transactionId:row.id,teamId:String(id)});
+      });
+    });
+
+    add('player-integrity','Transaction player IDs resolve to LIVE players',orphanPlayers.length===0,
+      orphanPlayers.length?`${orphanPlayers.length} transaction player references do not resolve to the LIVE player directory.`:'All transaction player IDs resolve to LIVE players.',
+      orphanPlayers.length?'warning':'error');
+
+    add('team-integrity','Transaction team IDs resolve to LIVE teams',orphanTeams.length===0,
+      orphanTeams.length?`${orphanTeams.length} transaction team references do not resolve to the LIVE team directory.`:'All transaction team IDs resolve to LIVE teams.',
+      orphanTeams.length?'warning':'error');
+
+    const evidenceMismatch=[];
+    transactions.forEach(row=>{
+      const evidenceTypes=new Set((row.evidence||[]).map(item=>String(item.sourceType||'').toLowerCase()));
+      const authority=String(row.authority||'').toLowerCase();
+      if(authority==='franchisehq+madden' && !(evidenceTypes.has('franchisehq-workflow')&&evidenceTypes.has('madden-explicit'))){
+        evidenceMismatch.push({transactionId:row.id,authority,evidence:[...evidenceTypes]});
+      }
+      if(authority==='franchisehq+snapshot-confirmed' && !(evidenceTypes.has('franchisehq-workflow')&&evidenceTypes.has('snapshot-diff'))){
+        evidenceMismatch.push({transactionId:row.id,authority,evidence:[...evidenceTypes]});
+      }
+      if(authority==='snapshot-inferred' && !evidenceTypes.has('snapshot-diff')){
+        evidenceMismatch.push({transactionId:row.id,authority,evidence:[...evidenceTypes]});
+      }
+    });
+    add('authority-evidence','Canonical authority matches attached evidence',evidenceMismatch.length===0,
+      evidenceMismatch.length?`${evidenceMismatch.length} canonical records have authority/evidence mismatches.`:'Canonical authority labels agree with attached evidence.',
+      evidenceMismatch.length?'warning':'error');
+
+    const synthetic=await canonicalTransactionRequest('POST',{action:'dedupe-test'});
+    add('dedupe-invariant','One real-world trade = one canonical transaction',synthetic?.test?.passed===true,
+      synthetic?.test?.passed===true
+        ?`Synthetic dedupe test merged ${synthetic.test.simulatedEvidenceRecords} evidence sources into ${synthetic.test.expectedCanonicalTransactions} canonical transaction.`
+        :'Synthetic dedupe invariant failed.');
+
+    const publicTransactions=transactions.filter(transactionIsPubliclyVisible);
+    const privateTransactions=transactions.filter(row=>!transactionIsPubliclyVisible(row));
+    const failures=checks.filter(check=>!check.pass&&check.severity==='error');
+    const warnings=checks.filter(check=>!check.pass&&check.severity==='warning');
+
+    return {
+      release:'5.9.10.5',
+      status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
+      passed:failures.length===0,
+      checks,
+      failures,
+      warnings,
+      summary:{
+        canonicalTransactions:transactions.length,
+        publicTransactions:publicTransactions.length,
+        privateTransactions:privateTransactions.length,
+        rosterSnapshots:rosterSnapshots.length,
+        livePlayers:players.length,
+        liveTeams:teams.length
+      },
+      visibilitySample,
+      generatedAt:new Date().toISOString()
+    };
+  }
+
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.4b',
+    release:'5.9.10.5',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -8538,7 +8676,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     },
     syncCanonical:()=>syncCanonicalTransactions(),
     canonical:()=>canonicalTransactionRequest('GET'),
-    dedupeTest:()=>canonicalTransactionRequest('POST',{action:'dedupe-test'})
+    dedupeTest:()=>canonicalTransactionRequest('POST',{action:'dedupe-test'}),
+    certify:()=>certifyTransactionIntegration()
   };
 
 })();
