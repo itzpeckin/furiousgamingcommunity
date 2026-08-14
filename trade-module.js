@@ -404,7 +404,7 @@ function transactionHistoryPanel(playerId){
 
 function playerCanonicalTransactionLabel(type=''){
  const key=String(type||'').toLowerCase();
- return ({trade:'Trade',signing:'Signing',release:'Release','waiver-claim':'Waiver Claim',waived:'Waived','team-change':'Team Change','roster-move':'Roster Move','roster-status-change':'Roster Status Change'})[key]||key.replace(/-/g,' ').replace(/\b\w/g,char=>char.toUpperCase())||'Transaction';
+ return ({trade:'Trade',signing:'Signing',release:'Release','waiver-claim':'Waiver Claim',waived:'Waived',retired:'Retired',retirement:'Retired','team-change':'Team Change','roster-move':'Roster Move','roster-status-change':'Roster Status Change'})[key]||key.replace(/-/g,' ').replace(/\b\w/g,char=>char.toUpperCase())||'Transaction';
 }
 
 function playerCanonicalAuthorityLabel(row={}){
@@ -445,9 +445,14 @@ async function refreshPlayerCanonicalTransactions(playerId,panel=null){
      .filter(row=>{
        const authority=String(row.authority||'').toLowerCase();
        const execution=String(row.executionStatus||'').toLowerCase();
-       if(authority==='franchisehq-workflow'||execution==='pending-madden-execution')return false;
-       return ['confirmed-madden','confirmed-roster','observed-roster','observed'].includes(execution)
-         || ['madden-explicit','franchisehq+madden','franchisehq+snapshot-confirmed','snapshot-inferred'].includes(authority);
+       const type=String(row.eventType||'').toLowerCase();
+       const hasMaddenEvidence=authority==='madden-explicit'||authority==='franchisehq+madden'||execution==='confirmed-madden';
+       const hasRosterEvidence=authority==='franchisehq+snapshot-confirmed'||authority==='snapshot-inferred'||execution==='confirmed-roster'||execution==='observed-roster';
+       if(type==='trade'){
+         if(execution==='pending-madden-execution')return false;
+         return hasMaddenEvidence||hasRosterEvidence;
+       }
+       return hasMaddenEvidence||hasRosterEvidence;
      })
      .sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
 
@@ -1377,7 +1382,7 @@ document.addEventListener('keydown',e=>{
 let builderNavigationGuard=false,pendingBuilderRoute=null,builderScrollPosition=0,builderHistoryArmed=false;function armBuilderHistoryGuard(){if(!ui.builder||!builderHasWork()||builderHistoryArmed)return;try{history.replaceState({...history.state,fgcTradeBuilderBase:true},'',location.href);history.pushState({fgcTradeBuilderGuard:true},'',location.href);builderHistoryArmed=true}catch{}}function showBuilderLeavePrompt(target){pendingBuilderRoute=target||'trade-center';builderScrollPosition=window.scrollY;persistBuilderRecovery();requestAnimationFrame(()=>{document.querySelector('[data-builder-leave-modal]')?.classList.add('is-open');window.scrollTo({top:builderScrollPosition,behavior:'auto'})})}window.addEventListener('popstate',()=>{if(ui.builder&&builderHasWork()){builderHistoryArmed=false;try{history.pushState({fgcTradeBuilderGuard:true},'',location.href);builderHistoryArmed=true}catch{}showBuilderLeavePrompt('trade-center')}});window.addEventListener('hashchange',()=>{const route=location.hash.slice(1);if(builderNavigationGuard){builderNavigationGuard=false;return}if(ui.builder&&builderHasWork()&&!route.startsWith('trade-center/new')){builderNavigationGuard=true;const target=route||'trade-center';try{history.replaceState({fgcTradeBuilderGuard:true},'','#trade-center/new')}catch{}showBuilderLeavePrompt(target)}});window.addEventListener('beforeunload',event=>{if(ui.builder&&builderHasWork()){persistBuilderRecovery();event.preventDefault();event.returnValue=''}});
 
 window.FGC_TRADE={renderTradeCenter,renderMultiTradeBuilder,renderMultiTradeDetail,multiTrades,renderTradeBlock,renderCommissioner,renderPlatformWorkspace,getApprovedNews,getActivitySnapshot,accounts,getCurrentAccount:me,setUser,openLogin,resetDemo:()=>{{const fresh=seed();store={...fresh,negotiations:fresh.trades.map(normalizeNegotiation)};delete store.trades;}save();ui.builder=null;renderRoute();},playerValuation,pickValuation,packageValuation,tradeValueSettings,defaultTradeValueSettings,tradeCalculatorEnabled,tradeRules,defaultTradeRules,freeTradeAssetCheck,freeTradePackageCheck,legacyFreeTradeCheck,multiFreeTradeCheck,builderFreeTradeCheck,toggleFreeTradeDesignation,tradeLimitReviewRows,committedTradeUnits,remainingTradeCredits,approvedTradeRecords,assetUnitCost,resetAllTradeData,tradeDataDiagnostics,currentReviewers,openValueCard,openPickCard,renderProjectionEditor,leagueYear,draftDistance,saveDraft,submit,accept,decline,withdraw,revise:(tradeId)=>{const t=trade(tradeId);if(t){initBuilder(t);setRoute('trade-center/new')}},replay:(tradeId)=>{const t=trade(tradeId);if(t)renderReplay(t)},sendMessage:sendChat,isWatched,toggleWatch,togglePlayerBlock,addPlayerToTrade,onBlock,openBlockManager,renderAISuggestions,generateAISuggestions,modifyMultiTrade,counterMultiTrade,declineMultiTrade,getRosterPlayerForQa,teamBlockNeeds,listedAssetsForTeam,getTeamTradeHistory,getPlayerTransactionHistory,allTradeRecords,completedTradeAnalytics,renderTradeAnalytics};
-window.FGC_TRADE.release='5.9.10.4';
+window.FGC_TRADE.release='5.9.10.4a';
 window.FGC_TRADE.tradeBlockDataSource=()=>({
   release:'5.9.10.1k',
   mode:window.FGC_TRADE_LIVE?.status?.().mode||'unknown',
