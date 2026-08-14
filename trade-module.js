@@ -3,10 +3,13 @@
 const app=window.FGC_APP;if(!app)return;
 const teamService=window.FranchiseHQ?.teams;
 const playerService=window.FranchiseHQ?.players;
-const teams=teamService?.getAll?.()||app.teams;
-const players=playerService?.getAll?.()||app.players;
-const teamById=(id)=>teamService?.getById?.(id)||app.teamById(id);
-const playerById=(id)=>playerService?.getById?.(id)||app.playerById(id);
+// v5.9.10.1h: FGC_APP arrays are the Trade UI authority because the LIVE snapshot
+// bridge mutates these references in place. The older product services may still
+// contain prototype data and are therefore fallback-only during this migration.
+const teams=app.teams||teamService?.getAll?.()||[];
+const players=app.players||playerService?.getAll?.()||[];
+const teamById=(id)=>app.teamById(id)||teamService?.getById?.(id);
+const playerById=(id)=>app.playerById(id)||playerService?.getById?.(id);
 const {state,pageContent,teamStyle,renderTeamMark,renderPlayerIdentity,formatMoney,escapeHtml,setRoute,renderRoute,showToast,applyRole,closeProfileMenu}=app;
 const KEY='fgc-negotiations-v3',LEGACY_KEY='fgc-m1-trades-v2',USER='fgc-m1-user-v2',BUILDER_RECOVERY='fgc-unified-trade-builder-recovery-v1';
 const commissioner={id:'commissioner',name:'Justin',handle:'Peckin',initials:'JM',role:'commissioner',teamId:'tb',tradeCommittee:true};
@@ -1302,7 +1305,17 @@ document.addEventListener('keydown',e=>{
 let builderNavigationGuard=false,pendingBuilderRoute=null,builderScrollPosition=0,builderHistoryArmed=false;function armBuilderHistoryGuard(){if(!ui.builder||!builderHasWork()||builderHistoryArmed)return;try{history.replaceState({...history.state,fgcTradeBuilderBase:true},'',location.href);history.pushState({fgcTradeBuilderGuard:true},'',location.href);builderHistoryArmed=true}catch{}}function showBuilderLeavePrompt(target){pendingBuilderRoute=target||'trade-center';builderScrollPosition=window.scrollY;persistBuilderRecovery();requestAnimationFrame(()=>{document.querySelector('[data-builder-leave-modal]')?.classList.add('is-open');window.scrollTo({top:builderScrollPosition,behavior:'auto'})})}window.addEventListener('popstate',()=>{if(ui.builder&&builderHasWork()){builderHistoryArmed=false;try{history.pushState({fgcTradeBuilderGuard:true},'',location.href);builderHistoryArmed=true}catch{}showBuilderLeavePrompt('trade-center')}});window.addEventListener('hashchange',()=>{const route=location.hash.slice(1);if(builderNavigationGuard){builderNavigationGuard=false;return}if(ui.builder&&builderHasWork()&&!route.startsWith('trade-center/new')){builderNavigationGuard=true;const target=route||'trade-center';try{history.replaceState({fgcTradeBuilderGuard:true},'','#trade-center/new')}catch{}showBuilderLeavePrompt(target)}});window.addEventListener('beforeunload',event=>{if(ui.builder&&builderHasWork()){persistBuilderRecovery();event.preventDefault();event.returnValue=''}});
 
 window.FGC_TRADE={renderTradeCenter,renderMultiTradeBuilder,renderMultiTradeDetail,multiTrades,renderTradeBlock,renderCommissioner,renderPlatformWorkspace,getApprovedNews,getActivitySnapshot,accounts,getCurrentAccount:me,setUser,openLogin,resetDemo:()=>{{const fresh=seed();store={...fresh,negotiations:fresh.trades.map(normalizeNegotiation)};delete store.trades;}save();ui.builder=null;renderRoute();},playerValuation,pickValuation,packageValuation,tradeValueSettings,defaultTradeValueSettings,tradeCalculatorEnabled,tradeRules,defaultTradeRules,freeTradeAssetCheck,freeTradePackageCheck,legacyFreeTradeCheck,multiFreeTradeCheck,builderFreeTradeCheck,toggleFreeTradeDesignation,tradeLimitReviewRows,committedTradeUnits,remainingTradeCredits,approvedTradeRecords,assetUnitCost,resetAllTradeData,tradeDataDiagnostics,currentReviewers,openValueCard,openPickCard,renderProjectionEditor,leagueYear,draftDistance,saveDraft,submit,accept,decline,withdraw,revise:(tradeId)=>{const t=trade(tradeId);if(t){initBuilder(t);setRoute('trade-center/new')}},replay:(tradeId)=>{const t=trade(tradeId);if(t)renderReplay(t)},sendMessage:sendChat,isWatched,toggleWatch,togglePlayerBlock,addPlayerToTrade,onBlock,openBlockManager,renderAISuggestions,generateAISuggestions,modifyMultiTrade,counterMultiTrade,declineMultiTrade,getRosterPlayerForQa,teamBlockNeeds,listedAssetsForTeam,getTeamTradeHistory,getPlayerTransactionHistory,allTradeRecords,completedTradeAnalytics,renderTradeAnalytics};
-window.FGC_TRADE.release='5.9.10.1g';
+window.FGC_TRADE.release='5.9.10.1h';
+window.FGC_TRADE.tradeBlockDataSource=()=>({
+  release:'5.9.10.1h',
+  mode:window.FGC_TRADE_LIVE?.status?.().mode||'unknown',
+  snapshotId:window.FGC_TRADE_LIVE?.status?.().snapshotId||null,
+  teamCount:teams.length,
+  playerCount:players.length,
+  listedPlayerCount:players.filter(p=>{try{return onBlock(p)}catch{return false}}).length,
+  samplePlayers:players.slice(0,5).map(p=>({id:p.id,name:p.name,teamId:p.teamId,overall:p.overall,liveSource:p.liveSource===true}))
+});
+
 window.FranchiseHQ?.trade?.attachLegacy?.(window.FGC_TRADE);
 window.FranchiseHQ?.getService?.('trade.negotiations')?.attachLegacy?.(window.FGC_TRADE);
 window.FranchiseHQ?.ui?.registerAdapter?.('legacy-trade', {
