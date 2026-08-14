@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.1';
+const RELEASE='5.9.10.6.1a';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -1161,6 +1161,210 @@ async function finalizeHistoricalBackfill(state){
   };
 }
 
+function safeJsonParse(value){
+  if(value==null)return null;
+  if(typeof value==='object')return value;
+  if(typeof value!=='string')return null;
+  try{return JSON.parse(value)}catch{return null}
+}
+
+function shapeOfValue(value,depth=0){
+  if(depth>3)return typeof value;
+  if(Array.isArray(value)){
+    return{
+      type:'array',
+      length:value.length,
+      itemTypes:[...new Set(value.slice(0,10).map(item=>Array.isArray(item)?'array':item===null?'null':typeof item))],
+      sampleItem:value.length?shapeOfValue(value[0],depth+1):null
+    };
+  }
+  if(value&&typeof value==='object'){
+    const entries=Object.entries(value).slice(0,40);
+    return{
+      type:'object',
+      keys:entries.map(([key])=>key),
+      fields:Object.fromEntries(entries.map(([key,val])=>[key,
+        Array.isArray(val)?`array(${val.length})`:val===null?'null':typeof val
+      ]))
+    };
+  }
+  return{type:value===null?'null':typeof value,value:compactValue(value,300)};
+}
+
+function collectCollections(value,path='root',rows=[],depth=0){
+  if(value==null||depth>6)return rows;
+  if(Array.isArray(value)){
+    if(value.length){
+      const objectCount=value.slice(0,50).filter(item=>item&&typeof item==='object'&&!Array.isArray(item)).length;
+      const playerLikeCount=value.slice(0,50).filter(playerLikeObject).length;
+      rows.push({
+        path,
+        length:value.length,
+        objectSampleCount:objectCount,
+        playerLikeSampleCount:playerLikeCount,
+        sampleShape:shapeOfValue(value[0],1)
+      });
+    }
+    value.slice(0,20).forEach((child,index)=>{
+      if(child&&typeof child==='object')collectCollections(child,`${path}[${index}]`,rows,depth+1);
+    });
+    return rows;
+  }
+  if(typeof value==='object'){
+    for(const [key,child] of Object.entries(value)){
+      if(child&&typeof child==='object')collectCollections(child,`${path}.${key}`,rows,depth+1);
+    }
+  }
+  return rows;
+}
+
+function collectFreeAgentFieldEvidence(value,path='root',rows=[],depth=0){
+  if(value==null||depth>6)return rows;
+  if(Array.isArray(value)){
+    value.slice(0,100).forEach((child,index)=>collectFreeAgentFieldEvidence(child,`${path}[${index}]`,rows,depth+1));
+    return rows;
+  }
+  if(typeof value!=='object')return rows;
+
+  if(playerLikeObject(value)){
+    const identity=playerIdentity(value);
+    const candidates=[
+      ['teamExternalId',value.teamExternalId],
+      ['team_external_id',value.team_external_id],
+      ['teamId',value.teamId],
+      ['team_id',value.team_id],
+      ['rosterTeamId',value.rosterTeamId],
+      ['roster_team_id',value.roster_team_id],
+      ['currentTeamId',value.currentTeamId],
+      ['current_team_id',value.current_team_id],
+      ['rosterStatus',value.rosterStatus],
+      ['roster_status',value.roster_status],
+      ['status',value.status]
+    ].filter(([,v])=>v!==undefined&&v!==null);
+
+    const suspicious=candidates.filter(([key,v])=>{
+      const text=String(v).trim().toLowerCase();
+      return ['0','-1','fa','free agent','free-agent','free_agent','unassigned','none','null','freeagent'].includes(text)
+        || /free.?agent|unassigned/i.test(text);
+    });
+
+    if(suspicious.length){
+      rows.push({
+        path,
+        playerId:identity.id,
+        playerName:identity.name,
+        evidence:suspicious.map(([field,v])=>({field,value:compactValue(v,200)}))
+      });
+    }
+  }
+
+  for(const [key,child] of Object.entries(value)){
+    if(child&&typeof child==='object')collectFreeAgentFieldEvidence(child,`${path}.${key}`,rows,depth+1);
+  }
+  return rows;
+}
+
+async function inspectSnapshotRecordDecoder(db,leagueId){
+  const columns=await safeTableColumns(db,'league_snapshot_records');
+  let rows=[];
+  try{
+    rows=(await db.prepare(`SELECT * FROM league_snapshot_records WHERE league_id=? LIMIT 10`).bind(leagueId).all()).results||[];
+  }catch{}
+
+  const samples=rows.map(row=>{
+    const parsedFields={};
+    for(const [key,value] of Object.entries(row)){
+      const parsed=safeJsonParse(value);
+      if(parsed&&typeof parsed==='object'){
+        parsedFields[key]={
+          shape:shapeOfValue(parsed),
+          preview:compactValue(JSON.stringify(parsed),1800)
+        };
+      }
+    }
+    return{
+      raw:Object.fromEntries(Object.entries(row).map(([k,v])=>[k,compactValue(v,1800)])),
+      parsedFields
+    };
+  });
+
+  const distributions={};
+  for(const column of columns){
+    const name=String(column.name);
+    if(/type|kind|key|entity|dataset|route|path|name|category|source/i.test(name)){
+      try{
+        const result=await db.prepare(`SELECT "${name}" value,COUNT(*) count
+          FROM league_snapshot_records
+          WHERE league_id=?
+          GROUP BY "${name}"
+          ORDER BY count DESC
+          LIMIT 100`).bind(leagueId).all();
+        distributions[name]=(result.results||[]).map(row=>({value:compactValue(row.value,500),count:Number(row.count||0)}));
+      }catch{}
+    }
+  }
+
+  return{
+    schema:columns.map(c=>({name:c.name,type:c.type,pk:c.pk,notnull:c.notnull})),
+    samples,
+    distributions
+  };
+}
+
+async function inspectR2RoutePayloads(context,state){
+  const meta=await candidateCaptureMeta(state.db,state.league.id,0,25);
+  const sampleRows=[];
+  const collectionSummary=[];
+  const freeAgentEvidence=[];
+
+  for(const row of meta.rows.slice(0,12)){
+    const route=meta.routeCol?String(row?.[meta.routeCol]||''):'';
+    const payload=await readCapturePayload(context.env,row,meta.storageCol);
+    if(!payload)continue;
+
+    const collections=collectCollections(payload,'root',[],0)
+      .filter(item=>item.length>0)
+      .sort((a,b)=>(b.playerLikeSampleCount-a.playerLikeSampleCount)||(b.length-a.length))
+      .slice(0,30);
+
+    const evidence=collectFreeAgentFieldEvidence(payload,'root',[],0).slice(0,50);
+
+    sampleRows.push({
+      route,
+      captureId:meta.idCol?row?.[meta.idCol]:null,
+      storageKey:meta.storageCol?row?.[meta.storageCol]:null,
+      topLevelShape:shapeOfValue(payload),
+      payloadPreview:compactValue(JSON.stringify(payload),2600),
+      collections
+    });
+
+    collections.forEach(item=>collectionSummary.push({route,...item}));
+    evidence.forEach(item=>freeAgentEvidence.push({route,...item}));
+  }
+
+  const dedupCollections=[];
+  const seen=new Set();
+  collectionSummary
+    .sort((a,b)=>(b.playerLikeSampleCount-a.playerLikeSampleCount)||(b.length-a.length))
+    .forEach(row=>{
+      const key=`${row.route}|${row.path}`;
+      if(seen.has(key))return;
+      seen.add(key);
+      dedupCollections.push(row);
+    });
+
+  return{
+    routePayloadSamples:sampleRows,
+    routeStructureSummary:{
+      inspectedCaptures:sampleRows.length,
+      candidateCaptureCount:meta.total,
+      topCollections:dedupCollections.slice(0,100)
+    },
+    candidatePlayerCollections:dedupCollections.filter(row=>row.playerLikeSampleCount>0).slice(0,100),
+    freeAgentFieldEvidence:freeAgentEvidence.slice(0,100)
+  };
+}
+
 export async function onRequestPost(context){
   const state=await requestState(context);
   if(state.response)return state.response;
@@ -1211,6 +1415,19 @@ export async function onRequestPost(context){
 
   if(action==='finalize-historical-backfill'){
     return json({ok:true,release:RELEASE,...(await finalizeHistoricalBackfill(state))});
+  }
+
+  if(action==='decoder-inspection'){
+    const snapshot=await inspectSnapshotRecordDecoder(state.db,state.league.id);
+    const routes=await inspectR2RoutePayloads(context,state);
+    return json({
+      ok:true,
+      release:RELEASE,
+      snapshotRecordSchema:snapshot.schema,
+      snapshotRecordSamples:snapshot.samples,
+      snapshotRecordDistributions:snapshot.distributions,
+      ...routes
+    });
   }
 
   if(action!=='sync')return json({ok:false,error:`Unsupported action: ${action}`},400);
