@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.1';
+const RELEASE='5.9.10.6.1a';
 
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);
