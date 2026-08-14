@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.5',
+      release:'5.9.10.6.0',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -8287,9 +8287,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.5';
+      node.textContent = 'Current Release - 5.9.10.6.0';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.5';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.0';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8650,9 +8650,84 @@ function canonicalPlayerDashboardStats(playerId='') {
     };
   }
 
+  function freeAgentLikeValue(value){
+    const text=String(value??'').trim().toLowerCase();
+    return !text || ['0','fa','free agent','free-agent','free_agent','unassigned','none','null','freeagent'].includes(text);
+  }
+
+  function playerSourceTeamCandidates(player={}){
+    const raw=player.raw||player.source||player||{};
+    const keys=['teamId','team_id','teamExternalId','team_external_id','team','teamAbbr','team_abbr','currentTeamId','current_team_id','rosterStatus','roster_status','status'];
+    return keys.map(key=>({key,value:raw?.[key]})).filter(row=>row.value!==undefined&&row.value!==null&&row.value!=='');
+  }
+
+  async function freeAgentAndSnapshotDiscovery(){
+    await loadLiveTeamDirectory(false);
+    const canonicalPlayers=liveTeamDirectory?.players||[];
+    const canonicalTeams=liveTeamDirectory?.teams||[];
+    const snapshot=liveTeamDirectory?.snapshot||{};
+    const playerServiceRows=window.FranchiseHQ?.players?.getAll?.()||[];
+
+    const sourceFieldCoverage=new Map();
+    canonicalPlayers.forEach(player=>{
+      playerSourceTeamCandidates(player).forEach(({key,value})=>{
+        const row=sourceFieldCoverage.get(key)||{field:key,count:0,values:new Map()};
+        row.count+=1;
+        const val=String(value);
+        row.values.set(val,(row.values.get(val)||0)+1);
+        sourceFieldCoverage.set(key,row);
+      });
+    });
+
+    const fieldCoverage=[...sourceFieldCoverage.values()].map(row=>({
+      field:row.field,
+      count:row.count,
+      topValues:[...row.values.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20).map(([value,count])=>({value,count}))
+    })).sort((a,b)=>b.count-a.count);
+
+    const canonicalFreeAgentLike=canonicalPlayers.filter(player=>{
+      const direct=[player.teamId,player.teamAbbr,player.rosterStatus,player.status];
+      return direct.some(freeAgentLikeValue);
+    });
+
+    const canonicalUnmappedTeam=canonicalPlayers.filter(player=>{
+      const id=String(player.teamId||'');
+      return id && !canonicalTeams.some(team=>String(team.id)===id);
+    });
+
+    const backend=await canonicalTransactionRequest('POST',{
+      action:'discovery',
+      activeSnapshotId:String(snapshot.id||snapshot.snapshotId||snapshot.snapshot_id||'')
+    });
+
+    return {
+      release:'5.9.10.6.0',
+      activeSnapshot:{
+        id:String(snapshot.id||snapshot.snapshotId||snapshot.snapshot_id||'')||null,
+        season:snapshot.seasonYear??snapshot.season??null,
+        week:snapshot.week??snapshot.currentWeek??null
+      },
+      canonicalPlayerDirectory:{
+        count:canonicalPlayers.length,
+        playerServiceCount:playerServiceRows.length,
+        freeAgentLikeCount:canonicalFreeAgentLike.length,
+        unmappedTeamCount:canonicalUnmappedTeam.length,
+        freeAgentLikeSample:canonicalFreeAgentLike.slice(0,25).map(player=>({
+          id:player.id,name:player.name||player.displayName,teamId:player.teamId||null,
+          rosterStatus:player.rosterStatus||player.status||null
+        })),
+        sourceFieldCoverage:fieldCoverage
+      },
+      historicalSnapshots:backend?.historicalSnapshots||[],
+      sourcePlayerAudit:backend?.sourcePlayerAudit||null,
+      transactionBackfill:backend?.transactionBackfill||null,
+      generatedAt:new Date().toISOString()
+    };
+  }
+
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.5',
+    release:'5.9.10.6.0',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -8677,7 +8752,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     syncCanonical:()=>syncCanonicalTransactions(),
     canonical:()=>canonicalTransactionRequest('GET'),
     dedupeTest:()=>canonicalTransactionRequest('POST',{action:'dedupe-test'}),
-    certify:()=>certifyTransactionIntegration()
+    certify:()=>certifyTransactionIntegration(),
+    discoverFreeAgentsAndHistory:()=>freeAgentAndSnapshotDiscovery()
   };
 
 })();
