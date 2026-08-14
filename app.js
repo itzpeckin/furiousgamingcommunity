@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.4a',
+      release:'5.9.10.4b',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -3584,9 +3584,45 @@
   }
 
   function canonicalTransactionHistory(playerId='') {
-    const rows=window.FGC_TRADE?.getPlayerTransactionHistory?.(playerId)||[];
-    if(!rows.length)return `<div class="canonical-player-empty"><strong>No transaction history</strong><span>This player has not appeared in a saved Franchise HQ trade record.</span></div>`;
-    return `<div class="canonical-transaction-list">${rows.map(row=>`<button type="button" class="canonical-transaction-row" ${row.kind==='multi'?`data-open-multi-trade="${escapeHtml(row.tradeId)}"`:`data-open-trade="${escapeHtml(row.tradeId)}"`}><span><strong>Trade #${escapeHtml(row.tradeId)} · ${escapeHtml(row.movement||'Player movement')}</strong><small>${escapeHtml(row.date||'')} · ${escapeHtml(String(row.status||'recorded').replace(/-/g,' '))}</small></span><span class="pill ${row.status==='approved'?'pill--success':'pill--neutral'}">${escapeHtml(row.status==='approved'?'Approved':'Recorded')}</span></button>`).join('')}</div>`;
+    return `<div class="canonical-player-transaction-history" data-canonical-player-transaction-history="${escapeHtml(String(playerId))}">
+      <div class="canonical-player-empty"><strong>Loading transaction history…</strong></div>
+    </div>`;
+  }
+
+  async function refreshCanonicalPlayerTransactionHistory(playerId='',root=null) {
+    const selector=`[data-canonical-player-transaction-history="${CSS.escape(String(playerId))}"]`;
+    const hosts=root?[...root.querySelectorAll(selector)]:[...document.querySelectorAll(selector)];
+    if(!hosts.length)return;
+
+    try{
+      const payload=await loadCanonicalTransactionsForUi(false);
+      const rows=(payload?.transactions||[])
+        .filter(transaction=>transactionIsPubliclyVisible(transaction))
+        .filter(transaction=>(transaction.playerIds||[]).map(String).includes(String(playerId)))
+        .sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
+
+      const markup=rows.length
+        ? `<div class="canonical-transaction-list">${rows.map(row=>{
+            const teams=(row.teamIds||[]).map(id=>transactionTeamByCanonicalId(id)).filter(Boolean);
+            const teamLabel=teams.length?teams.map(team=>team.abbr||team.fullName).join(' → '):'';
+            const workflowId=row.workflowTradeId;
+            return `<button type="button" class="canonical-transaction-row" ${workflowId?`data-route="trade-center/${escapeHtml(String(workflowId))}"`:''}>
+              <span>
+                <strong>${escapeHtml(transactionEventLabel(row.eventType))}${teamLabel?` · ${escapeHtml(teamLabel)}`:''}</strong>
+                <small>${escapeHtml(transactionTimeLabel(row))}</small>
+              </span>
+              <span class="pill pill--neutral">${escapeHtml(transactionAuthorityLabel(row))}</span>
+            </button>`;
+          }).join('')}</div>`
+        : `<div class="canonical-player-empty"><strong>No transaction history</strong><span>No completed or Madden-recorded transaction is available for this player.</span></div>`;
+
+      hosts.forEach(host=>host.innerHTML=markup);
+    }catch(error){
+      console.error('[Canonical Player Transaction History]',error);
+      hosts.forEach(host=>{
+        host.innerHTML=`<div class="canonical-player-empty"><strong>Transaction history unavailable</strong><span>${escapeHtml(error?.message||'The transaction ledger could not be loaded.')}</span></div>`;
+      });
+    }
   }
 
   function canonicalTradePlayer(player={}) {
@@ -3970,6 +4006,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       </div>
       ${canonicalTradeBreakdown(player)}`;
 
+    refreshCanonicalPlayerTransactionHistory(player.id,content);
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden','false');
     document.body.style.overflow='hidden';
@@ -3985,6 +4022,10 @@ function canonicalPlayerDashboardStats(playerId='') {
     const target=tab.getAttribute('data-canonical-player-tab');
     root.querySelectorAll('[data-canonical-player-tab]').forEach(button=>button.classList.toggle('is-active',button===tab));
     root.querySelectorAll('[data-canonical-player-panel]').forEach(panel=>panel.classList.toggle('is-active',panel.getAttribute('data-canonical-player-panel')===target));
+    if(target==='transactions'){
+      const host=root.querySelector('[data-canonical-player-transaction-history]');
+      if(host)refreshCanonicalPlayerTransactionHistory(host.dataset.canonicalPlayerTransactionHistory,root);
+    }
   });
 
   function openRosterPlayerDetail(playerId) {
@@ -8246,9 +8287,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.4a';
+      node.textContent = 'Current Release - 5.9.10.4b';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.4a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.4b';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8473,7 +8514,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.4a',
+    release:'5.9.10.4b',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
