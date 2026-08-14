@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.1';
+const RELEASE='5.9.10.6.0';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -452,6 +452,73 @@ export async function onRequestGet(context){
   });
 }
 
+async function discoveryPayload(db,leagueId,activeSnapshotId=null){
+  const historical=await db.prepare(`SELECT league_id,snapshot_id,season,week,captured_at,player_count
+    FROM canonical_roster_snapshots
+    WHERE league_id=?
+    ORDER BY captured_at ASC`).bind(leagueId).all();
+
+  const snapshots=historical.results||[];
+  const snapshotDetails=[];
+  for(const snapshot of snapshots){
+    const result=await db.prepare(`SELECT player_id,player_name,team_id,roster_status,position
+      FROM canonical_roster_snapshot_players
+      WHERE league_id=? AND snapshot_id=?`).bind(leagueId,snapshot.snapshot_id).all();
+    const rows=result.results||[];
+    const freeAgentLike=rows.filter(row=>freeAgentTeam(row.team_id));
+    snapshotDetails.push({
+      snapshotId:snapshot.snapshot_id,
+      season:snapshot.season==null?null:Number(snapshot.season),
+      week:snapshot.week==null?null:Number(snapshot.week),
+      capturedAt:snapshot.captured_at,
+      playerCount:Number(snapshot.player_count||rows.length),
+      freeAgentLikeCount:freeAgentLike.length,
+      freeAgentLikeSample:freeAgentLike.slice(0,20).map(row=>({
+        playerId:row.player_id,playerName:row.player_name,teamId:row.team_id,rosterStatus:row.roster_status
+      }))
+    });
+  }
+
+  let movementPairs=0;
+  let teamChanges=0;
+  let signings=0;
+  let releases=0;
+
+  for(let i=1;i<snapshotDetails.length;i++){
+    const prevId=snapshotDetails[i-1].snapshotId;
+    const currId=snapshotDetails[i].snapshotId;
+    const prevRows=await rosterRows(db,leagueId,prevId);
+    const currResult=await db.prepare(`SELECT player_id AS playerId,player_name AS playerName,team_id AS teamId,roster_status AS rosterStatus,position
+      FROM canonical_roster_snapshot_players WHERE league_id=? AND snapshot_id=?`).bind(leagueId,currId).all();
+    const currRows=currResult.results||[];
+    const events=buildDiffEvents(prevRows,currRows,prevId,currId,snapshotDetails[i].season,snapshotDetails[i].week);
+    movementPairs+=events.length;
+    events.forEach(event=>{
+      if(event.eventType==='team-change')teamChanges+=1;
+      if(event.eventType==='signing')signings+=1;
+      if(event.eventType==='release')releases+=1;
+    });
+  }
+
+  const sourcePlayerAudit={
+    rosterSnapshotCount:snapshotDetails.length,
+    snapshotsWithFreeAgentLikePlayers:snapshotDetails.filter(row=>row.freeAgentLikeCount>0).length,
+    totalFreeAgentLikeRows:snapshotDetails.reduce((sum,row)=>sum+row.freeAgentLikeCount,0),
+    activeSnapshotId:activeSnapshotId||null
+  };
+
+  const transactionBackfill={
+    snapshotPairsCompared:Math.max(0,snapshotDetails.length-1),
+    inferredMovementEvents:movementPairs,
+    inferredTeamChanges:teamChanges,
+    inferredSignings:signings,
+    inferredReleases:releases,
+    canBackfillFromStoredSnapshots:snapshotDetails.length>1
+  };
+
+  return{historicalSnapshots:snapshotDetails,sourcePlayerAudit,transactionBackfill};
+}
+
 export async function onRequestPost(context){
   const state=await requestState(context);
   if(state.response)return state.response;
@@ -462,6 +529,11 @@ export async function onRequestPost(context){
 
   if(action==='dedupe-test'){
     return json({ok:true,release:RELEASE,test:syntheticDedupeTest()});
+  }
+
+  if(action==='discovery'){
+    const payload=await discoveryPayload(state.db,state.league.id,clean(body.activeSnapshotId));
+    return json({ok:true,release:RELEASE,...payload});
   }
 
   if(action!=='sync')return json({ok:false,error:`Unsupported action: ${action}`},400);
