@@ -66,6 +66,9 @@
     capPosition: 'All',
     capSortKey: 'capHit',
     capSortDirection: 'desc',
+    transactionSearch: '',
+    transactionType: 'all',
+    transactionTeam: 'all',
     activityFilter: 'all',
     featuredGameId: null,
     homeLeaderMetrics: {
@@ -170,7 +173,7 @@
   const newsArticles = buildNews();
   const pageNames = {
     home: 'League Home', 'league-activity': 'League Activity', teams: 'Teams', players: 'Players', standings: 'Standings', stats: 'Stats & Leaders',
-    schedule: 'Schedule', news: 'League News', 'trade-center': 'Trade Center', 'trade-block': 'Trade Block',
+    schedule: 'Schedule', news: 'League News', transactions: 'Transactions', 'trade-center': 'Trade Center', 'trade-block': 'Trade Block',
     commissioner: 'Commissioner HQ', 'player-stats-certification': 'Player Statistics Certification', 'design-system': 'Design System'
   };
 
@@ -2331,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.3',
+      release:'5.9.10.4',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -5546,6 +5549,23 @@ function canonicalPlayerDashboardStats(playerId='') {
       .filter(value=>value!==undefined&&value!==null&&String(value)!=='').map(value=>String(value).toLowerCase()));
   }
 
+  function transactionIsPubliclyVisible(transaction={}){
+    const authority=String(transaction.authority||'').toLowerCase();
+    const execution=String(transaction.executionStatus||'').toLowerCase();
+
+    // Private Trade Center workflow state must never leak to Team, Player, or League
+    // transaction surfaces. Public history begins only after execution/roster evidence.
+    if(authority==='franchisehq-workflow')return false;
+    if(execution==='pending-madden-execution')return false;
+
+    return [
+      'confirmed-madden',
+      'confirmed-roster',
+      'observed-roster',
+      'observed'
+    ].includes(execution) || ['madden-explicit','franchisehq+madden','franchisehq+snapshot-confirmed','snapshot-inferred'].includes(authority);
+  }
+
   function transactionInvolvesTeam(transaction={},team={}){
     const aliases=canonicalTeamAliases(team);
     return (transaction.teamIds||[]).some(value=>aliases.has(String(value).toLowerCase()));
@@ -5635,7 +5655,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     try{
       const payload=await loadCanonicalTransactionsForUi(false);
       if(state.teamTab!=='trade-history')return;
-      const rows=(payload?.transactions||[]).filter(transaction=>transactionInvolvesTeam(transaction,team));
+      const rows=(payload?.transactions||[]).filter(transaction=>transactionIsPubliclyVisible(transaction)&&transactionInvolvesTeam(transaction,team));
       rows.sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
       host.innerHTML=`<div class="team-trade-history-view"><div class="section-heading"><div><h2>${escapeHtml(team.fullName)} Transaction History</h2></div><span class="pill pill--neutral">${rows.length} transaction${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-transaction-list">${rows.map(row=>renderCanonicalTeamTransactionRow(row,team)).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No LIVE transactions recorded</h3><p>No canonical transaction currently involves ${escapeHtml(team.fullName)}.</p></div></article>`}</div>`;
     }catch(error){
@@ -6414,6 +6434,73 @@ function canonicalPlayerDashboardStats(playerId='') {
     </article>`;
   }
 
+  async function renderLeagueTransactions() {
+    pageContent.innerHTML=`<div class="page-heading"><div><h1>Transactions</h1></div></div>
+      <article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Loading transactions…</h3></div></article>`;
+
+    try{
+      const payload=await loadCanonicalTransactionsForUi(false);
+      const publicRows=(payload?.transactions||[]).filter(transactionIsPubliclyVisible);
+
+      const teamOptions=(liveTeamDirectory?.teams||[]).slice().sort((a,b)=>String(a.fullName||a.abbr).localeCompare(String(b.fullName||b.abbr)));
+      const typeOptions=[...new Set(publicRows.map(row=>String(row.eventType||'').toLowerCase()).filter(Boolean))]
+        .sort((a,b)=>transactionEventLabel(a).localeCompare(transactionEventLabel(b)));
+
+      const matchesTeam=row=>{
+        if(state.transactionTeam==='all')return true;
+        const team=transactionTeamByCanonicalId(state.transactionTeam)||teamOptions.find(t=>canonicalTeamAliases(t).has(String(state.transactionTeam).toLowerCase()));
+        return team?transactionInvolvesTeam(row,team):(row.teamIds||[]).map(String).includes(String(state.transactionTeam));
+      };
+      const q=String(state.transactionSearch||'').trim().toLowerCase();
+      const matchesSearch=row=>{
+        if(!q)return true;
+        const players=transactionPlayerRows(row);
+        const teams=(row.teamIds||[]).map(id=>transactionTeamByCanonicalId(id)).filter(Boolean);
+        return [
+          transactionEventLabel(row.eventType),
+          transactionAuthorityLabel(row),
+          transactionTimeLabel(row),
+          ...players.map(p=>p.name),
+          ...teams.flatMap(t=>[t.fullName,t.abbr])
+        ].filter(Boolean).join(' ').toLowerCase().includes(q);
+      };
+
+      const rows=publicRows
+        .filter(row=>state.transactionType==='all'||String(row.eventType||'').toLowerCase()===state.transactionType)
+        .filter(matchesTeam)
+        .filter(matchesSearch)
+        .sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
+
+      const renderLeagueRow=row=>{
+        const players=transactionPlayerRows(row);
+        const involvedTeams=(row.teamIds||[]).map(id=>transactionTeamByCanonicalId(id)||{id,abbr:String(id).toUpperCase(),fullName:String(id).toUpperCase()});
+        return `<article class="card league-transaction-card">
+          <div class="league-transaction-card__top">
+            <div><span class="pill pill--${transactionEventTone(row.eventType)}">${escapeHtml(transactionEventLabel(row.eventType))}</span><strong>${escapeHtml(transactionTimeLabel(row))}</strong></div>
+            <span class="pill pill--neutral">${escapeHtml(transactionAuthorityLabel(row))}</span>
+          </div>
+          <div class="league-transaction-card__teams">${involvedTeams.map(team=>`<span>${renderTeamMark(team,'team-logo')}<strong>${escapeHtml(team.abbr||team.fullName)}</strong></span>`).join('<span class="league-transaction-arrow">↔</span>')}</div>
+          <div class="league-transaction-card__players">${players.length?players.map(player=>player.summary
+            ?`<span class="team-transaction-summary">${escapeHtml(player.name)}</span>`
+            :`<button type="button" class="team-transaction-player" data-roster-player-detail="${escapeHtml(player.id)}"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position||'—')}${player.overall?` · ${player.overall} OVR`:''}</small></button>`).join('')
+            :'<span class="team-transaction-summary">Roster movement recorded</span>'}</div>
+        </article>`;
+      };
+
+      pageContent.innerHTML=`<div class="page-heading"><div><h1>Transactions</h1></div></div>
+        <div class="filter-bar league-transaction-filters">
+          <label class="field field--grow"><span>Search</span><input data-transaction-search value="${escapeHtml(state.transactionSearch||'')}" placeholder="Player, team, transaction..."></label>
+          <label class="field"><span>Type</span><select data-transaction-type><option value="all">All Types</option>${typeOptions.map(type=>`<option value="${escapeHtml(type)}" ${state.transactionType===type?'selected':''}>${escapeHtml(transactionEventLabel(type))}</option>`).join('')}</select></label>
+          <label class="field"><span>Team</span><select data-transaction-team><option value="all">All Teams</option>${teamOptions.map(team=>`<option value="${escapeHtml(String(team.id))}" ${String(state.transactionTeam)===String(team.id)?'selected':''}>${escapeHtml(team.fullName||team.abbr)}</option>`).join('')}</select></label>
+          <span class="result-count">${rows.length} transaction${rows.length===1?'':'s'}</span>
+        </div>
+        ${rows.length?`<div class="league-transaction-list">${rows.map(renderLeagueRow).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No transactions found</h3><p>No public executed transactions match the current filters.</p></div></article>`}`;
+    }catch(error){
+      console.error('[League Transactions]',error);
+      pageContent.innerHTML=`<div class="page-heading"><div><h1>Transactions</h1></div></div><article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Transactions unavailable</h3><p>${escapeHtml(error?.message||'The transaction ledger could not be loaded.')}</p></div></article>`;
+    }
+  }
+
   function renderNews() {
     const dynamicNews = window.FGC_TRADE?.getApprovedNews?.() || [];
     const allNews = [...dynamicNews, ...newsArticles];
@@ -7128,6 +7215,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         break;
       case 'schedule': renderSchedule(); break;
       case 'news': renderNews(); break;
+      case 'transactions': renderLeagueTransactions(); break;
       case 'trade-center': window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : window.FranchiseHQ?.trade?.renderTradeCenter ? window.FranchiseHQ.trade.renderTradeCenter(id) : renderRoadmap(base); break;
       case 'trade-block': window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : window.FranchiseHQ?.trade?.renderTradeBlock ? window.FranchiseHQ.trade.renderTradeBlock() : renderRoadmap(base); break;
       case 'design-system': renderDesignSystem(); break;
@@ -7190,7 +7278,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function pageIcon(route) {
-    return {home:'icon-home',teams:'icon-shield',players:'icon-users',standings:'icon-table',stats:'icon-chart',schedule:'icon-calendar',news:'icon-news','trade-center':'icon-swap','trade-block':'icon-tag',commissioner:'icon-sliders','design-system':'icon-palette'}[route]||'icon-search';
+    return {home:'icon-home',teams:'icon-shield',players:'icon-users',standings:'icon-table',stats:'icon-chart',schedule:'icon-calendar',news:'icon-news',transactions:'icon-activity','trade-center':'icon-swap','trade-block':'icon-tag',commissioner:'icon-sliders','design-system':'icon-palette'}[route]||'icon-search';
   }
 
   function openCommand() {
@@ -7724,6 +7812,27 @@ function canonicalPlayerDashboardStats(playerId='') {
     refreshActiveCapTab();
   });
 
+  document.addEventListener('input',event=>{
+    if(!event.target.matches('[data-transaction-search]'))return;
+    state.transactionSearch=event.target.value;
+    renderLeagueTransactions().then(()=>{
+      const input=document.querySelector('[data-transaction-search]');
+      if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length)}
+    });
+  });
+
+  document.addEventListener('change',event=>{
+    if(event.target.matches('[data-transaction-type]')){
+      state.transactionType=event.target.value||'all';
+      renderLeagueTransactions();
+      return;
+    }
+    if(event.target.matches('[data-transaction-team]')){
+      state.transactionTeam=event.target.value||'all';
+      renderLeagueTransactions();
+    }
+  });
+
   document.addEventListener('keydown', event => {
     const gameTarget=event.target.closest('[data-game-id]');
     if(gameTarget&&['Enter',' '].includes(event.key)){
@@ -8138,9 +8247,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.3';
+      node.textContent = 'Current Release - 5.9.10.4';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.3';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.4';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8365,7 +8474,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.3',
+    release:'5.9.10.4',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);

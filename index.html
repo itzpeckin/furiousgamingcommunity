@@ -948,6 +948,21 @@ html.trade-live-first-load main{visibility:hidden!important}
     @media(max-width:760px){.team-transaction-row__body{grid-template-columns:1fr}.team-transaction-row__header,.team-transaction-row__footer{align-items:flex-start;flex-direction:column}}
   </style>
 
+
+  <style id="v59104-league-transactions">
+    .league-transaction-list{display:grid;gap:12px}
+    .league-transaction-card{padding:16px 18px}
+    .league-transaction-card__top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .league-transaction-card__top>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .league-transaction-card__top strong{font-size:12px;opacity:.75}
+    .league-transaction-card__teams{display:flex;align-items:center;gap:10px;padding:16px 0 12px;flex-wrap:wrap}
+    .league-transaction-card__teams>span:not(.league-transaction-arrow){display:inline-flex;align-items:center;gap:7px}
+    .league-transaction-card__teams .team-logo{width:30px;height:30px}
+    .league-transaction-arrow{opacity:.45}
+    .league-transaction-card__players{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.06);padding-top:12px}
+    @media(max-width:760px){.league-transaction-card__top{align-items:flex-start;flex-direction:column}.league-transaction-filters{align-items:stretch}}
+  </style>
+
 </head>
 <body data-density="comfortable">
 <div class="app-shell" data-app-shell>
@@ -995,6 +1010,7 @@ html.trade-live-first-load main{visibility:hidden!important}
         <a class="nav-item" href="#news" data-route="news"><svg><use href="#icon-news"></use></svg><span>League News</span><span class="nav-badge nav-badge--quiet">6</span></a>
 
         <div class="nav-divider"><span>Transactions</span></div>
+        <a class="nav-item" href="#transactions" data-route="transactions"><svg><use href="#icon-activity"></use></svg><span>Transactions</span></a>
         <a class="nav-item nav-item--featured" href="#trade-center" data-route="trade-center"><svg><use href="#icon-swap"></use></svg><span>Trade Center</span><span class="nav-badge">2</span></a>
         <a class="nav-item" href="#trade-block" data-route="trade-block"><svg><use href="#icon-tag"></use></svg><span>Trade Block</span></a>
 
@@ -1008,7 +1024,7 @@ html.trade-live-first-load main{visibility:hidden!important}
           <span class="status-dot status-dot--success"></span>
           <div><strong>Live Franchise</strong><span>Powered by the active Madden snapshot</span></div>
         </div>
-        <span class="version-label">Current Release - 5.9.10.3</span>
+        <span class="version-label">Current Release - 5.9.10.4</span>
       </div>
     </aside>
 
@@ -1403,10 +1419,10 @@ html.trade-live-first-load main{visibility:hidden!important}
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=5.7.1b"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=5.9.10.3"></script>
+<script src="app.js?v=5.9.10.4"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
-<script src="trade-module.js?v=5.9.10.3"></script>
+<script src="trade-module.js?v=5.9.10.4"></script>
 <script src="auth-ui.js"></script>
 <script src="dev-mode.js"></script>
 
