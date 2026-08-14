@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.0b',
+      release:'5.9.10.6.1',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2625,6 +2625,19 @@
     };
   }
 
+  async function loadIntegratedFreeAgents(){
+    try{
+      const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community');
+      const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/players/free-agents`,{credentials:'include'});
+      if(!response.ok)return[];
+      const payload=await response.json();
+      return Array.isArray(payload?.players)?payload.players:[];
+    }catch(error){
+      console.warn('[Free Agents] Public read failed.',error);
+      return[];
+    }
+  }
+
   async function loadLiveTeamDirectory(force=false) {
     if(liveTeamDirectory && !force) return liveTeamDirectory;
     if(liveTeamDirectoryLoading) {
@@ -2635,8 +2648,8 @@
     try{
       const service=liveReadModel();
       if(!service) return null;
-      const [stateValue,snapshotValue,teamRows,standingRows,playerRows,gameRows]=await Promise.all([
-        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getPlayers(),service.getSchedule()
+      const [stateValue,snapshotValue,teamRows,standingRows,playerRows,gameRows,freeAgentRows]=await Promise.all([
+        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getPlayers(),service.getSchedule(),loadIntegratedFreeAgents()
       ]);
       if(stateValue!=='live') return null;
       const rawTeamMap=new Map(teamRows.map(team=>[String(team.id),team]));
@@ -2644,7 +2657,18 @@
       const teamsLive=teamRows.map(team=>liveTeamUiShape(team,standingMap.get(String(team.id))));
       [...teamsLive].sort((a,b)=>Number(b.pf)-Number(a.pf)||String(a.fullName).localeCompare(String(b.fullName))).forEach((team,index)=>team.pfRank=index+1);
       [...teamsLive].sort((a,b)=>Number(a.pa)-Number(b.pa)||String(a.fullName).localeCompare(String(b.fullName))).forEach((team,index)=>team.paRank=index+1);
-      const playersLive=playerRows.map(liveRosterPlayerShape);
+      const rosteredPlayers=playerRows.map(liveRosterPlayerShape);
+      const rosteredIds=new Set(rosteredPlayers.map(player=>String(player.id)));
+      const integratedFreeAgents=(freeAgentRows||[])
+        .map(row=>liveRosterPlayerShape({
+          ...row,
+          teamId:'FA',
+          rosterStatus:'free-agent',
+          source:{...(row.source||row.raw||row),teamId:'FA',rosterStatus:'free-agent',status:'free-agent'}
+        }))
+        .filter(player=>player.id&&!rosteredIds.has(String(player.id)))
+        .map(player=>({...player,teamId:'FA',rosterStatus:'free-agent'}));
+      const playersLive=[...rosteredPlayers,...integratedFreeAgents];
       liveRosterPlayers.clear();
       playersLive.forEach(player=>{if(player.id)liveRosterPlayers.set(String(player.id),player)});
       const playersByTeam=new Map();
@@ -8287,9 +8311,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.0b';
+      node.textContent = 'Current Release - 5.9.10.6.1';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.0b';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.1';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8763,9 +8787,68 @@ function canonicalPlayerDashboardStats(playerId='') {
     };
   }
 
+  async function integrateFreeAgentsAndHistoricalRoster(){
+    const progress={
+      release:'5.9.10.6.1',
+      stage:'planning',
+      freeAgents:{capturesProcessed:0,discovered:0},
+      historical:{snapshotsProcessed:0,recordsProcessed:0},
+      final:null
+    };
+
+    const plan=await canonicalTransactionRequest('POST',{action:'integration-plan'});
+    progress.plan=plan;
+
+    // Scan small R2 capture batches to stay below Cloudflare Worker CPU/memory limits.
+    let captureOffset=0;
+    const captureTotal=Number(plan?.freeAgentCaptureCount||0);
+    while(captureOffset<captureTotal){
+      progress.stage='free-agent-scan';
+      const batch=await canonicalTransactionRequest('POST',{
+        action:'scan-free-agents',
+        offset:captureOffset,
+        limit:3
+      });
+      captureOffset+=Number(batch?.processedCaptures||0);
+      if(!Number(batch?.processedCaptures||0))break;
+      progress.freeAgents.capturesProcessed=captureOffset;
+      progress.freeAgents.discovered=Number(batch?.canonicalFreeAgents||progress.freeAgents.discovered||0);
+    }
+
+    // Normalize each historical league snapshot in bounded D1 record batches.
+    for(const snapshot of plan?.snapshots||[]){
+      progress.stage='historical-normalization';
+      let offset=0;
+      const total=Number(snapshot.recordCount||0);
+      while(offset<total){
+        const batch=await canonicalTransactionRequest('POST',{
+          action:'normalize-historical-snapshot',
+          snapshotId:String(snapshot.snapshotId),
+          offset,
+          limit:400
+        });
+        const processed=Number(batch?.processedRecords||0);
+        if(!processed)break;
+        offset+=processed;
+        progress.historical.recordsProcessed+=processed;
+      }
+      progress.historical.snapshotsProcessed+=1;
+    }
+
+    progress.stage='historical-backfill';
+    const final=await canonicalTransactionRequest('POST',{action:'finalize-historical-backfill'});
+    progress.final=final;
+    progress.stage='complete';
+
+    // Force the live directory to reload so the Players page immediately receives persisted Free Agents.
+    await loadLiveTeamDirectory(true);
+
+    return progress;
+  }
+
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.0b',
+    release:'5.9.10.6.1',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -8792,7 +8875,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     dedupeTest:()=>canonicalTransactionRequest('POST',{action:'dedupe-test'}),
     certify:()=>certifyTransactionIntegration(),
     discoverFreeAgentsAndHistory:()=>freeAgentAndSnapshotDiscovery(),
-    deepInspectHistoricalPlayers:()=>historicalSnapshotRawPlayerDeepInspection()
+    deepInspectHistoricalPlayers:()=>historicalSnapshotRawPlayerDeepInspection(),
+    integrateFreeAgentsAndHistoricalRoster:()=>integrateFreeAgentsAndHistoricalRoster()
   };
 
 })();
