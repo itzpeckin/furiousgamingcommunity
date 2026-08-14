@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.1',
+      release:'5.9.10.6.1a',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -8311,9 +8311,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.1';
+      node.textContent = 'Current Release - 5.9.10.6.1a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.1';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.1a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8846,9 +8846,24 @@ function canonicalPlayerDashboardStats(playerId='') {
     return progress;
   }
 
+  async function inspectStoredRecordAndRouteShapes(){
+    const payload=await canonicalTransactionRequest('POST',{action:'decoder-inspection'});
+    return {
+      release:'5.9.10.6.1a',
+      snapshotRecordSchema:payload?.snapshotRecordSchema||null,
+      snapshotRecordSamples:payload?.snapshotRecordSamples||[],
+      snapshotRecordDistributions:payload?.snapshotRecordDistributions||null,
+      routePayloadSamples:payload?.routePayloadSamples||[],
+      routeStructureSummary:payload?.routeStructureSummary||null,
+      candidatePlayerCollections:payload?.candidatePlayerCollections||[],
+      freeAgentFieldEvidence:payload?.freeAgentFieldEvidence||[],
+      generatedAt:new Date().toISOString()
+    };
+  }
+
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.1',
+    release:'5.9.10.6.1a',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -8876,7 +8891,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     certify:()=>certifyTransactionIntegration(),
     discoverFreeAgentsAndHistory:()=>freeAgentAndSnapshotDiscovery(),
     deepInspectHistoricalPlayers:()=>historicalSnapshotRawPlayerDeepInspection(),
-    integrateFreeAgentsAndHistoricalRoster:()=>integrateFreeAgentsAndHistoricalRoster()
+    integrateFreeAgentsAndHistoricalRoster:()=>integrateFreeAgentsAndHistoricalRoster(),
+    inspectStoredRecordShapes:()=>inspectStoredRecordAndRouteShapes()
   };
 
 })();
