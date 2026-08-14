@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.0',
+      release:'5.9.10.6.0a',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -8287,9 +8287,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.0';
+      node.textContent = 'Current Release - 5.9.10.6.0a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.0';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.0a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8651,8 +8651,21 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function freeAgentLikeValue(value){
-    const text=String(value??'').trim().toLowerCase();
-    return !text || ['0','fa','free agent','free-agent','free_agent','unassigned','none','null','freeagent'].includes(text);
+    if(value===undefined||value===null)return false;
+    const text=String(value).trim().toLowerCase();
+    if(!text)return false;
+    return ['0','fa','free agent','free-agent','free_agent','unassigned','none','null','freeagent'].includes(text);
+  }
+
+  function explicitFreeAgentEvidence(player={}){
+    const raw=player.raw||player.source||{};
+    const fields=[
+      ['teamId',player.teamId],['teamAbbr',player.teamAbbr],['rosterStatus',player.rosterStatus],['status',player.status],
+      ['raw.teamId',raw.teamId],['raw.team_id',raw.team_id],['raw.teamExternalId',raw.teamExternalId],
+      ['raw.team_external_id',raw.team_external_id],['raw.rosterStatus',raw.rosterStatus],
+      ['raw.roster_status',raw.roster_status],['raw.status',raw.status]
+    ];
+    return fields.filter(([,value])=>freeAgentLikeValue(value)).map(([field,value])=>({field,value}));
   }
 
   function playerSourceTeamCandidates(player={}){
@@ -8685,10 +8698,9 @@ function canonicalPlayerDashboardStats(playerId='') {
       topValues:[...row.values.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20).map(([value,count])=>({value,count}))
     })).sort((a,b)=>b.count-a.count);
 
-    const canonicalFreeAgentLike=canonicalPlayers.filter(player=>{
-      const direct=[player.teamId,player.teamAbbr,player.rosterStatus,player.status];
-      return direct.some(freeAgentLikeValue);
-    });
+    const canonicalFreeAgentLike=canonicalPlayers
+      .map(player=>({player,evidence:explicitFreeAgentEvidence(player)}))
+      .filter(row=>row.evidence.length);
 
     const canonicalUnmappedTeam=canonicalPlayers.filter(player=>{
       const id=String(player.teamId||'');
@@ -8696,7 +8708,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     });
 
     const backend=await canonicalTransactionRequest('POST',{
-      action:'discovery',
+      action:'raw-discovery',
       activeSnapshotId:String(snapshot.id||snapshot.snapshotId||snapshot.snapshot_id||'')
     });
 
@@ -8712,22 +8724,25 @@ function canonicalPlayerDashboardStats(playerId='') {
         playerServiceCount:playerServiceRows.length,
         freeAgentLikeCount:canonicalFreeAgentLike.length,
         unmappedTeamCount:canonicalUnmappedTeam.length,
-        freeAgentLikeSample:canonicalFreeAgentLike.slice(0,25).map(player=>({
+        freeAgentLikeSample:canonicalFreeAgentLike.slice(0,25).map(({player,evidence})=>({
           id:player.id,name:player.name||player.displayName,teamId:player.teamId||null,
-          rosterStatus:player.rosterStatus||player.status||null
+          rosterStatus:player.rosterStatus||player.status||null,evidence
         })),
         sourceFieldCoverage:fieldCoverage
       },
       historicalSnapshots:backend?.historicalSnapshots||[],
       sourcePlayerAudit:backend?.sourcePlayerAudit||null,
       transactionBackfill:backend?.transactionBackfill||null,
+      rawStorageDiscovery:backend?.rawStorageDiscovery||null,
+      d1StorageInventory:backend?.d1StorageInventory||null,
+      r2StorageInventory:backend?.r2StorageInventory||null,
       generatedAt:new Date().toISOString()
     };
   }
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.0',
+    release:'5.9.10.6.0a',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
