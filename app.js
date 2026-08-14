@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.0a',
+      release:'5.9.10.6.0b',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -8287,9 +8287,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.0a';
+      node.textContent = 'Current Release - 5.9.10.6.0b';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.0a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.0b';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8740,9 +8740,32 @@ function canonicalPlayerDashboardStats(playerId='') {
     };
   }
 
+  async function historicalSnapshotRawPlayerDeepInspection(){
+    await loadLiveTeamDirectory(false);
+    const snapshot=liveTeamDirectory?.snapshot||{};
+    const backend=await canonicalTransactionRequest('POST',{
+      action:'deep-inspection',
+      activeSnapshotId:String(snapshot.id||snapshot.snapshotId||snapshot.snapshot_id||'')
+    });
+    return {
+      release:'5.9.10.6.0b',
+      activeSnapshot:{
+        id:String(snapshot.id||snapshot.snapshotId||snapshot.snapshot_id||'')||null,
+        season:snapshot.seasonYear??snapshot.season??null,
+        week:snapshot.week??snapshot.currentWeek??null
+      },
+      leagueSnapshots:backend?.leagueSnapshots||[],
+      snapshotRecordInventory:backend?.snapshotRecordInventory||null,
+      playerPreviewAudit:backend?.playerPreviewAudit||null,
+      routeCaptureAudit:backend?.routeCaptureAudit||null,
+      historicalBackfillReadiness:backend?.historicalBackfillReadiness||null,
+      generatedAt:new Date().toISOString()
+    };
+  }
+
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.0a',
+    release:'5.9.10.6.0b',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -8768,7 +8791,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     canonical:()=>canonicalTransactionRequest('GET'),
     dedupeTest:()=>canonicalTransactionRequest('POST',{action:'dedupe-test'}),
     certify:()=>certifyTransactionIntegration(),
-    discoverFreeAgentsAndHistory:()=>freeAgentAndSnapshotDiscovery()
+    discoverFreeAgentsAndHistory:()=>freeAgentAndSnapshotDiscovery(),
+    deepInspectHistoricalPlayers:()=>historicalSnapshotRawPlayerDeepInspection()
   };
 
 })();
