@@ -2331,7 +2331,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.1h',
+      release:'5.9.10.1i',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -7823,7 +7823,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       removeOriginalTradeDemoSeeds();
 
       window.FGC_TRADE_LIVE={
-        release:'5.9.10.1h',
+        release:'5.9.10.1i',
         status:()=>({...tradeCenterLiveBridgeState}),
         resync:()=>syncTradeCenterLiveBridge({rerender:true})
       };
@@ -7911,9 +7911,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.1h';
+      node.textContent = 'Current Release - 5.9.10.1i';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1h';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.1i';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8138,7 +8138,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.1h',
+    release:'5.9.10.1i',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
