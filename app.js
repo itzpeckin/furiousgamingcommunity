@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.1c',
+      release:'5.9.10.6.1d',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -8311,9 +8311,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.1c';
+      node.textContent = 'Current Release - 5.9.10.6.1d';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.1c';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.1d';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8877,9 +8877,20 @@ function canonicalPlayerDashboardStats(playerId='') {
     };
   }
 
+  async function freeAgentCaptureStatus(){
+    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community');
+    const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/companion/free-agent-capture`,{
+      credentials:'include',
+      cache:'no-store'
+    });
+    const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
+    if(!response.ok||payload?.ok===false)throw Object.assign(new Error(payload?.detail||payload?.error||'Free Agent capture status failed.'),{payload});
+    return payload;
+  }
+
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.1c',
+    release:'5.9.10.6.1d',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -8909,7 +8920,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     deepInspectHistoricalPlayers:()=>historicalSnapshotRawPlayerDeepInspection(),
     integrateFreeAgentsAndHistoricalRoster:()=>integrateFreeAgentsAndHistoricalRoster(),
     inspectStoredRecordShapes:()=>inspectStoredRecordAndRouteShapes(),
-    discoverFreeAgentRouteAndDecodeHistory:()=>discoverFreeAgentRouteAndDecodeHistory()
+    discoverFreeAgentRouteAndDecodeHistory:()=>discoverFreeAgentRouteAndDecodeHistory(),
+    freeAgentCaptureStatus:()=>freeAgentCaptureStatus()
   };
 
 })();
