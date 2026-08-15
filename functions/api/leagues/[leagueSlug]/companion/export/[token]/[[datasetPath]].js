@@ -13,7 +13,7 @@ import {
   summarizePayloadShape
 } from '../../../../../../_lib/cloud-platform.js';
 
-const RELEASE = '5.9.3.0a';
+const RELEASE = '5.9.10.6.1c';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
 
 function slugOf(context) {
@@ -115,6 +115,18 @@ function parseBody(bytes, contentType) {
     text,
     payload: null,
     shape: { topLevelKeys: [], collections: [] }
+  };
+}
+
+function freeAgentCaptureAssessment(routePath,parsed){
+  if(!/\/freeagents\/roster\/?$/i.test(String(routePath||'')))return null;
+  const list=Array.isArray(parsed?.payload?.rosterInfoList)?parsed.payload.rosterInfoList:[];
+  return{
+    dataset:'free-agents',
+    datasetValid:parsed?.payload?.success!==false && list.length>0,
+    playerCount:list.length,
+    maddenSuccess:parsed?.payload?.success??null,
+    maddenMessage:parsed?.payload?.message||null
   };
 }
 
@@ -319,6 +331,7 @@ export async function onRequest(context) {
         bodyFormat: parsed.bodyFormat,
         parseStatus: parsed.parseStatus,
         payloadShape: parsed.shape,
+        freeAgentAssessment: freeAgentCaptureAssessment(routePath, parsed),
         kvError: String(error?.message || error)
       });
     }
@@ -334,7 +347,8 @@ export async function onRequest(context) {
       contentEncoding,
       bodyFormat: parsed.bodyFormat,
       parseStatus: parsed.parseStatus,
-      payloadShape: parsed.shape
+      payloadShape: parsed.shape,
+      freeAgentAssessment: freeAgentCaptureAssessment(routePath, parsed)
     });
   } catch (error) {
     // Discovery mode must return a useful JSON response instead of a generic uncaught Worker exception.
