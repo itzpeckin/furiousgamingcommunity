@@ -7,9 +7,9 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.10.6.1c';
+const RELEASE = '5.9.10.6.1d';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
-const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
+const FREE_AGENT_ROUTE = /\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const A = Object.freeze({
   id: ['playerId','playerID','id','player_id','rosterId','assetId'],
@@ -126,7 +126,7 @@ async function rosterCaptureSet(db,leagueId){
 async function latestUsableFreeAgentCapture(db,env,leagueId){
   const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,received_at,byte_length
     FROM companion_route_captures
-    WHERE league_id=? AND LOWER(route_path) LIKE '%/freeagents/roster%'
+    WHERE league_id=? AND LOWER(route_path) LIKE '%free%agent%'
     ORDER BY received_at DESC LIMIT 20`).bind(leagueId).all();
 
   const attempts=[];
@@ -226,7 +226,7 @@ export async function onRequestPost(context){
       }catch(error){warnings.push(`${capture.route_path}: ${error?.message||String(error)}`);diagnostics.push({routePath:capture.route_path,sourceTeamId,accepted:false,reason:error?.message||String(error)});}
     }
 
-    // 5.9.10.6.1c: Madden exposes Free Agents as a separate league-level roster.
+    // 5.9.10.6.1d: Madden exposes Free Agents as a separate league-level roster.
     // Only merge a capture when the response is explicitly usable and non-empty.
     const freeAgentSource=await latestUsableFreeAgentCapture(db,context.env,league.id);
     if(freeAgentSource.capture){
