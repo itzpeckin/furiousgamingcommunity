@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.1c';
-const FREE_AGENT_ROUTE=/\/freeagents\/roster\/?$/i;
+const RELEASE='5.9.10.6.1d';
+const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const text=v=>v==null?null:(String(v).trim()||null);
 const int=v=>{const n=Number.parseInt(v,10);return Number.isFinite(n)?n:null};
@@ -56,7 +56,7 @@ async function payloadFor(context,capture){
 async function captures(db,leagueId){
   const result=await db.prepare(`SELECT id,route_path,r2_object_key,received_at,byte_length
     FROM companion_route_captures
-    WHERE league_id=? AND LOWER(route_path) LIKE '%/freeagents/roster%'
+    WHERE league_id=? AND LOWER(route_path) LIKE '%free%agent%'
     ORDER BY received_at DESC LIMIT 20`).bind(leagueId).all();
   return (result.results||[]).filter(row=>FREE_AGENT_ROUTE.test(String(row.route_path||'')));
 }
