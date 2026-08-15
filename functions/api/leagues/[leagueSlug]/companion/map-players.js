@@ -7,8 +7,9 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.3.3b';
+const RELEASE = '5.9.10.6.1c';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
+const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
 const A = Object.freeze({
   id: ['playerId','playerID','id','player_id','rosterId','assetId'],
@@ -121,6 +122,45 @@ async function rosterCaptureSet(db,leagueId){
   chosen.rows.sort((a,b)=>String(a.route_path).localeCompare(String(b.route_path)));
   return {captures:chosen.rows,sessionId:chosen.sessionId,availableRoutes:all.map(r=>r.route_path),sessionDiagnostics:ranked.map(g=>({discoverySessionId:g.sessionId,rosterRouteCount:g.routeCount,latestReceived:g.latestReceived}))};
 }
+
+async function latestUsableFreeAgentCapture(db,env,leagueId){
+  const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,received_at,byte_length
+    FROM companion_route_captures
+    WHERE league_id=? AND LOWER(route_path) LIKE '%/freeagents/roster%'
+    ORDER BY received_at DESC LIMIT 20`).bind(leagueId).all();
+
+  const attempts=[];
+  for(const capture of result.results||[]){
+    if(!FREE_AGENT_ROUTE.test(String(capture.route_path||'')))continue;
+    try{
+      const payload=await parsePayload(env,capture);
+      const collection=chooseCollection(payload);
+      const explicitList=Array.isArray(payload?.rosterInfoList)?payload.rosterInfoList:null;
+      const objects=explicitList||collection?.objects||[];
+      const success=payload?.success!==false && objects.length>0;
+      attempts.push({
+        captureId:capture.capture_id,
+        routePath:capture.route_path,
+        receivedAt:capture.received_at,
+        payloadSuccess:payload?.success??null,
+        recordCount:objects.length,
+        message:text(payload?.message),
+        usable:success
+      });
+      if(success)return{capture,payload,objects,attempts};
+    }catch(error){
+      attempts.push({
+        captureId:capture.capture_id,
+        routePath:capture.route_path,
+        receivedAt:capture.received_at,
+        recordCount:0,
+        usable:false,
+        message:error?.message||String(error)
+      });
+    }
+  }
+  return{capture:null,payload:null,objects:[],attempts};
+}
 function normalizePosition(v){const p=text(v)?.toUpperCase();const map={HB:'RB'};return p?map[p]||p:null;}
 function normalizeDev(v){const s=text(v);if(!s)return null;const n=Number(s);if(Number.isFinite(n)){return ({0:'Normal',1:'Star',2:'Superstar',3:'X-Factor'})[n]||s;}const l=s.toLowerCase().replace(/[_-]/g,' ');if(l.includes('x')&&l.includes('factor'))return 'X-Factor';if(l.includes('superstar'))return 'Superstar';if(l.includes('star'))return 'Star';if(l.includes('normal'))return 'Normal';return s;}
 function heightInches(v){if(v==null)return null;if(Number.isFinite(Number(v)))return int(v);const m=String(v).match(/(\d+)\D+(\d+)/);return m?Number(m[1])*12+Number(m[2]):null;}
@@ -185,18 +225,72 @@ export async function onRequestPost(context){
         }
       }catch(error){warnings.push(`${capture.route_path}: ${error?.message||String(error)}`);diagnostics.push({routePath:capture.route_path,sourceTeamId,accepted:false,reason:error?.message||String(error)});}
     }
+
+    // 5.9.10.6.1c: Madden exposes Free Agents as a separate league-level roster.
+    // Only merge a capture when the response is explicitly usable and non-empty.
+    const freeAgentSource=await latestUsableFreeAgentCapture(db,context.env,league.id);
+    if(freeAgentSource.capture){
+      diagnostics.push({
+        routePath:freeAgentSource.capture.route_path,
+        sourceTeamId:'FA',
+        collectionPath:'$.rosterInfoList',
+        recordCount:freeAgentSource.objects.length,
+        accepted:true,
+        dataset:'free-agents'
+      });
+      for(let i=0;i<freeAgentSource.objects.length;i++){
+        const p=canonical(freeAgentSource.objects[i],i,'FA',validTeams);
+        if(seen.has(p.externalId)){
+          // A currently rostered player wins over the Free Agent source.
+          continue;
+        }
+        seen.add(p.externalId);
+        p.teamExternalId=null;
+        p.sourceTeamId='FA';
+        if(p.externalId.startsWith('generated-player-'))warnings.push(`Generated missing Free Agent player ID for ${p.displayName}.`);
+        if(!p.position)warnings.push(`Missing position for Free Agent ${p.displayName}.`);
+        freeAgents++;
+        players.push(p);
+      }
+    }else{
+      const latestAttempt=freeAgentSource.attempts?.[0]||null;
+      warnings.push(latestAttempt
+        ? `Free Agent roster was captured but is not usable yet: ${latestAttempt.message||'empty rosterInfoList or success=false'}.`
+        : 'No Free Agent roster capture is available yet. Export the Madden Free Agents roster, then rerun the import.');
+      diagnostics.push({
+        routePath:'xbsx/{franchiseId}/freeagents/roster',
+        sourceTeamId:'FA',
+        accepted:false,
+        dataset:'free-agents',
+        reason:latestAttempt?.message||'No successful non-empty Free Agent capture is available.',
+        attempts:freeAgentSource.attempts||[]
+      });
+    }
+
     if(!players.length)return json({ok:false,error:'No canonical players were produced from the captured team rosters.',rosterRouteCount:source.captures.length,rosterDiagnostics:diagnostics},422);
 
     await db.prepare(`UPDATE companion_player_mapping_runs SET status='superseded',updated_at=? WHERE league_id=? AND status='pending-preview'`).bind(new Date().toISOString(),league.id).run();
     const runId=crypto.randomUUID(),now=new Date().toISOString();
     const representative=source.captures[0];
-    const routeSummary=`${source.captures.length} team roster routes (/team/{teamId}/roster)`;
+    const routeSummary=`${source.captures.length} team roster routes + ${freeAgentSource.capture?'1 usable':'0 usable'} Free Agent roster route`;
     await db.prepare(`INSERT INTO companion_player_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,rostered_count,free_agent_count,warning_count,warnings_json,created_at,updated_at) VALUES (?,?,?,?,?,'pending-preview',?,?,?,?,?,?,?)`).bind(runId,league.id,source.sessionId||representative.discovery_session_id,representative.capture_id,routeSummary,players.length,rostered,freeAgents,warnings.length,JSON.stringify(warnings),now,now).run();
 
     const insertSql=`INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,team_external_id,first_name,last_name,display_name,position,archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id,ratings_json,source_record_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
     const statements=players.map(p=>db.prepare(insertSql).bind(runId,league.id,p.externalId,p.teamExternalId,p.firstName,p.lastName,p.displayName,p.position,p.archetype,p.overall,p.developmentTrait,p.age,p.yearsPro,p.jerseyNumber,p.heightInches,p.weightLbs,p.college,p.injuryStatus,p.isInjured?1:0,p.contractYearsRemaining,p.salary,p.capHit,p.portraitId,JSON.stringify(p.ratings),JSON.stringify(p.sourceRecord),now));
     await runBatches(db,statements);
     const run=await latestRun(db,league.id);
-    return json(response(run,await preview(db,league.id,run.id),slug,league.id,{rosterRouteCount:source.captures.length,expectedTeamCount:validTeams.size,rosterDiagnostics:diagnostics,sessionDiagnostics:source.sessionDiagnostics}));
+    return json(response(run,await preview(db,league.id,run.id),slug,league.id,{
+      rosterRouteCount:source.captures.length,
+      expectedTeamCount:validTeams.size,
+      freeAgentCapture:{
+        usable:Boolean(freeAgentSource.capture),
+        captureId:freeAgentSource.capture?.capture_id||null,
+        routePath:freeAgentSource.capture?.route_path||'xbsx/{franchiseId}/freeagents/roster',
+        recordCount:freeAgentSource.objects?.length||0,
+        attempts:freeAgentSource.attempts||[]
+      },
+      rosterDiagnostics:diagnostics,
+      sessionDiagnostics:source.sessionDiagnostics
+    }));
   }catch(error){return json({ok:false,error:'Player roster aggregation failed.',detail:error?.message||String(error),release:RELEASE},500);}
 }
