@@ -2,9 +2,10 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.2g';
+  const VERSION = '5.9.10.6.2i';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
+    ['storage-preflight','Prepare Import Storage'],
     ['map-teams','Map Teams'],
     ['map-players','Map Players'],
     ['map-schedule','Map Schedule'],
@@ -252,6 +253,13 @@
       if (!discovery) throw new Error('Route Discovery service is unavailable.');
       if (!Number(discovery.routeCount||0)) throw new Error('No Madden Companion captures are available to import.');
       setStage('discover','complete',`${discovery.routeCount} captured routes discovered`);
+
+      setStage('storage-preflight','running','Reclaiming disposable Madden import staging data…');
+      const storage=await api(`${base()}storage-preflight`,'POST',{});
+      const reclaimed=storage.reclaimed||{};
+      const reclaimedRows=Object.values(reclaimed).reduce((sum,value)=>sum+Number(value||0),0);
+      setStage('storage-preflight','complete',`${reclaimedRows} obsolete D1 row(s) reclaimed`);
+      await report('storage-preflight',true,{summary:`${reclaimedRows} obsolete D1 row(s) reclaimed`}).catch(()=>{});
 
       const start=await orchestrator('POST',{action:'start'});
       run=start.run;
