@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.2j';
+  const VERSION = '5.9.10.6.3';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -14,6 +14,7 @@
     ['validate-snapshot','Validate Snapshot'],
     ['activate-snapshot','Activate Snapshot'],
     ['detect-transactions','Detect Roster Movements'],
+    ['classify-transactions','Classify Transactions'],
     ['verify-active-snapshot','Verify Live Snapshot']
   ];
 
@@ -49,6 +50,7 @@
 
   const orchestrator = (method='GET', body) => api(`${base()}import-orchestrator`, method, body);
   const forwardDetection = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/forward-detection`, method, body);
+  const transactionClassification = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/classification`, method, body);
 
   function setStage(id, state, detail='') {
     stageState[id] = {state, detail, at:new Date().toISOString()};
@@ -222,6 +224,25 @@
     }
   }
 
+  async function classifyTransactions() {
+    const stage='classify-transactions';
+    setStage(stage,'running','Classifying roster movement evidence…');
+    try {
+      const payload=await transactionClassification('POST',{action:'classify'});
+      const s=payload.summary||{};
+      const summary=payload.baseline
+        ? 'Baseline · no classification required'
+        : `${payload.classifiedCount||0} classified · ${s.teamChanges||0} team change(s) · ${s.rosterEntries||0} entries · ${s.rosterExits||0} exits`;
+      setStage(stage,'complete',summary);
+      await report(stage,true,{summary,snapshotId});
+      return payload;
+    } catch(error) {
+      setStage(stage,'failed',error.message);
+      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
+      throw error;
+    }
+  }
+
   async function verify() {
     const stage='verify-active-snapshot';
     setStage(stage,'running','Verifying active snapshot…');
@@ -271,6 +292,7 @@
       await lifecycle('validate-snapshot','validate');
       await lifecycle('activate-snapshot','activate');
       await detectTransactions();
+      await classifyTransactions();
       await verify();
       progress=`Import complete · ${snapshotId} is LIVE`;
       try { window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,runId:run?.id}})); } catch (_) {}
