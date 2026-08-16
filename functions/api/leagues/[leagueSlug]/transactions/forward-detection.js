@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.2c',DEFAULT_OWNER_ACCOUNT_ID='owner-tb',DEFAULT_BATCH=250;
+const RELEASE='5.9.10.6.2d',DEFAULT_OWNER_ACCOUNT_ID='owner-tb',DEFAULT_BATCH=250;
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 const text=v=>v==null?null:(String(v).trim()||null);
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
