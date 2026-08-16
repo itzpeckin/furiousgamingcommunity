@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE = '5.9.4.2jg';
+const RELEASE = '5.9.10.6.2h';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -130,17 +130,33 @@ async function activeSnapshot(db, leagueId) {
   `).bind(leagueId).first();
 }
 
-async function domainRows(db, leagueId, snapshotId, domain) {
-  const result = await rows(db, `
-    SELECT external_id, data_json
-    FROM league_snapshot_records
-    WHERE league_id = ? AND snapshot_id = ? AND domain = ?
-    ORDER BY external_id
-  `, leagueId, snapshotId, domain);
-  return result.map(row => normalize(domain, parse(row.data_json) || {}));
+async function domainRows(db, leagueId, snapshotId, domain, cursor = null, limit = 150) {
+  const safeLimit = Math.max(25, Math.min(500, Number(limit) || 150));
+  let result;
+  if (cursor) {
+    result = await rows(db, `
+      SELECT external_id, data_json
+      FROM league_snapshot_records
+      WHERE league_id = ? AND snapshot_id = ? AND domain = ? AND external_id > ?
+      ORDER BY external_id
+      LIMIT ?
+    `, leagueId, snapshotId, domain, String(cursor), safeLimit);
+  } else {
+    result = await rows(db, `
+      SELECT external_id, data_json
+      FROM league_snapshot_records
+      WHERE league_id = ? AND snapshot_id = ? AND domain = ?
+      ORDER BY external_id
+      LIMIT ?
+    `, leagueId, snapshotId, domain, safeLimit);
+  }
+  const records = result.map(row => normalize(domain, parse(row.data_json) || {}));
+  const nextCursor = result.length === safeLimit ? String(result[result.length - 1]?.external_id || '') : null;
+  return {records, nextCursor, complete: !nextCursor, pageSize: safeLimit};
 }
 
 export async function onRequestGet(context) {
+  try {
   const slug = normalizeLeagueSlug(context);
   if (!validLeagueSlug(slug)) return json({ok:false,error:'Invalid league slug.'},400);
 
@@ -191,13 +207,24 @@ export async function onRequestGet(context) {
   };
 
   if (ALLOWED_DOMAINS.has(domain)) {
-    return json({...base,domain,records:await domainRows(db,league.id,active.id,domain)});
+    const cursor = String(url.searchParams.get('cursor') || '').trim() || null;
+    const limit = Number(url.searchParams.get('limit') || 150);
+    const page = await domainRows(db,league.id,active.id,domain,cursor,limit);
+    return json({...base,domain,...page});
   }
 
   if (ALLOWED_DOMAINS.has(sample)) {
-    const records = await domainRows(db,league.id,active.id,sample);
-    return json({...base,sample:{domain:sample,record:records[0] || null}});
+    const page = await domainRows(db,league.id,active.id,sample,null,1);
+    return json({...base,sample:{domain:sample,record:page.records[0] || null}});
   }
 
   return json(base);
+  } catch (error) {
+    return json({
+      ok:false,
+      release:RELEASE,
+      error:'Live snapshot read failed.',
+      detail:error?.message||String(error)
+    },500);
+  }
 }
