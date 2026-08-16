@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.2c';
+  const VERSION = '5.9.10.6.2d';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['map-teams','Map Teams'],
