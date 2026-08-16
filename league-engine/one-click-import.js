@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.2e';
+  const VERSION = '5.9.10.6.2f';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['map-teams','Map Teams'],
@@ -157,7 +157,7 @@
           progress=`Snapshot validation · ${phase} ${total?`${Math.min(offset,total)}/${total}`:'processing'}`;
           stageState[stage]={state:'running',detail:progress};
           rerender();
-          payload=await api(`${base()}snapshot-lifecycle`,'POST',{action:'validate-next',snapshotId,limit:100});
+          payload=await api(`${base()}snapshot-lifecycle`,'POST',{action:'validate-next',snapshotId,limit:75});
           guard++;
         }
         if (guard>=500) throw new Error('Snapshot validation stopped after 500 batches.');
@@ -205,7 +205,7 @@
         progress=`Roster comparison ${compared}/${total||'?'} · ${job.movementCount||0} movement(s)`;
         stageState[stage]={state:'running',detail:progress};
         rerender();
-        payload=await forwardDetection('POST',{action:'next',limit:100});
+        payload=await forwardDetection('POST',{action:'next',limit:75});
         guard++;
       }
       if (guard>=100) throw new Error('Forward transaction detection stopped after 100 batches.');
