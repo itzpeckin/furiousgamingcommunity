@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.2a';
+  const VERSION = '5.9.10.6.2b';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['map-teams','Map Teams'],
@@ -141,13 +141,33 @@
   }
 
   async function lifecycle(stage, action) {
-    setStage(stage,'running',`${action==='validate'?'Validating':'Activating'} snapshot…`);
+    setStage(stage,'running',`${action==='validate'?'Starting batched validation':'Activating'} snapshot…`);
     try {
       if (!snapshotId) throw new Error('No new Snapshot ID is available.');
-      const payload=await api(`${base()}snapshot-lifecycle`,'POST',{action,snapshotId});
+
+      let payload;
+      if (action==='validate') {
+        payload=await api(`${base()}snapshot-lifecycle`,'POST',{action:'validate-start',snapshotId});
+        let guard=0;
+        while (!payload.complete && guard < 500) {
+          const job=payload.validationJob||{};
+          const phase=job.phase||'validation';
+          const offset=Number(job.phaseOffset||0);
+          const total=Number(job.phaseTotal||0);
+          progress=`Snapshot validation · ${phase} ${total?`${Math.min(offset,total)}/${total}`:'processing'}`;
+          stageState[stage]={state:'running',detail:progress};
+          rerender();
+          payload=await api(`${base()}snapshot-lifecycle`,'POST',{action:'validate-next',snapshotId,limit:250});
+          guard++;
+        }
+        if (guard>=500) throw new Error('Snapshot validation stopped after 500 batches.');
+      } else {
+        payload=await api(`${base()}snapshot-lifecycle`,'POST',{action,snapshotId});
+      }
+
       const record=(payload.snapshots||[]).find(s=>String(s.snapshotId)===String(snapshotId));
       if (action==='validate' && record?.validationStatus && record.validationStatus!=='ready') {
-        throw Object.assign(new Error(`Snapshot validation returned ${record.validationStatus}.`),{payload:record.validationReport||record});
+        throw Object.assign(new Error(`Snapshot validation returned ${record.validationStatus}.`),{payload:record.validationReport||payload.report||record});
       }
       if (action==='activate' && payload.activeSnapshotId && String(payload.activeSnapshotId)!==String(snapshotId)) {
         throw new Error('Snapshot activation did not move the live pointer to the new snapshot.');
