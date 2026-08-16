@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.3';
+  const VERSION = '5.9.10.6.3P.1';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -24,6 +24,58 @@
   let lastError = null;
   let progress = '';
   let snapshotId = null;
+  let importStartedAt = null;
+  let importCompletedAt = null;
+  let stageTimings = {};
+  let currentStageStartedAt = {};
+
+  const nowMs = () => (window.performance?.now?.() ?? Date.now());
+  const isoNow = () => new Date().toISOString();
+
+  function timingStart(stage) {
+    currentStageStartedAt[stage] = {ms:nowMs(), at:isoNow()};
+    stageTimings[stage] = {
+      ...(stageTimings[stage] || {}),
+      stage,
+      startedAt: currentStageStartedAt[stage].at,
+      completedAt: null,
+      durationMs: null,
+      durationSeconds: null,
+      state:'running'
+    };
+  }
+
+  function timingFinish(stage,state='complete') {
+    const start=currentStageStartedAt[stage];
+    if(!start)return;
+    const duration=Math.max(0,Math.round(nowMs()-start.ms));
+    stageTimings[stage]={
+      ...(stageTimings[stage]||{}),
+      completedAt:isoNow(),
+      durationMs:duration,
+      durationSeconds:Number((duration/1000).toFixed(2)),
+      state
+    };
+    delete currentStageStartedAt[stage];
+  }
+
+  function timingSummary() {
+    const rows=STAGES.map(([id])=>stageTimings[id]).filter(Boolean);
+    const totalMs=rows.reduce((sum,row)=>sum+Number(row.durationMs||0),0);
+    const wallMs=importStartedAt
+      ? Math.max(0,Math.round((importCompletedAt?.ms ?? nowMs())-importStartedAt.ms))
+      : 0;
+    return {
+      release:VERSION,
+      startedAt:importStartedAt?.at||null,
+      completedAt:importCompletedAt?.at||null,
+      totalStageDurationMs:totalMs,
+      totalStageDurationSeconds:Number((totalMs/1000).toFixed(2)),
+      wallClockDurationMs:wallMs,
+      wallClockDurationSeconds:Number((wallMs/1000).toFixed(2)),
+      stages:rows
+    };
+  }
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const account = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
@@ -53,6 +105,9 @@
   const transactionClassification = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/classification`, method, body);
 
   function setStage(id, state, detail='') {
+    const previous=stageState[id]?.state;
+    if(state==='running' && previous!=='running')timingStart(id);
+    if((state==='complete'||state==='failed') && previous==='running')timingFinish(id,state);
     stageState[id] = {state, detail, at:new Date().toISOString()};
     rerender();
   }
@@ -267,7 +322,10 @@
 
   async function runImport() {
     if (busy) return;
-    busy=true; lastError=null; progress='Preparing import…'; snapshotId=null; stageState={}; rerender();
+    busy=true; lastError=null; progress='Preparing import…'; snapshotId=null; stageState={};
+    stageTimings={}; currentStageStartedAt={};
+    importStartedAt={ms:nowMs(),at:isoNow()}; importCompletedAt=null;
+    rerender();
     try {
       setStage('discover','running','Refreshing Companion capture discovery…');
       const discovery=await HQ?.leagueCompanionRouteDiscovery?.refresh?.();
@@ -301,7 +359,18 @@
       progress='Import stopped safely. The previous LIVE snapshot was not replaced unless activation had already completed.';
       console.error('[One-Click Import]',error.payload||error);
     } finally {
-      busy=false; rerender();
+      importCompletedAt={ms:nowMs(),at:isoNow()};
+      busy=false;
+      window.__FHQ_IMPORT_TIMING__=timingSummary();
+      console.table(window.__FHQ_IMPORT_TIMING__.stages.map(row=>({
+        stage:row.stage,
+        state:row.state,
+        seconds:row.durationSeconds,
+        startedAt:row.startedAt,
+        completedAt:row.completedAt
+      })));
+      console.info('[One-Click Import Timing]',window.__FHQ_IMPORT_TIMING__);
+      rerender();
     }
   }
 
@@ -314,6 +383,7 @@
       <div style="display:grid;gap:8px;margin:14px 0">${STAGES.map(([id,label])=>`<div style="display:grid;grid-template-columns:28px minmax(180px,.7fr) 1fr;gap:10px;align-items:center;padding:9px 10px;border:1px solid rgba(127,127,127,.14);border-radius:10px"><span class="pill pill--${stageClass(id)}" style="justify-content:center;min-width:26px">${stageIcon(id)}</span><strong>${esc(label)}</strong><small>${esc(stageState[id]?.detail||'Pending')}</small></div>`).join('')}</div>
       <div class="league-import-framework-actions"><button class="button button--primary" data-run-one-click-import ${busy?'disabled':''}>${busy?'Importing Madden Data…':'Import Latest Madden Data'}</button></div>
       ${progress?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>${esc(progress)}</span></div>`:''}
+      ${importStartedAt?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>Import timing: ${esc(timingSummary().wallClockDurationSeconds)}s ${importCompletedAt?'total':'elapsed'}</span></div>`:''}
       ${snapshotId?`<p class="league-import-status-note"><strong>New Snapshot:</strong> ${esc(snapshotId)}</p>`:''}
       ${lastError?`<div class="validation-errors"><p><strong>${esc(lastError.message)}</strong></p>${lastError.payload?`<pre style="white-space:pre-wrap;max-height:260px;overflow:auto">${esc(JSON.stringify(lastError.payload,null,2))}</pre>`:''}</div>`:''}
       <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>Fail-safe behavior: the existing LIVE snapshot remains authoritative until the new snapshot passes validation and activation succeeds.</span></div>
@@ -334,4 +404,20 @@
   function diagnostics(){return Object.freeze({service:'oneClickImport',version:VERSION,busy,runId:run?.id||null,snapshotId,stageState:{...stageState},lastError:lastError?.message||null});}
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
   HQ.defineModuleService('platform','oneClickImport',{runImport,renderPanel,diagnostics},{replace:true,alias:'oneClickImport'});
+
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.importTiming={
+    release:VERSION,
+    current:()=>timingSummary(),
+    last:()=>window.__FHQ_IMPORT_TIMING__||null,
+    reset:()=>{
+      stageTimings={};
+      currentStageStartedAt={};
+      importStartedAt=null;
+      importCompletedAt=null;
+      window.__FHQ_IMPORT_TIMING__=null;
+      return true;
+    }
+  };
+
 })();
