@@ -13,7 +13,7 @@ import {
   summarizePayloadShape
 } from '../../../../../../_lib/cloud-platform.js';
 
-const RELEASE = '5.9.10.6.1d';
+const RELEASE = '5.9.10.6.2';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
 
 function slugOf(context) {
