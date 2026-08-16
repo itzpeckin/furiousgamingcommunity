@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.2';
+const RELEASE='5.9.10.6.2a';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const text=v=>v==null?null:(String(v).trim()||null);
