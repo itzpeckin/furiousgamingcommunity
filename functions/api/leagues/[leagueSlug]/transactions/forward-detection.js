@@ -1,80 +1,198 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
+import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.2';
-
-async function tableExists(db,name){
-  const row=await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).bind(name).first();
-  return Boolean(row);
-}
-
+const RELEASE='5.9.10.6.2a',DEFAULT_OWNER_ACCOUNT_ID='owner-tb',DEFAULT_BATCH=250;
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
+const text=v=>v==null?null:(String(v).trim()||null);
+const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 
-export async function onRequestGet(context){
-  const slug=normalizeLeagueSlug(context);
-  if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.',release:RELEASE},400);
-  const db=database(context.env),league=db?await resolveLeague(context.env,slug):null;
-  if(!db||!league)return json({ok:false,error:'League not found.',release:RELEASE},404);
-
-  if(!(await tableExists(db,'forward_detection_runs'))){
-    return json({
-      ok:true,release:RELEASE,state:'not-initialized',
-      baselineEstablished:false,runCount:0,movementCount:0,runs:[],movements:[]
-    });
+async function requirePlatformOwner(context){
+  const auth=await requireCommissioner(context);if(!auth.authorized)return auth;
+  const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();
+  if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};
+  return auth;
+}
+async function state(context,write=false){
+  const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return{response:json({ok:false,error:'Invalid league slug.',release:RELEASE},400)};
+  if(write){const auth=await requirePlatformOwner(context);if(!auth.authorized)return{response:auth.response};}
+  const db=database(context.env),league=await resolveLeague(context.env,slug);
+  if(!db||!league)return{response:json({ok:false,error:'League not found.',release:RELEASE},404)};
+  if(write)await ensureSchema(db);
+  return{db,league,slug};
+}
+async function ensureSchema(db){
+  const sqls=[
+    `CREATE TABLE IF NOT EXISTS forward_roster_movements (
+      id TEXT PRIMARY KEY, league_id TEXT NOT NULL, previous_snapshot_id TEXT NOT NULL,
+      current_snapshot_id TEXT NOT NULL, player_id TEXT NOT NULL, player_name TEXT,
+      previous_team_id TEXT, current_team_id TEXT, previous_roster_status TEXT,
+      current_roster_status TEXT, position TEXT, detection_type TEXT NOT NULL,
+      season INTEGER, week INTEGER, evidence_json TEXT NOT NULL DEFAULT '{}',
+      detected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (league_id,previous_snapshot_id,current_snapshot_id,player_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_forward_roster_movements_pair ON forward_roster_movements (league_id,previous_snapshot_id,current_snapshot_id)`,
+    `CREATE TABLE IF NOT EXISTS forward_detection_jobs (
+      id TEXT PRIMARY KEY, league_id TEXT NOT NULL, previous_snapshot_id TEXT,
+      current_snapshot_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'running',
+      phase TEXT NOT NULL DEFAULT 'current', current_offset INTEGER NOT NULL DEFAULT 0,
+      exit_offset INTEGER NOT NULL DEFAULT 0, current_total INTEGER NOT NULL DEFAULT 0,
+      exit_total INTEGER NOT NULL DEFAULT 0, compared_count INTEGER NOT NULL DEFAULT 0,
+      movement_count INTEGER NOT NULL DEFAULT 0, team_change_count INTEGER NOT NULL DEFAULT 0,
+      roster_entry_count INTEGER NOT NULL DEFAULT 0, roster_exit_count INTEGER NOT NULL DEFAULT 0,
+      status_change_count INTEGER NOT NULL DEFAULT 0, error_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT, UNIQUE (league_id,current_snapshot_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_forward_detection_jobs_league ON forward_detection_jobs (league_id,created_at DESC)`
+  ];
+  for(const sql of sqls)await db.prepare(sql).run();
+}
+function canonicalState(externalId,dataJson){
+  const data=parse(dataJson)||{},source=parse(data.source_record_json)||{};
+  const id=text(data.external_id??data.playerId??data.player_id??externalId??source.rosterId??source.playerId??source.id);if(!id)return null;
+  const first=text(data.first_name??data.firstName??source.firstName??source.first_name)||'';
+  const last=text(data.last_name??data.lastName??source.lastName??source.last_name)||'';
+  return{
+    playerId:id,
+    playerName:text(data.display_name??data.displayName??data.player_name??data.playerName??source.displayName??source.fullName??source.playerName)||`${first} ${last}`.trim()||id,
+    teamId:text(data.team_external_id??data.teamId??data.team_id??source.teamExternalId??source.team_external_id??source.teamId??source.team_id??source.rosterTeamId),
+    rosterStatus:text(data.roster_status??data.status??source.rosterStatus??source.roster_status??source.status),
+    position:text(data.position??source.position??source.positionName??source.pos)
+  };
+}
+function movementType(before,after){
+  if(before&&after){
+    if(String(before.teamId||'')!==String(after.teamId||''))return'team-change';
+    if(String(before.rosterStatus||'')!==String(after.rosterStatus||''))return'roster-status-change';
+    return null;
   }
-
-  const runResult=await db.prepare(`SELECT * FROM forward_detection_runs
-    WHERE league_id=? ORDER BY created_at DESC LIMIT 20`).bind(league.id).all();
-
-  const moveResult=await db.prepare(`SELECT * FROM forward_roster_movements
-    WHERE league_id=? ORDER BY detected_at DESC LIMIT 100`).bind(league.id).all();
-
-  const runs=(runResult.results||[]).map(row=>({
-    runId:row.id,
-    previousSnapshotId:row.previous_snapshot_id||null,
-    currentSnapshotId:row.current_snapshot_id,
-    status:row.status,
-    previousPlayerCount:Number(row.previous_player_count||0),
-    currentPlayerCount:Number(row.current_player_count||0),
-    movementCount:Number(row.movement_count||0),
-    teamChanges:Number(row.team_change_count||0),
-    rosterEntries:Number(row.roster_entry_count||0),
-    rosterExits:Number(row.roster_exit_count||0),
-    statusChanges:Number(row.status_change_count||0),
-    note:row.note||null,
-    createdAt:row.created_at
-  }));
-
-  const movements=(moveResult.results||[]).map(row=>({
-    id:row.id,
-    previousSnapshotId:row.previous_snapshot_id,
-    currentSnapshotId:row.current_snapshot_id,
-    playerId:row.player_id,
-    playerName:row.player_name,
-    previousTeamId:row.previous_team_id||null,
-    currentTeamId:row.current_team_id||null,
-    previousRosterStatus:row.previous_roster_status||null,
-    currentRosterStatus:row.current_roster_status||null,
-    position:row.position||null,
-    detectionType:row.detection_type,
-    season:row.season==null?null:Number(row.season),
-    week:row.week==null?null:Number(row.week),
-    evidence:parse(row.evidence_json)||{},
-    detectedAt:row.detected_at
-  }));
-
-  return json({
-    ok:true,
-    release:RELEASE,
-    state:runs.length?'active':'initialized',
-    baselineEstablished:runs.some(run=>run.status==='baseline')||runs.length>0,
-    runCount:runs.length,
-    movementCount:movements.length,
-    latestRun:runs[0]||null,
-    runs,
-    movements,
-    deferred:{
-      freeAgentAcquisition:true,
-      note:'Roster entry/exit is captured as movement evidence but is not classified as Signing/Release until authoritative Free Agent acquisition is available.'
-    }
-  });
+  if(!before&&after)return'roster-entry';
+  if(before&&!after)return'roster-exit';
+  return null;
+}
+async function activePair(db,leagueId){
+  const active=await db.prepare(`SELECT snapshot_id,previous_snapshot_id FROM league_active_snapshots WHERE league_id=?`).bind(leagueId).first();
+  if(!active?.snapshot_id)return null;
+  const current=await db.prepare(`SELECT * FROM league_snapshots WHERE id=? AND league_id=?`).bind(active.snapshot_id,leagueId).first();
+  const previous=active.previous_snapshot_id?await db.prepare(`SELECT * FROM league_snapshots WHERE id=? AND league_id=?`).bind(active.previous_snapshot_id,leagueId).first():null;
+  return{active,current,previous};
+}
+async function counts(db,leagueId,previousId,currentId){
+  const current=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE league_id=? AND snapshot_id=? AND domain='players'`).bind(leagueId,currentId).first())?.count||0);
+  if(!previousId)return{current,previous:0,exits:0};
+  const previous=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE league_id=? AND snapshot_id=? AND domain='players'`).bind(leagueId,previousId).first())?.count||0);
+  const exits=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records p LEFT JOIN league_snapshot_records c ON c.league_id=p.league_id AND c.snapshot_id=? AND c.domain='players' AND c.external_id=p.external_id WHERE p.league_id=? AND p.snapshot_id=? AND p.domain='players' AND c.external_id IS NULL`).bind(currentId,leagueId,previousId).first())?.count||0);
+  return{current,previous,exits};
+}
+async function getJob(db,leagueId,currentId){return db.prepare(`SELECT * FROM forward_detection_jobs WHERE league_id=? AND current_snapshot_id=?`).bind(leagueId,currentId).first();}
+function publicJob(j){if(!j)return null;return{jobId:j.id,status:j.status,phase:j.phase,previousSnapshotId:j.previous_snapshot_id||null,currentSnapshotId:j.current_snapshot_id,currentOffset:Number(j.current_offset||0),exitOffset:Number(j.exit_offset||0),currentTotal:Number(j.current_total||0),exitTotal:Number(j.exit_total||0),comparedCount:Number(j.compared_count||0),movementCount:Number(j.movement_count||0),teamChanges:Number(j.team_change_count||0),rosterEntries:Number(j.roster_entry_count||0),rosterExits:Number(j.roster_exit_count||0),statusChanges:Number(j.status_change_count||0),error:parse(j.error_json),createdAt:j.created_at,updatedAt:j.updated_at,completedAt:j.completed_at||null};}
+async function refreshAggregates(db,job){
+  const r=await db.prepare(`SELECT COUNT(*) total,
+    SUM(CASE WHEN detection_type='team-change' THEN 1 ELSE 0 END) team_changes,
+    SUM(CASE WHEN detection_type='roster-entry' THEN 1 ELSE 0 END) roster_entries,
+    SUM(CASE WHEN detection_type='roster-exit' THEN 1 ELSE 0 END) roster_exits,
+    SUM(CASE WHEN detection_type='roster-status-change' THEN 1 ELSE 0 END) status_changes
+    FROM forward_roster_movements WHERE league_id=? AND previous_snapshot_id=? AND current_snapshot_id=?`)
+    .bind(job.league_id,job.previous_snapshot_id,job.current_snapshot_id).first();
+  await db.prepare(`UPDATE forward_detection_jobs SET movement_count=?,team_change_count=?,roster_entry_count=?,roster_exit_count=?,status_change_count=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .bind(Number(r?.total||0),Number(r?.team_changes||0),Number(r?.roster_entries||0),Number(r?.roster_exits||0),Number(r?.status_changes||0),job.id).run();
+}
+async function storeMove(db,job,before,after,type,currentSnapshot){
+  const p=after||before;if(!p||!type)return;
+  await db.prepare(`INSERT INTO forward_roster_movements
+    (id,league_id,previous_snapshot_id,current_snapshot_id,player_id,player_name,previous_team_id,current_team_id,previous_roster_status,current_roster_status,position,detection_type,season,week,evidence_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(league_id,previous_snapshot_id,current_snapshot_id,player_id) DO UPDATE SET
+      player_name=excluded.player_name,previous_team_id=excluded.previous_team_id,current_team_id=excluded.current_team_id,
+      previous_roster_status=excluded.previous_roster_status,current_roster_status=excluded.current_roster_status,
+      position=excluded.position,detection_type=excluded.detection_type,season=excluded.season,week=excluded.week,evidence_json=excluded.evidence_json`)
+    .bind(crypto.randomUUID(),job.league_id,job.previous_snapshot_id,job.current_snapshot_id,p.playerId,p.playerName,
+      before?.teamId||null,after?.teamId||null,before?.rosterStatus||null,after?.rosterStatus||null,p.position||null,
+      type,currentSnapshot?.season_year??null,currentSnapshot?.week_index??null,
+      JSON.stringify({source:'snapshot-diff',previousSnapshotId:job.previous_snapshot_id,currentSnapshotId:job.current_snapshot_id,playerId:p.playerId,fromTeamId:before?.teamId||null,toTeamId:after?.teamId||null,previousRosterStatus:before?.rosterStatus||null,currentRosterStatus:after?.rosterStatus||null}))
+    .run();
+}
+async function startJob(s){
+  const pair=await activePair(s.db,s.league.id);if(!pair?.current)return json({ok:false,error:'No active snapshot is available.',release:RELEASE},422);
+  const currentId=String(pair.current.id),previousId=pair.previous?.id?String(pair.previous.id):null;
+  let job=await getJob(s.db,s.league.id,currentId);
+  if(job?.status==='complete'||job?.status==='baseline')return json({ok:true,release:RELEASE,action:'start',complete:true,job:publicJob(job)});
+  const c=await counts(s.db,s.league.id,previousId,currentId);
+  if(!previousId){
+    if(!job){await s.db.prepare(`INSERT INTO forward_detection_jobs (id,league_id,previous_snapshot_id,current_snapshot_id,status,phase,current_total,compared_count,completed_at) VALUES (?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(crypto.randomUUID(),s.league.id,null,currentId,'baseline','complete',c.current,c.current).run();}
+    else await s.db.prepare(`UPDATE forward_detection_jobs SET status='baseline',phase='complete',current_total=?,compared_count=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(c.current,c.current,job.id).run();
+    job=await getJob(s.db,s.league.id,currentId);
+    return json({ok:true,release:RELEASE,action:'start',complete:true,baselineEstablished:true,job:publicJob(job)});
+  }
+  if(!job){
+    await s.db.prepare(`INSERT INTO forward_detection_jobs (id,league_id,previous_snapshot_id,current_snapshot_id,status,phase,current_total,exit_total) VALUES (?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(),s.league.id,previousId,currentId,'running','current',c.current,c.exits).run();
+  }else{
+    await s.db.prepare(`UPDATE forward_detection_jobs SET previous_snapshot_id=?,status='running',phase=CASE WHEN phase='complete' THEN 'current' ELSE phase END,current_total=?,exit_total=?,error_json=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(previousId,c.current,c.exits,job.id).run();
+  }
+  job=await getJob(s.db,s.league.id,currentId);
+  return json({ok:true,release:RELEASE,action:'start',complete:false,job:publicJob(job)});
+}
+async function processCurrent(s,job,limit,currentSnapshot){
+  const result=await s.db.prepare(`SELECT c.external_id current_external_id,c.data_json current_data_json,p.external_id previous_external_id,p.data_json previous_data_json
+    FROM league_snapshot_records c LEFT JOIN league_snapshot_records p
+      ON p.league_id=c.league_id AND p.snapshot_id=? AND p.domain='players' AND p.external_id=c.external_id
+    WHERE c.league_id=? AND c.snapshot_id=? AND c.domain='players'
+    ORDER BY c.external_id LIMIT ? OFFSET ?`).bind(job.previous_snapshot_id,job.league_id,job.current_snapshot_id,limit,Number(job.current_offset||0)).all();
+  const rows=result.results||[];
+  for(const row of rows){
+    const after=canonicalState(row.current_external_id,row.current_data_json),before=row.previous_external_id?canonicalState(row.previous_external_id,row.previous_data_json):null;
+    const type=movementType(before,after);if(type)await storeMove(s.db,job,before,after,type,currentSnapshot);
+  }
+  const next=Number(job.current_offset||0)+rows.length;
+  const phase=next>=Number(job.current_total||0)?'exits':'current';
+  await s.db.prepare(`UPDATE forward_detection_jobs SET current_offset=?,compared_count=compared_count+?,phase=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(next,rows.length,phase,job.id).run();
+}
+async function processExits(s,job,limit,currentSnapshot){
+  const result=await s.db.prepare(`SELECT p.external_id previous_external_id,p.data_json previous_data_json
+    FROM league_snapshot_records p LEFT JOIN league_snapshot_records c
+      ON c.league_id=p.league_id AND c.snapshot_id=? AND c.domain='players' AND c.external_id=p.external_id
+    WHERE p.league_id=? AND p.snapshot_id=? AND p.domain='players' AND c.external_id IS NULL
+    ORDER BY p.external_id LIMIT ? OFFSET ?`).bind(job.current_snapshot_id,job.league_id,job.previous_snapshot_id,limit,Number(job.exit_offset||0)).all();
+  const rows=result.results||[];
+  for(const row of rows){const before=canonicalState(row.previous_external_id,row.previous_data_json);if(before)await storeMove(s.db,job,before,null,'roster-exit',currentSnapshot);}
+  const next=Number(job.exit_offset||0)+rows.length;
+  const done=next>=Number(job.exit_total||0);
+  await s.db.prepare(`UPDATE forward_detection_jobs SET exit_offset=?,compared_count=compared_count+?,phase=?,status=?,completed_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .bind(next,rows.length,done?'complete':'exits',done?'complete':'running',done?new Date().toISOString():null,job.id).run();
+}
+async function nextBatch(s,body){
+  const pair=await activePair(s.db,s.league.id);if(!pair?.current)return json({ok:false,error:'No active snapshot.',release:RELEASE},422);
+  let job=await getJob(s.db,s.league.id,String(pair.current.id));if(!job)return startJob(s);
+  if(['complete','baseline'].includes(job.status))return json({ok:true,release:RELEASE,action:'next',complete:true,job:publicJob(job)});
+  const limit=Math.max(50,Math.min(300,Number(body.limit)||DEFAULT_BATCH));
+  try{
+    if(job.phase==='current')await processCurrent(s,job,limit,pair.current);
+    job=await getJob(s.db,s.league.id,String(pair.current.id));
+    if(job.phase==='exits'&&Number(job.current_offset||0)>=Number(job.current_total||0))await processExits(s,job,limit,pair.current);
+    job=await getJob(s.db,s.league.id,String(pair.current.id));
+    await refreshAggregates(s.db,job);job=await getJob(s.db,s.league.id,String(pair.current.id));
+    return json({ok:true,release:RELEASE,action:'next',complete:['complete','baseline'].includes(job.status),job:publicJob(job)});
+  }catch(error){
+    await s.db.prepare(`UPDATE forward_detection_jobs SET status='failed',error_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(JSON.stringify({message:error?.message||String(error)}),job.id).run();
+    return json({ok:false,release:RELEASE,error:'Forward transaction batch failed.',detail:error?.message||String(error),job:publicJob(await getJob(s.db,s.league.id,String(pair.current.id)))},500);
+  }
+}
+export async function onRequestGet(context){
+  const s=await state(context,false);if(s.response)return s.response;
+  const exists=await s.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='forward_detection_jobs'`).first();
+  if(!exists)return json({ok:true,release:RELEASE,state:'not-initialized',latestRun:null,runs:[],movements:[],deferred:{freeAgentAcquisition:true}});
+  const jobs=(await s.db.prepare(`SELECT * FROM forward_detection_jobs WHERE league_id=? ORDER BY created_at DESC LIMIT 20`).bind(s.league.id).all()).results||[];
+  let movements=[];
+  const moveExists=await s.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='forward_roster_movements'`).first();
+  if(moveExists)movements=(await s.db.prepare(`SELECT * FROM forward_roster_movements WHERE league_id=? ORDER BY detected_at DESC LIMIT 100`).bind(s.league.id).all()).results||[];
+  return json({ok:true,release:RELEASE,state:jobs.length?'active':'initialized',latestRun:publicJob(jobs[0]),runs:jobs.map(publicJob),movements:movements.map(r=>({id:r.id,previousSnapshotId:r.previous_snapshot_id,currentSnapshotId:r.current_snapshot_id,playerId:r.player_id,playerName:r.player_name,previousTeamId:r.previous_team_id||null,currentTeamId:r.current_team_id||null,previousRosterStatus:r.previous_roster_status||null,currentRosterStatus:r.current_roster_status||null,position:r.position||null,detectionType:r.detection_type,season:r.season==null?null:Number(r.season),week:r.week==null?null:Number(r.week),evidence:parse(r.evidence_json)||{},detectedAt:r.detected_at})),deferred:{freeAgentAcquisition:true,note:'Roster entries/exits are evidence only until authoritative Free Agent acquisition exists.'}});
+}
+export async function onRequestPost(context){
+  const s=await state(context,true);if(s.response)return s.response;
+  let body={};try{body=await context.request.json()}catch{}
+  const action=String(body.action||'start').toLowerCase();
+  if(action==='start')return startJob(s);
+  if(action==='next')return nextBatch(s,body);
+  return json({ok:false,release:RELEASE,error:`Unsupported action: ${action}`},400);
 }
