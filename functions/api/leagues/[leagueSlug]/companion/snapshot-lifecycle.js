@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.2e',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.10.6.2f',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -61,7 +61,7 @@ function emptyValidationContext(counts={},snapshotWarningCount=0){
   if(!Number(counts.statistics||0))addError('statistics','No statistic records exist.');
   if(Number(counts.standings||0)!==32)addError('standings',`Expected 32 standings records; found ${Number(counts.standings||0)}.`);
   if(Number(snapshotWarningCount||0))addWarning('snapshot',`${Number(snapshotWarningCount)} warning(s) were inherited from source mappers.`);
-  return{counts,teamIds:[],errors,warnings,domains,orphanPlayers:0,invalidGames:0,unresolvedStats:0};
+  return{counts,teamIds:[],phaseCursor:null,errors,warnings,domains,orphanPlayers:0,invalidGames:0,unresolvedStats:0};
 }
 function pushValidationIssue(ctx,kind,domain,message){
   const key=kind==='error'?'errors':'warnings';
@@ -112,7 +112,7 @@ async function startSnapshotValidation(db,leagueId,snapshot){
   if(!job)throw new Error('Validation job could not be created.');
   return{job,complete:false,report:null};
 }
-async function validationBatchRows(db,leagueId,snapshotId,domain,offset,limit){
+async function validationBatchRows(db,leagueId,snapshotId,domain,cursor,limit){
   const safeDomain=String(domain||'');
   let select='external_id';
   if(safeDomain==='players'){
@@ -130,11 +130,23 @@ async function validationBatchRows(db,leagueId,snapshotId,domain,offset,limit){
       json_extract(data_json,'$.player_external_id') AS player_external_id,
       json_extract(data_json,'$.playerId') AS player_id`;
   }
+
+  if(cursor){
+    const result=await db.prepare(`SELECT ${select}
+      FROM league_snapshot_records
+      WHERE league_id=? AND snapshot_id=? AND domain=? AND external_id>?
+      ORDER BY external_id
+      LIMIT ?`)
+      .bind(leagueId,snapshotId,safeDomain,String(cursor),limit).all();
+    return result.results||[];
+  }
+
   const result=await db.prepare(`SELECT ${select}
     FROM league_snapshot_records
     WHERE league_id=? AND snapshot_id=? AND domain=?
-    ORDER BY external_id LIMIT ? OFFSET ?`)
-    .bind(leagueId,snapshotId,safeDomain,limit,offset).all();
+    ORDER BY external_id
+    LIMIT ?`)
+    .bind(leagueId,snapshotId,safeDomain,limit).all();
   return result.results||[];
 }
 async function existingSnapshotPlayerIds(db,leagueId,snapshotId,ids=[]){
@@ -192,48 +204,69 @@ function finalizeValidationReport(ctx){
     execution:'batched'
   };
 }
-async function nextSnapshotValidation(db,leagueId,snapshot,limit=250){
+async function nextSnapshotValidation(db,leagueId,snapshot,limit=100){
   await ensureValidationSchema(db);
   const safeLimit=Math.max(25,Math.min(125,Number(limit)||100));
   let job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`).bind(leagueId,snapshot.id).first();
   if(!job)return startSnapshotValidation(db,leagueId,snapshot);
   if(job.status==='completed')return{job,complete:true,report:parse(job.report_json)||null};
+
   const ctx=parse(job.context_json)||emptyValidationContext(await validationCounts(db,leagueId,snapshot.id),snapshot.warning_count);
-  let phase=String(job.phase||'teams'),offset=Number(job.phase_offset||0),processed=Number(job.processed_count||0);
+  let phase=String(job.phase||'teams');
+  let offset=Number(job.phase_offset||0);
+  let processed=Number(job.processed_count||0);
+  let cursor=ctx.phaseCursor||null;
+
+  const advancePhase=next=>{
+    phase=next;
+    offset=0;
+    cursor=null;
+    ctx.phaseCursor=null;
+  };
 
   if(phase==='teams'){
-    const batch=await validationBatchRows(db,leagueId,snapshot.id,'teams',offset,safeLimit);
+    const batch=await validationBatchRows(db,leagueId,snapshot.id,'teams',cursor,safeLimit);
     const teamIds=new Set(ctx.teamIds||[]);
     for(const row of batch){
-      const data=parse(row.data_json)||{};
-      const id=key(data,'external_id','teamId','team_id')||String(row.external_id||'');
-      if(id)teamIds.add(String(id));
+      const id=String(row.external_id||'').trim();
+      if(id)teamIds.add(id);
     }
     ctx.teamIds=[...teamIds];
     processed+=batch.length;
     offset+=batch.length;
-    if(batch.length<safeLimit||offset>=Number(ctx.counts.teams||0)){phase='players';offset=0;}
+    if(batch.length)cursor=String(batch[batch.length-1].external_id||'');
+    ctx.phaseCursor=cursor;
+    if(batch.length<safeLimit||offset>=Number(ctx.counts.teams||0))advancePhase('players');
+
   }else if(phase==='players'){
-    const batch=await validationBatchRows(db,leagueId,snapshot.id,'players',offset,safeLimit);
+    const batch=await validationBatchRows(db,leagueId,snapshot.id,'players',cursor,safeLimit);
     const teamIds=new Set(ctx.teamIds||[]);
     for(const row of batch){
       const team=row.team_external_id??row.team_id;
       if(team!=null&&team!==''&&!teamIds.has(String(team)))ctx.orphanPlayers=Number(ctx.orphanPlayers||0)+1;
     }
-    processed+=batch.length;offset+=batch.length;
-    if(batch.length<safeLimit||offset>=Number(ctx.counts.players||0)){phase='games';offset=0;}
+    processed+=batch.length;
+    offset+=batch.length;
+    if(batch.length)cursor=String(batch[batch.length-1].external_id||'');
+    ctx.phaseCursor=cursor;
+    if(batch.length<safeLimit||offset>=Number(ctx.counts.players||0))advancePhase('games');
+
   }else if(phase==='games'){
-    const batch=await validationBatchRows(db,leagueId,snapshot.id,'games',offset,safeLimit);
+    const batch=await validationBatchRows(db,leagueId,snapshot.id,'games',cursor,safeLimit);
     const teamIds=new Set(ctx.teamIds||[]);
     for(const row of batch){
       const home=row.home_team_external_id??row.home_team_id;
       const away=row.away_team_external_id??row.away_team_id;
       if((home!=null&&home!==''&&!teamIds.has(String(home)))||(away!=null&&away!==''&&!teamIds.has(String(away))))ctx.invalidGames=Number(ctx.invalidGames||0)+1;
     }
-    processed+=batch.length;offset+=batch.length;
-    if(batch.length<safeLimit||offset>=Number(ctx.counts.games||0)){phase='statistics';offset=0;}
+    processed+=batch.length;
+    offset+=batch.length;
+    if(batch.length)cursor=String(batch[batch.length-1].external_id||'');
+    ctx.phaseCursor=cursor;
+    if(batch.length<safeLimit||offset>=Number(ctx.counts.games||0))advancePhase('statistics');
+
   }else if(phase==='statistics'){
-    const batch=await validationBatchRows(db,leagueId,snapshot.id,'statistics',offset,safeLimit);
+    const batch=await validationBatchRows(db,leagueId,snapshot.id,'statistics',cursor,safeLimit);
     const ids=[];
     for(const row of batch){
       const player=row.player_external_id??row.player_id;
@@ -241,29 +274,40 @@ async function nextSnapshotValidation(db,leagueId,snapshot,limit=250){
     }
     const known=await existingSnapshotPlayerIds(db,leagueId,snapshot.id,ids);
     for(const id of ids)if(!known.has(id))ctx.unresolvedStats=Number(ctx.unresolvedStats||0)+1;
-    processed+=batch.length;offset+=batch.length;
-    if(batch.length<safeLimit||offset>=Number(ctx.counts.statistics||0)){phase='standings';offset=0;}
+    processed+=batch.length;
+    offset+=batch.length;
+    if(batch.length)cursor=String(batch[batch.length-1].external_id||'');
+    ctx.phaseCursor=cursor;
+    if(batch.length<safeLimit||offset>=Number(ctx.counts.statistics||0))advancePhase('standings');
+
   }else if(phase==='standings'){
-    const batch=await validationBatchRows(db,leagueId,snapshot.id,'standings',offset,safeLimit);
-    processed+=batch.length;offset+=batch.length;
-    if(batch.length<safeLimit||offset>=Number(ctx.counts.standings||0)){phase='finalize';offset=0;}
+    const batch=await validationBatchRows(db,leagueId,snapshot.id,'standings',cursor,safeLimit);
+    processed+=batch.length;
+    offset+=batch.length;
+    if(batch.length)cursor=String(batch[batch.length-1].external_id||'');
+    ctx.phaseCursor=cursor;
+    if(batch.length<safeLimit||offset>=Number(ctx.counts.standings||0))advancePhase('finalize');
   }
 
   if(phase==='finalize'){
     const report=finalizeValidationReport(ctx);
     await db.prepare(`UPDATE league_snapshots SET status=?,validation_status=?,validation_score=?,validation_error_count=?,validation_warning_count=?,validation_report_json=?,validated_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
       .bind(report.status==='ready'?'validated':'validation-failed',report.status,report.score,report.errorCount,report.warningCount,JSON.stringify(report),report.validatedAt,snapshot.id).run();
+
     await db.prepare(`UPDATE snapshot_validation_jobs SET status='completed',phase='complete',phase_offset=0,processed_count=?,context_json=?,report_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
       .bind(processed,JSON.stringify(ctx),JSON.stringify(report),job.id).run();
+
     job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE id=?`).bind(job.id).first();
     return{job,complete:true,report};
   }
 
   await db.prepare(`UPDATE snapshot_validation_jobs SET status='running',phase=?,phase_offset=?,processed_count=?,context_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
     .bind(phase,offset,processed,JSON.stringify(ctx),job.id).run();
+
   job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE id=?`).bind(job.id).first();
   return{job,complete:false,report:null};
 }
+
 async function event(db,leagueId,snapshotId,type,actor,detail={}){await db.prepare(`INSERT INTO league_snapshot_lifecycle_events (id,league_id,snapshot_id,event_type,actor_id,detail_json) VALUES (?,?,?,?,?,?)`).bind(crypto.randomUUID(),leagueId,snapshotId,type,actor||null,JSON.stringify(detail)).run();}
 async function ensureForwardSchema(db){
   const statements=[
