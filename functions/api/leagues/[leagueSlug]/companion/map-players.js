@@ -7,7 +7,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.10.6.2c';
+const RELEASE = '5.9.10.6.2d';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
@@ -226,7 +226,7 @@ export async function onRequestPost(context){
       }catch(error){warnings.push(`${capture.route_path}: ${error?.message||String(error)}`);diagnostics.push({routePath:capture.route_path,sourceTeamId,accepted:false,reason:error?.message||String(error)});}
     }
 
-    // 5.9.10.6.2c: Madden exposes Free Agents as a separate league-level roster.
+    // 5.9.10.6.2d: Madden exposes Free Agents as a separate league-level roster.
     // Only merge a capture when the response is explicitly usable and non-empty.
     const freeAgentSource=await latestUsableFreeAgentCapture(db,context.env,league.id);
     if(freeAgentSource.capture){

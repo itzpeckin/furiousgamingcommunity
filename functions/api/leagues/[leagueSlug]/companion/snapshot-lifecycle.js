@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.2c',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.10.6.2d',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -43,8 +43,7 @@ async function ensureValidationSchema(db){
       report_json TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (league_id, snapshot_id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
+      UNIQUE (league_id, snapshot_id)
     )`,
     `CREATE TABLE IF NOT EXISTS snapshot_validation_player_ids (
       job_id TEXT NOT NULL,
@@ -89,30 +88,34 @@ async function startSnapshotValidation(db,leagueId,snapshot){
   await ensureValidationSchema(db);
   const counts=await validationCounts(db,leagueId,snapshot.id);
   const ctx=emptyValidationContext(counts,snapshot.warning_count);
-  let job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`).bind(leagueId,snapshot.id).first();
+  const total=Object.values(counts).reduce((a,b)=>a+Number(b||0),0);
+
+  let job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`)
+    .bind(leagueId,snapshot.id).first();
+
   if(job?.status==='completed'){
     return{job,complete:true,report:parse(job.report_json)||null};
   }
-  const jobId=job?.id||crypto.randomUUID();
-  await db.prepare(`DELETE FROM snapshot_validation_player_ids WHERE job_id=?`).bind(jobId).run();
-  await db.prepare(`INSERT INTO snapshot_validation_jobs
-    (id,league_id,snapshot_id,status,phase,phase_offset,processed_count,total_count,context_json,report_json,created_at,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
-    ON CONFLICT(league_id,snapshot_id) DO UPDATE SET
-      status='running',phase='teams',phase_offset=0,processed_count=0,total_count=excluded.total_count,
-      context_json=excluded.context_json,report_json=NULL,updated_at=CURRENT_TIMESTAMP`)
-    .bind(
-      jobId,
-      leagueId,
-      snapshot.id,
-      'running',
-      'teams',
-      0,
-      0,
-      Object.values(counts).reduce((a,b)=>a+Number(b||0),0),
-      JSON.stringify(ctx)
-    ).run();
-  job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`).bind(leagueId,snapshot.id).first();
+
+  if(job){
+    await db.prepare(`DELETE FROM snapshot_validation_player_ids WHERE job_id=?`).bind(job.id).run();
+    await db.prepare(`UPDATE snapshot_validation_jobs
+      SET status='running',phase='teams',phase_offset=0,processed_count=0,total_count=?,
+          context_json=?,report_json=NULL,updated_at=CURRENT_TIMESTAMP
+      WHERE id=?`)
+      .bind(total,JSON.stringify(ctx),job.id).run();
+  }else{
+    const jobId=crypto.randomUUID();
+    await db.prepare(`INSERT INTO snapshot_validation_jobs
+      (id,league_id,snapshot_id,status,phase,phase_offset,processed_count,total_count,context_json,report_json,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
+      .bind(jobId,leagueId,snapshot.id,'running','teams',0,0,total,JSON.stringify(ctx)).run();
+  }
+
+  job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`)
+    .bind(leagueId,snapshot.id).first();
+
+  if(!job)throw new Error('Validation job could not be created.');
   return{job,complete:false,report:null};
 }
 async function validationBatchRows(db,leagueId,snapshotId,domain,offset,limit){
@@ -124,8 +127,13 @@ async function validationBatchRows(db,leagueId,snapshotId,domain,offset,limit){
 }
 async function storeValidationPlayerIds(db,jobId,ids=[]){
   const unique=[...new Set(ids.filter(Boolean).map(String))];
-  const statements=unique.map(id=>db.prepare(`INSERT OR IGNORE INTO snapshot_validation_player_ids (job_id,player_id) VALUES (?,?)`).bind(jobId,id));
-  for(let i=0;i<statements.length;i+=75)await db.batch(statements.slice(i,i+75));
+  for(let i=0;i<unique.length;i+=50){
+    const batch=unique.slice(i,i+50);
+    for(const id of batch){
+      await db.prepare(`INSERT OR IGNORE INTO snapshot_validation_player_ids (job_id,player_id) VALUES (?,?)`)
+        .bind(jobId,id).run();
+    }
+  }
 }
 async function knownValidationPlayerIds(db,jobId,ids=[]){
   const unique=[...new Set(ids.filter(Boolean).map(String))];
@@ -484,14 +492,22 @@ async function contextData(context){const slug=normalizeLeagueSlug(context);if(!
 export async function onRequestGet(context){const c=await contextData(context);if(c.response)return c.response;await ensureForwardSchema(c.db);const data=await listSnapshots(c.db,c.league.id);const events=await rows(c.db,`SELECT * FROM league_snapshot_lifecycle_events WHERE league_id=? ORDER BY created_at DESC LIMIT 50`,c.league.id);return json({ok:true,release:RELEASE,activeSnapshotId:data.active?.snapshot_id||null,snapshots:data.snapshots,events:events.map(e=>({...e,detail:parse(e.detail_json)}))});}
 export async function onRequestPost(context){const c=await contextData(context);if(c.response)return c.response;let body={};try{body=await context.request.json()}catch{}const action=String(body.action||'').trim(),snapshotId=String(body.snapshotId||'').trim();if(!['validate','validate-start','validate-next','activate','rollback'].includes(action)||!snapshotId)return json({ok:false,error:'A valid action and snapshotId are required.'},400);const snapshot=await c.db.prepare(`SELECT * FROM league_snapshots WHERE id=? AND league_id=?`).bind(snapshotId,c.league.id).first();if(!snapshot)return json({ok:false,error:'Snapshot not found.'},404);const actor=ownerAccountId(context.env);
  if(action==='validate'||action==='validate-start'){
-   const result=await startSnapshotValidation(c.db,c.league.id,snapshot);
-   if(result.complete&&result.report)await event(c.db,c.league.id,snapshot.id,'validated',actor,result.report);
-   return json({ok:true,release:RELEASE,action:'validate-start',complete:Boolean(result.complete),validationJob:validationProgress(result.job,parse(result.job?.context_json)||{}),report:result.report,...await listSnapshots(c.db,c.league.id)});
+   try{
+     const result=await startSnapshotValidation(c.db,c.league.id,snapshot);
+     if(result.complete&&result.report)await event(c.db,c.league.id,snapshot.id,'validated',actor,result.report);
+     return json({ok:true,release:RELEASE,action:'validate-start',complete:Boolean(result.complete),validationJob:validationProgress(result.job,parse(result.job?.context_json)||{}),report:result.report,...await listSnapshots(c.db,c.league.id)});
+   }catch(error){
+     return json({ok:false,release:RELEASE,error:'Snapshot validation could not start.',detail:error?.message||String(error),phase:'validate-start',snapshotId:snapshot.id},500);
+   }
  }
  if(action==='validate-next'){
-   const result=await nextSnapshotValidation(c.db,c.league.id,snapshot,body.limit);
-   if(result.complete&&result.report)await event(c.db,c.league.id,snapshot.id,'validated',actor,result.report);
-   return json({ok:true,release:RELEASE,action:'validate-next',complete:Boolean(result.complete),validationJob:validationProgress(result.job,parse(result.job?.context_json)||{}),report:result.report,...await listSnapshots(c.db,c.league.id)});
+   try{
+     const result=await nextSnapshotValidation(c.db,c.league.id,snapshot,body.limit);
+     if(result.complete&&result.report)await event(c.db,c.league.id,snapshot.id,'validated',actor,result.report);
+     return json({ok:true,release:RELEASE,action:'validate-next',complete:Boolean(result.complete),validationJob:validationProgress(result.job,parse(result.job?.context_json)||{}),report:result.report,...await listSnapshots(c.db,c.league.id)});
+   }catch(error){
+     return json({ok:false,release:RELEASE,error:'Snapshot validation batch failed.',detail:error?.message||String(error),phase:'validate-next',snapshotId:snapshot.id},500);
+   }
  }
  if(snapshot.validation_status!=='ready'||Number(snapshot.validation_error_count||0)>0)return json({ok:false,error:'Snapshot must pass validation before activation.',validationStatus:snapshot.validation_status||'not-run'},422);
  const current=await active(c.db,c.league.id);if(current?.snapshot_id===snapshot.id)return json({ok:true,release:RELEASE,action,alreadyActive:true,...await listSnapshots(c.db,c.league.id)});
@@ -499,7 +515,7 @@ export async function onRequestPost(context){const c=await contextData(context);
  await c.db.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id,activated_at,activated_by,previous_snapshot_id) VALUES (?,?,CURRENT_TIMESTAMP,?,?) ON CONFLICT(league_id) DO UPDATE SET snapshot_id=excluded.snapshot_id,activated_at=CURRENT_TIMESTAMP,activated_by=excluded.activated_by,previous_snapshot_id=league_active_snapshots.snapshot_id`).bind(c.league.id,snapshot.id,actor,current?.snapshot_id||null).run();
  await c.db.prepare(`UPDATE league_snapshots SET status='active',activated_at=CURRENT_TIMESTAMP,archived_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(snapshot.id).run();
  const forwardDetection=action==='activate'
-   ?{status:'pending-separate-stage',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id,note:'5.9.10.6.2c runs forward transaction detection in bounded requests after activation.'}
+   ?{status:'pending-separate-stage',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id,note:'5.9.10.6.2d runs forward transaction detection in bounded requests after activation.'}
    :{status:'skipped',reason:'rollback-activation',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id};
  await event(c.db,c.league.id,snapshot.id,action==='rollback'?'rollback-activated':'activated',actor,{previousSnapshotId:current?.snapshot_id||null,forwardDetection});
  return json({ok:true,release:RELEASE,action,activeSnapshotChanged:true,activationPerformed:true,forwardDetection,...await listSnapshots(c.db,c.league.id)});
