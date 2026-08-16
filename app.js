@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.2e',
+      release:'5.9.10.6.2i',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -8313,7 +8313,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
       node.textContent = 'Current Release - 5.9.10.6.2e';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.2e';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.2i';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8901,7 +8901,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.2e',
+    release:'5.9.10.6.2i',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
