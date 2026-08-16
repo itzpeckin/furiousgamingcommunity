@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.7.1';
+  const VERSION = '5.9.10.6.2a';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['map-teams','Map Teams'],
@@ -12,6 +12,7 @@
     ['build-snapshot','Build Snapshot'],
     ['validate-snapshot','Validate Snapshot'],
     ['activate-snapshot','Activate Snapshot'],
+    ['detect-transactions','Detect Roster Movements'],
     ['verify-active-snapshot','Verify Live Snapshot']
   ];
 
@@ -46,6 +47,7 @@
   }
 
   const orchestrator = (method='GET', body) => api(`${base()}import-orchestrator`, method, body);
+  const forwardDetection = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/forward-detection`, method, body);
 
   function setStage(id, state, detail='') {
     stageState[id] = {state, detail, at:new Date().toISOString()};
@@ -161,6 +163,44 @@
     }
   }
 
+  async function detectTransactions() {
+    const stage='detect-transactions';
+    setStage(stage,'running','Starting batched roster comparison…');
+    try {
+      let payload=await forwardDetection('POST',{action:'start'});
+      let job=payload.job||{};
+      if (payload.complete) {
+        const summary=job.status==='baseline'
+          ? `Baseline established · ${job.currentTotal||0} players`
+          : `${job.movementCount||0} movement(s) detected`;
+        setStage(stage,'complete',summary);
+        await report(stage,true,{summary,snapshotId});
+        return payload;
+      }
+      let guard=0;
+      while (!payload.complete && guard < 100) {
+        job=payload.job||job||{};
+        const total=(job.currentTotal||0)+(job.exitTotal||0);
+        const compared=job.comparedCount||0;
+        progress=`Roster comparison ${compared}/${total||'?'} · ${job.movementCount||0} movement(s)`;
+        stageState[stage]={state:'running',detail:progress};
+        rerender();
+        payload=await forwardDetection('POST',{action:'next',limit:250});
+        guard++;
+      }
+      if (guard>=100) throw new Error('Forward transaction detection stopped after 100 batches.');
+      job=payload.job||{};
+      const summary=`${job.movementCount||0} movement(s) · ${job.teamChanges||0} team change(s) · ${job.rosterEntries||0} entries · ${job.rosterExits||0} exits`;
+      setStage(stage,'complete',summary);
+      await report(stage,true,{summary,snapshotId});
+      return payload;
+    } catch(error) {
+      setStage(stage,'failed',error.message);
+      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
+      throw error;
+    }
+  }
+
   async function verify() {
     const stage='verify-active-snapshot';
     setStage(stage,'running','Verifying active snapshot…');
@@ -202,6 +242,7 @@
       await buildSnapshot();
       await lifecycle('validate-snapshot','validate');
       await lifecycle('activate-snapshot','activate');
+      await detectTransactions();
       await verify();
       progress=`Import complete · ${snapshotId} is LIVE`;
       try { window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,runId:run?.id}})); } catch (_) {}
@@ -218,7 +259,7 @@
     const completed=STAGES.filter(([id])=>stageState[id]?.state==='complete').length;
     const percent=Math.round((completed/STAGES.length)*100);
     return `<article class="card" data-one-click-import-panel>
-      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner import workflow</span><h3>Import Latest Madden Data</h3><p>One action maps the newest Companion captures, builds and validates a new immutable snapshot, activates it, and refreshes Franchise HQ.</p></div><span class="pill pill--${lastError?'danger':busy?'warning':completed===STAGES.length?'success':'neutral'}">${lastError?'Stopped':busy?`${percent}% Importing`:completed===STAGES.length?'LIVE':'Ready'}</span></div>
+      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner import workflow</span><h3>Import Latest Madden Data</h3><p>One action maps the newest Companion captures, builds and validates a new immutable snapshot, activates it, runs roster movement detection in safe batches, and refreshes Franchise HQ.</p></div><span class="pill pill--${lastError?'danger':busy?'warning':completed===STAGES.length?'success':'neutral'}">${lastError?'Stopped':busy?`${percent}% Importing`:completed===STAGES.length?'LIVE':'Ready'}</span></div>
       <div style="height:8px;background:rgba(127,127,127,.16);border-radius:999px;overflow:hidden;margin:16px 0"><div style="height:100%;width:${percent}%;background:currentColor;transition:width .2s ease"></div></div>
       <div style="display:grid;gap:8px;margin:14px 0">${STAGES.map(([id,label])=>`<div style="display:grid;grid-template-columns:28px minmax(180px,.7fr) 1fr;gap:10px;align-items:center;padding:9px 10px;border:1px solid rgba(127,127,127,.14);border-radius:10px"><span class="pill pill--${stageClass(id)}" style="justify-content:center;min-width:26px">${stageIcon(id)}</span><strong>${esc(label)}</strong><small>${esc(stageState[id]?.detail||'Pending')}</small></div>`).join('')}</div>
       <div class="league-import-framework-actions"><button class="button button--primary" data-run-one-click-import ${busy?'disabled':''}>${busy?'Importing Madden Data…':'Import Latest Madden Data'}</button></div>
