@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.2b',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.10.6.2c',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -101,7 +101,17 @@ async function startSnapshotValidation(db,leagueId,snapshot){
     ON CONFLICT(league_id,snapshot_id) DO UPDATE SET
       status='running',phase='teams',phase_offset=0,processed_count=0,total_count=excluded.total_count,
       context_json=excluded.context_json,report_json=NULL,updated_at=CURRENT_TIMESTAMP`)
-    .bind(jobId,leagueId,snapshot.id,'running','teams',0,Object.values(counts).reduce((a,b)=>a+Number(b||0),0),JSON.stringify(ctx)).run();
+    .bind(
+      jobId,
+      leagueId,
+      snapshot.id,
+      'running',
+      'teams',
+      0,
+      0,
+      Object.values(counts).reduce((a,b)=>a+Number(b||0),0),
+      JSON.stringify(ctx)
+    ).run();
   job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`).bind(leagueId,snapshot.id).first();
   return{job,complete:false,report:null};
 }
@@ -489,7 +499,7 @@ export async function onRequestPost(context){const c=await contextData(context);
  await c.db.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id,activated_at,activated_by,previous_snapshot_id) VALUES (?,?,CURRENT_TIMESTAMP,?,?) ON CONFLICT(league_id) DO UPDATE SET snapshot_id=excluded.snapshot_id,activated_at=CURRENT_TIMESTAMP,activated_by=excluded.activated_by,previous_snapshot_id=league_active_snapshots.snapshot_id`).bind(c.league.id,snapshot.id,actor,current?.snapshot_id||null).run();
  await c.db.prepare(`UPDATE league_snapshots SET status='active',activated_at=CURRENT_TIMESTAMP,archived_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(snapshot.id).run();
  const forwardDetection=action==='activate'
-   ?{status:'pending-separate-stage',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id,note:'5.9.10.6.2b runs forward transaction detection in bounded requests after activation.'}
+   ?{status:'pending-separate-stage',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id,note:'5.9.10.6.2c runs forward transaction detection in bounded requests after activation.'}
    :{status:'skipped',reason:'rollback-activation',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id};
  await event(c.db,c.league.id,snapshot.id,action==='rollback'?'rollback-activated':'activated',actor,{previousSnapshotId:current?.snapshot_id||null,forwardDetection});
  return json({ok:true,release:RELEASE,action,activeSnapshotChanged:true,activationPerformed:true,forwardDetection,...await listSnapshots(c.db,c.league.id)});
