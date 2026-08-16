@@ -1,8 +1,8 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.7.0a',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
-const STAGES=['map-teams','map-players','map-schedule','map-statistics','build-snapshot','validate-snapshot','activate-snapshot','verify-active-snapshot'];
+const RELEASE='5.9.10.6.2a',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const STAGES=['map-teams','map-players','map-schedule','map-statistics','build-snapshot','validate-snapshot','activate-snapshot','detect-transactions','verify-active-snapshot'];
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 const parse=(v,f={})=>{try{return JSON.parse(v||'')}catch{return f}};
 const text=v=>v==null?null:(String(v).trim()||null);
@@ -41,6 +41,7 @@ function instruction(slug,run){
     case'build-snapshot':return{method:'POST',url:`${base}build-snapshot`,body:{}};
     case'validate-snapshot':return{method:'POST',url:`${base}snapshot-lifecycle`,body:{action:'validate',snapshotId:run.snapshot_id||'<snapshotId>'}};
     case'activate-snapshot':return{method:'POST',url:`${base}snapshot-lifecycle`,body:{action:'activate',snapshotId:run.snapshot_id||'<snapshotId>'}};
+    case'detect-transactions':return{mode:'incremental',method:'POST',url:`/api/leagues/${encodeURIComponent(slug)}/transactions/forward-detection`,startBody:{action:'start'},nextBody:{action:'next',limit:250},repeatUntil:'complete=true'};
     case'verify-active-snapshot':return{method:'GET',url:`${base}snapshot-verification`};
     default:return null;
   }
