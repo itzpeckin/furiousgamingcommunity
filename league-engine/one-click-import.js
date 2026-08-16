@@ -168,7 +168,10 @@
       if (guard >= 5000) throw new Error('Statistics mapping stopped after 5000 chunks.');
       const final = await api(`${base()}map-statistics`,'GET');
       const count=final.mappingRun?.recordCount ?? payload.mappingRun?.recordCount ?? 0;
-      const summary=`${count} statistics records mapped`;
+      const delta=final.delta||payload.delta||payload.deltaPlan||{};
+      const skipped=Number(delta.skippedRoutes||0);
+      const changed=Number(delta.processedRoutes??delta.changedOrNewRoutes??0);
+      const summary=`${count} new/changed statistics records mapped · ${skipped} route(s) skipped${changed?` · ${changed} route(s) processed`:''}`;
       setStage(stage,'complete',summary);
       await report(stage,true,{summary,statisticsMappingRunId:statsRunId});
       return final;
