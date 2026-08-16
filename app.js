@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.2j',
+      release:'5.9.10.6.2k',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2642,12 +2642,19 @@
     if(liveTeamDirectory && !force) return liveTeamDirectory;
     if(liveTeamDirectoryLoading) {
       while(liveTeamDirectoryLoading) await new Promise(resolve=>setTimeout(resolve,25));
-      return liveTeamDirectory;
+      if(!force) return liveTeamDirectory;
     }
     liveTeamDirectoryLoading=true;
     try{
       const service=liveReadModel();
       if(!service) return null;
+
+      // 5.9.10.6.2k — a new activated snapshot must invalidate BOTH layers:
+      // Live Read Model caches and app-level liveTeamDirectory caches.
+      if(force && typeof service.refresh==='function'){
+        await service.refresh();
+      }
+
       const [stateValue,snapshotValue,teamRows,standingRows,playerRows,gameRows,freeAgentRows]=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getPlayers(),service.getSchedule(),loadIntegratedFreeAgents()
       ]);
@@ -8077,7 +8084,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       window.FGC_TRADE_LIVE={
         release:'5.9.10.1k',
         status:()=>({...tradeCenterLiveBridgeState}),
-        resync:()=>syncTradeCenterLiveBridge({rerender:true})
+        resync:()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true})
       };
       document.documentElement.classList.remove('trade-live-boot-pending','trade-live-first-load');
       document.querySelector('[data-trade-live-boot-curtain]')?.remove();
@@ -8168,9 +8175,9 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   }
 
-  async function syncTradeCenterLiveBridge({rerender=true}={}) {
+  async function syncTradeCenterLiveBridge({rerender=true,forceLive=false}={}) {
     try{
-      await loadLiveTeamDirectory(false);
+      await loadLiveTeamDirectory(Boolean(forceLive));
       if(!liveTeamDirectory?.teams?.length||!liveTeamDirectory?.players?.length)return false;
 
       const liveTeams=liveTeamDirectory.teams.map(tradeCenterLiveTeamShape);
@@ -8208,7 +8215,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       window.FGC_TRADE_LIVE={
         release:'5.9.10.1k',
         status:()=>({...tradeCenterLiveBridgeState}),
-        resync:()=>syncTradeCenterLiveBridge({rerender:true})
+        resync:()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true})
       };
 
       // Remove the pre-render Trade LIVE boot curtain only after authoritative
@@ -8305,15 +8312,16 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(['trade-center','trade-block'].includes(base)) renderRoute(location.hash.slice(1));
     }
   });
-  document.addEventListener('franchisehq:league-data-state-changed',()=>syncTradeCenterLiveBridge({rerender:true}));
-  window.addEventListener('franchisehq:live-snapshot-booted',()=>syncTradeCenterLiveBridge({rerender:true}));
+  document.addEventListener('franchisehq:league-data-state-changed',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
+  window.addEventListener('franchisehq:live-snapshot-booted',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
+  window.addEventListener('franchisehq:one-click-import-complete',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
 
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.2j';
+      node.textContent = 'Current Release - 5.9.10.6.2k';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.2j';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.2k';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8324,6 +8332,32 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.playerLiveSync={
+    release:'5.9.10.6.2k',
+    refresh:async()=>{
+      await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
+      return window.FranchiseHQ.playerLiveSync.status();
+    },
+    status:()=>{
+      const live=liveTeamDirectory?.players||[];
+      const serviceRows=window.FranchiseHQ?.players?.getAll?.()||[];
+      const liveIds=new Set(live.map(p=>String(p.id||'')));
+      const serviceIds=new Set(serviceRows.map(p=>String(p.id??p.externalId??p.playerId??p.rosterId??'')));
+      let missingFromService=0,staleInService=0;
+      liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
+      serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
+      return{
+        release:'5.9.10.6.2k',
+        snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
+        livePlayerCount:live.length,
+        playerServiceCount:serviceRows.length,
+        missingFromService,
+        staleInService,
+        synchronized:Boolean(live.length&&live.length===serviceRows.length&&!missingFromService&&!staleInService)
+      };
+    }
+  };
+
   window.FranchiseHQ.contracts={
     release:'5.9.10.0',
     normalize:player=>canonicalContract(player),
@@ -8901,7 +8935,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.2j',
+    release:'5.9.10.6.2k',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
