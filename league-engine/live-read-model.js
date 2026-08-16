@@ -2,9 +2,10 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.4.2a';
+  const VERSION = '5.9.10.6.2h';
   const cache = new Map();
   let summary = null;
+  const domainCache = new Map();
   let busy = false;
   let lastError = null;
   let lastRefreshAt = null;
@@ -33,6 +34,7 @@
     busy = true;
     lastError = null;
     cache.clear();
+    domainCache.clear();
     rerender();
     try {
       summary = await request({}, true);
@@ -51,7 +53,27 @@
   async function getSnapshot() { return (summary || await request({})).snapshot; }
   async function getLeague() { return (summary || await request({})).league; }
   async function getState() { return (summary || await request({})).state; }
-  async function getDomain(domain) { return (await request({domain})).records || []; }
+  async function getDomain(domain) {
+    if (domainCache.has(domain)) return domainCache.get(domain);
+    const limits={teams:64,standings:64,players:100,games:200,statistics:300};
+    const limit=limits[domain]||150;
+    let cursor=null;
+    const records=[];
+    let guard=0;
+
+    do {
+      const params={domain,limit};
+      if(cursor)params.cursor=cursor;
+      const payload=await request(params);
+      records.push(...(payload.records||[]));
+      cursor=payload.nextCursor||null;
+      guard++;
+      if(guard>1000)throw new Error(`Live ${domain} read exceeded 1000 pages.`);
+    } while(cursor);
+
+    domainCache.set(domain,records);
+    return records;
+  }
   async function getTeams() { return getDomain('teams'); }
   async function getPlayers() { return getDomain('players'); }
   async function getStandings() { return getDomain('standings'); }
@@ -88,7 +110,7 @@
     const state = String(summary?.state || 'not-loaded').toUpperCase();
     return `<section data-live-read-model-panel>
       <article class="card">
-        <div class="card-header"><div><span class="eyebrow">v5.9.4.2a · Live Snapshot Read Model</span><h3>Live Read Model</h3><p>Stable application-facing contracts backed only by the league's active immutable snapshot.</p></div><span class="pill pill--${state==='LIVE'?'success':'neutral'}">${esc(state)}</span></div>
+        <div class="card-header"><div><span class="eyebrow">v5.9.10.6.2h · Paged Live Snapshot Read Model</span><h3>Live Read Model</h3><p>Stable application-facing contracts backed only by the league's active immutable snapshot.</p></div><span class="pill pill--${state==='LIVE'?'success':'neutral'}">${esc(state)}</span></div>
         <div class="league-import-framework-grid">
           <div><span>Snapshot</span><strong>${esc(s?.id || '—')}</strong></div>
           <div><span>Season / Week</span><strong>${esc(s ? `${s.seasonYear ?? '—'} / ${s.weekIndex ?? '—'}` : '—')}</strong></div>
@@ -133,6 +155,7 @@
       snapshotId:summary?.snapshot?.id || null,
       cache:'healthy',
       cachedRequests:cache.size,
+      cachedDomains:domainCache.size,
       domainsReady:Boolean(summary?.snapshot && Object.values(summary.domains || {}).every(v => Number(v) >= 0)),
       counts:summary?.domains || null,
       lastRefreshAt,
