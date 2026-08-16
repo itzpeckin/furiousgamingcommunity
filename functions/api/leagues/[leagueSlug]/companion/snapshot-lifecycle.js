@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.2d',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.10.6.2e',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -44,11 +44,6 @@ async function ensureValidationSchema(db){
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (league_id, snapshot_id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS snapshot_validation_player_ids (
-      job_id TEXT NOT NULL,
-      player_id TEXT NOT NULL,
-      PRIMARY KEY (job_id, player_id)
     )`
   ];
   for(const sql of statements)await db.prepare(sql).run();
@@ -98,7 +93,6 @@ async function startSnapshotValidation(db,leagueId,snapshot){
   }
 
   if(job){
-    await db.prepare(`DELETE FROM snapshot_validation_player_ids WHERE job_id=?`).bind(job.id).run();
     await db.prepare(`UPDATE snapshot_validation_jobs
       SET status='running',phase='teams',phase_offset=0,processed_count=0,total_count=?,
           context_json=?,report_json=NULL,updated_at=CURRENT_TIMESTAMP
@@ -119,31 +113,45 @@ async function startSnapshotValidation(db,leagueId,snapshot){
   return{job,complete:false,report:null};
 }
 async function validationBatchRows(db,leagueId,snapshotId,domain,offset,limit){
-  const result=await db.prepare(`SELECT external_id,data_json FROM league_snapshot_records
+  const safeDomain=String(domain||'');
+  let select='external_id';
+  if(safeDomain==='players'){
+    select=`external_id,
+      json_extract(data_json,'$.team_external_id') AS team_external_id,
+      json_extract(data_json,'$.teamId') AS team_id`;
+  }else if(safeDomain==='games'){
+    select=`external_id,
+      json_extract(data_json,'$.home_team_external_id') AS home_team_external_id,
+      json_extract(data_json,'$.homeTeamId') AS home_team_id,
+      json_extract(data_json,'$.away_team_external_id') AS away_team_external_id,
+      json_extract(data_json,'$.awayTeamId') AS away_team_id`;
+  }else if(safeDomain==='statistics'){
+    select=`external_id,
+      json_extract(data_json,'$.player_external_id') AS player_external_id,
+      json_extract(data_json,'$.playerId') AS player_id`;
+  }
+  const result=await db.prepare(`SELECT ${select}
+    FROM league_snapshot_records
     WHERE league_id=? AND snapshot_id=? AND domain=?
     ORDER BY external_id LIMIT ? OFFSET ?`)
-    .bind(leagueId,snapshotId,domain,limit,offset).all();
+    .bind(leagueId,snapshotId,safeDomain,limit,offset).all();
   return result.results||[];
 }
-async function storeValidationPlayerIds(db,jobId,ids=[]){
-  const unique=[...new Set(ids.filter(Boolean).map(String))];
-  for(let i=0;i<unique.length;i+=50){
-    const batch=unique.slice(i,i+50);
-    for(const id of batch){
-      await db.prepare(`INSERT OR IGNORE INTO snapshot_validation_player_ids (job_id,player_id) VALUES (?,?)`)
-        .bind(jobId,id).run();
-    }
-  }
-}
-async function knownValidationPlayerIds(db,jobId,ids=[]){
+async function existingSnapshotPlayerIds(db,leagueId,snapshotId,ids=[]){
   const unique=[...new Set(ids.filter(Boolean).map(String))];
   if(!unique.length)return new Set();
   const found=new Set();
-  for(let i=0;i<unique.length;i+=200){
-    const batch=unique.slice(i,i+200);
+  // Query against the league_snapshot_records PK (snapshot_id, domain, external_id)
+  // instead of staging thousands of player IDs into a temporary D1 table.
+  for(let i=0;i<unique.length;i+=75){
+    const batch=unique.slice(i,i+75);
     const marks=batch.map(()=>'?').join(',');
-    const result=await db.prepare(`SELECT player_id FROM snapshot_validation_player_ids WHERE job_id=? AND player_id IN (${marks})`).bind(jobId,...batch).all();
-    for(const row of result.results||[])found.add(String(row.player_id));
+    const result=await db.prepare(`SELECT external_id
+      FROM league_snapshot_records
+      WHERE league_id=? AND snapshot_id=? AND domain='players'
+        AND external_id IN (${marks})`)
+      .bind(leagueId,snapshotId,...batch).all();
+    for(const row of result.results||[])found.add(String(row.external_id));
   }
   return found;
 }
@@ -186,7 +194,7 @@ function finalizeValidationReport(ctx){
 }
 async function nextSnapshotValidation(db,leagueId,snapshot,limit=250){
   await ensureValidationSchema(db);
-  const safeLimit=Math.max(50,Math.min(400,Number(limit)||250));
+  const safeLimit=Math.max(25,Math.min(125,Number(limit)||100));
   let job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`).bind(leagueId,snapshot.id).first();
   if(!job)return startSnapshotValidation(db,leagueId,snapshot);
   if(job.status==='completed')return{job,complete:true,report:parse(job.report_json)||null};
@@ -208,25 +216,19 @@ async function nextSnapshotValidation(db,leagueId,snapshot,limit=250){
   }else if(phase==='players'){
     const batch=await validationBatchRows(db,leagueId,snapshot.id,'players',offset,safeLimit);
     const teamIds=new Set(ctx.teamIds||[]);
-    const playerIds=[];
     for(const row of batch){
-      const data=parse(row.data_json)||{};
-      const id=key(data,'external_id','playerId','player_id')||String(row.external_id||'');
-      if(id)playerIds.push(String(id));
-      const team=key(data,'team_external_id','teamId','team_id');
-      if(team&&!teamIds.has(String(team)))ctx.orphanPlayers=Number(ctx.orphanPlayers||0)+1;
+      const team=row.team_external_id??row.team_id;
+      if(team!=null&&team!==''&&!teamIds.has(String(team)))ctx.orphanPlayers=Number(ctx.orphanPlayers||0)+1;
     }
-    await storeValidationPlayerIds(db,job.id,playerIds);
     processed+=batch.length;offset+=batch.length;
     if(batch.length<safeLimit||offset>=Number(ctx.counts.players||0)){phase='games';offset=0;}
   }else if(phase==='games'){
     const batch=await validationBatchRows(db,leagueId,snapshot.id,'games',offset,safeLimit);
     const teamIds=new Set(ctx.teamIds||[]);
     for(const row of batch){
-      const data=parse(row.data_json)||{};
-      const home=key(data,'home_team_external_id','homeTeamId','home_team_id');
-      const away=key(data,'away_team_external_id','awayTeamId','away_team_id');
-      if((home&&!teamIds.has(String(home)))||(away&&!teamIds.has(String(away))))ctx.invalidGames=Number(ctx.invalidGames||0)+1;
+      const home=row.home_team_external_id??row.home_team_id;
+      const away=row.away_team_external_id??row.away_team_id;
+      if((home!=null&&home!==''&&!teamIds.has(String(home)))||(away!=null&&away!==''&&!teamIds.has(String(away))))ctx.invalidGames=Number(ctx.invalidGames||0)+1;
     }
     processed+=batch.length;offset+=batch.length;
     if(batch.length<safeLimit||offset>=Number(ctx.counts.games||0)){phase='statistics';offset=0;}
@@ -234,11 +236,10 @@ async function nextSnapshotValidation(db,leagueId,snapshot,limit=250){
     const batch=await validationBatchRows(db,leagueId,snapshot.id,'statistics',offset,safeLimit);
     const ids=[];
     for(const row of batch){
-      const data=parse(row.data_json)||{};
-      const player=key(data,'player_external_id','playerId','player_id');
-      if(player)ids.push(String(player));
+      const player=row.player_external_id??row.player_id;
+      if(player!=null&&player!=='')ids.push(String(player));
     }
-    const known=await knownValidationPlayerIds(db,job.id,ids);
+    const known=await existingSnapshotPlayerIds(db,leagueId,snapshot.id,ids);
     for(const id of ids)if(!known.has(id))ctx.unresolvedStats=Number(ctx.unresolvedStats||0)+1;
     processed+=batch.length;offset+=batch.length;
     if(batch.length<safeLimit||offset>=Number(ctx.counts.statistics||0)){phase='standings';offset=0;}
@@ -254,7 +255,6 @@ async function nextSnapshotValidation(db,leagueId,snapshot,limit=250){
       .bind(report.status==='ready'?'validated':'validation-failed',report.status,report.score,report.errorCount,report.warningCount,JSON.stringify(report),report.validatedAt,snapshot.id).run();
     await db.prepare(`UPDATE snapshot_validation_jobs SET status='completed',phase='complete',phase_offset=0,processed_count=?,context_json=?,report_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
       .bind(processed,JSON.stringify(ctx),JSON.stringify(report),job.id).run();
-    await db.prepare(`DELETE FROM snapshot_validation_player_ids WHERE job_id=?`).bind(job.id).run();
     job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE id=?`).bind(job.id).first();
     return{job,complete:true,report};
   }
@@ -515,7 +515,7 @@ export async function onRequestPost(context){const c=await contextData(context);
  await c.db.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id,activated_at,activated_by,previous_snapshot_id) VALUES (?,?,CURRENT_TIMESTAMP,?,?) ON CONFLICT(league_id) DO UPDATE SET snapshot_id=excluded.snapshot_id,activated_at=CURRENT_TIMESTAMP,activated_by=excluded.activated_by,previous_snapshot_id=league_active_snapshots.snapshot_id`).bind(c.league.id,snapshot.id,actor,current?.snapshot_id||null).run();
  await c.db.prepare(`UPDATE league_snapshots SET status='active',activated_at=CURRENT_TIMESTAMP,archived_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(snapshot.id).run();
  const forwardDetection=action==='activate'
-   ?{status:'pending-separate-stage',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id,note:'5.9.10.6.2d runs forward transaction detection in bounded requests after activation.'}
+   ?{status:'pending-separate-stage',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id,note:'5.9.10.6.2e runs forward transaction detection in bounded requests after activation.'}
    :{status:'skipped',reason:'rollback-activation',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id};
  await event(c.db,c.league.id,snapshot.id,action==='rollback'?'rollback-activated':'activated',actor,{previousSnapshotId:current?.snapshot_id||null,forwardDetection});
  return json({ok:true,release:RELEASE,action,activeSnapshotChanged:true,activationPerformed:true,forwardDetection,...await listSnapshots(c.db,c.league.id)});

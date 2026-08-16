@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.2d',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.10.6.2e',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const STAGES=['map-teams','map-players','map-schedule','map-statistics','build-snapshot','validate-snapshot','activate-snapshot','detect-transactions','verify-active-snapshot'];
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 const parse=(v,f={})=>{try{return JSON.parse(v||'')}catch{return f}};
