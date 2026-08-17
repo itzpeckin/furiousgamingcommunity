@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.2e';
+const RELEASE='5.9.10.6.4.2';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const text=v=>v==null?null:(String(v).trim()||null);
@@ -46,6 +46,28 @@ function playerShape(raw,index){
   };
 }
 
+
+async function canonicalFreeAgents(db,leagueId){
+  const exists=await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='canonical_free_agents'`).first();
+  if(!exists)return[];
+  const result=await db.prepare(`SELECT * FROM canonical_free_agents WHERE league_id=? ORDER BY player_name`).bind(leagueId).all();
+  return (result.results||[]).map(row=>{
+    const raw=(()=>{try{return JSON.parse(row.raw_json||'{}')}catch{return{}}})();
+    return playerShape({
+      ...raw,
+      playerId:row.player_id,
+      displayName:row.player_name,
+      position:row.position,
+      overall:row.overall,
+      age:row.age,
+      devTrait:row.dev_trait,
+      teamId:'FA',
+      rosterStatus:'free-agent',
+      status:'free-agent'
+    },0);
+  }).filter(Boolean);
+}
+
 async function payloadFor(context,capture){
   if(!capture?.r2_object_key)return null;
   const object=await context.env.COMPANION_EXPORTS?.get?.(capture.r2_object_key);
@@ -70,6 +92,7 @@ export async function onRequestGet(context){
   const rows=await captures(db,league.id);
   const attempts=[];
   let selected=null,players=[];
+  const ledgerPlayers=await canonicalFreeAgents(db,league.id);
 
   for(const capture of rows){
     const payload=await payloadFor(context,capture);
@@ -91,10 +114,15 @@ export async function onRequestGet(context){
     }
   }
 
+  const merged=new Map();
+  for(const player of ledgerPlayers)merged.set(String(player.id),player);
+  for(const player of players)merged.set(String(player.id),player);
+  const allPlayers=[...merged.values()];
+
   return json({
     ok:true,
     release:RELEASE,
-    sourceRoute:'xbsx/{franchiseId}/freeagents/roster',
+    sourceRoute:'canonical-ledger + xbsx/{franchiseId}/freeagents/roster',
     captureAvailable:Boolean(rows.length),
     usableCaptureAvailable:Boolean(selected),
     selectedCapture:selected?{
@@ -102,8 +130,10 @@ export async function onRequestGet(context){
       routePath:selected.route_path,
       receivedAt:selected.received_at
     }:null,
-    count:players.length,
-    players,
+    ledgerCount:ledgerPlayers.length,
+    capturedCount:players.length,
+    count:allPlayers.length,
+    players:allPlayers,
     attempts
   });
 }
