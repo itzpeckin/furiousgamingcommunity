@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.3P.5';
+const RELEASE='5.9.10.6.3P.5a';
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 const parse=(value,fallback={})=>{try{return JSON.parse(value||'')}catch{return fallback}};
@@ -90,6 +90,10 @@ async function certify(s,body){
   if(!snapshot)return{error:'Snapshot not found.',status:404};
 
   const previousSnapshotId=String(active?.previous_snapshot_id||'').trim()||null;
+  const previousSnapshot=previousSnapshotId
+    ? await s.db.prepare(`SELECT season_year,week_index,validation_status FROM league_snapshots WHERE league_id=? AND id=?`)
+      .bind(s.league.id,previousSnapshotId).first()
+    : null;
   const manifest=parse(snapshot.manifest_json,{});
   const statsRunId=String(manifest?.sources?.statisticsMappingRunId||'').trim();
   const delta=manifest?.deltaStatistics||{};
@@ -130,6 +134,26 @@ async function certify(s,body){
         .bind(s.league.id,previousSnapshotId,snapshotId).first())?.c||0);
     }
   }
+
+  let latestRegularStatWeek=null;
+  if(await tableExists(s.db,'canonical_statistics_snapshot_manifest')){
+    const latestWeek=await s.db.prepare(`SELECT MAX(week_index) max_week
+      FROM canonical_statistics_snapshot_manifest
+      WHERE league_id=? AND snapshot_id=? AND stage='regular-season' AND record_count>0`)
+      .bind(s.league.id,snapshotId).first();
+    if(latestWeek?.max_week!==null&&latestWeek?.max_week!==undefined)latestRegularStatWeek=Number(latestWeek.max_week);
+  }
+
+  const currentSeason=Number(snapshot.season_year);
+  const currentWeek=Number(snapshot.week_index);
+  const previousSeason=Number(previousSnapshot?.season_year);
+  const previousWeek=Number(previousSnapshot?.week_index);
+  const advancedLeagueState=Boolean(previousSnapshot)&&(
+    (Number.isFinite(currentSeason)&&Number.isFinite(previousSeason)&&currentSeason>previousSeason) ||
+    (currentSeason===previousSeason&&Number.isFinite(currentWeek)&&Number.isFinite(previousWeek)&&currentWeek>previousWeek)
+  );
+  const deltaStatisticRows=Number(delta?.deltaStatisticRows||0);
+  const expectedLatestCompletedWeek=Number.isFinite(currentWeek)?Math.max(0,currentWeek-1):null;
 
   let detection=null;
   if(await tableExists(s.db,'forward_detection_jobs')){
@@ -186,9 +210,23 @@ async function certify(s,body){
       `${skippedRoutes} skipped of ${totalRoutes} statistics route(s).`,
       'warning'),
 
-    check('new-week-processed','New/changed statistics processed',
-      processedRoutes>0,
-      `${processedRoutes} new/changed statistics route(s) processed.`,
+    check('new-week-processed','New/changed statistics routes processed',
+      !advancedLeagueState||processedRoutes>0,
+      `${processedRoutes} new/changed statistics route(s) processed${advancedLeagueState?' for an advanced league state':''}.`,
+      'required'),
+
+    check('new-week-records','New/changed statistics produced records',
+      !advancedLeagueState||deltaStatisticRows>0,
+      `${deltaStatisticRows} new/changed statistic row(s) committed${advancedLeagueState?' for the advanced week':''}.`,
+      'required'),
+
+    check('statistics-freshness','Statistics are current with the league week',
+      !advancedLeagueState||expectedLatestCompletedWeek===null||(
+        latestRegularStatWeek!==null&&latestRegularStatWeek>=expectedLatestCompletedWeek
+      ),
+      expectedLatestCompletedWeek===null
+        ? 'League week unavailable for freshness check.'
+        : `Latest committed regular-season stats week index ${latestRegularStatWeek??'none'}; expected at least ${expectedLatestCompletedWeek}.`,
       'required'),
 
     check('statistics-errors','No statistics mapping failures',
@@ -245,6 +283,10 @@ async function certify(s,body){
       previousManifestRoutes,
       currentManifestRoutes,
       missingHistoricalRoutes,
+      deltaStatisticRows,
+      latestRegularStatWeek,
+      expectedLatestCompletedWeek,
+      advancedLeagueState,
       delta
     },
     transactionPipeline:{

@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.3P.2';
+const RELEASE='5.9.10.6.3P.5a';
 const RECORD_CHUNK_SIZE=40;
 const MAX_STORED_WARNINGS_PER_BATCH=25;
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
@@ -139,11 +139,48 @@ async function readPayload(env,batch){
   if(!raw)throw new Error(`Payload empty for ${batch.route_path}.`);
   return JSON.parse(raw);
 }
+function captureCollectionCount(row){
+  const collections=safeParse(row?.collections_json,[]);
+  return (collections||[]).reduce((max,item)=>Math.max(max,Number(item?.count||0)),0);
+}
+function captureParseStatus(row){
+  const headers=safeParse(row?.request_headers_json,{});
+  return text(headers?.parseStatus);
+}
+function usableStatisticsCapture(row){
+  const count=captureCollectionCount(row);
+  const status=String(captureParseStatus(row)||'').toLowerCase();
+  return Number(row?.byte_length||0)>2 && count>0 && (status.startsWith('parsed')||!status);
+}
 async function capturedRoutes(db,leagueId){
-  const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,payload_hash,received_at FROM companion_route_captures WHERE league_id=? AND route_path LIKE '%/week/%' ORDER BY received_at DESC`).bind(leagueId).all();
-  const latest=new Map();
-  for(const row of result.results||[]){if(!WEEKLY_ROUTE.test(row.route_path))continue;if(!latest.has(row.route_path))latest.set(row.route_path,row)}
-  return[...latest.values()].sort((a,b)=>a.route_path.localeCompare(b.route_path));
+  const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,payload_hash,
+      byte_length,collections_json,request_headers_json,received_at
+    FROM companion_route_captures
+    WHERE league_id=? AND route_path LIKE '%/week/%'
+    ORDER BY received_at DESC`).bind(leagueId).all();
+
+  const grouped=new Map();
+  for(const row of result.results||[]){
+    if(!WEEKLY_ROUTE.test(row.route_path))continue;
+    const key=String(row.route_path);
+    if(!grouped.has(key))grouped.set(key,[]);
+    grouped.get(key).push(row);
+  }
+
+  const selected=[];
+  for(const rows of grouped.values()){
+    // Prefer the newest capture that actually contains a parsed non-empty statistics collection.
+    // A later empty/error discovery capture must never shadow an earlier usable export payload.
+    const usable=rows.find(usableStatisticsCapture);
+    const chosen=usable||rows[0];
+    selected.push({
+      ...chosen,
+      discoveredRecordCount:captureCollectionCount(chosen),
+      captureUsable:Boolean(usableStatisticsCapture(chosen))
+    });
+  }
+
+  return selected.sort((a,b)=>a.route_path.localeCompare(b.route_path));
 }
 
 async function activeSnapshotId(db,leagueId){
@@ -244,7 +281,7 @@ async function startRun(db,leagueId){
     const meta=routeMeta(capture.route_path);
     if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
-    const unchanged=Boolean(prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
+    const unchanged=Boolean(Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     if(unchanged)skipped++;else pending++;
   }
 
@@ -265,7 +302,7 @@ async function startRun(db,leagueId){
   for(const capture of routes){
     const meta=routeMeta(capture.route_path);if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
-    const unchanged=Boolean(prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
+    const unchanged=Boolean(Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     statements.push(db.prepare(sql).bind(
       crypto.randomUUID(),runId,leagueId,capture.capture_id,capture.discovery_session_id,capture.route_path,
       capture.r2_object_key,capture.payload_hash||'',meta.category,canonicalStage(meta.stage),meta.week,
@@ -312,7 +349,9 @@ async function processNext(db,env,leagueId,runId){
   if(batch.status==='pending')await db.prepare(`UPDATE companion_statistics_mapping_batches SET status='processing',started_at=COALESCE(started_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(batch.id).run();
   try{
     const meta=routeMeta(batch.route_path),payload=await readPayload(env,batch),collection=choose(payload,meta.category),allRecords=collection?.objects||[],warnings=[];
-    if(!collection)warnings.push(`No ${meta.category} collection found in ${batch.route_path}`);
+    if(!collection||!allRecords.length){
+      throw new Error(`No usable ${meta.category} statistic records found in ${batch.route_path}. The route will not be committed as a successful weekly statistics import.`);
+    }
     const offset=Number(batch.record_offset||0),chunk=allRecords.slice(offset,offset+RECORD_CHUNK_SIZE),output=[];
     const players=meta.category===TEAMSTATS_CATEGORY?{byId:new Map(),byName:new Map()}:await playerIndexForRecords(db,leagueId,chunk);
     let resolved=0,unresolved=0;
