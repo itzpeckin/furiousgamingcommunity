@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.4.1';
+  const VERSION = '5.9.10.6.4.2';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -15,8 +15,8 @@
     ['activate-snapshot','Activate Snapshot'],
     ['detect-transactions','Detect Roster Movements'],
     ['classify-transactions','Classify Transactions'],
-    ['reconcile-transactions','Publish Transactions & Free Agents'],
-    ['verify-active-snapshot','Verify Live Snapshot']
+    ['verify-active-snapshot','Verify Live Snapshot'],
+    ['publish-transactions','Publish Transactions & Free Agents']
   ];
 
   let busy = false;
@@ -309,22 +309,6 @@
     }
   }
 
-  async function reconcileTransactions() {
-    const stage='reconcile-transactions';
-    setStage(stage,'running','Publishing roster signings, releases, and team changes…');
-    try {
-      const payload=await api(`/api/leagues/${encodeURIComponent(slug())}/transactions/canonical`,'POST',{action:'reconcile-forward-classifications'});
-      const summary=`${payload.reconciled||0} published · ${payload.signings||0} signing(s) · ${payload.releases||0} release(s) · ${payload.teamChanges||0} team change(s)`;
-      setStage(stage,'complete',summary);
-      await report(stage,true,{summary,snapshotId});
-      return payload;
-    } catch(error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
   async function verify() {
     const stage='verify-active-snapshot';
     setStage(stage,'running','Verifying active snapshot…');
@@ -343,6 +327,24 @@
     } catch(error) {
       setStage(stage,'failed',error.message);
       await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
+      throw error;
+    }
+  }
+
+  async function publishTransactions(){
+    const stage='publish-transactions';
+    setStage(stage,'running','Publishing signings, releases, roster moves and Free Agent state…');
+    try{
+      const service=window.FranchiseHQ?.transactions;
+      if(!service?.syncCanonical)throw new Error('Canonical transaction service is unavailable.');
+      const payload=await service.syncCanonical({force:true});
+      const touched=Number(payload?.canonical?.touchedTransactions||0);
+      const freeAgents=Number(payload?.freeAgents?.currentFreeAgents||0);
+      const forward=Number(payload?.input?.forwardMovementEvents||0);
+      setStage(stage,'complete',`${touched} transaction(s) touched · ${freeAgents} Free Agent(s) · ${forward} movement event(s) reconciled`);
+      return payload;
+    }catch(error){
+      setStage(stage,'failed',error.message);
       throw error;
     }
   }
@@ -402,8 +404,8 @@
       await lifecycle('activate-snapshot','activate');
       await detectTransactions();
       await classifyTransactions();
-      await reconcileTransactions();
       await verify();
+      await publishTransactions();
       progress=`Import complete · ${snapshotId} is LIVE`;
       try { window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,runId:run?.id}})); } catch (_) {}
     } catch(error) {
