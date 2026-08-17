@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.3P.5e';
+const RELEASE='5.9.10.6.3P.5f';
 const RECORD_CHUNK_SIZE=40;
 const MAX_STORED_WARNINGS_PER_BATCH=25;
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
@@ -247,6 +247,15 @@ async function capturedRoutes(db,env,leagueId){
   return selected.sort((a,b)=>a.route_path.localeCompare(b.route_path));
 }
 
+async function latestCompletedRegularWeek(db,leagueId){
+  const active=await db.prepare(`SELECT s.week_index
+    FROM league_active_snapshots a
+    JOIN league_snapshots s ON s.id=a.snapshot_id AND s.league_id=a.league_id
+    WHERE a.league_id=?`).bind(leagueId).first();
+  const week=Number(active?.week_index);
+  return Number.isFinite(week)?week:null;
+}
+
 async function activeSnapshotId(db,leagueId){
   const row=await db.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id=?`).bind(leagueId).first();
   return text(row?.snapshot_id);
@@ -341,6 +350,7 @@ async function startRun(db,env,leagueId){
   const bootstrap=await bootstrapActiveStatisticsManifest(db,leagueId);
   const activeId=bootstrap.snapshotId||await activeSnapshotId(db,leagueId);
   const committed=await activeManifestByRoute(db,leagueId,activeId);
+  const completedRegularWeek=await latestCompletedRegularWeek(db,leagueId);
 
   const runId=crypto.randomUUID();
   let skipped=0,pending=0;
@@ -349,8 +359,12 @@ async function startRun(db,env,leagueId){
     const meta=routeMeta(capture.route_path);
     if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
+    const optionalEmpty=Boolean(!capture.captureUsable && (
+      meta?.stage==='pre' ||
+      (meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)
+    ));
     const unchanged=Boolean(capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
-    if(unchanged)skipped++;else pending++;
+    if(unchanged||optionalEmpty)skipped++;else pending++;
   }
 
   await db.prepare(`INSERT INTO companion_statistics_mapping_runs
@@ -370,21 +384,31 @@ async function startRun(db,env,leagueId){
   for(const capture of routes){
     const meta=routeMeta(capture.route_path);if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
+    const optionalEmpty=Boolean(!capture.captureUsable && (
+      meta.stage==='pre' ||
+      (meta.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)
+    ));
     const unchanged=Boolean(capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     statements.push(db.prepare(sql).bind(
       crypto.randomUUID(),runId,leagueId,capture.capture_id,capture.discovery_session_id,capture.route_path,
       capture.r2_object_key,capture.payload_hash||'',meta.category,canonicalStage(meta.stage),meta.week,
       prior?.season_year==null?null:Number(prior.season_year),
-      unchanged?'skipped':capture.captureUsable?'pending':'failed',
+      (unchanged||optionalEmpty)?'skipped':capture.captureUsable?'pending':'failed',
       unchanged?Number(prior?.record_count||0):0,
       0,
       unchanged?Number(prior?.record_count||0):null,
-      (unchanged||!capture.captureUsable)?new Date().toISOString():null
+      (unchanged||optionalEmpty||!capture.captureUsable)?new Date().toISOString():null
     ));
   }
   for(let i=0;i<statements.length;i+=75)await db.batch(statements.slice(i,i+75));
 
-  for(const capture of routes.filter(row=>!row.captureUsable)){
+  for(const capture of routes.filter(row=>{
+    if(row.captureUsable)return false;
+    const meta=routeMeta(row.route_path);
+    if(meta?.stage==='pre')return false;
+    if(meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)return false;
+    return true;
+  })){
     const diagnostic={
       error:capture.selectionError||'No usable statistics capture found.',
       routePath:capture.route_path,
@@ -399,7 +423,14 @@ async function startRun(db,env,leagueId){
 
   return{
     runId,activeSnapshotId:activeId,bootstrap,skippedRoutes:skipped,pendingRoutes:pending,totalRoutes:routes.length,
-    unusableRoutes:routes.filter(row=>!row.captureUsable).map(row=>({
+    completedRegularWeek,
+    unusableRoutes:routes.filter(row=>{
+      if(row.captureUsable)return false;
+      const meta=routeMeta(row.route_path);
+      if(meta?.stage==='pre')return false;
+      if(meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)return false;
+      return true;
+    }).map(row=>({
       routePath:row.route_path,
       error:row.selectionError,
       candidates:row.candidateAudit||[]
