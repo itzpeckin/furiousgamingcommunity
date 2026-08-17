@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.3P.5d';
+const RELEASE='5.9.10.6.3P.5e';
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const MAX_PREVIEW_CHARS=4000;
 
