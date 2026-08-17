@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.3P.4';
+  const VERSION = '5.9.10.6.3P.5';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -28,6 +28,7 @@
   let importCompletedAt = null;
   let stageTimings = {};
   let currentStageStartedAt = {};
+  let lastCertification = null;
 
   const nowMs = () => (window.performance?.now?.() ?? Date.now());
   const isoNow = () => new Date().toISOString();
@@ -103,6 +104,7 @@
   const orchestrator = (method='GET', body) => api(`${base()}import-orchestrator`, method, body);
   const forwardDetection = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/forward-detection`, method, body);
   const transactionClassification = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/classification`, method, body);
+  const importCertification = (method='GET', body) => api(`${base()}import-certification`, method, body);
 
   function setStage(id, state, detail='') {
     const previous=stageState[id]?.state;
@@ -323,9 +325,33 @@
     }
   }
 
+  async function certifyCompletedImport() {
+    if(lastError||!snapshotId)return null;
+    const timing=timingSummary();
+    let playerSync=null;
+    try {
+      const service=window.FranchiseHQ?.playerLiveSync;
+      if(service?.refresh)playerSync=await service.refresh();
+      else if(service?.status)playerSync=service.status();
+    } catch(error) {
+      console.warn('[Import Certification] Player service synchronization check could not run.',error);
+    }
+
+    const payload=await importCertification('POST',{
+      snapshotId,
+      runId:run?.id||null,
+      timing,
+      playerSync
+    });
+    lastCertification=payload.certification||null;
+    window.__FHQ_IMPORT_CERTIFICATION__=lastCertification;
+    console.info('[Import Performance Certification]',lastCertification);
+    return lastCertification;
+  }
+
   async function runImport() {
     if (busy) return;
-    busy=true; lastError=null; progress='Preparing import…'; snapshotId=null; stageState={};
+    busy=true; lastError=null; progress='Preparing import…'; snapshotId=null; stageState={}; lastCertification=null;
     stageTimings={}; currentStageStartedAt={};
     importStartedAt={ms:nowMs(),at:isoNow()}; importCompletedAt=null;
     rerender();
@@ -373,6 +399,20 @@
         completedAt:row.completedAt
       })));
       console.info('[One-Click Import Timing]',window.__FHQ_IMPORT_TIMING__);
+
+      if(!lastError && STAGES.every(([id])=>stageState[id]?.state==='complete')){
+        try{
+          progress='Import complete · running production certification…';
+          rerender();
+          await certifyCompletedImport();
+          progress=lastCertification?.passed
+            ? `Import certified · ${snapshotId} is LIVE · ${lastCertification.wallClockSeconds??'?'}s`
+            : `Import completed · certification requires review`;
+        }catch(error){
+          console.error('[Import Performance Certification]',error.payload||error);
+          progress='Import completed, but performance certification could not be generated.';
+        }
+      }
       rerender();
     }
   }
@@ -389,6 +429,7 @@
       ${importStartedAt?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>Import timing: ${esc(timingSummary().wallClockDurationSeconds)}s ${importCompletedAt?'total':'elapsed'}</span></div>`:''}
       ${snapshotId?`<p class="league-import-status-note"><strong>New Snapshot:</strong> ${esc(snapshotId)}</p>`:''}
       ${lastError?`<div class="validation-errors"><p><strong>${esc(lastError.message)}</strong></p>${lastError.payload?`<pre style="white-space:pre-wrap;max-height:260px;overflow:auto">${esc(JSON.stringify(lastError.payload,null,2))}</pre>`:''}</div>`:''}
+      ${lastCertification?`<div class="league-import-framework-note"><svg><use href="#icon-activity"></use></svg><span><strong>Production Certification:</strong> ${lastCertification.passed?'PASS':'REVIEW'} · ${lastCertification.score}% · ${lastCertification.wallClockSeconds??'?'}s</span></div>`:''}
       <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>Fail-safe behavior: the existing LIVE snapshot remains authoritative until the new snapshot passes validation and activation succeeds.</span></div>
     </article>`;
   }
@@ -409,6 +450,17 @@
   HQ.defineModuleService('platform','oneClickImport',{runImport,renderPanel,diagnostics},{replace:true,alias:'oneClickImport'});
 
   window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.importCertification={
+    release:VERSION,
+    last:()=>lastCertification||window.__FHQ_IMPORT_CERTIFICATION__||null,
+    refresh:async()=>{
+      const payload=await importCertification('GET');
+      lastCertification=payload.certification||null;
+      window.__FHQ_IMPORT_CERTIFICATION__=lastCertification;
+      return lastCertification;
+    }
+  };
+
   window.FranchiseHQ.importTiming={
     release:VERSION,
     current:()=>timingSummary(),
