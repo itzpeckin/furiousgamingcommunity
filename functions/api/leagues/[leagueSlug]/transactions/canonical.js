@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.4.1';
+const RELEASE='5.9.10.6.4.2';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -356,9 +356,21 @@ function buildDiffEvents(previous=[],current=[],previousSnapshotId,currentSnapsh
   const newMap=new Map(current.map(row=>[String(row.playerId),row]));
   const rawMoves=[];
 
+  // Previously rostered, now absent = release evidence.
   for(const [playerId,oldRow] of oldMap){
     const next=newMap.get(playerId);
-    if(!next)continue;
+    if(!next){
+      rawMoves.push({
+        playerId,
+        playerName:oldRow.player_name||'Unknown Player',
+        fromTeamId:clean(oldRow.team_id),
+        toTeamId:'FA',
+        oldStatus:clean(oldRow.roster_status),
+        newStatus:'free-agent',
+        eventType:'release'
+      });
+      continue;
+    }
     const from=clean(oldRow.team_id),to=clean(next.teamId);
     const oldStatus=clean(oldRow.roster_status),newStatus=clean(next.rosterStatus);
     if(from===to && oldStatus===newStatus)continue;
@@ -382,9 +394,20 @@ function buildDiffEvents(previous=[],current=[],previousSnapshotId,currentSnapsh
     });
   }
 
-  // Group team-to-team movement by team pair per snapshot. This makes a two-player swap
-  // one inferred movement event, but it remains "team-change" until workflow/Madden evidence
-  // proves it is a trade.
+  // Newly rostered, absent from previous team roster = signing evidence.
+  for(const [playerId,next] of newMap){
+    if(oldMap.has(playerId))continue;
+    rawMoves.push({
+      playerId,
+      playerName:next.playerName||'Unknown Player',
+      fromTeamId:'FA',
+      toTeamId:clean(next.teamId),
+      oldStatus:'free-agent',
+      newStatus:clean(next.rosterStatus)||'active',
+      eventType:'signing'
+    });
+  }
+
   const grouped=new Map();
   rawMoves.forEach(move=>{
     const pair=normalizedPair([move.fromTeamId,move.toTeamId]).join('|');
@@ -408,6 +431,109 @@ function buildDiffEvents(previous=[],current=[],previousSnapshotId,currentSnapsh
   });
 
   return [...grouped.values()];
+}
+
+async function forwardMovementHistory(db,leagueId){
+  const exists=await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='forward_roster_movements'`).first();
+  if(!exists)return[];
+  const result=await db.prepare(`SELECT * FROM forward_roster_movements
+    WHERE league_id=? ORDER BY COALESCE(detected_at,'') ASC,id ASC`).bind(leagueId).all();
+  return result.results||[];
+}
+
+function forwardMovementEvent(row){
+  const detection=String(row.detection_type||'').toLowerCase();
+  const eventType=detection==='roster-entry'?'signing'
+    :detection==='roster-exit'?'release'
+    :detection==='team-change'?'team-change'
+    :detection==='roster-status-change'?'roster-status-change'
+    :'roster-move';
+  const from=clean(row.previous_team_id)||(eventType==='signing'?'FA':null);
+  const to=clean(row.current_team_id)||(eventType==='release'?'FA':null);
+  return normalizeIncomingEvent({
+    sourceKey:`forward:${row.id}`,
+    eventType,
+    fromTeamId:from,
+    toTeamId:to,
+    teamIds:normalizedPair([from,to]),
+    playerIds:[row.player_id],
+    playerId:row.player_id,
+    season:row.season,
+    week:row.week,
+    previousSnapshotId:row.previous_snapshot_id||null,
+    currentSnapshotId:row.current_snapshot_id||null,
+    occurredAt:row.detected_at||null,
+    confidence:'snapshot-observed',
+    moves:[{
+      playerId:row.player_id,
+      playerName:row.player_name||'Unknown Player',
+      fromTeamId:from,
+      toTeamId:to,
+      oldStatus:row.previous_roster_status||null,
+      newStatus:row.current_roster_status||null,
+      eventType
+    }]
+  },'snapshot-diff');
+}
+
+async function snapshotPlayerRaw(db,leagueId,snapshotId,playerId){
+  if(!snapshotId||!playerId)return null;
+  const row=await db.prepare(`SELECT data_json FROM league_snapshot_records
+    WHERE league_id=? AND snapshot_id=? AND domain='players' AND external_id=? LIMIT 1`)
+    .bind(leagueId,snapshotId,String(playerId)).first();
+  return parse(row?.data_json,{})||null;
+}
+
+function rawPlayerMeta(raw={},fallback={}){
+  const nested=typeof raw?.source_record_json==='string'?parse(raw.source_record_json,{}):(raw?.source_record_json||raw?.source||{});
+  const source={...(nested&&typeof nested==='object'?nested:{}),...(raw||{})};
+  const num=value=>{const n=Number(value);return Number.isFinite(n)?n:null};
+  return{
+    playerName:clean(source.display_name??source.displayName??source.playerName??source.name) || clean(fallback.player_name) || 'Unknown Player',
+    position:clean(source.position??source.position_name??source.positionName??source.pos) || clean(fallback.position),
+    overall:num(source.overall??source.overall_rating??source.overallRating??source.ovrRating??source.playerBestOvr??source.playerOverall??source.ovr),
+    age:num(source.age),
+    devTrait:clean(source.dev_trait??source.devTrait??source.developmentTrait??source.development),
+    raw:source
+  };
+}
+
+async function rebuildFreeAgentLedger(db,leagueId,movements,currentRoster=[]){
+  // Only rebuild snapshot-inferred Free Agents. Explicit Companion FA rows, if ever available, remain untouched.
+  await db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND source_route='forward-detection'`).bind(leagueId).run();
+  let releases=0,removed=0;
+  for(const movement of movements){
+    const detection=String(movement.detection_type||'').toLowerCase();
+    const playerId=clean(movement.player_id);
+    if(!playerId)continue;
+    if(detection==='roster-exit'){
+      const raw=await snapshotPlayerRaw(db,leagueId,movement.previous_snapshot_id,playerId);
+      const meta=rawPlayerMeta(raw||{},movement);
+      await db.prepare(`INSERT INTO canonical_free_agents
+        (league_id,player_id,player_name,position,overall,age,dev_trait,source_route,source_capture_id,raw_json,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+        ON CONFLICT(league_id,player_id) DO UPDATE SET
+          player_name=excluded.player_name,position=COALESCE(excluded.position,canonical_free_agents.position),
+          overall=COALESCE(excluded.overall,canonical_free_agents.overall),age=COALESCE(excluded.age,canonical_free_agents.age),
+          dev_trait=COALESCE(excluded.dev_trait,canonical_free_agents.dev_trait),source_route=excluded.source_route,
+          source_capture_id=excluded.source_capture_id,raw_json=excluded.raw_json,updated_at=CURRENT_TIMESTAMP`)
+        .bind(leagueId,playerId,meta.playerName,meta.position,meta.overall,meta.age,meta.devTrait,
+          'forward-detection',movement.id,JSON.stringify({...meta.raw,teamId:'FA',rosterStatus:'free-agent',status:'free-agent'})).run();
+      releases++;
+    }else if(['roster-entry','team-change'].includes(detection)){
+      const result=await db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND player_id=?`).bind(leagueId,playerId).run();
+      removed+=Number(result?.meta?.changes||0);
+    }
+  }
+  // Current team rosters always win over historical release evidence.
+  for(let i=0;i<currentRoster.length;i+=75){
+    const ids=currentRoster.slice(i,i+75).map(row=>clean(row.playerId)).filter(Boolean);
+    if(!ids.length)continue;
+    const marks=ids.map(()=>'?').join(',');
+    await db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND player_id IN (${marks})`).bind(leagueId,...ids).run();
+  }
+  const count=Number((await db.prepare(`SELECT COUNT(*) c FROM canonical_free_agents WHERE league_id=?`).bind(leagueId).first())?.c||0);
+  return{releasesObserved:releases,removedByAcquisition:removed,currentFreeAgents:count};
 }
 
 async function storeRosterSnapshot(db,leagueId,snapshotId,season,week,roster=[]){
@@ -1513,64 +1639,6 @@ export async function onRequestPost(context){
   try{body=await context.request.json()}catch{}
   const action=String(body.action||'sync').toLowerCase();
 
-  if(action==='reconcile-forward-classifications'){
-    let rows=[];
-    try{
-      rows=(await state.db.prepare(`SELECT c.*,m.player_name,m.position,m.previous_team_id,m.current_team_id,m.previous_roster_status,m.current_roster_status,m.season,m.week
-        FROM transaction_movement_classifications c
-        LEFT JOIN forward_roster_movements m ON m.id=c.movement_id
-        WHERE c.league_id=? AND c.current_snapshot_id=(
-          SELECT current_snapshot_id FROM forward_detection_jobs WHERE league_id=? AND status IN ('complete','baseline') ORDER BY COALESCE(completed_at,updated_at,created_at) DESC LIMIT 1
-        ) ORDER BY c.classified_at,c.player_id`).bind(state.league.id,state.league.id).all()).results||[];
-    }catch(error){return json({ok:false,error:'Forward transaction classifications are unavailable.',detail:error?.message||String(error),release:RELEASE},422)}
-    const grouped=new Map();
-    for(const row of rows){
-      const cls=String(row.classification||'').toUpperCase();
-      const detection=String(row.detection_type||'').toLowerCase();
-      const lifecycleClass=cls==='ROSTER_ENTRY'?'SIGNING':cls==='ROSTER_EXIT'?'RELEASE':cls;
-      if(!['SIGNING','RELEASE','TEAM_CHANGE'].includes(lifecycleClass))continue;
-      const eventType=lifecycleClass==='SIGNING'?'signing':lifecycleClass==='RELEASE'?'release':'team-change';
-      const pair=normalizedPair([row.previous_team_id,row.current_team_id]);
-      const key=eventType==='team-change'
-        ?`forward:${row.previous_snapshot_id}:${row.current_snapshot_id}:team-change:${pair.join('|')}`
-        :`forward:${row.previous_snapshot_id}:${row.current_snapshot_id}:${eventType}:${row.player_id}`;
-      const event=grouped.get(key)||{sourceKey:key,sourceType:'snapshot-diff',eventType,teamIds:pair,playerIds:[],season:row.season,week:row.week,confidence:'snapshot-observed',moves:[]};
-      event.playerIds.push(String(row.player_id));
-      event.moves.push({playerId:String(row.player_id),playerName:row.player_name||String(row.player_id),position:row.position||null,fromTeamId:row.previous_team_id||null,toTeamId:row.current_team_id||null,fromStatus:row.previous_roster_status||null,toStatus:row.current_roster_status||null});
-      grouped.set(key,event);
-    }
-    let reconciled=0;
-    const counts={signings:0,releases:0,teamChanges:0};
-    for(const raw of grouped.values()){
-      const event=normalizeIncomingEvent(raw,'snapshot-diff');
-      await mergeEvidence(state.db,state.league.id,event,rows[0]?.current_snapshot_id||null);
-      // Keep the player universe stable across releases/signings even when the Companion
-      // team-roster export omits free agents. A roster exit becomes an inferred FA state;
-      // a later roster entry removes that inferred FA state.
-      for(const move of raw.moves||[]){
-        if(event.eventType==='release'){
-          await state.db.prepare(`INSERT INTO canonical_free_agents
-            (league_id,player_id,player_name,position,source_route,source_capture_id,raw_json,updated_at)
-            VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
-            ON CONFLICT(league_id,player_id) DO UPDATE SET
-              player_name=excluded.player_name,position=COALESCE(excluded.position,canonical_free_agents.position),
-              source_route=excluded.source_route,source_capture_id=excluded.source_capture_id,
-              raw_json=excluded.raw_json,updated_at=CURRENT_TIMESTAMP`)
-            .bind(state.league.id,String(move.playerId),move.playerName||String(move.playerId),move.position||null,
-              'snapshot-diff:roster-exit',rows[0]?.current_snapshot_id||null,
-              JSON.stringify({inferred:true,event:'release',fromTeamId:move.fromTeamId||null,toTeamId:null,
-                previousRosterStatus:move.fromStatus||null,currentRosterStatus:'free-agent'})).run();
-        }else if(event.eventType==='signing'){
-          await state.db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND player_id=?`)
-            .bind(state.league.id,String(move.playerId)).run();
-        }
-      }
-      reconciled++;
-      if(event.eventType==='signing')counts.signings++; else if(event.eventType==='release')counts.releases++; else counts.teamChanges++;
-    }
-    return json({ok:true,release:RELEASE,reconciled,...counts,currentSnapshotId:rows[0]?.current_snapshot_id||null});
-  }
-
   if(action==='dedupe-test'){
     return json({ok:true,release:RELEASE,test:syntheticDedupeTest()});
   }
@@ -1665,6 +1733,8 @@ export async function onRequestPost(context){
     ? buildDiffEvents(previousRows,roster,previous.snapshot_id,snapshotId,season,week)
       .map(row=>normalizeIncomingEvent(row,'snapshot-diff'))
     : [];
+  const forwardMovements=await forwardMovementHistory(state.db,state.league.id);
+  const forwardEvents=forwardMovements.map(forwardMovementEvent);
 
   // Source priority is deliberate:
   // 1) existing canonical source-key match is checked inside mergeEvidence
@@ -1678,11 +1748,15 @@ export async function onRequestPost(context){
   for(const event of explicitEvents){
     results.push({source:'madden-explicit',...(await mergeEvidence(state.db,state.league.id,event,snapshotId))});
   }
+  for(const event of forwardEvents){
+    results.push({source:'forward-history',...(await mergeEvidence(state.db,state.league.id,event,event.raw?.currentSnapshotId||snapshotId))});
+  }
   for(const event of diffEvents){
     results.push({source:'snapshot-diff',...(await mergeEvidence(state.db,state.league.id,event,snapshotId))});
   }
 
   await storeRosterSnapshot(state.db,state.league.id,snapshotId,season,week,roster);
+  const freeAgentLedger=await rebuildFreeAgentLedger(state.db,state.league.id,forwardMovements,roster);
 
   const touchedIds=uniq(results.map(row=>row.transactionId));
   const touched=[];
@@ -1702,8 +1776,10 @@ export async function onRequestPost(context){
       rosterPlayers:roster.length,
       workflowEvents:workflowEvents.length,
       explicitMaddenEvents:explicitEvents.length,
+      forwardMovementEvents:forwardEvents.length,
       snapshotDiffEvents:diffEvents.length
     },
+    freeAgents:freeAgentLedger,
     canonical:{
       touchedTransactions:touched.length,
       transactions:touched
