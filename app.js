@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.3P.2a',
+      release:'5.9.10.6.3P.2b',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2649,7 +2649,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.3P.2a — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.3P.2b — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -5518,20 +5518,112 @@ function canonicalPlayerDashboardStats(playerId='') {
       grouped.get(playerId).push(row);
     });
 
+    const canonicalToTeamKeys=(category,totals,playerRows)=>{
+      const games=new Set(playerRows.map(row=>{
+        const raw=statisticRaw(row);
+        return `${canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage)}:${Number(row.week??row.weekIndex??raw.week??raw.weekIndex)||0}`;
+      })).size;
+
+      const n=value=>{
+        const number=Number(value);
+        return Number.isFinite(number)?number:0;
+      };
+
+      if(category==='passing'){
+        return {
+          games,
+          completions:n(totals.CMP),
+          attempts:n(totals.ATT),
+          compPct:n(totals['CMP%']),
+          passingYards:n(totals.YDS),
+          passingTD:n(totals.TD),
+          interceptions:n(totals.INT),
+          yardsPerAttempt:n(totals['Y/A']),
+          passerRating:n(totals.RTG)
+        };
+      }
+
+      if(category==='rushing'){
+        return {
+          games,
+          carries:n(totals.ATT),
+          rushingYards:n(totals.YDS),
+          rushingTD:n(totals.TD),
+          yardsPerCarry:n(totals['Y/A']),
+          fumbles:n(totals.FUM),
+          longRush:n(totals.LONG)
+        };
+      }
+
+      if(category==='receiving'){
+        const targets=playerStatSum(playerRows,['recTargets','targets','receivingTargets']);
+        return {
+          games,
+          targets:n(targets),
+          receptions:n(totals.REC),
+          receivingYards:n(totals.YDS),
+          receivingTD:n(totals.TD),
+          yardsPerCatch:n(totals['Y/R']),
+          drops:n(totals.DROP),
+          longReception:n(totals.LONG)
+        };
+      }
+
+      if(category==='defense'){
+        const tfl=playerStatSum(playerRows,['defTacklesForLoss','tacklesForLoss','tfl']);
+        return {
+          games,
+          tackles:n(totals.TKL),
+          tacklesForLoss:n(tfl),
+          sacks:n(totals.SACK),
+          defensiveInterceptions:n(totals.INT),
+          passDeflections:n(totals.DEF),
+          forcedFumbles:n(totals.FF),
+          fumbleRecoveries:n(totals.FR),
+          defensiveTD:n(totals.TD)
+        };
+      }
+
+      if(category==='kicking'){
+        return {
+          games,
+          fgm:n(totals.FGM),
+          fga:n(totals.FGA),
+          fgPct:n(totals['FG%']),
+          longFieldGoal:n(totals.LONG),
+          xpm:n(totals.XPM),
+          xpa:n(totals.XPA),
+          points:n(totals.PTS)
+        };
+      }
+
+      if(category==='punting'){
+        const puntYards=playerStatSum(playerRows,['puntYds','puntYards']);
+        const punts=n(totals.PUNTS);
+        return {
+          games,
+          punts,
+          average:punts&&Number.isFinite(Number(puntYards))?Number(puntYards)/punts:n(totals['NET Y/P']),
+          netAverage:n(totals['NET Y/P']),
+          inside20:n(totals.IN20),
+          touchbacks:n(totals.TB),
+          longPunt:n(totals.LONG)
+        };
+      }
+
+      return {games};
+    };
+
     return [...grouped.entries()].map(([playerId,playerRows])=>{
       const identity=matchupPlayerIdentity(playerId);
-      const totals=playerStatCategoryTotals(playerRows,category)||{};
+      const canonicalTotals=playerStatCategoryTotals(playerRows,category)||{};
+      const stats=canonicalToTeamKeys(category,canonicalTotals,playerRows);
+
       return {
         id:playerId,
         name:identity?.name||`Player ${playerId}`,
         position:identity?.position||'',
-        stats:{
-          games:new Set(playerRows.map(row=>{
-            const raw=statisticRaw(row);
-            return `${canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage)}:${Number(row.week??row.weekIndex??raw.week??raw.weekIndex)||0}`;
-          })).size,
-          ...totals
-        }
+        stats
       };
     }).sort((x,y)=>{
       const key=({
@@ -8487,9 +8579,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.3P.2a';
+      node.textContent = 'Current Release - 5.9.10.6.3P.2b';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.3P.2a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.3P.2b';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8501,7 +8593,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.3P.2a',
+    release:'5.9.10.6.3P.2b',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8515,7 +8607,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.3P.2a',
+        release:'5.9.10.6.3P.2b',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9111,7 +9203,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.3P.2a',
+    release:'5.9.10.6.3P.2b',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
