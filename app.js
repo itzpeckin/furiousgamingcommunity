@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.3P.2',
+      release:'5.9.10.6.3P.2a',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2649,7 +2649,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.3P.2 — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.3P.2a — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -3432,12 +3432,36 @@
     return 'regular-season';
   }
 
+  function canonicalTeamIdAliases(teamId='') {
+    const wanted=String(teamId??'').toLowerCase();
+    const team=(liveTeamDirectory?.teams||[]).find(candidate=>{
+      const aliases=[
+        candidate?.id,candidate?.liveTeamId,candidate?.abbr,candidate?.abbreviation,
+        candidate?.source?.teamId,candidate?.source?.team_id,candidate?.source?.external_id
+      ].filter(value=>value!==undefined&&value!==null&&String(value)!=='')
+       .map(value=>String(value).toLowerCase());
+      return aliases.includes(wanted);
+    });
+    const aliases=new Set([
+      teamId,
+      team?.id,team?.liveTeamId,team?.abbr,team?.abbreviation,
+      team?.source?.teamId,team?.source?.team_id,team?.source?.external_id
+    ].filter(value=>value!==undefined&&value!==null&&String(value)!=='')
+     .map(value=>String(value).toLowerCase()));
+    return aliases;
+  }
+
+  function canonicalTeamIdentityMatches(value='',aliases=new Set()) {
+    return aliases.has(String(value??'').toLowerCase());
+  }
+
   function canonicalGameLog(playerId='',seasonOverride=null) {
     const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId);
     const categories=model?.categories||{};
     const normalized=liveRosterPlayers.get(String(playerId))||rosterService()?.findPlayer?.(playerId);
     const view=normalized?rosterPlayerView(normalized):{};
     const teamId=String(view.teamId||normalized?.teamId||'');
+    const teamAliases=canonicalTeamIdAliases(teamId);
 
     const currentYear=canonicalCurrentSeasonYear();
     const selectedYear=Number.isFinite(Number(seasonOverride))
@@ -3471,7 +3495,7 @@
       const year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??selectedYear);
       const stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
 
-      return (home===teamId||away===teamId)
+      return (canonicalTeamIdentityMatches(home,teamAliases)||canonicalTeamIdentityMatches(away,teamAliases))
         &&stage!=='preseason'
         &&(!Number.isFinite(selectedYear)||!Number.isFinite(year)||year===selectedYear);
     }).sort((a,b)=>{
@@ -5468,15 +5492,159 @@ function canonicalPlayerDashboardStats(playerId='') {
     return `<article class="card team-stat-section"><div class="card-header"><div><span class="eyebrow">Position-specific production</span><h3>${title}</h3></div><span class="pill pill--neutral">${players.length} player${players.length===1?'':'s'}</span></div><div class="table-wrap"><table class="team-stat-table"><thead><tr><th>Player</th>${columns.map(column=>`<th>${column.label}</th>`).join('')}</tr></thead><tbody>${players.length?players.map(player=>`<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id)}"><td><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position)}</small></td>${columns.map(column=>`<td>${column.format?column.format(player.stats?.[column.key],player):escapeHtml(String(player.stats?.[column.key] ?? '—'))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${columns.length+1}">${emptyMessage}</td></tr>`}</tbody></table></div></article>`;
   }
 
-  function renderTeamStats(team, roster) {
-    const service=statisticsService();
-    if(!service) return '<article class="card"><div class="card-body">Statistics service unavailable.</div></article>';
-    const model=service.getTeamStats(team.id);
-    const overview=model.overview||{};
-    const categoryColumns={
-      passing:statsColumnMap.passing,rushing:statsColumnMap.rushing,receiving:statsColumnMap.receiving,defense:statsColumnMap.defense,kicking:statsColumnMap.kicking,punting:statsColumnMap.punting
+  function canonicalTeamStatsRows(team={}) {
+    const aliases=canonicalTeamIdAliases(team?.id||team?.liveTeamId||'');
+    const currentYear=Number(canonicalCurrentSeasonYear());
+    return (playerStatisticsState.rows||[]).filter(row=>{
+      const raw=statisticRaw(row);
+      const rowTeam=String(rowTeamId(row)||'');
+      if(!canonicalTeamIdentityMatches(rowTeam,aliases))return false;
+      const stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage);
+      if(stage==='preseason')return false;
+      const year=Number(row.seasonYear??row.season??raw.seasonYear??raw.season_year??raw.calendarYear);
+      if(Number.isFinite(currentYear)&&Number.isFinite(year)&&year!==currentYear)return false;
+      return Boolean(rowPlayerId(row));
+    });
+  }
+
+  function canonicalTeamPlayerTotals(team={},category='') {
+    const rows=canonicalTeamStatsRows(team).filter(row=>matchupPlayerCategory(row)===category);
+    const grouped=new Map();
+
+    rows.forEach(row=>{
+      const playerId=String(rowPlayerId(row)||'');
+      if(!playerId)return;
+      if(!grouped.has(playerId))grouped.set(playerId,[]);
+      grouped.get(playerId).push(row);
+    });
+
+    return [...grouped.entries()].map(([playerId,playerRows])=>{
+      const identity=matchupPlayerIdentity(playerId);
+      const totals=playerStatCategoryTotals(playerRows,category)||{};
+      return {
+        id:playerId,
+        name:identity?.name||`Player ${playerId}`,
+        position:identity?.position||'',
+        stats:{
+          games:new Set(playerRows.map(row=>{
+            const raw=statisticRaw(row);
+            return `${canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage)}:${Number(row.week??row.weekIndex??raw.week??raw.weekIndex)||0}`;
+          })).size,
+          ...totals
+        }
+      };
+    }).sort((x,y)=>{
+      const key=({
+        passing:'passingYards',
+        rushing:'rushingYards',
+        receiving:'receivingYards',
+        defense:'tackles',
+        kicking:'points',
+        punting:'average'
+      })[category]||'games';
+      return Number(y.stats?.[key]||0)-Number(x.stats?.[key]||0)||String(x.name).localeCompare(String(y.name));
+    });
+  }
+
+  function canonicalTeamOverview(team={}) {
+    const aliases=canonicalTeamIdAliases(team?.id||team?.liveTeamId||'');
+    const currentYear=Number(canonicalCurrentSeasonYear());
+    const teamRows=(playerStatisticsState.rows||[]).filter(row=>{
+      if(String(row.category||'').toLowerCase()!=='team-game')return false;
+      if(!canonicalTeamIdentityMatches(rowTeamId(row),aliases))return false;
+      const raw=statisticRaw(row);
+      const stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage);
+      if(stage==='preseason')return false;
+      const year=Number(row.seasonYear??row.season??raw.seasonYear??raw.season_year??raw.calendarYear);
+      return !(Number.isFinite(currentYear)&&Number.isFinite(year)&&year!==currentYear);
+    });
+
+    let latest=null;
+    teamRows.forEach(row=>{
+      const raw=statisticRaw(row);
+      const stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage);
+      const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex)||0;
+      const rank=stage==='playoffs'?2:1;
+      if(!latest||rank>latest.rank||(rank===latest.rank&&week>latest.week))latest={row,rank,week};
+    });
+
+    const raw=latest?statisticRaw(latest.row):{};
+    const num=aliases=>{
+      for(const key of aliases){
+        const value=raw[key];
+        const n=Number(value);
+        if(value!==undefined&&value!==null&&value!==''&&Number.isFinite(n))return n;
+      }
+      return 0;
     };
-    return `<div class="team-stats-view"><div class="team-stats-overview">${[['PPG',overview.pointsPerGame],['Allowed/G',overview.pointsAllowedPerGame],['Total Offense',overview.totalOffense],['Pass Offense',overview.passingOffense],['Rush Offense',overview.rushingOffense],['Takeaways',overview.takeaways],['Turnovers',overview.turnovers],['Turnover Diff',overview.turnoverDifferential],['Sacks',overview.sacks]].map(([label,value])=>summaryStatBox(label,Number(value||0).toLocaleString(undefined,{maximumFractionDigits:1}))).join('')}</div>${Object.entries(categoryColumns).map(([category,columns])=>{const rows=model.totals?.[category]||[];return `<article class="card team-stat-section"><div class="card-header"><div><span class="eyebrow">Official Statistics service</span><h3>${titleCase(category)}</h3></div><span class="pill pill--neutral">${rows.length} players</span></div><div class="table-wrap"><table class="team-stat-table"><thead><tr><th>Player</th>${columns.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr class="clickable-row" data-player-id="${escapeHtml(row.id)}"><td><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.position)}</small></td>${columns.map(([key])=>`<td>${formatStatValue(key,row.stats?.[key])}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${columns.length+1}">No ${category} statistics are available.</td></tr>`}</tbody></table></div></article>`}).join('')}</div>`;
+    const giveaways=num(['tOGiveaways'])||num(['offFumLost'])+num(['offIntsLost']);
+    const takeaways=num(['tOTakeaways'])||num(['defIntsRec'])+num(['defFumRec']);
+
+    return {
+      pointsPerGame:num(['offPtsPerGame']),
+      pointsAllowedPerGame:num(['defPtsPerGame']),
+      totalOffense:num(['offTotalYds','offTotalYdsGained']),
+      passingOffense:num(['offPassYds']),
+      rushingOffense:num(['offRushYds']),
+      takeaways,
+      turnovers:giveaways,
+      turnoverDifferential:num(['tODiff'])||(takeaways-giveaways),
+      sacks:num(['defSacks'])
+    };
+  }
+
+  function renderTeamStats(team, roster) {
+    if(!playerStatisticsState.loaded){
+      hydratePlayerStatistics(false).then(()=>{
+        if(state.teamTab==='stats'){
+          const host=document.querySelector('[data-team-tab-content]');
+          if(host)host.innerHTML=renderTeamStats(team,roster);
+        }
+      }).catch(error=>console.error('[Team Stats Canonical Hydration]',error));
+      return '<article class="card"><div class="card-body">Loading canonical team statistics…</div></article>';
+    }
+
+    const overview=canonicalTeamOverview(team);
+    const categoryColumns={
+      passing:statsColumnMap.passing,
+      rushing:statsColumnMap.rushing,
+      receiving:statsColumnMap.receiving,
+      defense:statsColumnMap.defense,
+      kicking:statsColumnMap.kicking,
+      punting:statsColumnMap.punting
+    };
+
+    return `<div class="team-stats-view">
+      <div class="team-stats-overview">
+        ${[
+          ['PPG',overview.pointsPerGame],
+          ['Allowed/G',overview.pointsAllowedPerGame],
+          ['Total Offense',overview.totalOffense],
+          ['Pass Offense',overview.passingOffense],
+          ['Rush Offense',overview.rushingOffense],
+          ['Takeaways',overview.takeaways],
+          ['Turnovers',overview.turnovers],
+          ['Turnover Diff',overview.turnoverDifferential],
+          ['Sacks',overview.sacks]
+        ].map(([label,value])=>summaryStatBox(label,Number(value||0).toLocaleString(undefined,{maximumFractionDigits:1}))).join('')}
+      </div>
+      ${Object.entries(categoryColumns).map(([category,columns])=>{
+        const rows=canonicalTeamPlayerTotals(team,category);
+        return `<article class="card team-stat-section">
+          <div class="card-header">
+            <div><span class="eyebrow">Canonical Madden Statistics</span><h3>${titleCase(category)}</h3></div>
+            <span class="pill pill--neutral">${rows.length} players</span>
+          </div>
+          <div class="table-wrap"><table class="team-stat-table">
+            <thead><tr><th>Player</th>${columns.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map(row=>`<tr class="clickable-row" data-player-id="${escapeHtml(row.id)}">
+              <td><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.position)}</small></td>
+              ${columns.map(([key])=>`<td>${formatStatValue(key,row.stats?.[key])}</td>`).join('')}
+            </tr>`).join('')||`<tr><td colspan="${columns.length+1}">No ${category} statistics are available.</td></tr>`}</tbody>
+          </table></div>
+        </article>`;
+      }).join('')}
+    </div>`;
   }
 
   function summaryStatBox(label,value) { return `<div class="stat-box"><span>${label}</span><strong>${value}</strong></div>`; }
@@ -8319,9 +8487,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.3P.2';
+      node.textContent = 'Current Release - 5.9.10.6.3P.2a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.3P.2';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.3P.2a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8333,7 +8501,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.3P.2',
+    release:'5.9.10.6.3P.2a',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8347,7 +8515,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.3P.2',
+        release:'5.9.10.6.3P.2a',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -8943,7 +9111,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.3P.2',
+    release:'5.9.10.6.3P.2a',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
