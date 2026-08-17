@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.2f',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.10.6.3P.3',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -79,11 +79,83 @@ async function validationCounts(db,leagueId,snapshotId){
   for(const row of result.results||[])if(Object.prototype.hasOwnProperty.call(counts,row.domain))counts[row.domain]=Number(row.count||0);
   return counts;
 }
+
+async function statisticsDeltaValidationPlan(db,leagueId,snapshot){
+  const manifest=parse(snapshot?.manifest_json)||{};
+  const delta=manifest?.deltaStatistics||{};
+  const priorSnapshotId=String(delta?.priorSnapshotId||'').trim();
+  const statisticsRunId=String(manifest?.sources?.statisticsMappingRunId||'').trim();
+
+  if(!delta?.enabled||!priorSnapshotId||!statisticsRunId){
+    return{
+      mode:'full',
+      priorSnapshotId:priorSnapshotId||null,
+      priorSnapshotValidated:false,
+      changedRoutes:[],
+      statisticsRowsToValidate:Number(snapshot?.statistic_count||0),
+      trustedStatisticsRows:0,
+      reason:'delta-metadata-unavailable'
+    };
+  }
+
+  const prior=await db.prepare(`SELECT validation_status,validation_error_count,statistic_count
+    FROM league_snapshots WHERE league_id=? AND id=?`)
+    .bind(leagueId,priorSnapshotId).first();
+
+  const priorReady=String(prior?.validation_status||'')==='ready'&&Number(prior?.validation_error_count||0)===0;
+  if(!priorReady){
+    return{
+      mode:'full',
+      priorSnapshotId,
+      priorSnapshotValidated:false,
+      changedRoutes:[],
+      statisticsRowsToValidate:Number(snapshot?.statistic_count||0),
+      trustedStatisticsRows:0,
+      reason:'prior-snapshot-not-validated'
+    };
+  }
+
+  const routeRows=await db.prepare(`SELECT DISTINCT route_path
+    FROM companion_statistics_mapping_batches
+    WHERE league_id=? AND mapping_run_id=? AND status='complete'
+    ORDER BY route_path`)
+    .bind(leagueId,statisticsRunId).all();
+  const changedRoutes=(routeRows.results||[]).map(row=>String(row.route_path||'')).filter(Boolean);
+
+  let deltaCount=0;
+  for(const route of changedRoutes){
+    const row=await db.prepare(`SELECT COUNT(*) c FROM league_snapshot_records
+      WHERE league_id=? AND snapshot_id=? AND domain='statistics'
+        AND json_extract(data_json,'$.route')=?`)
+      .bind(leagueId,snapshot.id,route).first();
+    deltaCount+=Number(row?.c||0);
+  }
+
+  const totalStats=Number(snapshot?.statistic_count||0);
+  return{
+    mode:'delta',
+    priorSnapshotId,
+    priorSnapshotValidated:true,
+    changedRoutes,
+    statisticsRowsToValidate:deltaCount,
+    trustedStatisticsRows:Math.max(0,totalStats-deltaCount),
+    reason:changedRoutes.length?'validate-new-or-changed-statistics-only':'all-statistics-carried-forward-unchanged'
+  };
+}
+
 async function startSnapshotValidation(db,leagueId,snapshot){
   await ensureValidationSchema(db);
   const counts=await validationCounts(db,leagueId,snapshot.id);
   const ctx=emptyValidationContext(counts,snapshot.warning_count);
-  const total=Object.values(counts).reduce((a,b)=>a+Number(b||0),0);
+  const plan=await statisticsDeltaValidationPlan(db,leagueId,snapshot);
+  ctx.validationPlan=plan;
+
+  const total=
+    Number(counts.teams||0)+
+    Number(counts.players||0)+
+    Number(counts.games||0)+
+    Number(counts.standings||0)+
+    Number(plan.statisticsRowsToValidate||0);
 
   let job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`)
     .bind(leagueId,snapshot.id).first();
@@ -149,6 +221,28 @@ async function validationBatchRows(db,leagueId,snapshotId,domain,cursor,limit){
     .bind(leagueId,snapshotId,safeDomain,limit).all();
   return result.results||[];
 }
+
+async function validationDeltaStatisticRows(db,leagueId,snapshotId,routes,cursor,limit){
+  const unique=[...new Set((routes||[]).filter(Boolean).map(String))];
+  if(!unique.length)return[];
+  const marks=unique.map(()=>'?').join(',');
+  const args=[leagueId,snapshotId,...unique];
+  let sql=`SELECT external_id,
+      json_extract(data_json,'$.player_external_id') AS player_external_id,
+      json_extract(data_json,'$.playerId') AS player_id
+    FROM league_snapshot_records
+    WHERE league_id=? AND snapshot_id=? AND domain='statistics'
+      AND json_extract(data_json,'$.route') IN (${marks})`;
+  if(cursor){
+    sql+=` AND external_id>?`;
+    args.push(String(cursor));
+  }
+  sql+=` ORDER BY external_id LIMIT ?`;
+  args.push(limit);
+  const result=await db.prepare(sql).bind(...args).all();
+  return result.results||[];
+}
+
 async function existingSnapshotPlayerIds(db,leagueId,snapshotId,ids=[]){
   const unique=[...new Set(ids.filter(Boolean).map(String))];
   if(!unique.length)return new Set();
@@ -170,7 +264,9 @@ async function existingSnapshotPlayerIds(db,leagueId,snapshotId,ids=[]){
 function validationProgress(job,ctx){
   const phaseTotals=ctx?.counts||{};
   const phase=job?.phase||'complete';
-  const phaseTotal=Number(phaseTotals[phase]||0);
+  const phaseTotal=phase==='statistics'
+    ? Number(ctx?.validationPlan?.statisticsRowsToValidate??phaseTotals.statistics??0)
+    : Number(phaseTotals[phase]||0);
   return{
     jobId:job?.id||null,
     status:job?.status||null,
@@ -201,12 +297,13 @@ function finalizeValidationReport(ctx){
     warnings:ctx.warnings,
     domains:ctx.domains,
     validatedAt:new Date().toISOString(),
-    execution:'batched'
+    execution:ctx?.validationPlan?.mode==='delta'?'delta-batched':'batched',
+    validationPlan:ctx?.validationPlan||{mode:'full'}
   };
 }
 async function nextSnapshotValidation(db,leagueId,snapshot,limit=100){
   await ensureValidationSchema(db);
-  const safeLimit=Math.max(25,Math.min(125,Number(limit)||100));
+  const safeLimit=Math.max(25,Math.min(500,Number(limit)||250));
   let job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`).bind(leagueId,snapshot.id).first();
   if(!job)return startSnapshotValidation(db,leagueId,snapshot);
   if(job.status==='completed')return{job,complete:true,report:parse(job.report_json)||null};
@@ -266,19 +363,30 @@ async function nextSnapshotValidation(db,leagueId,snapshot,limit=100){
     if(batch.length<safeLimit||offset>=Number(ctx.counts.games||0))advancePhase('statistics');
 
   }else if(phase==='statistics'){
-    const batch=await validationBatchRows(db,leagueId,snapshot.id,'statistics',cursor,safeLimit);
-    const ids=[];
-    for(const row of batch){
-      const player=row.player_external_id??row.player_id;
-      if(player!=null&&player!=='')ids.push(String(player));
+    const plan=ctx.validationPlan||{mode:'full',statisticsRowsToValidate:Number(ctx.counts.statistics||0),changedRoutes:[]};
+    const target=Number(plan.statisticsRowsToValidate||0);
+
+    if(plan.mode==='delta'&&target===0){
+      advancePhase('standings');
+    }else{
+      const batch=plan.mode==='delta'
+        ? await validationDeltaStatisticRows(db,leagueId,snapshot.id,plan.changedRoutes||[],cursor,safeLimit)
+        : await validationBatchRows(db,leagueId,snapshot.id,'statistics',cursor,safeLimit);
+
+      const ids=[];
+      for(const row of batch){
+        const player=row.player_external_id??row.player_id;
+        if(player!=null&&player!=='')ids.push(String(player));
+      }
+      const known=await existingSnapshotPlayerIds(db,leagueId,snapshot.id,ids);
+      for(const id of ids)if(!known.has(id))ctx.unresolvedStats=Number(ctx.unresolvedStats||0)+1;
+
+      processed+=batch.length;
+      offset+=batch.length;
+      if(batch.length)cursor=String(batch[batch.length-1].external_id||'');
+      ctx.phaseCursor=cursor;
+      if(batch.length<safeLimit||offset>=target)advancePhase('standings');
     }
-    const known=await existingSnapshotPlayerIds(db,leagueId,snapshot.id,ids);
-    for(const id of ids)if(!known.has(id))ctx.unresolvedStats=Number(ctx.unresolvedStats||0)+1;
-    processed+=batch.length;
-    offset+=batch.length;
-    if(batch.length)cursor=String(batch[batch.length-1].external_id||'');
-    ctx.phaseCursor=cursor;
-    if(batch.length<safeLimit||offset>=Number(ctx.counts.statistics||0))advancePhase('standings');
 
   }else if(phase==='standings'){
     const batch=await validationBatchRows(db,leagueId,snapshot.id,'standings',cursor,safeLimit);
