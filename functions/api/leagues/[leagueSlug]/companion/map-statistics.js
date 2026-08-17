@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.3P.5a';
+const RELEASE='5.9.10.6.3P.5b';
 const RECORD_CHUNK_SIZE=40;
 const MAX_STORED_WARNINGS_PER_BATCH=25;
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
@@ -147,12 +147,7 @@ function captureParseStatus(row){
   const headers=safeParse(row?.request_headers_json,{});
   return text(headers?.parseStatus);
 }
-function usableStatisticsCapture(row){
-  const count=captureCollectionCount(row);
-  const status=String(captureParseStatus(row)||'').toLowerCase();
-  return Number(row?.byte_length||0)>2 && count>0 && (status.startsWith('parsed')||!status);
-}
-async function capturedRoutes(db,leagueId){
+async function capturedRouteCandidates(db,leagueId){
   const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,payload_hash,
       byte_length,collections_json,request_headers_json,received_at
     FROM companion_route_captures
@@ -166,18 +161,87 @@ async function capturedRoutes(db,leagueId){
     if(!grouped.has(key))grouped.set(key,[]);
     grouped.get(key).push(row);
   }
+  return grouped;
+}
 
+function obviousCaptureCandidate(row){
+  const status=String(captureParseStatus(row)||'').toLowerCase();
+  return Number(row?.byte_length||0)>2 && (!status || status.startsWith('parsed'));
+}
+
+async function inspectCaptureShape(env,capture,meta){
+  try{
+    const payload=await readPayload(env,capture);
+    const collection=choose(payload,meta.category);
+    const objects=collection?.objects||[];
+    if(!objects.length)return{usable:false,recordCount:0,reason:'no-stat-object-collection',collectionPath:collection?.path||null};
+
+    const sample=objects.slice(0,Math.min(25,objects.length));
+    if(meta.category===TEAMSTATS_CATEGORY){
+      const teamSignalCount=sample.filter(row=>text(first(row,TEAM))).length;
+      if(!teamSignalCount)return{usable:false,recordCount:objects.length,reason:'teamstats-collection-has-no-team-identifiers',collectionPath:collection?.path||null};
+      return{usable:true,recordCount:objects.length,reason:null,collectionPath:collection?.path||null};
+    }
+
+    const statSignalCount=sample.filter(row=>{
+      if(!row||typeof row!=='object'||Array.isArray(row))return false;
+      const hasPlayer=playerSignal(row);
+      const metricCount=Object.entries(flattenMetrics(row)).filter(([key])=>!META.has(key)).length;
+      return hasPlayer && metricCount>0;
+    }).length;
+
+    if(!statSignalCount)return{usable:false,recordCount:objects.length,reason:'collection-does-not-look-like-player-statistics',collectionPath:collection?.path||null};
+    return{usable:true,recordCount:objects.length,reason:null,collectionPath:collection?.path||null};
+  }catch(error){
+    return{usable:false,recordCount:0,reason:`payload-read-failed: ${error?.message||String(error)}`,collectionPath:null};
+  }
+}
+
+async function capturedRoutes(db,env,leagueId){
+  const grouped=await capturedRouteCandidates(db,leagueId);
   const selected=[];
-  for(const rows of grouped.values()){
-    // Prefer the newest capture that actually contains a parsed non-empty statistics collection.
-    // A later empty/error discovery capture must never shadow an earlier usable export payload.
-    const usable=rows.find(usableStatisticsCapture);
-    const chosen=usable||rows[0];
-    selected.push({
-      ...chosen,
-      discoveredRecordCount:captureCollectionCount(chosen),
-      captureUsable:Boolean(usableStatisticsCapture(chosen))
-    });
+
+  for(const [routePath,rows] of grouped.entries()){
+    const meta=routeMeta(routePath);
+    if(!meta)continue;
+
+    let chosen=null;
+    const audit=[];
+    // Only inspect a bounded number of recent candidates; this keeps weekly imports fast.
+    const candidates=rows.filter(obviousCaptureCandidate).slice(0,12);
+
+    for(const candidate of candidates){
+      const shape=await inspectCaptureShape(env,candidate,meta);
+      audit.push({
+        captureId:candidate.capture_id,
+        receivedAt:candidate.received_at,
+        discoverySessionId:candidate.discovery_session_id,
+        byteLength:Number(candidate.byte_length||0),
+        payloadHash:candidate.payload_hash,
+        ...shape
+      });
+      if(shape.usable){
+        chosen={...candidate,discoveredRecordCount:shape.recordCount,collectionPath:shape.collectionPath};
+        break;
+      }
+    }
+
+    if(!chosen){
+      const fallback=rows[0];
+      selected.push({
+        ...fallback,
+        captureUsable:false,
+        candidateAudit:audit,
+        selectionError:`No usable statistics capture found for ${routePath}.`
+      });
+    }else{
+      selected.push({
+        ...chosen,
+        captureUsable:true,
+        candidateAudit:audit,
+        selectionError:null
+      });
+    }
   }
 
   return selected.sort((a,b)=>a.route_path.localeCompare(b.route_path));
@@ -253,8 +317,12 @@ async function progress(db,runId){
 async function runPublic(db,run){
   if(!run)return null;
   const p=await progress(db,run.id);
+  const failed=(await db.prepare(`SELECT route_path,capture_id,error_json,warnings_json
+    FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status='failed' ORDER BY route_path`)
+    .bind(run.id).all()).results||[];
   return{mappingRun:{id:run.id,status:run.status,routeCount:Number(run.route_count||0),recordCount:Number(run.record_count||0),resolvedPlayerCount:Number(run.resolved_player_count||0),unresolvedPlayerCount:Number(run.unresolved_player_count||0),categorySummary:safeParse(run.category_summary_json,{}),warningCount:Number(run.warning_count||0),warnings:safeParse(run.warnings_json,[]),createdAt:run.created_at,updatedAt:run.updated_at},
     progress:p,
+    failedRoutes:failed.map(row=>({routePath:row.route_path,captureId:row.capture_id,error:safeParse(row.error_json,null),warnings:safeParse(row.warnings_json,[])})),
     delta:{totalRoutes:p.total,skippedRoutes:p.skipped,processedRoutes:p.complete,changedOrNewRoutes:p.pending+p.processing+p.complete,failedRoutes:p.failed}
   };
 }
@@ -266,8 +334,8 @@ async function latestRun(db,leagueId,includeRows=false){
   const result=await db.prepare(`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=? ORDER BY category,stage,week_index,player_name,team_external_id,external_key LIMIT 500`).bind(leagueId,run.id).all();
   return{...pub,statistics:(result.results||[]).map(row=>({externalKey:row.external_key,category:row.category,seasonYear:row.season_year,stage:row.stage,weekIndex:row.week_index,playerExternalId:row.player_external_id,teamExternalId:row.team_external_id,playerName:row.player_name,position:row.position,metrics:safeParse(row.metrics_json,{}),sourceRoutePath:row.source_route_path}))};
 }
-async function startRun(db,leagueId){
-  const routes=await capturedRoutes(db,leagueId);
+async function startRun(db,env,leagueId){
+  const routes=await capturedRoutes(db,env,leagueId);
   if(!routes.length)throw Object.assign(new Error('No weekly statistics datasets were captured.'),{status:422});
 
   const bootstrap=await bootstrapActiveStatisticsManifest(db,leagueId);
@@ -281,7 +349,7 @@ async function startRun(db,leagueId){
     const meta=routeMeta(capture.route_path);
     if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
-    const unchanged=Boolean(Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
+    const unchanged=Boolean(capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     if(unchanged)skipped++;else pending++;
   }
 
@@ -302,21 +370,41 @@ async function startRun(db,leagueId){
   for(const capture of routes){
     const meta=routeMeta(capture.route_path);if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
-    const unchanged=Boolean(Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
+    const unchanged=Boolean(capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     statements.push(db.prepare(sql).bind(
       crypto.randomUUID(),runId,leagueId,capture.capture_id,capture.discovery_session_id,capture.route_path,
       capture.r2_object_key,capture.payload_hash||'',meta.category,canonicalStage(meta.stage),meta.week,
       prior?.season_year==null?null:Number(prior.season_year),
-      unchanged?'skipped':'pending',
+      unchanged?'skipped':capture.captureUsable?'pending':'failed',
       unchanged?Number(prior?.record_count||0):0,
       0,
       unchanged?Number(prior?.record_count||0):null,
-      unchanged?new Date().toISOString():null
+      (unchanged||!capture.captureUsable)?new Date().toISOString():null
     ));
   }
   for(let i=0;i<statements.length;i+=75)await db.batch(statements.slice(i,i+75));
 
-  return{runId,activeSnapshotId:activeId,bootstrap,skippedRoutes:skipped,pendingRoutes:pending,totalRoutes:routes.length};
+  for(const capture of routes.filter(row=>!row.captureUsable)){
+    const diagnostic={
+      error:capture.selectionError||'No usable statistics capture found.',
+      routePath:capture.route_path,
+      selectedCaptureId:capture.capture_id||null,
+      candidates:capture.candidateAudit||[]
+    };
+    await db.prepare(`UPDATE companion_statistics_mapping_batches
+      SET error_json=?,warning_count=1,warnings_json=?,updated_at=CURRENT_TIMESTAMP
+      WHERE mapping_run_id=? AND route_path=?`)
+      .bind(JSON.stringify(diagnostic),JSON.stringify([diagnostic.error]),runId,capture.route_path).run();
+  }
+
+  return{
+    runId,activeSnapshotId:activeId,bootstrap,skippedRoutes:skipped,pendingRoutes:pending,totalRoutes:routes.length,
+    unusableRoutes:routes.filter(row=>!row.captureUsable).map(row=>({
+      routePath:row.route_path,
+      error:row.selectionError,
+      candidates:row.candidateAudit||[]
+    }))
+  };
 }
 async function insertRows(db,runId,leagueId,rows){
   if(!rows.length)return;
@@ -414,14 +502,15 @@ export async function onRequestPost(context){
   try{
     const body=await readBody(context.request),action=String(body.action||'start').toLowerCase();
     if(action==='start'){
-      const started=await startRun(state.db,state.league.id);
+      const started=await startRun(state.db,context.env,state.league.id);
       const run=await state.db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=?`).bind(started.runId).first();
       const pub=await runPublic(state.db,run);
       return json({ok:true,release:RELEASE,action:'start',...pub,
         complete:run.status!=='processing',
         deltaPlan:{activeSnapshotId:started.activeSnapshotId,totalRoutes:started.totalRoutes,
           skippedRoutes:started.skippedRoutes,changedOrNewRoutes:started.pendingRoutes,
-          bootstrappedRoutes:started.bootstrap?.bootstrapped||0},
+          bootstrappedRoutes:started.bootstrap?.bootstrapped||0,
+          unusableRoutes:started.unusableRoutes||[]},
         activeSnapshotChanged:false,activationPerformed:false});
     }
     if(action==='next'){
