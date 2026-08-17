@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.3P.3';
+  const VERSION = '5.9.10.6.3P.4';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -259,17 +259,17 @@
         return payload;
       }
       let guard=0;
-      while (!payload.complete && guard < 100) {
+      while (!payload.complete && guard < 20) {
         job=payload.job||job||{};
         const total=(job.currentTotal||0)+(job.exitTotal||0);
         const compared=job.comparedCount||0;
         progress=`Roster comparison ${compared}/${total||'?'} · ${job.movementCount||0} movement(s)`;
         stageState[stage]={state:'running',detail:progress};
         rerender();
-        payload=await forwardDetection('POST',{action:'next',limit:75});
+        payload=await forwardDetection('POST',{action:'next',limit:750});
         guard++;
       }
-      if (guard>=100) throw new Error('Forward transaction detection stopped after 100 batches.');
+      if (guard>=20) throw new Error('Forward transaction detection stopped after 20 accelerated batches.');
       job=payload.job||{};
       const summary=`${job.movementCount||0} movement(s) · ${job.teamChanges||0} team change(s) · ${job.rosterEntries||0} entries · ${job.rosterExits||0} exits`;
       setStage(stage,'complete',summary);
