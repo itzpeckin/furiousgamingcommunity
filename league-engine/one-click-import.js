@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.3P.5';
+  const VERSION = '5.9.10.6.3P.5a';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -169,6 +169,10 @@
       }
       if (guard >= 5000) throw new Error('Statistics mapping stopped after 5000 chunks.');
       const final = await api(`${base()}map-statistics`,'GET');
+      const failedRoutes=Number(final.progress?.failed ?? final.delta?.failedRoutes ?? 0);
+      if(failedRoutes>0){
+        throw Object.assign(new Error(`${failedRoutes} statistics route(s) failed mapping. Snapshot build has been blocked to prevent stale/partial weekly statistics from going LIVE.`),{payload:final});
+      }
       const count=final.mappingRun?.recordCount ?? payload.mappingRun?.recordCount ?? 0;
       const delta=final.delta||payload.delta||payload.deltaPlan||{};
       const skipped=Number(delta.skippedRoutes||0);
