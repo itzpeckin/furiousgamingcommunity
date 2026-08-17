@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.3P.5f',
+      release:'5.9.10.6.4.2',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2649,7 +2649,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.3P.5f — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.4.2 — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -8579,9 +8579,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.3P.5f';
+      node.textContent = 'Current Release - 5.9.10.6.4.2';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.3P.5f';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.4.2';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8593,7 +8593,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.3P.5f',
+    release:'5.9.10.6.4.2',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8607,7 +8607,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.3P.5f',
+        release:'5.9.10.6.4.2',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -8781,13 +8781,24 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function currentRosterState(players=[]){
-    return (players||[]).map(player=>({
-      playerId:String(player.id||''),
-      playerName:String(player.name||'Unknown Player'),
-      teamId:String(player.teamId||''),
-      rosterStatus:String(player.rosterStatus||'active'),
-      position:String(player.position||'')
-    })).filter(row=>row.playerId);
+    return (players||[])
+      .filter(player=>{
+        const team=String(player.teamId||'').toLowerCase();
+        const status=String(player.rosterStatus||'').toLowerCase();
+        return !['','fa','free-agent','free_agent','unassigned','none','null'].includes(team)
+          && !['free-agent','unassigned'].includes(status);
+      })
+      .map(player=>({
+        playerId:String(player.id||''),
+        playerName:String(player.name||'Unknown Player'),
+        teamId:String(player.teamId||''),
+        rosterStatus:String(player.rosterStatus||'active'),
+        position:String(player.position||''),
+        overall:Number(player.overall??0)||null,
+        age:Number(player.age??0)||null,
+        devTrait:String(player.developmentTrait||player.dev||''),
+        source:player.raw||player.source||{}
+      })).filter(row=>row.playerId);
   }
 
   async function canonicalTransactionRequest(method='GET',body=null){
@@ -8808,8 +8819,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     return payload;
   }
 
-  async function syncCanonicalTransactions(){
-    await loadLiveTeamDirectory(false);
+  async function syncCanonicalTransactions(force=true){
+    await loadLiveTeamDirectory(Boolean(force));
     const snapshot=liveTeamDirectory?.snapshot||{};
     const snapshotId=String(snapshot.id||snapshot.snapshotId||snapshot.snapshot_id||'');
     if(!snapshotId)throw new Error('No active LIVE snapshot ID is available.');
@@ -8819,15 +8830,18 @@ function canonicalPlayerDashboardStats(playerId='') {
     const explicitEvents=explicitTransactionEventsFromPlayers(players);
     const workflowEvents=workflowTransactionEvents(teams);
 
-    return canonicalTransactionRequest('POST',{
+    const payload=await canonicalTransactionRequest('POST',{
       action:'sync',
       snapshotId,
       season:Number(snapshot.seasonYear??snapshot.season??0)||null,
-      week:Number(snapshot.week??snapshot.currentWeek??0)||null,
+      week:Number(snapshot.weekIndex??snapshot.week??snapshot.currentWeek??0)||null,
       roster:currentRosterState(players),
       explicitEvents,
       workflowEvents
     });
+    canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+    await loadLiveTeamDirectory(true);
+    return payload;
   }
 
   function transactionCertificationVisibilitySample(){
@@ -9203,7 +9217,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.3P.5f',
+    release:'5.9.10.6.4.2',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9225,7 +9239,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       await loadLiveTeamDirectory(false);
       return workflowTransactionEvents(liveTeamDirectory?.teams||[]);
     },
-    syncCanonical:()=>syncCanonicalTransactions(),
+    syncCanonical:(options={})=>syncCanonicalTransactions(options?.force!==false),
     canonical:()=>canonicalTransactionRequest('GET'),
     dedupeTest:()=>canonicalTransactionRequest('POST',{action:'dedupe-test'}),
     certify:()=>certifyTransactionIntegration(),
