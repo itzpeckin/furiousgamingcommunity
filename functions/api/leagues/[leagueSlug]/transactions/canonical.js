@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.4.0';
+const RELEASE='5.9.10.6.4.1';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -1526,8 +1526,10 @@ export async function onRequestPost(context){
     const grouped=new Map();
     for(const row of rows){
       const cls=String(row.classification||'').toUpperCase();
-      if(!['SIGNING','RELEASE','TEAM_CHANGE'].includes(cls))continue;
-      const eventType=cls==='SIGNING'?'signing':cls==='RELEASE'?'release':'team-change';
+      const detection=String(row.detection_type||'').toLowerCase();
+      const lifecycleClass=cls==='ROSTER_ENTRY'?'SIGNING':cls==='ROSTER_EXIT'?'RELEASE':cls;
+      if(!['SIGNING','RELEASE','TEAM_CHANGE'].includes(lifecycleClass))continue;
+      const eventType=lifecycleClass==='SIGNING'?'signing':lifecycleClass==='RELEASE'?'release':'team-change';
       const pair=normalizedPair([row.previous_team_id,row.current_team_id]);
       const key=eventType==='team-change'
         ?`forward:${row.previous_snapshot_id}:${row.current_snapshot_id}:team-change:${pair.join('|')}`
@@ -1542,6 +1544,27 @@ export async function onRequestPost(context){
     for(const raw of grouped.values()){
       const event=normalizeIncomingEvent(raw,'snapshot-diff');
       await mergeEvidence(state.db,state.league.id,event,rows[0]?.current_snapshot_id||null);
+      // Keep the player universe stable across releases/signings even when the Companion
+      // team-roster export omits free agents. A roster exit becomes an inferred FA state;
+      // a later roster entry removes that inferred FA state.
+      for(const move of raw.moves||[]){
+        if(event.eventType==='release'){
+          await state.db.prepare(`INSERT INTO canonical_free_agents
+            (league_id,player_id,player_name,position,source_route,source_capture_id,raw_json,updated_at)
+            VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+            ON CONFLICT(league_id,player_id) DO UPDATE SET
+              player_name=excluded.player_name,position=COALESCE(excluded.position,canonical_free_agents.position),
+              source_route=excluded.source_route,source_capture_id=excluded.source_capture_id,
+              raw_json=excluded.raw_json,updated_at=CURRENT_TIMESTAMP`)
+            .bind(state.league.id,String(move.playerId),move.playerName||String(move.playerId),move.position||null,
+              'snapshot-diff:roster-exit',rows[0]?.current_snapshot_id||null,
+              JSON.stringify({inferred:true,event:'release',fromTeamId:move.fromTeamId||null,toTeamId:null,
+                previousRosterStatus:move.fromStatus||null,currentRosterStatus:'free-agent'})).run();
+        }else if(event.eventType==='signing'){
+          await state.db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND player_id=?`)
+            .bind(state.league.id,String(move.playerId)).run();
+        }
+      }
       reconciled++;
       if(event.eventType==='signing')counts.signings++; else if(event.eventType==='release')counts.releases++; else counts.teamChanges++;
     }

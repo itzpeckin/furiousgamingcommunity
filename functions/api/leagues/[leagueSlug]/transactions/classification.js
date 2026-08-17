@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.4.0';
+const RELEASE='5.9.10.6.4.1';
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 
 async function ensureSchema(db){
@@ -105,8 +105,8 @@ async function classify(db,leagueId){
         WHEN m.detection_type='team-change' AND COALESCE(m.previous_team_id,'')<>'' AND COALESCE(m.current_team_id,'')='' THEN 'RELEASE'
         WHEN m.detection_type='team-change' AND COALESCE(m.previous_team_id,'')='' AND COALESCE(m.current_team_id,'')<>'' THEN 'SIGNING'
         WHEN m.detection_type='team-change' THEN 'TEAM_CHANGE'
-        WHEN m.detection_type='roster-entry' THEN 'ROSTER_ENTRY'
-        WHEN m.detection_type='roster-exit' THEN 'ROSTER_EXIT'
+        WHEN m.detection_type='roster-entry' THEN 'SIGNING'
+        WHEN m.detection_type='roster-exit' THEN 'RELEASE'
         WHEN m.detection_type='roster-status-change' THEN 'ROSTER_STATUS_CHANGE'
         ELSE 'ROSTER_MOVEMENT'
       END,
@@ -125,15 +125,16 @@ async function classify(db,leagueId){
           THEN COALESCE(m.previous_team_id,'') || '|' || COALESCE(m.current_team_id,'')
           ELSE COALESCE(m.current_team_id,'') || '|' || COALESCE(m.previous_team_id,'') END
       ELSE NULL END,
-      CASE WHEN m.detection_type IN ('roster-entry','roster-exit') THEN 1 ELSE 0 END,
+      0,
       'snapshot-diff',
       json_object(
-        'ruleVersion','5.9.10.6.4.0',
+        'ruleVersion','5.9.10.6.4.1',
         'detectionType',m.detection_type,
         'fromTeamId',m.previous_team_id,
         'toTeamId',m.current_team_id,
         'freeAgentAuthoritative',0,
-        'promotionDeferred',CASE WHEN m.detection_type IN ('roster-entry','roster-exit') THEN 1 ELSE 0 END
+        'freeAgentLifecycleInferred',CASE WHEN m.detection_type IN ('roster-entry','roster-exit') THEN 1 ELSE 0 END,
+        'promotionDeferred',0
       ),
       CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
     FROM forward_roster_movements m
@@ -183,8 +184,8 @@ export async function onRequestGet(context){
   const s=await requestState(context,false);if(s.response)return s.response;
   const exists=await s.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='transaction_movement_classifications'`).first();
   if(!exists)return json({ok:true,release:RELEASE,state:'not-initialized',classifications:[],summary:null,policy:{
-    rosterEntry:'ROSTER_ENTRY until authoritative Free Agent evidence exists',
-    rosterExit:'ROSTER_EXIT until authoritative Free Agent evidence exists',
+    rosterEntry:'SIGNING inferred when a player enters the 32-team roster universe',
+    rosterExit:'RELEASE inferred when a player leaves the 32-team roster universe',
     teamChange:'TEAM_CHANGE and candidate for 6.4 trade reconciliation'
   }});
 
@@ -212,8 +213,8 @@ export async function onRequestGet(context){
   return json({ok:true,release:RELEASE,state:run?'active':'initialized',
     latestDetectionRun:run?{previousSnapshotId:run.previous_snapshot_id||null,currentSnapshotId:run.current_snapshot_id,status:run.status,movementCount:Number(run.movement_count||0)}:null,
     summary,classifications:rows.map(publicRow),policy:{
-      rosterEntry:'ROSTER_ENTRY until authoritative Free Agent evidence exists',
-      rosterExit:'ROSTER_EXIT until authoritative Free Agent evidence exists',
+      rosterEntry:'SIGNING inferred when a player enters the 32-team roster universe',
+      rosterExit:'RELEASE inferred when a player leaves the 32-team roster universe',
       teamChange:'TEAM_CHANGE and candidate for 6.4 trade reconciliation'
     }});
 }
