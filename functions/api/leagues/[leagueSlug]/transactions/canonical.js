@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.2e';
+const RELEASE='5.9.10.6.4.0';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -1512,6 +1512,41 @@ export async function onRequestPost(context){
   let body={};
   try{body=await context.request.json()}catch{}
   const action=String(body.action||'sync').toLowerCase();
+
+  if(action==='reconcile-forward-classifications'){
+    let rows=[];
+    try{
+      rows=(await state.db.prepare(`SELECT c.*,m.player_name,m.position,m.previous_team_id,m.current_team_id,m.previous_roster_status,m.current_roster_status,m.season,m.week
+        FROM transaction_movement_classifications c
+        LEFT JOIN forward_roster_movements m ON m.id=c.movement_id
+        WHERE c.league_id=? AND c.current_snapshot_id=(
+          SELECT current_snapshot_id FROM forward_detection_jobs WHERE league_id=? AND status IN ('complete','baseline') ORDER BY COALESCE(completed_at,updated_at,created_at) DESC LIMIT 1
+        ) ORDER BY c.classified_at,c.player_id`).bind(state.league.id,state.league.id).all()).results||[];
+    }catch(error){return json({ok:false,error:'Forward transaction classifications are unavailable.',detail:error?.message||String(error),release:RELEASE},422)}
+    const grouped=new Map();
+    for(const row of rows){
+      const cls=String(row.classification||'').toUpperCase();
+      if(!['SIGNING','RELEASE','TEAM_CHANGE'].includes(cls))continue;
+      const eventType=cls==='SIGNING'?'signing':cls==='RELEASE'?'release':'team-change';
+      const pair=normalizedPair([row.previous_team_id,row.current_team_id]);
+      const key=eventType==='team-change'
+        ?`forward:${row.previous_snapshot_id}:${row.current_snapshot_id}:team-change:${pair.join('|')}`
+        :`forward:${row.previous_snapshot_id}:${row.current_snapshot_id}:${eventType}:${row.player_id}`;
+      const event=grouped.get(key)||{sourceKey:key,sourceType:'snapshot-diff',eventType,teamIds:pair,playerIds:[],season:row.season,week:row.week,confidence:'snapshot-observed',moves:[]};
+      event.playerIds.push(String(row.player_id));
+      event.moves.push({playerId:String(row.player_id),playerName:row.player_name||String(row.player_id),position:row.position||null,fromTeamId:row.previous_team_id||null,toTeamId:row.current_team_id||null,fromStatus:row.previous_roster_status||null,toStatus:row.current_roster_status||null});
+      grouped.set(key,event);
+    }
+    let reconciled=0;
+    const counts={signings:0,releases:0,teamChanges:0};
+    for(const raw of grouped.values()){
+      const event=normalizeIncomingEvent(raw,'snapshot-diff');
+      await mergeEvidence(state.db,state.league.id,event,rows[0]?.current_snapshot_id||null);
+      reconciled++;
+      if(event.eventType==='signing')counts.signings++; else if(event.eventType==='release')counts.releases++; else counts.teamChanges++;
+    }
+    return json({ok:true,release:RELEASE,reconciled,...counts,currentSnapshotId:rows[0]?.current_snapshot_id||null});
+  }
 
   if(action==='dedupe-test'){
     return json({ok:true,release:RELEASE,test:syntheticDedupeTest()});

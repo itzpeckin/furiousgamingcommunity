@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.3';
+const RELEASE='5.9.10.6.4.0';
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 
 async function ensureSchema(db){
@@ -101,11 +101,13 @@ async function classify(db,leagueId){
     )
     SELECT
       lower(hex(randomblob(16))),m.league_id,m.id,m.previous_snapshot_id,m.current_snapshot_id,m.player_id,
-      CASE m.detection_type
-        WHEN 'team-change' THEN 'TEAM_CHANGE'
-        WHEN 'roster-entry' THEN 'ROSTER_ENTRY'
-        WHEN 'roster-exit' THEN 'ROSTER_EXIT'
-        WHEN 'roster-status-change' THEN 'ROSTER_STATUS_CHANGE'
+      CASE
+        WHEN m.detection_type='team-change' AND COALESCE(m.previous_team_id,'')<>'' AND COALESCE(m.current_team_id,'')='' THEN 'RELEASE'
+        WHEN m.detection_type='team-change' AND COALESCE(m.previous_team_id,'')='' AND COALESCE(m.current_team_id,'')<>'' THEN 'SIGNING'
+        WHEN m.detection_type='team-change' THEN 'TEAM_CHANGE'
+        WHEN m.detection_type='roster-entry' THEN 'ROSTER_ENTRY'
+        WHEN m.detection_type='roster-exit' THEN 'ROSTER_EXIT'
+        WHEN m.detection_type='roster-status-change' THEN 'ROSTER_STATUS_CHANGE'
         ELSE 'ROSTER_MOVEMENT'
       END,
       CASE m.detection_type
@@ -126,7 +128,7 @@ async function classify(db,leagueId){
       CASE WHEN m.detection_type IN ('roster-entry','roster-exit') THEN 1 ELSE 0 END,
       'snapshot-diff',
       json_object(
-        'ruleVersion','5.9.10.6.3',
+        'ruleVersion','5.9.10.6.4.0',
         'detectionType',m.detection_type,
         'fromTeamId',m.previous_team_id,
         'toTeamId',m.current_team_id,
@@ -150,6 +152,8 @@ async function classify(db,leagueId){
 
   const counts=await db.prepare(`SELECT COUNT(*) total,
     SUM(CASE WHEN classification='TEAM_CHANGE' THEN 1 ELSE 0 END) team_changes,
+    SUM(CASE WHEN classification='SIGNING' THEN 1 ELSE 0 END) signings,
+    SUM(CASE WHEN classification='RELEASE' THEN 1 ELSE 0 END) releases,
     SUM(CASE WHEN classification='ROSTER_ENTRY' THEN 1 ELSE 0 END) roster_entries,
     SUM(CASE WHEN classification='ROSTER_EXIT' THEN 1 ELSE 0 END) roster_exits,
     SUM(CASE WHEN classification='ROSTER_STATUS_CHANGE' THEN 1 ELSE 0 END) status_changes,
@@ -164,6 +168,8 @@ async function classify(db,leagueId){
     classifiedCount:Number(counts?.total||0),
     summary:{
       teamChanges:Number(counts?.team_changes||0),
+      signings:Number(counts?.signings||0),
+      releases:Number(counts?.releases||0),
       rosterEntries:Number(counts?.roster_entries||0),
       rosterExits:Number(counts?.roster_exits||0),
       statusChanges:Number(counts?.status_changes||0),
@@ -195,6 +201,8 @@ export async function onRequestGet(context){
   const summary={
     total:rows.length,
     teamChanges:rows.filter(r=>r.classification==='TEAM_CHANGE').length,
+    signings:rows.filter(r=>r.classification==='SIGNING').length,
+    releases:rows.filter(r=>r.classification==='RELEASE').length,
     rosterEntries:rows.filter(r=>r.classification==='ROSTER_ENTRY').length,
     rosterExits:rows.filter(r=>r.classification==='ROSTER_EXIT').length,
     statusChanges:rows.filter(r=>r.classification==='ROSTER_STATUS_CHANGE').length,
