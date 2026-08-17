@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.3P.1';
+  const VERSION = '5.9.10.6.3P.3';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -218,7 +218,7 @@
           progress=`Snapshot validation · ${phase} ${total?`${Math.min(offset,total)}/${total}`:'processing'}`;
           stageState[stage]={state:'running',detail:progress};
           rerender();
-          payload=await api(`${base()}snapshot-lifecycle`,'POST',{action:'validate-next',snapshotId,limit:75});
+          payload=await api(`${base()}snapshot-lifecycle`,'POST',{action:'validate-next',snapshotId,limit:250});
           guard++;
         }
         if (guard>=500) throw new Error('Snapshot validation stopped after 500 batches.');
