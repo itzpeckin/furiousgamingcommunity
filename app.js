@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.4.7a',
+      release:'5.9.10.6.4.8',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2649,7 +2649,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.4.7a — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.4.8 — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -3654,19 +3654,18 @@
       const rows=(payload?.transactions||[])
         .filter(transaction=>transactionIsPubliclyVisible(transaction))
         .filter(transaction=>(transaction.playerIds||[]).map(String).includes(String(playerId)))
-        .sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
+        .sort((a,b)=>(Number(b.season||0)-Number(a.season||0))||(Number(b.week||0)-Number(a.week||0))||((new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0)));
 
       const markup=rows.length
         ? `<div class="canonical-transaction-list">${rows.map(row=>{
-            const teams=(row.teamIds||[]).map(id=>transactionTeamByCanonicalId(id)).filter(Boolean);
-            const teamLabel=teams.length?teams.map(team=>team.abbr||team.fullName).join(' → '):'';
+            const direction=transactionDirectionLabel(row);
             const workflowId=row.workflowTradeId;
             return `<button type="button" class="canonical-transaction-row" ${workflowId?`data-route="trade-center/${escapeHtml(String(workflowId))}"`:''}>
               <span>
-                <strong>${escapeHtml(transactionEventLabel(row.eventType))}${teamLabel?` · ${escapeHtml(teamLabel)}`:''}</strong>
+                <strong>${escapeHtml(transactionEventLabel(row.eventType))}${direction?` · ${escapeHtml(direction)}`:''}</strong>
                 <small>${escapeHtml(transactionTimeLabel(row))}</small>
               </span>
-              <span class="pill pill--neutral">${escapeHtml(transactionAuthorityLabel(row))}</span>
+              ${transactionAuthorityMarkup(row)}
             </button>`;
           }).join('')}</div>`
         : `<div class="canonical-player-empty"><strong>No transaction history</strong><span>No completed or Madden-recorded transaction is available for this player.</span></div>`;
@@ -4145,7 +4144,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         ${summaryTile('Overall',team.ovr,'Team rating')}${summaryTile('Offense',team.off,'Unit rating')}${summaryTile('Defense',team.def,'Unit rating')}${summaryTile('Points For',team.pf,`${(team.pf/7).toFixed(1)} per game`)}${summaryTile('Points Against',team.pa,`${(team.pa/7).toFixed(1)} per game`)}${summaryTile('Cap Space',formatMoney(team.cap),'Current estimate')}
       </div>
       <div class="subnav" data-team-tabs>
-        ${['roster','depth','schedule','stats','cap','trade-history'].map(tab => `<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab === 'depth' ? 'Depth Chart' : tab === 'trade-history' ? 'Trade History' : titleCase(tab)}</button>`).join('')}
+        ${['roster','depth','schedule','stats','cap','trade-history'].map(tab => `<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab === 'depth' ? 'Depth Chart' : tab === 'trade-history' ? 'Transaction History' : titleCase(tab)}</button>`).join('')}
       </div>
       <div data-team-tab-content>${renderTeamTab(team, rosterModel, roster, teamGames, leaders)}</div>`;
   }
@@ -5864,7 +5863,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   let canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
 
   async function loadCanonicalTransactionsForUi(force=false){
-    if(!force&&canonicalTransactionUiCache.payload&&Date.now()-canonicalTransactionUiCache.loadedAt<30000)return canonicalTransactionUiCache.payload;
+    if(!force&&canonicalTransactionUiCache.payload&&Date.now()-canonicalTransactionUiCache.loadedAt<300000)return canonicalTransactionUiCache.payload;
     if(!force&&canonicalTransactionUiCache.promise)return canonicalTransactionUiCache.promise;
     canonicalTransactionUiCache.promise=(async()=>{
       const payload=await window.FranchiseHQ?.transactions?.canonical?.();
@@ -5909,14 +5908,28 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   function transactionEventLabel(type=''){
     const key=String(type||'').toLowerCase();
-    return ({trade:'Trade',signing:'Signing',release:'Release','waiver-claim':'Waiver Claim',waived:'Waived','team-change':'Team Change','roster-move':'Roster Move','roster-status-change':'Roster Status Change'})[key]||titleCase(key.replace(/-/g,' '))||'Transaction';
+    return ({
+      trade:'Trade',
+      signing:'Signed',
+      release:'Released',
+      'waiver-claim':'Waiver Claim',
+      waived:'Waived',
+      'team-change':'Team Change',
+      'practice-squad-signing':'Signed from Practice Squad',
+      'practice-squad-promotion':'Promoted from Practice Squad',
+      'practice-squad-demotion':'Moved to Practice Squad',
+      'ir-placement':'Placed on IR',
+      'ir-activation':'Activated from IR',
+      'roster-move':'Roster Move',
+      'roster-status-change':'Roster Status Change'
+    })[key]||titleCase(key.replace(/-/g,' '))||'Transaction';
   }
 
   function transactionEventTone(type=''){
     const key=String(type||'').toLowerCase();
     if(key==='trade')return'accent';
-    if(['signing','waiver-claim'].includes(key))return'success';
-    if(['release','waived'].includes(key))return'danger';
+    if(['signing','waiver-claim','practice-squad-signing','practice-squad-promotion','ir-activation'].includes(key))return'success';
+    if(['release','waived','practice-squad-demotion','ir-placement'].includes(key))return'danger';
     return'neutral';
   }
 
@@ -5934,11 +5947,41 @@ function canonicalPlayerDashboardStats(playerId='') {
     const parts=[];
     if(transaction.season!=null)parts.push(`Season ${transaction.season}`);
     if(transaction.week!=null)parts.push(`Week ${transaction.week}`);
-    if(transaction.occurredAt){
-      const date=new Date(transaction.occurredAt);
-      parts.push(Number.isNaN(date.getTime())?String(transaction.occurredAt):date.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}));
+    return parts.join(' · ')||'Madden week unavailable';
+  }
+
+  function transactionMoves(transaction={}){
+    return (transaction.evidence||[])
+      .flatMap(item=>Array.isArray(item?.evidence?.moves)?item.evidence.moves:[])
+      .filter(Boolean);
+  }
+
+  function transactionTeamLabel(id){
+    if(id==null||String(id).toUpperCase()==='FA')return'FA';
+    const team=transactionTeamByCanonicalId(id);
+    return team?.abbr||team?.fullName||String(id).toUpperCase();
+  }
+
+  function transactionDirectionLabel(transaction={}){
+    const moves=transactionMoves(transaction);
+    const type=String(transaction.eventType||'').toLowerCase();
+    if(type==='trade'){
+      const ids=[...new Set(moves.flatMap(m=>[m.fromTeamId,m.toTeamId]).filter(v=>v&&String(v).toUpperCase()!=='FA').map(String))];
+      if(ids.length>=2)return `${transactionTeamLabel(ids[0])} ↔ ${transactionTeamLabel(ids[1])}`;
     }
-    return parts.join(' · ')||'Date unavailable';
+    const move=moves[0]||{};
+    let from=move.fromTeamId, to=move.toTeamId;
+    if(type==='signing'){from='FA';to=to||(transaction.teamIds||[]).find(id=>String(id).toUpperCase()!=='FA')}
+    if(type==='release'){from=from||(transaction.teamIds||[]).find(id=>String(id).toUpperCase()!=='FA');to='FA'}
+    if(from||to)return `${transactionTeamLabel(from)} → ${transactionTeamLabel(to)}`;
+    const ids=transaction.teamIds||[];
+    return ids.length?ids.map(transactionTeamLabel).join(' → '):'';
+  }
+
+  function transactionAuthorityMarkup(transaction={}){
+    const label=transactionAuthorityLabel(transaction);
+    if(label==='Roster Detected')return'';
+    return `<span class="pill pill--neutral">${escapeHtml(label)}</span>`;
   }
 
   function transactionPlayerRows(transaction={}){
@@ -5970,7 +6013,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const partnersMarkup=partners.length?partners.map(partner=>`<span class="team-transaction-partner">${renderTeamMark(partner,'team-logo')}<span>${escapeHtml(partner.abbr||partner.fullName||'Team')}</span></span>`).join(''):'<span class="team-transaction-partner">League transaction</span>';
 
     return `<article class="card team-transaction-row">
-      <div class="team-transaction-row__header"><div><span class="pill pill--${transactionEventTone(transaction.eventType)}">${escapeHtml(transactionEventLabel(transaction.eventType))}</span><strong>${escapeHtml(transactionTimeLabel(transaction))}</strong></div><span class="pill pill--neutral">${escapeHtml(transactionAuthorityLabel(transaction))}</span></div>
+      <div class="team-transaction-row__header"><div><span class="pill pill--${transactionEventTone(transaction.eventType)}">${escapeHtml(transactionEventLabel(transaction.eventType))}</span><strong>${escapeHtml(transactionTimeLabel(transaction))}</strong>${transactionDirectionLabel(transaction)?`<small>${escapeHtml(transactionDirectionLabel(transaction))}</small>`:''}</div>${transactionAuthorityMarkup(transaction)}</div>
       <div class="team-transaction-row__body"><div class="team-transaction-partners"><small>${partners.length?'With / Against':'Team'}</small>${partnersMarkup}</div>${playersMarkup}</div>
       <div class="team-transaction-row__footer"><small>${evidenceCount} source record${evidenceCount===1?'':'s'} merged into one canonical transaction</small>${canOpenTrade?`<button type="button" class="text-button" data-route="trade-center/${escapeHtml(transaction.workflowTradeId)}">View Trade Details <svg><use href="#icon-arrow"></use></svg></button>`:''}</div>
     </article>`;
@@ -5987,7 +6030,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const payload=await loadCanonicalTransactionsForUi(false);
       if(state.teamTab!=='trade-history')return;
       const rows=(payload?.transactions||[]).filter(transaction=>transactionIsPubliclyVisible(transaction)&&transactionInvolvesTeam(transaction,team));
-      rows.sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
+      rows.sort((a,b)=>(Number(b.season||0)-Number(a.season||0))||(Number(b.week||0)-Number(a.week||0))||((new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0)));
       host.innerHTML=`<div class="team-trade-history-view"><div class="section-heading"><div><h2>${escapeHtml(team.fullName)} Transaction History</h2></div><span class="pill pill--neutral">${rows.length} transaction${rows.length===1?'':'s'}</span></div>${rows.length?`<div class="team-transaction-list">${rows.map(row=>renderCanonicalTeamTransactionRow(row,team)).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No LIVE transactions recorded</h3><p>No canonical transaction currently involves ${escapeHtml(team.fullName)}.</p></div></article>`}</div>`;
     }catch(error){
       console.error('[Team Transaction History]',error);
@@ -6800,17 +6843,17 @@ function canonicalPlayerDashboardStats(playerId='') {
         .filter(row=>state.transactionType==='all'||String(row.eventType||'').toLowerCase()===state.transactionType)
         .filter(matchesTeam)
         .filter(matchesSearch)
-        .sort((a,b)=>(new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0));
+        .sort((a,b)=>(Number(b.season||0)-Number(a.season||0))||(Number(b.week||0)-Number(a.week||0))||((new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0)));
 
       const renderLeagueRow=row=>{
         const players=transactionPlayerRows(row);
-        const involvedTeams=(row.teamIds||[]).map(id=>transactionTeamByCanonicalId(id)||{id,abbr:String(id).toUpperCase(),fullName:String(id).toUpperCase()});
+        const direction=transactionDirectionLabel(row);
         return `<article class="card league-transaction-card">
           <div class="league-transaction-card__top">
             <div><span class="pill pill--${transactionEventTone(row.eventType)}">${escapeHtml(transactionEventLabel(row.eventType))}</span><strong>${escapeHtml(transactionTimeLabel(row))}</strong></div>
-            <span class="pill pill--neutral">${escapeHtml(transactionAuthorityLabel(row))}</span>
+            ${transactionAuthorityMarkup(row)}
           </div>
-          <div class="league-transaction-card__teams">${involvedTeams.map(team=>`<span>${renderTeamMark(team,'team-logo')}<strong>${escapeHtml(team.abbr||team.fullName)}</strong></span>`).join('<span class="league-transaction-arrow">↔</span>')}</div>
+          <div class="league-transaction-card__teams"><strong>${escapeHtml(direction||'League transaction')}</strong></div>
           <div class="league-transaction-card__players">${players.length?players.map(player=>player.summary
             ?`<span class="team-transaction-summary">${escapeHtml(player.name)}</span>`
             :`<button type="button" class="team-transaction-player" data-roster-player-detail="${escapeHtml(player.id)}"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position||'—')}${player.overall?` · ${player.overall} OVR`:''}</small></button>`).join('')
@@ -8579,9 +8622,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.4.7a';
+      node.textContent = 'Current Release - 5.9.10.6.4.8';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.4.7a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.4.8';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8593,7 +8636,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.4.7a',
+    release:'5.9.10.6.4.8',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8607,7 +8650,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.4.7a',
+        release:'5.9.10.6.4.8',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9229,7 +9272,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.4.7a',
+    release:'5.9.10.6.4.8',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9266,6 +9309,10 @@ function canonicalPlayerDashboardStats(playerId='') {
   };
 
 })();
+
+  window.addEventListener('franchisehq:one-click-import-complete', () => {
+    canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+  });
 
   window.addEventListener('franchisehq:league-data-state-changed', () => {
     window.FGC_APP?.renderGlobalLeagueDataBanner?.();
@@ -9317,9 +9364,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.4.7a — Historical Roster Released Player Resolver */
+/* 5.9.10.6.4.8 — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.4.7a';
+  const RELEASE='5.9.10.6.4.8';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
