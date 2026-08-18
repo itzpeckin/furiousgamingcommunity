@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.4.2';
+const RELEASE='5.9.10.6.4.6';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -113,6 +113,21 @@ async function ensureSchema(db){
     )`,
     `CREATE INDEX IF NOT EXISTS idx_historical_player_states_player
       ON canonical_historical_player_states (league_id, player_id, snapshot_id)`
+,
+    `CREATE TABLE IF NOT EXISTS canonical_capture_lifecycle_sessions (
+      league_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      received_at TEXT,
+      team_route_count INTEGER NOT NULL DEFAULT 0,
+      player_count INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      processed_at TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (league_id, session_id),
+      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_capture_lifecycle_sessions_order
+      ON canonical_capture_lifecycle_sessions (league_id, received_at)`
   ];
   for(const sql of statements)await db.prepare(sql).run();
   schemaReady=true;
@@ -1631,6 +1646,173 @@ async function historicalBackfillPreview(db,leagueId){
   }
   return{playerDomains:domains,normalizedCounts,snapshotsCompared:Math.max(0,snaps.length-1),totalMoves,inferred:{signings,releases,teamChanges,statusChanges},sampleMoves};
 }
+
+function captureRosterPlayer(raw={},routeTeamId=null){
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+  const playerId=clean(raw.rosterId??raw.playerId??raw.playerID??raw.player_id??raw.assetId??raw.id);
+  if(!playerId)return null;
+  const first=clean(raw.firstName??raw.first_name),last=clean(raw.lastName??raw.last_name);
+  const playerName=clean(raw.displayName??raw.fullName??raw.playerName??raw.name)||[first,last].filter(Boolean).join(' ')||'Unknown Player';
+  const teamId=clean(raw.teamId??raw.teamID??raw.team_id??routeTeamId);
+  const rosterStatus=raw.isOnPracticeSquad===true?'practice-squad':raw.isOnIR===true?'ir':clean(raw.rosterStatus??raw.status)||'active';
+  return{playerId,playerName,teamId,rosterStatus,position:clean(raw.position??raw.pos),raw};
+}
+
+async function captureLifecyclePlan(db,leagueId){
+  const result=await db.prepare(`SELECT discovery_session_id session_id,
+      MIN(received_at) received_at,COUNT(DISTINCT route_path) team_route_count
+    FROM companion_route_captures
+    WHERE league_id=? AND route_path LIKE '%/team/%/roster'
+      AND discovery_session_id IS NOT NULL AND discovery_session_id<>''
+    GROUP BY discovery_session_id
+    HAVING COUNT(DISTINCT route_path)>=32
+    ORDER BY MIN(received_at) ASC`).bind(leagueId).all();
+  const sessions=[];
+  for(const row of result.results||[]){
+    const stored=await db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions WHERE league_id=? AND session_id=?`)
+      .bind(leagueId,row.session_id).first();
+    sessions.push({
+      sessionId:String(row.session_id),receivedAt:row.received_at,
+      teamRouteCount:Number(row.team_route_count||0),
+      processed:Boolean(stored?.status==='complete'),playerCount:Number(stored?.player_count||0),status:stored?.status||'pending'
+    });
+  }
+  return{sessions,pendingSessions:sessions.filter(x=>!x.processed).length,completeSessions:sessions.filter(x=>x.processed).length};
+}
+
+async function processCaptureLifecycleSession(context,state,sessionId){
+  const rows=(await state.db.prepare(`SELECT id,route_path,r2_object_key,received_at
+    FROM companion_route_captures WHERE league_id=? AND discovery_session_id=?
+      AND route_path LIKE '%/team/%/roster' ORDER BY received_at DESC`)
+    .bind(state.league.id,sessionId).all()).results||[];
+  const byRoute=new Map();
+  for(const row of rows)if(!byRoute.has(String(row.route_path)))byRoute.set(String(row.route_path),row);
+  const captures=[...byRoute.values()];
+  if(captures.length<32)throw new Error(`Lifecycle session ${sessionId} is incomplete (${captures.length}/32 team rosters).`);
+
+  await state.db.prepare(`DELETE FROM canonical_historical_player_states WHERE league_id=? AND snapshot_id=?`)
+    .bind(state.league.id,sessionId).run();
+
+  const players=new Map();
+  for(const capture of captures){
+    const object=await context.env.COMPANION_EXPORTS?.get?.(capture.r2_object_key);
+    if(!object)continue;
+    let payload=null;try{payload=JSON.parse(await object.text())}catch{continue}
+    const list=Array.isArray(payload?.rosterInfoList)?payload.rosterInfoList:[];
+    const routeTeamId=String(capture.route_path||'').match(/\/team\/([^/]+)\/roster/i)?.[1]||null;
+    for(const raw of list){
+      const player=captureRosterPlayer(raw,routeTeamId);
+      if(player)players.set(player.playerId,player);
+    }
+  }
+
+  const statements=[...players.values()].map(player=>state.db.prepare(`INSERT OR REPLACE INTO canonical_historical_player_states
+    (league_id,snapshot_id,player_id,player_name,team_id,roster_status,position,raw_json,created_at)
+    VALUES (?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`)
+    .bind(state.league.id,sessionId,player.playerId,player.playerName,player.teamId,player.rosterStatus,player.position,JSON.stringify(player.raw||{})));
+  for(let i=0;i<statements.length;i+=75)await state.db.batch(statements.slice(i,i+75));
+
+  const receivedAt=captures.map(r=>r.received_at).filter(Boolean).sort()[0]||now();
+  await state.db.prepare(`INSERT INTO canonical_capture_lifecycle_sessions
+    (league_id,session_id,received_at,team_route_count,player_count,status,processed_at,updated_at)
+    VALUES (?,?,?,?,?,'complete',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+    ON CONFLICT(league_id,session_id) DO UPDATE SET received_at=excluded.received_at,
+      team_route_count=excluded.team_route_count,player_count=excluded.player_count,status='complete',
+      processed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`)
+    .bind(state.league.id,sessionId,receivedAt,captures.length,players.size).run();
+  return{sessionId,teamRouteCount:captures.length,playerCount:players.size,receivedAt};
+}
+
+async function captureLifecycleRows(db,leagueId,sessionId){
+  const result=await db.prepare(`SELECT player_id,player_name,team_id,roster_status,position,raw_json
+    FROM canonical_historical_player_states WHERE league_id=? AND snapshot_id=?`).bind(leagueId,sessionId).all();
+  return result.results||[];
+}
+
+function lifecycleDiffEvents(previous=[],current=[],previousSession,currentSession,occurredAt=null){
+  const oldMap=new Map(previous.map(row=>[String(row.player_id),row]));
+  const newMap=new Map(current.map(row=>[String(row.player_id),row]));
+  const events=[];
+  const add=(type,playerId,oldRow,newRow)=>{
+    const from=type==='signing'?'FA':clean(oldRow?.team_id);
+    const to=type==='release'?'FA':clean(newRow?.team_id);
+    events.push(normalizeIncomingEvent({
+      sourceKey:`capture-lifecycle:${previousSession}:${currentSession}:${type}:${playerId}`,
+      eventType:type,playerIds:[playerId],playerId,
+      teamIds:normalizedPair([from,to]),fromTeamId:from,toTeamId:to,
+      occurredAt,confidence:'capture-history',previousSnapshotId:previousSession,currentSnapshotId:currentSession,
+      moves:[{playerId,playerName:clean(newRow?.player_name)||clean(oldRow?.player_name)||'Unknown Player',
+        fromTeamId:from,toTeamId:to,oldStatus:clean(oldRow?.roster_status),newStatus:clean(newRow?.roster_status),eventType:type}]
+    },'snapshot-diff'));
+  };
+  for(const [playerId,oldRow] of oldMap){
+    const next=newMap.get(playerId);
+    if(!next){add('release',playerId,oldRow,null);continue}
+    const from=clean(oldRow.team_id),to=clean(next.team_id),oldStatus=clean(oldRow.roster_status),newStatus=clean(next.roster_status);
+    if(from!==to)add('team-change',playerId,oldRow,next);
+    else if(oldStatus!==newStatus)add('roster-status-change',playerId,oldRow,next);
+  }
+  for(const [playerId,next] of newMap){
+    if(!oldMap.has(playerId))add('signing',playerId,null,next);
+  }
+  return events;
+}
+
+async function rebuildCaptureFreeAgents(db,leagueId,sessions){
+  if(!sessions.length)return{currentFreeAgents:0,latestSessionId:null};
+  const latest=sessions[sessions.length-1];
+  await db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND source_route IN ('capture-lifecycle','forward-detection')`)
+    .bind(leagueId).run();
+
+  const absent=(await db.prepare(`SELECT h.player_id,h.player_name,h.position,h.raw_json,h.snapshot_id,s.received_at
+    FROM canonical_historical_player_states h
+    JOIN canonical_capture_lifecycle_sessions s ON s.league_id=h.league_id AND s.session_id=h.snapshot_id
+    WHERE h.league_id=?
+      AND NOT EXISTS (SELECT 1 FROM canonical_historical_player_states cur
+        WHERE cur.league_id=h.league_id AND cur.snapshot_id=? AND cur.player_id=h.player_id)
+      AND NOT EXISTS (SELECT 1 FROM canonical_historical_player_states newer
+        JOIN canonical_capture_lifecycle_sessions ns ON ns.league_id=newer.league_id AND ns.session_id=newer.snapshot_id
+        WHERE newer.league_id=h.league_id AND newer.player_id=h.player_id AND ns.received_at>s.received_at)
+    ORDER BY h.player_name`).bind(leagueId,latest.session_id).all()).results||[];
+
+  let inserted=0;
+  for(const row of absent){
+    const raw=parse(row.raw_json,{})||{};
+    const meta=rawPlayerMeta(raw,row);
+    await db.prepare(`INSERT INTO canonical_free_agents
+      (league_id,player_id,player_name,position,overall,age,dev_trait,source_route,source_capture_id,raw_json,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(league_id,player_id) DO UPDATE SET player_name=excluded.player_name,position=excluded.position,
+        overall=excluded.overall,age=excluded.age,dev_trait=excluded.dev_trait,source_route=excluded.source_route,
+        source_capture_id=excluded.source_capture_id,raw_json=excluded.raw_json,updated_at=CURRENT_TIMESTAMP`)
+      .bind(leagueId,row.player_id,row.player_name||meta.playerName,row.position||meta.position,meta.overall,meta.age,meta.devTrait,
+        'capture-lifecycle',row.snapshot_id,JSON.stringify({...raw,teamId:'FA',rosterStatus:'free-agent',status:'free-agent',isFreeAgent:true})).run();
+    inserted++;
+  }
+  return{currentFreeAgents:inserted,latestSessionId:latest.session_id};
+}
+
+async function finalizeCaptureLifecycle(db,leagueId){
+  const sessions=(await db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
+    WHERE league_id=? AND status='complete' ORDER BY received_at ASC,session_id ASC`).bind(leagueId).all()).results||[];
+  let eventCount=0,signings=0,releases=0,teamChanges=0,statusChanges=0;
+  for(let i=1;i<sessions.length;i++){
+    const previous=await captureLifecycleRows(db,leagueId,sessions[i-1].session_id);
+    const current=await captureLifecycleRows(db,leagueId,sessions[i].session_id);
+    const events=lifecycleDiffEvents(previous,current,sessions[i-1].session_id,sessions[i].session_id,sessions[i].received_at);
+    for(const event of events){
+      await mergeEvidence(db,leagueId,event,sessions[i].session_id);
+      eventCount++;
+      if(event.eventType==='signing')signings++;
+      else if(event.eventType==='release')releases++;
+      else if(event.eventType==='team-change')teamChanges++;
+      else if(event.eventType==='roster-status-change')statusChanges++;
+    }
+  }
+  const freeAgents=await rebuildCaptureFreeAgents(db,leagueId,sessions);
+  return{sessionsCompared:Math.max(0,sessions.length-1),eventCount,signings,releases,teamChanges,statusChanges,freeAgents};
+}
+
 export async function onRequestPost(context){
   const state=await requestState(context);
   if(state.response)return state.response;
@@ -1709,6 +1891,22 @@ export async function onRequestPost(context){
       historicalSnapshotCounts:historical.snapshotCounts,
       backfillPreview
     });
+  }
+
+  if(action==='capture-lifecycle-plan'){
+    return json({ok:true,release:RELEASE,...(await captureLifecyclePlan(state.db,state.league.id))});
+  }
+
+  if(action==='capture-lifecycle-session'){
+    const sessionId=clean(body.sessionId);
+    if(!sessionId)return json({ok:false,release:RELEASE,error:'sessionId is required.'},400);
+    try{return json({ok:true,release:RELEASE,...(await processCaptureLifecycleSession(context,state,sessionId))})}
+    catch(error){return json({ok:false,release:RELEASE,error:'Capture lifecycle session failed.',detail:error?.message||String(error)},500)}
+  }
+
+  if(action==='capture-lifecycle-finalize'){
+    try{return json({ok:true,release:RELEASE,...(await finalizeCaptureLifecycle(state.db,state.league.id))})}
+    catch(error){return json({ok:false,release:RELEASE,error:'Capture lifecycle finalization failed.',detail:error?.message||String(error)},500)}
   }
 
   if(action!=='sync')return json({ok:false,error:`Unsupported action: ${action}`},400);
