@@ -2,11 +2,12 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.4.6';
+  const VERSION = '5.9.10.6.4.7';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
     ['map-teams','Map Teams'],
+    ['reconstruct-player-lifecycle','Reconstruct Player Lifecycle'],
     ['map-players','Map Players'],
     ['map-schedule','Map Schedule'],
     ['map-statistics','Map Statistics'],
@@ -105,6 +106,7 @@
   const orchestrator = (method='GET', body) => api(`${base()}import-orchestrator`, method, body);
   const forwardDetection = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/forward-detection`, method, body);
   const transactionClassification = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/classification`, method, body);
+  const canonicalTransactions = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/canonical`, method, body);
   const importCertification = (method='GET', body) => api(`${base()}import-certification`, method, body);
 
   function setStage(id, state, detail='') {
@@ -331,20 +333,47 @@
     }
   }
 
+  async function reconstructPlayerLifecycle(){
+    const stage='reconstruct-player-lifecycle';
+    setStage(stage,'running','Reconstructing roster history before Player Mapping…');
+    try{
+      const plan=await canonicalTransactions('POST',{action:'capture-lifecycle-plan'});
+      const pending=(plan.sessions||[]).filter(row=>!row.processed);
+      let processed=0;
+      for(const session of pending){
+        progress=`Lifecycle history ${processed+1}/${pending.length} · ${session.sessionId}`;
+        stageState[stage]={state:'running',detail:progress};
+        rerender();
+        await canonicalTransactions('POST',{action:'capture-lifecycle-session',sessionId:session.sessionId});
+        processed++;
+      }
+      const finalized=await canonicalTransactions('POST',{action:'capture-lifecycle-finalize'});
+      const freeAgents=Number(finalized?.freeAgents?.currentFreeAgents||0);
+      const events=Number(finalized?.eventCount||0);
+      const summary=`${events} lifecycle event(s) · ${freeAgents} preserved Free Agent(s) · ${processed} new roster session(s) processed`;
+      setStage(stage,'complete',summary);
+      return {...finalized,processedSessions:processed};
+    }catch(error){
+      setStage(stage,'failed',error.message);
+      throw error;
+    }
+  }
+
   async function publishTransactions(){
     const stage='publish-transactions';
-    setStage(stage,'running','Publishing signings, releases, roster moves and Free Agent state…');
+    setStage(stage,'running','Confirming canonical transaction ledger and Free Agent state…');
     try{
-      const service=window.FranchiseHQ?.transactions;
-      if(!service?.syncCanonical)throw new Error('Canonical transaction service is unavailable.');
-      const payload=await service.syncCanonical({force:true});
-      const touched=Number(payload?.canonical?.touchedTransactions||0);
-      const freeAgents=Number(payload?.captureLifecycle?.freeAgents?.currentFreeAgents ?? payload?.freeAgents?.currentFreeAgents ?? 0);
-      const forward=Number(payload?.input?.forwardMovementEvents||0);
-      const rebuilt=Number(payload?.captureLifecycle?.eventCount||0);
-      const sessions=Number(payload?.captureLifecycle?.processedSessions||0);
-      setStage(stage,'complete',`${touched} current transaction(s) · ${rebuilt} lifecycle event(s) reconstructed · ${freeAgents} Free Agent(s) · ${sessions} new capture session(s)`);
-      return payload;
+      const lifecycle=await canonicalTransactions('POST',{action:'capture-lifecycle-finalize'});
+      const payload=await canonicalTransactions('GET');
+      const freeAgents=Number(lifecycle?.freeAgents?.currentFreeAgents||0);
+      const events=Number(lifecycle?.eventCount||0);
+      const transactions=Number(payload?.transactions?.length ?? payload?.canonical?.transactions?.length ?? payload?.count ?? 0);
+      const summary=`${transactions} canonical transaction(s) · ${events} lifecycle event(s) · ${freeAgents} Free Agent(s)`;
+      setStage(stage,'complete',summary);
+      try{
+        if(typeof window.FranchiseHQ?.playerLiveSync?.refresh==='function')await window.FranchiseHQ.playerLiveSync.refresh();
+      }catch(_){}
+      return {canonical:payload,lifecycle};
     }catch(error){
       setStage(stage,'failed',error.message);
       throw error;
@@ -398,7 +427,12 @@
       const start=await orchestrator('POST',{action:'start'});
       run=start.run;
       await runSimpleStage('map-teams','map-teams',p=>`${p.teams?.length ?? p.mappingRun?.teamCount ?? '?'} teams mapped`);
-      await runSimpleStage('map-players','map-players',p=>`${p.players?.length ?? p.mappingRun?.playerCount ?? '?'} players mapped`);
+      await reconstructPlayerLifecycle();
+      await runSimpleStage('map-players','map-players',p=>{
+        const total=p.players?.length ?? p.mappingRun?.playerCount ?? '?';
+        const fas=p.lifecycleFreeAgentCount ?? p.mappingRun?.freeAgentCount ?? 0;
+        return `${total} players mapped · ${fas} Free Agent(s)`;
+      });
       await runSimpleStage('map-schedule','map-schedule',p=>`${p.games?.length ?? p.mappingRun?.gameCount ?? '?'} games mapped`);
       await runStatistics();
       await buildSnapshot();
