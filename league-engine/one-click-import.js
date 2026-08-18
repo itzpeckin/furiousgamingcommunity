@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.4.2';
+  const VERSION = '5.9.10.6.4.6';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -339,9 +339,11 @@
       if(!service?.syncCanonical)throw new Error('Canonical transaction service is unavailable.');
       const payload=await service.syncCanonical({force:true});
       const touched=Number(payload?.canonical?.touchedTransactions||0);
-      const freeAgents=Number(payload?.freeAgents?.currentFreeAgents||0);
+      const freeAgents=Number(payload?.captureLifecycle?.freeAgents?.currentFreeAgents ?? payload?.freeAgents?.currentFreeAgents ?? 0);
       const forward=Number(payload?.input?.forwardMovementEvents||0);
-      setStage(stage,'complete',`${touched} transaction(s) touched · ${freeAgents} Free Agent(s) · ${forward} movement event(s) reconciled`);
+      const rebuilt=Number(payload?.captureLifecycle?.eventCount||0);
+      const sessions=Number(payload?.captureLifecycle?.processedSessions||0);
+      setStage(stage,'complete',`${touched} current transaction(s) · ${rebuilt} lifecycle event(s) reconstructed · ${freeAgents} Free Agent(s) · ${sessions} new capture session(s)`);
       return payload;
     }catch(error){
       setStage(stage,'failed',error.message);
