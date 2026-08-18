@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.4.4';
+const RELEASE='5.9.10.6.4.5';
 const DEFAULT_NAMES=['Colby Wooden','Neville Gallimore','Logan Hall'];
 const ID_KEYS=['playerId','playerID','player_id','rosterId','rosterID','roster_id','assetId','assetID','presentationId','id'];
 const NAME_KEYS=['displayName','fullName','playerName','name'];
@@ -128,6 +128,20 @@ export async function onRequestPost(context){
     if(!object)continue;
     const raw=await object.text();
     const hay=raw.toLowerCase();
+
+    if(phase==='resolve'){
+      const payload=parse(raw);
+      const objectMatches=payload?walk(payload,targets):[];
+      if(!objectMatches.length)continue;
+      matches.push({
+        captureId:row.id,routePath:row.route_path,receivedAt:row.received_at,
+        discoverySessionId:row.discovery_session_id,byteLength:Number(row.byte_length||0),
+        rawHitTargets:[...new Set(objectMatches.flatMap(x=>x.targets||[]))],
+        objectMatches
+      });
+      continue;
+    }
+
     const rawHitTargets=[...new Set(needles.filter(n=>hay.includes(String(n.value).toLowerCase())).map(n=>n.target))];
     if(!rawHitTargets.length)continue;
     const payload=parse(raw);
