@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.4.5';
+const RELEASE='5.9.10.6.4.6';
 const DEFAULT_NAMES=['Colby Wooden','Neville Gallimore','Logan Hall'];
 const ID_KEYS=['playerId','playerID','player_id','rosterId','rosterID','roster_id','assetId','assetID','presentationId','id'];
 const NAME_KEYS=['displayName','fullName','playerName','name'];
