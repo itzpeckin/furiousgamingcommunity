@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.4.5',
+      release:'5.9.10.6.4.6',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2649,7 +2649,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.4.5 — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.4.6 — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -8579,9 +8579,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.4.5';
+      node.textContent = 'Current Release - 5.9.10.6.4.6';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.4.5';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.4.6';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8593,7 +8593,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.4.5',
+    release:'5.9.10.6.4.6',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8607,7 +8607,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.4.5',
+        release:'5.9.10.6.4.6',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -8839,9 +8839,21 @@ function canonicalPlayerDashboardStats(playerId='') {
       explicitEvents,
       workflowEvents
     });
+
+    // 6.4.6: reconstruct roster lifecycle from complete 32-team Companion capture sessions.
+    // This gives us stable rosterId-based Releases/Signings even when a player disappears
+    // from the current canonical player snapshot and no Free Agent endpoint is available.
+    const plan=await canonicalTransactionRequest('POST',{action:'capture-lifecycle-plan'});
+    const pending=(plan.sessions||[]).filter(row=>!row.processed);
+    const processed=[];
+    for(const session of pending){
+      processed.push(await canonicalTransactionRequest('POST',{action:'capture-lifecycle-session',sessionId:session.sessionId}));
+    }
+    const lifecycle=await canonicalTransactionRequest('POST',{action:'capture-lifecycle-finalize'});
+
     canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
     await loadLiveTeamDirectory(true);
-    return payload;
+    return {...payload,captureLifecycle:{planned:plan.sessions?.length||0,processedSessions:processed.length,...lifecycle}};
   }
 
   function transactionCertificationVisibilitySample(){
@@ -9217,7 +9229,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.4.5',
+    release:'5.9.10.6.4.6',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9305,9 +9317,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.4.5 — Historical Roster Released Player Resolver */
+/* 5.9.10.6.4.6 — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.4.5';
+  const RELEASE='5.9.10.6.4.6';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
