@@ -7,7 +7,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.10.6.2e';
+const RELEASE = '5.9.10.6.4.7';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
@@ -184,6 +184,35 @@ function runPayload(run){if(!run)return null;let warnings=[];try{warnings=JSON.p
 function response(run,players,slug,leagueId,extra={}){return{ok:true,release:RELEASE,leagueId,leagueSlug:slug,previewAvailable:Boolean(run),mappingRun:runPayload(run),players,activeSnapshotChanged:false,activationPerformed:false,rawPayloadReturned:false,...extra};}
 async function runBatches(db,statements,size=75){for(let i=0;i<statements.length;i+=size)await db.batch(statements.slice(i,i+size));}
 
+async function lifecycleFreeAgents(db,leagueId,validTeams){
+  const table=await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='canonical_free_agents'`).first();
+  if(!table)return[];
+  const rows=(await db.prepare(`SELECT player_id,player_name,position,overall,age,dev_trait,raw_json
+    FROM canonical_free_agents WHERE league_id=? ORDER BY player_name`).bind(leagueId).all()).results||[];
+  return rows.map((row,index)=>{
+    let raw={};try{raw=JSON.parse(row.raw_json||'{}')}catch{}
+    const player=canonical({
+      ...raw,
+      rosterId:row.player_id,
+      playerId:row.player_id,
+      displayName:row.player_name,
+      position:row.position??raw.position,
+      overall:row.overall??raw.overall??raw.playerBestOvr,
+      age:row.age??raw.age,
+      devTrait:row.dev_trait??raw.devTrait,
+      teamId:'FA',
+      rosterStatus:'free-agent',
+      status:'free-agent',
+      isFreeAgent:true
+    },index,'FA',validTeams);
+    player.teamExternalId=null;
+    player.sourceTeamId='FA';
+    player.recordTeamId='FA';
+    player.sourceRecord={...(player.sourceRecord||raw),teamId:'FA',rosterStatus:'free-agent',status:'free-agent',isFreeAgent:true};
+    return player;
+  }).filter(player=>player.externalId);
+}
+
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);
   const db=database(context.env);if(!db)return json({ok:false,error:'D1 is not configured.'},503);
@@ -267,12 +296,32 @@ export async function onRequestPost(context){
       });
     }
 
+
+    // 5.9.10.6.4.7 — authoritative fallback: lifecycle reconstruction preserves players who
+    // disappeared from all 32 team rosters and marks them as canonical Free Agents.
+    const lifecycleFAs=await lifecycleFreeAgents(db,league.id,validTeams);
+    let lifecycleFreeAgentCount=0;
+    for(const p of lifecycleFAs){
+      if(seen.has(p.externalId))continue; // current team roster always wins.
+      seen.add(p.externalId);
+      freeAgents++;
+      lifecycleFreeAgentCount++;
+      players.push(p);
+    }
+    diagnostics.push({
+      routePath:'canonical_free_agents',
+      sourceTeamId:'FA',
+      accepted:true,
+      dataset:'capture-history-free-agents',
+      recordCount:lifecycleFreeAgentCount
+    });
+
     if(!players.length)return json({ok:false,error:'No canonical players were produced from the captured team rosters.',rosterRouteCount:source.captures.length,rosterDiagnostics:diagnostics},422);
 
     await db.prepare(`UPDATE companion_player_mapping_runs SET status='superseded',updated_at=? WHERE league_id=? AND status='pending-preview'`).bind(new Date().toISOString(),league.id).run();
     const runId=crypto.randomUUID(),now=new Date().toISOString();
     const representative=source.captures[0];
-    const routeSummary=`${source.captures.length} team roster routes + ${freeAgentSource.capture?'1 usable':'0 usable'} Free Agent roster route`;
+    const routeSummary=`${source.captures.length} team roster routes + ${freeAgentSource.capture?'1 usable':'0 usable'} raw Free Agent route + ${lifecycleFreeAgentCount} lifecycle Free Agent(s)`;
     await db.prepare(`INSERT INTO companion_player_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,rostered_count,free_agent_count,warning_count,warnings_json,created_at,updated_at) VALUES (?,?,?,?,?,'pending-preview',?,?,?,?,?,?,?)`).bind(runId,league.id,source.sessionId||representative.discovery_session_id,representative.capture_id,routeSummary,players.length,rostered,freeAgents,warnings.length,JSON.stringify(warnings),now,now).run();
 
     const insertSql=`INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,team_external_id,first_name,last_name,display_name,position,archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id,ratings_json,source_record_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
@@ -282,6 +331,7 @@ export async function onRequestPost(context){
     return json(response(run,await preview(db,league.id,run.id),slug,league.id,{
       rosterRouteCount:source.captures.length,
       expectedTeamCount:validTeams.size,
+      lifecycleFreeAgentCount,
       freeAgentCapture:{
         usable:Boolean(freeAgentSource.capture),
         captureId:freeAgentSource.capture?.capture_id||null,
