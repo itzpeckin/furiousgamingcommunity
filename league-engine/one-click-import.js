@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.4.7';
+  const VERSION = '5.9.10.6.4.7a';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -16,6 +16,7 @@
     ['activate-snapshot','Activate Snapshot'],
     ['detect-transactions','Detect Roster Movements'],
     ['classify-transactions','Classify Transactions'],
+    ['reconcile-transactions','Reconcile Transactions'],
     ['verify-active-snapshot','Verify Live Snapshot'],
     ['publish-transactions','Publish Transactions & Free Agents']
   ];
@@ -311,6 +312,25 @@
     }
   }
 
+  async function reconcileTransactions() {
+    const stage='reconcile-transactions';
+    setStage(stage,'running','Reconciling lifecycle evidence into the canonical transaction ledger…');
+    try {
+      // Capture-history finalization already merges Release / Signing / Team Change /
+      // roster-status evidence into the canonical ledger. Re-running it here is
+      // idempotent and places reconciliation in the exact orchestrator stage order.
+      const payload=await canonicalTransactions('POST',{action:'capture-lifecycle-finalize'});
+      const summary=`${Number(payload?.eventCount||0)} lifecycle event(s) · ${Number(payload?.signings||0)} signing(s) · ${Number(payload?.releases||0)} release(s) · ${Number(payload?.teamChanges||0)} team change(s)`;
+      setStage(stage,'complete',summary);
+      await report(stage,true,{summary,snapshotId});
+      return payload;
+    } catch(error) {
+      setStage(stage,'failed',error.message);
+      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
+      throw error;
+    }
+  }
+
   async function verify() {
     const stage='verify-active-snapshot';
     setStage(stage,'running','Verifying active snapshot…');
@@ -440,6 +460,7 @@
       await lifecycle('activate-snapshot','activate');
       await detectTransactions();
       await classifyTransactions();
+      await reconcileTransactions();
       await verify();
       await publishTransactions();
       progress=`Import complete · ${snapshotId} is LIVE`;
