@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.4.8',
+      release:'5.9.10.6.4.8a',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2649,7 +2649,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.4.8 — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.4.8a — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -3662,7 +3662,7 @@
             const workflowId=row.workflowTradeId;
             return `<button type="button" class="canonical-transaction-row" ${workflowId?`data-route="trade-center/${escapeHtml(String(workflowId))}"`:''}>
               <span>
-                <strong>${escapeHtml(transactionEventLabel(row.eventType))}${direction?` · ${escapeHtml(direction)}`:''}</strong>
+                <strong>${escapeHtml(transactionEventLabel(transactionDisplayType(row)))}${direction?` · ${escapeHtml(direction)}`:''}</strong>
                 <small>${escapeHtml(transactionTimeLabel(row))}</small>
               </span>
               ${transactionAuthorityMarkup(row)}
@@ -5885,6 +5885,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     const execution=String(transaction.executionStatus||'').toLowerCase();
     const type=String(transaction.eventType||'').toLowerCase();
 
+    if(type==='roster-status-change')return false;
+
     const hasMaddenEvidence=authority==='madden-explicit'||authority==='franchisehq+madden'||execution==='confirmed-madden';
     const hasRosterEvidence=authority==='franchisehq+snapshot-confirmed'||authority==='snapshot-inferred'||execution==='confirmed-roster'||execution==='observed-roster';
 
@@ -5906,6 +5908,20 @@ function canonicalPlayerDashboardStats(playerId='') {
     return (liveTeamDirectory?.teams||[]).find(team=>canonicalTeamAliases(team).has(wanted))||null;
   }
 
+  function transactionDisplayType(transaction={}){
+    const rawType=String(transaction.eventType||'').toLowerCase();
+    if(rawType==='roster-status-change')return'roster-status-change';
+    if(rawType==='team-change'){
+      const moves=transactionMoves(transaction);
+      const move=moves.find(m=>String(m?.oldStatus||'').toLowerCase().includes('practice') &&
+                               String(m?.fromTeamId||'') &&
+                               String(m?.toTeamId||'') &&
+                               String(m.fromTeamId)!==String(m.toTeamId));
+      if(move)return'signed-off-practice-squad';
+    }
+    return rawType;
+  }
+
   function transactionEventLabel(type=''){
     const key=String(type||'').toLowerCase();
     return ({
@@ -5915,7 +5931,8 @@ function canonicalPlayerDashboardStats(playerId='') {
       'waiver-claim':'Waiver Claim',
       waived:'Waived',
       'team-change':'Team Change',
-      'practice-squad-signing':'Signed from Practice Squad',
+      'signed-off-practice-squad':'Signed off Practice Squad',
+      'practice-squad-signing':'Signed off Practice Squad',
       'practice-squad-promotion':'Promoted from Practice Squad',
       'practice-squad-demotion':'Moved to Practice Squad',
       'ir-placement':'Placed on IR',
@@ -5928,7 +5945,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   function transactionEventTone(type=''){
     const key=String(type||'').toLowerCase();
     if(key==='trade')return'accent';
-    if(['signing','waiver-claim','practice-squad-signing','practice-squad-promotion','ir-activation'].includes(key))return'success';
+    if(['signing','waiver-claim','practice-squad-signing','signed-off-practice-squad','practice-squad-promotion','ir-activation'].includes(key))return'success';
     if(['release','waived','practice-squad-demotion','ir-placement'].includes(key))return'danger';
     return'neutral';
   }
@@ -6013,7 +6030,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const partnersMarkup=partners.length?partners.map(partner=>`<span class="team-transaction-partner">${renderTeamMark(partner,'team-logo')}<span>${escapeHtml(partner.abbr||partner.fullName||'Team')}</span></span>`).join(''):'<span class="team-transaction-partner">League transaction</span>';
 
     return `<article class="card team-transaction-row">
-      <div class="team-transaction-row__header"><div><span class="pill pill--${transactionEventTone(transaction.eventType)}">${escapeHtml(transactionEventLabel(transaction.eventType))}</span><strong>${escapeHtml(transactionTimeLabel(transaction))}</strong>${transactionDirectionLabel(transaction)?`<small>${escapeHtml(transactionDirectionLabel(transaction))}</small>`:''}</div>${transactionAuthorityMarkup(transaction)}</div>
+      <div class="team-transaction-row__header"><div><span class="pill pill--${transactionEventTone(transactionDisplayType(transaction))}">${escapeHtml(transactionEventLabel(transactionDisplayType(transaction)))}</span><strong>${escapeHtml(transactionTimeLabel(transaction))}</strong>${transactionDirectionLabel(transaction)?`<small>${escapeHtml(transactionDirectionLabel(transaction))}</small>`:''}</div>${transactionAuthorityMarkup(transaction)}</div>
       <div class="team-transaction-row__body"><div class="team-transaction-partners"><small>${partners.length?'With / Against':'Team'}</small>${partnersMarkup}</div>${playersMarkup}</div>
       <div class="team-transaction-row__footer"><small>${evidenceCount} source record${evidenceCount===1?'':'s'} merged into one canonical transaction</small>${canOpenTrade?`<button type="button" class="text-button" data-route="trade-center/${escapeHtml(transaction.workflowTradeId)}">View Trade Details <svg><use href="#icon-arrow"></use></svg></button>`:''}</div>
     </article>`;
@@ -6817,7 +6834,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const publicRows=(payload?.transactions||[]).filter(transactionIsPubliclyVisible);
 
       const teamOptions=(liveTeamDirectory?.teams||[]).slice().sort((a,b)=>String(a.fullName||a.abbr).localeCompare(String(b.fullName||b.abbr)));
-      const typeOptions=[...new Set(publicRows.map(row=>String(row.eventType||'').toLowerCase()).filter(Boolean))]
+      const typeOptions=[...new Set(publicRows.map(row=>transactionDisplayType(row)).filter(Boolean))]
         .sort((a,b)=>transactionEventLabel(a).localeCompare(transactionEventLabel(b)));
 
       const matchesTeam=row=>{
@@ -6831,7 +6848,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         const players=transactionPlayerRows(row);
         const teams=(row.teamIds||[]).map(id=>transactionTeamByCanonicalId(id)).filter(Boolean);
         return [
-          transactionEventLabel(row.eventType),
+          transactionEventLabel(transactionDisplayType(row)),
           transactionAuthorityLabel(row),
           transactionTimeLabel(row),
           ...players.map(p=>p.name),
@@ -6840,7 +6857,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       };
 
       const rows=publicRows
-        .filter(row=>state.transactionType==='all'||String(row.eventType||'').toLowerCase()===state.transactionType)
+        .filter(row=>state.transactionType==='all'||transactionDisplayType(row)===state.transactionType)
         .filter(matchesTeam)
         .filter(matchesSearch)
         .sort((a,b)=>(Number(b.season||0)-Number(a.season||0))||(Number(b.week||0)-Number(a.week||0))||((new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0)));
@@ -6850,7 +6867,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         const direction=transactionDirectionLabel(row);
         return `<article class="card league-transaction-card">
           <div class="league-transaction-card__top">
-            <div><span class="pill pill--${transactionEventTone(row.eventType)}">${escapeHtml(transactionEventLabel(row.eventType))}</span><strong>${escapeHtml(transactionTimeLabel(row))}</strong></div>
+            <div><span class="pill pill--${transactionEventTone(transactionDisplayType(row))}">${escapeHtml(transactionEventLabel(transactionDisplayType(row)))}</span><strong>${escapeHtml(transactionTimeLabel(row))}</strong></div>
             ${transactionAuthorityMarkup(row)}
           </div>
           <div class="league-transaction-card__teams"><strong>${escapeHtml(direction||'League transaction')}</strong></div>
@@ -8622,9 +8639,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.4.8';
+      node.textContent = 'Current Release - 5.9.10.6.4.8a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.4.8';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.4.8a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8636,7 +8653,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.4.8',
+    release:'5.9.10.6.4.8a',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8650,7 +8667,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.4.8',
+        release:'5.9.10.6.4.8a',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9272,7 +9289,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.4.8',
+    release:'5.9.10.6.4.8a',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9364,9 +9381,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.4.8 — Historical Roster Released Player Resolver */
+/* 5.9.10.6.4.8a — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.4.8';
+  const RELEASE='5.9.10.6.4.8a';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
