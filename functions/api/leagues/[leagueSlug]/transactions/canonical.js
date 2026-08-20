@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.0';
+const RELEASE='5.9.10.6.5.1';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -148,6 +148,25 @@ async function requestState(context){
 
 function publicTransaction(row,evidence=[]){
   if(!row)return null;
+  const moves=evidence.flatMap(item=>{
+    const parsed=parse(item.evidence_json,{})||{};
+    return Array.isArray(parsed.moves)?parsed.moves:[];
+  });
+  const participants=[];
+  const seen=new Set();
+  for(const move of moves){
+    const id=clean(move.playerId);
+    if(!id||seen.has(id))continue;
+    seen.add(id);
+    participants.push({
+      id,
+      name:clean(move.playerName)||`Player ${id}`,
+      fromTeamId:clean(move.fromTeamId),
+      toTeamId:clean(move.toTeamId),
+      oldStatus:clean(move.oldStatus),
+      newStatus:clean(move.newStatus)
+    });
+  }
   return{
     id:row.id,
     eventType:row.event_type,
@@ -164,6 +183,7 @@ function publicTransaction(row,evidence=[]){
     lastSnapshotId:row.last_snapshot_id||null,
     confidence:row.confidence,
     details:parse(row.details_json,{})||{},
+    participants,
     evidence:evidence.map(item=>({
       sourceType:item.source_type,
       sourceKey:item.source_key,
