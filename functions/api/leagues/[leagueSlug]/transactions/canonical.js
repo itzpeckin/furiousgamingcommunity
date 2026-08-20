@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.4.8';
+const RELEASE='5.9.10.6.4.8a';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -1797,7 +1797,7 @@ function lifecycleDiffEvents(previous=[],current=[],previousSession,currentSessi
     let refinedType=type;
 
     if(type==='team-change'&&oldStatus==='practice-squad'){
-      refinedType='practice-squad-signing';
+      refinedType='signed-off-practice-squad';
     }else if(type==='roster-status-change'){
       refinedType=refinedStatusEvent(oldStatus,newStatus);
     }
@@ -1916,6 +1916,7 @@ async function finalizeCaptureLifecycle(db,leagueId){
       if(event.eventType==='signing')signings++;
       else if(event.eventType==='release')releases++;
       else if(event.eventType==='team-change')teamChanges++;
+      else if(event.eventType==='signed-off-practice-squad')teamChanges++;
       else if(event.eventType==='roster-status-change')statusChanges++;
     }
   }
