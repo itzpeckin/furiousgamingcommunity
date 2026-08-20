@@ -2394,7 +2394,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.1c',
+      release:'5.9.10.6.5.2',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2709,7 +2709,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.1c — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.2 — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -7675,7 +7675,10 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   const commissionerImportObserver=new MutationObserver(()=>{
-    if((location.hash.slice(1)||'').startsWith('commissioner'))scheduleCommissionerImporterMount();
+    if((location.hash.slice(1)||'').startsWith('commissioner')){
+      scheduleCommissionerImporterMount();
+      setTimeout(()=>mountPerformanceCertificationCard(),60);
+    }
   });
   function startCommissionerImportObserver(){
     const target=document.querySelector('[data-page-content]')||document.querySelector('main')||document.body;
@@ -7683,6 +7686,191 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startCommissionerImportObserver,{once:true});
   else startCommissionerImportObserver();
+
+
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.2';
+  const PERFORMANCE_PAGE_TARGET_MS=1000;
+  let performanceCertificationResult=null;
+  let performanceCertificationRunning=false;
+
+  function performanceCertificationRoutes(){
+    return [
+      {route:'home',label:'League Home'},
+      {route:'players',label:'Players'},
+      {route:'stats',label:'Stats & Leaders'},
+      {route:'transactions',label:'Transactions'},
+      {route:'standings',label:'Standings'},
+      {route:'teams',label:'Teams'},
+      {route:'schedule',label:'Schedule'}
+    ];
+  }
+
+  function performanceRouteLooksReady(route){
+    if(!pageContent||!pageContent.children.length)return false;
+    if(pageContent.getAttribute('aria-busy')==='true')return false;
+    const text=String(pageContent.innerText||'').replace(/\\s+/g,' ').trim();
+    if(!text)return false;
+    const blockers=[
+      'Loading current league leaders',
+      'Loading transaction ledger',
+      'Loading the canonical transaction ledger',
+      'Loading Players',
+      'Loading league data',
+      'Loading My Team',
+      'Checking Commissioner access'
+    ];
+    if(blockers.some(value=>text.includes(value)))return false;
+    return true;
+  }
+
+  async function waitForPerformanceRoute(route,timeoutMs=12000){
+    const started=performance.now();
+    return await new Promise(resolve=>{
+      let settled=false;
+      const finish=(timedOut=false)=>{
+        if(settled)return;
+        settled=true;
+        observer.disconnect();
+        cancelAnimationFrame(frame);
+        resolve({
+          ms:Math.round((performance.now()-started)*100)/100,
+          timedOut,
+          textLength:String(pageContent?.innerText||'').length
+        });
+      };
+      const check=()=>{
+        if(performanceRouteLooksReady(route))return finish(false);
+        if(performance.now()-started>=timeoutMs)return finish(true);
+        frame=requestAnimationFrame(check);
+      };
+      const observer=new MutationObserver(()=>{
+        if(performanceRouteLooksReady(route))finish(false);
+      });
+      observer.observe(pageContent,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-busy']});
+      let frame=requestAnimationFrame(check);
+    });
+  }
+
+  async function measurePerformanceRoute(item){
+    const started=performance.now();
+    renderRoute(item.route);
+    const readiness=await waitForPerformanceRoute(item.route);
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const totalMs=Math.round((performance.now()-started)*100)/100;
+    return {
+      route:item.route,
+      label:item.label,
+      readyMs:readiness.ms,
+      totalMs,
+      timedOut:readiness.timedOut,
+      pass:!readiness.timedOut&&readiness.ms<=PERFORMANCE_PAGE_TARGET_MS
+    };
+  }
+
+  async function runPerformanceCertification(){
+    if(performanceCertificationRunning)return performanceCertificationResult;
+    performanceCertificationRunning=true;
+    const returnRoute=location.hash.slice(1)||'commissioner';
+    const routes=performanceCertificationRoutes();
+    const startedAt=new Date().toISOString();
+    const cold=[];
+    const warm=[];
+    try{
+      showToast('Performance certification started','Franchise HQ will briefly open each core page twice and return to Commissioner HQ.');
+      for(const item of routes)cold.push(await measurePerformanceRoute(item));
+      for(const item of routes)warm.push(await measurePerformanceRoute(item));
+      const nav=performance.getEntriesByType('navigation')?.[0];
+      const boot={
+        domContentLoadedMs:nav?Math.round(nav.domContentLoadedEventEnd*100)/100:null,
+        windowLoadMs:nav?Math.round(nav.loadEventEnd*100)/100:null
+      };
+      const failed=[...cold,...warm].filter(row=>!row.pass);
+      performanceCertificationResult={
+        ok:true,
+        release:PERFORMANCE_CERTIFICATION_RELEASE,
+        targetMs:PERFORMANCE_PAGE_TARGET_MS,
+        startedAt,
+        completedAt:new Date().toISOString(),
+        status:failed.length?'review':'pass',
+        score:Math.round((([...cold,...warm].length-failed.length)/([...cold,...warm].length||1))*100),
+        boot,
+        firstVisit:cold,
+        repeatVisit:warm,
+        failed:failed.map(row=>({route:row.route,label:row.label,readyMs:row.readyMs,timedOut:row.timedOut}))
+      };
+      try{localStorage.setItem('fhq:performance-certification:v6.5.2',JSON.stringify(performanceCertificationResult));}catch{}
+      console.info('[Performance Certification]',JSON.stringify(performanceCertificationResult,null,2));
+      return performanceCertificationResult;
+    }finally{
+      performanceCertificationRunning=false;
+      if(returnRoute.startsWith('commissioner')){
+        renderRoute('commissioner');
+        setTimeout(()=>mountPerformanceCertificationCard(),60);
+      }else renderRoute(returnRoute);
+    }
+  }
+
+  function lastPerformanceCertification(){
+    if(performanceCertificationResult)return performanceCertificationResult;
+    try{
+      performanceCertificationResult=JSON.parse(localStorage.getItem('fhq:performance-certification:v6.5.2')||'null');
+    }catch{}
+    return performanceCertificationResult;
+  }
+
+  function renderPerformanceCertificationCard(){
+    const result=lastPerformanceCertification();
+    const status=result?.status==='pass'?'success':result?'warning':'neutral';
+    const summary=result
+      ? `${result.score}% · ${result.failed?.length||0} measurement(s) over ${result.targetMs}ms`
+      : `Target: core pages ready within ${PERFORMANCE_PAGE_TARGET_MS}ms`;
+    const rows=result?.repeatVisit||[];
+    return `<section class="card commissioner-performance-certification" data-performance-certification-card>
+      <div class="card-header"><div><span class="eyebrow">6.5.2 · Production readiness</span><h3>Performance Certification</h3><p>Measure the core league pages twice: first visit and repeat navigation.</p></div><span class="pill pill--${status}">${result?result.status.toUpperCase():'READY'}</span></div>
+      <div class="commissioner-live-import-summary">
+        <span><small>Page Target</small><strong>&le; ${PERFORMANCE_PAGE_TARGET_MS} ms</strong></span>
+        <span><small>Last Result</small><strong>${escapeHtml(summary)}</strong></span>
+        ${result?.boot?.domContentLoadedMs!=null?`<span><small>DOM Ready</small><strong>${escapeHtml(result.boot.domContentLoadedMs)} ms</strong></span>`:''}
+      </div>
+      ${rows.length?`<div class="table-wrap"><table><thead><tr><th>Page</th><th>First Visit</th><th>Repeat Visit</th><th>Status</th></tr></thead><tbody>${rows.map((row,index)=>{const first=result.firstVisit?.[index];const pass=Boolean(first?.pass&&row.pass);return `<tr><td><strong>${escapeHtml(row.label)}</strong></td><td>${first?.timedOut?'Timeout':`${escapeHtml(first?.readyMs??'—')} ms`}</td><td>${row.timedOut?'Timeout':`${escapeHtml(row.readyMs)} ms`}</td><td><span class="pill pill--${pass?'success':'warning'}">${pass?'PASS':'REVIEW'}</span></td></tr>`}).join('')}</tbody></table></div>`:''}
+      <div class="commissioner-import-actions"><button class="button button--primary" data-run-performance-certification ${performanceCertificationRunning?'disabled':''}>${performanceCertificationRunning?'Running Certification…':'Run Performance Certification'}</button></div>
+      <div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>The test temporarily navigates through League Home, Players, Stats & Leaders, Transactions, Standings, Teams, and Schedule, then automatically returns here.</span></div>
+    </section>`;
+  }
+
+  function mountPerformanceCertificationCard(){
+    const route=location.hash.slice(1)||'home';
+    if(!route.startsWith('commissioner')||route.includes('platform-workspace'))return false;
+    if(document.querySelector('[data-performance-certification-card]'))return true;
+    const panel=document.querySelector('.commissioner-tab-panel');
+    if(!panel)return false;
+    const importActive=document.querySelector('.commissioner-tabs [data-commissioner-tab="import"].is-active');
+    if(importActive)return false;
+    panel.insertAdjacentHTML('beforeend',renderPerformanceCertificationCard());
+    return true;
+  }
+
+  document.addEventListener('click',event=>{
+    const button=event.target.closest('[data-run-performance-certification]');
+    if(!button)return;
+    event.preventDefault();
+    button.disabled=true;
+    button.textContent='Running Certification…';
+    runPerformanceCertification().catch(error=>{
+      console.error('[Performance Certification]',error);
+      showToast('Performance certification failed',error?.message||'Unable to complete the performance test.');
+      renderRoute('commissioner');
+      setTimeout(()=>mountPerformanceCertificationCard(),60);
+    });
+  });
+
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.performanceCertification={
+    release:PERFORMANCE_CERTIFICATION_RELEASE,
+    run:()=>runPerformanceCertification(),
+    last:()=>lastPerformanceCertification(),
+    print:()=>console.log(JSON.stringify(lastPerformanceCertification(),null,2))
+  };
 
   function renderRoute(routeInput=location.hash.slice(1)||'home') {
     const route=routeInput||'home';
@@ -7752,9 +7940,11 @@ function canonicalPlayerDashboardStats(playerId='') {
         }else if(window.FGC_TRADE?.renderCommissioner){
           window.FGC_TRADE.renderCommissioner();
           scheduleCommissionerImporterMount();
+          setTimeout(()=>mountPerformanceCertificationCard(),60);
         }else if(window.FranchiseHQ?.trade?.renderCommissioner){
           window.FranchiseHQ.trade.renderCommissioner();
           scheduleCommissionerImporterMount();
+          setTimeout(()=>mountPerformanceCertificationCard(),60);
         }else{
           renderRoadmap(base);
         }
@@ -8771,9 +8961,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.1c';
+      node.textContent = 'Current Release - 5.9.10.6.5.2';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.1c';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.2';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8785,7 +8975,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.1c',
+    release:'5.9.10.6.5.2',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8799,7 +8989,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.1c',
+        release:'5.9.10.6.5.2',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9421,7 +9611,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.1c',
+    release:'5.9.10.6.5.2',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9533,9 +9723,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.1c — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.2 — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.1c';
+  const RELEASE='5.9.10.6.5.2';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
