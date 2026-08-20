@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.1';
+  const VERSION = '5.9.10.6.5.1a';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();
@@ -40,7 +40,7 @@
   }
 
   function storageKey(snapshotId,domain){
-    return `fhq:live-read:5.9.10.6.5.1:${leagueSlug()}:${snapshotId}:${domain}`;
+    return `fhq:live-read:5.9.10.6.5.1a:${leagueSlug()}:${snapshotId}:${domain}`;
   }
 
   function readPersisted(snapshotId,domain){
