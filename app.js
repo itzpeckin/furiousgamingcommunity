@@ -2394,7 +2394,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.2b',
+      release:'5.9.10.6.5.2c',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2709,7 +2709,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.2b — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.2c — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -7705,7 +7705,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.2b';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.2c';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -8985,9 +8985,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.2b';
+      node.textContent = 'Current Release - 5.9.10.6.5.2c';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.2b';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.2c';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8999,7 +8999,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.2b',
+    release:'5.9.10.6.5.2c',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9013,7 +9013,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.2b',
+        release:'5.9.10.6.5.2c',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9635,7 +9635,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.2b',
+    release:'5.9.10.6.5.2c',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9759,9 +9759,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.2b — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.2c — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.2b';
+  const RELEASE='5.9.10.6.5.2c';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
