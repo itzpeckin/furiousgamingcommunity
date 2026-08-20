@@ -2394,7 +2394,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.2',
+      release:'5.9.10.6.5.2a',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2709,7 +2709,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.2 — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.2a — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -2777,30 +2777,47 @@
   }
 
   async function renderTeamsLive() {
-    pageContent.setAttribute('aria-busy','true');
+    const service=liveReadModel();
+    if(!service){
+      pageContent.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>Teams unavailable</h2><p>The live read service has not loaded.</p></div></article>`;
+      return;
+    }
+
+    // Paint the page chrome immediately. Team cards hydrate from the small teams +
+    // standings domains only; do not wait for 2,000+ players, schedule, or Free Agents.
+    pageContent.innerHTML=`
+      <div class="page-heading"><div><h1>Teams</h1></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Team comparison remains planned for a later release."><svg><use href="#icon-chart"></use></svg>Compare teams</button></div></div>
+      <div class="filter-bar">
+        <label class="field field--grow"><span>Search teams or owners</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-team-search value="${escapeHtml(state.teamSearch)}" placeholder="Ravens, owner, Baltimore..." /></div></label>
+        <label class="field"><span>Conference</span><select data-team-conference><option ${state.teamConference==='All'?'selected':''}>All</option><option ${state.teamConference==='AFC'?'selected':''}>AFC</option><option ${state.teamConference==='NFC'?'selected':''}>NFC</option></select></label>
+        <label class="field"><span>Division</span><select data-team-division><option ${state.teamDivision==='All'?'selected':''}>All</option><option>East</option><option>North</option><option>South</option><option>West</option></select></label>
+        <span class="result-count" data-team-count>Loading…</span>
+      </div>
+      <div class="team-grid" data-team-grid><article class="card roadmap-state" style="grid-column:1/-1"><div class="roadmap-state__inner"><p>Loading teams…</p></div></article></div>`;
+
     try{
-      const directory=await loadLiveTeamDirectory();
-      pageContent.removeAttribute('aria-busy');
-      if(routeBase(location.hash.slice(1))!=='teams' || location.hash.split('/')[1]) return;
-      if(!directory){
+      const [stateValue,snapshot,teamRows,standingRows]=await Promise.all([
+        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings()
+      ]);
+      if(routeBase(location.hash.slice(1))!=='teams'||location.hash.split('/')[1])return;
+      if(stateValue!=='live'||!snapshot){
         pageContent.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>No live team directory</h2><p>Activate a validated snapshot to populate Teams.</p></div></article>`;
         return;
       }
-      liveTeamDirectory=directory;
-      pageContent.innerHTML=`
-        <div class="page-heading"><div><h1>Teams</h1></div><div class="heading-actions"><button class="button button--ghost" data-demo-toast="Team comparison remains planned for a later release."><svg><use href="#icon-chart"></use></svg>Compare teams</button></div></div>
-        <div class="filter-bar">
-          <label class="field field--grow"><span>Search teams or owners</span><div class="input-wrap"><svg><use href="#icon-search"></use></svg><input data-team-search value="${escapeHtml(state.teamSearch)}" placeholder="Ravens, owner, Baltimore..." /></div></label>
-          <label class="field"><span>Conference</span><select data-team-conference><option ${state.teamConference==='All'?'selected':''}>All</option><option ${state.teamConference==='AFC'?'selected':''}>AFC</option><option ${state.teamConference==='NFC'?'selected':''}>NFC</option></select></label>
-          <label class="field"><span>Division</span><select data-team-division><option ${state.teamDivision==='All'?'selected':''}>All</option><option>East</option><option>North</option><option>South</option><option>West</option></select></label>
-          <span class="result-count" data-team-count></span>
-        </div>
-        <div class="team-grid" data-team-grid></div>`;
+      const standingMap=new Map((standingRows||[]).map(row=>[String(row.teamId),row]));
+      const teamsLive=(teamRows||[]).map(team=>liveTeamUiShape(team,standingMap.get(String(team.id))));
+      liveTeamDirectory=liveTeamDirectory||{};
+      liveTeamDirectory.teams=teamsLive;
+      liveTeamDirectory.teamMap=new Map(teamsLive.map(team=>[String(team.id),team]));
+      liveTeamDirectory.standings=standingRows||[];
+      liveTeamDirectory.standingMap=standingMap;
       refreshTeamGrid();
     }catch(error){
-      pageContent.removeAttribute('aria-busy');
       console.error('[Teams Live Integration]',error);
-      pageContent.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>Live teams unavailable</h2><p>${escapeHtml(error.message||'The active snapshot could not be read.')}</p></div></article>`;
+      if(routeBase(location.hash.slice(1))==='teams'){
+        const grid=document.querySelector('[data-team-grid]');
+        if(grid)grid.innerHTML=`<article class="card roadmap-state" style="grid-column:1/-1"><div class="roadmap-state__inner"><h2>Live teams unavailable</h2><p>${escapeHtml(error.message||'The active snapshot could not be read.')}</p></div></article>`;
+      }
     }
   }
 
@@ -6469,7 +6486,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function renderStats() {
-    pageContent.innerHTML='<section class="empty-state"><strong>Loading live league statistics…</strong><p>Franchise HQ is reading the active snapshot.</p></section>';
+    pageContent.innerHTML=`<div class="page-heading"><div><h1>Stats & Leaders</h1></div></div><section class="card stats-loading-shell"><div class="card-header"><div><h3>League Leaders</h3><p>Loading live league statistics…</p></div><span class="pill pill--neutral">Loading</span></div></section>`;
 
     try{
       await Promise.all([
@@ -7688,7 +7705,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.2';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.2a';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -7712,6 +7729,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     if(!text)return false;
     const blockers=[
       'Loading current league leaders',
+      'Loading live league statistics',
+      'Franchise HQ is reading the active snapshot',
       'Loading transaction ledger',
       'Loading the canonical transaction ledger',
       'Loading Players',
@@ -7753,6 +7772,10 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   async function measurePerformanceRoute(item){
     const started=performance.now();
+    // Async live renderers verify the active hash before committing their DOM.
+    // Update the URL without firing hashchange so the certification measures the
+    // real page instead of leaving the renderer thinking Commissioner HQ is active.
+    history.replaceState(null,'',`#${item.route}`);
     renderRoute(item.route);
     const readiness=await waitForPerformanceRoute(item.route);
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
@@ -7803,6 +7826,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return performanceCertificationResult;
     }finally{
       performanceCertificationRunning=false;
+      history.replaceState(null,'',`#${returnRoute}`);
       if(returnRoute.startsWith('commissioner')){
         renderRoute('commissioner');
         setTimeout(()=>mountPerformanceCertificationCard(),60);
@@ -8961,9 +8985,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.2';
+      node.textContent = 'Current Release - 5.9.10.6.5.2a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.2';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.2a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8975,7 +8999,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.2',
+    release:'5.9.10.6.5.2a',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8989,7 +9013,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.2',
+        release:'5.9.10.6.5.2a',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9611,7 +9635,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.2',
+    release:'5.9.10.6.5.2a',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9667,10 +9691,24 @@ function canonicalPlayerDashboardStats(playerId='') {
     if(live?.warm)live.warm().catch(()=>{});
     window.FranchiseHQ?.transactionUiLoader?.load?.(false)?.catch?.(()=>{});
   }
+
+  function warmLeagueStatisticsCache(){
+    if(playerStatisticsState?.loaded||playerStatisticsState?.loading)return;
+    hydratePlayerStatistics(false).catch(()=>{});
+  }
+
+  const scheduleStatisticsWarm=()=>{
+    if('requestIdleCallback' in window)requestIdleCallback(()=>warmLeagueStatisticsCache(),{timeout:2500});
+    else setTimeout(()=>warmLeagueStatisticsCache(),1200);
+  };
   if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',()=>setTimeout(warmLeagueReadCaches,0),{once:true});
+    document.addEventListener('DOMContentLoaded',()=>{
+      setTimeout(warmLeagueReadCaches,0);
+      scheduleStatisticsWarm();
+    },{once:true});
   }else{
     setTimeout(warmLeagueReadCaches,0);
+    scheduleStatisticsWarm();
   }
 
   window.addEventListener('franchisehq:league-data-state-changed', () => {
@@ -9723,9 +9761,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.2 — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.2a — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.2';
+  const RELEASE='5.9.10.6.5.2a';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
