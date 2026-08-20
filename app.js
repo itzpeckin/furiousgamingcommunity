@@ -2394,7 +2394,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.1b',
+      release:'5.9.10.6.5.1c',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2709,7 +2709,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.1b — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.1c — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -5946,6 +5946,13 @@ function canonicalPlayerDashboardStats(playerId='') {
     return canonicalTransactionUiCache.promise;
   }
 
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.transactionUiLoader={
+    load:(force=false)=>loadCanonicalTransactionsForUi(force),
+    cached:()=>canonicalTransactionUiCache.payload,
+    clear:()=>{canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};}
+  };
+
   function canonicalTeamAliases(team={}){
     return new Set([team.id,team.liveTeamId,team.abbr,team.abbreviation,team.source?.teamId,team.source?.team_id]
       .filter(value=>value!==undefined&&value!==null&&String(value)!=='').map(value=>String(value).toLowerCase()));
@@ -8764,9 +8771,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.1b';
+      node.textContent = 'Current Release - 5.9.10.6.5.1c';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.1b';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.1c';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8778,7 +8785,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.1b',
+    release:'5.9.10.6.5.1c',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8792,7 +8799,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.1b',
+        release:'5.9.10.6.5.1c',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9414,7 +9421,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.1b',
+    release:'5.9.10.6.5.1c',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9453,7 +9460,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 })();
 
   window.addEventListener('franchisehq:one-click-import-complete', () => {
-    canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+    window.FranchiseHQ?.transactionUiLoader?.clear?.();
     try{
       [...Object.keys(sessionStorage)].filter(key=>key.startsWith('fhq:live-home:')).forEach(key=>sessionStorage.removeItem(key));
       [...Object.keys(localStorage)].filter(key=>key.startsWith('fhq:home-critical:')).forEach(key=>localStorage.removeItem(key));
@@ -9468,7 +9475,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       || window.FranchiseHQ?.getModuleService?.('league','liveData')
       || null;
     if(live?.warm)live.warm().catch(()=>{});
-    loadCanonicalTransactionsForUi(false).catch(()=>{});
+    window.FranchiseHQ?.transactionUiLoader?.load?.(false)?.catch?.(()=>{});
   }
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',()=>setTimeout(warmLeagueReadCaches,0),{once:true});
@@ -9526,9 +9533,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.1b — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.1c — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.1b';
+  const RELEASE='5.9.10.6.5.1c';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
