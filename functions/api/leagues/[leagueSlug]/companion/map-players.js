@@ -7,7 +7,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.10.6.4.8';
+const RELEASE = '5.9.10.6.4.8a';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
@@ -297,7 +297,7 @@ export async function onRequestPost(context){
     }
 
 
-    // 5.9.10.6.4.8 — authoritative fallback: lifecycle reconstruction preserves players who
+    // 5.9.10.6.4.8a — authoritative fallback: lifecycle reconstruction preserves players who
     // disappeared from all 32 team rosters and marks them as canonical Free Agents.
     const lifecycleFAs=await lifecycleFreeAgents(db,league.id,validTeams);
     let lifecycleFreeAgentCount=0;
