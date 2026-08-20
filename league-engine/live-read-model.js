@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.1b';
+  const VERSION = '5.9.10.6.5.2c';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();
@@ -40,11 +40,11 @@
   }
 
   function storageKey(snapshotId,domain){
-    return `fhq:live-read:5.9.10.6.5.1b:${leagueSlug()}:${snapshotId}:${domain}`;
+    return `fhq:live-read:5.9.10.6.5.2c:${leagueSlug()}:${snapshotId}:${domain}`;
   }
 
   function readPersisted(snapshotId,domain){
-    if(!snapshotId||!['teams','standings','games','players'].includes(domain))return null;
+    if(!snapshotId||!['teams','standings','games','players','statistics'].includes(domain))return null;
     try{
       const parsed=JSON.parse(sessionStorage.getItem(storageKey(snapshotId,domain))||'null');
       if(!parsed||!Array.isArray(parsed.records))return null;
@@ -53,7 +53,7 @@
   }
 
   function persist(snapshotId,domain,records){
-    if(!snapshotId||!['teams','standings','games','players'].includes(domain))return;
+    if(!snapshotId||!['teams','standings','games','players','statistics'].includes(domain))return;
     try{
       sessionStorage.setItem(storageKey(snapshotId,domain),JSON.stringify({savedAt:Date.now(),records}));
     }catch{
@@ -99,8 +99,10 @@
     const work=(async()=>{
       // Teams, standings, games and players are bounded league datasets.
       // Fetch them in one read instead of dozens of 100-row HTTP round trips.
-      if(['teams','standings','games','players'].includes(domain)){
-        const payload=await request({domain,bulk:'1'});
+      if(['teams','standings','games','players','statistics'].includes(domain)){
+        const params={domain,bulk:'1'};
+        if(domain==='statistics')params.compact='1';
+        const payload=await request(params);
         const records=payload.records||[];
         domainCache.set(domain,records);
         persist(snapshot?.id,domain,records);
@@ -223,6 +225,9 @@
     try{
       await getSnapshot();
       await Promise.allSettled([getTeams(),getStandings(),getSchedule(),getPlayers()]);
+      // Statistics are secondary and can be larger. Start them after the core shell
+      // datasets so they never delay League Home boot.
+      getStatistics().catch(()=>{});
       return true;
     }catch{return false}
   }
