@@ -2334,7 +2334,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.4.8a',
+      release:'5.9.10.6.5.0',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2649,7 +2649,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.4.8a — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.0 — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -7560,6 +7560,44 @@ function canonicalPlayerDashboardStats(playerId='') {
     return false;
   }
 
+
+  function commissionerImportService(){
+    return window.FranchiseHQ?.oneClickImport
+      || window.FranchiseHQ?.platform?.oneClickImport
+      || window.FranchiseHQ?.getModuleService?.('platform','oneClickImport')
+      || null;
+  }
+
+  function mountCommissionerFranchiseImporter(){
+    const route=location.hash.slice(1)||'home';
+    if(!route.startsWith('commissioner')||route.startsWith('commissioner/platform-workspace'))return false;
+    const panel=document.querySelector('.commissioner-tab-panel');
+    if(!panel)return false;
+    const activeImport=document.querySelector('.commissioner-tabs [data-commissioner-tab="import"].is-active');
+    const legacyImport=panel.querySelector('.commissioner-import-layout');
+    if(!activeImport&&!legacyImport)return false;
+    const service=commissionerImportService();
+    if(!service?.renderPanel)return false;
+    if(panel.querySelector('[data-commissioner-live-import-host]'))return true;
+    panel.innerHTML=`<div class="commissioner-import-layout commissioner-import-layout--live"><div data-commissioner-live-import-host>${service.renderPanel()}</div></div>`;
+    service.renderImportNotification?.();
+    return true;
+  }
+
+  function scheduleCommissionerImporterMount(){
+    requestAnimationFrame(()=>requestAnimationFrame(()=>mountCommissionerFranchiseImporter()));
+  }
+
+  const commissionerImportObserver=new MutationObserver(()=>{
+    if((location.hash.slice(1)||'').startsWith('commissioner'))scheduleCommissionerImporterMount();
+  });
+  function startCommissionerImportObserver(){
+    const target=document.querySelector('[data-page-content]')||document.querySelector('main')||document.body;
+    commissionerImportObserver.observe(target,{childList:true,subtree:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startCommissionerImportObserver,{once:true});
+  else startCommissionerImportObserver();
+
   function renderRoute(routeInput=location.hash.slice(1)||'home') {
     const route=routeInput||'home';
     const [base,id]=route.split('/');
@@ -7627,8 +7665,10 @@ function canonicalPlayerDashboardStats(playerId='') {
           else renderRoadmap(base);
         }else if(window.FGC_TRADE?.renderCommissioner){
           window.FGC_TRADE.renderCommissioner();
+          scheduleCommissionerImporterMount();
         }else if(window.FranchiseHQ?.trade?.renderCommissioner){
           window.FranchiseHQ.trade.renderCommissioner();
+          scheduleCommissionerImporterMount();
         }else{
           renderRoadmap(base);
         }
@@ -7640,6 +7680,12 @@ function canonicalPlayerDashboardStats(playerId='') {
     mainContent.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:'smooth'});
     return { base, id, route };
+  }
+
+
+  function suppressPlatformWorkspaceImporter(){
+    if(!(location.hash.slice(1)||'').startsWith('commissioner/platform-workspace'))return;
+    document.querySelectorAll('[data-one-click-import-panel]').forEach(node=>node.remove());
   }
 
   function resolveRouteTitle(routeInput) {
@@ -8639,9 +8685,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.4.8a';
+      node.textContent = 'Current Release - 5.9.10.6.5.0';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.4.8a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.0';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -8653,7 +8699,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.4.8a',
+    release:'5.9.10.6.5.0',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -8667,7 +8713,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.4.8a',
+        release:'5.9.10.6.5.0',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9289,7 +9335,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.4.8a',
+    release:'5.9.10.6.5.0',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9381,9 +9427,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.4.8a — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.0 — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.4.8a';
+  const RELEASE='5.9.10.6.5.0';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
