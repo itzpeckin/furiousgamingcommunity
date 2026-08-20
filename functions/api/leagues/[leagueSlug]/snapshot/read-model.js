@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE = '5.9.10.6.5.1b';
+const RELEASE = '5.9.10.6.5.2c';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -94,6 +94,34 @@ function normalizeStatistic(raw = {}) {
   };
 }
 
+function normalizeStatisticCompact(raw = {}) {
+  raw = sourceRecord(raw);
+  const metrics=parse(raw.metrics_json) ?? raw.metrics ?? {};
+  const source={
+    routePath:raw.routePath ?? raw.route_path ?? raw.sourceRoutePath ?? raw.source_route_path ?? null,
+    gameId:raw.gameId ?? raw.game_id ?? raw.scheduleId ?? raw.schedule_id ?? metrics.__gameId ?? metrics.gameId ?? null,
+    scheduleId:raw.scheduleId ?? raw.schedule_id ?? metrics.scheduleId ?? null,
+    playerId:raw.player_external_id ?? raw.player_id ?? raw.playerId ?? raw.rosterId ?? raw.roster_id ?? null,
+    teamId:raw.team_external_id ?? raw.team_id ?? raw.teamId ?? raw.teamID ?? raw.rosterTeamId ?? raw.roster_team_id ?? null,
+    seasonYear:raw.season_year ?? raw.seasonYear ?? raw.calendarYear ?? null,
+    stage:raw.stage ?? raw.stage_name ?? raw.stageName ?? raw.seasonStage ?? null,
+    weekIndex:raw.week_index ?? raw.weekIndex ?? raw.week ?? null
+  };
+  return {
+    id:String(raw.external_key ?? raw.external_id ?? raw.id ?? ''),
+    category:raw.category ?? raw.statistic_category ?? null,
+    playerId:String(source.playerId ?? ''),
+    teamId:String(source.teamId ?? ''),
+    season:source.seasonYear,
+    seasonYear:source.seasonYear,
+    stage:source.stage,
+    week:source.weekIndex,
+    weekIndex:source.weekIndex,
+    metrics,
+    source
+  };
+}
+
 function normalizeStanding(raw = {}) {
   raw = sourceRecord(raw);
   return {
@@ -143,6 +171,26 @@ async function bulkDomainRows(db,leagueId,snapshotId,domain){
     complete:true,
     pageSize:result.length,
     bulk:true
+  };
+}
+
+async function bulkStatisticsRows(db,leagueId,snapshotId,compact=false){
+  const result=await rows(db,`
+    SELECT external_id,data_json
+    FROM league_snapshot_records
+    WHERE league_id=? AND snapshot_id=? AND domain='statistics'
+    ORDER BY external_id
+  `,leagueId,snapshotId);
+  return {
+    records:result.map(row=>{
+      const raw=parse(row.data_json)||{};
+      return compact?normalizeStatisticCompact(raw):normalizeStatistic(raw);
+    }),
+    nextCursor:null,
+    complete:true,
+    pageSize:result.length,
+    bulk:true,
+    compact:Boolean(compact)
   };
 }
 
@@ -226,6 +274,11 @@ export async function onRequestGet(context) {
     const bulk = String(url.searchParams.get('bulk')||'') === '1';
     if(bulk && ['teams','players','games','standings'].includes(domain)){
       const page=await bulkDomainRows(db,league.id,active.id,domain);
+      return json({...base,domain,...page});
+    }
+    if(bulk && domain==='statistics'){
+      const compact=String(url.searchParams.get('compact')||'')==='1';
+      const page=await bulkStatisticsRows(db,league.id,active.id,compact);
       return json({...base,domain,...page});
     }
     const cursor = String(url.searchParams.get('cursor') || '').trim() || null;
