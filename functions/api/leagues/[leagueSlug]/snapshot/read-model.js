@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE = '5.9.10.6.2h';
+const RELEASE = '5.9.10.6.5.1';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -130,6 +130,22 @@ async function activeSnapshot(db, leagueId) {
   `).bind(leagueId).first();
 }
 
+async function bulkDomainRows(db,leagueId,snapshotId,domain){
+  const result=await rows(db,`
+    SELECT external_id,data_json
+    FROM league_snapshot_records
+    WHERE league_id=? AND snapshot_id=? AND domain=?
+    ORDER BY external_id
+  `,leagueId,snapshotId,domain);
+  return {
+    records:result.map(row=>normalize(domain,parse(row.data_json)||{})),
+    nextCursor:null,
+    complete:true,
+    pageSize:result.length,
+    bulk:true
+  };
+}
+
 async function domainRows(db, leagueId, snapshotId, domain, cursor = null, limit = 150) {
   const safeLimit = Math.max(25, Math.min(500, Number(limit) || 150));
   let result;
@@ -207,6 +223,11 @@ export async function onRequestGet(context) {
   };
 
   if (ALLOWED_DOMAINS.has(domain)) {
+    const bulk = String(url.searchParams.get('bulk')||'') === '1';
+    if(bulk && ['teams','players','games','standings'].includes(domain)){
+      const page=await bulkDomainRows(db,league.id,active.id,domain);
+      return json({...base,domain,...page});
+    }
     const cursor = String(url.searchParams.get('cursor') || '').trim() || null;
     const limit = Number(url.searchParams.get('limit') || 150);
     const page = await domainRows(db,league.id,active.id,domain,cursor,limit);
