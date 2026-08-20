@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.4.8a';
+  const VERSION = '5.9.10.6.5.0';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -116,6 +116,7 @@
     if((state==='complete'||state==='failed') && previous==='running')timingFinish(id,state);
     stageState[id] = {state, detail, at:new Date().toISOString()};
     rerender();
+    renderImportNotification();
   }
 
   function stageIcon(id) {
@@ -126,6 +127,49 @@
   function stageClass(id) {
     const state = stageState[id]?.state || 'pending';
     return state === 'complete' ? 'success' : state === 'failed' ? 'danger' : state === 'running' ? 'warning' : 'neutral';
+  }
+
+  function stageLabel(id) {
+    return STAGES.find(([stage])=>stage===id)?.[1] || id;
+  }
+
+  function activeStage() {
+    return STAGES.find(([id])=>stageState[id]?.state==='running')?.[0] || null;
+  }
+
+  function ensureImportNotification() {
+    let node=document.querySelector('[data-franchise-import-notification]');
+    if(node)return node;
+    node=document.createElement('div');
+    node.setAttribute('data-franchise-import-notification','');
+    node.className='franchise-import-notification';
+    node.setAttribute('aria-live','polite');
+    document.body.appendChild(node);
+    return node;
+  }
+
+  function renderImportNotification() {
+    const node=ensureImportNotification();
+    const current=activeStage();
+    if(!busy && !lastError && !importCompletedAt){
+      node.className='franchise-import-notification';
+      node.innerHTML='';
+      return;
+    }
+    let title='Importing Franchise';
+    let detail=current?stageLabel(current):(progress||'Preparing import…');
+    let state='running';
+    if(lastError){
+      title='Import Stopped';
+      detail=lastError.message||'The import could not be completed.';
+      state='error';
+    }else if(!busy&&importCompletedAt){
+      title='Franchise Updated';
+      detail=`Import complete · ${timingSummary().wallClockDurationSeconds}s`;
+      state='success';
+    }
+    node.className=`franchise-import-notification is-visible is-${state}`;
+    node.innerHTML=`<span class="franchise-import-notification__indicator" aria-hidden="true"></span><span><strong>${esc(title)}</strong><small>${esc(detail)}</small></span>`;
   }
 
   async function report(stage, ok, extra={}) {
@@ -430,6 +474,7 @@
     stageTimings={}; currentStageStartedAt={};
     importStartedAt={ms:nowMs(),at:isoNow()}; importCompletedAt=null;
     rerender();
+    renderImportNotification();
     try {
       setStage('discover','running','Refreshing Companion capture discovery…');
       const discovery=await HQ?.leagueCompanionRouteDiscovery?.refresh?.();
@@ -496,24 +541,31 @@
         }
       }
       rerender();
+      renderImportNotification();
     }
   }
 
   function renderPanel() {
     const completed=STAGES.filter(([id])=>stageState[id]?.state==='complete').length;
-    const percent=Math.round((completed/STAGES.length)*100);
-    return `<article class="card" data-one-click-import-panel>
-      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner import workflow</span><h3>Import Latest Madden Data</h3><p>One action maps the newest Companion captures, builds and validates a new immutable snapshot, activates it, runs roster movement detection in safe batches, and refreshes Franchise HQ.</p></div><span class="pill pill--${lastError?'danger':busy?'warning':completed===STAGES.length?'success':'neutral'}">${lastError?'Stopped':busy?`${percent}% Importing`:completed===STAGES.length?'LIVE':'Ready'}</span></div>
-      <div style="height:8px;background:rgba(127,127,127,.16);border-radius:999px;overflow:hidden;margin:16px 0"><div style="height:100%;width:${percent}%;background:currentColor;transition:width .2s ease"></div></div>
-      <div style="display:grid;gap:8px;margin:14px 0">${STAGES.map(([id,label])=>`<div style="display:grid;grid-template-columns:28px minmax(180px,.7fr) 1fr;gap:10px;align-items:center;padding:9px 10px;border:1px solid rgba(127,127,127,.14);border-radius:10px"><span class="pill pill--${stageClass(id)}" style="justify-content:center;min-width:26px">${stageIcon(id)}</span><strong>${esc(label)}</strong><small>${esc(stageState[id]?.detail||'Pending')}</small></div>`).join('')}</div>
-      <div class="league-import-framework-actions"><button class="button button--primary" data-run-one-click-import ${busy?'disabled':''}>${busy?'Importing Madden Data…':'Import Latest Madden Data'}</button></div>
-      ${progress?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>${esc(progress)}</span></div>`:''}
-      ${importStartedAt?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>Import timing: ${esc(timingSummary().wallClockDurationSeconds)}s ${importCompletedAt?'total':'elapsed'}</span></div>`:''}
-      ${snapshotId?`<p class="league-import-status-note"><strong>New Snapshot:</strong> ${esc(snapshotId)}</p>`:''}
-      ${lastError?`<div class="validation-errors"><p><strong>${esc(lastError.message)}</strong></p>${lastError.payload?`<pre style="white-space:pre-wrap;max-height:260px;overflow:auto">${esc(JSON.stringify(lastError.payload,null,2))}</pre>`:''}</div>`:''}
-      ${lastCertification?`<div class="league-import-framework-note"><svg><use href="#icon-activity"></use></svg><span><strong>Production Certification:</strong> ${lastCertification.passed?'PASS':'REVIEW'} · ${lastCertification.score}% · ${lastCertification.wallClockSeconds??'?'}s</span></div>`:''}
-      <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>Fail-safe behavior: the existing LIVE snapshot remains authoritative until the new snapshot passes validation and activation succeeds.</span></div>
-    </article>`;
+    const current=activeStage();
+    const status=lastError?'Stopped':busy?(current?stageLabel(current):'Importing…'):importCompletedAt?'Complete':'Ready';
+    const lastSeconds=importCompletedAt?timingSummary().wallClockDurationSeconds:null;
+    return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
+      <div class="card-header">
+        <div><span class="eyebrow">Madden Companion</span><h2>Import Franchise</h2><p>Import the latest Madden Companion data into Franchise HQ. Your current LIVE league remains active until the new import passes validation.</p></div>
+        <span class="pill pill--${lastError?'danger':busy?'warning':importCompletedAt?'success':'accent'}">${esc(status)}</span>
+      </div>
+      <div class="commissioner-live-import-summary">
+        <span><small>Release</small><strong>${esc(VERSION)}</strong></span>
+        <span><small>Status</small><strong>${busy?`${completed}/${STAGES.length} complete`:status}</strong></span>
+        ${lastSeconds!=null?`<span><small>Last Run</small><strong>${esc(lastSeconds)}s</strong></span>`:''}
+      </div>
+      <div class="commissioner-import-actions">
+        <button class="button button--primary" data-run-one-click-import ${busy?'disabled':''}><svg><use href="#icon-refresh"></use></svg>${busy?'Import Running…':'Import Latest Madden Data'}</button>
+      </div>
+      ${lastError?`<div class="validation-errors"><p><strong>${esc(lastError.message)}</strong></p>${lastError.payload?`<pre style="white-space:pre-wrap;max-height:220px;overflow:auto">${esc(JSON.stringify(lastError.payload,null,2))}</pre>`:''}</div>`:''}
+      <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>Franchise HQ will show a small notification with the current import task. No stage-by-stage interaction is required.</span></div>
+    </section>`;
   }
 
   function rerender() {
@@ -529,7 +581,7 @@
 
   function diagnostics(){return Object.freeze({service:'oneClickImport',version:VERSION,busy,runId:run?.id||null,snapshotId,stageState:{...stageState},lastError:lastError?.message||null});}
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
-  HQ.defineModuleService('platform','oneClickImport',{runImport,renderPanel,diagnostics},{replace:true,alias:'oneClickImport'});
+  HQ.defineModuleService('platform','oneClickImport',{runImport,renderPanel,diagnostics,renderImportNotification},{replace:true,alias:'oneClickImport'});
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.importCertification={
