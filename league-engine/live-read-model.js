@@ -2,10 +2,11 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.2h';
+  const VERSION = '5.9.10.6.5.1';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();
+  const inFlight = new Map();
   let busy = false;
   let lastError = null;
   let lastRefreshAt = null;
@@ -23,11 +24,41 @@
   async function request(params = {}, force = false) {
     const key = JSON.stringify(params);
     if (!force && cache.has(key)) return cache.get(key);
-    const response = await fetch(endpoint(params), {credentials:'same-origin',cache:'no-store'});
-    const payload = await response.json().catch(() => ({ok:false,error:`HTTP ${response.status}`}));
-    if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), {payload});
-    cache.set(key,payload);
-    return payload;
+    if (!force && inFlight.has(key)) return inFlight.get(key);
+
+    const work=(async()=>{
+      const response = await fetch(endpoint(params), {credentials:'same-origin',cache:'no-store'});
+      const payload = await response.json().catch(() => ({ok:false,error:`HTTP ${response.status}`}));
+      if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), {payload});
+      cache.set(key,payload);
+      return payload;
+    })();
+
+    inFlight.set(key,work);
+    try{return await work}
+    finally{inFlight.delete(key)}
+  }
+
+  function storageKey(snapshotId,domain){
+    return `fhq:live-read:5.9.10.6.5.1:${leagueSlug()}:${snapshotId}:${domain}`;
+  }
+
+  function readPersisted(snapshotId,domain){
+    if(!snapshotId||!['teams','standings','games','players'].includes(domain))return null;
+    try{
+      const parsed=JSON.parse(sessionStorage.getItem(storageKey(snapshotId,domain))||'null');
+      if(!parsed||!Array.isArray(parsed.records))return null;
+      return parsed.records;
+    }catch{return null}
+  }
+
+  function persist(snapshotId,domain,records){
+    if(!snapshotId||!['teams','standings','games','players'].includes(domain))return;
+    try{
+      sessionStorage.setItem(storageKey(snapshotId,domain),JSON.stringify({savedAt:Date.now(),records}));
+    }catch{
+      // Player payloads can exceed browser storage on some devices. Memory cache still works.
+    }
   }
 
   async function refresh() {
@@ -55,25 +86,49 @@
   async function getState() { return (summary || await request({})).state; }
   async function getDomain(domain) {
     if (domainCache.has(domain)) return domainCache.get(domain);
-    const limits={teams:64,standings:64,players:100,games:200,statistics:300};
-    const limit=limits[domain]||150;
-    let cursor=null;
-    const records=[];
-    let guard=0;
 
-    do {
-      const params={domain,limit};
-      if(cursor)params.cursor=cursor;
-      const payload=await request(params);
-      records.push(...(payload.records||[]));
-      cursor=payload.nextCursor||null;
-      guard++;
-      if(guard>1000)throw new Error(`Live ${domain} read exceeded 1000 pages.`);
-    } while(cursor);
+    const snapshot=await getSnapshot();
+    const persisted=readPersisted(snapshot?.id,domain);
+    if(persisted){
+      domainCache.set(domain,persisted);
+      return persisted;
+    }
 
-    domainCache.set(domain,records);
-    return records;
+    if(inFlight.has(`domain:${domain}`))return inFlight.get(`domain:${domain}`);
+
+    const work=(async()=>{
+      // Teams, standings, games and players are bounded league datasets.
+      // Fetch them in one read instead of dozens of 100-row HTTP round trips.
+      if(['teams','standings','games','players'].includes(domain)){
+        const payload=await request({domain,bulk:'1'});
+        const records=payload.records||[];
+        domainCache.set(domain,records);
+        persist(snapshot?.id,domain,records);
+        return records;
+      }
+
+      const limit=500;
+      let cursor=null;
+      const records=[];
+      let guard=0;
+      do {
+        const params={domain,limit};
+        if(cursor)params.cursor=cursor;
+        const payload=await request(params);
+        records.push(...(payload.records||[]));
+        cursor=payload.nextCursor||null;
+        guard++;
+        if(guard>1000)throw new Error(`Live ${domain} read exceeded 1000 pages.`);
+      } while(cursor);
+      domainCache.set(domain,records);
+      return records;
+    })();
+
+    inFlight.set(`domain:${domain}`,work);
+    try{return await work}
+    finally{inFlight.delete(`domain:${domain}`)}
   }
+
   async function getTeams() { return getDomain('teams'); }
   async function getPlayers() { return getDomain('players'); }
   async function getStandings() { return getDomain('standings'); }
@@ -164,6 +219,18 @@
   }
 
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before live-read-model.js.');
-  const service = {refresh,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,loadSample,renderPanel,diagnostics};
+  async function warm(){
+    try{
+      await getSnapshot();
+      await Promise.allSettled([getTeams(),getStandings(),getSchedule(),getPlayers()]);
+      return true;
+    }catch{return false}
+  }
+
+  const service = {refresh,warm,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,loadSample,renderPanel,diagnostics};
   HQ.defineModuleService('league','liveData',service,{replace:true,alias:'liveData'});
+
+  const scheduleWarm=()=>setTimeout(()=>warm(),0);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scheduleWarm,{once:true});
+  else scheduleWarm();
 })();

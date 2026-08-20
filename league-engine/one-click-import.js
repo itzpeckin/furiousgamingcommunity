@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.0';
+  const VERSION = '5.9.10.6.5.1';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -109,6 +109,7 @@
   const transactionClassification = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/classification`, method, body);
   const canonicalTransactions = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/canonical`, method, body);
   const importCertification = (method='GET', body) => api(`${base()}import-certification`, method, body);
+  const changeCheck = () => api(`${base()}change-check`,'GET');
 
   function setStage(id, state, detail='') {
     const previous=stageState[id]?.state;
@@ -481,6 +482,20 @@
       if (!discovery) throw new Error('Route Discovery service is unavailable.');
       if (!Number(discovery.routeCount||0)) throw new Error('No Madden Companion captures are available to import.');
       setStage('discover','complete',`${discovery.routeCount} captured routes discovered`);
+
+      // 6.5.1 fast path: if the newest Companion export is byte-for-byte identical
+      // to the previous capture of every exported route, do not rebuild the snapshot.
+      const delta=await changeCheck();
+      if(delta?.unchanged && delta?.activeSnapshot?.id){
+        snapshotId=String(delta.activeSnapshot.id);
+        for(const [id] of STAGES){
+          if(id==='discover')continue;
+          setStage(id,'complete','No data change · reused current LIVE snapshot');
+        }
+        progress=`No Madden data changed · current LIVE snapshot reused`;
+        try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,noChange:true}}))}catch(_){}
+        return;
+      }
 
       setStage('storage-preflight','running','Reclaiming disposable Madden import staging data…');
       const storage=await api(`${base()}storage-preflight`,'POST',{});
