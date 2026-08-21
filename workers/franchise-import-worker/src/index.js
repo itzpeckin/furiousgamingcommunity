@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4b';
+const RELEASE='5.9.10.6.5.4c';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -82,37 +82,41 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     if(!ctx.slug||!ctx.owner.id||!ctx.origin||!ctx.importAuthToken)throw new Error('Workflow payload is incomplete.');
     ctx.call=(path,method='GET',body)=>call(ctx.origin,path,ctx.owner,method,body,ctx.importAuthToken);
 
+    // Discover and the no-new-export gate happen before an orchestrator run exists.
+    // The original proven browser pipeline also performed storage preflight before
+    // creating the orchestrator. Once the run starts, its first expected stage is map-teams.
+    const delta=await step.do('discover',async()=>call(
+      ctx.origin,companion(ctx.slug,'change-check'),ctx.owner
+    ));
+
+    if(delta?.unchanged&&delta?.activeSnapshot?.id){
+      ctx.snapshotId=String(delta.activeSnapshot.id);
+      return {
+        ok:true,
+        release:RELEASE,
+        noChange:true,
+        noNewExport:Boolean(delta.noNewExport),
+        snapshotId:ctx.snapshotId,
+        runId:null
+      };
+    }
+
+    const reusePlayers=Boolean(delta?.canReusePlayers&&!delta?.rosterChanged);
+
+    const storage=await step.do(
+      'storage-preflight',
+      {retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'15 minutes'},
+      ()=>call(
+        ctx.origin,companion(ctx.slug,'storage-preflight'),ctx.owner,'POST',
+        {preservePlayers:reusePlayers}
+      )
+    );
+
     const started=await step.do('create-import-run',async()=>call(
       ctx.origin,companion(ctx.slug,'import-orchestrator'),ctx.owner,'POST',{action:'start'}
     ));
     ctx.runId=started?.run?.id||null;
     if(!ctx.runId)throw new Error('Import orchestrator did not return a run ID.');
-
-    // The server performs the no-new-export test itself. The browser is not involved.
-    const delta=await step.do('discover',async()=>call(ctx.origin,companion(ctx.slug,'change-check'),ctx.owner));
-    await report(ctx,'discover',true,{summary:delta?.noNewExport?'No new Companion export':'New Companion export detected'});
-
-    if(delta?.unchanged&&delta?.activeSnapshot?.id){
-      ctx.snapshotId=String(delta.activeSnapshot.id);
-      // Advance every remaining orchestrator stage as reused so the persisted run closes cleanly.
-      const reusable=[
-        'storage-preflight','map-teams','reconstruct-player-lifecycle','map-players','map-schedule',
-        'map-statistics','build-snapshot','validate-snapshot','activate-snapshot','detect-transactions',
-        'classify-transactions','reconcile-transactions','verify-active-snapshot','publish-transactions'
-      ];
-      for(const name of reusable){
-        await report(ctx,name,true,{summary:'No new Companion export · current LIVE snapshot reused',snapshotId:ctx.snapshotId,reused:true});
-      }
-      return {ok:true,release:RELEASE,noChange:true,noNewExport:Boolean(delta.noNewExport),snapshotId:ctx.snapshotId,runId:ctx.runId};
-    }
-
-    const reusePlayers=Boolean(delta?.canReusePlayers&&!delta?.rosterChanged);
-
-    const storage=await stage(ctx,step,'storage-preflight',()=>call(
-      ctx.origin,companion(ctx.slug,'storage-preflight'),ctx.owner,'POST',{preservePlayers:reusePlayers}
-    ));
-    const reclaimed=Object.values(storage?.reclaimed||{}).reduce((sum,v)=>sum+Number(v||0),0);
-    await report(ctx,'storage-preflight',true,{summary:`${reclaimed} obsolete D1 row(s) reclaimed`});
 
     await simple(ctx,step,'map-teams','map-teams',p=>`${p.teams?.length??p.mappingRun?.teamCount??'?'} teams mapped`);
 
