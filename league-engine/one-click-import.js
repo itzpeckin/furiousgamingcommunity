@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.1b';
+  const VERSION = '5.9.10.6.5.3';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -32,6 +32,7 @@
   let stageTimings = {};
   let currentStageStartedAt = {};
   let lastCertification = null;
+  let deltaPlan = null;
 
   const nowMs = () => (window.performance?.now?.() ?? Date.now());
   const isoNow = () => new Date().toISOString();
@@ -178,6 +179,13 @@
     const payload = await orchestrator('POST', {action:'report', runId:run.id, stage, ok, ...extra});
     run = payload.run || run;
     return payload;
+  }
+
+  async function skipReportedStage(stage,summary){
+    setStage(stage,'running','Reusing unchanged LIVE data…');
+    setStage(stage,'complete',summary);
+    await report(stage,true,{summary,reused:true});
+    return {ok:true,reused:true,summary};
   }
 
   async function runSimpleStage(stage, endpoint, summaryFn) {
@@ -471,7 +479,7 @@
 
   async function runImport() {
     if (busy) return;
-    busy=true; lastError=null; progress='Preparing import…'; snapshotId=null; stageState={}; lastCertification=null;
+    busy=true; lastError=null; progress='Preparing import…'; snapshotId=null; stageState={}; lastCertification=null; deltaPlan=null;
     stageTimings={}; currentStageStartedAt={};
     importStartedAt={ms:nowMs(),at:isoNow()}; importCompletedAt=null;
     rerender();
@@ -486,6 +494,7 @@
       // 6.5.1 fast path: if the newest Companion export is byte-for-byte identical
       // to the previous capture of every exported route, do not rebuild the snapshot.
       const delta=await changeCheck();
+      deltaPlan=delta;
       if(delta?.unchanged && delta?.activeSnapshot?.id){
         snapshotId=String(delta.activeSnapshot.id);
         for(const [id] of STAGES){
@@ -493,12 +502,18 @@
           setStage(id,'complete','No data change · reused current LIVE snapshot');
         }
         progress=`No Madden data changed · current LIVE snapshot reused`;
-        try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,noChange:true}}))}catch(_){}
+        try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,noChange:true,deltaPlan:delta}}))}catch(_){}
         return;
       }
 
-      setStage('storage-preflight','running','Reclaiming disposable Madden import staging data…');
-      const storage=await api(`${base()}storage-preflight`,'POST',{});
+      const reusePlayers=Boolean(delta?.canReusePlayers&&!delta?.rosterChanged);
+      progress=reusePlayers
+        ? `Delta import · roster unchanged · reusing ${Number(delta?.reusablePlayerPreviewCount||0)} mapped players`
+        : `Delta import · ${Number(delta?.changedRouteCount||0)} changed route(s)`;
+      renderImportNotification();
+
+      setStage('storage-preflight','running','Preparing delta import storage…');
+      const storage=await api(`${base()}storage-preflight`,'POST',{preservePlayers:reusePlayers});
       const reclaimed=storage.reclaimed||{};
       const reclaimedRows=Object.values(reclaimed).reduce((sum,value)=>sum+Number(value||0),0);
       setStage('storage-preflight','complete',`${reclaimedRows} obsolete D1 row(s) reclaimed`);
@@ -507,12 +522,22 @@
       const start=await orchestrator('POST',{action:'start'});
       run=start.run;
       await runSimpleStage('map-teams','map-teams',p=>`${p.teams?.length ?? p.mappingRun?.teamCount ?? '?'} teams mapped`);
-      await reconstructPlayerLifecycle();
-      await runSimpleStage('map-players','map-players',p=>{
-        const total=p.players?.length ?? p.mappingRun?.playerCount ?? '?';
-        const fas=p.lifecycleFreeAgentCount ?? p.mappingRun?.freeAgentCount ?? 0;
-        return `${total} players mapped · ${fas} Free Agent(s)`;
-      });
+
+      if(reusePlayers){
+        setStage('reconstruct-player-lifecycle','complete','Roster payloads unchanged · lifecycle state reused');
+        await skipReportedStage(
+          'map-players',
+          `${Number(deltaPlan?.reusablePlayerPreviewCount||0)} players reused · no roster payload changed`
+        );
+      }else{
+        await reconstructPlayerLifecycle();
+        await runSimpleStage('map-players','map-players',p=>{
+          const total=p.players?.length ?? p.mappingRun?.playerCount ?? '?';
+          const fas=p.lifecycleFreeAgentCount ?? p.mappingRun?.freeAgentCount ?? 0;
+          return `${total} players mapped · ${fas} Free Agent(s)`;
+        });
+      }
+
       await runSimpleStage('map-schedule','map-schedule',p=>`${p.games?.length ?? p.mappingRun?.gameCount ?? '?'} games mapped`);
       await runStatistics();
       await buildSnapshot();
@@ -524,7 +549,7 @@
       await verify();
       await publishTransactions();
       progress=`Import complete · ${snapshotId} is LIVE`;
-      try { window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,runId:run?.id}})); } catch (_) {}
+      try { window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,runId:run?.id,deltaPlan}})); } catch (_) {}
     } catch(error) {
       lastError=error;
       progress='Import stopped safely. The previous LIVE snapshot was not replaced unless activation had already completed.';
@@ -594,7 +619,22 @@
     runImport();
   });
 
-  function diagnostics(){return Object.freeze({service:'oneClickImport',version:VERSION,busy,runId:run?.id||null,snapshotId,stageState:{...stageState},lastError:lastError?.message||null});}
+  function diagnostics(){return Object.freeze({
+    service:'oneClickImport',
+    version:VERSION,
+    busy,
+    runId:run?.id||null,
+    snapshotId,
+    stageState:{...stageState},
+    deltaPlan:deltaPlan?{
+      changedRouteCount:Number(deltaPlan.changedRouteCount||0),
+      changedByClass:deltaPlan.changedByClass||{},
+      rosterChanged:Boolean(deltaPlan.rosterChanged),
+      canReusePlayers:Boolean(deltaPlan.canReusePlayers),
+      reusablePlayerPreviewCount:Number(deltaPlan.reusablePlayerPreviewCount||0)
+    }:null,
+    lastError:lastError?.message||null
+  });}
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
   HQ.defineModuleService('platform','oneClickImport',{runImport,renderPanel,diagnostics,renderImportNotification},{replace:true,alias:'oneClickImport'});
 
