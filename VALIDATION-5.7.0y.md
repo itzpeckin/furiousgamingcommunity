@@ -1,4 +1,4 @@
-# v5.7.0y Validation
+.# v5.7.0y Validation
 
 1. Confirm the footer displays `v5.7.0y`.
 2. Open Commish HQ → Commissioner Controls → Trade Center → Draft Pick Value Calculations.
