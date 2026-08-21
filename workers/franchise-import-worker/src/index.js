@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4c';
+const RELEASE='5.9.10.6.5.4d';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -121,8 +121,12 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     await simple(ctx,step,'map-teams','map-teams',p=>`${p.teams?.length??p.mappingRun?.teamCount??'?'} teams mapped`);
 
     if(reusePlayers){
-      await report(ctx,'reconstruct-player-lifecycle',true,{summary:'Roster unchanged · lifecycle reused',reused:true});
-      await report(ctx,'map-players',true,{summary:`${Number(delta?.reusablePlayerPreviewCount||0)} players reused`,reused:true});
+      // Lifecycle reconstruction is auxiliary work, not an orchestrator stage.
+      // Only advance the orchestrator through its expected map-players stage.
+      await report(ctx,'map-players',true,{
+        summary:`${Number(delta?.reusablePlayerPreviewCount||0)} players reused · roster unchanged`,
+        reused:true
+      });
     }else{
       const plan=await stage(ctx,step,'reconstruct-player-lifecycle',()=>call(
         ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'capture-lifecycle-plan'}
@@ -139,9 +143,8 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       const finalized=await step.do('lifecycle-finalize',()=>call(
         ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'capture-lifecycle-finalize'}
       ));
-      await report(ctx,'reconstruct-player-lifecycle',true,{
-        summary:`${Number(finalized?.eventCount||0)} lifecycle event(s) · ${processed} new roster session(s)`
-      });
+      // Do not report reconstruct-player-lifecycle to the import orchestrator.
+      // Its next expected stage is map-players.
       await simple(ctx,step,'map-players','map-players',p=>{
         const total=p.players?.length??p.mappingRun?.playerCount??'?';
         const fas=p.lifecycleFreeAgentCount??p.mappingRun?.freeAgentCount??0;
@@ -225,13 +228,15 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     if(active&&String(active)!==String(ctx.snapshotId))throw new Error(`Verification returned different active snapshot (${active}).`);
     await report(ctx,'verify-active-snapshot',true,{summary:'LIVE snapshot verified',snapshotId:ctx.snapshotId});
 
-    const published=await stage(ctx,step,'publish-transactions',()=>call(
+    // Final canonical/free-agent confirmation happens after the orchestrator
+    // has already completed at verify-active-snapshot. It is auxiliary work
+    // and MUST NOT be reported as another orchestrator stage.
+    const published=await step.do('publish-transactions',{
+      retries:{limit:2,delay:'2 seconds',backoff:'exponential'},
+      timeout:'15 minutes'
+    },()=>call(
       ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'capture-lifecycle-finalize'}
     ));
-    await report(ctx,'publish-transactions',true,{
-      summary:`${Number(published?.eventCount||0)} lifecycle event(s) · ${Number(published?.freeAgents?.currentFreeAgents||0)} Free Agent(s)`,
-      snapshotId:ctx.snapshotId
-    });
 
     // Certification is server-side now as well. Failure here does not undo the already-verified LIVE snapshot.
     await step.do('certification',{retries:{limit:1,delay:'2 seconds'},timeout:'5 minutes'},()=>call(
