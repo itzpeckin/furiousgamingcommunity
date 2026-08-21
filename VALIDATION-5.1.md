@@ -9,7 +9,7 @@ FranchiseHQ.metadata.version
 ```
 
 Expected: `"5.1"`
-
+.
 ## 2. Read model diagnostics
 
 ```javascript
