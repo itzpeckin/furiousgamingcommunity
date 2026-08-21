@@ -1,7 +1,21 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.1b';
+const RELEASE='5.9.10.6.5.3';
+
+async function tableExists(db,name){
+  return Boolean(await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).bind(name).first());
+}
+
+function routeClass(route=''){
+  const value=String(route||'').toLowerCase();
+  if(/\/team\/[^/]+\/roster\/?$/.test(value)||/roster/.test(value))return'roster';
+  if(/\/week\/(?:pre|reg|post|playoffs?)\/\d+\/(?:defense|kicking|passing|punting|receiving|rushing|team)\/?$/.test(value))return'statistics';
+  if(/schedule|game/.test(value))return'schedule';
+  if(/standing/.test(value))return'standings';
+  if(/team/.test(value))return'teams';
+  return'other';
+}
 
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);
@@ -43,15 +57,36 @@ export async function onRequestGet(context){
   const rows=result.results||[];
   let changed=0,unchanged=0,newRoutes=0;
   const changedRoutes=[];
+  const changedByClass={roster:0,statistics:0,schedule:0,standings:0,teams:0,other:0};
   for(const row of rows){
-    if(!row.previous_hash){newRoutes++;changed++;changedRoutes.push(row.route_path);continue}
-    if(String(row.current_hash||'')===String(row.previous_hash||''))unchanged++;
-    else{changed++;changedRoutes.push(row.route_path)}
+    const isNew=!row.previous_hash;
+    const isChanged=isNew||String(row.current_hash||'')!==String(row.previous_hash||'');
+    if(isNew)newRoutes++;
+    if(isChanged){
+      changed++;
+      changedRoutes.push(row.route_path);
+      changedByClass[routeClass(row.route_path)]++;
+    }else unchanged++;
   }
 
   const active=await db.prepare(`SELECT s.id,s.season_year,s.week_index,s.activated_at
     FROM league_active_snapshots a JOIN league_snapshots s ON s.id=a.snapshot_id
     WHERE a.league_id=? LIMIT 1`).bind(league.id).first();
+
+  let latestPlayerMappingRunId=null;
+  let reusablePlayerPreviewCount=0;
+  if(active&&await tableExists(db,'companion_player_mapping_runs')&&await tableExists(db,'companion_canonical_players_preview')){
+    const playerRun=await db.prepare(`SELECT id FROM companion_player_mapping_runs
+      WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(league.id).first();
+    latestPlayerMappingRunId=playerRun?.id?String(playerRun.id):null;
+    if(latestPlayerMappingRunId){
+      reusablePlayerPreviewCount=Number((await db.prepare(`SELECT COUNT(*) c FROM companion_canonical_players_preview
+        WHERE league_id=? AND mapping_run_id=?`).bind(league.id,latestPlayerMappingRunId).first())?.c||0);
+    }
+  }
+
+  const rosterChanged=Number(changedByClass.roster||0)>0;
+  const canReusePlayers=Boolean(active&&!rosterChanged&&latestPlayerMappingRunId&&reusablePlayerPreviewCount>0);
 
   return json({
     ok:true,
@@ -62,7 +97,12 @@ export async function onRequestGet(context){
     changedRouteCount:changed,
     unchangedRouteCount:unchanged,
     newRouteCount:newRoutes,
-    changedRoutes:changedRoutes.slice(0,25),
+    changedRoutes,
+    changedByClass,
+    rosterChanged,
+    canReusePlayers,
+    reusablePlayerPreviewCount,
+    latestPlayerMappingRunId,
     unchanged:Boolean(rows.length&&changed===0),
     activeSnapshot:active?{id:active.id,seasonYear:active.season_year,weekIndex:active.week_index,activatedAt:active.activated_at}:null
   });

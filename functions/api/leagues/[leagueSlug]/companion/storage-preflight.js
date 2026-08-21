@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.2i';
+const RELEASE='5.9.10.6.5.3';
 
 async function tableExists(db,name){
   const row=await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).bind(name).first();
@@ -30,6 +30,10 @@ export async function onRequestPost(context){
   const db=database(context.env);
   const league=db?await resolveLeague(context.env,slug):null;
   if(!db||!league||auth.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.',release:RELEASE},404);
+
+  let body={};
+  try{body=await context.request.json()}catch{}
+  const preservePlayers=body?.preservePlayers===true;
 
   try{
     const active=await db.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id=?`).bind(league.id).first();
@@ -78,7 +82,9 @@ export async function onRequestPost(context){
 
     // Preview tables are only working/staging data. The active site reads league_snapshot_records.
     reclaimed.previewTeams=await deleteLeagueRows(db,'companion_canonical_teams_preview',league.id);
-    reclaimed.previewPlayers=await deleteLeagueRows(db,'companion_canonical_players_preview',league.id);
+    reclaimed.previewPlayers=preservePlayers
+      ? 0
+      : await deleteLeagueRows(db,'companion_canonical_players_preview',league.id);
     reclaimed.previewGames=await deleteLeagueRows(db,'companion_canonical_games_preview',league.id);
     reclaimed.previewStatistics=await deleteLeagueRows(db,'companion_canonical_statistics_preview',league.id);
 
@@ -87,6 +93,9 @@ export async function onRequestPost(context){
       release:RELEASE,
       activeSnapshotPreserved:activeId,
       reclaimed,
+      deltaReuse:{
+        playerPreviewPreserved:preservePlayers
+      },
       protected:{
         activeSnapshot:true,
         users:true,
