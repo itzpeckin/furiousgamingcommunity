@@ -2444,7 +2444,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p1a',
+      release:'5.9.10.6.5.4h-p1b',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2759,7 +2759,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p1a — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p1b — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -6300,9 +6300,29 @@ function canonicalPlayerDashboardStats(playerId='') {
         <article class="card"><div class="card-header"><div><span class="eyebrow">Season production</span><h3>2026 statistics</h3></div><button class="text-button" data-route="stats">League ranks <svg><use href="#icon-arrow"></use></svg></button></div><div class="card-body"><div class="stat-box-grid">${renderPlayerStatBoxes(player)}</div></div></article>
       </div>
       <div class="content-grid content-grid--equal" style="margin-top:18px">
-        <article class="card"><div class="card-header"><div><span class="eyebrow">Weekly performance</span><h3>Game log</h3></div></div><div class="table-wrap"><table><thead><tr><th>Week</th><th>Opponent</th><th>Primary</th><th>Secondary</th><th>Fantasy</th></tr></thead><tbody>${gameLog.map(row=>`<tr><td>${canonicalGameLogWeekLabel(row.week,row.stage||row.phase||'')}</td><td>${row.opponent}</td><td><strong>${row.primary}</strong></td><td>${row.secondary}</td><td>${row.fantasy.toFixed(1)}</td></tr>`).join('')}</tbody></table></div></article>
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Weekly performance</span><h3>Game log</h3></div></div><div class="table-wrap player-details-game-log-scroll"><table><thead><tr><th>Week</th><th>Opponent</th><th>Primary</th><th>Secondary</th><th>Fantasy</th></tr></thead><tbody>${gameLog.map(row=>`<tr><td>${canonicalGameLogWeekLabel(row.week,row.stage||row.phase||'')}</td><td>${row.opponent}</td><td><strong>${row.primary}</strong></td><td>${row.secondary}</td><td>${row.fantasy.toFixed(1)}</td></tr>`).join('')}</tbody></table></div></article>
         <article class="card"><div class="card-header"><div><span class="eyebrow">Market comparison</span><h3>Similar players</h3></div></div><div class="activity-list">${similar.map(p=>leaderActivity(p,`${p.position} · ${p.dev}`,p.overall)).join('')}</div></article>
       </div>`;
+  }
+
+  const PLAYER_DETAILS_GAME_LOG_STYLE_ID='fhq-player-details-game-log-style';
+  if(!document.getElementById(PLAYER_DETAILS_GAME_LOG_STYLE_ID)){
+    const style=document.createElement('style');
+    style.id=PLAYER_DETAILS_GAME_LOG_STYLE_ID;
+    style.textContent=`
+      .player-details-game-log-scroll{
+        max-height:390px;
+        overflow-y:auto;
+        overflow-x:auto;
+      }
+      .player-details-game-log-scroll thead th{
+        position:sticky;
+        top:0;
+        z-index:2;
+        background:var(--surface,#fff);
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function renderPlayerStatBoxes(player) {
@@ -6316,16 +6336,18 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function createGameLogRow(player, week) {
-    const teamGames = schedule[week-1].games;
+    const teamGames = schedule[week-1]?.games||[];
     const game = teamGames.find(g=>g.homeId===player.teamId||g.awayId===player.teamId);
+    if(!game)return null;
     const opponentId = game.homeId===player.teamId?game.awayId:game.homeId;
     const opponent = teamById(opponentId);
+    const stage=canonicalEffectiveStage(game.stage||game.phase||game.stageLabel||'',week);
     const base = seededNumber(`${player.id}-week-${week}`,1,100);
-    if (player.position==='QB') return { week, opponent:opponent.abbr, primary:`${170+base*3} YDS`, secondary:`${1+base%4} TD · ${base%3} INT`, fantasy:12+base/5 };
-    if (['RB','FB'].includes(player.position)) return { week, opponent:opponent.abbr, primary:`${35+base*2} RUSH`, secondary:`${base%3} TD · ${base%5} REC`, fantasy:7+base/6 };
-    if (['WR','TE'].includes(player.position)) return { week, opponent:opponent.abbr, primary:`${3+base%8} REC`, secondary:`${40+base*2} YDS · ${base%2} TD`, fantasy:6+base/7 };
-    if (defensePositions.includes(player.position)) return { week, opponent:opponent.abbr, primary:`${3+base%9} TKL`, secondary:`${(base%25)/10} SCK · ${base%2} INT`, fantasy:4+base/8 };
-    return { week, opponent:opponent.abbr, primary:`${1+base%4} FGM`, secondary:`${base%2} XP`, fantasy:3+base/10 };
+    if (player.position==='QB') return { week, stage, opponent:opponent.abbr, primary:`${170+base*3} YDS`, secondary:`${1+base%4} TD · ${base%3} INT`, fantasy:12+base/5 };
+    if (['RB','FB'].includes(player.position)) return { week, stage, opponent:opponent.abbr, primary:`${35+base*2} RUSH`, secondary:`${base%3} TD · ${base%5} REC`, fantasy:7+base/6 };
+    if (['WR','TE'].includes(player.position)) return { week, stage, opponent:opponent.abbr, primary:`${3+base%8} REC`, secondary:`${40+base*2} YDS · ${base%2} TD`, fantasy:6+base/7 };
+    if (defensePositions.includes(player.position)) return { week, stage, opponent:opponent.abbr, primary:`${3+base%9} TKL`, secondary:`${(base%25)/10} SCK · ${base%2} INT`, fantasy:4+base/8 };
+    return { week, stage, opponent:opponent.abbr, primary:`${1+base%4} FGM`, secondary:`${base%2} XP`, fantasy:3+base/10 };
   }
 
   function standingsService() {
@@ -7821,7 +7843,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p1a';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p1b';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9101,9 +9123,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p1a';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p1b';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p1a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p1b';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9115,7 +9137,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p1a',
+    release:'5.9.10.6.5.4h-p1b',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9129,7 +9151,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p1a',
+        release:'5.9.10.6.5.4h-p1b',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9751,7 +9773,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p1a',
+    release:'5.9.10.6.5.4h-p1b',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9875,9 +9897,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p1a — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p1b — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p1a';
+  const RELEASE='5.9.10.6.5.4h-p1b';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
