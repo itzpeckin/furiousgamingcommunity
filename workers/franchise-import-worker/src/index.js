@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4f';
+const RELEASE='5.9.10.6.5.4g';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -263,18 +263,15 @@ export default {
         return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
       }
 
-      const delta=await call(
-        origin,
-        companion(slug,'change-check'),
-        owner,
-        'GET',
-        undefined,
-        token
-      );
-
-      const exportKey=text(delta?.latestSessionId)
-        || text(delta?.latestReceivedAt)
-        || 'current';
+      // IMPORTANT: /start must not synchronously call back into the Pages application.
+      // That request can sit behind the originating Pages -> Service Binding request and
+      // produce a Cloudflare 522 before a Workflow is even returned.
+      //
+      // Use a short-lived deterministic launch bucket instead. Repeated clicks/devices
+      // inside the same import launch window converge on the same Workflow, while the
+      // Workflow itself performs change-check asynchronously after it has been accepted.
+      const launchBucket=Math.floor(Date.now()/30000);
+      const exportKey=`launch-${launchBucket}`;
 
       const encoded=new TextEncoder().encode(`${slug}:${exportKey}`);
       const digest=await crypto.subtle.digest('SHA-256',encoded);
