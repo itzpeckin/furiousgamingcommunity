@@ -1,0 +1,10 @@
+{
+  "name": "franchise-hq-import-worker",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}
