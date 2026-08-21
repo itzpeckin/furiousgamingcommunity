@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4e';
+const RELEASE='5.9.10.6.5.4f';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -250,17 +250,19 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
 
 export default {
   async fetch(request,env){
-    const url=new URL(request.url);
+    try{
+      const url=new URL(request.url);
     if(url.pathname==='/start'&&request.method==='POST'){
       const body=await request.json().catch(()=>({}));
       const slug=text(body.leagueSlug);
       const owner=text(body.ownerAccountId);
       const origin=text(body.origin).replace(/\/+$/,'');
       const token=text(body.importAuthToken);
-      if(!slug||!owner||!origin||!token)return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
 
-      // Resolve the newest Companion export BEFORE creating a Workflow.
-      // Every browser/device looking at the same export must converge on the same Workflow ID.
+      if(!slug||!owner||!origin||!token){
+        return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
+      }
+
       const delta=await call(
         origin,
         companion(slug,'change-check'),
@@ -273,52 +275,55 @@ export default {
       const exportKey=text(delta?.latestSessionId)
         || text(delta?.latestReceivedAt)
         || 'current';
-      const safeExportKey=exportKey.replace(/[^a-zA-Z0-9_-]+/g,'-').slice(0,120);
-      const id=`league-${slug}-export-${safeExportKey}`;
 
-      // If this export already has a Workflow, return that SAME instance.
-      // This is the concurrency lock across desktop, mobile, refreshes, and double-clicks.
-      try{
-        const existing=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
-        const status=await existing.status();
-        return json({
-          ok:true,
-          release:RELEASE,
-          id,
-          reusedExisting:true,
-          exportKey,
-          status
-        });
-      }catch(_){}
+      const encoded=new TextEncoder().encode(`${slug}:${exportKey}`);
+      const digest=await crypto.subtle.digest('SHA-256',encoded);
+      const shortHash=Array.from(new Uint8Array(digest))
+        .slice(0,12)
+        .map(v=>v.toString(16).padStart(2,'0'))
+        .join('');
+      const id=`fhq-${shortHash}`;
+
+      let instance=null;
+      let reusedExisting=false;
 
       try{
-        const instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
-        return json({
-          ok:true,
-          release:RELEASE,
+        instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({
           id,
-          reusedExisting:false,
-          exportKey,
-          status:await instance.status()
+          params:body
         });
-      }catch(error){
-        // A second device can race between get() and create(). If create loses that race,
-        // resolve the canonical instance instead of launching/returning an error.
+      }catch(createError){
         try{
-          const existing=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
+          instance=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
+          reusedExisting=true;
+        }catch(getError){
+          console.error('[Import Workflow Create]',createError);
+          console.error('[Import Workflow Recover]',getError);
           return json({
-            ok:true,
+            ok:false,
             release:RELEASE,
-            id,
-            reusedExisting:true,
-            raced:true,
-            exportKey,
-            status:await existing.status()
-          });
-        }catch(_){
-          throw error;
+            error:'Unable to create or recover the server-side import Workflow.',
+            createError:createError?.message||String(createError),
+            recoverError:getError?.message||String(getError)
+          },500);
         }
       }
+
+      let status=null;
+      try{
+        status=await instance.status();
+      }catch(statusError){
+        console.warn('[Import Workflow Status]',statusError);
+      }
+
+      return json({
+        ok:true,
+        release:RELEASE,
+        id,
+        reusedExisting,
+        exportKey,
+        status
+      });
     }
 
     if(url.pathname==='/status'&&request.method==='GET'){
@@ -328,8 +333,16 @@ export default {
       const origin=text(url.searchParams.get('origin')).replace(/\/+$/,'');
       let workflowStatus=null;
       if(id){
-        try{workflowStatus=await (await env.FRANCHISE_IMPORT_WORKFLOW.get(id)).status();}
-        catch(error){workflowStatus={status:'unknown',error:String(error?.message||error)};}
+        try{
+          const instance=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
+          try{
+            workflowStatus=await instance.status();
+          }catch(statusError){
+            workflowStatus={status:'unknown',error:String(statusError?.message||statusError)};
+          }
+        }catch(getError){
+          workflowStatus={status:'unknown',error:String(getError?.message||getError)};
+        }
       }
       let orchestrator=null;
       if(slug&&owner&&origin){
@@ -347,6 +360,16 @@ export default {
       });
     }
 
-    return json({ok:false,release:RELEASE,error:'Not found.'},404);
+      return json({ok:false,release:RELEASE,error:'Not found.'},404);
+    }catch(error){
+      console.error('[Franchise Import Worker]',error);
+      return json({
+        ok:false,
+        release:RELEASE,
+        error:error?.message||'Server-side import Worker failed.',
+        stage:'worker-fetch',
+        detail:error?.stack||null
+      },500);
+    }
   }
 };
