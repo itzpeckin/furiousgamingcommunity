@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.4';
+  const VERSION = '5.9.10.6.5.4e';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -33,6 +33,7 @@
   let currentStageStartedAt = {};
   let lastCertification = null;
   let deltaPlan = null;
+  let notificationDismissTimer = null;
 
   const nowMs = () => (window.performance?.now?.() ?? Date.now());
   const isoNow = () => new Date().toISOString();
@@ -113,7 +114,7 @@
   const changeCheck = () => api(`${base()}change-check`,'GET');
   const importJob = (method='GET', body, id='') => api(`${base()}import-job${id?`?id=${encodeURIComponent(id)}`:''}`,method,body);
   const JOB_KEY = () => `franchisehq:import-job:${slug()}`;
-  const workflowDone = status => ['complete','completed','failed','errored','terminated','cancelled'].includes(String(status||'').toLowerCase());
+  const workflowDone = status => ['complete','completed','failed','errored','error','terminated','cancelled','canceled'].includes(String(status||'').toLowerCase());
 
   function applyServerRun(serverRun){
     if(!serverRun)return;
@@ -142,22 +143,32 @@
       const ws=status?.workflowStatus||{};
       const serverRun=status?.orchestrator?.run||null;
       applyServerRun(serverRun);
-      const state=String(ws.status||'running').toLowerCase();
+      const state=String(status?.workflowState||ws.status||'running').toLowerCase();
+      const output=status?.workflowOutput||ws?.output||null;
+      if(output?.snapshotId)snapshotId=output.snapshotId;
       if(serverRun?.snapshotId||serverRun?.snapshot_id)snapshotId=serverRun.snapshotId||serverRun.snapshot_id;
-      if(workflowDone(state)){
+
+      const orchestratorDone=['complete','completed'].includes(String(serverRun?.status||'').toLowerCase());
+      const successfulWorkflow=state==='complete'||state==='completed';
+
+      if(workflowDone(state)||orchestratorDone){
         localStorage.removeItem(JOB_KEY());
         busy=false;
-        if(state==='complete'||state==='completed'){
-          progress=ws?.output?.noNewExport
+
+        if(successfulWorkflow||orchestratorDone){
+          progress=output?.noNewExport
             ? 'No new Madden Companion export detected · nothing to import'
             : 'Import complete · server-side job finished successfully';
+          lastError=null;
           try{await HQ?.liveSnapshotBoot?.boot?.({force:true});}catch(_){}
-          try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,serverSide:true}}));}catch(_){}
+          try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,serverSide:true,workflowId:id}}));}catch(_){}
         }else{
           lastError=new Error(ws?.error?.message||ws?.error||`Server-side import ${state}.`);
           progress='Import stopped safely on the server.';
         }
-        rerender(); renderImportNotification();
+
+        rerender();
+        renderImportNotification();
         return status;
       }
       const current=serverRun?.currentStage||serverRun?.current_stage;
@@ -235,7 +246,22 @@
       state='success';
     }
     node.className=`franchise-import-notification is-visible is-${state}`;
-    node.innerHTML=`<span class="franchise-import-notification__indicator" aria-hidden="true"></span><span><strong>${esc(title)}</strong><small>${esc(detail)}</small></span>`;
+    node.innerHTML=`<span class="franchise-import-notification__indicator" aria-hidden="true"></span><span><strong>${esc(title)}</strong><small>${esc(detail)}</small></span>${state!=='running'?'<button type="button" class="franchise-import-notification__close" aria-label="Dismiss import notification">×</button>':''}`;
+
+    node.querySelector('.franchise-import-notification__close')?.addEventListener('click',()=>{
+      if(notificationDismissTimer)clearTimeout(notificationDismissTimer);
+      node.className='franchise-import-notification';
+      node.innerHTML='';
+    });
+
+    if(notificationDismissTimer)clearTimeout(notificationDismissTimer);
+    notificationDismissTimer=null;
+    if(state==='success'){
+      notificationDismissTimer=setTimeout(()=>{
+        node.className='franchise-import-notification';
+        node.innerHTML='';
+      },5000);
+    }
   }
 
   async function report(stage, ok, extra={}) {
@@ -552,7 +578,9 @@
       const id=started?.id;
       if(!id)throw new Error('Server-side importer did not return a Workflow ID.');
       localStorage.setItem(JOB_KEY(),id);
-      progress='Import accepted by Franchise HQ servers · you may lock your phone now';
+      progress=started?.reusedExisting
+        ? 'This Companion export is already being processed · connected to the existing server job'
+        : 'Import accepted by Franchise HQ servers · you may lock your phone now';
       rerender(); renderImportNotification();
       await monitorServerJob(id);
     }catch(error){
