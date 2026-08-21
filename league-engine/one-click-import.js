@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.3';
+  const VERSION = '5.9.10.6.5.3a';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -497,11 +497,17 @@
       deltaPlan=delta;
       if(delta?.unchanged && delta?.activeSnapshot?.id){
         snapshotId=String(delta.activeSnapshot.id);
+        const noExport=Boolean(delta?.noNewExport);
+        const detail=noExport
+          ? 'No new Companion export · current LIVE snapshot reused'
+          : 'No data change · current LIVE snapshot reused';
         for(const [id] of STAGES){
           if(id==='discover')continue;
-          setStage(id,'complete','No data change · reused current LIVE snapshot');
+          setStage(id,'complete',detail);
         }
-        progress=`No Madden data changed · current LIVE snapshot reused`;
+        progress=noExport
+          ? `No new Madden Companion export detected · nothing to import`
+          : `No Madden data changed · current LIVE snapshot reused`;
         try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,noChange:true,deltaPlan:delta}}))}catch(_){}
         return;
       }
