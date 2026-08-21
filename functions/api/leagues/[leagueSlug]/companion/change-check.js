@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.3';
+const RELEASE='5.9.10.6.5.3a';
 
 async function tableExists(db,name){
   return Boolean(await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).bind(name).first());
@@ -36,6 +36,45 @@ export async function onRequestGet(context){
 
   if(!latest?.session_id)return json({ok:true,release:RELEASE,unchanged:false,reason:'no-capture-session'},200);
 
+  const active=await db.prepare(`SELECT s.id,s.season_year,s.week_index,s.activated_at
+    FROM league_active_snapshots a JOIN league_snapshots s ON s.id=a.snapshot_id
+    WHERE a.league_id=? LIMIT 1`).bind(league.id).first();
+
+  const latestCaptureMs=Date.parse(String(latest.received_at||''));
+  const activeMs=Date.parse(String(active?.activated_at||''));
+  const noNewCaptureSinceActive=Boolean(
+    active?.id &&
+    Number.isFinite(latestCaptureMs) &&
+    Number.isFinite(activeMs) &&
+    latestCaptureMs <= activeMs
+  );
+
+  if(noNewCaptureSinceActive){
+    return json({
+      ok:true,
+      release:RELEASE,
+      latestSessionId:String(latest.session_id),
+      latestReceivedAt:latest.received_at,
+      unchanged:true,
+      noNewExport:true,
+      reason:'latest-companion-capture-already-consumed',
+      routeCount:0,
+      changedRouteCount:0,
+      unchangedRouteCount:0,
+      newRouteCount:0,
+      changedRoutes:[],
+      changedByClass:{roster:0,statistics:0,schedule:0,standings:0,teams:0,other:0},
+      rosterChanged:false,
+      canReusePlayers:true,
+      activeSnapshot:{
+        id:active.id,
+        seasonYear:active.season_year,
+        weekIndex:active.week_index,
+        activatedAt:active.activated_at
+      }
+    });
+  }
+
   const result=await db.prepare(`
     WITH latest_routes AS (
       SELECT route_path,payload_hash,received_at,
@@ -68,10 +107,6 @@ export async function onRequestGet(context){
       changedByClass[routeClass(row.route_path)]++;
     }else unchanged++;
   }
-
-  const active=await db.prepare(`SELECT s.id,s.season_year,s.week_index,s.activated_at
-    FROM league_active_snapshots a JOIN league_snapshots s ON s.id=a.snapshot_id
-    WHERE a.league_id=? LIMIT 1`).bind(league.id).first();
 
   let latestPlayerMappingRunId=null;
   let reusablePlayerPreviewCount=0;
