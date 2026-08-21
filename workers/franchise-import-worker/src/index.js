@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4';
+const RELEASE='5.9.10.6.5.4a';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -245,7 +245,7 @@ export default {
 
       // A deterministic active ID cannot be reused after completion, so include an epoch suffix.
       const id=`${activeId}-${Date.now()}`;
-      const instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,payload:body});
+      const instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
       return json({ok:true,release:RELEASE,id,status:await instance.status()});
     }
 
