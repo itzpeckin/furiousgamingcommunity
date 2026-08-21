@@ -2444,7 +2444,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p1',
+      release:'5.9.10.6.5.4h-p1a',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2759,7 +2759,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p1 — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p1a — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -3398,18 +3398,12 @@
     const teamId=String(view?.teamId||player?.teamId||'');
     if(!teamId)return null;
 
-    const normalizeStage=value=>{
-      const text=String(value||'').toLowerCase();
-      if(text.includes('pre'))return 'preseason';
-      if(text.includes('post')||text.includes('playoff'))return 'playoffs';
-      return 'regular-season';
-    };
-    const wantedStage=normalizeStage(stage);
+    const wantedStage=canonicalEffectiveStage(stage,week);
 
     const match=canonicalScheduleUniverse().find(game=>{
       const source=game.source||{};
       const gw=Number(game.week??game.weekIndex??source.weekIndex??source.week);
-      const gs=normalizeStage(game.stage??game.stageLabel??game.phase??source.stage??source.seasonStage);
+      const gs=canonicalEffectiveStage(game.stage??game.stageLabel??game.phase??source.stage??source.seasonStage,gw);
       const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');
       const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');
 
@@ -3582,12 +3576,24 @@
     return Number(week);
   }
 
+  function canonicalEffectiveStage(stage='',week=null){
+    const normalized=canonicalNormalizeStage(stage);
+    const n=Number(week);
+    if(CANONICAL_POSTSEASON_WEEKS[n]){
+      return n===22?'pro-bowl':'playoffs';
+    }
+    return normalized;
+  }
+
+  function canonicalGameLogWeekLabel(week,stage=''){
+    const meta=canonicalPostseasonMeta(week,stage);
+    return meta?.short||String(week);
+  }
+
   function canonicalStatStage(row={}){
     const raw=row.source||{};
-    const stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage);
     const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
-    if(stage==='regular-season'&&CANONICAL_POSTSEASON_WEEKS[week])return 'playoffs';
-    return stage;
+    return canonicalEffectiveStage(row.stage||raw.stage||raw.seasonStage,week);
   }
 
   function canonicalNormalizeStage(value='') {
@@ -3658,26 +3664,27 @@
       const home=String(game.homeTeamId??game.homeId??game.home?.id??source.homeTeamId??'');
       const away=String(game.awayTeamId??game.awayId??game.away?.id??source.awayTeamId??'');
       const year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??selectedYear);
-      const stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
+      const week=game.week??game.weekIndex??source.weekIndex??source.week;
+      const stage=canonicalEffectiveStage(game.stage??game.stageLabel??source.stage??source.seasonStage,week);
 
       return (canonicalTeamIdentityMatches(home,teamAliases)||canonicalTeamIdentityMatches(away,teamAliases))
         &&stage!=='preseason'
         &&(!Number.isFinite(selectedYear)||!Number.isFinite(year)||year===selectedYear);
     }).sort((a,b)=>{
       const sourceA=a.source||{},sourceB=b.source||{};
-      const stageA=canonicalNormalizeStage(a.stage??a.stageLabel??sourceA.stage??sourceA.seasonStage);
-      const stageB=canonicalNormalizeStage(b.stage??b.stageLabel??sourceB.stage??sourceB.seasonStage);
-      const order={'regular-season':0,'playoffs':1};
       const wa=Number(a.week??a.weekIndex??sourceA.weekIndex??0);
       const wb=Number(b.week??b.weekIndex??sourceB.weekIndex??0);
+      const stageA=canonicalEffectiveStage(a.stage??a.stageLabel??sourceA.stage??sourceA.seasonStage,wa);
+      const stageB=canonicalEffectiveStage(b.stage??b.stageLabel??sourceB.stage??sourceB.seasonStage,wb);
+      const order={'regular-season':0,'playoffs':1,'pro-bowl':2};
       return (order[stageA]-order[stageB])||wa-wb;
     });
 
     const rowFor=(category,week,stage)=>{
       return (categories[category]?.rows||[]).find(row=>{
         const raw=row.source||{};
-        const rowStage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage);
         const rowWeek=Number(row.week??row.weekIndex??raw.weekIndex??raw.week);
+        const rowStage=canonicalEffectiveStage(row.stage||raw.stage||raw.seasonStage,rowWeek);
         const rowYear=Number(row.seasonYear??raw.seasonYear??raw.calendarYear??selectedYear);
 
         return rowStage===stage
@@ -3687,16 +3694,16 @@
     };
 
     const playerAppearedInGame=(week,stage)=>{
-      if(stage!=='playoffs')return true;
       const meta=canonicalPostseasonMeta(week,stage);
-      if(meta?.full==='Pro Bowl')return false;
+      if(meta?.full==='Pro Bowl'||stage==='pro-bowl')return false;
+      if(stage!=='playoffs')return true;
       return available.some(category=>Boolean(rowFor(category,week,stage)));
     };
 
     const visibleScheduleRows=scheduleRows.filter(game=>{
       const source=game.source||{};
       const week=game.week??game.weekIndex??source.weekIndex??source.week;
-      const stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
+      const stage=canonicalEffectiveStage(game.stage??game.stageLabel??source.stage??source.seasonStage,week);
       return playerAppearedInGame(week,stage);
     });
 
@@ -3737,7 +3744,7 @@
     const body=visibleScheduleRows.map(game=>{
       const source=game.source||{};
       const week=game.week??game.weekIndex??source.weekIndex??source.week??'—';
-      const stage=canonicalNormalizeStage(game.stage??game.stageLabel??source.stage??source.seasonStage);
+      const stage=canonicalEffectiveStage(game.stage??game.stageLabel??source.stage??source.seasonStage,week);
       const year=Number(game.seasonYear??game.calendarYear??source.seasonYear??source.calendarYear??selectedYear);
 
       const result=canonicalGameResultFor(playerId,week,stage,year);
@@ -3745,7 +3752,7 @@
       const opponent=result
         ? `${result.opponent}${result.score?` - ${result.score}`:''}`
         : (postseason?.short||`${stage==='playoffs'?'Playoffs':'Week'} ${week}`);
-      const gameLogWeekLabel=stage==='playoffs'?(postseason?.short||String(week)):String(week);
+      const gameLogWeekLabel=canonicalGameLogWeekLabel(week,stage);
 
       const cells=groups.flatMap(group=>{
         const row=rowFor(group.category,week,stage);
@@ -6293,7 +6300,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         <article class="card"><div class="card-header"><div><span class="eyebrow">Season production</span><h3>2026 statistics</h3></div><button class="text-button" data-route="stats">League ranks <svg><use href="#icon-arrow"></use></svg></button></div><div class="card-body"><div class="stat-box-grid">${renderPlayerStatBoxes(player)}</div></div></article>
       </div>
       <div class="content-grid content-grid--equal" style="margin-top:18px">
-        <article class="card"><div class="card-header"><div><span class="eyebrow">Weekly performance</span><h3>Game log</h3></div></div><div class="table-wrap"><table><thead><tr><th>Week</th><th>Opponent</th><th>Primary</th><th>Secondary</th><th>Fantasy</th></tr></thead><tbody>${gameLog.map(row=>`<tr><td>Week ${row.week}</td><td>${row.opponent}</td><td><strong>${row.primary}</strong></td><td>${row.secondary}</td><td>${row.fantasy.toFixed(1)}</td></tr>`).join('')}</tbody></table></div></article>
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Weekly performance</span><h3>Game log</h3></div></div><div class="table-wrap"><table><thead><tr><th>Week</th><th>Opponent</th><th>Primary</th><th>Secondary</th><th>Fantasy</th></tr></thead><tbody>${gameLog.map(row=>`<tr><td>${canonicalGameLogWeekLabel(row.week,row.stage||row.phase||'')}</td><td>${row.opponent}</td><td><strong>${row.primary}</strong></td><td>${row.secondary}</td><td>${row.fantasy.toFixed(1)}</td></tr>`).join('')}</tbody></table></div></article>
         <article class="card"><div class="card-header"><div><span class="eyebrow">Market comparison</span><h3>Similar players</h3></div></div><div class="activity-list">${similar.map(p=>leaderActivity(p,`${p.position} · ${p.dev}`,p.overall)).join('')}</div></article>
       </div>`;
   }
@@ -6648,7 +6655,8 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(Number.isFinite(currentYear)&&Number.isFinite(rowYear)&&rowYear!==Number(currentYear))return false;
 
       const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);
-      if(canonicalStatStage(row)!=='regular-season')return false;
+      const rowStage=canonicalStatStage(row);
+      if(!scopeWeek&&rowStage!=='regular-season')return false;
       if(scopeWeek&&week!==scopeWeek)return false;
 
       const teamId=rowTeamId(row);
@@ -6673,7 +6681,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   function aggregateLiveLeaderboard(category='passing'){
     const columns=LIVE_LEADER_COLUMNS[category]||[],rows=liveStatsRowsForCategory(category),players=new Map();
-    rows.forEach(row=>{const playerId=rowPlayerId(row);if(!playerId)return;const identity=matchupPlayerIdentity(playerId),teamId=rowTeamId(row)||identity.teamId;let entry=players.get(playerId);if(!entry){entry={id:playerId,identity,teamId,rows:[],games:new Set(),values:{}};players.set(playerId,entry);}entry.rows.push(row);const raw=statisticRaw(row),stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage),week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex);if(stage!=='preseason'&&Number.isFinite(week))entry.games.add(`${stage}:${week}`);});
+    rows.forEach(row=>{const playerId=rowPlayerId(row);if(!playerId)return;const identity=matchupPlayerIdentity(playerId),teamId=rowTeamId(row)||identity.teamId;let entry=players.get(playerId);if(!entry){entry={id:playerId,identity,teamId,rows:[],games:new Set(),values:{}};players.set(playerId,entry);}entry.rows.push(row);const raw=statisticRaw(row),week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex),stage=canonicalEffectiveStage(row.stage||raw.stage||raw.seasonStage,week);if(Number.isFinite(week))entry.games.add(`${stage}:${week}`);});
     const list=[...players.values()].filter(entry=>entry.games.size>=Number(state.statsMinimumGames||0));list.forEach(entry=>{const totals=playerStatCategoryTotals(entry.rows,category);columns.forEach(([label])=>entry.values[label]=totals[label]??0);if(['passing','rushing','receiving'].includes(category))entry.values['Y/G']=entry.games.size?(Number(totals.YDS)||0)/entry.games.size:0;});
     const validLabels=new Set(columns.map(([label])=>label)),requestedSort=state.statsSortKey,sortLabel=requestedSort&&validLabels.has(requestedSort)?requestedSort:liveLeaderDefaultSort(category),direction=state.statsSortDirection==='asc'?1:-1;list.sort((a,b)=>((Number(a.values[sortLabel]||0)-Number(b.values[sortLabel]||0))*direction)||String(a.identity.name).localeCompare(String(b.identity.name)));return {list,columns,sortLabel};
   }
@@ -7813,7 +7821,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p1';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p1a';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9093,9 +9101,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p1';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p1a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p1';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p1a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9107,7 +9115,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p1',
+    release:'5.9.10.6.5.4h-p1a',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9121,7 +9129,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p1',
+        release:'5.9.10.6.5.4h-p1a',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9743,7 +9751,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p1',
+    release:'5.9.10.6.5.4h-p1a',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9867,9 +9875,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p1 — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p1a — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p1';
+  const RELEASE='5.9.10.6.5.4h-p1a';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
