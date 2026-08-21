@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.3a';
+  const VERSION = '5.9.10.6.5.4';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -111,6 +111,70 @@
   const canonicalTransactions = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/canonical`, method, body);
   const importCertification = (method='GET', body) => api(`${base()}import-certification`, method, body);
   const changeCheck = () => api(`${base()}change-check`,'GET');
+  const importJob = (method='GET', body, id='') => api(`${base()}import-job${id?`?id=${encodeURIComponent(id)}`:''}`,method,body);
+  const JOB_KEY = () => `franchisehq:import-job:${slug()}`;
+  const workflowDone = status => ['complete','completed','failed','errored','terminated','cancelled'].includes(String(status||'').toLowerCase());
+
+  function applyServerRun(serverRun){
+    if(!serverRun)return;
+    run=serverRun;
+    const states=serverRun.stageState||serverRun.stage_state||serverRun.stages||{};
+    for(const [id] of STAGES){
+      const row=states?.[id];
+      if(row){
+        stageState[id]={state:row.ok===false?'failed':'complete',detail:row.summary||'',at:row.at||new Date().toISOString()};
+      }else if(serverRun.currentStage===id||serverRun.current_stage===id){
+        stageState[id]={state:'running',detail:'Running on Franchise HQ servers…',at:new Date().toISOString()};
+      }
+    }
+  }
+
+  async function monitorServerJob(id,{silent=false}={}){
+    if(!id)return null;
+    busy=true;
+    if(!silent){
+      progress='Import started on Franchise HQ servers · you may lock your phone or close this page';
+      rerender(); renderImportNotification();
+    }
+    let guard=0;
+    while(guard<7200){
+      const status=await importJob('GET',undefined,id);
+      const ws=status?.workflowStatus||{};
+      const serverRun=status?.orchestrator?.run||null;
+      applyServerRun(serverRun);
+      const state=String(ws.status||'running').toLowerCase();
+      if(serverRun?.snapshotId||serverRun?.snapshot_id)snapshotId=serverRun.snapshotId||serverRun.snapshot_id;
+      if(workflowDone(state)){
+        localStorage.removeItem(JOB_KEY());
+        busy=false;
+        if(state==='complete'||state==='completed'){
+          progress=ws?.output?.noNewExport
+            ? 'No new Madden Companion export detected · nothing to import'
+            : 'Import complete · server-side job finished successfully';
+          try{await HQ?.liveSnapshotBoot?.boot?.({force:true});}catch(_){}
+          try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,serverSide:true}}));}catch(_){}
+        }else{
+          lastError=new Error(ws?.error?.message||ws?.error||`Server-side import ${state}.`);
+          progress='Import stopped safely on the server.';
+        }
+        rerender(); renderImportNotification();
+        return status;
+      }
+      const current=serverRun?.currentStage||serverRun?.current_stage;
+      progress=current?`Import running on server · ${stageLabel(current)}`:'Import running on Franchise HQ servers…';
+      rerender(); renderImportNotification();
+      await new Promise(resolve=>setTimeout(resolve,1500));
+      guard++;
+    }
+    throw new Error('Import status monitoring exceeded the local display window. The server-side import may still be running.');
+  }
+
+  async function reconnectServerJob(){
+    const id=localStorage.getItem(JOB_KEY());
+    if(!id||busy)return;
+    try{await monitorServerJob(id,{silent:true});}
+    catch(error){console.warn('[Server Import Monitor]',error);}
+  }
 
   function setStage(id, state, detail='') {
     const previous=stageState[id]?.state;
@@ -478,118 +542,30 @@
   }
 
   async function runImport() {
-    if (busy) return;
-    busy=true; lastError=null; progress='Preparing import…'; snapshotId=null; stageState={}; lastCertification=null; deltaPlan=null;
+    if(busy)return;
+    busy=true; lastError=null; progress='Starting server-side import…'; snapshotId=null; stageState={}; lastCertification=null; deltaPlan=null;
     stageTimings={}; currentStageStartedAt={};
     importStartedAt={ms:nowMs(),at:isoNow()}; importCompletedAt=null;
-    rerender();
-    renderImportNotification();
-    try {
-      setStage('discover','running','Refreshing Companion capture discovery…');
-      const discovery=await HQ?.leagueCompanionRouteDiscovery?.refresh?.();
-      if (!discovery) throw new Error('Route Discovery service is unavailable.');
-      if (!Number(discovery.routeCount||0)) throw new Error('No Madden Companion captures are available to import.');
-      setStage('discover','complete',`${discovery.routeCount} captured routes discovered`);
-
-      // 6.5.1 fast path: if the newest Companion export is byte-for-byte identical
-      // to the previous capture of every exported route, do not rebuild the snapshot.
-      const delta=await changeCheck();
-      deltaPlan=delta;
-      if(delta?.unchanged && delta?.activeSnapshot?.id){
-        snapshotId=String(delta.activeSnapshot.id);
-        const noExport=Boolean(delta?.noNewExport);
-        const detail=noExport
-          ? 'No new Companion export · current LIVE snapshot reused'
-          : 'No data change · current LIVE snapshot reused';
-        for(const [id] of STAGES){
-          if(id==='discover')continue;
-          setStage(id,'complete',detail);
-        }
-        progress=noExport
-          ? `No new Madden Companion export detected · nothing to import`
-          : `No Madden data changed · current LIVE snapshot reused`;
-        try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,noChange:true,deltaPlan:delta}}))}catch(_){}
-        return;
-      }
-
-      const reusePlayers=Boolean(delta?.canReusePlayers&&!delta?.rosterChanged);
-      progress=reusePlayers
-        ? `Delta import · roster unchanged · reusing ${Number(delta?.reusablePlayerPreviewCount||0)} mapped players`
-        : `Delta import · ${Number(delta?.changedRouteCount||0)} changed route(s)`;
-      renderImportNotification();
-
-      setStage('storage-preflight','running','Preparing delta import storage…');
-      const storage=await api(`${base()}storage-preflight`,'POST',{preservePlayers:reusePlayers});
-      const reclaimed=storage.reclaimed||{};
-      const reclaimedRows=Object.values(reclaimed).reduce((sum,value)=>sum+Number(value||0),0);
-      setStage('storage-preflight','complete',`${reclaimedRows} obsolete D1 row(s) reclaimed`);
-      await report('storage-preflight',true,{summary:`${reclaimedRows} obsolete D1 row(s) reclaimed`}).catch(()=>{});
-
-      const start=await orchestrator('POST',{action:'start'});
-      run=start.run;
-      await runSimpleStage('map-teams','map-teams',p=>`${p.teams?.length ?? p.mappingRun?.teamCount ?? '?'} teams mapped`);
-
-      if(reusePlayers){
-        setStage('reconstruct-player-lifecycle','complete','Roster payloads unchanged · lifecycle state reused');
-        await skipReportedStage(
-          'map-players',
-          `${Number(deltaPlan?.reusablePlayerPreviewCount||0)} players reused · no roster payload changed`
-        );
-      }else{
-        await reconstructPlayerLifecycle();
-        await runSimpleStage('map-players','map-players',p=>{
-          const total=p.players?.length ?? p.mappingRun?.playerCount ?? '?';
-          const fas=p.lifecycleFreeAgentCount ?? p.mappingRun?.freeAgentCount ?? 0;
-          return `${total} players mapped · ${fas} Free Agent(s)`;
-        });
-      }
-
-      await runSimpleStage('map-schedule','map-schedule',p=>`${p.games?.length ?? p.mappingRun?.gameCount ?? '?'} games mapped`);
-      await runStatistics();
-      await buildSnapshot();
-      await lifecycle('validate-snapshot','validate');
-      await lifecycle('activate-snapshot','activate');
-      await detectTransactions();
-      await classifyTransactions();
-      await reconcileTransactions();
-      await verify();
-      await publishTransactions();
-      progress=`Import complete · ${snapshotId} is LIVE`;
-      try { window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,runId:run?.id,deltaPlan}})); } catch (_) {}
-    } catch(error) {
+    rerender(); renderImportNotification();
+    try{
+      const started=await importJob('POST',{});
+      const id=started?.id;
+      if(!id)throw new Error('Server-side importer did not return a Workflow ID.');
+      localStorage.setItem(JOB_KEY(),id);
+      progress='Import accepted by Franchise HQ servers · you may lock your phone now';
+      rerender(); renderImportNotification();
+      await monitorServerJob(id);
+    }catch(error){
       lastError=error;
-      progress='Import stopped safely. The previous LIVE snapshot was not replaced unless activation had already completed.';
-      console.error('[One-Click Import]',error.payload||error);
-    } finally {
-      importCompletedAt={ms:nowMs(),at:isoNow()};
       busy=false;
-      window.__FHQ_IMPORT_TIMING__=timingSummary();
-      console.table(window.__FHQ_IMPORT_TIMING__.stages.map(row=>({
-        stage:row.stage,
-        state:row.state,
-        seconds:row.durationSeconds,
-        startedAt:row.startedAt,
-        completedAt:row.completedAt
-      })));
-      console.info('[One-Click Import Timing]',window.__FHQ_IMPORT_TIMING__);
-
-      if(!lastError && STAGES.every(([id])=>stageState[id]?.state==='complete')){
-        try{
-          progress='Import complete · running production certification…';
-          rerender();
-          await certifyCompletedImport();
-          progress=lastCertification?.passed
-            ? `Import certified · ${snapshotId} is LIVE · ${lastCertification.wallClockSeconds??'?'}s`
-            : `Import completed · certification requires review`;
-        }catch(error){
-          console.error('[Import Performance Certification]',error.payload||error);
-          progress='Import completed, but performance certification could not be generated.';
-        }
-      }
-      rerender();
-      renderImportNotification();
+      progress='Import could not be started or monitored.';
+      console.error('[Server-Side Import]',error.payload||error);
+      rerender(); renderImportNotification();
+    }finally{
+      importCompletedAt={ms:nowMs(),at:isoNow()};
     }
   }
+
 
   function renderPanel() {
     const completed=STAGES.filter(([id])=>stageState[id]?.state==='complete').length;
@@ -670,4 +646,5 @@
     }
   };
 
+  setTimeout(()=>reconnectServerJob(),250);
 })();
