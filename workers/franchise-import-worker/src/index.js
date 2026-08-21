@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4d';
+const RELEASE='5.9.10.6.5.4e';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -254,23 +254,71 @@ export default {
     if(url.pathname==='/start'&&request.method==='POST'){
       const body=await request.json().catch(()=>({}));
       const slug=text(body.leagueSlug);
-      if(!slug||!text(body.ownerAccountId)||!text(body.origin))return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
+      const owner=text(body.ownerAccountId);
+      const origin=text(body.origin).replace(/\/+$/,'');
+      const token=text(body.importAuthToken);
+      if(!slug||!owner||!origin||!token)return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
 
-      // Refuse a second running import for the same league.
-      const activeId=`league-${slug}`;
-      let existing=null;
+      // Resolve the newest Companion export BEFORE creating a Workflow.
+      // Every browser/device looking at the same export must converge on the same Workflow ID.
+      const delta=await call(
+        origin,
+        companion(slug,'change-check'),
+        owner,
+        'GET',
+        undefined,
+        token
+      );
+
+      const exportKey=text(delta?.latestSessionId)
+        || text(delta?.latestReceivedAt)
+        || 'current';
+      const safeExportKey=exportKey.replace(/[^a-zA-Z0-9_-]+/g,'-').slice(0,120);
+      const id=`league-${slug}-export-${safeExportKey}`;
+
+      // If this export already has a Workflow, return that SAME instance.
+      // This is the concurrency lock across desktop, mobile, refreshes, and double-clicks.
       try{
-        existing=await env.FRANCHISE_IMPORT_WORKFLOW.get(activeId);
+        const existing=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
         const status=await existing.status();
-        if(['queued','running','waiting','waitingForPause'].includes(String(status?.status||''))){
-          return json({ok:true,release:RELEASE,alreadyRunning:true,id:activeId,status});
-        }
+        return json({
+          ok:true,
+          release:RELEASE,
+          id,
+          reusedExisting:true,
+          exportKey,
+          status
+        });
       }catch(_){}
 
-      // A deterministic active ID cannot be reused after completion, so include an epoch suffix.
-      const id=`${activeId}-${Date.now()}`;
-      const instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
-      return json({ok:true,release:RELEASE,id,status:await instance.status()});
+      try{
+        const instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
+        return json({
+          ok:true,
+          release:RELEASE,
+          id,
+          reusedExisting:false,
+          exportKey,
+          status:await instance.status()
+        });
+      }catch(error){
+        // A second device can race between get() and create(). If create loses that race,
+        // resolve the canonical instance instead of launching/returning an error.
+        try{
+          const existing=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
+          return json({
+            ok:true,
+            release:RELEASE,
+            id,
+            reusedExisting:true,
+            raced:true,
+            exportKey,
+            status:await existing.status()
+          });
+        }catch(_){
+          throw error;
+        }
+      }
     }
 
     if(url.pathname==='/status'&&request.method==='GET'){
@@ -288,7 +336,15 @@ export default {
         try{orchestrator=await call(origin,companion(slug,'import-orchestrator'),owner);}
         catch(_){}
       }
-      return json({ok:true,release:RELEASE,id,workflowStatus,orchestrator});
+      return json({
+        ok:true,
+        release:RELEASE,
+        id,
+        workflowStatus,
+        workflowState:String(workflowStatus?.status||'unknown').toLowerCase(),
+        workflowOutput:workflowStatus?.output||null,
+        orchestrator
+      });
     }
 
     return json({ok:false,release:RELEASE,error:'Not found.'},404);
