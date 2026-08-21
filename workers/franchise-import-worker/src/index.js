@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4a';
+const RELEASE='5.9.10.6.5.4b';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -8,17 +8,27 @@ const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
 const text=v=>String(v??'').trim();
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-function apiHeaders(ownerAccountId){
-  return {
+function apiHeaders(ownerAccountId,importAuthToken){
+  const ownerId=ownerAccountId&&typeof ownerAccountId==='object'
+    ? String(ownerAccountId.id||'')
+    : String(ownerAccountId||'');
+  const delegatedToken=importAuthToken||(
+    ownerAccountId&&typeof ownerAccountId==='object'
+      ? ownerAccountId.importAuthToken||''
+      : ''
+  );
+  const headers={
     accept:'application/json',
     'content-type':'application/json',
-    'x-franchisehq-platform-owner-account-id':String(ownerAccountId||'')
+    'x-franchisehq-platform-owner-account-id':ownerId
   };
+  if(delegatedToken)headers['x-franchisehq-import-token']=String(delegatedToken);
+  return headers;
 }
-async function call(origin,path,ownerAccountId,method='GET',body){
+async function call(origin,path,ownerAccountId,method='GET',body,importAuthToken=''){
   const response=await fetch(`${origin}${path}`,{
     method,
-    headers:apiHeaders(ownerAccountId),
+    headers:apiHeaders(ownerAccountId,importAuthToken),
     body:body===undefined?undefined:JSON.stringify(body)
   });
   const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
@@ -60,12 +70,17 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     const payload=event.payload||{};
     const ctx={
       slug:text(payload.leagueSlug),
-      owner:text(payload.ownerAccountId),
+      owner:{
+        id:text(payload.ownerAccountId),
+        importAuthToken:text(payload.importAuthToken)
+      },
       origin:text(payload.origin).replace(/\/+$/,''),
       runId:null,
-      snapshotId:null
+      snapshotId:null,
+      importAuthToken:text(payload.importAuthToken)
     };
-    if(!ctx.slug||!ctx.owner||!ctx.origin)throw new Error('Workflow payload is incomplete.');
+    if(!ctx.slug||!ctx.owner.id||!ctx.origin||!ctx.importAuthToken)throw new Error('Workflow payload is incomplete.');
+    ctx.call=(path,method='GET',body)=>call(ctx.origin,path,ctx.owner,method,body,ctx.importAuthToken);
 
     const started=await step.do('create-import-run',async()=>call(
       ctx.origin,companion(ctx.slug,'import-orchestrator'),ctx.owner,'POST',{action:'start'}
