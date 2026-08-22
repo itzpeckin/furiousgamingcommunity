@@ -34,6 +34,10 @@
       .league-transactions-table td:nth-child(3),
       .league-transactions-table td:nth-child(4),
       .league-transactions-table td:nth-child(6){white-space:nowrap}
+      .transaction-table-loading{min-height:300px}
+      .transaction-skeleton-row span{display:block;height:14px;width:72%;max-width:150px;border-radius:5px;background:rgba(127,127,127,.16)}
+      .transaction-skeleton-row td:nth-child(2) span{width:85%}
+      .transaction-skeleton-row td:nth-child(4) span{width:36px}
       @media (max-width:720px){
         .transaction-table-wrap{max-height:70vh}
         .league-transactions-table{min-width:760px}
@@ -2470,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p4',
+      release:'5.9.10.6.5.4h-p4a',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2785,7 +2789,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p4 — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p4a — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -6190,6 +6194,40 @@ function canonicalPlayerDashboardStats(playerId='') {
     clear:()=>{canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};}
   };
 
+  let canonicalTransactionPrewarmStarted=false;
+
+  function prewarmCanonicalTransactions(){
+    if(canonicalTransactionPrewarmStarted||canonicalTransactionUiCache.payload||canonicalTransactionUiCache.promise)return;
+    canonicalTransactionPrewarmStarted=true;
+    Promise.resolve()
+      .then(()=>loadCanonicalTransactionsForUi(false))
+      .catch(error=>console.warn('[Transactions Prewarm]',error))
+      .finally(()=>{canonicalTransactionPrewarmStarted=false});
+  }
+
+  function scheduleCanonicalTransactionPrewarm(){
+    if(canonicalTransactionUiCache.payload||canonicalTransactionUiCache.promise)return;
+    const start=()=>prewarmCanonicalTransactions();
+    if(typeof requestIdleCallback==='function') requestIdleCallback(start,{timeout:350});
+    else setTimeout(start,120);
+  }
+
+  window.FranchiseHQ.transactionPerformance={
+    cached:()=>Boolean(canonicalTransactionUiCache.payload),
+    loading:()=>Boolean(canonicalTransactionUiCache.promise),
+    loadedAt:()=>canonicalTransactionUiCache.loadedAt||0,
+    ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
+    prewarm:()=>{scheduleCanonicalTransactionPrewarm();return true;},
+    print:()=>console.log('[Transaction Performance]',{
+      release:'5.9.10.6.5.4h-p4a',
+      cached:Boolean(canonicalTransactionUiCache.payload),
+      loading:Boolean(canonicalTransactionUiCache.promise),
+      loadedAt:canonicalTransactionUiCache.loadedAt||null,
+      ageMs:canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
+      transactionCount:canonicalTransactionUiCache.payload?.transactions?.length||0
+    })
+  };
+
   function canonicalTeamAliases(team={}){
     return new Set([team.id,team.liveTeamId,team.abbr,team.abbreviation,team.source?.teamId,team.source?.team_id]
       .filter(value=>value!==undefined&&value!==null&&String(value)!=='').map(value=>String(value).toLowerCase()));
@@ -7287,7 +7325,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
 
     pageContent.innerHTML=`<div class="page-heading"><div><h1>Transactions</h1></div></div>
-      <section class="card transaction-loading-shell"><div class="card-header"><div><h3>League Transactions</h3><p>Loading the canonical transaction ledger.</p></div><span class="pill pill--neutral">Loading</span></div></section>`;
+      <article class="card transaction-table-card transaction-table-loading" aria-busy="true">
+        <div class="table-wrap transaction-table-wrap">
+          <table class="league-transactions-table">
+            <thead><tr><th>Team Name</th><th>Player Name</th><th>Position</th><th>Overall</th><th>Action</th><th>Madden Week</th></tr></thead>
+            <tbody>${Array.from({length:6},()=>`<tr class="transaction-skeleton-row"><td><span></span></td><td><span></span></td><td><span></span></td><td><span></span></td><td><span></span></td><td><span></span></td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </article>`;
 
     try{
       const payload=await loadCanonicalTransactionsForUi(false);
@@ -8009,7 +8054,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p4';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p4a';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -8957,6 +9002,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
 
+  // P4a: warm Transactions in the background; never await this during page boot.
+  scheduleCanonicalTransactionPrewarm();
+
   // 4.21.2: guarantee the active route mounts after hard refresh / bfcache restore.
   window.addEventListener('pageshow', () => {
     const route=String(location.hash||'#home').replace(/^#\/?/,'')||'home';
@@ -9296,9 +9344,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p4';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p4a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p4';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p4a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9310,7 +9358,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p4',
+    release:'5.9.10.6.5.4h-p4a',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9324,7 +9372,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p4',
+        release:'5.9.10.6.5.4h-p4a',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9946,7 +9994,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p4',
+    release:'5.9.10.6.5.4h-p4a',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -9995,6 +10043,8 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   function warmLeagueReadCaches(){
+    scheduleCanonicalTransactionPrewarm();
+
     const live=window.FranchiseHQ?.liveData
       || window.FranchiseHQ?.league?.liveData
       || window.FranchiseHQ?.getModuleService?.('league','liveData')
@@ -10070,9 +10120,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p4 — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p4a — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p4';
+  const RELEASE='5.9.10.6.5.4h-p4a';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
