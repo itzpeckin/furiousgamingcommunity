@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3c */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.4h-p3c';
+  const VERSION = '5.9.10.6.5.4h-p3d';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -58,6 +58,18 @@
 
   const nowMs = () => (window.performance?.now?.() ?? Date.now());
   const isoNow = () => new Date().toISOString();
+
+  function serverTimestampMs(value){
+    if(!value)return NaN;
+    const raw=String(value).trim();
+    // D1 CURRENT_TIMESTAMP is returned as "YYYY-MM-DD HH:MM:SS" with no timezone.
+    // SQLite stores that value in UTC, but browsers parse a timezone-less string as local time.
+    // Normalize it to explicit UTC before calculating elapsed time.
+    const normalized=/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(raw)
+      ? raw.replace(' ','T')+'Z'
+      : raw;
+    return Date.parse(normalized);
+  }
 
   function timingStart(stage) {
     currentStageStartedAt[stage] = {ms:nowMs(), at:isoNow()};
@@ -177,9 +189,9 @@
         detail:'Transactions and Free Agents published',
         at:serverRun.completedAt||serverRun.updatedAt||new Date().toISOString()
       };
-      const startMs=Date.parse(serverRun.createdAt||'');
-      const endMs=Date.parse(serverRun.completedAt||serverRun.updatedAt||'');
-      if(Number.isFinite(startMs)&&Number.isFinite(endMs)){
+      const startMs=serverTimestampMs(serverRun.createdAt);
+      const endMs=serverTimestampMs(serverRun.completedAt||serverRun.updatedAt);
+      if(Number.isFinite(startMs)&&Number.isFinite(endMs)&&endMs>=startMs){
         serverDurationSeconds=Number(((endMs-startMs)/1000).toFixed(2));
       }
     }
@@ -324,7 +336,8 @@
       state='error';
     }else if(!busy&&importCompletedAt){
       title='Franchise Updated';
-      detail=`Import complete · ${serverDurationSeconds!=null?serverDurationSeconds:timingSummary().wallClockDurationSeconds}s`;
+      const completedSeconds=Math.max(0,Number(serverDurationSeconds!=null?serverDurationSeconds:timingSummary().wallClockDurationSeconds)||0);
+      detail=`Import complete · ${completedSeconds}s`;
       state='success';
     }
     const pct=state==='success'?100:progressPercent();
@@ -693,7 +706,9 @@
     const current=activeStage();
     const pct=progressPercent();
     const status=lastError?'Stopped':busy?(current?stageLabel(current):'Importing…'):importCompletedAt?'Complete':'Ready';
-    const lastSeconds=importCompletedAt?(serverDurationSeconds!=null?serverDurationSeconds:timingSummary().wallClockDurationSeconds):null;
+    const lastSeconds=importCompletedAt
+      ? Math.max(0,Number(serverDurationSeconds!=null?serverDurationSeconds:timingSummary().wallClockDurationSeconds)||0)
+      : null;
 
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
       <div class="card-header">
