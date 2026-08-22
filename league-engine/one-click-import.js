@@ -1,8 +1,9 @@
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3a | import-ui-progress */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.4h-p2';
+  const VERSION = '5.9.10.6.5.4h-p3a';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
