@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p3d';
+const RELEASE='5.9.10.6.5.4h-p5';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -163,7 +163,10 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       ctx.lifecycleReconciliation={
         ...finalized,
         processedSessions:processedSessionIds.length,
-        skipped:processedSessionIds.length===0
+        skipped:processedSessionIds.length===0,
+        planStrategy:plan?.strategy||null,
+        planDurationMs:Number(plan?.durationMs||0),
+        ignoredHistoricalCandidateCount:Number(plan?.ignoredHistoricalCandidateCount||0)
       };
 
       // Do not report reconstruct-player-lifecycle to the import orchestrator.
@@ -173,7 +176,16 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       ));
       const total=mappedPlayers?.mappingRun?.playerCount??mappedPlayers?.playerCount??'?';
       const fas=mappedPlayers?.lifecycleFreeAgentCount??mappedPlayers?.mappingRun?.freeAgentCount??0;
-      await report(ctx,'map-players',true,{summary:`${total} players mapped · ${fas} Free Agent(s)`});
+      await report(ctx,'map-players',true,{
+        summary:`${total} players mapped · ${fas} Free Agent(s)`,
+        lifecycle:{
+          strategy:ctx.lifecycleReconciliation?.strategy||ctx.lifecycleReconciliation?.planStrategy||null,
+          processedSessions:Number(ctx.lifecycleReconciliation?.processedSessions||0),
+          eventCount:Number(ctx.lifecycleReconciliation?.eventCount||0),
+          durationMs:Number(ctx.lifecycleReconciliation?.durationMs||0),
+          ignoredHistoricalCandidateCount:Number(ctx.lifecycleReconciliation?.ignoredHistoricalCandidateCount||0)
+        }
+      });
     }
 
     await simple(ctx,step,'map-schedule','map-schedule',p=>`${p.games?.length??p.mappingRun?.gameCount??'?'} games mapped`);
