@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p4a',
+      release:'5.9.10.6.5.4h-p4c',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2789,7 +2789,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p4a — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p4c — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -6161,7 +6161,42 @@ function canonicalPlayerDashboardStats(playerId='') {
     target.innerHTML=renderTeamCap(team,roster);
   }
 
+  const TRANSACTION_SESSION_CACHE_KEY='fhq:transactions:ui:v1';
+  const TRANSACTION_SESSION_TTL_MS=300000;
   let canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+
+  function hydrateCanonicalTransactionSessionCache(){
+    try{
+      const raw=sessionStorage.getItem(TRANSACTION_SESSION_CACHE_KEY);
+      if(!raw)return;
+      const cached=JSON.parse(raw);
+      const loadedAt=Number(cached?.loadedAt||0);
+      if(!loadedAt||Date.now()-loadedAt>TRANSACTION_SESSION_TTL_MS){
+        sessionStorage.removeItem(TRANSACTION_SESSION_CACHE_KEY);
+        return;
+      }
+      if(cached?.payload&&Array.isArray(cached.payload.transactions)){
+        canonicalTransactionUiCache.payload=cached.payload;
+        canonicalTransactionUiCache.loadedAt=loadedAt;
+      }
+    }catch(error){
+      console.warn('[Transactions Session Cache] hydrate failed',error);
+    }
+  }
+
+  function persistCanonicalTransactionSessionCache(){
+    try{
+      if(!canonicalTransactionUiCache.payload||!canonicalTransactionUiCache.loadedAt)return;
+      sessionStorage.setItem(TRANSACTION_SESSION_CACHE_KEY,JSON.stringify({
+        loadedAt:canonicalTransactionUiCache.loadedAt,
+        payload:canonicalTransactionUiCache.payload
+      }));
+    }catch(error){
+      console.warn('[Transactions Session Cache] persist skipped',error);
+    }
+  }
+
+  hydrateCanonicalTransactionSessionCache();
 
   async function loadCanonicalTransactionsForUi(force=false){
     if(!force&&canonicalTransactionUiCache.payload&&Date.now()-canonicalTransactionUiCache.loadedAt<300000)return canonicalTransactionUiCache.payload;
@@ -6182,6 +6217,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       canonicalTransactionUiCache.payload=payload||{transactions:[]};
       canonicalTransactionUiCache.loadedAt=Date.now();
       canonicalTransactionUiCache.promise=null;
+      persistCanonicalTransactionSessionCache();
       return canonicalTransactionUiCache.payload;
     })().catch(error=>{canonicalTransactionUiCache.promise=null;throw error});
     return canonicalTransactionUiCache.promise;
@@ -6191,10 +6227,14 @@ function canonicalPlayerDashboardStats(playerId='') {
   window.FranchiseHQ.transactionUiLoader={
     load:(force=false)=>loadCanonicalTransactionsForUi(force),
     cached:()=>canonicalTransactionUiCache.payload,
-    clear:()=>{canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};}
+    clear:()=>{
+      canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+      try{sessionStorage.removeItem(TRANSACTION_SESSION_CACHE_KEY)}catch{}
+    }
   };
 
   let canonicalTransactionPrewarmStarted=false;
+  let canonicalTransactionPostLoadScheduled=false;
 
   function prewarmCanonicalTransactions(){
     if(canonicalTransactionPrewarmStarted||canonicalTransactionUiCache.payload||canonicalTransactionUiCache.promise)return;
@@ -6206,27 +6246,56 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function scheduleCanonicalTransactionPrewarm(){
-    if(canonicalTransactionUiCache.payload||canonicalTransactionUiCache.promise)return;
-    const start=()=>prewarmCanonicalTransactions();
-    if(typeof requestIdleCallback==='function') requestIdleCallback(start,{timeout:350});
-    else setTimeout(start,120);
+    if(canonicalTransactionPostLoadScheduled)return;
+    canonicalTransactionPostLoadScheduled=true;
+
+    const queueAfterLoad=()=>{
+      setTimeout(()=>{
+        const begin=()=>{
+          if(canonicalTransactionUiCache.payload)return;
+          prewarmCanonicalTransactions();
+        };
+        if(typeof requestIdleCallback==='function') requestIdleCallback(begin,{timeout:2000});
+        else setTimeout(begin,750);
+      },1500);
+    };
+
+    if(document.readyState==='complete')queueAfterLoad();
+    else window.addEventListener('load',queueAfterLoad,{once:true});
   }
+
+  // Network prewarm is deliberately outside the cold-boot critical path.
+  scheduleCanonicalTransactionPrewarm();
+
 
   window.FranchiseHQ.transactionPerformance={
     cached:()=>Boolean(canonicalTransactionUiCache.payload),
     loading:()=>Boolean(canonicalTransactionUiCache.promise),
     loadedAt:()=>canonicalTransactionUiCache.loadedAt||0,
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
-    prewarm:()=>{scheduleCanonicalTransactionPrewarm();return true;},
+    prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'5.9.10.6.5.4h-p4a',
+      release:'5.9.10.6.5.4h-p4c',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
       ageMs:canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
-      transactionCount:canonicalTransactionUiCache.payload?.transactions?.length||0
+      transactionCount:canonicalTransactionUiCache.payload?.transactions?.length||0,
+      documentReadyState:document.readyState,
+      postLoadPrewarmScheduled:canonicalTransactionPostLoadScheduled
     })
   };
+
+  window.FranchiseHQ.coldBootPerformance={
+    print:()=>console.log('[Cold Boot Performance]',{
+      release:'5.9.10.6.5.4h-p4c',
+      domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
+      loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
+      transactionCached:Boolean(canonicalTransactionUiCache.payload),
+      transactionLoading:Boolean(canonicalTransactionUiCache.promise)
+    })
+  };
+
 
   function canonicalTeamAliases(team={}){
     return new Set([team.id,team.liveTeamId,team.abbr,team.abbreviation,team.source?.teamId,team.source?.team_id]
@@ -8054,7 +8123,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p4a';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p4c';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9002,9 +9071,6 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
 
-  // P4a: warm Transactions in the background; never await this during page boot.
-  scheduleCanonicalTransactionPrewarm();
-
   // 4.21.2: guarantee the active route mounts after hard refresh / bfcache restore.
   window.addEventListener('pageshow', () => {
     const route=String(location.hash||'#home').replace(/^#\/?/,'')||'home';
@@ -9344,9 +9410,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p4a';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p4c';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p4a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p4c';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9358,7 +9424,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p4a',
+    release:'5.9.10.6.5.4h-p4c',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9372,7 +9438,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p4a',
+        release:'5.9.10.6.5.4h-p4c',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9994,7 +10060,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p4a',
+    release:'5.9.10.6.5.4h-p4c',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -10043,7 +10109,6 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   function warmLeagueReadCaches(){
-    scheduleCanonicalTransactionPrewarm();
 
     const live=window.FranchiseHQ?.liveData
       || window.FranchiseHQ?.league?.liveData
@@ -10120,9 +10185,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p4a — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p4c — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p4a';
+  const RELEASE='5.9.10.6.5.4h-p4c';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
