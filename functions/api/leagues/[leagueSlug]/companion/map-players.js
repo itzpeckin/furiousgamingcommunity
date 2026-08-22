@@ -7,9 +7,9 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.10.6.5.1b';
+const RELEASE = '5.9.10.6.1c';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
-const FREE_AGENT_ROUTE = /\/free[-_]?agents?\/(?:roster|players)\/?$/i;
+const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
 const A = Object.freeze({
   id: ['playerId','playerID','id','player_id','rosterId','assetId'],
@@ -126,7 +126,7 @@ async function rosterCaptureSet(db,leagueId){
 async function latestUsableFreeAgentCapture(db,env,leagueId){
   const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,received_at,byte_length
     FROM companion_route_captures
-    WHERE league_id=? AND LOWER(route_path) LIKE '%free%agent%'
+    WHERE league_id=? AND LOWER(route_path) LIKE '%/freeagents/roster%'
     ORDER BY received_at DESC LIMIT 20`).bind(leagueId).all();
 
   const attempts=[];
@@ -182,36 +182,7 @@ async function latestRun(db,leagueId){return db.prepare(`SELECT * FROM companion
 async function preview(db,leagueId,runId){if(!runId)return[];const r=await db.prepare(`SELECT external_id,team_external_id,first_name,last_name,display_name,position,archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? ORDER BY team_external_id,overall DESC,display_name`).bind(leagueId,runId).all();return (r.results||[]).map(x=>({externalId:x.external_id,teamExternalId:x.team_external_id,firstName:x.first_name,lastName:x.last_name,displayName:x.display_name,position:x.position,archetype:x.archetype,overall:x.overall,developmentTrait:x.development_trait,age:x.age,yearsPro:x.years_pro,jerseyNumber:x.jersey_number,heightInches:x.height_inches,weightLbs:x.weight_lbs,college:x.college,injuryStatus:x.injury_status,isInjured:Boolean(x.is_injured),contractYearsRemaining:x.contract_years_remaining,salary:x.salary,capHit:x.cap_hit,portraitId:x.portrait_id}));}
 function runPayload(run){if(!run)return null;let warnings=[];try{warnings=JSON.parse(run.warnings_json||'[]')}catch{}return{id:run.id,discoverySessionId:run.discovery_session_id,sourceCaptureId:run.source_capture_id,sourceRoutePath:run.source_route_path,status:run.status,playerCount:run.player_count,rosteredCount:run.rostered_count,freeAgentCount:run.free_agent_count,warningCount:run.warning_count,warnings,createdAt:run.created_at,updatedAt:run.updated_at};}
 function response(run,players,slug,leagueId,extra={}){return{ok:true,release:RELEASE,leagueId,leagueSlug:slug,previewAvailable:Boolean(run),mappingRun:runPayload(run),players,activeSnapshotChanged:false,activationPerformed:false,rawPayloadReturned:false,...extra};}
-async function runBatches(db,statements,size=75){for(let i=0;i<statements.length;i+=size)await db.batch(statements.slice(i,i+size));}
-
-async function lifecycleFreeAgents(db,leagueId,validTeams){
-  const table=await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='canonical_free_agents'`).first();
-  if(!table)return[];
-  const rows=(await db.prepare(`SELECT player_id,player_name,position,overall,age,dev_trait,raw_json
-    FROM canonical_free_agents WHERE league_id=? ORDER BY player_name`).bind(leagueId).all()).results||[];
-  return rows.map((row,index)=>{
-    let raw={};try{raw=JSON.parse(row.raw_json||'{}')}catch{}
-    const player=canonical({
-      ...raw,
-      rosterId:row.player_id,
-      playerId:row.player_id,
-      displayName:row.player_name,
-      position:row.position??raw.position,
-      overall:row.overall??raw.overall??raw.playerBestOvr,
-      age:row.age??raw.age,
-      devTrait:row.dev_trait??raw.devTrait,
-      teamId:'FA',
-      rosterStatus:'free-agent',
-      status:'free-agent',
-      isFreeAgent:true
-    },index,'FA',validTeams);
-    player.teamExternalId=null;
-    player.sourceTeamId='FA';
-    player.recordTeamId='FA';
-    player.sourceRecord={...(player.sourceRecord||raw),teamId:'FA',rosterStatus:'free-agent',status:'free-agent',isFreeAgent:true};
-    return player;
-  }).filter(player=>player.externalId);
-}
+async function runBatches(db,statements,size=150){for(let i=0;i<statements.length;i+=size)await db.batch(statements.slice(i,i+size));}
 
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);
@@ -222,6 +193,8 @@ export async function onRequestGet(context){
 
 export async function onRequestPost(context){
   const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);
+  let requestBody={};try{requestBody=await context.request.json()}catch{}
+  const compact=Boolean(requestBody?.compact);
   const auth=await requireCommissioner(context);if(!auth.authorized)return auth.response;
   const db=database(context.env);if(!db||!context.env.COMPANION_EXPORTS?.get)return json({ok:false,error:'D1 and R2 must be configured.'},503);
   const league=await resolveLeague(context.env,slug);if(!league)return json({ok:false,error:'League not found.'},404);
@@ -232,30 +205,47 @@ export async function onRequestPost(context){
     const validTeams=await teamIds(db,league.id);if(!validTeams.size)return json({ok:false,error:'Map the canonical Teams preview before mapping players.'},409);
 
     const warnings=[],diagnostics=[],players=[],seen=new Set();let rostered=0,freeAgents=0;
-    for(const capture of source.captures){
+    const parsedCaptures=await Promise.all(source.captures.map(async capture=>{
       const sourceTeamId=routeTeamId(capture.route_path);
       try{
         const payload=await parsePayload(context.env,capture);
         const collection=chooseCollection(payload);
-        if(!collection){warnings.push(`No player-shaped roster collection found in ${capture.route_path}.`);diagnostics.push({routePath:capture.route_path,sourceTeamId,accepted:false,reason:'No player-shaped array found.'});continue;}
-        diagnostics.push({routePath:capture.route_path,sourceTeamId,collectionPath:collection.path,recordCount:collection.objects.length,shapeScore:Number(collection.score.toFixed(2)),accepted:true});
-        for(let i=0;i<collection.objects.length;i++){
-          const p=canonical(collection.objects[i],i,sourceTeamId,validTeams);
-          if(seen.has(p.externalId)){warnings.push(`Duplicate player ID skipped: ${p.externalId} from ${capture.route_path}.`);continue;}
-          seen.add(p.externalId);
-          if(p.externalId.startsWith('generated-player-'))warnings.push(`Generated missing player ID for ${p.displayName}.`);
-          if(!p.position)warnings.push(`Missing position for ${p.displayName}.`);
-          if(p.teamExternalId)rostered++;else{
-            freeAgents++;
-            const supplied=p.recordTeamId||p.sourceTeamId;
-            if(supplied&&!['0','-1','null'].includes(String(supplied)))warnings.push(`Unknown team ID ${supplied} for ${p.displayName}; treated as unassigned.`);
-          }
-          players.push(p);
+        return {capture,sourceTeamId,collection,error:null};
+      }catch(error){
+        return {capture,sourceTeamId,collection:null,error};
+      }
+    }));
+
+    for(const item of parsedCaptures){
+      const {capture,sourceTeamId,collection,error}=item;
+      if(error){
+        warnings.push(`${capture.route_path}: ${error?.message||String(error)}`);
+        diagnostics.push({routePath:capture.route_path,sourceTeamId,accepted:false,reason:error?.message||String(error)});
+        continue;
+      }
+      if(!collection){
+        warnings.push(`No player-shaped roster collection found in ${capture.route_path}.`);
+        diagnostics.push({routePath:capture.route_path,sourceTeamId,accepted:false,reason:'No player-shaped array found.'});
+        continue;
+      }
+      diagnostics.push({routePath:capture.route_path,sourceTeamId,collectionPath:collection.path,recordCount:collection.objects.length,shapeScore:Number(collection.score.toFixed(2)),accepted:true});
+      for(let i=0;i<collection.objects.length;i++){
+        const p=canonical(collection.objects[i],i,sourceTeamId,validTeams);
+        if(seen.has(p.externalId)){warnings.push(`Duplicate player ID skipped: ${p.externalId} from ${capture.route_path}.`);continue;}
+        seen.add(p.externalId);
+        if(p.externalId.startsWith('generated-player-'))warnings.push(`Generated missing player ID for ${p.displayName}.`);
+        if(!p.position)warnings.push(`Missing position for ${p.displayName}.`);
+        if(p.teamExternalId)rostered++;
+        else{
+          freeAgents++;
+          const supplied=p.recordTeamId||p.sourceTeamId;
+          if(supplied&&!['0','-1','null'].includes(String(supplied)))warnings.push(`Unknown team ID ${supplied} for ${p.displayName}; treated as unassigned.`);
         }
-      }catch(error){warnings.push(`${capture.route_path}: ${error?.message||String(error)}`);diagnostics.push({routePath:capture.route_path,sourceTeamId,accepted:false,reason:error?.message||String(error)});}
+        players.push(p);
+      }
     }
 
-    // 5.9.10.6.2e: Madden exposes Free Agents as a separate league-level roster.
+    // 5.9.10.6.1c: Madden exposes Free Agents as a separate league-level roster.
     // Only merge a capture when the response is explicitly usable and non-empty.
     const freeAgentSource=await latestUsableFreeAgentCapture(db,context.env,league.id);
     if(freeAgentSource.capture){
@@ -296,42 +286,24 @@ export async function onRequestPost(context){
       });
     }
 
-
-    // 5.9.10.6.5.1b — authoritative fallback: lifecycle reconstruction preserves players who
-    // disappeared from all 32 team rosters and marks them as canonical Free Agents.
-    const lifecycleFAs=await lifecycleFreeAgents(db,league.id,validTeams);
-    let lifecycleFreeAgentCount=0;
-    for(const p of lifecycleFAs){
-      if(seen.has(p.externalId))continue; // current team roster always wins.
-      seen.add(p.externalId);
-      freeAgents++;
-      lifecycleFreeAgentCount++;
-      players.push(p);
-    }
-    diagnostics.push({
-      routePath:'canonical_free_agents',
-      sourceTeamId:'FA',
-      accepted:true,
-      dataset:'capture-history-free-agents',
-      recordCount:lifecycleFreeAgentCount
-    });
-
     if(!players.length)return json({ok:false,error:'No canonical players were produced from the captured team rosters.',rosterRouteCount:source.captures.length,rosterDiagnostics:diagnostics},422);
 
     await db.prepare(`UPDATE companion_player_mapping_runs SET status='superseded',updated_at=? WHERE league_id=? AND status='pending-preview'`).bind(new Date().toISOString(),league.id).run();
     const runId=crypto.randomUUID(),now=new Date().toISOString();
     const representative=source.captures[0];
-    const routeSummary=`${source.captures.length} team roster routes + ${freeAgentSource.capture?'1 usable':'0 usable'} raw Free Agent route + ${lifecycleFreeAgentCount} lifecycle Free Agent(s)`;
+    const routeSummary=`${source.captures.length} team roster routes + ${freeAgentSource.capture?'1 usable':'0 usable'} Free Agent roster route`;
     await db.prepare(`INSERT INTO companion_player_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,rostered_count,free_agent_count,warning_count,warnings_json,created_at,updated_at) VALUES (?,?,?,?,?,'pending-preview',?,?,?,?,?,?,?)`).bind(runId,league.id,source.sessionId||representative.discovery_session_id,representative.capture_id,routeSummary,players.length,rostered,freeAgents,warnings.length,JSON.stringify(warnings),now,now).run();
 
     const insertSql=`INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,team_external_id,first_name,last_name,display_name,position,archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id,ratings_json,source_record_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
     const statements=players.map(p=>db.prepare(insertSql).bind(runId,league.id,p.externalId,p.teamExternalId,p.firstName,p.lastName,p.displayName,p.position,p.archetype,p.overall,p.developmentTrait,p.age,p.yearsPro,p.jerseyNumber,p.heightInches,p.weightLbs,p.college,p.injuryStatus,p.isInjured?1:0,p.contractYearsRemaining,p.salary,p.capHit,p.portraitId,JSON.stringify(p.ratings),JSON.stringify(p.sourceRecord),now));
     await runBatches(db,statements);
     const run=await latestRun(db,league.id);
-    return json(response(run,await preview(db,league.id,run.id),slug,league.id,{
+    const responsePlayers=compact?[]:await preview(db,league.id,run.id);
+    return json(response(run,responsePlayers,slug,league.id,{
+      compact,
+      playerCount:players.length,
       rosterRouteCount:source.captures.length,
       expectedTeamCount:validTeams.size,
-      lifecycleFreeAgentCount,
       freeAgentCapture:{
         usable:Boolean(freeAgentSource.capture),
         captureId:freeAgentSource.capture?.capture_id||null,
