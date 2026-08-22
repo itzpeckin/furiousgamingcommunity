@@ -1,8 +1,9 @@
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3a | import-job-proxy */
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 
-const RELEASE='5.9.10.6.5.4h-p2';
+const RELEASE='5.9.10.6.5.4h-p3a';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}

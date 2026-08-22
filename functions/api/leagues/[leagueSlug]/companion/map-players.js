@@ -1,3 +1,4 @@
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3a | map-players-throughput */
 import {
   json,
   database,
@@ -7,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.10.6.1c';
+const RELEASE='5.9.10.6.5.4h-p3a';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
