@@ -1,11 +1,19 @@
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5b */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.5.1b';
+const RELEASE='5.9.10.6.5.4h-p5b';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const text=v=>v==null?null:(String(v).trim()||null);
 const int=v=>{const n=Number.parseInt(v,10);return Number.isFinite(n)?n:null};
 const money=v=>{const n=Number(v);return Number.isFinite(n)?Math.round(n):null};
+const bool=v=>v===true||v===1||v==='1'||['true','yes'].includes(String(v??'').trim().toLowerCase());
+
+function retiredRecord(raw={}){
+  if(bool(raw.isRetired??raw.retired??raw.hasRetired))return true;
+  const status=String(raw.rosterStatus??raw.roster_status??raw.playerStatus??raw.player_status??raw.status??raw.transactionStatus??'').trim();
+  return /(^|\b)(retired|retirement)(\b|$)/i.test(status);
+}
 
 function normalizeDev(v){
   if(v==null)return null;
@@ -46,28 +54,6 @@ function playerShape(raw,index){
   };
 }
 
-
-async function canonicalFreeAgents(db,leagueId){
-  const exists=await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='canonical_free_agents'`).first();
-  if(!exists)return[];
-  const result=await db.prepare(`SELECT * FROM canonical_free_agents WHERE league_id=? ORDER BY player_name`).bind(leagueId).all();
-  return (result.results||[]).map(row=>{
-    const raw=(()=>{try{return JSON.parse(row.raw_json||'{}')}catch{return{}}})();
-    return playerShape({
-      ...raw,
-      playerId:row.player_id,
-      displayName:row.player_name,
-      position:row.position,
-      overall:row.overall,
-      age:row.age,
-      devTrait:row.dev_trait,
-      teamId:'FA',
-      rosterStatus:'free-agent',
-      status:'free-agent'
-    },0);
-  }).filter(Boolean);
-}
-
 async function payloadFor(context,capture){
   if(!capture?.r2_object_key)return null;
   const object=await context.env.COMPANION_EXPORTS?.get?.(capture.r2_object_key);
@@ -91,8 +77,7 @@ export async function onRequestGet(context){
 
   const rows=await captures(db,league.id);
   const attempts=[];
-  let selected=null,players=[];
-  const ledgerPlayers=await canonicalFreeAgents(db,league.id);
+  let selected=null,players=[],retiredFiltered=0;
 
   for(const capture of rows){
     const payload=await payloadFor(context,capture);
@@ -110,19 +95,15 @@ export async function onRequestGet(context){
     });
     if(!selected&&success){
       selected=capture;
-      players=list.map(playerShape).filter(Boolean);
+      retiredFiltered=list.filter(retiredRecord).length;
+      players=list.filter(raw=>!retiredRecord(raw)).map(playerShape).filter(Boolean);
     }
   }
-
-  const merged=new Map();
-  for(const player of ledgerPlayers)merged.set(String(player.id),player);
-  for(const player of players)merged.set(String(player.id),player);
-  const allPlayers=[...merged.values()];
 
   return json({
     ok:true,
     release:RELEASE,
-    sourceRoute:'canonical-ledger + xbsx/{franchiseId}/freeagents/roster',
+    sourceRoute:'xbsx/{franchiseId}/freeagents/roster',
     captureAvailable:Boolean(rows.length),
     usableCaptureAvailable:Boolean(selected),
     selectedCapture:selected?{
@@ -130,10 +111,9 @@ export async function onRequestGet(context){
       routePath:selected.route_path,
       receivedAt:selected.received_at
     }:null,
-    ledgerCount:ledgerPlayers.length,
-    capturedCount:players.length,
-    count:allPlayers.length,
-    players:allPlayers,
+    count:players.length,
+    retiredFiltered,
+    players,
     attempts
   });
 }
