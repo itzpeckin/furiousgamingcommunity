@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4g';
+const RELEASE='5.9.10.6.5.4h-p2';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -68,6 +68,7 @@ async function simple(ctx,step,name,path,summaryFn){
 export class FranchiseImportWorkflow extends WorkflowEntrypoint {
   async run(event,step){
     const payload=event.payload||{};
+    const workflowStartedAt=Date.now();
     const ctx={
       slug:text(payload.leagueSlug),
       owner:{
@@ -97,7 +98,8 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
         noChange:true,
         noNewExport:Boolean(delta.noNewExport),
         snapshotId:ctx.snapshotId,
-        runId:null
+        runId:null,
+        durationMs:Date.now()-workflowStartedAt
       };
     }
 
@@ -244,7 +246,7 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       {snapshotId:ctx.snapshotId,runId:ctx.runId,serverSide:true}
     )).catch(()=>null);
 
-    return {ok:true,release:RELEASE,noChange:false,snapshotId:ctx.snapshotId,runId:ctx.runId};
+    return {ok:true,release:RELEASE,noChange:false,snapshotId:ctx.snapshotId,runId:ctx.runId,durationMs:Date.now()-workflowStartedAt};
   }
 }
 
@@ -258,102 +260,80 @@ export default {
       const owner=text(body.ownerAccountId);
       const origin=text(body.origin).replace(/\/+$/,'');
       const token=text(body.importAuthToken);
+      const workflowKey=text(body.workflowKey);
 
-      if(!slug||!owner||!origin||!token){
+      if(!slug||!owner||!origin||!token||!workflowKey){
         return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
       }
 
-      // IMPORTANT: /start must not synchronously call back into the Pages application.
-      // That request can sit behind the originating Pages -> Service Binding request and
-      // produce a Cloudflare 522 before a Workflow is even returned.
-      //
-      // Use a short-lived deterministic launch bucket instead. Repeated clicks/devices
-      // inside the same import launch window converge on the same Workflow, while the
-      // Workflow itself performs change-check asynchronously after it has been accepted.
-      const launchBucket=Math.floor(Date.now()/30000);
-      const exportKey=`launch-${launchBucket}`;
-
-      const encoded=new TextEncoder().encode(`${slug}:${exportKey}`);
+      const encoded=new TextEncoder().encode(`${slug}:${workflowKey}`);
       const digest=await crypto.subtle.digest('SHA-256',encoded);
       const shortHash=Array.from(new Uint8Array(digest))
         .slice(0,12)
         .map(v=>v.toString(16).padStart(2,'0'))
         .join('');
-      const id=`fhq-${shortHash}`;
+      const baseId=`fhq-${shortHash}`;
 
-      let instance=null;
-      let reusedExisting=false;
-
+      // Same Companion session = same Workflow.
+      // Mobile, desktop and repeated clicks converge on the same server job.
       try{
-        instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({
-          id,
-          params:body
-        });
+        const existing=await env.FRANCHISE_IMPORT_WORKFLOW.get(baseId);
+        const existingStatus=await existing.status().catch(()=>null);
+        const existingState=String(existingStatus?.status||'').toLowerCase();
+        if(existingStatus&&!['failed','errored','error','terminated','cancelled','canceled'].includes(existingState)){
+          return json({ok:true,release:RELEASE,id:baseId,reusedExisting:true,workflowKey,status:existingStatus});
+        }
+      }catch(_){}
+
+      let id=baseId;
+      let instance=null;
+      try{
+        instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
       }catch(createError){
+        // A second device may have won the create race.
         try{
           instance=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
-          reusedExisting=true;
-        }catch(getError){
-          console.error('[Import Workflow Create]',createError);
-          console.error('[Import Workflow Recover]',getError);
-          return json({
-            ok:false,
-            release:RELEASE,
-            error:'Unable to create or recover the server-side import Workflow.',
-            createError:createError?.message||String(createError),
-            recoverError:getError?.message||String(getError)
-          },500);
+          return json({ok:true,release:RELEASE,id,reusedExisting:true,raced:true,workflowKey,status:await instance.status().catch(()=>null)});
+        }catch(_){
+          // If a prior failed instance owns the deterministic ID, allow a retry ID.
+          id=`${baseId}-r${Date.now().toString(36)}`;
+          instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
         }
-      }
-
-      let status=null;
-      try{
-        status=await instance.status();
-      }catch(statusError){
-        console.warn('[Import Workflow Status]',statusError);
       }
 
       return json({
         ok:true,
         release:RELEASE,
         id,
-        reusedExisting,
-        exportKey,
-        status
+        reusedExisting:false,
+        workflowKey,
+        status:await instance.status().catch(()=>null)
       });
     }
 
     if(url.pathname==='/status'&&request.method==='GET'){
       const id=text(url.searchParams.get('id'));
-      const slug=text(url.searchParams.get('leagueSlug'));
-      const owner=text(url.searchParams.get('ownerAccountId'));
-      const origin=text(url.searchParams.get('origin')).replace(/\/+$/,'');
       let workflowStatus=null;
+
       if(id){
         try{
           const instance=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
-          try{
-            workflowStatus=await instance.status();
-          }catch(statusError){
-            workflowStatus={status:'unknown',error:String(statusError?.message||statusError)};
-          }
-        }catch(getError){
-          workflowStatus={status:'unknown',error:String(getError?.message||getError)};
+          workflowStatus=await instance.status().catch(error=>({
+            status:'unknown',
+            error:String(error?.message||error)
+          }));
+        }catch(error){
+          workflowStatus={status:'unknown',error:String(error?.message||error)};
         }
       }
-      let orchestrator=null;
-      if(slug&&owner&&origin){
-        try{orchestrator=await call(origin,companion(slug,'import-orchestrator'),owner);}
-        catch(_){}
-      }
+
       return json({
         ok:true,
         release:RELEASE,
         id,
         workflowStatus,
         workflowState:String(workflowStatus?.status||'unknown').toLowerCase(),
-        workflowOutput:workflowStatus?.output||null,
-        orchestrator
+        workflowOutput:workflowStatus?.output||null
       });
     }
 
