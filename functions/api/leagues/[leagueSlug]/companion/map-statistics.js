@@ -1,11 +1,13 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.3P.5f';
+const RELEASE='5.9.10.6.5.4h-p3b';
 const RECORD_CHUNK_SIZE=40;
 const MAX_STORED_WARNINGS_PER_BATCH=25;
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const WEEKLY_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/(defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
+// Madden can emit empty /week/reg/0/* routes as lifecycle placeholders.
+// Week 0 is not a playable regular-season statistics week and must never block snapshot activation.
 const TEAMSTATS_CATEGORY='team';
 const IDS=['playerId','playerID','rosterId','player_id','id'];
 const TEAM=['teamId','teamID','team_id','teamExternalId','team_external_id'];
@@ -361,6 +363,7 @@ async function startRun(db,env,leagueId){
     const prior=committed.get(String(capture.route_path));
     const optionalEmpty=Boolean(!capture.captureUsable && (
       meta?.stage==='pre' ||
+      (meta?.stage==='reg' && Number(meta.week)===0) ||
       (meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)
     ));
     const unchanged=Boolean(capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
@@ -386,6 +389,7 @@ async function startRun(db,env,leagueId){
     const prior=committed.get(String(capture.route_path));
     const optionalEmpty=Boolean(!capture.captureUsable && (
       meta.stage==='pre' ||
+      (meta.stage==='reg' && Number(meta.week)===0) ||
       (meta.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)
     ));
     const unchanged=Boolean(capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
@@ -406,6 +410,7 @@ async function startRun(db,env,leagueId){
     if(row.captureUsable)return false;
     const meta=routeMeta(row.route_path);
     if(meta?.stage==='pre')return false;
+    if(meta?.stage==='reg' && Number(meta.week)===0)return false;
     if(meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)return false;
     return true;
   })){
