@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5b */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5c */
 import {
   json,
   database,
@@ -8,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5b';
+const RELEASE='5.9.10.6.5.4h-p5c';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -95,65 +95,52 @@ function latestByRoute(rows){
   return [...selected.values()];
 }
 async function rosterCaptureSet(db,leagueId){
-  const sessionResult=await db.prepare(`SELECT discovery_session_id session_id,
-      COUNT(DISTINCT route_path) route_count,
-      MAX(received_at) latest_received
-    FROM companion_route_captures
-    WHERE league_id=? AND route_path LIKE '%/team/%/roster'
-      AND discovery_session_id IS NOT NULL AND discovery_session_id<>''
-    GROUP BY discovery_session_id
-    HAVING COUNT(DISTINCT route_path)>=32
-    ORDER BY MAX(received_at) DESC
-    LIMIT 8`).bind(leagueId).all();
-
-  const sessions=(sessionResult.results||[]).map(row=>({
-    sessionId:String(row.session_id),
-    routeCount:Number(row.route_count||0),
-    latestReceived:row.latest_received
-  }));
-
-  if(sessions.length){
-    const chosen=sessions[0];
-    const result=await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
-        COALESCE(i.dataset_type,'unknown') dataset_type,COALESCE(i.record_count,0) record_count
-      FROM companion_route_captures c
-      LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id
-      WHERE c.league_id=? AND c.discovery_session_id=? AND c.route_path LIKE '%/team/%/roster'
-      ORDER BY c.received_at DESC`).bind(leagueId,chosen.sessionId).all();
-
-    const rows=latestByRoute((result.results||[]).filter(row=>ROSTER_ROUTE.test(String(row.route_path||''))));
-    rows.sort((a,b)=>String(a.route_path).localeCompare(String(b.route_path)));
-
-    if(rows.length>=32){
-      return{
-        captures:rows,
-        sessionId:chosen.sessionId,
-        availableRoutes:rows.map(r=>r.route_path),
-        sessionDiagnostics:sessions,
-        strategy:'latest-complete-session'
-      };
-    }
-  }
-
-  // Compatibility fallback for receiver versions that split requests across session IDs.
-  // Bound the scan to recent captures instead of reading the entire league history.
-  const fallback=await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
+  // Madden Companion roster requests are not guaranteed to share one discoverySessionId.
+  // Current roster authority is therefore the freshest capture for each team within
+  // one bounded export-time cohort, not one arbitrary session ID.
+  const result=await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
       COALESCE(i.dataset_type,'unknown') dataset_type,COALESCE(i.record_count,0) record_count
     FROM companion_route_captures c
     LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id
     WHERE c.league_id=? AND c.route_path LIKE '%/team/%/roster'
-    ORDER BY c.received_at DESC LIMIT 256`).bind(leagueId).all();
+    ORDER BY c.received_at DESC LIMIT 512`).bind(leagueId).all();
 
-  const all=(fallback.results||[]).filter(row=>ROSTER_ROUTE.test(String(row.route_path||'')));
-  const combined=latestByRoute(all);
-  combined.sort((a,b)=>String(a.route_path).localeCompare(String(b.route_path)));
+  const all=(result.results||[]).filter(row=>ROSTER_ROUTE.test(String(row.route_path||'')));
+  if(!all.length)return{
+    captures:[],sessionId:null,availableRoutes:[],sessionDiagnostics:[],
+    strategy:'fresh-route-cohort',cohort:null
+  };
+
+  const latestMs=Math.max(...all.map(row=>Date.parse(row.received_at)||0));
+  const cohortWindowMs=20*60*1000;
+  const cutoffMs=latestMs-cohortWindowMs;
+  const recent=all.filter(row=>{
+    const ms=Date.parse(row.received_at)||0;
+    return ms>=cutoffMs&&ms<=latestMs;
+  });
+
+  const captures=latestByRoute(recent);
+  captures.sort((a,b)=>String(a.route_path).localeCompare(String(b.route_path)));
+
+  const captureTimes=captures.map(row=>Date.parse(row.received_at)||0).filter(Boolean);
+  const minMs=captureTimes.length?Math.min(...captureTimes):null;
+  const maxMs=captureTimes.length?Math.max(...captureTimes):null;
+  const spreadMs=minMs!=null&&maxMs!=null?maxMs-minMs:null;
 
   return{
-    captures:combined,
-    sessionId:'aggregated-latest-rosters',
-    availableRoutes:combined.map(r=>r.route_path),
-    sessionDiagnostics:sessions,
-    strategy:'bounded-aggregated-fallback'
+    captures,
+    sessionId:`aggregate-${latestMs}`,
+    availableRoutes:captures.map(r=>r.route_path),
+    sessionDiagnostics:[...new Set(captures.map(r=>String(r.discovery_session_id||'')).filter(Boolean))],
+    strategy:'fresh-route-cohort',
+    cohort:{
+      latestReceivedAt:new Date(latestMs).toISOString(),
+      earliestSelectedAt:minMs?new Date(minMs).toISOString():null,
+      routeCount:captures.length,
+      discoverySessionCount:new Set(captures.map(r=>String(r.discovery_session_id||'')).filter(Boolean)).size,
+      spreadMs,
+      windowMs:cohortWindowMs
+    }
   };
 }
 
@@ -244,6 +231,16 @@ export async function onRequestPost(context){
   try{
     const source=await rosterCaptureSet(db,league.id);
     if(!source.captures.length)return json({ok:false,error:'No team roster payloads have been captured yet.',detail:'Run the Madden Companion export with Rosters selected, then classify the latest export.',availableRoutes:source.availableRoutes},404);
+    if(source.captures.length<32){
+      return json({
+        ok:false,
+        error:`Newest roster export is incomplete (${source.captures.length}/32 team rosters).`,
+        detail:'Franchise HQ refused to reuse older team rosters. Run one fresh Companion roster export and retry.',
+        rosterSelectionStrategy:source.strategy,
+        cohort:source.cohort,
+        availableRoutes:source.availableRoutes
+      },409);
+    }
     const validTeams=await teamIds(db,league.id);if(!validTeams.size)return json({ok:false,error:'Map the canonical Teams preview before mapping players.'},409);
 
     const warnings=[],diagnostics=[],players=[],seen=new Set();let rostered=0,freeAgents=0;
