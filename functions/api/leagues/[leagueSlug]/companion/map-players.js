@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5 */
 import {
   json,
   database,
@@ -8,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p3d';
+const RELEASE='5.9.10.6.5.4h-p5';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -93,35 +93,66 @@ function latestByRoute(rows){
   return [...selected.values()];
 }
 async function rosterCaptureSet(db,leagueId){
-  const result=await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
+  const sessionResult=await db.prepare(`SELECT discovery_session_id session_id,
+      COUNT(DISTINCT route_path) route_count,
+      MAX(received_at) latest_received
+    FROM companion_route_captures
+    WHERE league_id=? AND route_path LIKE '%/team/%/roster'
+      AND discovery_session_id IS NOT NULL AND discovery_session_id<>''
+    GROUP BY discovery_session_id
+    HAVING COUNT(DISTINCT route_path)>=32
+    ORDER BY MAX(received_at) DESC
+    LIMIT 8`).bind(leagueId).all();
+
+  const sessions=(sessionResult.results||[]).map(row=>({
+    sessionId:String(row.session_id),
+    routeCount:Number(row.route_count||0),
+    latestReceived:row.latest_received
+  }));
+
+  if(sessions.length){
+    const chosen=sessions[0];
+    const result=await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
+        COALESCE(i.dataset_type,'unknown') dataset_type,COALESCE(i.record_count,0) record_count
+      FROM companion_route_captures c
+      LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id
+      WHERE c.league_id=? AND c.discovery_session_id=? AND c.route_path LIKE '%/team/%/roster'
+      ORDER BY c.received_at DESC`).bind(leagueId,chosen.sessionId).all();
+
+    const rows=latestByRoute((result.results||[]).filter(row=>ROSTER_ROUTE.test(String(row.route_path||''))));
+    rows.sort((a,b)=>String(a.route_path).localeCompare(String(b.route_path)));
+
+    if(rows.length>=32){
+      return{
+        captures:rows,
+        sessionId:chosen.sessionId,
+        availableRoutes:rows.map(r=>r.route_path),
+        sessionDiagnostics:sessions,
+        strategy:'latest-complete-session'
+      };
+    }
+  }
+
+  // Compatibility fallback for receiver versions that split requests across session IDs.
+  // Bound the scan to recent captures instead of reading the entire league history.
+  const fallback=await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
       COALESCE(i.dataset_type,'unknown') dataset_type,COALESCE(i.record_count,0) record_count
     FROM companion_route_captures c
     LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id
     WHERE c.league_id=? AND c.route_path LIKE '%/team/%/roster'
-    ORDER BY c.received_at DESC`).bind(leagueId).all();
-  const all=(result.results||[]).filter(row=>ROSTER_ROUTE.test(String(row.route_path||'')));
-  if(!all.length)return {captures:[],availableRoutes:[]};
+    ORDER BY c.received_at DESC LIMIT 256`).bind(leagueId).all();
 
-  const groups=new Map();
-  for(const row of all){
-    const key=row.discovery_session_id||'unscoped';
-    if(!groups.has(key))groups.set(key,[]);
-    groups.get(key).push(row);
-  }
-  const ranked=[...groups.entries()].map(([sessionId,rows])=>{
-    const unique=latestByRoute(rows);
-    return {sessionId,rows:unique,routeCount:unique.length,latestReceived:unique.reduce((m,r)=>String(r.received_at)>m?String(r.received_at):m,'')};
-  }).sort((a,b)=>b.routeCount-a.routeCount||String(b.latestReceived).localeCompare(String(a.latestReceived)));
+  const all=(fallback.results||[]).filter(row=>ROSTER_ROUTE.test(String(row.route_path||'')));
+  const combined=latestByRoute(all);
+  combined.sort((a,b)=>String(a.route_path).localeCompare(String(b.route_path)));
 
-  let chosen=ranked[0];
-  // Some receiver versions may assign a separate session ID per request. In that case,
-  // use the latest capture for each unique team-roster route across all sessions.
-  if(chosen.routeCount<Math.min(8,new Set(all.map(r=>r.route_path)).size)){
-    const combined=latestByRoute(all);
-    chosen={sessionId:'aggregated-latest-rosters',rows:combined,routeCount:combined.length,latestReceived:combined.reduce((m,r)=>String(r.received_at)>m?String(r.received_at):m,'')};
-  }
-  chosen.rows.sort((a,b)=>String(a.route_path).localeCompare(String(b.route_path)));
-  return {captures:chosen.rows,sessionId:chosen.sessionId,availableRoutes:all.map(r=>r.route_path),sessionDiagnostics:ranked.map(g=>({discoverySessionId:g.sessionId,rosterRouteCount:g.routeCount,latestReceived:g.latestReceived}))};
+  return{
+    captures:combined,
+    sessionId:'aggregated-latest-rosters',
+    availableRoutes:combined.map(r=>r.route_path),
+    sessionDiagnostics:sessions,
+    strategy:'bounded-aggregated-fallback'
+  };
 }
 
 async function latestUsableFreeAgentCapture(db,env,leagueId){
@@ -313,7 +344,8 @@ export async function onRequestPost(context){
         attempts:freeAgentSource.attempts||[]
       },
       rosterDiagnostics:diagnostics,
-      sessionDiagnostics:source.sessionDiagnostics
+      sessionDiagnostics:source.sessionDiagnostics,
+      rosterSelectionStrategy:source.strategy||'unknown'
     }));
   }catch(error){return json({ok:false,error:'Player roster aggregation failed.',detail:error?.message||String(error),release:RELEASE},500);}
 }
