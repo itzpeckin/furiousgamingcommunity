@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5 */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5a */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5';
+const RELEASE='5.9.10.6.5.4h-p5a';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -609,10 +609,27 @@ export async function onRequestGet(context){
     WHERE league_id=? ORDER BY COALESCE(occurred_at,created_at) DESC,created_at DESC LIMIT 250`)
     .bind(state.league.id).all();
 
-  const transactions=[];
-  for(const row of txResult.results||[]){
-    transactions.push(publicTransaction(row,await evidenceForTransaction(state.db,row.id)));
+  const transactionRows=txResult.results||[];
+  const evidenceByTransaction=new Map();
+  const ids=transactionRows.map(row=>String(row.id)).filter(Boolean);
+
+  for(let i=0;i<ids.length;i+=75){
+    const batch=ids.slice(i,i+75);
+    if(!batch.length)continue;
+    const marks=batch.map(()=>'?').join(',');
+    const evidenceResult=await state.db.prepare(`SELECT * FROM canonical_transaction_evidence
+      WHERE transaction_id IN (${marks})
+      ORDER BY transaction_id,created_at`).bind(...batch).all();
+    for(const item of evidenceResult.results||[]){
+      const key=String(item.transaction_id);
+      if(!evidenceByTransaction.has(key))evidenceByTransaction.set(key,[]);
+      evidenceByTransaction.get(key).push(item);
+    }
   }
+
+  const transactions=transactionRows.map(row=>
+    publicTransaction(row,evidenceByTransaction.get(String(row.id))||[])
+  );
 
   const snapshots=await state.db.prepare(`SELECT * FROM canonical_roster_snapshots
     WHERE league_id=? ORDER BY captured_at DESC LIMIT 20`).bind(state.league.id).all();
