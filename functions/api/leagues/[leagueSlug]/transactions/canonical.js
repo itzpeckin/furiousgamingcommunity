@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3a | lifecycle-throughput */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3c */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p3a';
+const RELEASE='5.9.10.6.5.4h-p3c';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
