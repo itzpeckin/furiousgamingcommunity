@@ -2,16 +2,14 @@ import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 
-const RELEASE='5.9.10.6.5.4b';
+const RELEASE='5.9.10.6.5.4h-p2';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
 });
 const text=v=>String(v??'').trim();
 
-function ownerId(request){
-  return text(request.headers.get('x-franchisehq-platform-owner-account-id'));
-}
+const platformOwnerId=env=>text(env?.PLATFORM_OWNER_ACCOUNT_ID||'owner-tb');
 function worker(context){
   return context.env?.FRANCHISE_IMPORT_WORKER || null;
 }
@@ -59,6 +57,44 @@ async function authorizedState(context){
   return{leagueSlug,auth,db,league};
 }
 
+function parseJson(value,fallback={}){
+  try{return JSON.parse(value||'')}catch{return fallback}
+}
+
+async function latestCaptureSession(db,leagueId){
+  return db.prepare(`SELECT discovery_session_id session_id,MAX(received_at) received_at
+    FROM companion_route_captures
+    WHERE league_id=? AND discovery_session_id IS NOT NULL AND discovery_session_id<>''
+    GROUP BY discovery_session_id
+    ORDER BY MAX(received_at) DESC LIMIT 1`).bind(leagueId).first();
+}
+
+async function currentActiveSnapshot(db,leagueId){
+  return db.prepare(`SELECT s.id,s.activated_at,s.season_year,s.week_index
+    FROM league_active_snapshots a
+    JOIN league_snapshots s ON s.id=a.snapshot_id
+    WHERE a.league_id=? LIMIT 1`).bind(leagueId).first();
+}
+
+async function latestImportRun(db,leagueId){
+  const row=await db.prepare(`SELECT * FROM companion_import_orchestrator_runs
+    WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first().catch(()=>null);
+  if(!row)return null;
+  return{
+    id:row.id,
+    status:row.status,
+    currentStage:row.current_stage,
+    stageIndex:Number(row.stage_index||0),
+    stageState:parseJson(row.stage_state_json,{}),
+    statisticsMappingRunId:row.statistics_mapping_run_id||null,
+    snapshotId:row.snapshot_id||null,
+    error:parseJson(row.error_json,null),
+    createdAt:row.created_at,
+    updatedAt:row.updated_at,
+    completedAt:row.completed_at||null
+  };
+}
+
 export async function onRequestPost(context){
   const state=await authorizedState(context);
   if(state.response)return state.response;
@@ -66,18 +102,39 @@ export async function onRequestPost(context){
   const binding=worker(context);
   if(!binding)return json({ok:false,release:RELEASE,error:'FRANCHISE_IMPORT_WORKER service binding is not configured.'},503);
 
-  const accountId=ownerId(context.request);
-  if(!accountId)return json({ok:false,release:RELEASE,error:'Commissioner account is required.'},401);
+  const latest=await latestCaptureSession(state.db,state.league.id);
+  if(!latest?.session_id){
+    return json({ok:false,release:RELEASE,error:'No Madden Companion export is available.'},400);
+  }
+
+  const active=await currentActiveSnapshot(state.db,state.league.id);
+  const latestMs=Date.parse(String(latest.received_at||''));
+  const activeMs=Date.parse(String(active?.activated_at||''));
+
+  // Fastest path: no new Companion capture exists after the LIVE snapshot.
+  if(active?.id&&Number.isFinite(latestMs)&&Number.isFinite(activeMs)&&latestMs<=activeMs){
+    return json({
+      ok:true,
+      release:RELEASE,
+      completed:true,
+      noNewExport:true,
+      snapshotId:active.id,
+      workflowKey:String(latest.session_id),
+      durationMs:0
+    });
+  }
 
   const delegation=await createDelegation(state.db,state.auth.session,state.league.id);
+  const ownerAccountId=platformOwnerId(context.env);
 
   const response=await binding.fetch('https://franchise-import.internal/start',{
     method:'POST',
     headers:{'content-type':'application/json','accept':'application/json'},
     body:JSON.stringify({
       leagueSlug:state.leagueSlug,
-      ownerAccountId:accountId,
+      ownerAccountId,
       origin:origin(context.request),
+      workflowKey:String(latest.session_id),
       importAuthToken:delegation.token,
       importAuthExpiresAt:delegation.expiresAt
     })
@@ -92,19 +149,28 @@ export async function onRequestGet(context){
   const binding=worker(context);
   if(!binding)return json({ok:false,release:RELEASE,error:'FRANCHISE_IMPORT_WORKER service binding is not configured.'},503);
 
-  const accountId=ownerId(context.request);
-  if(!accountId)return json({ok:false,release:RELEASE,error:'Commissioner account is required.'},401);
-
   const requestUrl=new URL(context.request.url);
   const id=text(requestUrl.searchParams.get('id'));
 
-  const u=new URL('https://franchise-import.internal/status');
-  u.searchParams.set('leagueSlug',state.leagueSlug);
-  u.searchParams.set('ownerAccountId',accountId);
-  u.searchParams.set('origin',origin(context.request));
-  if(id)u.searchParams.set('id',id);
+  let workerStatus={ok:true,id,workflowStatus:null,workflowState:'unknown',workflowOutput:null};
+  if(id){
+    const u=new URL('https://franchise-import.internal/status');
+    u.searchParams.set('id',id);
+    const response=await binding.fetch(u.toString(),{headers:{accept:'application/json'}});
+    workerStatus=await response.json().catch(()=>workerStatus);
+  }
 
-  const response=await binding.fetch(u.toString(),{headers:{accept:'application/json'}});
-  return new Response(response.body,{status:response.status,headers:response.headers});
+  // Read persisted progress locally from D1. This avoids the old
+  // Pages -> Worker -> Pages status round trip.
+  const run=await latestImportRun(state.db,state.league.id);
+
+  return json({
+    ok:true,
+    release:RELEASE,
+    id,
+    workflowStatus:workerStatus?.workflowStatus||null,
+    workflowState:workerStatus?.workflowState||'unknown',
+    workflowOutput:workerStatus?.workflowOutput||null,
+    orchestrator:{run}
+  });
 }
-
