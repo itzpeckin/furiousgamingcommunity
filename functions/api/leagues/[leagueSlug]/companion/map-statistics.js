@@ -1,7 +1,8 @@
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3c */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p3b';
+const RELEASE='5.9.10.6.5.4h-p3c';
 const RECORD_CHUNK_SIZE=40;
 const MAX_STORED_WARNINGS_PER_BATCH=25;
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
