@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.4h-r1';
+  const VERSION = '5.9.10.6.5.4h-p2';
   const STAGES = [
     ['discover','Discover Latest Companion Captures'],
     ['storage-preflight','Prepare Import Storage'],
@@ -34,6 +34,26 @@
   let lastCertification = null;
   let deltaPlan = null;
   let notificationDismissTimer = null;
+  let serverDurationSeconds = null;
+
+  const IMPORT_PROGRESS_STYLE_ID='fhq-import-progress-style-v654hp2';
+  if(!document.getElementById(IMPORT_PROGRESS_STYLE_ID)){
+    const style=document.createElement('style');
+    style.id=IMPORT_PROGRESS_STYLE_ID;
+    style.textContent=`
+      .commissioner-import-progress-block{margin:18px 0;padding:16px;border:1px solid var(--border,#d9dee7);border-radius:12px}
+      .commissioner-import-progress-head,.commissioner-import-progress-foot{display:flex;justify-content:space-between;gap:16px;align-items:center}
+      .commissioner-import-progress-head span{font-weight:800;font-size:16px}
+      .commissioner-import-progress-track{height:14px;border-radius:999px;overflow:hidden;background:rgba(127,127,127,.18);margin:10px 0}
+      .commissioner-import-progress-track>span{display:block;height:100%;width:0;background:currentColor;border-radius:inherit;transition:width .3s ease}
+      .commissioner-import-progress-foot{font-size:12px;opacity:.78}
+      .franchise-import-notification__copy{display:grid;gap:4px;min-width:220px}
+      .franchise-import-progress-mini{height:5px;border-radius:999px;overflow:hidden;background:rgba(127,127,127,.2)}
+      .franchise-import-progress-mini i{display:block;height:100%;background:currentColor;border-radius:inherit;transition:width .3s ease}
+      .franchise-import-notification__copy em{font-style:normal;font-size:11px;font-weight:800;opacity:.72}
+    `;
+    document.head.appendChild(style);
+  }
 
   const nowMs = () => (window.performance?.now?.() ?? Date.now());
   const isoNow = () => new Date().toISOString();
@@ -120,12 +140,46 @@
     if(!serverRun)return;
     run=serverRun;
     const states=serverRun.stageState||serverRun.stage_state||serverRun.stages||{};
+    const current=serverRun.currentStage||serverRun.current_stage||null;
+
+    // The orchestrator begins after discovery and storage preflight.
+    stageState.discover={state:'complete',detail:'Latest Companion export discovered',at:serverRun.createdAt||new Date().toISOString()};
+    stageState['storage-preflight']={state:'complete',detail:'Import storage prepared',at:serverRun.createdAt||new Date().toISOString()};
+
     for(const [id] of STAGES){
       const row=states?.[id];
       if(row){
-        stageState[id]={state:row.ok===false?'failed':'complete',detail:row.summary||'',at:row.at||new Date().toISOString()};
-      }else if(serverRun.currentStage===id||serverRun.current_stage===id){
+        stageState[id]={state:row.ok===false?'failed':'complete',detail:row.summary||'Complete',at:row.at||new Date().toISOString()};
+      }else if(current===id){
         stageState[id]={state:'running',detail:'Running on Franchise HQ servers…',at:new Date().toISOString()};
+      }
+    }
+
+    // Lifecycle is auxiliary work immediately before map-players.
+    if(states?.['map-players']){
+      stageState['reconstruct-player-lifecycle']={
+        state:'complete',
+        detail:'Player lifecycle synchronized',
+        at:states['map-players'].at||new Date().toISOString()
+      };
+    }else if(current==='map-players'){
+      stageState['reconstruct-player-lifecycle']={
+        state:'running',
+        detail:'Synchronizing roster lifecycle and Free Agents…',
+        at:new Date().toISOString()
+      };
+    }
+
+    if(['complete','completed'].includes(String(serverRun.status||'').toLowerCase())){
+      stageState['publish-transactions']={
+        state:'complete',
+        detail:'Transactions and Free Agents published',
+        at:serverRun.completedAt||serverRun.updatedAt||new Date().toISOString()
+      };
+      const startMs=Date.parse(serverRun.createdAt||'');
+      const endMs=Date.parse(serverRun.completedAt||serverRun.updatedAt||'');
+      if(Number.isFinite(startMs)&&Number.isFinite(endMs)){
+        serverDurationSeconds=Number(((endMs-startMs)/1000).toFixed(2));
       }
     }
   }
@@ -156,6 +210,14 @@
         busy=false;
 
         if(successfulWorkflow||orchestratorDone){
+          if(Number.isFinite(Number(output?.durationMs))){
+            serverDurationSeconds=Number((Number(output.durationMs)/1000).toFixed(2));
+          }
+          STAGES.forEach(([stage])=>{
+            if(stageState[stage]?.state!=='failed'){
+              stageState[stage]={...(stageState[stage]||{}),state:'complete',detail:stageState[stage]?.detail||'Complete'};
+            }
+          });
           progress=output?.noNewExport
             ? 'No new Madden Companion export detected · nothing to import'
             : 'Import complete · server-side job finished successfully';
@@ -172,9 +234,13 @@
         return status;
       }
       const current=serverRun?.currentStage||serverRun?.current_stage;
-      progress=current?`Import running on server · ${stageLabel(current)}`:'Import running on Franchise HQ servers…';
+      const completed=completedStageCount();
+      const pct=progressPercent();
+      progress=current
+        ? `${stageLabel(current)} · ${completed}/${STAGES.length} tasks · ${pct}%`
+        : `Import running on Franchise HQ servers · ${pct}%`;
       rerender(); renderImportNotification();
-      await new Promise(resolve=>setTimeout(resolve,1500));
+      await new Promise(resolve=>setTimeout(resolve,500));
       guard++;
     }
     throw new Error('Import status monitoring exceeded the local display window. The server-side import may still be running.');
@@ -184,7 +250,13 @@
     const id=localStorage.getItem(JOB_KEY());
     if(!id||busy)return;
     try{await monitorServerJob(id,{silent:true});}
-    catch(error){console.warn('[Server Import Monitor]',error);}
+    catch(error){
+      if(/Authentication required|Commissioner account is required/i.test(String(error?.message||''))){
+        setTimeout(reconnectServerJob,1000);
+        return;
+      }
+      console.warn('[Server Import Monitor]',error);
+    }
   }
 
   function setStage(id, state, detail='') {
@@ -212,6 +284,15 @@
 
   function activeStage() {
     return STAGES.find(([id])=>stageState[id]?.state==='running')?.[0] || null;
+  }
+
+  function completedStageCount(){
+    return STAGES.filter(([id])=>stageState[id]?.state==='complete').length;
+  }
+
+  function progressPercent(){
+    if(!busy&&importCompletedAt&&!lastError)return 100;
+    return Math.max(0,Math.min(100,Math.round((completedStageCount()/STAGES.length)*100)));
   }
 
   function ensureImportNotification() {
@@ -242,11 +323,12 @@
       state='error';
     }else if(!busy&&importCompletedAt){
       title='Franchise Updated';
-      detail=`Import complete · ${timingSummary().wallClockDurationSeconds}s`;
+      detail=`Import complete · ${serverDurationSeconds!=null?serverDurationSeconds:timingSummary().wallClockDurationSeconds}s`;
       state='success';
     }
+    const pct=state==='success'?100:progressPercent();
     node.className=`franchise-import-notification is-visible is-${state}`;
-    node.innerHTML=`<span class="franchise-import-notification__indicator" aria-hidden="true"></span><span><strong>${esc(title)}</strong><small>${esc(detail)}</small></span>${state!=='running'?'<button type="button" class="franchise-import-notification__close" aria-label="Dismiss import notification">×</button>':''}`;
+    node.innerHTML=`<span class="franchise-import-notification__indicator" aria-hidden="true"></span><span class="franchise-import-notification__copy"><strong>${esc(title)}</strong><small>${esc(detail)}</small><span class="franchise-import-progress-mini"><i style="width:${pct}%"></i></span><em>${pct}%</em></span>${state!=='running'?'<button type="button" class="franchise-import-notification__close" aria-label="Dismiss import notification">×</button>':''}`;
 
     node.querySelector('.franchise-import-notification__close')?.addEventListener('click',()=>{
       if(notificationDismissTimer)clearTimeout(notificationDismissTimer);
@@ -569,12 +651,22 @@
 
   async function runImport() {
     if(busy)return;
-    busy=true; lastError=null; progress='Starting server-side import…'; snapshotId=null; stageState={}; lastCertification=null; deltaPlan=null;
+    busy=true; lastError=null; progress='Starting server-side import…'; snapshotId=null; stageState={}; lastCertification=null; deltaPlan=null; serverDurationSeconds=null;
     stageTimings={}; currentStageStartedAt={};
     importStartedAt={ms:nowMs(),at:isoNow()}; importCompletedAt=null;
     rerender(); renderImportNotification();
     try{
       const started=await importJob('POST',{});
+      if(started?.completed&&started?.noNewExport){
+        snapshotId=started.snapshotId||null;
+        serverDurationSeconds=0;
+        STAGES.forEach(([stage])=>stageState[stage]={state:'complete',detail:'No new Companion export · current LIVE snapshot reused'});
+        busy=false;
+        progress='No new Madden Companion export detected · nothing to import';
+        importCompletedAt={ms:nowMs(),at:isoNow()};
+        rerender();renderImportNotification();
+        return;
+      }
       const id=started?.id;
       if(!id)throw new Error('Server-side importer did not return a Workflow ID.');
       localStorage.setItem(JOB_KEY(),id);
@@ -596,25 +688,44 @@
 
 
   function renderPanel() {
-    const completed=STAGES.filter(([id])=>stageState[id]?.state==='complete').length;
+    const completed=completedStageCount();
     const current=activeStage();
+    const pct=progressPercent();
     const status=lastError?'Stopped':busy?(current?stageLabel(current):'Importing…'):importCompletedAt?'Complete':'Ready';
-    const lastSeconds=importCompletedAt?timingSummary().wallClockDurationSeconds:null;
+    const lastSeconds=importCompletedAt?(serverDurationSeconds!=null?serverDurationSeconds:timingSummary().wallClockDurationSeconds):null;
+
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
       <div class="card-header">
         <div><span class="eyebrow">Madden Companion</span><h2>Import Franchise</h2><p>Import the latest Madden Companion data into Franchise HQ. Your current LIVE league remains active until the new import passes validation.</p></div>
         <span class="pill pill--${lastError?'danger':busy?'warning':importCompletedAt?'success':'accent'}">${esc(status)}</span>
       </div>
+
+      <div class="commissioner-import-progress-block">
+        <div class="commissioner-import-progress-head">
+          <strong>${lastError?'Import stopped':busy?(current?stageLabel(current):'Starting import…'):importCompletedAt?'Franchise updated':'Ready to import'}</strong>
+          <span>${pct}%</span>
+        </div>
+        <div class="commissioner-import-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+          <span style="width:${pct}%"></span>
+        </div>
+        <div class="commissioner-import-progress-foot">
+          <small>${completed} of ${STAGES.length} tasks complete</small>
+          ${busy?`<small>${esc(progress||'Working on Franchise HQ servers…')}</small>`:''}
+        </div>
+      </div>
+
       <div class="commissioner-live-import-summary">
         <span><small>Release</small><strong>${esc(VERSION)}</strong></span>
         <span><small>Status</small><strong>${busy?`${completed}/${STAGES.length} complete`:status}</strong></span>
         ${lastSeconds!=null?`<span><small>Last Run</small><strong>${esc(lastSeconds)}s</strong></span>`:''}
       </div>
+
       <div class="commissioner-import-actions">
         <button class="button button--primary" data-run-one-click-import ${busy?'disabled':''}><svg><use href="#icon-refresh"></use></svg>${busy?'Import Running…':'Import Latest Madden Data'}</button>
       </div>
+
       ${lastError?`<div class="validation-errors"><p><strong>${esc(lastError.message)}</strong></p>${lastError.payload?`<pre style="white-space:pre-wrap;max-height:220px;overflow:auto">${esc(JSON.stringify(lastError.payload,null,2))}</pre>`:''}</div>`:''}
-      <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>Franchise HQ will show a small notification with the current import task. No stage-by-stage interaction is required.</span></div>
+      <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>The import runs on Franchise HQ servers. You may lock your phone or leave this page after the server accepts the job.</span></div>
     </section>`;
   }
 
