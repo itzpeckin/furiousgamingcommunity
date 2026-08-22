@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.1b';
+const RELEASE='5.9.10.6.5.4h-p3';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -148,25 +148,6 @@ async function requestState(context){
 
 function publicTransaction(row,evidence=[]){
   if(!row)return null;
-  const moves=evidence.flatMap(item=>{
-    const parsed=parse(item.evidence_json,{})||{};
-    return Array.isArray(parsed.moves)?parsed.moves:[];
-  });
-  const participants=[];
-  const seen=new Set();
-  for(const move of moves){
-    const id=clean(move.playerId);
-    if(!id||seen.has(id))continue;
-    seen.add(id);
-    participants.push({
-      id,
-      name:clean(move.playerName)||`Player ${id}`,
-      fromTeamId:clean(move.fromTeamId),
-      toTeamId:clean(move.toTeamId),
-      oldStatus:clean(move.oldStatus),
-      newStatus:clean(move.newStatus)
-    });
-  }
   return{
     id:row.id,
     eventType:row.event_type,
@@ -183,7 +164,6 @@ function publicTransaction(row,evidence=[]){
     lastSnapshotId:row.last_snapshot_id||null,
     confidence:row.confidence,
     details:parse(row.details_json,{})||{},
-    participants,
     evidence:evidence.map(item=>({
       sourceType:item.source_type,
       sourceKey:item.source_key,
@@ -325,12 +305,6 @@ async function refreshCanonicalRow(db,transactionId){
 async function mergeEvidence(db,leagueId,event,snapshotId=null){
   const existingEvidence=await evidenceBySource(db,leagueId,event.sourceType,event.sourceKey);
   if(existingEvidence){
-    await db.prepare(`UPDATE canonical_transactions
-      SET season=COALESCE(season,?),week=COALESCE(week,?),
-          occurred_at=COALESCE(occurred_at,?),last_snapshot_id=COALESCE(?,last_snapshot_id),
-          updated_at=CURRENT_TIMESTAMP
-      WHERE id=?`)
-      .bind(event.season,event.week,event.occurredAt,snapshotId,existingEvidence.transaction_id).run();
     const row=await refreshCanonicalRow(db,existingEvidence.transaction_id);
     return{transactionId:existingEvidence.transaction_id,created:false,deduped:true,row};
   }
@@ -631,30 +605,23 @@ export async function onRequestGet(context){
   if(state.response)return state.response;
 
   const txResult=await state.db.prepare(`SELECT * FROM canonical_transactions
-    WHERE league_id=? ORDER BY COALESCE(season,0) DESC,COALESCE(week,0) DESC,COALESCE(occurred_at,created_at) DESC,created_at DESC LIMIT 250`)
+    WHERE league_id=? ORDER BY COALESCE(occurred_at,created_at) DESC,created_at DESC LIMIT 250`)
     .bind(state.league.id).all();
-  const rows=txResult.results||[];
 
-  // 6.4.8: one evidence query for the whole ledger instead of one query per transaction.
-  // This removes the N+1 D1 read pattern that made Transactions / Player Cards / Team History slow.
-  const evidenceResult=rows.length
-    ? await state.db.prepare(`SELECT * FROM canonical_transaction_evidence
-        WHERE league_id=? ORDER BY transaction_id,created_at`).bind(state.league.id).all()
-    : {results:[]};
-  const evidenceByTransaction=new Map();
-  for(const item of evidenceResult.results||[]){
-    const key=String(item.transaction_id);
-    if(!evidenceByTransaction.has(key))evidenceByTransaction.set(key,[]);
-    evidenceByTransaction.get(key).push(item);
+  const transactions=[];
+  for(const row of txResult.results||[]){
+    transactions.push(publicTransaction(row,await evidenceForTransaction(state.db,row.id)));
   }
 
-  const transactions=rows.map(row=>publicTransaction(row,evidenceByTransaction.get(String(row.id))||[]));
+  const snapshots=await state.db.prepare(`SELECT * FROM canonical_roster_snapshots
+    WHERE league_id=? ORDER BY captured_at DESC LIMIT 20`).bind(state.league.id).all();
 
   return json({
     ok:true,
     release:RELEASE,
     invariant:'one real-world trade = one canonical transaction',
-    transactions
+    transactions,
+    rosterSnapshots:snapshots.results||[]
   });
 }
 
@@ -1727,10 +1694,18 @@ async function processCaptureLifecycleSession(context,state,sessionId){
     .bind(state.league.id,sessionId).run();
 
   const players=new Map();
-  for(const capture of captures){
-    const object=await context.env.COMPANION_EXPORTS?.get?.(capture.r2_object_key);
-    if(!object)continue;
-    let payload=null;try{payload=JSON.parse(await object.text())}catch{continue}
+  const capturePayloads=await Promise.all(captures.map(async capture=>{
+    try{
+      const object=await context.env.COMPANION_EXPORTS?.get?.(capture.r2_object_key);
+      if(!object)return null;
+      const payload=JSON.parse(await object.text());
+      return {capture,payload};
+    }catch{return null}
+  }));
+
+  for(const item of capturePayloads){
+    if(!item)continue;
+    const {capture,payload}=item;
     const list=Array.isArray(payload?.rosterInfoList)?payload.rosterInfoList:[];
     const routeTeamId=String(capture.route_path||'').match(/\/team\/([^/]+)\/roster/i)?.[1]||null;
     for(const raw of list){
@@ -1762,129 +1737,33 @@ async function captureLifecycleRows(db,leagueId,sessionId){
   return result.results||[];
 }
 
-async function completedMaddenContextForCapture(db,leagueId,receivedAt){
-  let rows=[];
-  try{
-    rows=(await db.prepare(`SELECT * FROM league_snapshots WHERE league_id=? ORDER BY created_at ASC`).bind(leagueId).all()).results||[];
-  }catch{return{season:null,week:null}}
-  if(!rows.length)return{season:null,week:null};
-
-  const target=new Date(receivedAt||0).getTime();
-  let best=null,bestDistance=Infinity;
-  for(const row of rows){
-    const stamp=new Date(row.created_at??row.createdAt??row.activated_at??0).getTime();
-    if(!Number.isFinite(stamp))continue;
-    const distance=Math.abs(stamp-target);
-    if(distance<bestDistance){best=row;bestDistance=distance}
-  }
-  best=best||rows[rows.length-1];
-  const season=Number(best.season??best.season_year??best.current_season??best.year);
-  const currentWeek=Number(best.week??best.week_index??best.current_week??best.currentWeek);
-  return{
-    season:Number.isFinite(season)&&season>0?season:null,
-    // Roster capture after an advance represents transactions from the week just completed.
-    week:Number.isFinite(currentWeek)&&currentWeek>0?Math.max(1,currentWeek-1):null
-  };
-}
-
-function normalizedLifecycleStatus(value=''){
-  const v=String(value||'').trim().toLowerCase();
-  if(/practice/.test(v))return'practice-squad';
-  if(/^ir$|injured.?reserve/.test(v))return'ir';
-  if(/free.?agent|unassigned/.test(v))return'free-agent';
-  return v||'active';
-}
-
-function refinedStatusEvent(oldStatus,newStatus){
-  const oldS=normalizedLifecycleStatus(oldStatus),newS=normalizedLifecycleStatus(newStatus);
-  if(oldS==='practice-squad'&&newS!=='practice-squad')return'practice-squad-promotion';
-  if(oldS!=='practice-squad'&&newS==='practice-squad')return'practice-squad-demotion';
-  if(oldS!=='ir'&&newS==='ir')return'ir-placement';
-  if(oldS==='ir'&&newS!=='ir')return'ir-activation';
-  return'roster-status-change';
-}
-
-function lifecycleDiffEvents(previous=[],current=[],previousSession,currentSession,occurredAt=null,season=null,week=null){
+function lifecycleDiffEvents(previous=[],current=[],previousSession,currentSession,occurredAt=null){
   const oldMap=new Map(previous.map(row=>[String(row.player_id),row]));
   const newMap=new Map(current.map(row=>[String(row.player_id),row]));
   const events=[];
-
-  const makeEvent=(type,playerId,oldRow,newRow)=>{
+  const add=(type,playerId,oldRow,newRow)=>{
     const from=type==='signing'?'FA':clean(oldRow?.team_id);
     const to=type==='release'?'FA':clean(newRow?.team_id);
-    const oldStatus=normalizedLifecycleStatus(oldRow?.roster_status);
-    const newStatus=normalizedLifecycleStatus(newRow?.roster_status);
-    let refinedType=type;
-
-    if(type==='team-change'&&oldStatus==='practice-squad'){
-      refinedType='signed-off-practice-squad';
-    }else if(type==='roster-status-change'){
-      refinedType=refinedStatusEvent(oldStatus,newStatus);
-    }
-
-    return normalizeIncomingEvent({
-      sourceKey:`capture-lifecycle:${previousSession}:${currentSession}:${refinedType}:${playerId}`,
-      eventType:refinedType,playerIds:[playerId],playerId,
+    events.push(normalizeIncomingEvent({
+      sourceKey:`capture-lifecycle:${previousSession}:${currentSession}:${type}:${playerId}`,
+      eventType:type,playerIds:[playerId],playerId,
       teamIds:normalizedPair([from,to]),fromTeamId:from,toTeamId:to,
-      season,week,occurredAt,confidence:'capture-history',
-      previousSnapshotId:previousSession,currentSnapshotId:currentSession,
-      moves:[{
-        playerId,
-        playerName:clean(newRow?.player_name)||clean(oldRow?.player_name)||'Unknown Player',
-        fromTeamId:from,toTeamId:to,oldStatus,newStatus,eventType:refinedType
-      }]
-    },'snapshot-diff');
+      occurredAt,confidence:'capture-history',previousSnapshotId:previousSession,currentSnapshotId:currentSession,
+      moves:[{playerId,playerName:clean(newRow?.player_name)||clean(oldRow?.player_name)||'Unknown Player',
+        fromTeamId:from,toTeamId:to,oldStatus:clean(oldRow?.roster_status),newStatus:clean(newRow?.roster_status),eventType:type}]
+    },'snapshot-diff'));
   };
-
   for(const [playerId,oldRow] of oldMap){
     const next=newMap.get(playerId);
-    if(!next){events.push(makeEvent('release',playerId,oldRow,null));continue}
-    const from=clean(oldRow.team_id),to=clean(next.team_id);
-    const oldStatus=normalizedLifecycleStatus(oldRow.roster_status),newStatus=normalizedLifecycleStatus(next.roster_status);
-    if(from!==to)events.push(makeEvent('team-change',playerId,oldRow,next));
-    else if(oldStatus!==newStatus)events.push(makeEvent('roster-status-change',playerId,oldRow,next));
+    if(!next){add('release',playerId,oldRow,null);continue}
+    const from=clean(oldRow.team_id),to=clean(next.team_id),oldStatus=clean(oldRow.roster_status),newStatus=clean(next.roster_status);
+    if(from!==to)add('team-change',playerId,oldRow,next);
+    else if(oldStatus!==newStatus)add('roster-status-change',playerId,oldRow,next);
   }
   for(const [playerId,next] of newMap){
-    if(!oldMap.has(playerId))events.push(makeEvent('signing',playerId,null,next));
+    if(!oldMap.has(playerId))add('signing',playerId,null,next);
   }
-
-  // Reciprocal non-practice-squad Team A <-> Team B movement in one capture transition
-  // is treated as a single Madden-observed trade candidate.
-  const tradeCandidates=events.filter(e=>e.eventType==='team-change');
-  const tradeGroups=new Map();
-  for(const event of tradeCandidates){
-    const move=event.raw?.moves?.[0]||{};
-    const pair=normalizedPair([move.fromTeamId,move.toTeamId]).join('|');
-    if(!tradeGroups.has(pair))tradeGroups.set(pair,[]);
-    tradeGroups.get(pair).push(event);
-  }
-
-  const consumed=new Set();
-  const trades=[];
-  for(const [pair,group] of tradeGroups){
-    const directions=new Set(group.map(e=>{
-      const m=e.raw?.moves?.[0]||{};
-      return `${m.fromTeamId}->${m.toTeamId}`;
-    }));
-    const reciprocal=group.some(e=>{
-      const m=e.raw?.moves?.[0]||{};
-      return directions.has(`${m.toTeamId}->${m.fromTeamId}`);
-    });
-    if(!reciprocal)continue;
-
-    group.forEach(e=>consumed.add(e.sourceKey));
-    const moves=group.flatMap(e=>e.raw?.moves||[]);
-    trades.push(normalizeIncomingEvent({
-      sourceKey:`capture-lifecycle:${previousSession}:${currentSession}:trade:${pair}`,
-      eventType:'trade',
-      teamIds:normalizedPair(moves.flatMap(m=>[m.fromTeamId,m.toTeamId])),
-      playerIds:uniq(moves.map(m=>m.playerId)),
-      season,week,occurredAt,confidence:'capture-history-reciprocal',
-      previousSnapshotId:previousSession,currentSnapshotId:currentSession,moves
-    },'snapshot-diff'));
-  }
-
-  return [...events.filter(e=>!consumed.has(e.sourceKey)),...trades];
+  return events;
 }
 
 async function rebuildCaptureFreeAgents(db,leagueId,sessions){
@@ -1904,44 +1783,50 @@ async function rebuildCaptureFreeAgents(db,leagueId,sessions){
         WHERE newer.league_id=h.league_id AND newer.player_id=h.player_id AND ns.received_at>s.received_at)
     ORDER BY h.player_name`).bind(leagueId,latest.session_id).all()).results||[];
 
-  let inserted=0;
-  for(const row of absent){
+  const statements=absent.map(row=>{
     const raw=parse(row.raw_json,{})||{};
     const meta=rawPlayerMeta(raw,row);
-    await db.prepare(`INSERT INTO canonical_free_agents
+    return db.prepare(`INSERT INTO canonical_free_agents
       (league_id,player_id,player_name,position,overall,age,dev_trait,source_route,source_capture_id,raw_json,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
       ON CONFLICT(league_id,player_id) DO UPDATE SET player_name=excluded.player_name,position=excluded.position,
         overall=excluded.overall,age=excluded.age,dev_trait=excluded.dev_trait,source_route=excluded.source_route,
         source_capture_id=excluded.source_capture_id,raw_json=excluded.raw_json,updated_at=CURRENT_TIMESTAMP`)
       .bind(leagueId,row.player_id,row.player_name||meta.playerName,row.position||meta.position,meta.overall,meta.age,meta.devTrait,
-        'capture-lifecycle',row.snapshot_id,JSON.stringify({...raw,teamId:'FA',rosterStatus:'free-agent',status:'free-agent',isFreeAgent:true})).run();
-    inserted++;
-  }
+        'capture-lifecycle',row.snapshot_id,JSON.stringify({...raw,teamId:'FA',rosterStatus:'free-agent',status:'free-agent',isFreeAgent:true}));
+  });
+  for(let i=0;i<statements.length;i+=100)await db.batch(statements.slice(i,i+100));
+  const inserted=statements.length;
   return{currentFreeAgents:inserted,latestSessionId:latest.session_id};
 }
 
-async function finalizeCaptureLifecycle(db,leagueId){
+async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
   const sessions=(await db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
     WHERE league_id=? AND status='complete' ORDER BY received_at ASC,session_id ASC`).bind(leagueId).all()).results||[];
-  let eventCount=0,signings=0,releases=0,teamChanges=0,statusChanges=0;
+  const targets=new Set((Array.isArray(sessionIds)?sessionIds:[]).map(String).filter(Boolean));
+  let eventCount=0,signings=0,releases=0,teamChanges=0,statusChanges=0,comparisons=0;
   for(let i=1;i<sessions.length;i++){
+    if(targets.size&&!targets.has(String(sessions[i].session_id)))continue;
+    comparisons++;
     const previous=await captureLifecycleRows(db,leagueId,sessions[i-1].session_id);
     const current=await captureLifecycleRows(db,leagueId,sessions[i].session_id);
-    const context=await completedMaddenContextForCapture(db,leagueId,sessions[i].received_at);
-    const events=lifecycleDiffEvents(previous,current,sessions[i-1].session_id,sessions[i].session_id,sessions[i].received_at,context.season,context.week);
+    const events=lifecycleDiffEvents(previous,current,sessions[i-1].session_id,sessions[i].session_id,sessions[i].received_at);
     for(const event of events){
       await mergeEvidence(db,leagueId,event,sessions[i].session_id);
       eventCount++;
       if(event.eventType==='signing')signings++;
       else if(event.eventType==='release')releases++;
       else if(event.eventType==='team-change')teamChanges++;
-      else if(event.eventType==='signed-off-practice-squad')teamChanges++;
       else if(event.eventType==='roster-status-change')statusChanges++;
     }
   }
   const freeAgents=await rebuildCaptureFreeAgents(db,leagueId,sessions);
-  return{sessionsCompared:Math.max(0,sessions.length-1),eventCount,signings,releases,teamChanges,statusChanges,freeAgents};
+  return{
+    sessionsCompared:comparisons,
+    historicalSessionsAvailable:sessions.length,
+    incremental:targets.size>0,
+    eventCount,signings,releases,teamChanges,statusChanges,freeAgents
+  };
 }
 
 export async function onRequestPost(context){
@@ -2036,7 +1921,7 @@ export async function onRequestPost(context){
   }
 
   if(action==='capture-lifecycle-finalize'){
-    try{return json({ok:true,release:RELEASE,...(await finalizeCaptureLifecycle(state.db,state.league.id))})}
+    try{return json({ok:true,release:RELEASE,...(await finalizeCaptureLifecycle(state.db,state.league.id,body.sessionIds))})}
     catch(error){return json({ok:false,release:RELEASE,error:'Capture lifecycle finalization failed.',detail:error?.message||String(error)},500)}
   }
 
