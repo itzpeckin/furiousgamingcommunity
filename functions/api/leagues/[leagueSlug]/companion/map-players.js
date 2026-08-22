@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5 */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5a */
 import {
   json,
   database,
@@ -8,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5';
+const RELEASE='5.9.10.6.5.4h-p5a';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -25,7 +25,9 @@ const A = Object.freeze({
   age: ['age','playerAge'], yearsPro: ['yearsPro','experience','exp','yearsExperience'],
   jersey: ['jerseyNumber','jersey','number'], height: ['height','heightInches','height_inches'],
   weight: ['weight','weightLbs','weight_lbs'], college: ['college','collegeName','school'],
-  injury: ['injuryStatus','injury','status'], injured: ['isInjured','injured'],
+  injury: ['injuryStatus','injury'], injured: ['isInjured','injured'],
+  rosterStatus: ['rosterStatus','roster_status','playerStatus','player_status','status','transactionStatus'],
+  retired: ['isRetired','retired','hasRetired'],
   contractYears: ['contractYearsRemaining','yearsRemaining','contractLength','contractYears'],
   salary: ['salary','totalSalary','contractSalary'], capHit: ['capHit','salaryCapHit','cap'],
   portrait: ['portraitId','portraitID','headshotId','assetId']
@@ -196,7 +198,15 @@ async function latestUsableFreeAgentCapture(db,env,leagueId){
 function normalizePosition(v){const p=text(v)?.toUpperCase();const map={HB:'RB'};return p?map[p]||p:null;}
 function normalizeDev(v){const s=text(v);if(!s)return null;const n=Number(s);if(Number.isFinite(n)){return ({0:'Normal',1:'Star',2:'Superstar',3:'X-Factor'})[n]||s;}const l=s.toLowerCase().replace(/[_-]/g,' ');if(l.includes('x')&&l.includes('factor'))return 'X-Factor';if(l.includes('superstar'))return 'Superstar';if(l.includes('star'))return 'Star';if(l.includes('normal'))return 'Normal';return s;}
 function heightInches(v){if(v==null)return null;if(Number.isFinite(Number(v)))return int(v);const m=String(v).match(/(\d+)\D+(\d+)/);return m?Number(m[1])*12+Number(m[2]):null;}
+function retiredRecord(record={}){
+  if(bool(first(record,A.retired)))return true;
+  const status=String(first(record,A.rosterStatus)??'').trim().toLowerCase();
+  return /(^|\b)(retired|retirement)(\b|$)/i.test(status);
+}
+
 function canonical(record,index,sourceTeamId,validTeams){
+  if(retiredRecord(record))return {retired:true,sourceRecord:record};
+
   const firstName=text(first(record,A.firstName)),lastName=text(first(record,A.lastName));
   const displayName=text(first(record,A.displayName))||[firstName,lastName].filter(Boolean).join(' ')||`Player ${index+1}`;
   const externalId=text(first(record,A.id))||`generated-player-${sourceTeamId||'unknown'}-${index+1}`;
@@ -263,6 +273,7 @@ export async function onRequestPost(context){
       diagnostics.push({routePath:capture.route_path,sourceTeamId,collectionPath:collection.path,recordCount:collection.objects.length,shapeScore:Number(collection.score.toFixed(2)),accepted:true});
       for(let i=0;i<collection.objects.length;i++){
         const p=canonical(collection.objects[i],i,sourceTeamId,validTeams);
+        if(p.retired)continue;
         if(seen.has(p.externalId)){warnings.push(`Duplicate player ID skipped: ${p.externalId} from ${capture.route_path}.`);continue;}
         seen.add(p.externalId);
         if(p.externalId.startsWith('generated-player-'))warnings.push(`Generated missing player ID for ${p.displayName}.`);
@@ -291,6 +302,7 @@ export async function onRequestPost(context){
       });
       for(let i=0;i<freeAgentSource.objects.length;i++){
         const p=canonical(freeAgentSource.objects[i],i,'FA',validTeams);
+        if(p.retired)continue;
         if(seen.has(p.externalId)){
           // A currently rostered player wins over the Free Agent source.
           continue;
