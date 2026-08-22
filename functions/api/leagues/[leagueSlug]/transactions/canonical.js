@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5b */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5c */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5b';
+const RELEASE='5.9.10.6.5.4h-p5c';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -1709,110 +1709,124 @@ function lifecyclePlayerExperience(row={}){
 }
 
 
+async function latestRosterCaptureCohort(db,leagueId,atOrBefore=null){
+  const result=await db.prepare(`SELECT id,discovery_session_id,route_path,r2_object_key,received_at
+    FROM companion_route_captures
+    WHERE league_id=? AND route_path LIKE '%/team/%/roster'
+      ${atOrBefore?'AND received_at<=?':''}
+    ORDER BY received_at DESC LIMIT 512`)
+    .bind(...(atOrBefore?[leagueId,atOrBefore]:[leagueId])).all();
+
+  const rows=(result.results||[]).filter(row=>/\/team\/[^/]+\/roster\/?$/i.test(String(row.route_path||'')));
+  if(!rows.length)return{captures:[],latestMs:0,spreadMs:null};
+
+  const latestMs=Math.max(...rows.map(row=>Date.parse(row.received_at)||0));
+  const windowMs=20*60*1000;
+  const cutoffMs=latestMs-windowMs;
+  const recent=rows.filter(row=>{
+    const ms=Date.parse(row.received_at)||0;
+    return ms>=cutoffMs&&ms<=latestMs;
+  });
+
+  const byRoute=new Map();
+  for(const row of recent){
+    const route=String(row.route_path||'');
+    if(!byRoute.has(route))byRoute.set(route,row);
+  }
+
+  const captures=[...byRoute.values()];
+  const times=captures.map(row=>Date.parse(row.received_at)||0).filter(Boolean);
+  const spreadMs=times.length?Math.max(...times)-Math.min(...times):null;
+  return{captures,latestMs,spreadMs,windowMs};
+}
+
 async function captureLifecyclePlan(db,leagueId){
   const started=Date.now();
+  const cohort=await latestRosterCaptureCohort(db,leagueId);
 
-  // Only the newest complete roster capture matters for the next canonical state.
-  // Do not walk every historical discovery session on every import.
-  const result=await db.prepare(`SELECT
-      c.discovery_session_id session_id,
-      MIN(c.received_at) received_at,
-      MAX(c.received_at) latest_received_at,
-      COUNT(DISTINCT c.route_path) team_route_count,
-      CASE WHEN s.status='complete' THEN 1 ELSE 0 END processed,
-      COALESCE(s.player_count,0) player_count,
-      COALESCE(s.status,'pending') lifecycle_status
-    FROM companion_route_captures c
-    LEFT JOIN canonical_capture_lifecycle_sessions s
-      ON s.league_id=c.league_id AND s.session_id=c.discovery_session_id
-    WHERE c.league_id=?
-      AND c.route_path LIKE '%/team/%/roster'
-      AND c.discovery_session_id IS NOT NULL
-      AND c.discovery_session_id<>''
-    GROUP BY c.discovery_session_id
-    HAVING COUNT(DISTINCT c.route_path)>=32
-    ORDER BY MAX(c.received_at) DESC
-    LIMIT 12`).bind(leagueId).all();
-
-  const candidates=(result.results||[]).map(row=>({
-    sessionId:String(row.session_id),
-    receivedAt:row.received_at,
-    latestReceivedAt:row.latest_received_at,
-    teamRouteCount:Number(row.team_route_count||0),
-    processed:Boolean(Number(row.processed||0)),
-    playerCount:Number(row.player_count||0),
-    status:row.lifecycle_status||'pending'
-  }));
-
-  if(!candidates.length){
+  if(cohort.captures.length<32){
     return{
       sessions:[],
       pendingSessions:0,
       completeSessions:0,
-      strategy:'latest-complete-only',
+      strategy:'fresh-route-cohort-incomplete',
+      currentRouteCount:cohort.captures.length,
       durationMs:Date.now()-started
     };
   }
 
-  const latest=candidates[0];
-  if(latest.processed){
+  const sessionId=`aggregate-${cohort.latestMs}`;
+  const existing=await db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
+    WHERE league_id=? AND session_id=? LIMIT 1`).bind(leagueId,sessionId).first();
+
+  if(existing?.status==='complete'){
     return{
-      sessions:[latest],
-      pendingSessions:0,
-      completeSessions:1,
-      latestSessionId:latest.sessionId,
-      strategy:'latest-complete-only',
+      sessions:[{
+        sessionId,receivedAt:existing.received_at,teamRouteCount:Number(existing.team_route_count||32),
+        processed:true,playerCount:Number(existing.player_count||0),status:'complete',target:true
+      }],
+      pendingSessions:0,completeSessions:1,latestSessionId:sessionId,
+      strategy:'fresh-route-cohort',
+      routeCount:cohort.captures.length,
+      spreadMs:cohort.spreadMs,
       durationMs:Date.now()-started
     };
   }
 
-  // Prefer the latest already-processed lifecycle session as our baseline.
+  const latestReceivedAt=new Date(cohort.latestMs).toISOString();
   const baseline=await db.prepare(`SELECT session_id,received_at,team_route_count,player_count,status
     FROM canonical_capture_lifecycle_sessions
-    WHERE league_id=? AND status='complete' AND received_at<=?
+    WHERE league_id=? AND status='complete' AND received_at<?
     ORDER BY received_at DESC,session_id DESC LIMIT 1`)
-    .bind(leagueId,latest.receivedAt).first();
+    .bind(leagueId,latestReceivedAt).first();
 
   const sessions=[];
   if(baseline){
     sessions.push({
-      sessionId:String(baseline.session_id),
-      receivedAt:baseline.received_at,
-      teamRouteCount:Number(baseline.team_route_count||0),
-      processed:true,
-      playerCount:Number(baseline.player_count||0),
-      status:'complete',
-      baseline:true
+      sessionId:String(baseline.session_id),receivedAt:baseline.received_at,
+      teamRouteCount:Number(baseline.team_route_count||0),processed:true,
+      playerCount:Number(baseline.player_count||0),status:'complete',baseline:true
     });
-  }else{
-    // Fresh installation: establish only the immediately previous complete
-    // roster capture as baseline instead of backfilling the entire season.
-    const previous=candidates.find(row=>row.sessionId!==latest.sessionId);
-    if(previous) sessions.push({...previous,baseline:true});
   }
-
-  sessions.push({...latest,target:true});
+  sessions.push({
+    sessionId,receivedAt:latestReceivedAt,teamRouteCount:cohort.captures.length,
+    processed:false,playerCount:0,status:'pending',target:true
+  });
 
   return{
     sessions,
-    pendingSessions:sessions.filter(x=>!x.processed).length,
-    completeSessions:sessions.filter(x=>x.processed).length,
-    latestSessionId:latest.sessionId,
-    baselineSessionId:sessions.find(x=>x.baseline)?.sessionId||null,
-    ignoredHistoricalCandidateCount:Math.max(0,candidates.length-sessions.length),
-    strategy:'baseline-to-latest',
+    pendingSessions:1,
+    completeSessions:baseline?1:0,
+    latestSessionId:sessionId,
+    baselineSessionId:baseline?.session_id||null,
+    strategy:'fresh-route-cohort',
+    routeCount:cohort.captures.length,
+    spreadMs:cohort.spreadMs,
     durationMs:Date.now()-started
   };
 }
 
 async function processCaptureLifecycleSession(context,state,sessionId){
-  const rows=(await state.db.prepare(`SELECT id,route_path,r2_object_key,received_at
-    FROM companion_route_captures WHERE league_id=? AND discovery_session_id=?
-      AND route_path LIKE '%/team/%/roster' ORDER BY received_at DESC`)
-    .bind(state.league.id,sessionId).all()).results||[];
-  const byRoute=new Map();
-  for(const row of rows)if(!byRoute.has(String(row.route_path)))byRoute.set(String(row.route_path),row);
-  const captures=[...byRoute.values()];
+  let captures=[];
+  let receivedAt=null;
+
+  if(String(sessionId).startsWith('aggregate-')){
+    const targetMs=Number(String(sessionId).slice('aggregate-'.length));
+    if(!Number.isFinite(targetMs))throw new Error(`Invalid aggregate lifecycle session ${sessionId}.`);
+    const cohort=await latestRosterCaptureCohort(state.db,state.league.id,new Date(targetMs).toISOString());
+    captures=cohort.captures;
+    receivedAt=new Date(targetMs).toISOString();
+  }else{
+    const rows=(await state.db.prepare(`SELECT id,route_path,r2_object_key,received_at
+      FROM companion_route_captures WHERE league_id=? AND discovery_session_id=?
+        AND route_path LIKE '%/team/%/roster' ORDER BY received_at DESC`)
+      .bind(state.league.id,sessionId).all()).results||[];
+    const byRoute=new Map();
+    for(const row of rows)if(!byRoute.has(String(row.route_path)))byRoute.set(String(row.route_path),row);
+    captures=[...byRoute.values()];
+    receivedAt=captures.map(r=>r.received_at).filter(Boolean).sort().slice(-1)[0]||now();
+  }
+
   if(captures.length<32)throw new Error(`Lifecycle session ${sessionId} is incomplete (${captures.length}/32 team rosters).`);
 
   await state.db.prepare(`DELETE FROM canonical_historical_player_states WHERE league_id=? AND snapshot_id=?`)
@@ -1848,7 +1862,7 @@ async function processCaptureLifecycleSession(context,state,sessionId){
     ));
   for(let i=0;i<statements.length;i+=150)await state.db.batch(statements.slice(i,i+150));
 
-  const receivedAt=captures.map(r=>r.received_at).filter(Boolean).sort()[0]||now();
+  receivedAt=receivedAt||captures.map(r=>r.received_at).filter(Boolean).sort().slice(-1)[0]||now();
   await state.db.prepare(`INSERT INTO canonical_capture_lifecycle_sessions
     (league_id,session_id,received_at,team_route_count,player_count,status,processed_at,updated_at)
     VALUES (?,?,?,?,?,'complete',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
