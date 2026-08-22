@@ -1,6 +1,7 @@
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3a | import-worker-throughput */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p3';
+const RELEASE='5.9.10.6.5.4h-p3a';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
