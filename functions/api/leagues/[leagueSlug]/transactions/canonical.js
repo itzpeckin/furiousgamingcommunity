@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p3d';
+const RELEASE='5.9.10.6.5.4h-p5';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -1659,26 +1659,133 @@ function captureRosterPlayer(raw={},routeTeamId=null){
   return{playerId,playerName,teamId,rosterStatus,position:clean(raw.position??raw.pos),raw};
 }
 
-async function captureLifecyclePlan(db,leagueId){
-  const result=await db.prepare(`SELECT discovery_session_id session_id,
-      MIN(received_at) received_at,COUNT(DISTINCT route_path) team_route_count
-    FROM companion_route_captures
-    WHERE league_id=? AND route_path LIKE '%/team/%/roster'
-      AND discovery_session_id IS NOT NULL AND discovery_session_id<>''
-    GROUP BY discovery_session_id
-    HAVING COUNT(DISTINCT route_path)>=32
-    ORDER BY MIN(received_at) ASC`).bind(leagueId).all();
-  const sessions=[];
-  for(const row of result.results||[]){
-    const stored=await db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions WHERE league_id=? AND session_id=?`)
-      .bind(leagueId,row.session_id).first();
-    sessions.push({
-      sessionId:String(row.session_id),receivedAt:row.received_at,
-      teamRouteCount:Number(row.team_route_count||0),
-      processed:Boolean(stored?.status==='complete'),playerCount:Number(stored?.player_count||0),status:stored?.status||'pending'
-    });
+function compactLifecycleRaw(raw={}){
+  // Historical lifecycle rows only need identity/roster metadata for future
+  // Free Agent reconstruction. Avoid storing full Madden roster blobs per week.
+  return{
+    rosterId:raw.rosterId??raw.playerId??raw.playerID??raw.player_id??raw.assetId??raw.id??null,
+    playerId:raw.playerId??raw.rosterId??raw.playerID??raw.player_id??raw.assetId??raw.id??null,
+    firstName:raw.firstName??raw.first_name??null,
+    lastName:raw.lastName??raw.last_name??null,
+    displayName:raw.displayName??raw.fullName??raw.playerName??raw.name??null,
+    position:raw.position??raw.pos??null,
+    teamId:raw.teamId??raw.teamID??raw.team_id??null,
+    rosterStatus:raw.rosterStatus??raw.status??null,
+    isOnPracticeSquad:raw.isOnPracticeSquad===true,
+    isOnIR:raw.isOnIR===true,
+    overall:raw.overall??raw.overallRating??raw.ovrRating??raw.playerBestOvr??raw.playerOverall??raw.ovr??null,
+    age:raw.age??null,
+    yearsPro:raw.yearsPro??raw.years_pro??raw.experience??raw.yearsExperience??null,
+    devTrait:raw.devTrait??raw.developmentTrait??raw.dev??null
+  };
+}
+
+function lifecyclePlayerExperience(row={}){
+  const raw=parse(row.raw_json,{})||{};
+  const values=[raw.yearsPro,raw.years_pro,raw.experience,raw.yearsExperience];
+  for(const value of values){
+    if(value===null||value===undefined||value==='')continue;
+    const numeric=Number(value);
+    if(Number.isFinite(numeric))return numeric;
   }
-  return{sessions,pendingSessions:sessions.filter(x=>!x.processed).length,completeSessions:sessions.filter(x=>x.processed).length};
+  return null;
+}
+
+
+async function captureLifecyclePlan(db,leagueId){
+  const started=Date.now();
+
+  // Only the newest complete roster capture matters for the next canonical state.
+  // Do not walk every historical discovery session on every import.
+  const result=await db.prepare(`SELECT
+      c.discovery_session_id session_id,
+      MIN(c.received_at) received_at,
+      MAX(c.received_at) latest_received_at,
+      COUNT(DISTINCT c.route_path) team_route_count,
+      CASE WHEN s.status='complete' THEN 1 ELSE 0 END processed,
+      COALESCE(s.player_count,0) player_count,
+      COALESCE(s.status,'pending') lifecycle_status
+    FROM companion_route_captures c
+    LEFT JOIN canonical_capture_lifecycle_sessions s
+      ON s.league_id=c.league_id AND s.session_id=c.discovery_session_id
+    WHERE c.league_id=?
+      AND c.route_path LIKE '%/team/%/roster'
+      AND c.discovery_session_id IS NOT NULL
+      AND c.discovery_session_id<>''
+    GROUP BY c.discovery_session_id
+    HAVING COUNT(DISTINCT c.route_path)>=32
+    ORDER BY MAX(c.received_at) DESC
+    LIMIT 12`).bind(leagueId).all();
+
+  const candidates=(result.results||[]).map(row=>({
+    sessionId:String(row.session_id),
+    receivedAt:row.received_at,
+    latestReceivedAt:row.latest_received_at,
+    teamRouteCount:Number(row.team_route_count||0),
+    processed:Boolean(Number(row.processed||0)),
+    playerCount:Number(row.player_count||0),
+    status:row.lifecycle_status||'pending'
+  }));
+
+  if(!candidates.length){
+    return{
+      sessions:[],
+      pendingSessions:0,
+      completeSessions:0,
+      strategy:'latest-complete-only',
+      durationMs:Date.now()-started
+    };
+  }
+
+  const latest=candidates[0];
+  if(latest.processed){
+    return{
+      sessions:[latest],
+      pendingSessions:0,
+      completeSessions:1,
+      latestSessionId:latest.sessionId,
+      strategy:'latest-complete-only',
+      durationMs:Date.now()-started
+    };
+  }
+
+  // Prefer the latest already-processed lifecycle session as our baseline.
+  const baseline=await db.prepare(`SELECT session_id,received_at,team_route_count,player_count,status
+    FROM canonical_capture_lifecycle_sessions
+    WHERE league_id=? AND status='complete' AND received_at<=?
+    ORDER BY received_at DESC,session_id DESC LIMIT 1`)
+    .bind(leagueId,latest.receivedAt).first();
+
+  const sessions=[];
+  if(baseline){
+    sessions.push({
+      sessionId:String(baseline.session_id),
+      receivedAt:baseline.received_at,
+      teamRouteCount:Number(baseline.team_route_count||0),
+      processed:true,
+      playerCount:Number(baseline.player_count||0),
+      status:'complete',
+      baseline:true
+    });
+  }else{
+    // Fresh installation: establish only the immediately previous complete
+    // roster capture as baseline instead of backfilling the entire season.
+    const previous=candidates.find(row=>row.sessionId!==latest.sessionId);
+    if(previous) sessions.push({...previous,baseline:true});
+  }
+
+  sessions.push({...latest,target:true});
+
+  return{
+    sessions,
+    pendingSessions:sessions.filter(x=>!x.processed).length,
+    completeSessions:sessions.filter(x=>x.processed).length,
+    latestSessionId:latest.sessionId,
+    baselineSessionId:sessions.find(x=>x.baseline)?.sessionId||null,
+    ignoredHistoricalCandidateCount:Math.max(0,candidates.length-sessions.length),
+    strategy:'baseline-to-latest',
+    durationMs:Date.now()-started
+  };
 }
 
 async function processCaptureLifecycleSession(context,state,sessionId){
@@ -1718,8 +1825,11 @@ async function processCaptureLifecycleSession(context,state,sessionId){
   const statements=[...players.values()].map(player=>state.db.prepare(`INSERT OR REPLACE INTO canonical_historical_player_states
     (league_id,snapshot_id,player_id,player_name,team_id,roster_status,position,raw_json,created_at)
     VALUES (?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`)
-    .bind(state.league.id,sessionId,player.playerId,player.playerName,player.teamId,player.rosterStatus,player.position,JSON.stringify(player.raw||{})));
-  for(let i=0;i<statements.length;i+=75)await state.db.batch(statements.slice(i,i+75));
+    .bind(
+      state.league.id,sessionId,player.playerId,player.playerName,player.teamId,
+      player.rosterStatus,player.position,JSON.stringify(compactLifecycleRaw(player.raw||{}))
+    ));
+  for(let i=0;i<statements.length;i+=150)await state.db.batch(statements.slice(i,i+150));
 
   const receivedAt=captures.map(r=>r.received_at).filter(Boolean).sort()[0]||now();
   await state.db.prepare(`INSERT INTO canonical_capture_lifecycle_sessions
@@ -1729,7 +1839,13 @@ async function processCaptureLifecycleSession(context,state,sessionId){
       team_route_count=excluded.team_route_count,player_count=excluded.player_count,status='complete',
       processed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`)
     .bind(state.league.id,sessionId,receivedAt,captures.length,players.size).run();
-  return{sessionId,teamRouteCount:captures.length,playerCount:players.size,receivedAt};
+  return{
+    sessionId,
+    teamRouteCount:captures.length,
+    playerCount:players.size,
+    receivedAt,
+    compactHistoricalRows:true
+  };
 }
 
 async function captureLifecycleRows(db,leagueId,sessionId){
@@ -1762,9 +1878,78 @@ function lifecycleDiffEvents(previous=[],current=[],previousSession,currentSessi
     else if(oldStatus!==newStatus)add('roster-status-change',playerId,oldRow,next);
   }
   for(const [playerId,next] of newMap){
-    if(!oldMap.has(playerId))add('signing',playerId,null,next);
+    if(oldMap.has(playerId))continue;
+
+    // A new Madden player with 0 years of experience is a rookie entering the
+    // franchise universe, not proof that he was signed from Free Agency.
+    // Preseason rollover can add hundreds of rookies at once; creating a
+    // canonical transaction for every one is both inaccurate and expensive.
+    const experience=lifecyclePlayerExperience(next);
+    if(experience===0)continue;
+
+    add('signing',playerId,null,next);
   }
   return events;
+}
+
+async function applyIncrementalLifecycleFreeAgents(db,leagueId,events,currentRows=[],currentSessionId=null){
+  const releasedEvents=events.filter(event=>event.eventType==='release');
+  const acquiredIds=[...new Set(events
+    .filter(event=>['signing','team-change'].includes(event.eventType))
+    .flatMap(event=>event.playerIds||[])
+    .map(String)
+    .filter(Boolean))];
+
+  const releaseStatements=[];
+  for(const event of releasedEvents){
+    const playerId=String(event.playerIds?.[0]||'');
+    if(!playerId)continue;
+    const move=event.raw?.moves?.[0]||{};
+    const raw=parse(move?.raw_json||null,{})||{};
+    const previous=currentRows.find(row=>String(row.player_id)===playerId)||null;
+    const meta=rawPlayerMeta(raw,previous||move);
+    releaseStatements.push(db.prepare(`INSERT INTO canonical_free_agents
+      (league_id,player_id,player_name,position,overall,age,dev_trait,source_route,source_capture_id,raw_json,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(league_id,player_id) DO UPDATE SET
+        player_name=excluded.player_name,
+        position=COALESCE(excluded.position,canonical_free_agents.position),
+        overall=COALESCE(excluded.overall,canonical_free_agents.overall),
+        age=COALESCE(excluded.age,canonical_free_agents.age),
+        dev_trait=COALESCE(excluded.dev_trait,canonical_free_agents.dev_trait),
+        source_route=excluded.source_route,
+        source_capture_id=excluded.source_capture_id,
+        raw_json=excluded.raw_json,
+        updated_at=CURRENT_TIMESTAMP`)
+      .bind(
+        leagueId,playerId,meta.playerName,meta.position,meta.overall,meta.age,meta.devTrait,
+        'capture-lifecycle',currentSessionId,
+        JSON.stringify({...meta.raw,teamId:'FA',rosterStatus:'free-agent',status:'free-agent',isFreeAgent:true})
+      ));
+  }
+  for(let i=0;i<releaseStatements.length;i+=100)await db.batch(releaseStatements.slice(i,i+100));
+
+  // Any player present on the current roster must not remain in the inferred FA pool.
+  const rosterIds=[...new Set(currentRows.map(row=>String(row.player_id||'')).filter(Boolean))];
+  const removeIds=[...new Set([...acquiredIds,...rosterIds])];
+  for(let i=0;i<removeIds.length;i+=75){
+    const ids=removeIds.slice(i,i+75);
+    if(!ids.length)continue;
+    const marks=ids.map(()=>'?').join(',');
+    await db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND player_id IN (${marks})`)
+      .bind(leagueId,...ids).run();
+  }
+
+  const count=Number((await db.prepare(`SELECT COUNT(*) c FROM canonical_free_agents WHERE league_id=?`)
+    .bind(leagueId).first())?.c||0);
+
+  return{
+    currentFreeAgents:count,
+    releasesObserved:releasedEvents.length,
+    acquisitionsRemoved:acquiredIds.length,
+    latestSessionId:currentSessionId,
+    strategy:'incremental-delta'
+  };
 }
 
 async function rebuildCaptureFreeAgents(db,leagueId,sessions){
@@ -1802,31 +1987,92 @@ async function rebuildCaptureFreeAgents(db,leagueId,sessions){
 }
 
 async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
-  const sessions=(await db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
-    WHERE league_id=? AND status='complete' ORDER BY received_at ASC,session_id ASC`).bind(leagueId).all()).results||[];
-  const targets=new Set((Array.isArray(sessionIds)?sessionIds:[]).map(String).filter(Boolean));
-  let eventCount=0,signings=0,releases=0,teamChanges=0,statusChanges=0,comparisons=0;
-  for(let i=1;i<sessions.length;i++){
-    if(targets.size&&!targets.has(String(sessions[i].session_id)))continue;
-    comparisons++;
-    const previous=await captureLifecycleRows(db,leagueId,sessions[i-1].session_id);
-    const current=await captureLifecycleRows(db,leagueId,sessions[i].session_id);
-    const events=lifecycleDiffEvents(previous,current,sessions[i-1].session_id,sessions[i].session_id,sessions[i].received_at);
-    for(const event of events){
-      await mergeEvidence(db,leagueId,event,sessions[i].session_id);
-      eventCount++;
-      if(event.eventType==='signing')signings++;
-      else if(event.eventType==='release')releases++;
-      else if(event.eventType==='team-change')teamChanges++;
-      else if(event.eventType==='roster-status-change')statusChanges++;
-    }
+  const started=Date.now();
+  const targets=[...new Set((Array.isArray(sessionIds)?sessionIds:[]).map(String).filter(Boolean))];
+
+  if(!targets.length){
+    return{
+      sessionsCompared:0,
+      historicalSessionsAvailable:Number((await db.prepare(`SELECT COUNT(*) c FROM canonical_capture_lifecycle_sessions WHERE league_id=? AND status='complete'`).bind(leagueId).first())?.c||0),
+      incremental:true,
+      eventCount:0,signings:0,releases:0,teamChanges:0,statusChanges:0,
+      freeAgents:null,
+      durationMs:Date.now()-started,
+      strategy:'no-new-session'
+    };
   }
-  const freeAgents=await rebuildCaptureFreeAgents(db,leagueId,sessions);
+
+  // The newest processed target is the only state we need to reconcile.
+  const current=await db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
+    WHERE league_id=? AND status='complete' AND session_id IN (${targets.map(()=>'?').join(',')})
+    ORDER BY received_at DESC,session_id DESC LIMIT 1`)
+    .bind(leagueId,...targets).first();
+
+  if(!current){
+    return{
+      sessionsCompared:0,incremental:true,eventCount:0,signings:0,releases:0,
+      teamChanges:0,statusChanges:0,freeAgents:null,
+      durationMs:Date.now()-started,
+      strategy:'target-not-found'
+    };
+  }
+
+  const previous=await db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
+    WHERE league_id=? AND status='complete' AND received_at<?
+    ORDER BY received_at DESC,session_id DESC LIMIT 1`)
+    .bind(leagueId,current.received_at).first();
+
+  const historicalSessionsAvailable=Number((await db.prepare(`SELECT COUNT(*) c
+    FROM canonical_capture_lifecycle_sessions WHERE league_id=? AND status='complete'`)
+    .bind(leagueId).first())?.c||0);
+
+  if(!previous){
+    const currentRows=await captureLifecycleRows(db,leagueId,current.session_id);
+    const freeAgents=await applyIncrementalLifecycleFreeAgents(db,leagueId,[],currentRows,current.session_id);
+    return{
+      sessionsCompared:0,historicalSessionsAvailable,incremental:true,
+      eventCount:0,signings:0,releases:0,teamChanges:0,statusChanges:0,
+      freeAgents,durationMs:Date.now()-started,
+      strategy:'baseline-established'
+    };
+  }
+
+  const [previousRows,currentRows]=await Promise.all([
+    captureLifecycleRows(db,leagueId,previous.session_id),
+    captureLifecycleRows(db,leagueId,current.session_id)
+  ]);
+
+  const events=lifecycleDiffEvents(
+    previousRows,currentRows,previous.session_id,current.session_id,current.received_at
+  );
+
+  let eventCount=0,signings=0,releases=0,teamChanges=0,statusChanges=0;
+
+  // Canonical evidence writes remain serialized for deterministic dedupe, but we now
+  // feed them ONLY the one baseline->latest delta and exclude rookie pseudo-signings.
+  for(const event of events){
+    await mergeEvidence(db,leagueId,event,current.session_id);
+    eventCount++;
+    if(event.eventType==='signing')signings++;
+    else if(event.eventType==='release')releases++;
+    else if(event.eventType==='team-change')teamChanges++;
+    else if(event.eventType==='roster-status-change')statusChanges++;
+  }
+
+  const freeAgents=await applyIncrementalLifecycleFreeAgents(
+    db,leagueId,events,currentRows,current.session_id
+  );
+
   return{
-    sessionsCompared:comparisons,
-    historicalSessionsAvailable:sessions.length,
-    incremental:targets.size>0,
-    eventCount,signings,releases,teamChanges,statusChanges,freeAgents
+    sessionsCompared:1,
+    historicalSessionsAvailable,
+    incremental:true,
+    baselineSessionId:previous.session_id,
+    currentSessionId:current.session_id,
+    eventCount,signings,releases,teamChanges,statusChanges,
+    freeAgents,
+    durationMs:Date.now()-started,
+    strategy:'baseline-to-latest-only'
   };
 }
 
