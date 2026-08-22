@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p4c',
+      release:'5.9.10.6.5.4h-p5a',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2789,7 +2789,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p4c — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p5a — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -2813,7 +2813,7 @@
           rosterStatus:'free-agent',
           source:{...(row.source||row.raw||row),teamId:'FA',rosterStatus:'free-agent',status:'free-agent'}
         }))
-        .filter(player=>player.id&&!rosteredIds.has(String(player.id)))
+        .filter(player=>player.id&&!rosteredIds.has(String(player.id))&&!playerIsRetired(player))
         .map(player=>({...player,teamId:'FA',rosterStatus:'free-agent'}));
       const playersLive=[...rosteredPlayers,...integratedFreeAgents];
       liveRosterPlayers.clear();
@@ -3012,6 +3012,16 @@
       if(Number.isFinite(numeric))return numeric===0;
     }
     return false;
+  }
+
+  function playerIsRetired(player={}) {
+    const raw=player?.raw||player?.source||{};
+    const values=[
+      player?.rosterStatus,player?.status,raw.rosterStatus,raw.roster_status,
+      raw.playerStatus,raw.player_status,raw.status,raw.transactionStatus
+    ];
+    if(player?.isRetired===true||raw?.isRetired===true||raw?.retired===true||raw?.hasRetired===true)return true;
+    return values.some(value=>/(^|\b)(retired|retirement)(\b|$)/i.test(String(value||'').trim()));
   }
 
   function rosterTeamView(teamId) {
@@ -4479,7 +4489,7 @@ function canonicalPlayerDashboardStats(playerId='') {
           ${team.ovr?summaryTile('Overall',team.ovr,''):''}${summaryTile('Points For',team.pf,ordinalRank(team.pfRank))}${summaryTile('Points Against',team.pa,ordinalRank(team.paRank))}${summaryTile('Cap Space',compactMoney(team.cap),'')}
         </div>
         <div class="subnav" data-team-tabs>
-          ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Trade History':titleCase(tab)}</button>`).join('')}
+          ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Transaction History':titleCase(tab)}</button>`).join('')}
         </div>
         <div data-team-tab-content>${renderTeamTab(team,rosterModel,roster,teamGames,leaders)}</div>`;
       if(state.teamTab==='trade-history') refreshTeamTransactionHistory(team,pageContent.querySelector('[data-team-tab-content]'));
@@ -6163,7 +6173,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   const TRANSACTION_SESSION_CACHE_KEY='fhq:transactions:ui:v1';
   const TRANSACTION_SESSION_TTL_MS=300000;
-  let canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+  let canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0,snapshotId:''};
 
   function hydrateCanonicalTransactionSessionCache(){
     try{
@@ -6178,6 +6188,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(cached?.payload&&Array.isArray(cached.payload.transactions)){
         canonicalTransactionUiCache.payload=cached.payload;
         canonicalTransactionUiCache.loadedAt=loadedAt;
+        canonicalTransactionUiCache.snapshotId=String(cached.snapshotId||'');
       }
     }catch(error){
       console.warn('[Transactions Session Cache] hydrate failed',error);
@@ -6189,6 +6200,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(!canonicalTransactionUiCache.payload||!canonicalTransactionUiCache.loadedAt)return;
       sessionStorage.setItem(TRANSACTION_SESSION_CACHE_KEY,JSON.stringify({
         loadedAt:canonicalTransactionUiCache.loadedAt,
+        snapshotId:String(canonicalTransactionUiCache.snapshotId||liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||liveTeamDirectory?.snapshot?.snapshot_id||''),
         payload:canonicalTransactionUiCache.payload
       }));
     }catch(error){
@@ -6216,6 +6228,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       }
       canonicalTransactionUiCache.payload=payload||{transactions:[]};
       canonicalTransactionUiCache.loadedAt=Date.now();
+      canonicalTransactionUiCache.snapshotId=String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||liveTeamDirectory?.snapshot?.snapshot_id||'');
       canonicalTransactionUiCache.promise=null;
       persistCanonicalTransactionSessionCache();
       return canonicalTransactionUiCache.payload;
@@ -6228,7 +6241,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     load:(force=false)=>loadCanonicalTransactionsForUi(force),
     cached:()=>canonicalTransactionUiCache.payload,
     clear:()=>{
-      canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+      canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0,snapshotId:''};
       try{sessionStorage.removeItem(TRANSACTION_SESSION_CACHE_KEY)}catch{}
     }
   };
@@ -6275,7 +6288,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'5.9.10.6.5.4h-p4c',
+      release:'5.9.10.6.5.4h-p5a',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6288,7 +6301,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'5.9.10.6.5.4h-p4c',
+      release:'5.9.10.6.5.4h-p5a',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -6491,7 +6504,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function refreshPlayerTable() {
-    const tbody=document.querySelector('[data-player-table]');if(!tbody)return;let filtered=(liveTeamDirectory?.players||[]).map(player=>rosterPlayerView(player));const q=String(state.playerSearch||'').trim().toLowerCase();if(q)filtered=filtered.filter(player=>{const team=rosterTeamView(player.teamId);return [player.name,player.position,team?.abbr,team?.fullName].some(value=>String(value||'').toLowerCase().includes(q));});filtered=filtered.filter(player=>{if(state.playerPosition!=='All'&&canonicalFilterPosition(player.position)!==canonicalFilterPosition(state.playerPosition))return false;if(state.playerTeam==='__free_agents__'&&!['free-agent','unassigned'].includes(player.rosterStatus))return false;if(state.playerTeam!=='All'&&state.playerTeam!=='__free_agents__'&&String(player.teamId)!==String(state.playerTeam))return false;if(state.playerStatus!=='All'&&player.rosterStatus!==state.playerStatus)return false;if(state.playerDev!=='All'&&player.dev!==state.playerDev)return false;if(state.playerRookiesOnly&&!isRookiePlayer(player))return false;if((player.overall??0)<state.playerMinOvr||(player.overall??0)>state.playerMaxOvr)return false;if(player.age!=null&&(player.age<state.playerMinAge||player.age>state.playerMaxAge))return false;return true;});const sorters={'overall-desc':(a,b)=>(b.overall??-1)-(a.overall??-1)||a.name.localeCompare(b.name),'age-asc':(a,b)=>(a.age??999)-(b.age??999)||(b.overall??-1)-(a.overall??-1),'depth-asc':(a,b)=>(a.depthOrder??a.depth??999)-(b.depthOrder??b.depth??999)||(b.overall??-1)-(a.overall??-1),'name-asc':(a,b)=>a.name.localeCompare(b.name)};filtered.sort(sorters[state.playerSort]||sorters['overall-desc']);const count=document.querySelector('[data-player-count]');if(count)count.textContent=`${filtered.length.toLocaleString()} result${filtered.length===1?'':'s'}`;tbody.innerHTML=filtered.slice(0,500).map(player=>{const team=rosterTeamView(player.teamId);return `<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-name roster-player-name--single"><strong>${escapeHtml(player.name)}</strong></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall??'—'}</span></td><td>${player.age??'—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(team.abbr)}</strong><small>${escapeHtml(team.fullName)}</small></div></div>`:'<span class="pill pill--warning">Free Agent</span>'}</td><td><span class="pill ${player.rosterStatus==='active'?'pill--success':player.rosterStatus==='injured-reserve'?'pill--warning':'pill--neutral'}">${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td><td>${escapeHtml(formatRosterContract(player))}</td></tr>`;}).join('')||`<tr><td colspan="8"><div class="roadmap-state"><div class="roadmap-state__inner"><h2>No matching players</h2><p>Change or clear the filters to see more live players.</p></div></div></td></tr>`;
+    const tbody=document.querySelector('[data-player-table]');if(!tbody)return;let filtered=(liveTeamDirectory?.players||[]).map(player=>rosterPlayerView(player)).filter(player=>!playerIsRetired(player));const q=String(state.playerSearch||'').trim().toLowerCase();if(q)filtered=filtered.filter(player=>{const team=rosterTeamView(player.teamId);return [player.name,player.position,team?.abbr,team?.fullName].some(value=>String(value||'').toLowerCase().includes(q));});filtered=filtered.filter(player=>{if(state.playerPosition!=='All'&&canonicalFilterPosition(player.position)!==canonicalFilterPosition(state.playerPosition))return false;if(state.playerTeam==='__free_agents__'&&!['free-agent','unassigned'].includes(player.rosterStatus))return false;if(state.playerTeam!=='All'&&state.playerTeam!=='__free_agents__'&&String(player.teamId)!==String(state.playerTeam))return false;if(state.playerStatus!=='All'&&player.rosterStatus!==state.playerStatus)return false;if(state.playerDev!=='All'&&player.dev!==state.playerDev)return false;if(state.playerRookiesOnly&&!isRookiePlayer(player))return false;if((player.overall??0)<state.playerMinOvr||(player.overall??0)>state.playerMaxOvr)return false;if(player.age!=null&&(player.age<state.playerMinAge||player.age>state.playerMaxAge))return false;return true;});const sorters={'overall-desc':(a,b)=>(b.overall??-1)-(a.overall??-1)||a.name.localeCompare(b.name),'age-asc':(a,b)=>(a.age??999)-(b.age??999)||(b.overall??-1)-(a.overall??-1),'depth-asc':(a,b)=>(a.depthOrder??a.depth??999)-(b.depthOrder??b.depth??999)||(b.overall??-1)-(a.overall??-1),'name-asc':(a,b)=>a.name.localeCompare(b.name)};filtered.sort(sorters[state.playerSort]||sorters['overall-desc']);const count=document.querySelector('[data-player-count]');if(count)count.textContent=`${filtered.length.toLocaleString()} result${filtered.length===1?'':'s'}`;tbody.innerHTML=filtered.slice(0,500).map(player=>{const team=rosterTeamView(player.teamId);return `<tr class="clickable-row" data-roster-player-detail="${escapeHtml(player.id||'')}"><td><div class="roster-player-name roster-player-name--single"><strong>${escapeHtml(player.name)}</strong></div></td><td><span class="pill pill--neutral">${escapeHtml(player.position||'—')}</span></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall??'—'}</span></td><td>${player.age??'—'}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev)}</span></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(team.abbr)}</strong><small>${escapeHtml(team.fullName)}</small></div></div>`:'<span class="pill pill--warning">Free Agent</span>'}</td><td><span class="pill ${player.rosterStatus==='active'?'pill--success':player.rosterStatus==='injured-reserve'?'pill--warning':'pill--neutral'}">${escapeHtml(titleCase(String(player.rosterStatus||'other').replace(/-/g,' ')))}</span></td><td>${escapeHtml(formatRosterContract(player))}</td></tr>`;}).join('')||`<tr><td colspan="8"><div class="roadmap-state"><div class="roadmap-state__inner"><h2>No matching players</h2><p>Change or clear the filters to see more live players.</p></div></div></td></tr>`;
   }
 
   function renderPlayerProfile(playerId) {
@@ -7283,9 +7296,9 @@ function canonicalPlayerDashboardStats(playerId='') {
     const move=transactionPlayerMove(transaction,playerId);
     const nonFa=(transaction.teamIds||[]).find(id=>String(id).toUpperCase()!=='FA');
 
-    if(['signing','waiver-claim'].includes(type))return'FA';
+    if(['signing','waiver-claim'].includes(type))return move.toTeamId||nonFa||'FA';
     if(['release','waived'].includes(type))return move.fromTeamId||nonFa||'FA';
-    if(type==='signed-off-practice-squad')return move.fromTeamId||nonFa||'FA';
+    if(type==='signed-off-practice-squad')return move.toTeamId||nonFa||move.fromTeamId||'FA';
     if(['practice-squad-signing','practice-squad-promotion','practice-squad-demotion','ir-placement','ir-activation'].includes(type)){
       return move.fromTeamId||move.toTeamId||nonFa||'FA';
     }
@@ -8123,7 +8136,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p4c';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5a';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9407,12 +9420,20 @@ function canonicalPlayerDashboardStats(playerId='') {
   window.addEventListener('franchisehq:live-snapshot-booted',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
   window.addEventListener('franchisehq:one-click-import-complete',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
 
+  window.addEventListener('franchisehq:live-snapshot-booted',event=>{
+    const incoming=String(event?.detail?.snapshotId||event?.detail?.snapshot?.id||'');
+    const cached=String(canonicalTransactionUiCache?.snapshotId||'');
+    if(incoming&&cached&&incoming!==cached){
+      window.FranchiseHQ?.transactionUiLoader?.clear?.();
+    }
+  });
+
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p4c';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5a';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p4c';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5a';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9424,7 +9445,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p4c',
+    release:'5.9.10.6.5.4h-p5a',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9438,7 +9459,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p4c',
+        release:'5.9.10.6.5.4h-p5a',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9682,7 +9703,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
     const lifecycle=await canonicalTransactionRequest('POST',{action:'capture-lifecycle-finalize'});
 
-    canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0};
+    canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0,snapshotId:''};
     await loadLiveTeamDirectory(true);
     return {...payload,captureLifecycle:{planned:plan.sessions?.length||0,processedSessions:processed.length,...lifecycle}};
   }
@@ -10060,7 +10081,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p4c',
+    release:'5.9.10.6.5.4h-p5a',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -10098,13 +10119,31 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 })();
 
-  window.addEventListener('franchisehq:one-click-import-complete', () => {
+  window.addEventListener('franchisehq:one-click-import-complete', async () => {
     window.FranchiseHQ?.transactionUiLoader?.clear?.();
     try{
       [...Object.keys(sessionStorage)].filter(key=>key.startsWith('fhq:live-home:')).forEach(key=>sessionStorage.removeItem(key));
       [...Object.keys(localStorage)].filter(key=>key.startsWith('fhq:home-critical:')).forEach(key=>localStorage.removeItem(key));
     }catch{}
     window.__FHQ_HOME_DEEP_CACHE__=null;
+
+    try{await window.FranchiseHQ?.transactionUiLoader?.load?.(true)}
+    catch(error){console.warn('[Transactions Post Import Refresh]',error)}
+
+    const base=routeBase(location.hash.slice(1));
+    if(base==='transactions'){
+      renderLeagueTransactions();
+    }else if(base==='teams'&&state.teamTab==='trade-history'){
+      const teamId=String(location.hash.split('/')[1]||'');
+      const team=liveTeamDirectory?.teamMap?.get(teamId);
+      if(team)refreshTeamTransactionHistory(team,pageContent.querySelector('[data-team-tab-content]'));
+    }
+
+    const playerHost=document.querySelector('[data-canonical-player-transaction-history]');
+    if(playerHost){
+      refreshCanonicalPlayerTransactionHistory(playerHost.dataset.canonicalPlayerTransactionHistory,document);
+    }
+
     setTimeout(warmLeagueReadCaches,0);
   });
 
@@ -10185,9 +10224,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p4c — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p5a — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p4c';
+  const RELEASE='5.9.10.6.5.4h-p5a';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
