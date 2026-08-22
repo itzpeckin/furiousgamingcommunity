@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p5c',
+      release:'5.9.10.6.5.4h-p5d',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2789,7 +2789,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p5c — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p5d — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -6282,7 +6282,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ.transactionRecovery={
-    release:'5.9.10.6.5.4h-p5c',
+    release:'5.9.10.6.5.4h-p5d',
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
@@ -6290,7 +6290,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
-      release:'5.9.10.6.5.4h-p5c',
+      release:'5.9.10.6.5.4h-p5d',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
       route:routeBase(location.hash.slice(1))
@@ -6304,7 +6304,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'5.9.10.6.5.4h-p5c',
+      release:'5.9.10.6.5.4h-p5d',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6317,7 +6317,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'5.9.10.6.5.4h-p5c',
+      release:'5.9.10.6.5.4h-p5d',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -8152,7 +8152,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5c';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5d';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9447,9 +9447,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5c';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5d';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5c';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5d';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9461,7 +9461,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p5c',
+    release:'5.9.10.6.5.4h-p5d',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9475,7 +9475,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p5c',
+        release:'5.9.10.6.5.4h-p5d',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -10097,7 +10097,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p5c',
+    release:'5.9.10.6.5.4h-p5d',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -10240,9 +10240,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p5c — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p5d — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p5c';
+  const RELEASE='5.9.10.6.5.4h-p5d';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
