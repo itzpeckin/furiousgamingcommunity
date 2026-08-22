@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5c */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5d */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p5c';
+const RELEASE='5.9.10.6.5.4h-p5d';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -79,6 +79,7 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       origin:text(payload.origin).replace(/\/+$/,''),
       runId:null,
       snapshotId:null,
+      playerMappingRunId:null,
       importAuthToken:text(payload.importAuthToken),
       lifecycleReconciliation:{processedSessions:0,eventCount:0,freeAgents:null,skipped:true}
     };
@@ -174,6 +175,8 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       const mappedPlayers=await stage(ctx,step,'map-players',()=>call(
         ctx.origin,companion(ctx.slug,'map-players'),ctx.owner,'POST',{compact:true}
       ));
+      ctx.playerMappingRunId=mappedPlayers?.mappingRun?.id||null;
+      if(!ctx.playerMappingRunId)throw new Error('Map Players completed without returning its exact mapping run ID.');
       const total=mappedPlayers?.mappingRun?.playerCount??mappedPlayers?.playerCount??'?';
       const fas=mappedPlayers?.lifecycleFreeAgentCount??mappedPlayers?.mappingRun?.freeAgentCount??0;
       await report(ctx,'map-players',true,{
@@ -213,10 +216,17 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       statisticsMappingRunId:statsRunId
     });
 
-    const built=await stage(ctx,step,'build-snapshot',()=>call(ctx.origin,companion(ctx.slug,'build-snapshot'),ctx.owner,'POST',{}));
+    const built=await stage(ctx,step,'build-snapshot',()=>call(
+      ctx.origin,companion(ctx.slug,'build-snapshot'),ctx.owner,'POST',
+      {playerMappingRunId:ctx.playerMappingRunId}
+    ));
     ctx.snapshotId=built?.snapshot?.snapshotId||built?.snapshotId||null;
     if(!ctx.snapshotId)throw new Error('Snapshot Builder completed without returning a Snapshot ID.');
-    await report(ctx,'build-snapshot',true,{summary:`Snapshot ${ctx.snapshotId} built`,snapshotId:ctx.snapshotId});
+    await report(ctx,'build-snapshot',true,{
+      summary:`Snapshot ${ctx.snapshotId} built · players ${ctx.playerMappingRunId}`,
+      snapshotId:ctx.snapshotId,
+      playerMappingRunId:ctx.playerMappingRunId
+    });
 
     let validation=await step.do('validation-start',{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
       ctx.origin,companion(ctx.slug,'snapshot-lifecycle'),ctx.owner,'POST',{action:'validate-start',snapshotId:ctx.snapshotId}
