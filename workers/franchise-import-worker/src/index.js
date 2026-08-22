@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3c */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p3c';
+const RELEASE='5.9.10.6.5.4h-p3d';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -79,7 +79,8 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       origin:text(payload.origin).replace(/\/+$/,''),
       runId:null,
       snapshotId:null,
-      importAuthToken:text(payload.importAuthToken)
+      importAuthToken:text(payload.importAuthToken),
+      lifecycleReconciliation:{processedSessions:0,eventCount:0,freeAgents:null,skipped:true}
     };
     if(!ctx.slug||!ctx.owner.id||!ctx.origin||!ctx.importAuthToken)throw new Error('Workflow payload is incomplete.');
     ctx.call=(path,method='GET',body)=>call(ctx.origin,path,ctx.owner,method,body,ctx.importAuthToken);
@@ -124,6 +125,13 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     await simple(ctx,step,'map-teams','map-teams',p=>`${p.teams?.length??p.mappingRun?.teamCount??'?'} teams mapped`);
 
     if(reusePlayers){
+      ctx.lifecycleReconciliation={
+        processedSessions:0,
+        eventCount:0,
+        freeAgents:null,
+        skipped:true,
+        reusedPlayers:true
+      };
       // Lifecycle reconstruction is auxiliary work, not an orchestrator stage.
       // Only advance the orchestrator through its expected map-players stage.
       await report(ctx,'map-players',true,{
@@ -151,6 +159,13 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
             {action:'capture-lifecycle-finalize',sessionIds:processedSessionIds,incremental:true}
           ))
         : {eventCount:0,freeAgents:null,incremental:true,skipped:true};
+
+      ctx.lifecycleReconciliation={
+        ...finalized,
+        processedSessions:processedSessionIds.length,
+        skipped:processedSessionIds.length===0
+      };
+
       // Do not report reconstruct-player-lifecycle to the import orchestrator.
       // Its next expected stage is map-players.
       const mappedPlayers=await stage(ctx,step,'map-players',()=>call(
@@ -225,10 +240,20 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     ));
     await report(ctx,'classify-transactions',true,{summary:`${Number(classified?.classifiedCount||0)} classified`,snapshotId:ctx.snapshotId});
 
-    const reconciled=await stage(ctx,step,'reconcile-transactions',()=>call(
-      ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'capture-lifecycle-finalize'}
-    ));
-    await report(ctx,'reconcile-transactions',true,{summary:`${Number(reconciled?.eventCount||0)} lifecycle event(s)`,snapshotId:ctx.snapshotId});
+    // Lifecycle reconciliation already ran once, incrementally, before player mapping.
+    // Do NOT rescan historical lifecycle sessions here.
+    const reconciled=ctx.lifecycleReconciliation||{eventCount:0,processedSessions:0,skipped:true};
+    await step.do('reconcile-transactions',async()=>({
+      ok:true,
+      incremental:true,
+      reusedLifecycleResult:true,
+      eventCount:Number(reconciled?.eventCount||0),
+      processedSessions:Number(reconciled?.processedSessions||0)
+    }));
+    await report(ctx,'reconcile-transactions',true,{
+      summary:`${Number(reconciled?.eventCount||0)} lifecycle event(s) · ${Number(reconciled?.processedSessions||0)} new session(s) reconciled`,
+      snapshotId:ctx.snapshotId
+    });
 
     const verified=await stage(ctx,step,'verify-active-snapshot',()=>call(
       ctx.origin,companion(ctx.slug,'snapshot-verification'),ctx.owner
@@ -237,15 +262,15 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     if(active&&String(active)!==String(ctx.snapshotId))throw new Error(`Verification returned different active snapshot (${active}).`);
     await report(ctx,'verify-active-snapshot',true,{summary:'LIVE snapshot verified',snapshotId:ctx.snapshotId});
 
-    // Final canonical/free-agent confirmation happens after the orchestrator
-    // has already completed at verify-active-snapshot. It is auxiliary work
-    // and MUST NOT be reported as another orchestrator stage.
-    const published=await step.do('publish-transactions',{
-      retries:{limit:2,delay:'2 seconds',backoff:'exponential'},
-      timeout:'15 minutes'
-    },()=>call(
-      ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'capture-lifecycle-finalize'}
-    ));
+    // Canonical lifecycle/free-agent state was already finalized incrementally.
+    // Publishing is now a lightweight confirmation step rather than another historical rescan.
+    const published=await step.do('publish-transactions',async()=>({
+      ok:true,
+      incremental:true,
+      reusedLifecycleResult:true,
+      eventCount:Number(ctx.lifecycleReconciliation?.eventCount||0),
+      freeAgents:ctx.lifecycleReconciliation?.freeAgents||null
+    }));
 
     // Certification is server-side now as well. Failure here does not undo the already-verified LIVE snapshot.
     await step.do('certification',{retries:{limit:1,delay:'2 seconds'},timeout:'5 minutes'},()=>call(
