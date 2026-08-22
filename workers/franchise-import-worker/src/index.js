@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3a | import-worker-throughput */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p3c */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p3a';
+const RELEASE='5.9.10.6.5.4h-p3c';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -281,29 +281,54 @@ export default {
         .join('');
       const baseId=`fhq-${shortHash}`;
 
-      // Same Companion session = same Workflow.
-      // Mobile, desktop and repeated clicks converge on the same server job.
+      // Same Companion session = same Workflow while that Workflow is healthy/running/completed.
+      // A FAILED Workflow must never be reused for a retry because its Cloudflare step state
+      // contains the old failed statistics result.
+      let baseStatus=null;
+      let baseFailed=false;
       try{
         const existing=await env.FRANCHISE_IMPORT_WORKFLOW.get(baseId);
-        const existingStatus=await existing.status().catch(()=>null);
-        const existingState=String(existingStatus?.status||'').toLowerCase();
-        if(existingStatus&&!['failed','errored','error','terminated','cancelled','canceled'].includes(existingState)){
-          return json({ok:true,release:RELEASE,id:baseId,reusedExisting:true,workflowKey,status:existingStatus});
+        baseStatus=await existing.status().catch(()=>null);
+        const existingState=String(baseStatus?.status||'').toLowerCase();
+        baseFailed=['failed','errored','error','terminated','cancelled','canceled'].includes(existingState);
+
+        if(baseStatus&&!baseFailed){
+          return json({
+            ok:true,release:RELEASE,id:baseId,reusedExisting:true,
+            workflowKey,status:baseStatus
+          });
         }
       }catch(_){}
 
-      let id=baseId;
+      // If the deterministic ID belongs to a failed run, create a fresh retry ID immediately.
+      // Do not attempt to recreate or recover the failed base ID.
+      let id=baseFailed
+        ? `${baseId}-r${Date.now().toString(36)}`
+        : baseId;
       let instance=null;
+
       try{
         instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
       }catch(createError){
-        // A second device may have won the create race.
-        try{
-          instance=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
-          return json({ok:true,release:RELEASE,id,reusedExisting:true,raced:true,workflowKey,status:await instance.status().catch(()=>null)});
-        }catch(_){
-          // If a prior failed instance owns the deterministic ID, allow a retry ID.
-          id=`${baseId}-r${Date.now().toString(36)}`;
+        if(baseFailed){
+          // Extremely unlikely retry-ID collision: create another unique retry instance.
+          id=`${baseId}-r${Date.now().toString(36)}-${crypto.randomUUID().slice(0,6)}`;
+          instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
+        }else{
+          // Healthy concurrent start race: another device may have created baseId first.
+          const raced=await env.FRANCHISE_IMPORT_WORKFLOW.get(baseId);
+          const racedStatus=await raced.status().catch(()=>null);
+          const racedState=String(racedStatus?.status||'').toLowerCase();
+
+          if(racedStatus&&!['failed','errored','error','terminated','cancelled','canceled'].includes(racedState)){
+            return json({
+              ok:true,release:RELEASE,id:baseId,reusedExisting:true,raced:true,
+              workflowKey,status:racedStatus
+            });
+          }
+
+          // The race target failed before recovery; start a clean retry instead.
+          id=`${baseId}-r${Date.now().toString(36)}-${crypto.randomUUID().slice(0,6)}`;
           instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
         }
       }
@@ -313,6 +338,7 @@ export default {
         release:RELEASE,
         id,
         reusedExisting:false,
+        retryOfFailedWorkflow:baseFailed,
         workflowKey,
         status:await instance.status().catch(()=>null)
       });
