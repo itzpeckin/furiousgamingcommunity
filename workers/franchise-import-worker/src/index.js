@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p2';
+const RELEASE='5.9.10.6.5.4h-p3';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -135,23 +135,29 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       ));
       const pending=(plan?.sessions||[]).filter(row=>!row.processed);
       let processed=0;
+      const processedSessionIds=[];
       for(const session of pending){
         await step.do(`lifecycle-${processed+1}`,{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
           ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',
           {action:'capture-lifecycle-session',sessionId:session.sessionId}
         ));
+        processedSessionIds.push(session.sessionId);
         processed++;
       }
-      const finalized=await step.do('lifecycle-finalize',()=>call(
-        ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'capture-lifecycle-finalize'}
-      ));
+      const finalized=processedSessionIds.length
+        ? await step.do('lifecycle-finalize',()=>call(
+            ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',
+            {action:'capture-lifecycle-finalize',sessionIds:processedSessionIds,incremental:true}
+          ))
+        : {eventCount:0,freeAgents:null,incremental:true,skipped:true};
       // Do not report reconstruct-player-lifecycle to the import orchestrator.
       // Its next expected stage is map-players.
-      await simple(ctx,step,'map-players','map-players',p=>{
-        const total=p.players?.length??p.mappingRun?.playerCount??'?';
-        const fas=p.lifecycleFreeAgentCount??p.mappingRun?.freeAgentCount??0;
-        return `${total} players mapped · ${fas} Free Agent(s)`;
-      });
+      const mappedPlayers=await stage(ctx,step,'map-players',()=>call(
+        ctx.origin,companion(ctx.slug,'map-players'),ctx.owner,'POST',{compact:true}
+      ));
+      const total=mappedPlayers?.mappingRun?.playerCount??mappedPlayers?.playerCount??'?';
+      const fas=mappedPlayers?.lifecycleFreeAgentCount??mappedPlayers?.mappingRun?.freeAgentCount??0;
+      await report(ctx,'map-players',true,{summary:`${total} players mapped · ${fas} Free Agent(s)`});
     }
 
     await simple(ctx,step,'map-schedule','map-schedule',p=>`${p.games?.length??p.mappingRun?.gameCount??'?'} games mapped`);
