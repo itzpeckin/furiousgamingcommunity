@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e2 */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e3 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.5.4h-p5e2',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.10.6.5.4h-p5e3',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -59,7 +59,7 @@ function emptyValidationContext(counts={},snapshotWarningCount=0){
   if(Number(counts.teams||0)!==32)addError('teams',`Expected 32 teams; found ${Number(counts.teams||0)}.`);
   if(!Number(counts.players||0))addError('players','No player records exist.');
   if(!Number(counts.games||0))addError('games','No game records exist.');
-  if(!Number(counts.statistics||0))addError('statistics','No statistic records exist.');
+  if(!Number(counts.statistics||0))addWarning('statistics','No statistic records exist yet; snapshot activation is allowed when statistics mapping completed without failed routes.');
   if(Number(counts.standings||0)!==32)addError('standings',`Expected 32 standings records; found ${Number(counts.standings||0)}.`);
   if(Number(snapshotWarningCount||0))addWarning('snapshot',`${Number(snapshotWarningCount)} warning(s) were inherited from source mappers.`);
   return{counts,teamIds:[],phaseCursor:null,errors,warnings,domains,orphanPlayers:0,invalidGames:0,unresolvedStats:0};
