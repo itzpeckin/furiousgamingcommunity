@@ -6,7 +6,7 @@ export async function onRequestGet({env,params}){
   return json({
     ok:true,
     release:RELEASE,
-    mode:'discovery-only',
+    mode:'session-capture-discovery',
     leagueSlug:String(params?.leagueSlug||''),
     configured,
     discoveryConfigured,

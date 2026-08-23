@@ -32,7 +32,7 @@ export async function onRequestPost({request,env,params}){
       headers:{
         'accept':'application/json',
         'authorization':`Bearer ${token}`,
-        'user-agent':'FranchiseHQ-EA-Direct-Discovery/6.0.1'
+        'user-agent':'FranchiseHQ-EA-Direct-Discovery/6.0.2'
       },
       redirect:'manual'
     });
