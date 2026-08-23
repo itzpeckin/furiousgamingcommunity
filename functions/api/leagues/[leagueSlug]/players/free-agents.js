@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5b */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e';
+const RELEASE='5.9.10.6.5.4h-p5e4';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const text=v=>v==null?null:(String(v).trim()||null);
@@ -69,6 +69,17 @@ async function captures(db,leagueId){
   return (result.results||[]).filter(row=>FREE_AGENT_ROUTE.test(String(row.route_path||'')));
 }
 
+async function canonicalInferredFreeAgents(db,leagueId){
+  try{
+    const result=await db.prepare(`SELECT player_id,player_name,position,overall,age,dev_trait,raw_json,source_route,source_capture_id,updated_at
+      FROM canonical_free_agents WHERE league_id=? ORDER BY player_name`).bind(leagueId).all();
+    return result.results||[];
+  }catch(error){
+    console.warn('[Free Agents] canonical inferred read failed',error);
+    return[];
+  }
+}
+
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);
   if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);
@@ -100,10 +111,35 @@ export async function onRequestGet(context){
     }
   }
 
+  const inferredRows=await canonicalInferredFreeAgents(db,league.id);
+  const merged=new Map();
+  for(const player of players){
+    if(player?.id&&!retiredRecord(player.source||player))merged.set(String(player.id),player);
+  }
+  for(const row of inferredRows){
+    const raw=(()=>{try{return JSON.parse(row.raw_json||'{}')}catch{return{}}})();
+    if(retiredRecord(raw))continue;
+    const shaped=playerShape({
+      ...raw,
+      playerId:row.player_id,
+      displayName:row.player_name||raw.displayName||raw.fullName,
+      position:row.position||raw.position,
+      overall:row.overall??raw.overall,
+      age:row.age??raw.age,
+      devTrait:row.dev_trait??raw.devTrait,
+      teamId:'FA',rosterStatus:'free-agent',status:'free-agent',
+      historicalPlayer:true,
+      sourceRoute:row.source_route,
+      sourceCaptureId:row.source_capture_id
+    },merged.size);
+    if(shaped&&!merged.has(String(shaped.id)))merged.set(String(shaped.id),shaped);
+  }
+  const mergedPlayers=[...merged.values()].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+
   return json({
     ok:true,
     release:RELEASE,
-    sourceRoute:'xbsx/{franchiseId}/freeagents/roster',
+    sourceRoute:'companion-freeagents + canonical-inferred',
     captureAvailable:Boolean(rows.length),
     usableCaptureAvailable:Boolean(selected),
     selectedCapture:selected?{
@@ -111,9 +147,11 @@ export async function onRequestGet(context){
       routePath:selected.route_path,
       receivedAt:selected.received_at
     }:null,
-    count:players.length,
+    rawCompanionCount:players.length,
+    inferredCount:inferredRows.length,
+    count:mergedPlayers.length,
     retiredFiltered,
-    players,
+    players:mergedPlayers,
     attempts
   });
 }
