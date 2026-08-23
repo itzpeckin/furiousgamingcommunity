@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e1 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p5e';
+const RELEASE='5.9.10.6.5.4h-p5e1';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -240,7 +240,47 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
       validationGuard++;
     }
     if(validationGuard>=500)throw new Error('Snapshot validation stopped after 500 batches.');
-    await report(ctx,'validate-snapshot',true,{summary:'Validation ready',snapshotId:ctx.snapshotId});
+
+    const validationSnapshot=validation?.snapshot||validation?.result?.snapshot||null;
+    const validationStatus=String(
+      validation?.validationStatus||
+      validationSnapshot?.validationStatus||
+      validation?.status||
+      validation?.validation?.status||
+      ''
+    ).toLowerCase();
+    const validationReport=
+      validation?.validationReport||
+      validationSnapshot?.validationReport||
+      validation?.report||
+      validation?.validation||
+      null;
+    const validationErrors=[
+      ...(Array.isArray(validation?.errors)?validation.errors:[]),
+      ...(Array.isArray(validationReport?.errors)?validationReport.errors:[])
+    ];
+
+    if(validationStatus==='failed'||validationSnapshot?.errorCount>0||validationErrors.length){
+      const summary=validationErrors.length
+        ? validationErrors.slice(0,8).join(' | ')
+        : `Snapshot validation status: ${validationStatus||'failed'}`;
+      await report(ctx,'validate-snapshot',false,{
+        summary,
+        snapshotId:ctx.snapshotId,
+        validationStatus:validationStatus||'failed',
+        validationReport,
+        validationErrors
+      }).catch(()=>{});
+      const error=new Error(`Snapshot validation failed: ${summary}`);
+      error.payload={snapshotId:ctx.snapshotId,validationStatus,validationReport,validationErrors};
+      throw error;
+    }
+
+    await report(ctx,'validate-snapshot',true,{
+      summary:'Validation ready',
+      snapshotId:ctx.snapshotId,
+      validationStatus:validationStatus||'ready'
+    });
 
     await stage(ctx,step,'activate-snapshot',()=>call(
       ctx.origin,companion(ctx.slug,'snapshot-lifecycle'),ctx.owner,'POST',{action:'activate',snapshotId:ctx.snapshotId}
