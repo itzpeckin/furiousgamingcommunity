@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5c */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5c';
+const RELEASE='5.9.10.6.5.4h-p5e';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -165,6 +165,15 @@ function publicTransaction(row,evidence=[]){
     lastSnapshotId:row.last_snapshot_id||null,
     confidence:row.confidence,
     details:parse(row.details_json,{})||{},
+    participants:[...new Map(evidence
+      .flatMap(item=>(parse(item.evidence_json,{})?.moves||[]))
+      .filter(move=>move?.playerId)
+      .map(move=>[String(move.playerId),{
+        id:String(move.playerId),
+        name:move.playerName||`Player ${move.playerId}`,
+        position:move.position||null,
+        overall:Number.isFinite(Number(move.overall))?Number(move.overall):null
+      }])).values()],
     evidence:evidence.map(item=>({
       sourceType:item.source_type,
       sourceKey:item.source_key,
@@ -1693,7 +1702,12 @@ function compactLifecycleRaw(raw={}){
     overall:raw.overall??raw.overallRating??raw.ovrRating??raw.playerBestOvr??raw.playerOverall??raw.ovr??null,
     age:raw.age??null,
     yearsPro:raw.yearsPro??raw.years_pro??raw.experience??raw.yearsExperience??null,
-    devTrait:raw.devTrait??raw.developmentTrait??raw.dev??null
+    devTrait:raw.devTrait??raw.developmentTrait??raw.dev??null,
+    draftRound:raw.draftRound??raw.draft_round??raw.roundDrafted??raw.rookieDraftRound??null,
+    draftPick:raw.draftPick??raw.draft_pick??raw.pickNumber??raw.draftPickNumber??null,
+    draftYear:raw.draftYear??raw.draft_year??null,
+    draftedBy:raw.draftedBy??raw.drafted_by??raw.draftTeamId??raw.draftTeam??null,
+    isRetired:raw.isRetired===true||raw.retired===true||raw.hasRetired===true
   };
 }
 
@@ -1706,6 +1720,25 @@ function lifecyclePlayerExperience(row={}){
     if(Number.isFinite(numeric))return numeric;
   }
   return null;
+}
+
+function lifecycleRaw(row={}){
+  return parse(row?.raw_json,{})||{};
+}
+
+function lifecycleDraftEvidence(row={}){
+  const raw=lifecycleRaw(row);
+  const values=[raw.draftRound,raw.draft_round,raw.roundDrafted,raw.rookieDraftRound,
+    raw.draftPick,raw.draft_pick,raw.pickNumber,raw.draftPickNumber,
+    raw.draftedBy,raw.drafted_by,raw.draftTeamId,raw.draftTeam];
+  return values.some(value=>value!==null&&value!==undefined&&String(value).trim()!=='');
+}
+
+function lifecycleRetired(row={}){
+  const raw=lifecycleRaw(row);
+  if(raw.isRetired===true||raw.retired===true||raw.hasRetired===true)return true;
+  const status=String(raw.rosterStatus??raw.status??row?.roster_status??'').toLowerCase();
+  return /(^|\b)(retired|retirement)(\b|$)/i.test(status);
 }
 
 
@@ -1889,44 +1922,76 @@ function lifecycleDiffEvents(previous=[],current=[],previousSession,currentSessi
   const oldMap=new Map(previous.map(row=>[String(row.player_id),row]));
   const newMap=new Map(current.map(row=>[String(row.player_id),row]));
   const events=[];
+
   const add=(type,playerId,oldRow,newRow)=>{
-    const from=type==='signing'?'FA':clean(oldRow?.team_id);
+    const from=['signing','drafted'].includes(type)?'FA':clean(oldRow?.team_id);
     const to=type==='release'?'FA':clean(newRow?.team_id);
+    const oldRaw=lifecycleRaw(oldRow);
+    const newRaw=lifecycleRaw(newRow);
+    const identityRaw=Object.keys(newRaw).length?newRaw:oldRaw;
+    const meta=rawPlayerMeta(identityRaw,newRow||oldRow||{});
+
     events.push(normalizeIncomingEvent({
       sourceKey:`capture-lifecycle:${previousSession}:${currentSession}:${type}:${playerId}`,
-      eventType:type,playerIds:[playerId],playerId,
-      teamIds:normalizedPair([from,to]),fromTeamId:from,toTeamId:to,
-      occurredAt,confidence:'capture-history',previousSnapshotId:previousSession,currentSnapshotId:currentSession,
-      moves:[{playerId,playerName:clean(newRow?.player_name)||clean(oldRow?.player_name)||'Unknown Player',
-        fromTeamId:from,toTeamId:to,oldStatus:clean(oldRow?.roster_status),newStatus:clean(newRow?.roster_status),eventType:type}]
+      eventType:type,
+      playerIds:[playerId],
+      playerId,
+      teamIds:normalizedPair([from,to]),
+      fromTeamId:from,
+      toTeamId:to,
+      occurredAt,
+      confidence:'capture-history',
+      previousSnapshotId:previousSession,
+      currentSnapshotId:currentSession,
+      moves:[{
+        playerId,
+        playerName:meta.playerName||clean(newRow?.player_name)||clean(oldRow?.player_name)||'Unknown Player',
+        position:meta.position||clean(newRow?.position)||clean(oldRow?.position),
+        overall:meta.overall,
+        age:meta.age,
+        devTrait:meta.devTrait,
+        fromTeamId:from,
+        toTeamId:to,
+        oldStatus:clean(oldRow?.roster_status),
+        newStatus:clean(newRow?.roster_status),
+        eventType:type,
+        oldRaw,
+        newRaw
+      }]
     },'snapshot-diff'));
   };
+
   for(const [playerId,oldRow] of oldMap){
     const next=newMap.get(playerId);
-    if(!next){add('release',playerId,oldRow,null);continue}
-    const from=clean(oldRow.team_id),to=clean(next.team_id),oldStatus=clean(oldRow.roster_status),newStatus=clean(next.roster_status);
+    if(!next){
+      if(lifecycleRetired(oldRow))continue;
+      add('release',playerId,oldRow,null);
+      continue;
+    }
+    const from=clean(oldRow.team_id),to=clean(next.team_id);
+    const oldStatus=clean(oldRow.roster_status),newStatus=clean(next.roster_status);
     if(from!==to)add('team-change',playerId,oldRow,next);
     else if(oldStatus!==newStatus)add('roster-status-change',playerId,oldRow,next);
   }
+
   for(const [playerId,next] of newMap){
     if(oldMap.has(playerId))continue;
-
-    // A new Madden player with 0 years of experience is a rookie entering the
-    // franchise universe, not proof that he was signed from Free Agency.
-    // Preseason rollover can add hundreds of rookies at once; creating a
-    // canonical transaction for every one is both inaccurate and expensive.
     const experience=lifecyclePlayerExperience(next);
-    if(experience===0)continue;
 
-    add('signing',playerId,null,next);
+    // Drafted is only used when Madden provides positive draft metadata.
+    // A rookie without draft evidence is treated as a legitimate FA/UDFA signing.
+    if(experience===0 && lifecycleDraftEvidence(next))add('drafted',playerId,null,next);
+    else add('signing',playerId,null,next);
   }
+
   return events;
 }
+
 
 async function applyIncrementalLifecycleFreeAgents(db,leagueId,events,currentRows=[],currentSessionId=null){
   const releasedEvents=events.filter(event=>event.eventType==='release');
   const acquiredIds=[...new Set(events
-    .filter(event=>['signing','team-change'].includes(event.eventType))
+    .filter(event=>['signing','drafted','team-change'].includes(event.eventType))
     .flatMap(event=>event.playerIds||[])
     .map(String)
     .filter(Boolean))];
@@ -1936,9 +2001,9 @@ async function applyIncrementalLifecycleFreeAgents(db,leagueId,events,currentRow
     const playerId=String(event.playerIds?.[0]||'');
     if(!playerId)continue;
     const move=event.raw?.moves?.[0]||{};
-    const raw=parse(move?.raw_json||null,{})||{};
+    const raw=move?.oldRaw||move?.newRaw||{};
     const previous=currentRows.find(row=>String(row.player_id)===playerId)||null;
-    const meta=rawPlayerMeta(raw,previous||move);
+    const meta=rawPlayerMeta(raw,move||previous||{});
     releaseStatements.push(db.prepare(`INSERT INTO canonical_free_agents
       (league_id,player_id,player_name,position,overall,age,dev_trait,source_route,source_capture_id,raw_json,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
@@ -2026,7 +2091,7 @@ async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
       sessionsCompared:0,
       historicalSessionsAvailable:Number((await db.prepare(`SELECT COUNT(*) c FROM canonical_capture_lifecycle_sessions WHERE league_id=? AND status='complete'`).bind(leagueId).first())?.c||0),
       incremental:true,
-      eventCount:0,signings:0,releases:0,teamChanges:0,statusChanges:0,
+      eventCount:0,signings:0,drafted:0,releases:0,teamChanges:0,statusChanges:0,
       freeAgents:null,
       durationMs:Date.now()-started,
       strategy:'no-new-session'
@@ -2062,7 +2127,7 @@ async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
     const freeAgents=await applyIncrementalLifecycleFreeAgents(db,leagueId,[],currentRows,current.session_id);
     return{
       sessionsCompared:0,historicalSessionsAvailable,incremental:true,
-      eventCount:0,signings:0,releases:0,teamChanges:0,statusChanges:0,
+      eventCount:0,signings:0,drafted:0,releases:0,teamChanges:0,statusChanges:0,
       freeAgents,durationMs:Date.now()-started,
       strategy:'baseline-established'
     };
@@ -2077,7 +2142,7 @@ async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
     previousRows,currentRows,previous.session_id,current.session_id,current.received_at
   );
 
-  let eventCount=0,signings=0,releases=0,teamChanges=0,statusChanges=0;
+  let eventCount=0,signings=0,drafted=0,releases=0,teamChanges=0,statusChanges=0;
 
   // Canonical evidence writes remain serialized for deterministic dedupe, but we now
   // feed them ONLY the one baseline->latest delta and exclude rookie pseudo-signings.
@@ -2085,6 +2150,7 @@ async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
     await mergeEvidence(db,leagueId,event,current.session_id);
     eventCount++;
     if(event.eventType==='signing')signings++;
+    else if(event.eventType==='drafted')drafted++;
     else if(event.eventType==='release')releases++;
     else if(event.eventType==='team-change')teamChanges++;
     else if(event.eventType==='roster-status-change')statusChanges++;
@@ -2100,7 +2166,7 @@ async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
     incremental:true,
     baselineSessionId:previous.session_id,
     currentSessionId:current.session_id,
-    eventCount,signings,releases,teamChanges,statusChanges,
+    eventCount,signings,drafted,releases,teamChanges,statusChanges,
     freeAgents,
     durationMs:Date.now()-started,
     strategy:'baseline-to-latest-only'
