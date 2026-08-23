@@ -1,7 +1,7 @@
 /* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e6b';
+const RELEASE='5.9.10.6.5.4h-p5e7';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const text=v=>v==null?null:(String(v).trim()||null);
@@ -106,6 +106,153 @@ async function retiredPlayerIds(db,leagueId){
   return ids;
 }
 
+
+function parseJson(value,fallback){
+  try{return JSON.parse(value||'null')??fallback}catch{return fallback}
+}
+
+async function activeRosterIds(db,leagueId){
+  try{
+    const active=await db.prepare(`SELECT snapshot_id FROM league_active_snapshots
+      WHERE league_id=? LIMIT 1`).bind(leagueId).first();
+    if(!active?.snapshot_id)return new Set();
+
+    const rows=(await db.prepare(`SELECT external_id,data_json
+      FROM league_snapshot_records
+      WHERE league_id=? AND snapshot_id=? AND domain='players'`)
+      .bind(leagueId,active.snapshot_id).all()).results||[];
+
+    const ids=new Set();
+    for(const row of rows){
+      const raw=parseJson(row.data_json,{})||{};
+      const id=text(
+        row.external_id??
+        raw.external_id??raw.externalId??
+        raw.playerId??raw.player_id??raw.rosterId??raw.id
+      );
+      if(id)ids.add(String(id));
+    }
+    return ids;
+  }catch{
+    return new Set();
+  }
+}
+
+async function transactionDerivedFreeAgents(db,leagueId,retiredIds,currentRosterIds){
+  // We only need lifecycle transactions that can change FA state.
+  const txRows=(await db.prepare(`SELECT id,event_type,player_ids_json,created_at,updated_at,occurred_at
+    FROM canonical_transactions
+    WHERE league_id=?
+      AND LOWER(event_type) IN (
+        'release','released',
+        'signing','signed','waiver-claim',
+        'drafted',
+        'trade','team-change',
+        'retired','retirement'
+      )
+    ORDER BY COALESCE(occurred_at,updated_at,created_at) ASC, created_at ASC
+    LIMIT 5000`).bind(leagueId).all()).results||[];
+
+  const state=new Map();
+
+  for(const tx of txRows){
+    const type=String(tx.event_type||'').toLowerCase();
+    const ids=parseJson(tx.player_ids_json,[]);
+    for(const rawId of Array.isArray(ids)?ids:[]){
+      const playerId=String(rawId||'').trim();
+      if(!playerId)continue;
+
+      if(['retired','retirement'].includes(type)){
+        state.set(playerId,'retired');
+        continue;
+      }
+
+      if(['release','released'].includes(type)){
+        state.set(playerId,'free-agent');
+        continue;
+      }
+
+      if(['signing','signed','waiver-claim','drafted','trade','team-change'].includes(type)){
+        state.set(playerId,'rostered');
+      }
+    }
+  }
+
+  const freeAgentIds=[...state.entries()]
+    .filter(([playerId,status])=>
+      status==='free-agent' &&
+      !retiredIds.has(playerId) &&
+      !currentRosterIds.has(playerId)
+    )
+    .map(([playerId])=>playerId);
+
+  if(!freeAgentIds.length)return[];
+
+  const identities=new Map();
+
+  // Historical identity is authoritative for departed players.
+  for(let i=0;i<freeAgentIds.length;i+=75){
+    const ids=freeAgentIds.slice(i,i+75);
+    const marks=ids.map(()=>'?').join(',');
+    try{
+      const rows=(await db.prepare(`SELECT player_id,player_name,position,overall,age,dev_trait,
+          last_team_id,last_roster_status,raw_json,last_seen_snapshot_id,last_seen_at,retired
+        FROM canonical_historical_player_directory
+        WHERE league_id=? AND player_id IN (${marks})`)
+        .bind(leagueId,...ids).all()).results||[];
+      for(const row of rows)identities.set(String(row.player_id),row);
+    }catch{}
+  }
+
+  // canonical_free_agents can contribute richer raw data where available.
+  for(let i=0;i<freeAgentIds.length;i+=75){
+    const ids=freeAgentIds.slice(i,i+75);
+    const marks=ids.map(()=>'?').join(',');
+    try{
+      const rows=(await db.prepare(`SELECT player_id,player_name,position,overall,age,dev_trait,
+          raw_json,source_route,source_capture_id,updated_at
+        FROM canonical_free_agents
+        WHERE league_id=? AND player_id IN (${marks})`)
+        .bind(leagueId,...ids).all()).results||[];
+      for(const row of rows){
+        const id=String(row.player_id);
+        identities.set(id,{...(identities.get(id)||{}),...row});
+      }
+    }catch{}
+  }
+
+  return freeAgentIds.map(playerId=>{
+    const row=identities.get(playerId)||{};
+    const raw=parseJson(row.raw_json,{})||{};
+    return{
+      player_id:playerId,
+      player_name:row.player_name||raw.displayName||raw.fullName||raw.playerName||raw.name||`Player ${playerId}`,
+      position:row.position||raw.position||raw.pos||null,
+      overall:row.overall??raw.overall??raw.overallRating??raw.ovr??null,
+      age:row.age??raw.age??null,
+      dev_trait:row.dev_trait??raw.devTrait??raw.developmentTrait??null,
+      raw_json:JSON.stringify({
+        ...raw,
+        playerId,
+        displayName:row.player_name||raw.displayName||raw.fullName||raw.playerName||raw.name||`Player ${playerId}`,
+        position:row.position||raw.position||raw.pos||null,
+        overall:row.overall??raw.overall??raw.overallRating??raw.ovr??null,
+        age:row.age??raw.age??null,
+        devTrait:row.dev_trait??raw.devTrait??raw.developmentTrait??null,
+        teamId:'FA',
+        rosterStatus:'free-agent',
+        status:'free-agent',
+        isFreeAgent:true,
+        transactionDerived:true,
+        lastTeamId:row.last_team_id||raw.lastTeamId||null
+      }),
+      source_route:'transaction-derived',
+      source_capture_id:row.last_seen_snapshot_id||row.source_capture_id||null,
+      updated_at:row.last_seen_at||row.updated_at||null
+    };
+  });
+}
+
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);
   if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);
@@ -113,6 +260,7 @@ export async function onRequestGet(context){
   if(!db||!league)return json({ok:false,error:'League not found.'},404);
 
   const retiredIds=await retiredPlayerIds(db,league.id);
+  const currentRosterIds=await activeRosterIds(db,league.id);
   const rows=await captures(db,league.id);
   const attempts=[];
   let selected=null,players=[],retiredFiltered=0;
@@ -139,10 +287,16 @@ export async function onRequestGet(context){
     }
   }
 
-  const inferredRows=await canonicalInferredFreeAgents(db,league.id);
+  const inferredRows=await transactionDerivedFreeAgents(
+    db,league.id,retiredIds,currentRosterIds
+  );
   const merged=new Map();
   for(const player of players){
-    if(player?.id&&!retiredRecord(player.source||player))merged.set(String(player.id),player);
+    if(!player?.id)continue;
+    const id=String(player.id);
+    if(currentRosterIds.has(id))continue;
+    if(retiredIds.has(id)||retiredRecord(player.source||player))continue;
+    merged.set(id,player);
   }
   for(const row of inferredRows){
     const raw=(()=>{try{return JSON.parse(row.raw_json||'{}')}catch{return{}}})();
@@ -167,7 +321,7 @@ export async function onRequestGet(context){
   return json({
     ok:true,
     release:RELEASE,
-    sourceRoute:'companion-freeagents + canonical-inferred',
+    sourceRoute:'companion-freeagents + transaction-derived',
     captureAvailable:Boolean(rows.length),
     usableCaptureAvailable:Boolean(selected),
     selectedCapture:selected?{
@@ -177,6 +331,8 @@ export async function onRequestGet(context){
     }:null,
     rawCompanionCount:players.length,
     inferredCount:inferredRows.length,
+    transactionDerivedCount:inferredRows.length,
+    currentRosterIdCount:currentRosterIds.size,
     count:mergedPlayers.length,
     retiredFiltered:retiredFiltered+retiredIds.size,
     explicitRetiredIdCount:retiredIds.size,
