@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e3 */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p5e3';
+const RELEASE='5.9.10.6.5.4h-p5e4';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -95,6 +95,14 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
 
     if(delta?.unchanged&&delta?.activeSnapshot?.id){
       ctx.snapshotId=String(delta.activeSnapshot.id);
+      let lifecycleRepair=null;
+      try{
+        lifecycleRepair=await step.do('repair-latest-lifecycle',()=>call(
+          ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'repair-latest-lifecycle'}
+        ));
+      }catch(error){
+        console.warn?.('[Lifecycle Repair]',error);
+      }
       return {
         ok:true,
         release:RELEASE,
@@ -102,6 +110,7 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
         noNewExport:Boolean(delta.noNewExport),
         snapshotId:ctx.snapshotId,
         runId:null,
+        lifecycleRepair,
         durationMs:Date.now()-workflowStartedAt
       };
     }
