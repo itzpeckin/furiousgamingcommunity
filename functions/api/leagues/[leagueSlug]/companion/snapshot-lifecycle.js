@@ -1,6 +1,7 @@
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e2 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.3P.3',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.10.6.5.4h-p5e2',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -16,7 +17,7 @@ async function validateSnapshot(db,leagueId,snapshot){const records=await rows(d
  if(by.teams.length!==32)err('teams',`Expected 32 teams; found ${by.teams.length}.`);
  if(!by.players.length)err('players','No player records exist.');
  if(!by.games.length)err('games','No game records exist.');
- if(!by.statistics.length)err('statistics','No statistic records exist.');
+ if(!by.statistics.length)warn('statistics','No statistic records exist yet; snapshot activation is allowed when statistics mapping completed without failed routes.');
  if(by.standings.length!==32)err('standings',`Expected 32 standings records; found ${by.standings.length}.`);
  const teamIds=new Set(by.teams.map(x=>key(x,'external_id','teamId','team_id')).filter(Boolean));
  const playerIds=new Set(by.players.map(x=>key(x,'external_id','playerId','player_id')).filter(Boolean));
