@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e5 */
 import {
   json,
   database,
@@ -8,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e4';
+const RELEASE='5.9.10.6.5.4h-p5e5';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
