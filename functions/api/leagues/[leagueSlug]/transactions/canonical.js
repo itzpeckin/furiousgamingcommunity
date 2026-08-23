@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e5 */
+/* FHQ_BUILD: 5.9.11.0 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e8';
+const RELEASE='5.9.11.0';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -2293,6 +2293,14 @@ export async function onRequestPost(context){
   let body={};
   try{body=await context.request.json()}catch{}
   const action=String(body.action||'sync').toLowerCase();
+  const disabledStabilizationActions=new Set([
+    'repair-latest-lifecycle','repair-team-change-trades','repair-free-agent-pool',
+    'capture-lifecycle-plan','capture-lifecycle-session','capture-lifecycle-finalize'
+  ]);
+  if(disabledStabilizationActions.has(action)){
+    return json({ok:false,release:RELEASE,stabilized:true,disabled:true,
+      error:'Experimental lifecycle/Free Agent repair actions are disabled in the 5.9.11.0 stabilization baseline.'},410);
+  }
 
 
   if(action==='repair-latest-lifecycle'){
