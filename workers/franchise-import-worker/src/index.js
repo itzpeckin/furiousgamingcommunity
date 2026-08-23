@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5d */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p5d';
+const RELEASE='5.9.10.6.5.4h-p5e';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -185,6 +185,7 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
           strategy:ctx.lifecycleReconciliation?.strategy||ctx.lifecycleReconciliation?.planStrategy||null,
           processedSessions:Number(ctx.lifecycleReconciliation?.processedSessions||0),
           eventCount:Number(ctx.lifecycleReconciliation?.eventCount||0),
+        drafted:Number(ctx.lifecycleReconciliation?.drafted||0),
           durationMs:Number(ctx.lifecycleReconciliation?.durationMs||0),
           ignoredHistoricalCandidateCount:Number(ctx.lifecycleReconciliation?.ignoredHistoricalCandidateCount||0),
           routeCount:Number(ctx.lifecycleReconciliation?.routeCount||0),
