@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5d */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
 import {
   json,
   database,
@@ -8,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5d';
+const RELEASE='5.9.10.6.5.4h-p5e4';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -338,10 +338,8 @@ export async function onRequestPost(context){
     const insertSql=`INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,team_external_id,first_name,last_name,display_name,position,archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id,ratings_json,source_record_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
     const statements=players.map(p=>db.prepare(insertSql).bind(runId,league.id,p.externalId,p.teamExternalId,p.firstName,p.lastName,p.displayName,p.position,p.archetype,p.overall,p.developmentTrait,p.age,p.yearsPro,p.jerseyNumber,p.heightInches,p.weightLbs,p.college,p.injuryStatus,p.isInjured?1:0,p.contractYearsRemaining,p.salary,p.capHit,p.portraitId,JSON.stringify(p.ratings),JSON.stringify(p.sourceRecord),now));
     await runBatches(db,statements);
-    const run=await db.prepare(`SELECT * FROM companion_player_mapping_runs
-      WHERE league_id=? AND id=? LIMIT 1`).bind(league.id,runId).first();
-    if(!run)return json({ok:false,error:'The newly-created player mapping run could not be reloaded.',mappingRunId:runId,release:RELEASE},500);
-    const responsePlayers=compact?[]:await preview(db,league.id,runId);
+    const run=await latestRun(db,league.id);
+    const responsePlayers=compact?[]:await preview(db,league.id,run.id);
     return json(response(run,responsePlayers,slug,league.id,{
       compact,
       playerCount:players.length,
