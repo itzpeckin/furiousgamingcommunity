@@ -2,7 +2,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e6a';
+const RELEASE='5.9.10.6.5.4h-p5e6b';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -2259,15 +2259,6 @@ async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
   // Canonical evidence writes remain serialized for deterministic dedupe, but we now
   // feed them ONLY the one baseline->latest delta and exclude rookie pseudo-signings.
   for(const event of events){
-    if(event.eventType==='team-change'){
-      const move=event.raw?.moves?.[0]||{};
-      const from=String(move.fromTeamId||'').trim();
-      const to=String(move.toTeamId||'').trim();
-      if(from&&to&&from.toUpperCase()!=='FA'&&to.toUpperCase()!=='FA'&&from!==to){
-        event.eventType='trade';
-        event.raw={...(event.raw||{}),eventType:'trade',classifiedFrom:'team-change'};
-      }
-    }
     await mergeEvidence(db,leagueId,event,current.session_id);
     eventCount++;
     if(event.eventType==='signing')signings++;
@@ -2335,40 +2326,55 @@ export async function onRequestPost(context){
 
   if(action==='repair-team-change-trades'){
     await ensureSchema(state.db);
-    const rows=(await state.db.prepare(`SELECT t.id,t.event_type,e.evidence_json
-      FROM canonical_transactions t
-      LEFT JOIN canonical_transaction_evidence e ON e.transaction_id=t.id
-      WHERE t.league_id=? AND t.event_type='team-change'
-      ORDER BY t.created_at DESC LIMIT 500`)
-      .bind(state.league.id).all()).results||[];
 
-    const promote=new Set();
-    for(const row of rows){
-      const evidence=parse(row.evidence_json,{})||{};
-      const moves=Array.isArray(evidence.moves)?evidence.moves:[];
-      const teamToTeam=moves.some(move=>{
-        const from=String(move?.fromTeamId||'').trim();
-        const to=String(move?.toTeamId||'').trim();
-        return from&&to&&from.toUpperCase()!=='FA'&&to.toUpperCase()!=='FA'&&from!==to;
-      });
-      if(teamToTeam)promote.add(String(row.id));
+    // Undo P5e6a false promotions: snapshot-only "trade" rows are Team Change.
+    const falsePromotions=(await state.db.prepare(`SELECT DISTINCT t.id
+      FROM canonical_transactions t
+      WHERE t.league_id=? AND t.event_type='trade'
+        AND COALESCE(t.workflow_trade_id,'')=''
+        AND NOT EXISTS (
+          SELECT 1 FROM canonical_transaction_evidence e
+          WHERE e.transaction_id=t.id
+            AND e.source_type IN ('madden-explicit','franchisehq-workflow')
+        )
+      LIMIT 1000`).bind(state.league.id).all()).results||[];
+
+    for(let i=0;i<falsePromotions.length;i+=75){
+      const ids=falsePromotions.slice(i,i+75).map(row=>String(row.id));
+      if(!ids.length)continue;
+      await state.db.prepare(`UPDATE canonical_transactions
+        SET event_type='team-change',authority='snapshot-inferred',execution_status='observed-roster',updated_at=CURRENT_TIMESTAMP
+        WHERE league_id=? AND id IN (${ids.map(()=>'?').join(',')})`)
+        .bind(state.league.id,...ids).run();
     }
 
-    for(const id of promote){
+    // Promote only Team Change records with explicit Madden or Franchise HQ workflow trade evidence.
+    const realTrades=(await state.db.prepare(`SELECT DISTINCT t.id
+      FROM canonical_transactions t
+      JOIN canonical_transaction_evidence e ON e.transaction_id=t.id
+      WHERE t.league_id=? AND t.event_type='team-change'
+        AND e.source_type IN ('madden-explicit','franchisehq-workflow')
+      LIMIT 1000`).bind(state.league.id).all()).results||[];
+
+    for(let i=0;i<realTrades.length;i+=75){
+      const ids=realTrades.slice(i,i+75).map(row=>String(row.id));
+      if(!ids.length)continue;
       await state.db.prepare(`UPDATE canonical_transactions
         SET event_type='trade',updated_at=CURRENT_TIMESTAMP
-        WHERE league_id=? AND id=? AND event_type='team-change'`)
-        .bind(state.league.id,id).run();
+        WHERE league_id=? AND id IN (${ids.map(()=>'?').join(',')})`)
+        .bind(state.league.id,...ids).run();
     }
 
     return json({
       ok:true,
       release:RELEASE,
       repaired:true,
-      scanned:rows.length,
-      promotedToTrade:promote.size
+      revertedFalseTrades:falsePromotions.length,
+      promotedConfirmedTrades:realTrades.length,
+      rule:'trade requires madden-explicit or franchisehq-workflow evidence'
     });
   }
+
 
   if(action==='repair-free-agent-pool'){
     await ensureSchema(state.db);
