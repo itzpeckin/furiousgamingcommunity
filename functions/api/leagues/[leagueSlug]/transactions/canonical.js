@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e5 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e4';
+const RELEASE='5.9.10.6.5.4h-p5e5';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -1727,8 +1727,6 @@ function captureRosterPlayer(raw={},routeTeamId=null){
 }
 
 function compactLifecycleRaw(raw={}){
-  // Historical lifecycle rows only need identity/roster metadata for future
-  // Free Agent reconstruction. Avoid storing full Madden roster blobs per week.
   return{
     rosterId:raw.rosterId??raw.playerId??raw.playerID??raw.player_id??raw.assetId??raw.id??null,
     playerId:raw.playerId??raw.rosterId??raw.playerID??raw.player_id??raw.assetId??raw.id??null,
@@ -1744,11 +1742,25 @@ function compactLifecycleRaw(raw={}){
     age:raw.age??null,
     yearsPro:raw.yearsPro??raw.years_pro??raw.experience??raw.yearsExperience??null,
     devTrait:raw.devTrait??raw.developmentTrait??raw.dev??null,
+    jerseyNumber:raw.jerseyNumber??raw.jersey_number??raw.number??null,
+    college:raw.college??raw.school??raw.collegeName??null,
+    height:raw.height??raw.heightInches??null,
+    weight:raw.weight??null,
+    speed:raw.speed??raw.speedRating??raw.spd??null,
+    acceleration:raw.acceleration??raw.accelerationRating??raw.acc??null,
+    awareness:raw.awareness??raw.awarenessRating??raw.awr??null,
+    strength:raw.strength??raw.strengthRating??raw.str??null,
+    imageUrl:raw.imageUrl??raw.playerImageUrl??raw.headshotUrl??raw.portraitUrl??null,
     draftRound:raw.draftRound??raw.draft_round??raw.roundDrafted??raw.rookieDraftRound??null,
     draftPick:raw.draftPick??raw.draft_pick??raw.pickNumber??raw.draftPickNumber??null,
     draftYear:raw.draftYear??raw.draft_year??null,
     draftedBy:raw.draftedBy??raw.drafted_by??raw.draftTeamId??raw.draftTeam??null,
-    isRetired:raw.isRetired===true||raw.retired===true||raw.hasRetired===true
+    isRetired:raw.isRetired===true||raw.retired===true||raw.hasRetired===true,
+    retired:raw.retired===true,
+    hasRetired:raw.hasRetired===true,
+    contractYearsRemaining:raw.contractYearsRemaining??raw.yearsRemaining??raw.contractLength??raw.contractYears??null,
+    contractSalary:raw.contractSalary??raw.salary??raw.capHit??raw.currentSalary??null,
+    contractBonus:raw.contractBonus??raw.signingBonus??raw.bonus??null
   };
 }
 
@@ -2030,28 +2042,59 @@ function lifecycleDiffEvents(previous=[],current=[],previousSession,currentSessi
 
 
 async function applyIncrementalLifecycleFreeAgents(db,leagueId,events,currentRows=[],currentSessionId=null){
-  const releasedEvents=events.filter(event=>event.eventType==='release');
-  const acquiredIds=[...new Set(events
-    .filter(event=>['signing','drafted','team-change'].includes(event.eventType))
-    .flatMap(event=>event.playerIds||[])
-    .map(String)
-    .filter(Boolean))];
+  const currentIds=new Set(currentRows.map(row=>String(row.player_id||'')).filter(Boolean));
 
+  // Keep current roster identities fresh.
+  if(typeof upsertHistoricalPlayerDirectory==='function'){
+    await upsertHistoricalPlayerDirectory(db,leagueId,currentRows,currentSessionId,new Date().toISOString());
+  }
+
+  // Remove anyone currently rostered from the FA pool.
+  const rosterIds=[...currentIds];
+  for(let i=0;i<rosterIds.length;i+=75){
+    const ids=rosterIds.slice(i,i+75);
+    const marks=ids.map(()=>'?').join(',');
+    if(ids.length){
+      await db.prepare(`DELETE FROM canonical_free_agents
+        WHERE league_id=? AND player_id IN (${marks})`).bind(leagueId,...ids).run();
+    }
+  }
+
+  // Explicitly released players become free agents.
+  const releases=events.filter(event=>event.eventType==='release');
   const releaseStatements=[];
-  for(const event of releasedEvents){
+
+  for(const event of releases){
     const playerId=String(event.playerIds?.[0]||'');
     if(!playerId)continue;
+
+    const historical=await db.prepare(`SELECT * FROM canonical_historical_player_directory
+      WHERE league_id=? AND player_id=? LIMIT 1`).bind(leagueId,playerId).first();
+
     const move=event.raw?.moves?.[0]||{};
-    let raw=move?.oldRaw||move?.newRaw||{};
-    let previous=currentRows.find(row=>String(row.player_id)===playerId)||null;
-    if(!previous){
-      previous=await db.prepare(`SELECT h.* FROM canonical_historical_player_states h
-        JOIN canonical_capture_lifecycle_sessions s ON s.league_id=h.league_id AND s.session_id=h.snapshot_id
-        WHERE h.league_id=? AND h.player_id=? ORDER BY s.received_at DESC LIMIT 1`)
-        .bind(leagueId,playerId).first();
+    const raw=(historical?.raw_json?parse(historical.raw_json,{}):null)||
+      move?.oldRaw||move?.newRaw||{};
+
+    const status=String(
+      raw.rosterStatus??raw.status??historical?.last_roster_status??''
+    ).toLowerCase();
+
+    const explicitlyRetired=
+      Number(historical?.retired||0)===1 ||
+      raw.isRetired===true || raw.retired===true || raw.hasRetired===true ||
+      /(^|\b)(retired|retirement)(\b|$)/i.test(status);
+
+    if(explicitlyRetired){
+      await db.prepare(`DELETE FROM canonical_free_agents
+        WHERE league_id=? AND player_id=?`).bind(leagueId,playerId).run();
+      continue;
     }
-    if((!raw||!Object.keys(raw).length)&&previous)raw=parse(previous.raw_json,{})||{};
-    const meta=rawPlayerMeta(raw,previous||move||{});
+
+    const meta=rawPlayerMeta(raw,{
+      player_name:historical?.player_name||move.playerName||null,
+      position:historical?.position||move.position||null
+    });
+
     releaseStatements.push(db.prepare(`INSERT INTO canonical_free_agents
       (league_id,player_id,player_name,position,overall,age,dev_trait,source_route,source_capture_id,raw_json,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
@@ -2066,33 +2109,54 @@ async function applyIncrementalLifecycleFreeAgents(db,leagueId,events,currentRow
         raw_json=excluded.raw_json,
         updated_at=CURRENT_TIMESTAMP`)
       .bind(
-        leagueId,playerId,meta.playerName,meta.position,meta.overall,meta.age,meta.devTrait,
-        'capture-lifecycle',currentSessionId,
-        JSON.stringify({...meta.raw,teamId:'FA',rosterStatus:'free-agent',status:'free-agent',isFreeAgent:true})
+        leagueId,playerId,
+        historical?.player_name||meta.playerName||move.playerName||`Player ${playerId}`,
+        historical?.position||meta.position||move.position||null,
+        historical?.overall??meta.overall??move.overall??null,
+        historical?.age??meta.age??null,
+        historical?.dev_trait??meta.devTrait??null,
+        'capture-lifecycle',
+        currentSessionId,
+        JSON.stringify({
+          ...raw,
+          teamId:'FA',
+          rosterStatus:'free-agent',
+          status:'free-agent',
+          isFreeAgent:true,
+          historicalPlayer:true,
+          historicalPlayerId:playerId,
+          lastTeamId:historical?.last_team_id||move.fromTeamId||null
+        })
       ));
   }
-  for(let i=0;i<releaseStatements.length;i+=100)await db.batch(releaseStatements.slice(i,i+100));
 
-  // Any player present on the current roster must not remain in the inferred FA pool.
-  const rosterIds=[...new Set(currentRows.map(row=>String(row.player_id||'')).filter(Boolean))];
-  const removeIds=[...new Set([...acquiredIds,...rosterIds])];
-  for(let i=0;i<removeIds.length;i+=75){
-    const ids=removeIds.slice(i,i+75);
-    if(!ids.length)continue;
-    const marks=ids.map(()=>'?').join(',');
-    await db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND player_id IN (${marks})`)
-      .bind(leagueId,...ids).run();
+  for(let i=0;i<releaseStatements.length;i+=100){
+    await db.batch(releaseStatements.slice(i,i+100));
   }
 
-  const count=Number((await db.prepare(`SELECT COUNT(*) c FROM canonical_free_agents WHERE league_id=?`)
-    .bind(leagueId).first())?.c||0);
+  // Remove acquisitions from FA pool.
+  const acquired=[...new Set(events
+    .filter(event=>['signing','drafted','team-change'].includes(event.eventType))
+    .flatMap(event=>event.playerIds||[])
+    .map(String).filter(Boolean))];
+
+  for(let i=0;i<acquired.length;i+=75){
+    const ids=acquired.slice(i,i+75);
+    if(!ids.length)continue;
+    const marks=ids.map(()=>'?').join(',');
+    await db.prepare(`DELETE FROM canonical_free_agents
+      WHERE league_id=? AND player_id IN (${marks})`).bind(leagueId,...ids).run();
+  }
+
+  const currentFreeAgents=Number((await db.prepare(`SELECT COUNT(*) c
+    FROM canonical_free_agents WHERE league_id=?`).bind(leagueId).first())?.c||0);
 
   return{
-    currentFreeAgents:count,
-    releasesObserved:releasedEvents.length,
-    acquisitionsRemoved:acquiredIds.length,
+    currentFreeAgents,
+    releasesObserved:releases.length,
+    acquisitionsRemoved:acquired.length,
     latestSessionId:currentSessionId,
-    strategy:'incremental-delta'
+    strategy:'explicit-release-only'
   };
 }
 
@@ -2257,6 +2321,46 @@ export async function onRequestPost(context){
     const freeAgents=await applyIncrementalLifecycleFreeAgents(state.db,state.league.id,events,currentRows,current.session_id);
     return json({ok:true,release:RELEASE,repaired:true,events:events.length,created,deduped,drafted,signings,releases,freeAgents,
       previousSessionId:previous.session_id,currentSessionId:current.session_id});
+  }
+
+  if(action==='repair-free-agent-pool'){
+    await ensureSchema(state.db);
+    const currentSession=(await state.db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
+      WHERE league_id=? AND status='complete' ORDER BY received_at DESC,session_id DESC LIMIT 1`)
+      .bind(state.league.id).first())||null;
+    if(!currentSession)return json({ok:false,release:RELEASE,error:'No complete lifecycle session is available.'},409);
+
+    const previous=await state.db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
+      WHERE league_id=? AND status='complete' AND received_at<?
+      ORDER BY received_at DESC,session_id DESC LIMIT 1`)
+      .bind(state.league.id,currentSession.received_at).first();
+
+    const currentRows=await captureLifecycleRows(state.db,state.league.id,currentSession.session_id);
+    const previousRows=previous?await captureLifecycleRows(state.db,state.league.id,previous.session_id):[];
+
+    await state.db.prepare(`DELETE FROM canonical_free_agents
+      WHERE league_id=? AND source_route IN ('historical-directory','capture-lifecycle','forward-detection')`)
+      .bind(state.league.id).run();
+
+    let events=[];
+    if(previous){
+      events=lifecycleDiffEvents(previousRows,currentRows,previous.session_id,currentSession.session_id,currentSession.received_at);
+    }
+
+    const freeAgents=await applyIncrementalLifecycleFreeAgents(
+      state.db,state.league.id,events,currentRows,currentSession.session_id
+    );
+
+    return json({
+      ok:true,release:RELEASE,repaired:true,
+      previousSessionId:previous?.session_id||null,
+      currentSessionId:currentSession.session_id,
+      events:events.length,
+      releases:events.filter(e=>e.eventType==='release').length,
+      signings:events.filter(e=>e.eventType==='signing').length,
+      drafted:events.filter(e=>e.eventType==='drafted').length,
+      freeAgents
+    });
   }
 
   if(action==='dedupe-test'){
