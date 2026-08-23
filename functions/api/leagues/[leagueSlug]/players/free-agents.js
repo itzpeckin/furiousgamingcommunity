@@ -1,7 +1,7 @@
 /* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e6a';
+const RELEASE='5.9.10.6.5.4h-p5e6b';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const text=v=>v==null?null:(String(v).trim()||null);
@@ -80,12 +80,39 @@ async function canonicalInferredFreeAgents(db,leagueId){
   }
 }
 
+async function retiredPlayerIds(db,leagueId){
+  const ids=new Set();
+
+  // Historical directory explicit retirement state.
+  try{
+    const rows=(await db.prepare(`SELECT player_id FROM canonical_historical_player_directory
+      WHERE league_id=? AND retired=1 LIMIT 2500`).bind(leagueId).all()).results||[];
+    for(const row of rows)if(row.player_id!=null)ids.add(String(row.player_id));
+  }catch{}
+
+  // Explicit canonical retirement transactions.
+  try{
+    const rows=(await db.prepare(`SELECT player_ids_json FROM canonical_transactions
+      WHERE league_id=? AND LOWER(event_type) IN ('retired','retirement')
+      ORDER BY created_at DESC LIMIT 1000`).bind(leagueId).all()).results||[];
+    for(const row of rows){
+      try{
+        const list=JSON.parse(row.player_ids_json||'[]');
+        for(const id of Array.isArray(list)?list:[])if(id!=null)ids.add(String(id));
+      }catch{}
+    }
+  }catch{}
+
+  return ids;
+}
+
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);
   if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);
   const db=database(context.env),league=db?await resolveLeague(context.env,slug):null;
   if(!db||!league)return json({ok:false,error:'League not found.'},404);
 
+  const retiredIds=await retiredPlayerIds(db,league.id);
   const rows=await captures(db,league.id);
   const attempts=[];
   let selected=null,players=[],retiredFiltered=0;
@@ -107,7 +134,8 @@ export async function onRequestGet(context){
     if(!selected&&success){
       selected=capture;
       retiredFiltered=list.filter(retiredRecord).length;
-      players=list.filter(raw=>!retiredRecord(raw)).map(playerShape).filter(Boolean);
+      players=list.filter(raw=>!retiredRecord(raw)).map(playerShape).filter(Boolean)
+        .filter(player=>!retiredIds.has(String(player.id)));
     }
   }
 
@@ -118,7 +146,7 @@ export async function onRequestGet(context){
   }
   for(const row of inferredRows){
     const raw=(()=>{try{return JSON.parse(row.raw_json||'{}')}catch{return{}}})();
-    if(retiredRecord(raw))continue;
+    if(retiredIds.has(String(row.player_id))||retiredRecord(raw))continue;
     const shaped=playerShape({
       ...raw,
       playerId:row.player_id,
@@ -150,7 +178,8 @@ export async function onRequestGet(context){
     rawCompanionCount:players.length,
     inferredCount:inferredRows.length,
     count:mergedPlayers.length,
-    retiredFiltered,
+    retiredFiltered:retiredFiltered+retiredIds.size,
+    explicitRetiredIdCount:retiredIds.size,
     players:mergedPlayers,
     attempts
   });
