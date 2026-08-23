@@ -2,7 +2,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e7';
+const RELEASE='5.9.10.6.5.4h-p5e8';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -2327,45 +2327,68 @@ export async function onRequestPost(context){
   if(action==='repair-team-change-trades'){
     await ensureSchema(state.db);
 
-    // Step 1: revert every snapshot-only trade. P5e6a created many false trades.
-    const falseRows=(await state.db.prepare(`SELECT DISTINCT t.id
-      FROM canonical_transactions t
-      WHERE t.league_id=? AND t.event_type='trade'
-        AND COALESCE(t.workflow_trade_id,'')=''
-        AND NOT EXISTS (
-          SELECT 1 FROM canonical_transaction_evidence e
-          WHERE e.transaction_id=t.id
-            AND e.source_type IN ('madden-explicit','franchisehq-workflow')
-        )
-      LIMIT 1500`).bind(state.league.id).all()).results||[];
+    // Madden Companion does not currently give this ledger an explicit trade marker.
+    // A trade is therefore reconstructed ONLY from reciprocal movement evidence:
+    // same player + same reconciliation session/time cluster + both from-team and to-team.
+    const candidates=(await state.db.prepare(`SELECT id,event_type,player_ids_json,
+        from_team_id,to_team_id,source_session_id,occurred_at,created_at,updated_at,
+        workflow_trade_id
+      FROM canonical_transactions
+      WHERE league_id=? AND event_type IN ('team-change','trade')
+      ORDER BY COALESCE(occurred_at,updated_at,created_at) ASC
+      LIMIT 2500`).bind(state.league.id).all()).results||[];
 
-    for(let i=0;i<falseRows.length;i+=75){
-      const ids=falseRows.slice(i,i+75).map(row=>String(row.id));
-      if(!ids.length)continue;
+    const groups=new Map();
+    for(const row of candidates){
+      let ids=[];
+      try{ids=JSON.parse(row.player_ids_json||'[]')}catch{}
+      for(const rawId of Array.isArray(ids)?ids:[]){
+        const pid=String(rawId||'').trim();
+        if(!pid)continue;
+        const bucket=String(row.source_session_id||'').trim()||
+          String(row.occurred_at||row.updated_at||row.created_at||'').slice(0,16);
+        const key=`${pid}|${bucket}`;
+        if(!groups.has(key))groups.set(key,[]);
+        groups.get(key).push(row);
+      }
+    }
+
+    const confirmed=new Set();
+    for(const rows of groups.values()){
+      // Strong pair: one row establishes departure and another establishes arrival,
+      // or a single canonical row already has both different teams.
+      for(const row of rows){
+        const from=String(row.from_team_id||'').trim();
+        const to=String(row.to_team_id||'').trim();
+        if(from&&to&&from!==to){confirmed.add(String(row.id));continue;}
+        if(row.workflow_trade_id){confirmed.add(String(row.id));}
+      }
+      const departures=rows.filter(r=>String(r.from_team_id||'').trim());
+      const arrivals=rows.filter(r=>String(r.to_team_id||'').trim());
+      if(departures.length&&arrivals.length){
+        for(const d of departures)for(const a of arrivals){
+          const from=String(d.from_team_id||'').trim();
+          const to=String(a.to_team_id||'').trim();
+          if(from&&to&&from!==to){
+            confirmed.add(String(d.id));confirmed.add(String(a.id));
+          }
+        }
+      }
+    }
+
+    const allIds=candidates.map(r=>String(r.id));
+    const falseIds=allIds.filter(id=>!confirmed.has(id));
+
+    for(let i=0;i<falseIds.length;i+=75){
+      const ids=falseIds.slice(i,i+75);
       await state.db.prepare(`UPDATE canonical_transactions
-        SET event_type='team-change',
-            authority='snapshot-inferred',
-            execution_status='observed-roster',
-            updated_at=CURRENT_TIMESTAMP
+        SET event_type='team-change',updated_at=CURRENT_TIMESTAMP
         WHERE league_id=? AND id IN (${ids.map(()=>'?').join(',')})`)
         .bind(state.league.id,...ids).run();
     }
-
-    // Step 2: retain/promote only strong evidence trades.
-    const strongRows=(await state.db.prepare(`SELECT DISTINCT t.id
-      FROM canonical_transactions t
-      LEFT JOIN canonical_transaction_evidence e ON e.transaction_id=t.id
-      WHERE t.league_id=?
-        AND (
-          COALESCE(t.workflow_trade_id,'')<>''
-          OR e.source_type IN ('madden-explicit','franchisehq-workflow')
-        )
-        AND t.event_type IN ('team-change','trade')
-      LIMIT 1500`).bind(state.league.id).all()).results||[];
-
-    for(let i=0;i<strongRows.length;i+=75){
-      const ids=strongRows.slice(i,i+75).map(row=>String(row.id));
-      if(!ids.length)continue;
+    const confirmedIds=[...confirmed];
+    for(let i=0;i<confirmedIds.length;i+=75){
+      const ids=confirmedIds.slice(i,i+75);
       await state.db.prepare(`UPDATE canonical_transactions
         SET event_type='trade',updated_at=CURRENT_TIMESTAMP
         WHERE league_id=? AND id IN (${ids.map(()=>'?').join(',')})`)
@@ -2373,12 +2396,11 @@ export async function onRequestPost(context){
     }
 
     return json({
-      ok:true,
-      release:RELEASE,
-      repaired:true,
-      revertedFalseTrades:falseRows.length,
-      confirmedTrades:strongRows.length,
-      rule:'trade requires workflowTradeId, madden-explicit, or franchisehq-workflow evidence'
+      ok:true,release:RELEASE,repaired:true,
+      scanned:candidates.length,
+      confirmedTrades:confirmedIds.length,
+      teamChanges:falseIds.length,
+      rule:'trade requires reciprocal same-player movement or workflow evidence'
     });
   }
 
