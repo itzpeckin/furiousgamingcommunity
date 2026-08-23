@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p5e7',
+      release:'5.9.10.6.5.4h-p5e8',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2789,7 +2789,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p5e7 — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p5e8 — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -6277,7 +6277,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ.transactionRecovery={
-    release:'5.9.10.6.5.4h-p5e7',
+    release:'5.9.10.6.5.4h-p5e8',
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
@@ -6285,7 +6285,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
-      release:'5.9.10.6.5.4h-p5e7',
+      release:'5.9.10.6.5.4h-p5e8',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
       route:routeBase(location.hash.slice(1))
@@ -6299,7 +6299,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'5.9.10.6.5.4h-p5e7',
+      release:'5.9.10.6.5.4h-p5e8',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6312,7 +6312,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'5.9.10.6.5.4h-p5e7',
+      release:'5.9.10.6.5.4h-p5e8',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -8180,7 +8180,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5e7';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5e8';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9475,9 +9475,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5e7';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5e8';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5e7';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5e8';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9489,7 +9489,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p5e7',
+    release:'5.9.10.6.5.4h-p5e8',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9503,7 +9503,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p5e7',
+        release:'5.9.10.6.5.4h-p5e8',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -10129,7 +10129,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p5e7',
+    release:'5.9.10.6.5.4h-p5e8',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -10198,7 +10198,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.snapshotValidationDiagnostic={
-    release:'5.9.10.6.5.4h-p5e7',
+    release:'5.9.10.6.5.4h-p5e8',
     print:async()=>{
       const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
       const owner=window.FGC_TRADE?.getCurrentAccount?.()?.id||'owner-tb';
@@ -10219,7 +10219,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const snapshots=Array.isArray(payload?.snapshots)?payload.snapshots:[];
       const failed=snapshots.filter(s=>String(s.validationStatus||'').toLowerCase()==='failed');
       console.log('[Snapshot Validation Diagnostic]',JSON.stringify({
-        release:'5.9.10.6.5.4h-p5e7',
+        release:'5.9.10.6.5.4h-p5e8',
         http:r.status,
         activeSnapshotId:payload?.activeSnapshotId||payload?.active?.snapshot_id||null,
         latestSnapshot:snapshots[0]||null,
@@ -10231,7 +10231,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.lifecycleRepair={
-    release:'5.9.10.6.5.4h-p5e7',
+    release:'5.9.10.6.5.4h-p5e8',
     run:async()=>{
       const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
       const owner=window.FGC_TRADE?.getCurrentAccount?.()?.id||'owner-tb';
@@ -10308,11 +10308,55 @@ function canonicalPlayerDashboardStats(playerId='') {
         rawCompanionCount:payload.rawCompanionCount,
         explicitRetiredIdCount:payload.explicitRetiredIdCount,
         currentRosterIdCount:payload.currentRosterIdCount,
+        resolvedIdentityCount:payload.resolvedIdentityCount,
+        unresolvedIdentityCount:payload.unresolvedIdentityCount,
         sample:(payload.players||[]).slice(0,20).map(p=>({
           id:p.id,name:p.name,position:p.position,overall:p.overall
         }))
       });
       return payload;
+    }
+  };
+
+
+  async function mergeTransactionDerivedFreeAgentsIntoPlayerDirectory(){
+    try{
+      const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
+      const r=await fetch(`/api/leagues/${encodeURIComponent(slug)}/players/free-agents?_fhq=${Date.now()}`,{
+        credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}
+      });
+      if(!r.ok)return {ok:false,http:r.status};
+      const payload=await r.json();
+      const fas=Array.isArray(payload.players)?payload.players:[];
+      const targets=[
+        window.FranchiseHQ?.players,
+        window.FGC_APP?.players
+      ].filter(Boolean);
+      for(const target of targets){
+        if(!Array.isArray(target))continue;
+        const byId=new Map(target.map(p=>[String(p?.id??p?.playerId??p?.externalId??''),p]));
+        for(const fa of fas){
+          const id=String(fa?.id??fa?.playerId??fa?.externalId??'');
+          if(!id)continue;
+          const existing=byId.get(id);
+          const patch={...fa,teamId:'FA',team:'FA',rosterStatus:'free-agent',
+            status:'free-agent',isFreeAgent:true};
+          if(existing)Object.assign(existing,patch);
+          else {target.push(patch);byId.set(id,patch);}
+        }
+      }
+      return {ok:true,count:fas.length,resolvedIdentityCount:payload.resolvedIdentityCount,
+        unresolvedIdentityCount:payload.unresolvedIdentityCount};
+    }catch(error){return {ok:false,error:String(error?.message||error)}}
+  }
+
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.freeAgentDirectoryRepair={
+    run:async()=>{
+      const result=await mergeTransactionDerivedFreeAgentsIntoPlayerDirectory();
+      console.log('[Free Agent Directory Repair]',result);
+      try{window.FGC_APP?.render?.()}catch{}
+      return result;
     }
   };
 
@@ -10393,9 +10437,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p5e7 — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p5e8 — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p5e7';
+  const RELEASE='5.9.10.6.5.4h-p5e8';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
