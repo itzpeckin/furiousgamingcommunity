@@ -1,7 +1,7 @@
 /* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e7';
+const RELEASE='5.9.10.6.5.4h-p5e8';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 
 const text=v=>v==null?null:(String(v).trim()||null);
@@ -138,6 +138,49 @@ async function activeRosterIds(db,leagueId){
   }
 }
 
+
+async function snapshotPlayerIdentityByExternalIds(db,leagueId,playerIds){
+  const wanted=new Set((playerIds||[]).map(String));
+  const found=new Map();
+  if(!wanted.size)return found;
+
+  // Search recent player snapshot records and match every Madden ID alias.
+  // This deliberately does not require canonical player_id == Madden playerId.
+  try{
+    const rows=(await db.prepare(`SELECT r.external_id,r.data_json,r.snapshot_id,r.created_at
+      FROM league_snapshot_records r
+      JOIN league_snapshots s ON s.snapshot_id=r.snapshot_id
+      WHERE r.league_id=? AND r.domain='players'
+      ORDER BY s.created_at DESC
+      LIMIT 12000`).bind(leagueId).all()).results||[];
+
+    for(const row of rows){
+      const raw=parseJson(row.data_json,{})||{};
+      const aliases=[
+        row.external_id,raw.external_id,raw.externalId,raw.playerId,raw.player_id,
+        raw.rosterId,raw.roster_id,raw.id,raw.maddenId,raw.madden_id
+      ].filter(v=>v!==null&&v!==undefined&&String(v).trim()).map(String);
+
+      const match=aliases.find(id=>wanted.has(id));
+      if(!match||found.has(match))continue;
+
+      found.set(match,{
+        player_id:match,
+        player_name:raw.displayName||raw.fullName||raw.playerName||raw.name||
+          [raw.firstName,raw.lastName].filter(Boolean).join(' ')||null,
+        position:raw.position||raw.pos||raw.positionName||null,
+        overall:raw.overall??raw.overallRating??raw.ovr??null,
+        age:raw.age??null,
+        dev_trait:raw.devTrait??raw.developmentTrait??raw.dev_trait??null,
+        raw_json:JSON.stringify(raw),
+        last_seen_snapshot_id:row.snapshot_id,
+        last_seen_at:row.created_at
+      });
+    }
+  }catch{}
+  return found;
+}
+
 async function transactionDerivedFreeAgents(db,leagueId,retiredIds,currentRosterIds){
   // We only need lifecycle transactions that can change FA state.
   const txRows=(await db.prepare(`SELECT id,event_type,player_ids_json,created_at,updated_at,occurred_at
@@ -219,6 +262,23 @@ async function transactionDerivedFreeAgents(db,leagueId,retiredIds,currentRoster
         identities.set(id,{...(identities.get(id)||{}),...row});
       }
     }catch{}
+  }
+
+  const snapshotIdentities=await snapshotPlayerIdentityByExternalIds(db,leagueId,freeAgentIds);
+  for(const [id,snap] of snapshotIdentities){
+    const old=identities.get(id)||{};
+    identities.set(id,{
+      ...snap,
+      ...old,
+      player_name:old.player_name||snap.player_name,
+      position:old.position||snap.position,
+      overall:old.overall??snap.overall,
+      age:old.age??snap.age,
+      dev_trait:old.dev_trait??snap.dev_trait,
+      raw_json:(old.raw_json&&old.raw_json!=='{}')?old.raw_json:snap.raw_json,
+      last_seen_snapshot_id:old.last_seen_snapshot_id||snap.last_seen_snapshot_id,
+      last_seen_at:old.last_seen_at||snap.last_seen_at
+    });
   }
 
   return freeAgentIds.map(playerId=>{
@@ -333,6 +393,8 @@ export async function onRequestGet(context){
     inferredCount:inferredRows.length,
     transactionDerivedCount:inferredRows.length,
     currentRosterIdCount:currentRosterIds.size,
+    resolvedIdentityCount:mergedPlayers.filter(p=>p?.name&&!/^Player\s+\d+$/i.test(String(p.name))).length,
+    unresolvedIdentityCount:mergedPlayers.filter(p=>!p?.name||/^Player\s+\d+$/i.test(String(p.name))).length,
     count:mergedPlayers.length,
     retiredFiltered:retiredFiltered+retiredIds.size,
     explicitRetiredIdCount:retiredIds.size,
