@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e5 */
+/* FHQ_BUILD: 5.9.11.0 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.10.6.5.4h-p5e5';
+const RELEASE='5.9.11.0';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -95,14 +95,6 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
 
     if(delta?.unchanged&&delta?.activeSnapshot?.id){
       ctx.snapshotId=String(delta.activeSnapshot.id);
-      let lifecycleRepair=null;
-      try{
-        lifecycleRepair=await step.do('repair-latest-lifecycle',()=>call(
-          ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'repair-latest-lifecycle'}
-        ));
-      }catch(error){
-        console.warn?.('[Lifecycle Repair]',error);
-      }
       return {
         ok:true,
         release:RELEASE,
@@ -110,7 +102,6 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
         noNewExport:Boolean(delta.noNewExport),
         snapshotId:ctx.snapshotId,
         runId:null,
-        lifecycleRepair,
         durationMs:Date.now()-workflowStartedAt
       };
     }
@@ -135,72 +126,19 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     await simple(ctx,step,'map-teams','map-teams',p=>`${p.teams?.length??p.mappingRun?.teamCount??'?'} teams mapped`);
 
     if(reusePlayers){
-      ctx.lifecycleReconciliation={
-        processedSessions:0,
-        eventCount:0,
-        freeAgents:null,
-        skipped:true,
-        reusedPlayers:true
-      };
-      // Lifecycle reconstruction is auxiliary work, not an orchestrator stage.
-      // Only advance the orchestrator through its expected map-players stage.
       await report(ctx,'map-players',true,{
         summary:`${Number(delta?.reusablePlayerPreviewCount||0)} players reused · roster unchanged`,
         reused:true
       });
     }else{
-      const plan=await stage(ctx,step,'reconstruct-player-lifecycle',()=>call(
-        ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',{action:'capture-lifecycle-plan'}
-      ));
-      const pending=(plan?.sessions||[]).filter(row=>!row.processed);
-      let processed=0;
-      const processedSessionIds=[];
-      for(const session of pending){
-        await step.do(`lifecycle-${processed+1}`,{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
-          ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',
-          {action:'capture-lifecycle-session',sessionId:session.sessionId}
-        ));
-        processedSessionIds.push(session.sessionId);
-        processed++;
-      }
-      const finalized=processedSessionIds.length
-        ? await step.do('lifecycle-finalize',()=>call(
-            ctx.origin,transactions(ctx.slug,'canonical'),ctx.owner,'POST',
-            {action:'capture-lifecycle-finalize',sessionIds:processedSessionIds,incremental:true}
-          ))
-        : {eventCount:0,freeAgents:null,incremental:true,skipped:true};
-
-      ctx.lifecycleReconciliation={
-        ...finalized,
-        processedSessions:processedSessionIds.length,
-        skipped:processedSessionIds.length===0,
-        planStrategy:plan?.strategy||null,
-        planDurationMs:Number(plan?.durationMs||0),
-        ignoredHistoricalCandidateCount:Number(plan?.ignoredHistoricalCandidateCount||0)
-      };
-
-      // Do not report reconstruct-player-lifecycle to the import orchestrator.
-      // Its next expected stage is map-players.
       const mappedPlayers=await stage(ctx,step,'map-players',()=>call(
         ctx.origin,companion(ctx.slug,'map-players'),ctx.owner,'POST',{compact:true}
       ));
       ctx.playerMappingRunId=mappedPlayers?.mappingRun?.id||null;
       if(!ctx.playerMappingRunId)throw new Error('Map Players completed without returning its exact mapping run ID.');
       const total=mappedPlayers?.mappingRun?.playerCount??mappedPlayers?.playerCount??'?';
-      const fas=mappedPlayers?.lifecycleFreeAgentCount??mappedPlayers?.mappingRun?.freeAgentCount??0;
-      await report(ctx,'map-players',true,{
-        summary:`${total} players mapped · ${fas} Free Agent(s)`,
-        lifecycle:{
-          strategy:ctx.lifecycleReconciliation?.strategy||ctx.lifecycleReconciliation?.planStrategy||null,
-          processedSessions:Number(ctx.lifecycleReconciliation?.processedSessions||0),
-          eventCount:Number(ctx.lifecycleReconciliation?.eventCount||0),
-        drafted:Number(ctx.lifecycleReconciliation?.drafted||0),
-          durationMs:Number(ctx.lifecycleReconciliation?.durationMs||0),
-          ignoredHistoricalCandidateCount:Number(ctx.lifecycleReconciliation?.ignoredHistoricalCandidateCount||0),
-          routeCount:Number(ctx.lifecycleReconciliation?.routeCount||0),
-          spreadMs:Number(ctx.lifecycleReconciliation?.spreadMs||0)
-        }
-      });
+      const fas=mappedPlayers?.mappingRun?.freeAgentCount??0;
+      await report(ctx,'map-players',true,{summary:`${total} players mapped · ${fas} source Free Agent(s)`});
     }
 
     await simple(ctx,step,'map-schedule','map-schedule',p=>`${p.games?.length??p.mappingRun?.gameCount??'?'} games mapped`);
@@ -296,55 +234,13 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint {
     ));
     await report(ctx,'activate-snapshot',true,{summary:`LIVE · ${ctx.snapshotId}`,snapshotId:ctx.snapshotId});
 
-    let detection=await step.do('transactions-detect-start',{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
-      ctx.origin,transactions(ctx.slug,'forward-detection'),ctx.owner,'POST',{action:'start'}
-    ));
-    let detectGuard=0;
-    while(!detection.complete&&detectGuard<20){
-      detection=await step.do(`transactions-detect-next-${detectGuard+1}`,{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
-        ctx.origin,transactions(ctx.slug,'forward-detection'),ctx.owner,'POST',{action:'next',limit:750}
-      ));
-      detectGuard++;
-    }
-    if(detectGuard>=20)throw new Error('Forward transaction detection stopped after 20 batches.');
-    await report(ctx,'detect-transactions',true,{summary:`${Number(detection?.job?.movementCount||0)} movement(s) detected`,snapshotId:ctx.snapshotId});
-
-    const classified=await stage(ctx,step,'classify-transactions',()=>call(
-      ctx.origin,transactions(ctx.slug,'classification'),ctx.owner,'POST',{action:'classify'}
-    ));
-    await report(ctx,'classify-transactions',true,{summary:`${Number(classified?.classifiedCount||0)} classified`,snapshotId:ctx.snapshotId});
-
-    // Lifecycle reconciliation already ran once, incrementally, before player mapping.
-    // Do NOT rescan historical lifecycle sessions here.
-    const reconciled=ctx.lifecycleReconciliation||{eventCount:0,processedSessions:0,skipped:true};
-    await step.do('reconcile-transactions',async()=>({
-      ok:true,
-      incremental:true,
-      reusedLifecycleResult:true,
-      eventCount:Number(reconciled?.eventCount||0),
-      processedSessions:Number(reconciled?.processedSessions||0)
-    }));
-    await report(ctx,'reconcile-transactions',true,{
-      summary:`${Number(reconciled?.eventCount||0)} lifecycle event(s) · ${Number(reconciled?.processedSessions||0)} new session(s) reconciled`,
-      snapshotId:ctx.snapshotId
-    });
-
+    // 5.9.11.0: transaction/FA reconstruction is quarantined from the import critical path.
     const verified=await stage(ctx,step,'verify-active-snapshot',()=>call(
       ctx.origin,companion(ctx.slug,'snapshot-verification'),ctx.owner
     ));
     const active=verified?.snapshot?.id||verified?.snapshot?.snapshotId||verified?.activeSnapshotId||null;
     if(active&&String(active)!==String(ctx.snapshotId))throw new Error(`Verification returned different active snapshot (${active}).`);
     await report(ctx,'verify-active-snapshot',true,{summary:'LIVE snapshot verified',snapshotId:ctx.snapshotId});
-
-    // Canonical lifecycle/free-agent state was already finalized incrementally.
-    // Publishing is now a lightweight confirmation step rather than another historical rescan.
-    const published=await step.do('publish-transactions',async()=>({
-      ok:true,
-      incremental:true,
-      reusedLifecycleResult:true,
-      eventCount:Number(ctx.lifecycleReconciliation?.eventCount||0),
-      freeAgents:ctx.lifecycleReconciliation?.freeAgents||null
-    }));
 
     // Certification is server-side now as well. Failure here does not undo the already-verified LIVE snapshot.
     await step.do('certification',{retries:{limit:1,delay:'2 seconds'},timeout:'5 minutes'},()=>call(
