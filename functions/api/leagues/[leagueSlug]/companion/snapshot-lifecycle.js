@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e3 */
+/* FHQ_BUILD: 5.9.11.0 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.5.4h-p5e3',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='5.9.11.0',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
