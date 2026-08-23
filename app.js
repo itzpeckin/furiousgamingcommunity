@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p5e',
+      release:'5.9.10.6.5.4h-p5e1',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2789,7 +2789,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p5e — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p5e1 — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -6176,35 +6176,29 @@ function canonicalPlayerDashboardStats(playerId='') {
   let canonicalTransactionUiCache={payload:null,promise:null,loadedAt:0,snapshotId:''};
 
   function hydrateCanonicalTransactionSessionCache(){
+    // P5e1: full transaction payloads are intentionally NOT restored from sessionStorage.
+    // The ledger can exceed browser storage quotas. Keep the authoritative payload in memory.
     try{
       const raw=sessionStorage.getItem(TRANSACTION_SESSION_CACHE_KEY);
       if(!raw)return;
       const cached=JSON.parse(raw);
-      const loadedAt=Number(cached?.loadedAt||0);
-      if(!loadedAt||Date.now()-loadedAt>TRANSACTION_SESSION_TTL_MS){
-        sessionStorage.removeItem(TRANSACTION_SESSION_CACHE_KEY);
-        return;
-      }
-      if(cached?.payload&&Array.isArray(cached.payload.transactions)){
-        canonicalTransactionUiCache.payload=cached.payload;
-        canonicalTransactionUiCache.loadedAt=loadedAt;
-        canonicalTransactionUiCache.snapshotId=String(cached.snapshotId||'');
-      }
-    }catch(error){
-      console.warn('[Transactions Session Cache] hydrate failed',error);
+      canonicalTransactionUiCache.loadedAt=Number(cached?.loadedAt||0);
+      canonicalTransactionUiCache.snapshotId=String(cached?.snapshotId||'');
+      sessionStorage.removeItem(TRANSACTION_SESSION_CACHE_KEY);
+    }catch{
+      try{sessionStorage.removeItem(TRANSACTION_SESSION_CACHE_KEY)}catch{}
     }
   }
 
   function persistCanonicalTransactionSessionCache(){
+    // Store only tiny metadata. Never serialize the full canonical ledger.
     try{
-      if(!canonicalTransactionUiCache.payload||!canonicalTransactionUiCache.loadedAt)return;
       sessionStorage.setItem(TRANSACTION_SESSION_CACHE_KEY,JSON.stringify({
-        loadedAt:canonicalTransactionUiCache.loadedAt,
-        snapshotId:String(canonicalTransactionUiCache.snapshotId||liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||liveTeamDirectory?.snapshot?.snapshot_id||''),
-        payload:canonicalTransactionUiCache.payload
+        loadedAt:canonicalTransactionUiCache.loadedAt||Date.now(),
+        snapshotId:String(canonicalTransactionUiCache.snapshotId||'')
       }));
-    }catch(error){
-      console.warn('[Transactions Session Cache] persist skipped',error);
+    }catch{
+      try{sessionStorage.removeItem(TRANSACTION_SESSION_CACHE_KEY)}catch{}
     }
   }
 
@@ -6282,7 +6276,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ.transactionRecovery={
-    release:'5.9.10.6.5.4h-p5e',
+    release:'5.9.10.6.5.4h-p5e1',
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
@@ -6290,7 +6284,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
-      release:'5.9.10.6.5.4h-p5e',
+      release:'5.9.10.6.5.4h-p5e1',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
       route:routeBase(location.hash.slice(1))
@@ -6304,7 +6298,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'5.9.10.6.5.4h-p5e',
+      release:'5.9.10.6.5.4h-p5e1',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6317,7 +6311,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'5.9.10.6.5.4h-p5e',
+      release:'5.9.10.6.5.4h-p5e1',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -8178,7 +8172,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5e';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5e1';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9473,9 +9467,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5e';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5e1';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5e';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5e1';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9487,7 +9481,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p5e',
+    release:'5.9.10.6.5.4h-p5e1',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9501,7 +9495,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p5e',
+        release:'5.9.10.6.5.4h-p5e1',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -10123,7 +10117,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p5e',
+    release:'5.9.10.6.5.4h-p5e1',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -10172,7 +10166,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     try{await window.FranchiseHQ?.transactionUiLoader?.load?.(true)}
     catch(error){console.warn('[Transactions Post Import Refresh]',error)}
 
-    const base=routeBase(location.hash.slice(1));
+    const activeRoute=String(location.hash.slice(1)||'').replace(/^\/?/,'');
+    const base=activeRoute.split('/')[0]||'home';
     if(base==='transactions'){
       renderLeagueTransactions();
     }else if(base==='teams'&&state.teamTab==='trade-history'){
@@ -10188,6 +10183,39 @@ function canonicalPlayerDashboardStats(playerId='') {
 
     setTimeout(warmLeagueReadCaches,0);
   });
+
+  window.FranchiseHQ=window.FranchiseHQ||{};
+  window.FranchiseHQ.snapshotValidationDiagnostic={
+    release:'5.9.10.6.5.4h-p5e1',
+    print:async()=>{
+      const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
+      const owner=window.FGC_TRADE?.getCurrentAccount?.()?.id||'owner-tb';
+      const r=await fetch(`/api/leagues/${encodeURIComponent(slug)}/companion/snapshot-lifecycle?_fhq=${Date.now()}`,{
+        credentials:'same-origin',
+        cache:'no-store',
+        headers:{
+          accept:'application/json',
+          'x-franchisehq-platform-owner-account-id':String(owner)
+        }
+      });
+      const text=await r.text();
+      let payload=null;
+      try{payload=JSON.parse(text)}catch{
+        console.log('[Snapshot Validation Diagnostic]',{http:r.status,contentType:r.headers.get('content-type'),body:text.slice(0,300)});
+        return null;
+      }
+      const snapshots=Array.isArray(payload?.snapshots)?payload.snapshots:[];
+      const failed=snapshots.filter(s=>String(s.validationStatus||'').toLowerCase()==='failed');
+      console.log('[Snapshot Validation Diagnostic]',JSON.stringify({
+        release:'5.9.10.6.5.4h-p5e1',
+        http:r.status,
+        activeSnapshotId:payload?.activeSnapshotId||payload?.active?.snapshot_id||null,
+        latestSnapshot:snapshots[0]||null,
+        latestFailedSnapshot:failed[0]||null
+      },null,2));
+      return payload;
+    }
+  };
 
   function warmLeagueReadCaches(){
 
@@ -10266,9 +10294,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p5e — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p5e1 — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p5e';
+  const RELEASE='5.9.10.6.5.4h-p5e1';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
