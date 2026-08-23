@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.10.6.5.4h-p5e6a',
+      release:'5.9.10.6.5.4h-p5e6b',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2789,7 +2789,7 @@
       const service=liveReadModel();
       if(!service) return null;
 
-      // 5.9.10.6.5.4h-p5e6a — a new activated snapshot must invalidate BOTH layers:
+      // 5.9.10.6.5.4h-p5e6b — a new activated snapshot must invalidate BOTH layers:
       // Live Read Model caches and app-level liveTeamDirectory caches.
       if(force && typeof service.refresh==='function'){
         await service.refresh();
@@ -6277,7 +6277,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ.transactionRecovery={
-    release:'5.9.10.6.5.4h-p5e6a',
+    release:'5.9.10.6.5.4h-p5e6b',
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
@@ -6285,7 +6285,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
-      release:'5.9.10.6.5.4h-p5e6a',
+      release:'5.9.10.6.5.4h-p5e6b',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
       route:routeBase(location.hash.slice(1))
@@ -6299,7 +6299,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'5.9.10.6.5.4h-p5e6a',
+      release:'5.9.10.6.5.4h-p5e6b',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6312,7 +6312,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'5.9.10.6.5.4h-p5e6a',
+      release:'5.9.10.6.5.4h-p5e6b',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -6355,25 +6355,31 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function transactionDisplayType(transaction={}){
-    const type=String(transaction.eventType||transaction.type||'').toLowerCase();
+    const rawType=String(transaction.eventType||transaction.type||'').toLowerCase();
+    const evidence=Array.isArray(transaction.evidence)?transaction.evidence:[];
+    const evidenceTypes=new Set(evidence.map(item=>String(item?.sourceType||'').toLowerCase()));
+    const strongTradeEvidence=
+      Boolean(transaction.workflowTradeId) ||
+      evidenceTypes.has('madden-explicit') ||
+      evidenceTypes.has('franchisehq-workflow') ||
+      String(transaction.authority||'').toLowerCase().includes('madden') ||
+      String(transaction.authority||'').toLowerCase().includes('workflow');
 
-    // A canonical lifecycle "team-change" is a Trade when the player moved
-    // directly from one real team to another. Reserve Team Change for cases
-    // where we cannot establish two distinct NFL teams.
-    if(type==='team-change'){
+    if(rawType==='trade'&&!strongTradeEvidence)return'team-change';
+
+    if(rawType==='team-change'){
       const moves=transactionMoves(transaction);
-      const teamToTeam=moves.some(move=>{
-        const from=String(move?.fromTeamId||'').trim();
-        const to=String(move?.toTeamId||'').trim();
-        return from && to &&
-          from.toUpperCase()!=='FA' &&
-          to.toUpperCase()!=='FA' &&
-          from!==to;
-      });
-      if(teamToTeam)return'trade';
+      const practiceMove=moves.find(m=>
+        String(m?.oldStatus||'').toLowerCase().includes('practice') &&
+        String(m?.fromTeamId||'') &&
+        String(m?.toTeamId||'') &&
+        String(m.fromTeamId)!==String(m.toTeamId)
+      );
+      if(practiceMove)return'signed-off-practice-squad';
+      if(strongTradeEvidence)return'trade';
     }
 
-    return type;
+    return rawType;
   }
   function transactionEventLabel(type=''){
     const key=String(type||'').toLowerCase();
@@ -8174,7 +8180,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5e6a';
+  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.10.6.5.4h-p5e6b';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9469,9 +9475,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5e6a';
+      node.textContent = 'Current Release - 5.9.10.6.5.4h-p5e6b';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5e6a';
+    document.documentElement.dataset.franchiseHqRelease = '5.9.10.6.5.4h-p5e6b';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9483,7 +9489,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.10.6.5.4h-p5e6a',
+    release:'5.9.10.6.5.4h-p5e6b',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9497,7 +9503,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.10.6.5.4h-p5e6a',
+        release:'5.9.10.6.5.4h-p5e6b',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -10123,7 +10129,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.10.6.5.4h-p5e6a',
+    release:'5.9.10.6.5.4h-p5e6b',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
       await loadLiveTeamDirectory(false);
@@ -10192,7 +10198,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.snapshotValidationDiagnostic={
-    release:'5.9.10.6.5.4h-p5e6a',
+    release:'5.9.10.6.5.4h-p5e6b',
     print:async()=>{
       const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
       const owner=window.FGC_TRADE?.getCurrentAccount?.()?.id||'owner-tb';
@@ -10213,7 +10219,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const snapshots=Array.isArray(payload?.snapshots)?payload.snapshots:[];
       const failed=snapshots.filter(s=>String(s.validationStatus||'').toLowerCase()==='failed');
       console.log('[Snapshot Validation Diagnostic]',JSON.stringify({
-        release:'5.9.10.6.5.4h-p5e6a',
+        release:'5.9.10.6.5.4h-p5e6b',
         http:r.status,
         activeSnapshotId:payload?.activeSnapshotId||payload?.active?.snapshot_id||null,
         latestSnapshot:snapshots[0]||null,
@@ -10225,7 +10231,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.lifecycleRepair={
-    release:'5.9.10.6.5.4h-p5e6a',
+    release:'5.9.10.6.5.4h-p5e6b',
     run:async()=>{
       const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
       const owner=window.FGC_TRADE?.getCurrentAccount?.()?.id||'owner-tb';
@@ -10270,19 +10276,15 @@ function canonicalPlayerDashboardStats(playerId='') {
   window.FranchiseHQ.freeAgentRepair={
     run:async()=>{
       const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
-      const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/transactions/canonical`,{
-        method:'POST',
+      const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/players/free-agents?_fhq=${Date.now()}`,{
         credentials:'same-origin',
         cache:'no-store',
-        headers:{
-          'content-type':'application/json',
-          'x-franchisehq-platform-owner-account-id':String(window.FGC_TRADE?.getCurrentAccount?.()?.id||'owner-tb')
-        },
-        body:JSON.stringify({action:'repair-free-agent-pool'})
+        headers:{accept:'application/json'}
       });
-      const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
-      console.log('[Free Agent Repair]',payload);
-      try{window.FranchiseHQ?.transactionUiLoader?.clear?.()}catch{}
+      const text=await response.text();
+      let payload;
+      try{payload=JSON.parse(text)}catch{payload={ok:false,http:response.status,error:`HTTP ${response.status}`,detail:text.slice(0,500)}}
+      console.log('[Free Agent Status]',payload);
       window.dispatchEvent(new CustomEvent('franchisehq:league-data-state-changed'));
       return payload;
     }
@@ -10365,9 +10367,9 @@ document.addEventListener('click',event=>{
 });
 
 
-/* 5.9.10.6.5.4h-p5e6a — Historical Roster Released Player Resolver */
+/* 5.9.10.6.5.4h-p5e6b — Historical Roster Released Player Resolver */
 (() => {
-  const RELEASE='5.9.10.6.5.4h-p5e6a';
+  const RELEASE='5.9.10.6.5.4h-p5e6b';
   const defaultNames=['Colby Wooden','Neville Gallimore','Logan Hall'];
   const slug=()=>location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
 
