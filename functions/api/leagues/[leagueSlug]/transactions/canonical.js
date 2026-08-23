@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p5e */
+/* FHQ_BUILD: 5.9.10.6.5.4h-p5e4 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e';
+const RELEASE='5.9.10.6.5.4h-p5e4';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -639,6 +639,47 @@ export async function onRequestGet(context){
   const transactions=transactionRows.map(row=>
     publicTransaction(row,evidenceByTransaction.get(String(row.id))||[])
   );
+
+  // Departed players are no longer present in the active player directory.
+  // Resolve their identity from the latest stored lifecycle state so transaction
+  // rows keep Name / Position / OVR and remain linkable through the FA directory.
+  const historicalIds=[...new Set(transactions.flatMap(tx=>(tx.playerIds||[]).map(String)).filter(Boolean))];
+  const historicalByPlayer=new Map();
+  for(let i=0;i<historicalIds.length;i+=75){
+    const batch=historicalIds.slice(i,i+75);
+    if(!batch.length)continue;
+    const marks=batch.map(()=>'?').join(',');
+    const result=await state.db.prepare(`SELECT h.player_id,h.player_name,h.position,h.raw_json,h.team_id,h.roster_status,h.snapshot_id
+      FROM canonical_historical_player_states h
+      JOIN canonical_capture_lifecycle_sessions s
+        ON s.league_id=h.league_id AND s.session_id=h.snapshot_id
+      WHERE h.league_id=? AND h.player_id IN (${marks})
+      ORDER BY s.received_at DESC`).bind(state.league.id,...batch).all();
+    for(const row of result.results||[]){
+      const id=String(row.player_id||'');
+      if(id&&!historicalByPlayer.has(id))historicalByPlayer.set(id,row);
+    }
+  }
+
+  for(const tx of transactions){
+    const participantMap=new Map((tx.participants||[]).map(p=>[String(p.id),p]));
+    for(const playerId of (tx.playerIds||[]).map(String)){
+      const historical=historicalByPlayer.get(playerId);
+      if(!historical)continue;
+      const raw=parse(historical.raw_json,{})||{};
+      const meta=rawPlayerMeta(raw,historical);
+      const existing=participantMap.get(playerId)||{};
+      participantMap.set(playerId,{
+        id:playerId,
+        name:(!existing.name||/^Player \\d+$/i.test(existing.name))?(historical.player_name||meta.playerName||existing.name):existing.name,
+        position:(!existing.position||existing.position==='—')?(historical.position||meta.position||'—'):existing.position,
+        overall:existing.overall??meta.overall??null,
+        historical:true,
+        lastTeamId:historical.team_id||null
+      });
+    }
+    tx.participants=[...participantMap.values()];
+  }
 
   const snapshots=await state.db.prepare(`SELECT * FROM canonical_roster_snapshots
     WHERE league_id=? ORDER BY captured_at DESC LIMIT 20`).bind(state.league.id).all();
@@ -2001,9 +2042,16 @@ async function applyIncrementalLifecycleFreeAgents(db,leagueId,events,currentRow
     const playerId=String(event.playerIds?.[0]||'');
     if(!playerId)continue;
     const move=event.raw?.moves?.[0]||{};
-    const raw=move?.oldRaw||move?.newRaw||{};
-    const previous=currentRows.find(row=>String(row.player_id)===playerId)||null;
-    const meta=rawPlayerMeta(raw,move||previous||{});
+    let raw=move?.oldRaw||move?.newRaw||{};
+    let previous=currentRows.find(row=>String(row.player_id)===playerId)||null;
+    if(!previous){
+      previous=await db.prepare(`SELECT h.* FROM canonical_historical_player_states h
+        JOIN canonical_capture_lifecycle_sessions s ON s.league_id=h.league_id AND s.session_id=h.snapshot_id
+        WHERE h.league_id=? AND h.player_id=? ORDER BY s.received_at DESC LIMIT 1`)
+        .bind(leagueId,playerId).first();
+    }
+    if((!raw||!Object.keys(raw).length)&&previous)raw=parse(previous.raw_json,{})||{};
+    const meta=rawPlayerMeta(raw,previous||move||{});
     releaseStatements.push(db.prepare(`INSERT INTO canonical_free_agents
       (league_id,player_id,player_name,position,overall,age,dev_trait,source_route,source_capture_id,raw_json,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
@@ -2180,6 +2228,36 @@ export async function onRequestPost(context){
   let body={};
   try{body=await context.request.json()}catch{}
   const action=String(body.action||'sync').toLowerCase();
+
+
+  if(action==='repair-latest-lifecycle'){
+    const sessions=(await state.db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
+      WHERE league_id=? AND status='complete' ORDER BY received_at DESC,session_id DESC LIMIT 2`)
+      .bind(state.league.id).all()).results||[];
+    if(!sessions.length)return json({ok:true,release:RELEASE,repaired:false,reason:'no-lifecycle-sessions'});
+
+    const current=sessions[0];
+    const currentRows=await captureLifecycleRows(state.db,state.league.id,current.session_id);
+    if(sessions.length<2){
+      const freeAgents=await applyIncrementalLifecycleFreeAgents(state.db,state.league.id,[],currentRows,current.session_id);
+      return json({ok:true,release:RELEASE,repaired:true,events:0,freeAgents,reason:'baseline-only'});
+    }
+
+    const previous=sessions[1];
+    const previousRows=await captureLifecycleRows(state.db,state.league.id,previous.session_id);
+    const events=lifecycleDiffEvents(previousRows,currentRows,previous.session_id,current.session_id,current.received_at);
+    let created=0,deduped=0,drafted=0,signings=0,releases=0;
+    for(const event of events){
+      const merged=await mergeEvidence(state.db,state.league.id,event,current.session_id);
+      if(merged?.created)created++; else deduped++;
+      if(event.eventType==='drafted')drafted++;
+      else if(event.eventType==='signing')signings++;
+      else if(event.eventType==='release')releases++;
+    }
+    const freeAgents=await applyIncrementalLifecycleFreeAgents(state.db,state.league.id,events,currentRows,current.session_id);
+    return json({ok:true,release:RELEASE,repaired:true,events:events.length,created,deduped,drafted,signings,releases,freeAgents,
+      previousSessionId:previous.session_id,currentSessionId:current.session_id});
+  }
 
   if(action==='dedupe-test'){
     return json({ok:true,release:RELEASE,test:syntheticDedupeTest()});
