@@ -2,7 +2,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.5.4h-p5e5';
+const RELEASE='5.9.10.6.5.4h-p5e6a';
 let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
@@ -2259,11 +2259,21 @@ async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
   // Canonical evidence writes remain serialized for deterministic dedupe, but we now
   // feed them ONLY the one baseline->latest delta and exclude rookie pseudo-signings.
   for(const event of events){
+    if(event.eventType==='team-change'){
+      const move=event.raw?.moves?.[0]||{};
+      const from=String(move.fromTeamId||'').trim();
+      const to=String(move.toTeamId||'').trim();
+      if(from&&to&&from.toUpperCase()!=='FA'&&to.toUpperCase()!=='FA'&&from!==to){
+        event.eventType='trade';
+        event.raw={...(event.raw||{}),eventType:'trade',classifiedFrom:'team-change'};
+      }
+    }
     await mergeEvidence(db,leagueId,event,current.session_id);
     eventCount++;
     if(event.eventType==='signing')signings++;
     else if(event.eventType==='drafted')drafted++;
     else if(event.eventType==='release')releases++;
+    else if(event.eventType==='trade')teamChanges++;
     else if(event.eventType==='team-change')teamChanges++;
     else if(event.eventType==='roster-status-change')statusChanges++;
   }
@@ -2323,45 +2333,83 @@ export async function onRequestPost(context){
       previousSessionId:previous.session_id,currentSessionId:current.session_id});
   }
 
-  if(action==='repair-free-agent-pool'){
+  if(action==='repair-team-change-trades'){
     await ensureSchema(state.db);
-    const currentSession=(await state.db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
-      WHERE league_id=? AND status='complete' ORDER BY received_at DESC,session_id DESC LIMIT 1`)
-      .bind(state.league.id).first())||null;
-    if(!currentSession)return json({ok:false,release:RELEASE,error:'No complete lifecycle session is available.'},409);
+    const rows=(await state.db.prepare(`SELECT t.id,t.event_type,e.evidence_json
+      FROM canonical_transactions t
+      LEFT JOIN canonical_transaction_evidence e ON e.transaction_id=t.id
+      WHERE t.league_id=? AND t.event_type='team-change'
+      ORDER BY t.created_at DESC LIMIT 500`)
+      .bind(state.league.id).all()).results||[];
 
-    const previous=await state.db.prepare(`SELECT * FROM canonical_capture_lifecycle_sessions
-      WHERE league_id=? AND status='complete' AND received_at<?
-      ORDER BY received_at DESC,session_id DESC LIMIT 1`)
-      .bind(state.league.id,currentSession.received_at).first();
-
-    const currentRows=await captureLifecycleRows(state.db,state.league.id,currentSession.session_id);
-    const previousRows=previous?await captureLifecycleRows(state.db,state.league.id,previous.session_id):[];
-
-    await state.db.prepare(`DELETE FROM canonical_free_agents
-      WHERE league_id=? AND source_route IN ('historical-directory','capture-lifecycle','forward-detection')`)
-      .bind(state.league.id).run();
-
-    let events=[];
-    if(previous){
-      events=lifecycleDiffEvents(previousRows,currentRows,previous.session_id,currentSession.session_id,currentSession.received_at);
+    const promote=new Set();
+    for(const row of rows){
+      const evidence=parse(row.evidence_json,{})||{};
+      const moves=Array.isArray(evidence.moves)?evidence.moves:[];
+      const teamToTeam=moves.some(move=>{
+        const from=String(move?.fromTeamId||'').trim();
+        const to=String(move?.toTeamId||'').trim();
+        return from&&to&&from.toUpperCase()!=='FA'&&to.toUpperCase()!=='FA'&&from!==to;
+      });
+      if(teamToTeam)promote.add(String(row.id));
     }
 
-    const freeAgents=await applyIncrementalLifecycleFreeAgents(
-      state.db,state.league.id,events,currentRows,currentSession.session_id
-    );
+    for(const id of promote){
+      await state.db.prepare(`UPDATE canonical_transactions
+        SET event_type='trade',updated_at=CURRENT_TIMESTAMP
+        WHERE league_id=? AND id=? AND event_type='team-change'`)
+        .bind(state.league.id,id).run();
+    }
 
     return json({
-      ok:true,release:RELEASE,repaired:true,
-      previousSessionId:previous?.session_id||null,
-      currentSessionId:currentSession.session_id,
-      events:events.length,
-      releases:events.filter(e=>e.eventType==='release').length,
-      signings:events.filter(e=>e.eventType==='signing').length,
-      drafted:events.filter(e=>e.eventType==='drafted').length,
-      freeAgents
+      ok:true,
+      release:RELEASE,
+      repaired:true,
+      scanned:rows.length,
+      promotedToTrade:promote.size
     });
   }
+
+  if(action==='repair-free-agent-pool'){
+    await ensureSchema(state.db);
+    const sessions=(await state.db.prepare(`SELECT session_id,received_at FROM canonical_capture_lifecycle_sessions
+      WHERE league_id=? AND status='complete' ORDER BY received_at DESC,session_id DESC LIMIT 2`)
+      .bind(state.league.id).all()).results||[];
+    const current=sessions[0]||null,previous=sessions[1]||null;
+    if(!current)return json({ok:false,release:RELEASE,error:'No complete lifecycle session is available.'},409);
+    const currentRows=await captureLifecycleRows(state.db,state.league.id,current.session_id);
+    const rosterIds=[...new Set(currentRows.map(r=>String(r.player_id||'')).filter(Boolean))];
+    for(let i=0;i<rosterIds.length;i+=60){
+      const ids=rosterIds.slice(i,i+60); if(!ids.length)continue;
+      await state.db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND player_id IN (${ids.map(()=>'?').join(',')})`)
+        .bind(state.league.id,...ids).run();
+    }
+    const faRows=(await state.db.prepare(`SELECT player_id,raw_json FROM canonical_free_agents WHERE league_id=?`)
+      .bind(state.league.id).all()).results||[];
+    let retiredRemoved=0;
+    for(const row of faRows){
+      const raw=parse(row.raw_json,{})||{};
+      const status=String(raw.rosterStatus??raw.status??raw.transactionType??raw.action??'').toLowerCase();
+      const retired=raw.isRetired===true||raw.retired===true||raw.hasRetired===true||/(^|\\b)(retired|retirement)(\\b|$)/i.test(status);
+      if(!retired)continue;
+      await state.db.prepare(`DELETE FROM canonical_free_agents WHERE league_id=? AND player_id=?`)
+        .bind(state.league.id,String(row.player_id)).run();
+      retiredRemoved++;
+    }
+    let events=[];
+    if(previous){
+      const previousRows=await captureLifecycleRows(state.db,state.league.id,previous.session_id);
+      events=lifecycleDiffEvents(previousRows,currentRows,previous.session_id,current.session_id,current.received_at);
+      await applyIncrementalLifecycleFreeAgents(state.db,state.league.id,events,currentRows,current.session_id);
+    }
+    const count=Number((await state.db.prepare(`SELECT COUNT(*) c FROM canonical_free_agents WHERE league_id=?`)
+      .bind(state.league.id).first())?.c||0);
+    return json({ok:true,release:RELEASE,repaired:true,previousSessionId:previous?.session_id||null,
+      currentSessionId:current.session_id,events:events.length,releases:events.filter(e=>e.eventType==='release').length,
+      signings:events.filter(e=>e.eventType==='signing').length,drafted:events.filter(e=>e.eventType==='drafted').length,
+      retiredRemoved,freeAgents:{currentFreeAgents:count,strategy:'bounded-explicit-release-only'}});
+  }
+
 
   if(action==='dedupe-test'){
     return json({ok:true,release:RELEASE,test:syntheticDedupeTest()});
