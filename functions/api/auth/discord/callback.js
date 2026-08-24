@@ -277,8 +277,52 @@ export async function onRequestGet(context) {
       "/"
     );
 
+    // 6.1.0c: the public root is now a landing page, so a successful
+    // Discord login must return the user to an actual league instead of /.
+    // Resolve the destination from the authenticated user's active memberships
+    // to preserve multi-tenant behavior and avoid hard-coding any league slug.
+    let destination = "/?auth=success&state=no-league";
+
+    try {
+      const league = await context.env.DB
+        .prepare(
+          `
+          SELECT
+            leagues.slug,
+            league_memberships.role
+          FROM league_memberships
+          INNER JOIN leagues
+            ON leagues.id = league_memberships.league_id
+          WHERE league_memberships.user_id = ?
+            AND league_memberships.active = 1
+            AND leagues.public_status = 'active'
+          ORDER BY
+            CASE league_memberships.role
+              WHEN 'commissioner' THEN 0
+              WHEN 'trade_committee' THEN 1
+              WHEN 'team_owner' THEN 2
+              ELSE 3
+            END,
+            league_memberships.updated_at DESC,
+            leagues.slug ASC
+          LIMIT 1
+          `
+        )
+        .bind(user.id)
+        .first();
+
+      if (league?.slug) {
+        destination = `/leagues/${encodeURIComponent(league.slug)}?auth=success`;
+      }
+    } catch (destinationError) {
+      console.error(
+        "Discord post-login league resolution failed:",
+        destinationError
+      );
+    }
+
     const headers = new Headers({
-      Location: "/?auth=success",
+      Location: destination,
       "Cache-Control": "no-store"
     });
 
