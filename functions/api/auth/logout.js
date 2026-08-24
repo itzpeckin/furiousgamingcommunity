@@ -1,28 +1,56 @@
 import {
   AUTH_CONSTANTS,
   clearSecureCookie,
-  getCurrentSession,
+  getCookie,
+  hashToken,
   redirectResponse
 } from "../../_lib/auth.js";
 
-async function logout(context) {
-  try {
-    const session = await getCurrentSession(context);
-    if (session?.sessionId && context.env?.DB) {
-      await context.env.DB.prepare(
-        `UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE id=?`
-      ).bind(session.sessionId).run();
-    }
-  } catch (error) {
-    console.warn("Session revoke during logout failed:", error);
-  }
+const RELEASE = "6.1.2.8";
 
-  const headers = new Headers({ Location: "/", "Cache-Control": "no-store" });
-  headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.SESSION_COOKIE_NAME, "/"));
-  headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME, "/"));
-  headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME, "/"));
-  return new Response(null,{status:302,headers});
+async function revokeSession(context) {
+  const candidates = [
+    getCookie(context.request, AUTH_CONSTANTS.SESSION_COOKIE_NAME),
+    getCookie(context.request, AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME)
+  ].filter(Boolean);
+
+  for (const rawToken of [...new Set(candidates)]) {
+    try {
+      const tokenHash = await hashToken(rawToken);
+      await context.env.DB.prepare(`
+        UPDATE sessions
+        SET revoked_at = CURRENT_TIMESTAMP
+        WHERE session_token_hash = ? AND revoked_at IS NULL
+      `).bind(tokenHash).run();
+    } catch (error) {
+      console.warn("Session revocation warning:", error?.message || error);
+    }
+  }
 }
 
-export const onRequestGet = logout;
-export const onRequestPost = logout;
+function clearCookieHeaders(headers) {
+  headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.SESSION_COOKIE_NAME, "/"));
+  headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME, "/"));
+}
+
+export async function onRequestGet(context) {
+  await revokeSession(context);
+  const response = redirectResponse("/?logout=success");
+  clearCookieHeaders(response.headers);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+export async function onRequestPost(context) {
+  await revokeSession(context);
+  const headers = new Headers({
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  clearCookieHeaders(headers);
+  return new Response(JSON.stringify({
+    ok: true,
+    authenticated: false,
+    release: RELEASE
+  }), { status: 200, headers });
+}
