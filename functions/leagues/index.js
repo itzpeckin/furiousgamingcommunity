@@ -3,7 +3,7 @@ import {
   redirectResponse
 } from "../_lib/auth.js";
 
-const RELEASE = "6.1.2.2";
+const RELEASE = "6.1.2.3";
 
 function esc(value) {
   return String(value ?? "")
@@ -105,7 +105,8 @@ export async function onRequestGet(context) {
         INNER JOIN leagues ON leagues.id = league_memberships.league_id
         WHERE league_memberships.user_id = ?
           AND league_memberships.active = 0
-          AND league_memberships.role = 'pending'
+          AND league_memberships.role = 'team_owner'
+          AND league_memberships.team_id IS NULL
           AND leagues.public_status = 'active'
         ORDER BY leagues.name ASC
       `).bind(session.user.id).all();

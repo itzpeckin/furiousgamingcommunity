@@ -1,7 +1,7 @@
 import { onRequestGet as renderLeagueSelector } from "./index.js";
 import { AUTH_CONSTANTS, createSecureCookie, getCurrentSession, redirectResponse } from "../_lib/auth.js";
 
-const RELEASE='6.1.2.2';
+const RELEASE='6.1.2.3';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',
@@ -82,7 +82,7 @@ export async function onRequest(context){
   const session=await getCurrentSession(context,{leagueId:league.id});
   if(!session)return redirectResponse(`/api/auth/discord/login?returnTo=${encodeURIComponent(`/leagues/${league.slug}`)}`);
   if(!session.membership?.active){
-    if(session.membership?.role==='pending')return renderPendingPage(session,league);
+    if(session.membership?.role==='team_owner' && !session.membership?.teamId)return renderPendingPage(session,league);
     return redirectResponse('/leagues?access=denied');
   }
 
