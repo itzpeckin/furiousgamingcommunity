@@ -1,7 +1,7 @@
 import { onRequestGet as renderLeagueSelector } from "./index.js";
-import { getCurrentSession, redirectResponse } from "../_lib/auth.js";
+import { AUTH_CONSTANTS, createSecureCookie, getCurrentSession, redirectResponse } from "../_lib/auth.js";
 
-const RELEASE='6.1.2';
+const RELEASE='6.1.2.2';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',
@@ -64,7 +64,7 @@ export async function onRequest(context){
   if(request.method!=='GET'&&request.method!=='HEAD')return context.next();
   const parts=pathParts(request);
 
-  // 6.1.2: /leagues is the authenticated league selector.
+  // 6.1.2.2: /leagues is the authenticated league selector.
   // This catch-all also matches the empty /leagues path on Cloudflare Pages,
   // so handle it explicitly before the SPA fallback.
   if(parts.length===0){
@@ -76,7 +76,7 @@ export async function onRequest(context){
   if(isStaticAsset(parts))return fetchRootAsset(context,request,parts.join('/'));
 
   const requestedSlug=decodeURIComponent(parts[0]||'');
-  const league=await context.env.DB.prepare(`SELECT id,slug,name FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`).bind(requestedSlug).first();
+  const league=await context.env.DB.prepare(`SELECT id,slug,name FROM leagues WHERE lower(replace(slug,'-',''))=lower(replace(?,'-','')) AND public_status='active' LIMIT 1`).bind(requestedSlug).first();
   if(!league)return new Response('League not found.',{status:404,headers:{'cache-control':'no-store'}});
 
   const session=await getCurrentSession(context,{leagueId:league.id});
@@ -88,5 +88,19 @@ export async function onRequest(context){
 
   // Every authorized league page/subpage is an SPA route. Serve the root shell
   // while preserving the browser URL so the tenant router resolves this league.
-  return fetchSpaShell(context,request);
+  // Renew both persistent cookies during the document request itself so a hard
+  // refresh does not depend on a later /api/auth/me client request.
+  const shell = await fetchSpaShell(context,request);
+  const headers = new Headers(shell.headers);
+  if (session.rawSessionToken) {
+    headers.append("Set-Cookie", createSecureCookie(
+      AUTH_CONSTANTS.SESSION_COOKIE_NAME, session.rawSessionToken,
+      AUTH_CONSTANTS.SESSION_DURATION_SECONDS, "/"
+    ));
+    headers.append("Set-Cookie", createSecureCookie(
+      AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME, session.rawSessionToken,
+      AUTH_CONSTANTS.SESSION_DURATION_SECONDS, "/"
+    ));
+  }
+  return new Response(shell.body,{status:shell.status,statusText:shell.statusText,headers});
 }
