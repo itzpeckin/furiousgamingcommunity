@@ -1,4 +1,4 @@
-const RELEASE = "6.1.1";
+const RELEASE = "6.1.2";
 import {
   getCurrentSession,
   jsonResponse
