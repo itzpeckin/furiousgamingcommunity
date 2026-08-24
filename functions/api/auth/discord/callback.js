@@ -86,7 +86,7 @@ export async function onRequestGet(context) {
       );
     }
 
-    // 6.1.2.5: recover both league invitation context and the origin that
+    // 6.1.2.7: recover both league invitation context and the origin that
     // initiated OAuth. The state record is authoritative and single-use.
     let joinLeagueId = null;
     let joinLeagueSlug = null;
@@ -316,7 +316,7 @@ export async function onRequestGet(context) {
       }
     }
 
-    // 6.1.2.5: OAuth may complete on the pages.dev callback host while the
+    // 6.1.2.7: OAuth may complete on the pages.dev callback host while the
     // user actually entered through franchisehq.app. Cookies cannot cross
     // those hosts. Hand the authenticated Discord identity back to the origin
     // that initiated login with a short-lived signed transfer token; that
