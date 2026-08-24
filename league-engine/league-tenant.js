@@ -3,17 +3,17 @@
   const HQ = window.FranchiseHQ;
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before league-tenant.js.');
 
-  const VERSION = '6.1.0g';
+  const VERSION = '6.1.1';
   const REGISTRY_KEY = 'franchisehq.tenants.registry.v2';
   const ACTIVE_KEY = 'franchisehq.tenants.active.v2';
-  const FGC_ALIASES = Object.freeze(['furious-gaming-community']);
+  const FGC_ALIASES = Object.freeze(['furiousgamingcommunity']);
   const DEFAULT_LEAGUE = Object.freeze({
     id: 'franchise-hq-primary',
-    slug: 'furiousgamingcommunity',
+    slug: 'furious-gaming-community',
     aliases: FGC_ALIASES,
     name: 'Furious Gaming Community',
     status: 'active',
-    canonicalPath: '/leagues/furiousgamingcommunity',
+    canonicalPath: '/leagues/furious-gaming-community',
     createdAt: '2026-08-06T00:00:00.000Z'
   });
   let registry = [];
