@@ -1,13 +1,15 @@
 const SESSION_COOKIE_NAME = "franchise_hq_session";
 const OAUTH_STATE_COOKIE_NAME = "franchise_hq_oauth_state";
 const SESSION_RECOVERY_COOKIE_NAME = "franchise_hq_session_recovery";
+const SESSION_TRANSFER_DURATION_SECONDS = 60 * 3;
 
 export const AUTH_CONSTANTS = {
   SESSION_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
   SESSION_RECOVERY_COOKIE_NAME,
   SESSION_DURATION_SECONDS: 60 * 60 * 24 * 30,
-  OAUTH_STATE_DURATION_SECONDS: 60 * 10
+  OAUTH_STATE_DURATION_SECONDS: 60 * 10,
+  SESSION_TRANSFER_DURATION_SECONDS
 };
 
 export function createRandomToken(byteLength = 32) {
@@ -134,14 +136,86 @@ export function createSecureCookie(
   maxAgeSeconds,
   path = "/"
 ) {
+  const expires = new Date(Date.now() + Number(maxAgeSeconds || 0) * 1000).toUTCString();
   return [
     `${name}=${encodeURIComponent(value)}`,
     `Max-Age=${maxAgeSeconds}`,
+    `Expires=${expires}`,
     `Path=${path}`,
     "HttpOnly",
     "Secure",
-    "SameSite=Lax"
+    "SameSite=Lax",
+    "Priority=High"
   ].join("; ");
+}
+
+
+function bytesToBase64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
+}
+
+function base64UrlToBytes(value) {
+  const normalized = String(value || "").replaceAll("-", "+").replaceAll("_", "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+export function encodeOpaqueContext(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value || {}));
+  return bytesToBase64Url(bytes);
+}
+
+export function decodeOpaqueContext(value) {
+  try {
+    const bytes = base64UrlToBytes(value);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return null;
+  }
+}
+
+export async function createSessionTransferToken(secret, payload = {}) {
+  if (!secret) throw new Error("Session transfer signing secret is unavailable.");
+  const body = encodeOpaqueContext(payload);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(String(secret)),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  return `${body}.${bytesToBase64Url(new Uint8Array(signature))}`;
+}
+
+export async function verifySessionTransferToken(secret, token) {
+  if (!secret || !token) return null;
+  const [body, signatureText, extra] = String(token).split(".");
+  if (!body || !signatureText || extra) return null;
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(String(secret)),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlToBytes(signatureText),
+      new TextEncoder().encode(body)
+    );
+    if (!valid) return null;
+    const payload = decodeOpaqueContext(body);
+    if (!payload || Number(payload.exp || 0) <= Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 export function clearSecureCookie(name, path = "/") {
@@ -205,7 +279,7 @@ async function resolveRequestedLeagueId(context, options = {}) {
 
   try {
     const league = await context.env.DB
-      .prepare(`SELECT id FROM leagues WHERE lower(slug) = lower(?) LIMIT 1`)
+      .prepare(`SELECT id FROM leagues WHERE lower(replace(slug,'-','')) = lower(replace(?,'-','')) LIMIT 1`)
       .bind(String(routeSlug))
       .first();
     return league?.id || null;
