@@ -267,12 +267,8 @@
       return;
     }
 
-    renderAuthenticatedAccount();
-
-    FranchiseHQ.ui?.toast?.(
-      'Signed out',
-      'Your Discord session has been securely ended.'
-    );
+    window.location.assign('/');
+    return;
   }
 
   function handleDocumentClick(event) {

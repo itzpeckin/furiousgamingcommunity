@@ -61,7 +61,8 @@
     notifyAuthChanged('refresh-started');
 
     try {
-      const payload = await api.endpoints.auth.me();
+      const routeLeague = window.FranchiseHQ?.leagueTenant?.resolveRouteSlug?.() || (location.pathname.match(/\/leagues\/([^/?#]+)/i)?.[1] || null);
+      const payload = await api.get('/api/auth/me', { query: routeLeague ? { league: decodeURIComponent(routeLeague) } : null });
       applyAuthResponse(payload);
       notifyAuthChanged('refresh-succeeded');
       HQ.lifecycle?.markCheckpoint?.('auth:resolved', {

@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'6.1.0g',
+      release:'6.1.1',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -6277,7 +6277,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ.transactionRecovery={
-    release:'6.1.0g',
+    release:'6.1.1',
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
@@ -6285,7 +6285,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
-      release:'6.1.0g',
+      release:'6.1.1',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
       route:routeBase(location.hash.slice(1))
@@ -6299,7 +6299,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'6.1.0g',
+      release:'6.1.1',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6312,7 +6312,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'6.1.0g',
+      release:'6.1.1',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -8180,7 +8180,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='6.1.0g';
+  const PERFORMANCE_CERTIFICATION_RELEASE='6.1.1';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9475,9 +9475,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 6.1.0g';
+      node.textContent = 'Current Release - 6.1.1';
     });
-    document.documentElement.dataset.franchiseHqRelease = '6.1.0g';
+    document.documentElement.dataset.franchiseHqRelease = '6.1.1';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9489,7 +9489,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'6.1.0g',
+    release:'6.1.1',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9503,7 +9503,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'6.1.0g',
+        release:'6.1.1',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -10130,7 +10130,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'6.1.0g',
+    release:'6.1.1',
     mode:'read-only-stabilized',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
@@ -10199,7 +10199,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   // Free Agent ingestion remains source-only until Madden 27 export behavior is certified.
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.stabilization={
-    release:'6.1.0g',
+    release:'6.1.1',
     transactionRepairsDisabled:true,
     freeAgentInferenceDisabled:true,
     sourceOfTruth:'active-madden-snapshot'
