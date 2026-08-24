@@ -86,7 +86,8 @@
   }
 
   function login() {
-    window.location.assign(api.buildUrl('/api/auth/discord/login'));
+    const joinPath = location.pathname.match(/^\/leagues\/[^/?#]+$/i) ? location.pathname : null;
+    window.location.assign(api.buildUrl('/api/auth/discord/login', joinPath ? { returnTo: joinPath } : null));
   }
 
   async function logout() {
