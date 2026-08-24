@@ -1283,20 +1283,6 @@ html.trade-live-first-load main{visibility:hidden!important}
   </aside>
   <div class="panel-overlay" data-panel-overlay></div>
 
-
-  <div class="mock-login" data-mock-login aria-hidden="true">
-    <div class="mock-login__backdrop"></div>
-    <section class="mock-login__dialog" role="dialog" aria-modal="true" aria-labelledby="mock-login-title">
-      <div class="mock-login__brand">
-        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 3 42 13v22L24 45 6 35V13L24 3Z" fill="currentColor" opacity=".16"/><path d="M16 15h18v6H22v5h10v6H22v8h-6V15Z" fill="currentColor"/></svg></span>
-        <div><span class="eyebrow">Milestone 2A · Module 1 prototype</span><h1 id="mock-login-title">Continue with Discord</h1><p>Choose a mock league identity to test private offers, owner negotiations, hidden committee review, and commissioner decisions.</p></div>
-      </div>
-      <div class="mock-login__notice"><svg><use href="#icon-info"></use></svg><span>This is a local prototype. No real Discord account is contacted and all changes stay in this browser.</span></div>
-      <div class="mock-account-grid" data-mock-account-grid></div>
-      <div class="mock-login__footer"><span>Use <strong>Switch mock account</strong> from the profile menu at any time.</span><button class="button button--ghost" data-close-login>Return to site</button></div>
-    </section>
-  </div>
-
   <div class="value-card-modal" data-value-card-modal aria-hidden="true">
     <div class="value-card-backdrop" data-close-value-card></div>
     <section class="value-card-dialog" role="dialog" aria-modal="true" aria-label="Player valuation card">
@@ -1319,7 +1305,7 @@ html.trade-live-first-load main{visibility:hidden!important}
         <section class="dev-card"><span class="eyebrow">Identity</span><h3>View As</h3><label class="field"><span>Active account</span><select data-dev-account></select></label><p class="dev-help">Changes permissions immediately and remains selected after refresh.</p></section>
         <section class="dev-card"><span class="eyebrow">Application</span><h3>Prototype State</h3><label class="dev-toggle"><span><strong>Commissioner Mode</strong><small>Jump directly to the commissioner account.</small></span><input type="checkbox" data-dev-commissioner></label><label class="dev-toggle"><span><strong>Mock Data</strong><small>Live Madden sync is not connected yet.</small></span><input type="checkbox" checked disabled></label></section>
         <section class="dev-card"><span class="eyebrow">Navigation</span><h3>Quick Routes</h3><div class="dev-actions"><button class="button button--secondary" data-dev-route="home">League Home</button><button class="button button--secondary" data-dev-route="players">Players</button><button class="button button--secondary" data-dev-route="trade-center">Trade Center</button><button class="button button--secondary" data-dev-route="commissioner">Commissioner</button></div></section>
-        <section class="dev-card"><span class="eyebrow">Testing</span><h3>Demo Controls</h3><div class="dev-actions dev-actions--stack"><button class="button button--secondary" data-dev-open-login>Open Account Switcher</button><button class="button button--secondary" data-dev-seed>Restore Seeded Trades</button><button class="button button--danger" data-dev-clear>Clear Browser Data</button></div></section>
+        <section class="dev-card"><span class="eyebrow">Testing</span><h3>Demo Controls</h3><div class="dev-actions dev-actions--stack"><button class="button button--secondary" data-dev-seed>Restore Seeded Trades</button><button class="button button--danger" data-dev-clear>Clear Browser Data</button></div></section>
         <section class="dev-card dev-card--wide"><span class="eyebrow">Build information</span><h3>Current Release</h3><div class="dev-info"><div><span>Version</span><strong>1.0.0-rc</strong></div><div><span>Sprint</span><strong>TC-011.2</strong></div><div><span>Data source</span><strong>Mock Madden data</strong></div><div><span>Storage</span><strong>Browser localStorage</strong></div></div></section>
       </div>
       <footer class="dev-footer"><span>Developer Mode is visible only in this prototype build.</span><button class="button button--primary" data-close-dev>Done</button></footer>
