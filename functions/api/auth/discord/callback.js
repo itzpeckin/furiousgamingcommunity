@@ -87,6 +87,19 @@ export async function onRequestGet(context) {
       );
     }
 
+    // 6.1.2: recover the league invitation context from the one-time OAuth
+    // state record. This stays server-side and survives mobile Discord handoff.
+    let joinLeagueSlug = null;
+    if (String(storedState.id || "").startsWith("oauthjoin.")) {
+      try {
+        const encoded = String(storedState.id).split(".")[1] || "";
+        const padded = encoded.replaceAll("-", "+").replaceAll("_", "/") + "===".slice((encoded.length + 3) % 4);
+        joinLeagueSlug = decodeURIComponent(escape(atob(padded)));
+      } catch (joinStateError) {
+        console.warn("Unable to decode league join context:", joinStateError);
+      }
+    }
+
     await context.env.DB
       .prepare(
         `
@@ -279,10 +292,40 @@ export async function onRequestGet(context) {
       "/"
     );
 
-    // 6.1.0e: authentication and league selection are separate concerns.
-    // A successful Discord login always lands on the selector so users can
-    // explicitly choose the league they want to open.
-    const destination = "/leagues?auth=success";
+    // 6.1.2: when the user entered through a shared league URL, register that
+    // Discord identity as a pending member of that league. The commissioner
+    // then assigns team + role before full access is granted.
+    let destination = "/leagues?auth=success";
+    if (joinLeagueSlug) {
+      try {
+        const league = await context.env.DB
+          .prepare(`SELECT id, slug FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`)
+          .bind(joinLeagueSlug)
+          .first();
+        if (league) {
+          const existing = await context.env.DB
+            .prepare(`SELECT id, active, role FROM league_memberships WHERE league_id=? AND user_id=? LIMIT 1`)
+            .bind(league.id, user.id)
+            .first();
+          if (!existing) {
+            await context.env.DB.prepare(`
+              INSERT INTO league_memberships (id, league_id, user_id, role, team_id, active, created_at, updated_at)
+              VALUES (?, ?, ?, 'pending', NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            `).bind(createId("membership"), league.id, user.id).run();
+          } else if (!Number(existing.active)) {
+            await context.env.DB.prepare(`
+              UPDATE league_memberships SET role='pending', team_id=NULL, active=0, updated_at=CURRENT_TIMESTAMP
+              WHERE id=?
+            `).bind(existing.id).run();
+          }
+          destination = Number(existing?.active)
+            ? `/leagues/${encodeURIComponent(league.slug)}?auth=success`
+            : `/leagues/${encodeURIComponent(league.slug)}?auth=pending`;
+        }
+      } catch (joinError) {
+        console.error("League pending-membership registration failed:", joinError);
+      }
+    }
 
     const headers = new Headers({
       Location: destination,

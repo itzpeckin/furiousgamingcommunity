@@ -30,7 +30,26 @@ export async function onRequestGet(context) {
 
     const stateToken = createRandomToken(32);
     const stateTokenHash = await hashToken(stateToken);
-    const stateId = createId("oauth");
+    // 6.1.2: a shared /leagues/{slug} URL is the invitation context.
+    // Store that context in the opaque OAuth-state record ID so it survives
+    // Discord/mobile browser handoffs without relying on another cookie or DB column.
+    const requestUrl = new URL(context.request.url);
+    const rawReturnTo = String(requestUrl.searchParams.get("returnTo") || "");
+    const returnMatch = rawReturnTo.match(/^\/leagues\/([^/?#]+)$/i);
+    let joinLeagueSlug = null;
+    if (returnMatch) {
+      const candidate = decodeURIComponent(returnMatch[1]);
+      const league = await context.env.DB
+        .prepare(`SELECT slug FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`)
+        .bind(candidate)
+        .first();
+      joinLeagueSlug = league?.slug || null;
+    }
+    const encodeJoinSlug = (value) => btoa(unescape(encodeURIComponent(value)))
+      .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
+    const stateId = joinLeagueSlug
+      ? `oauthjoin.${encodeJoinSlug(joinLeagueSlug)}.${crypto.randomUUID()}`
+      : createId("oauth");
     const expiresAt = addSecondsToNow(
       AUTH_CONSTANTS.OAUTH_STATE_DURATION_SECONDS
     );
