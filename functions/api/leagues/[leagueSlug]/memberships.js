@@ -1,7 +1,7 @@
 import { createId, jsonResponse } from "../../../_lib/auth.js";
 import { requireCommissioner } from "../../../_lib/permissions.js";
 
-const RELEASE = "6.1.2.3";
+const RELEASE = "6.1.2.4";
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 
 async function resolveLeague(context) {
@@ -27,7 +27,16 @@ export async function onRequestGet(context) {
 
   const rows = await context.env.DB.prepare(`
     SELECT lm.id, lm.role, lm.team_id AS teamId, lm.active,
-           CASE WHEN lm.active=1 THEN 'active' WHEN lm.active=0 AND lm.role='team_owner' AND lm.team_id IS NULL THEN 'pending' ELSE 'disabled' END AS status,
+           CASE
+             WHEN lm.active=1 THEN 'active'
+             WHEN lm.active=0 AND EXISTS (
+               SELECT 1 FROM league_membership_audit la
+               WHERE la.league_id=lm.league_id
+                 AND la.subject_user_id=lm.user_id
+                 AND la.action='membership_deactivated'
+             ) THEN 'disabled'
+             ELSE 'pending'
+           END AS status,
            lm.created_at AS createdAt, lm.updated_at AS updatedAt,
            u.id AS userId, u.discord_user_id AS discordUserId, u.discord_username AS discordUsername,
            u.discord_global_name AS discordGlobalName, u.display_name AS displayName, u.avatar_url AS avatarUrl
@@ -47,6 +56,15 @@ export async function onRequestPost(context) {
   if (!league || auth.session.membership?.leagueId !== league.id) return jsonResponse({ ok:false, error:"Not found." }, 404);
 
   const body = await context.request.json().catch(() => ({}));
+
+  if (body.action === "restore_pending") {
+    const userId = String(body.userId || "").trim();
+    if (!userId) return jsonResponse({ ok:false, error:"userId is required." }, 400);
+    await context.env.DB.prepare(`UPDATE league_memberships SET role='team_owner', team_id=NULL, active=0, updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND user_id=?`).bind(league.id, userId).run();
+    await audit(context.env.DB, league.id, auth.session.user.id, userId, "membership_restored_pending", {});
+    return jsonResponse({ ok:true, release:RELEASE, status:"pending" });
+  }
+
   const role = String(body.role || "").trim();
   const teamId = body.teamId == null || body.teamId === "" ? null : String(body.teamId).trim();
   if (!ROLES.has(role)) return jsonResponse({ ok:false, error:"Invalid league role." }, 400);
