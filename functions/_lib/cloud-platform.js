@@ -1,5 +1,25 @@
 const DEFAULT_MAX_BYTES = 20 * 1024 * 1024;
 
+export const DEFAULT_LEAGUE_SLUG = 'furiousgamingcommunity';
+export const LEGACY_LEAGUE_ALIASES = Object.freeze({
+  'furious-gaming-community': DEFAULT_LEAGUE_SLUG
+});
+
+export function canonicalLeagueSlug(value) {
+  const slug = String(value || '').trim().toLowerCase();
+  return LEGACY_LEAGUE_ALIASES[slug] || slug;
+}
+
+export function leagueSlugCandidates(value) {
+  const requested = String(value || '').trim().toLowerCase();
+  const canonical = canonicalLeagueSlug(requested);
+  const candidates = new Set([canonical, requested]);
+  Object.entries(LEGACY_LEAGUE_ALIASES).forEach(([alias,target]) => {
+    if (target === canonical) candidates.add(alias);
+  });
+  return [...candidates].filter(Boolean);
+}
+
 export const CLOUD_BINDINGS = Object.freeze({
   database: 'FRANCHISE_HQ_DB',
   exports: 'COMPANION_EXPORTS',
@@ -22,7 +42,7 @@ export function database(env) {
 }
 
 export function normalizeLeagueSlug(context) {
-  return String(context.params?.leagueSlug || '').trim().toLowerCase();
+  return canonicalLeagueSlug(context.params?.leagueSlug || '');
 }
 
 export function validLeagueSlug(slug) {
@@ -39,8 +59,13 @@ export function companionObjectKey(slug, exportId, receivedAt, season = null, we
 }
 
 export async function configuredExportToken(env, slug) {
-  const leagueToken = env.LEAGUE_CONFIG?.get ? await env.LEAGUE_CONFIG.get(companionTokenKey(slug)) : null;
-  return leagueToken || env.COMPANION_EXPORT_TOKEN || null;
+  if (env.LEAGUE_CONFIG?.get) {
+    for (const candidate of leagueSlugCandidates(slug)) {
+      const leagueToken = await env.LEAGUE_CONFIG.get(companionTokenKey(candidate));
+      if (leagueToken) return leagueToken;
+    }
+  }
+  return env.COMPANION_EXPORT_TOKEN || null;
 }
 
 export function suppliedExportToken(request) {
@@ -68,8 +93,19 @@ export async function sha256Hex(value) {
 export async function resolveLeague(env, slug) {
   const db = database(env);
   if (!db) return null;
-  return db.prepare(`SELECT id, name, slug, current_season, current_week, public_status
-    FROM leagues WHERE slug = ? LIMIT 1`).bind(slug).first();
+  const canonical = canonicalLeagueSlug(slug);
+  const candidates = leagueSlugCandidates(canonical);
+  const marks = candidates.map(() => '?').join(',');
+  const row = await db.prepare(`SELECT id, name, product_name, slug, current_season, current_week,
+      trade_start_week, trade_deadline_week, discord_guild_id, discord_connected, public_status, created_at, updated_at
+    FROM leagues WHERE LOWER(slug) IN (${marks}) LIMIT 1`).bind(...candidates).first();
+  if (!row) return null;
+  return {
+    ...row,
+    storage_slug: row.slug,
+    requested_slug: String(slug || '').trim().toLowerCase(),
+    slug: canonicalLeagueSlug(row.slug)
+  };
 }
 
 export function detectCompanionMetadata(payload) {

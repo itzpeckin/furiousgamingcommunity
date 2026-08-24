@@ -183,6 +183,25 @@ export function addSecondsToNow(seconds) {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
+async function resolveSessionLeagueId(context) {
+  if (!context?.env?.DB) return null;
+  let rawSlug = String(context.params?.leagueSlug || '').trim().toLowerCase();
+  if (!rawSlug) {
+    try {
+      const match = new URL(context.request.url).pathname.match(/\/leagues\/([^/?#]+)/i);
+      rawSlug = match ? decodeURIComponent(match[1]).toLowerCase() : '';
+    } catch {}
+  }
+  const candidates = rawSlug === 'furiousgamingcommunity' || rawSlug === 'furious-gaming-community'
+    ? ['furiousgamingcommunity','furious-gaming-community']
+    : [rawSlug].filter(Boolean);
+  if (!candidates.length) candidates.push('furiousgamingcommunity','furious-gaming-community');
+  const marks = candidates.map(() => '?').join(',');
+  const row = await context.env.DB.prepare(`SELECT id FROM leagues WHERE LOWER(slug) IN (${marks}) LIMIT 1`)
+    .bind(...candidates).first();
+  return row?.id || null;
+}
+
 export async function getCurrentSession(context) {
   // Server-side Franchise Import Workflows authenticate with a short-lived
   // delegated token instead of persisting the commissioner's browser cookie.
@@ -201,6 +220,7 @@ export async function getCurrentSession(context) {
   }
 
   const sessionTokenHash = await hashToken(rawSessionToken);
+  const sessionLeagueId = await resolveSessionLeagueId(context);
 
   const record = await context.env.DB
     .prepare(
@@ -232,7 +252,7 @@ export async function getCurrentSession(context) {
       LIMIT 1
       `
     )
-    .bind("franchise-hq-primary", sessionTokenHash)
+    .bind(sessionLeagueId || "__no_league__", sessionTokenHash)
     .first();
 
   if (!record) {
