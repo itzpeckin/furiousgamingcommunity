@@ -275,6 +275,21 @@ async function resolveRequestedLeagueId(context, options = {}) {
     routeSlug = context.params.leagueSlug;
   }
 
+  // 6.1.2.4: /api/auth/me has no league slug in its own URL. On a full
+  // reload, recover the active tenant from the browser Referer so the auth
+  // client receives the correct commissioner/team membership instead of an
+  // authenticated user with membership=null.
+  if (!routeSlug) {
+    try {
+      const referer = context.request.headers.get("Referer") || context.request.headers.get("Referrer");
+      if (referer) {
+        const refererUrl = new URL(referer);
+        const refererMatch = refererUrl.pathname.match(/\/leagues\/([^/?#]+)/i);
+        routeSlug = refererMatch ? decodeURIComponent(refererMatch[1]) : null;
+      }
+    } catch {}
+  }
+
   if (!routeSlug) return "franchise-hq-primary";
 
   try {
