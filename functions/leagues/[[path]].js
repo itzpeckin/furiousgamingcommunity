@@ -1,7 +1,7 @@
 import { onRequestGet as renderLeagueSelector } from "./index.js";
 import { AUTH_CONSTANTS, createSecureCookie, getCurrentSession, redirectResponse } from "../_lib/auth.js";
 
-const RELEASE='6.1.2.7';
+const RELEASE='6.1.2.8';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',
@@ -39,12 +39,21 @@ async function fetchRootAsset(context,request,relativePath){
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
-async function fetchSpaShell(context,request){
+async function fetchSpaShell(context,request,session=null){
   const response=await fetchStatic(context,request,'/index.html');
   let html=await response.text();
   // Force the legacy SPA's relative CSS/JS/image URLs to resolve from the
   // deployment root even while the browser remains at /leagues/{slug}.
   if(!/<base\s/i.test(html)) html=html.replace(/<head([^>]*)>/i,'<head$1><base href="/">');
+  if(session){
+    const bootstrap=JSON.stringify({
+      authenticated:true,
+      user:session.user||null,
+      membership:session.membership||null,
+      session:{expiresAt:session.expiresAt||null}
+    }).replace(/</g,'\u003c');
+    html=html.replace(/<\/head>/i,`<script>window.__FHQ_AUTH_BOOTSTRAP__=${bootstrap};</script></head>`);
+  }
   const headers=new Headers(response.headers);
   headers.set('content-type','text/html; charset=UTF-8');
   headers.set('cache-control','no-store');
@@ -90,7 +99,7 @@ export async function onRequest(context){
   // while preserving the browser URL so the tenant router resolves this league.
   // Renew both persistent cookies during the document request itself so a hard
   // refresh does not depend on a later /api/auth/me client request.
-  const shell = await fetchSpaShell(context,request);
+  const shell = await fetchSpaShell(context,request,session);
   const headers = new Headers(shell.headers);
   if (session.rawSessionToken) {
     headers.append("Set-Cookie", createSecureCookie(
