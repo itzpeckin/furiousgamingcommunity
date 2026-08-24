@@ -86,7 +86,7 @@ export async function onRequestGet(context) {
       );
     }
 
-    // 6.1.2.3: recover both league invitation context and the origin that
+    // 6.1.2.4: recover both league invitation context and the origin that
     // initiated OAuth. The state record is authoritative and single-use.
     let joinLeagueId = null;
     let joinLeagueSlug = null;
@@ -291,10 +291,24 @@ export async function onRequestGet(context) {
             destination = `/leagues/${encodeURIComponent(league.slug)}?auth=pending`;
           } else if (Number(existing.active)) {
             destination = `/leagues/${encodeURIComponent(league.slug)}?auth=success`;
-          } else if (existing.role === "team_owner" && !existing.teamId) {
-            destination = `/leagues/${encodeURIComponent(league.slug)}?auth=pending`;
           } else {
-            destination = `/leagues?access=disabled`;
+            const explicitDisable = await context.env.DB.prepare(`
+              SELECT 1 AS disabled FROM league_membership_audit
+              WHERE league_id=? AND subject_user_id=? AND action='membership_deactivated'
+              LIMIT 1
+            `).bind(league.id, user.id).first().catch(() => null);
+            if (explicitDisable) {
+              destination = `/leagues?access=disabled`;
+            } else {
+              // Old failed/premature join records are normalized back to the
+              // self-service Pending state rather than being mislabeled Disabled.
+              await context.env.DB.prepare(`
+                UPDATE league_memberships
+                SET role='team_owner', team_id=NULL, active=0, updated_at=CURRENT_TIMESTAMP
+                WHERE league_id=? AND user_id=?
+              `).bind(league.id, user.id).run();
+              destination = `/leagues/${encodeURIComponent(league.slug)}?auth=pending`;
+            }
           }
         }
       } catch (joinError) {
@@ -302,7 +316,7 @@ export async function onRequestGet(context) {
       }
     }
 
-    // 6.1.2.3: OAuth may complete on the pages.dev callback host while the
+    // 6.1.2.4: OAuth may complete on the pages.dev callback host while the
     // user actually entered through franchisehq.app. Cookies cannot cross
     // those hosts. Hand the authenticated Discord identity back to the origin
     // that initiated login with a short-lived signed transfer token; that
