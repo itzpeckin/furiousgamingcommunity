@@ -3,7 +3,7 @@
   const HQ = window.FranchiseHQ;
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before league-tenant.js.');
 
-  const VERSION = '6.1.2.7';
+  const VERSION = '6.1.2.8';
   const REGISTRY_KEY = 'franchisehq.tenants.registry.v2';
   const ACTIVE_KEY = 'franchisehq.tenants.active.v2';
   const FGC_ALIASES = Object.freeze(['furiousgamingcommunity']);
