@@ -299,7 +299,7 @@ export async function onRequestGet(context) {
     if (joinLeagueSlug) {
       try {
         const league = await context.env.DB
-          .prepare(`SELECT id, slug FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`)
+          .prepare(`SELECT id, slug FROM leagues WHERE lower(replace(slug,'-',''))=lower(replace(?,'-','')) AND public_status='active' LIMIT 1`)
           .bind(joinLeagueSlug)
           .first();
         if (league) {
@@ -333,6 +333,15 @@ export async function onRequestGet(context) {
     });
 
     headers.append("Set-Cookie", sessionCookie);
+    headers.append(
+      "Set-Cookie",
+      createSecureCookie(
+        AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME,
+        rawSessionToken,
+        AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
+        "/"
+      )
+    );
 
     headers.append(
       "Set-Cookie",

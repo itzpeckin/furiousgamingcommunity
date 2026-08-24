@@ -40,7 +40,7 @@ export async function onRequestGet(context) {
     if (returnMatch) {
       const candidate = decodeURIComponent(returnMatch[1]);
       const league = await context.env.DB
-        .prepare(`SELECT slug FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`)
+        .prepare(`SELECT slug FROM leagues WHERE lower(replace(slug,'-',''))=lower(replace(?,'-','')) AND public_status='active' LIMIT 1`)
         .bind(candidate)
         .first();
       joinLeagueSlug = league?.slug || null;
