@@ -1,7 +1,7 @@
 import { onRequestGet as renderLeagueSelector } from "./index.js";
 import { AUTH_CONSTANTS, createSecureCookie, getCurrentSession, redirectResponse } from "../_lib/auth.js";
 
-const RELEASE='6.1.2.4';
+const RELEASE='6.1.2.5';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',
