@@ -275,7 +275,7 @@ async function resolveRequestedLeagueId(context, options = {}) {
     routeSlug = context.params.leagueSlug;
   }
 
-  // 6.1.2.5: /api/auth/me has no league slug in its own URL. On a full
+  // 6.1.2.7: /api/auth/me has no league slug in its own URL. On a full
   // reload, recover the active tenant from the browser Referer so the auth
   // client receives the correct commissioner/team membership instead of an
   // authenticated user with membership=null.
