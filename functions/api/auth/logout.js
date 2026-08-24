@@ -3,10 +3,11 @@ import {
   clearSecureCookie,
   getCookie,
   hashToken,
-  jsonResponse
+  jsonResponse,
+  redirectResponse
 } from "../../_lib/auth.js";
 
-export async function onRequestPost(context) {
+async function revokeSession(context) {
   try {
     const rawSessionToken = getCookie(
       context.request,
@@ -29,32 +30,28 @@ export async function onRequestPost(context) {
         .run();
     }
 
-    return jsonResponse(
-      {
-        ok: true,
-        authenticated: false
-      },
-      200,
-      {
-        "Set-Cookie": clearSecureCookie(
-          AUTH_CONSTANTS.SESSION_COOKIE_NAME,
-          "/"
-        )
-      }
-    );
+    return { ok: true, cookie: clearSecureCookie(AUTH_CONSTANTS.SESSION_COOKIE_NAME, "/") };
   } catch (error) {
     console.error("Logout failed:", error);
 
-    return jsonResponse(
-      {
-        ok: false,
-        error: "Unable to log out.",
-        details:
-          error instanceof Error
-            ? error.message
-            : String(error)
-      },
-      500
-    );
+    return { ok: false, error };
   }
+}
+
+
+export async function onRequestGet(context) {
+  const result = await revokeSession(context);
+  if (!result.ok) return redirectResponse("/?logout=error");
+  const response = redirectResponse("/?logout=success");
+  response.headers.set("Set-Cookie", result.cookie);
+  response.headers.set("cache-control", "no-store");
+  return response;
+}
+
+export async function onRequestPost(context) {
+  const result = await revokeSession(context);
+  if (!result.ok) {
+    return jsonResponse({ ok:false, error:"Unable to log out.", details: result.error instanceof Error ? result.error.message : String(result.error) },500);
+  }
+  return jsonResponse({ ok:true, authenticated:false },200,{ "Set-Cookie": result.cookie });
 }
