@@ -183,30 +183,44 @@ export function addSecondsToNow(seconds) {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
-async function resolveSessionLeagueId(context) {
-  if (!context?.env?.DB) return null;
-  let rawSlug = String(context.params?.leagueSlug || '').trim().toLowerCase();
-  if (!rawSlug) {
-    try {
-      const match = new URL(context.request.url).pathname.match(/\/leagues\/([^/?#]+)/i);
-      rawSlug = match ? decodeURIComponent(match[1]).toLowerCase() : '';
-    } catch {}
+async function resolveRequestedLeagueId(context, options = {}) {
+  if (options.leagueId) return String(options.leagueId);
+
+  const url = new URL(context.request.url);
+  const explicitSlug = options.leagueSlug || url.searchParams.get("league");
+  let routeSlug = explicitSlug;
+
+  if (!routeSlug) {
+    const match = url.pathname.match(/\/(?:api\/)?leagues\/([^/?#]+)/i);
+    routeSlug = match ? decodeURIComponent(match[1]) : null;
   }
-  const candidates = rawSlug === 'furiousgamingcommunity' || rawSlug === 'furious-gaming-community'
-    ? ['furiousgamingcommunity','furious-gaming-community']
-    : [rawSlug].filter(Boolean);
-  if (!candidates.length) candidates.push('furiousgamingcommunity','furious-gaming-community');
-  const marks = candidates.map(() => '?').join(',');
-  const row = await context.env.DB.prepare(`SELECT id FROM leagues WHERE LOWER(slug) IN (${marks}) LIMIT 1`)
-    .bind(...candidates).first();
-  return row?.id || null;
+
+  if (!routeSlug && context.params?.leagueSlug) {
+    routeSlug = context.params.leagueSlug;
+  }
+
+  if (!routeSlug) return "franchise-hq-primary";
+
+  try {
+    const league = await context.env.DB
+      .prepare(`SELECT id FROM leagues WHERE lower(slug) = lower(?) LIMIT 1`)
+      .bind(String(routeSlug))
+      .first();
+    return league?.id || null;
+  } catch {
+    return null;
+  }
 }
 
-export async function getCurrentSession(context) {
+export async function getCurrentSession(context, options = {}) {
   // Server-side Franchise Import Workflows authenticate with a short-lived
   // delegated token instead of persisting the commissioner's browser cookie.
   const delegated = await getImportDelegatedSession(context);
   if (delegated) {
+    const requestedLeagueId = await resolveRequestedLeagueId(context, options);
+    if (requestedLeagueId && delegated.membership?.leagueId !== requestedLeagueId) {
+      delegated.membership = null;
+    }
     return delegated;
   }
 
@@ -215,12 +229,10 @@ export async function getCurrentSession(context) {
     AUTH_CONSTANTS.SESSION_COOKIE_NAME
   );
 
-  if (!rawSessionToken) {
-    return null;
-  }
+  if (!rawSessionToken) return null;
 
   const sessionTokenHash = await hashToken(rawSessionToken);
-  const sessionLeagueId = await resolveSessionLeagueId(context);
+  const requestedLeagueId = await resolveRequestedLeagueId(context, options);
 
   const record = await context.env.DB
     .prepare(
@@ -239,34 +251,28 @@ export async function getCurrentSession(context) {
         league_memberships.league_id,
         league_memberships.role,
         league_memberships.team_id,
-        league_memberships.active AS membership_active
+        league_memberships.active AS membership_active,
+        leagues.slug AS league_slug,
+        leagues.name AS league_name
       FROM sessions
-      INNER JOIN users
-        ON users.id = sessions.user_id
+      INNER JOIN users ON users.id = sessions.user_id
       LEFT JOIN league_memberships
         ON league_memberships.user_id = users.id
         AND league_memberships.league_id = ?
+      LEFT JOIN leagues ON leagues.id = league_memberships.league_id
       WHERE sessions.session_token_hash = ?
         AND sessions.revoked_at IS NULL
         AND sessions.expires_at > CURRENT_TIMESTAMP
       LIMIT 1
       `
     )
-    .bind(sessionLeagueId || "__no_league__", sessionTokenHash)
+    .bind(requestedLeagueId || "__no_matching_league__", sessionTokenHash)
     .first();
 
-  if (!record) {
-    return null;
-  }
+  if (!record) return null;
 
   await context.env.DB
-    .prepare(
-      `
-      UPDATE sessions
-      SET last_seen_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `
-    )
+    .prepare(`UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?`)
     .bind(record.session_id)
     .run();
 
@@ -285,6 +291,8 @@ export async function getCurrentSession(context) {
       ? {
           id: record.membership_id,
           leagueId: record.league_id,
+          leagueSlug: record.league_slug,
+          leagueName: record.league_name,
           role: record.role,
           teamId: record.team_id,
           active: Boolean(record.membership_active)
