@@ -33,10 +33,19 @@
   function perspective(context = {}) {
     return context.perspective || HQ.simulation?.getPerspective?.() || HQ.simulation?.getSnapshot?.()?.perspective || null;
   }
+  function authenticatedWorkflowRole() {
+    if (!isActiveMember()) return null;
+    const role = authRole();
+    if (role === 'team_owner') return 'owner';
+    if (role === 'trade_committee') return 'committee';
+    if (role === 'commissioner') return 'commissioner';
+    return null;
+  }
   function perspectiveRole(context = {}) {
-    return context.role || perspective(context)?.role || HQ.simulation?.getRole?.() || 'guest';
+    return authenticatedWorkflowRole() || context.role || perspective(context)?.role || HQ.simulation?.getRole?.() || 'guest';
   }
   function perspectiveTeamId(context = {}) {
+    if (isActiveMember()) return authMembership()?.teamId || null;
     return context.teamId || perspective(context)?.teamId || HQ.simulation?.getTeam?.()?.id || null;
   }
 
@@ -63,7 +72,7 @@
     return {
       allowed,
       permission,
-      scope: platformPolicy ? 'authenticated-platform' : 'simulated-workflow',
+      scope: platformPolicy ? 'authenticated-platform' : (isActiveMember() ? 'authenticated-league' : 'simulated-workflow'),
       authenticated: HQ.auth?.isAuthenticated?.() === true,
       activeMembership: isActiveMember(),
       authenticatedRole: authRole(),
