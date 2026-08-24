@@ -1,7 +1,7 @@
 import { createId, jsonResponse } from "../../../_lib/auth.js";
 import { requireCommissioner } from "../../../_lib/permissions.js";
 
-const RELEASE = "6.1.2.4";
+const RELEASE = "6.1.2.5";
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 
 async function resolveLeague(context) {
@@ -29,13 +29,8 @@ export async function onRequestGet(context) {
     SELECT lm.id, lm.role, lm.team_id AS teamId, lm.active,
            CASE
              WHEN lm.active=1 THEN 'active'
-             WHEN lm.active=0 AND EXISTS (
-               SELECT 1 FROM league_membership_audit la
-               WHERE la.league_id=lm.league_id
-                 AND la.subject_user_id=lm.user_id
-                 AND la.action='membership_deactivated'
-             ) THEN 'disabled'
-             ELSE 'pending'
+             WHEN lm.active=0 AND lm.team_id IS NULL THEN 'pending'
+             ELSE 'disabled'
            END AS status,
            lm.created_at AS createdAt, lm.updated_at AS updatedAt,
            u.id AS userId, u.discord_user_id AS discordUserId, u.discord_username AS discordUsername,
@@ -43,7 +38,7 @@ export async function onRequestGet(context) {
     FROM league_memberships lm
     INNER JOIN users u ON u.id=lm.user_id
     WHERE lm.league_id=?
-    ORDER BY CASE WHEN lm.active=0 AND lm.role='team_owner' AND lm.team_id IS NULL THEN 0 WHEN lm.active=1 THEN 1 ELSE 2 END, lower(u.display_name) ASC
+    ORDER BY CASE WHEN lm.active=0 AND lm.team_id IS NULL THEN 0 WHEN lm.active=1 THEN 1 ELSE 2 END, lower(u.display_name) ASC
   `).bind(league.id).all();
 
   return jsonResponse({ ok:true, release:RELEASE, league, memberships:rows?.results || [] });
