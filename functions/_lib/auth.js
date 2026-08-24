@@ -4,7 +4,7 @@ const OAUTH_STATE_COOKIE_NAME = "franchise_hq_oauth_state";
 export const AUTH_CONSTANTS = {
   SESSION_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
-  SESSION_DURATION_SECONDS: 60 * 60 * 24 * 14,
+  SESSION_DURATION_SECONDS: 60 * 60 * 24 * 30,
   OAUTH_STATE_DURATION_SECONDS: 60 * 10
 };
 
@@ -271,14 +271,17 @@ export async function getCurrentSession(context, options = {}) {
 
   if (!record) return null;
 
+  const refreshedExpiresAt = addSecondsToNow(AUTH_CONSTANTS.SESSION_DURATION_SECONDS);
+
   await context.env.DB
-    .prepare(`UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?`)
-    .bind(record.session_id)
+    .prepare(`UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP, expires_at = ? WHERE id = ?`)
+    .bind(refreshedExpiresAt, record.session_id)
     .run();
 
   return {
     sessionId: record.session_id,
-    expiresAt: record.expires_at,
+    expiresAt: refreshedExpiresAt,
+    rawSessionToken,
     user: {
       id: record.user_id,
       discordUserId: record.discord_user_id,
