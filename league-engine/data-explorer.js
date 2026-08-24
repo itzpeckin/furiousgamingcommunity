@@ -3,7 +3,7 @@
   const HQ=window.FranchiseHQ;const VERSION='5.9.3.6';let catalog=null,detail=null,busy=false,lastError=null,query='',view='overview';
   const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const account=()=>window.FGC_TRADE?.getCurrentAccount?.()||null;
-  const slug=()=>document.querySelector('meta[name="franchise-hq-league-slug"]')?.content||'furious-gaming-community';
+  const slug=()=>document.querySelector('meta[name="franchise-hq-league-slug"]')?.content||'furiousgamingcommunity';
   const endpoint=id=>`/api/leagues/${encodeURIComponent(slug())}/companion/data-explorer${id?`?captureId=${encodeURIComponent(id)}`:''}`;
   const headers=()=>({'accept':'application/json','x-franchisehq-platform-owner-account-id':String(account()?.id||'')});
   async function request(id){busy=true;lastError=null;rerender();try{const r=await fetch(endpoint(id),{headers:headers(),credentials:'same-origin',cache:'no-store'});const p=await r.json().catch(()=>({ok:false,error:`HTTP ${r.status}`}));if(!r.ok||p.ok===false)throw Object.assign(new Error(p.detail||p.error||'Data Explorer request failed.'),{payload:p});if(id)detail=p.dataset;else catalog=p;return p;}catch(e){lastError=e.message;console.error('[Data Explorer]',e.payload||e);throw e;}finally{busy=false;rerender();}}

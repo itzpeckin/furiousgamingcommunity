@@ -13,7 +13,7 @@
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const account = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
-  const leagueSlug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || 'furious-gaming-community';
+  const leagueSlug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || 'furiousgamingcommunity';
 
   function endpoint(params = {}) {
     const url = new URL(`/api/leagues/${encodeURIComponent(leagueSlug())}/snapshot/read-model`, location.origin);
@@ -22,7 +22,7 @@
   }
 
   async function request(params = {}, force = false) {
-    const key = JSON.stringify(params);
+    const key = `${leagueSlug()}:${JSON.stringify(params)}`;
     if (!force && cache.has(key)) return cache.get(key);
     if (!force && inFlight.has(key)) return inFlight.get(key);
 
@@ -85,16 +85,18 @@
   async function getLeague() { return (summary || await request({})).league; }
   async function getState() { return (summary || await request({})).state; }
   async function getDomain(domain) {
-    if (domainCache.has(domain)) return domainCache.get(domain);
+    const domainKey=`${leagueSlug()}:${domain}`;
+    if (domainCache.has(domainKey)) return domainCache.get(domainKey);
 
     const snapshot=await getSnapshot();
     const persisted=readPersisted(snapshot?.id,domain);
     if(persisted){
-      domainCache.set(domain,persisted);
+      domainCache.set(domainKey,persisted);
       return persisted;
     }
 
-    if(inFlight.has(`domain:${domain}`))return inFlight.get(`domain:${domain}`);
+    const flightKey=`domain:${leagueSlug()}:${domain}`;
+    if(inFlight.has(flightKey))return inFlight.get(flightKey);
 
     const work=(async()=>{
       // Teams, standings, games and players are bounded league datasets.
@@ -104,7 +106,7 @@
         if(domain==='statistics')params.compact='1';
         const payload=await request(params);
         const records=payload.records||[];
-        domainCache.set(domain,records);
+        domainCache.set(domainKey,records);
         persist(snapshot?.id,domain,records);
         return records;
       }
@@ -122,13 +124,13 @@
         guard++;
         if(guard>1000)throw new Error(`Live ${domain} read exceeded 1000 pages.`);
       } while(cursor);
-      domainCache.set(domain,records);
+      domainCache.set(domainKey,records);
       return records;
     })();
 
-    inFlight.set(`domain:${domain}`,work);
+    inFlight.set(flightKey,work);
     try{return await work}
-    finally{inFlight.delete(`domain:${domain}`)}
+    finally{inFlight.delete(flightKey)}
   }
 
   async function getTeams() { return getDomain('teams'); }
@@ -201,6 +203,10 @@
       event.preventDefault();
       loadSample(sample.dataset.liveReadSample).catch(()=>{});
     }
+  });
+
+  window.addEventListener('franchisehq:league-tenant-changed',()=>{
+    cache.clear(); domainCache.clear(); inFlight.clear(); summary=null; lastError=null; lastRefreshAt=null;
   });
 
   function diagnostics() {

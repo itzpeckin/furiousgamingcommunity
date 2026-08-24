@@ -1,7 +1,7 @@
 (()=>{'use strict';
 const HQ=window.FranchiseHQ,VERSION='5.9.3.6';let latest=null,busy=false,lastError=null,open=false;
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const account=()=>window.FGC_TRADE?.getCurrentAccount?.()||null;const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||'furious-gaming-community';
+const account=()=>window.FGC_TRADE?.getCurrentAccount?.()||null;const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||'furiousgamingcommunity';
 const endpoint=()=>`/api/leagues/${encodeURIComponent(slug())}/companion/build-snapshot`;const headers=()=>({'content-type':'application/json','x-franchisehq-platform-owner-account-id':String(account()?.id||'')});
 async function request(method){busy=true;lastError=null;rerender();try{const r=await fetch(endpoint(),{method,headers:headers(),credentials:'same-origin',cache:'no-store',body:method==='POST'?'{}':undefined});const p=await r.json().catch(()=>({ok:false,error:`HTTP ${r.status}`}));if(!r.ok||p.ok===false)throw Object.assign(new Error(p.detail||p.error||'Snapshot build failed.'),{payload:p});latest=p;if(open)renderModal();return p}catch(e){lastError=e.message;console.error('[Snapshot Builder]',e.payload||e);throw e}finally{busy=false;rerender()}}
 const refresh=()=>request('GET'),buildSnapshot=()=>request('POST');

@@ -118,7 +118,7 @@
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const account = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
-  const slug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || document.querySelector('meta[name="franchise-hq-league-slug"]')?.content || 'furious-gaming-community';
+  const slug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || document.querySelector('meta[name="franchise-hq-league-slug"]')?.content || 'furiousgamingcommunity';
   const base = () => `/api/leagues/${encodeURIComponent(slug())}/companion/`;
   const headers = () => ({accept:'application/json','content-type':'application/json','x-franchisehq-platform-owner-account-id':String(account()?.id||'')});
 
