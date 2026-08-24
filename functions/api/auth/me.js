@@ -1,5 +1,7 @@
-const RELEASE = "6.1.2";
+const RELEASE = "6.1.2.1";
 import {
+  AUTH_CONSTANTS,
+  createSecureCookie,
   getCurrentSession,
   jsonResponse
 } from "../../_lib/auth.js";
@@ -26,6 +28,13 @@ export async function onRequestGet(context) {
         expiresAt: session.expiresAt
       },
       release: RELEASE
+    }, 200, {
+      "Set-Cookie": createSecureCookie(
+        AUTH_CONSTANTS.SESSION_COOKIE_NAME,
+        session.rawSessionToken,
+        AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
+        "/"
+      )
     });
   } catch (error) {
     console.error("Current-user lookup failed:", error);
