@@ -1,7 +1,7 @@
 import { createId, jsonResponse } from "../../../_lib/auth.js";
 import { requireCommissioner } from "../../../_lib/permissions.js";
 
-const RELEASE = "6.1.1";
+const RELEASE = "6.1.2";
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 
 async function resolveLeague(context) {
@@ -26,13 +26,15 @@ export async function onRequestGet(context) {
   if (!league || auth.session.membership?.leagueId !== league.id) return jsonResponse({ ok:false, error:"Not found." }, 404);
 
   const rows = await context.env.DB.prepare(`
-    SELECT lm.id, lm.role, lm.team_id AS teamId, lm.active, lm.created_at AS createdAt, lm.updated_at AS updatedAt,
+    SELECT lm.id, lm.role, lm.team_id AS teamId, lm.active,
+           CASE WHEN lm.active=1 THEN 'active' WHEN lm.role='pending' THEN 'pending' ELSE 'disabled' END AS status,
+           lm.created_at AS createdAt, lm.updated_at AS updatedAt,
            u.id AS userId, u.discord_user_id AS discordUserId, u.discord_username AS discordUsername,
            u.discord_global_name AS discordGlobalName, u.display_name AS displayName, u.avatar_url AS avatarUrl
     FROM league_memberships lm
     INNER JOIN users u ON u.id=lm.user_id
     WHERE lm.league_id=?
-    ORDER BY lm.active DESC, lower(u.display_name) ASC
+    ORDER BY CASE WHEN lm.role='pending' AND lm.active=0 THEN 0 WHEN lm.active=1 THEN 1 ELSE 2 END, lower(u.display_name) ASC
   `).bind(league.id).all();
 
   return jsonResponse({ ok:true, release:RELEASE, league, memberships:rows?.results || [] });
@@ -54,6 +56,15 @@ export async function onRequestPost(context) {
   if (body.userId) user = await context.env.DB.prepare(`SELECT id, discord_user_id, display_name FROM users WHERE id=? LIMIT 1`).bind(String(body.userId)).first();
   if (!user && body.discordUserId) user = await context.env.DB.prepare(`SELECT id, discord_user_id, display_name FROM users WHERE discord_user_id=? LIMIT 1`).bind(String(body.discordUserId)).first();
   if (!user) return jsonResponse({ ok:false, error:"That Discord user has not signed in to Franchise HQ yet." }, 404);
+
+  if (teamId) {
+    const occupied = await context.env.DB.prepare(`
+      SELECT u.display_name AS displayName FROM league_memberships lm
+      INNER JOIN users u ON u.id=lm.user_id
+      WHERE lm.league_id=? AND lm.team_id=? AND lm.active=1 AND lm.user_id<>? LIMIT 1
+    `).bind(league.id, teamId, user.id).first();
+    if (occupied) return jsonResponse({ ok:false, error:`That team is already assigned to ${occupied.displayName || 'another member'}.` }, 409);
+  }
 
   const existing = await context.env.DB.prepare(`SELECT id FROM league_memberships WHERE league_id=? AND user_id=? LIMIT 1`).bind(league.id, user.id).first();
   const membershipId = existing?.id || createId("membership");
