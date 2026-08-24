@@ -1,10 +1,9 @@
 import {
   AUTH_CONSTANTS,
-  addSecondsToNow,
   clearSecureCookie,
   createId,
-  createRandomToken,
-  createSecureCookie,
+  createSessionTransferToken,
+  decodeOpaqueContext,
   getCookie,
   hashToken,
   jsonResponse,
@@ -87,17 +86,27 @@ export async function onRequestGet(context) {
       );
     }
 
-    // 6.1.2: recover the league invitation context from the one-time OAuth
-    // state record. This stays server-side and survives mobile Discord handoff.
+    // 6.1.2.3: recover both league invitation context and the origin that
+    // initiated OAuth. The state record is authoritative and single-use.
+    let joinLeagueId = null;
     let joinLeagueSlug = null;
-    if (String(storedState.id || "").startsWith("oauthjoin.")) {
+    let loginOrigin = new URL(context.request.url).origin;
+    if (String(storedState.id || "").startsWith("oauthctx.")) {
+      const encoded = String(storedState.id).split(".")[1] || "";
+      const oauthContext = decodeOpaqueContext(encoded);
+      if (oauthContext) {
+        joinLeagueId = oauthContext.joinLeagueId || null;
+        joinLeagueSlug = oauthContext.joinLeagueSlug || null;
+        if (/^https:\/\//i.test(String(oauthContext.origin || ""))) {
+          loginOrigin = String(oauthContext.origin);
+        }
+      }
+    } else if (String(storedState.id || "").startsWith("oauthjoin.")) {
+      // Backward compatibility for an OAuth flow that began on 6.1.2.2.
       try {
         const encoded = String(storedState.id).split(".")[1] || "";
-        const padded = encoded.replaceAll("-", "+").replaceAll("_", "/") + "===".slice((encoded.length + 3) % 4);
-        joinLeagueSlug = decodeURIComponent(escape(atob(padded)));
-      } catch (joinStateError) {
-        console.warn("Unable to decode league join context:", joinStateError);
-      }
+        joinLeagueSlug = decodeOpaqueContext(encoded) || null;
+      } catch {}
     }
 
     await context.env.DB
@@ -258,112 +267,63 @@ export async function onRequestGet(context) {
         .run();
     }
 
-    const rawSessionToken = createRandomToken(48);
-    const sessionTokenHash = await hashToken(rawSessionToken);
-    const sessionId = createId("session");
-    const expiresAt = addSecondsToNow(
-      AUTH_CONSTANTS.SESSION_DURATION_SECONDS
-    );
-
-    await context.env.DB
-      .prepare(
-        `
-        INSERT INTO sessions (
-          id,
-          user_id,
-          session_token_hash,
-          expires_at
-        )
-        VALUES (?, ?, ?, ?)
-        `
-      )
-      .bind(
-        sessionId,
-        user.id,
-        sessionTokenHash,
-        expiresAt
-      )
-      .run();
-
-    const sessionCookie = createSecureCookie(
-      AUTH_CONSTANTS.SESSION_COOKIE_NAME,
-      rawSessionToken,
-      AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-      "/"
-    );
-
-    // 6.1.2: when the user entered through a shared league URL, register that
-    // Discord identity as a pending member of that league. The commissioner
-    // then assigns team + role before full access is granted.
+    // A shared league URL creates an inactive/unassigned membership. We do NOT
+    // write role='pending' because the production membership schema restricts
+    // role to real league roles. Pending is a workflow state, not a permission.
     let destination = "/leagues?auth=success";
-    if (joinLeagueSlug) {
+    if (joinLeagueId || joinLeagueSlug) {
       try {
         const league = await context.env.DB
-          .prepare(`SELECT id, slug FROM leagues WHERE lower(replace(slug,'-',''))=lower(replace(?,'-','')) AND public_status='active' LIMIT 1`)
-          .bind(joinLeagueSlug)
+          .prepare(`SELECT id, slug FROM leagues WHERE (id=? OR lower(replace(slug,'-',''))=lower(replace(?,'-',''))) AND public_status='active' LIMIT 1`)
+          .bind(joinLeagueId || "", joinLeagueSlug || "")
           .first();
         if (league) {
           const existing = await context.env.DB
-            .prepare(`SELECT id, active, role FROM league_memberships WHERE league_id=? AND user_id=? LIMIT 1`)
+            .prepare(`SELECT id, active, role, team_id AS teamId FROM league_memberships WHERE league_id=? AND user_id=? LIMIT 1`)
             .bind(league.id, user.id)
             .first();
+
           if (!existing) {
             await context.env.DB.prepare(`
               INSERT INTO league_memberships (id, league_id, user_id, role, team_id, active, created_at, updated_at)
-              VALUES (?, ?, ?, 'pending', NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+              VALUES (?, ?, ?, 'team_owner', NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             `).bind(createId("membership"), league.id, user.id).run();
-          } else if (!Number(existing.active)) {
-            await context.env.DB.prepare(`
-              UPDATE league_memberships SET role='pending', team_id=NULL, active=0, updated_at=CURRENT_TIMESTAMP
-              WHERE id=?
-            `).bind(existing.id).run();
+            destination = `/leagues/${encodeURIComponent(league.slug)}?auth=pending`;
+          } else if (Number(existing.active)) {
+            destination = `/leagues/${encodeURIComponent(league.slug)}?auth=success`;
+          } else if (existing.role === "team_owner" && !existing.teamId) {
+            destination = `/leagues/${encodeURIComponent(league.slug)}?auth=pending`;
+          } else {
+            destination = `/leagues?access=disabled`;
           }
-          destination = Number(existing?.active)
-            ? `/leagues/${encodeURIComponent(league.slug)}?auth=success`
-            : `/leagues/${encodeURIComponent(league.slug)}?auth=pending`;
         }
       } catch (joinError) {
         console.error("League pending-membership registration failed:", joinError);
       }
     }
 
+    // 6.1.2.3: OAuth may complete on the pages.dev callback host while the
+    // user actually entered through franchisehq.app. Cookies cannot cross
+    // those hosts. Hand the authenticated Discord identity back to the origin
+    // that initiated login with a short-lived signed transfer token; that
+    // origin then creates the D1 session and sets its own persistent cookies.
+    const transferSecret = context.env.SESSION_SIGNING_SECRET || context.env.DISCORD_CLIENT_SECRET;
+    const transferToken = await createSessionTransferToken(transferSecret, {
+      userId: user.id,
+      destination,
+      exp: Math.floor(Date.now() / 1000) + AUTH_CONSTANTS.SESSION_TRANSFER_DURATION_SECONDS
+    });
+    const claimUrl = new URL("/api/auth/session/claim", loginOrigin);
+    claimUrl.searchParams.set("token", transferToken);
+
     const headers = new Headers({
-      Location: destination,
+      Location: claimUrl.toString(),
       "Cache-Control": "no-store"
     });
+    headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME, "/"));
+    headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME, "/api/auth/discord"));
 
-    headers.append("Set-Cookie", sessionCookie);
-    headers.append(
-      "Set-Cookie",
-      createSecureCookie(
-        AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME,
-        rawSessionToken,
-        AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-        "/"
-      )
-    );
-
-    headers.append(
-      "Set-Cookie",
-      clearSecureCookie(
-        AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME,
-        "/"
-      )
-    );
-
-    // Clear the legacy path-scoped cookie from releases <= 6.1.0d as well.
-    headers.append(
-      "Set-Cookie",
-      clearSecureCookie(
-        AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME,
-        "/api/auth/discord"
-      )
-    );
-
-    return new Response(null, {
-      status: 302,
-      headers
-    });
+    return new Response(null, { status: 302, headers });
   } catch (error) {
     console.error("Discord callback failed:", error);
 

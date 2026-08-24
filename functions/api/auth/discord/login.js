@@ -4,6 +4,7 @@ import {
   createId,
   createRandomToken,
   createSecureCookie,
+  encodeOpaqueContext,
   hashToken,
   jsonResponse,
   redirectResponse
@@ -30,26 +31,27 @@ export async function onRequestGet(context) {
 
     const stateToken = createRandomToken(32);
     const stateTokenHash = await hashToken(stateToken);
-    // 6.1.2: a shared /leagues/{slug} URL is the invitation context.
-    // Store that context in the opaque OAuth-state record ID so it survives
-    // Discord/mobile browser handoffs without relying on another cookie or DB column.
+    // 6.1.2.3: keep the league join intent AND the browser origin inside the
+    // server-side OAuth state record. This survives Discord/mobile handoffs and
+    // lets the callback hand the finished login back to the exact FranchiseHQ
+    // origin that initiated it.
     const requestUrl = new URL(context.request.url);
     const rawReturnTo = String(requestUrl.searchParams.get("returnTo") || "");
     const returnMatch = rawReturnTo.match(/^\/leagues\/([^/?#]+)$/i);
-    let joinLeagueSlug = null;
+    let joinLeague = null;
     if (returnMatch) {
       const candidate = decodeURIComponent(returnMatch[1]);
-      const league = await context.env.DB
-        .prepare(`SELECT slug FROM leagues WHERE lower(replace(slug,'-',''))=lower(replace(?,'-','')) AND public_status='active' LIMIT 1`)
+      joinLeague = await context.env.DB
+        .prepare(`SELECT id, slug FROM leagues WHERE lower(replace(slug,'-',''))=lower(replace(?,'-','')) AND public_status='active' LIMIT 1`)
         .bind(candidate)
         .first();
-      joinLeagueSlug = league?.slug || null;
     }
-    const encodeJoinSlug = (value) => btoa(unescape(encodeURIComponent(value)))
-      .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
-    const stateId = joinLeagueSlug
-      ? `oauthjoin.${encodeJoinSlug(joinLeagueSlug)}.${crypto.randomUUID()}`
-      : createId("oauth");
+    const oauthContext = encodeOpaqueContext({
+      origin: requestUrl.origin,
+      joinLeagueId: joinLeague?.id || null,
+      joinLeagueSlug: joinLeague?.slug || null
+    });
+    const stateId = `oauthctx.${oauthContext}.${crypto.randomUUID()}`;
     const expiresAt = addSecondsToNow(
       AUTH_CONSTANTS.OAUTH_STATE_DURATION_SECONDS
     );
