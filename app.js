@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'6.1.2.4',
+      release:'6.1.2.5',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -6277,7 +6277,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ.transactionRecovery={
-    release:'6.1.2.4',
+    release:'6.1.2.5',
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
@@ -6285,7 +6285,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
-      release:'6.1.2.4',
+      release:'6.1.2.5',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
       route:routeBase(location.hash.slice(1))
@@ -6299,7 +6299,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'6.1.2.4',
+      release:'6.1.2.5',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6312,7 +6312,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'6.1.2.4',
+      release:'6.1.2.5',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -8084,6 +8084,19 @@ function canonicalPlayerDashboardStats(playerId='') {
     return normalized;
   }
 
+  let commissionerAuthRecoveryInFlight=false;
+
+  function requestCommissionerAuthRecovery(){
+    const auth=window.FranchiseHQ?.auth;
+    if(commissionerAuthRecoveryInFlight||typeof auth?.refresh!=='function') return false;
+    commissionerAuthRecoveryInFlight=true;
+    Promise.resolve(auth.refresh()).finally(()=>{
+      commissionerAuthRecoveryInFlight=false;
+      if(routeBase(location.hash.slice(1))==='commissioner') renderRoute(location.hash.slice(1)||'commissioner');
+    });
+    return true;
+  }
+
   function commissionerAccessState() {
     const platform=window.FranchiseHQ;
     const auth=platform?.auth;
@@ -8113,8 +8126,10 @@ function canonicalPlayerDashboardStats(playerId='') {
     });
 
     if (!access && routeBase(location.hash.slice(1))==='commissioner') {
-      showToast('Commissioner access required','Your authenticated league membership does not include Commissioner capabilities.');
-      setRoute('home');
+      // A hard refresh can briefly expose an anonymous snapshot before the
+      // persisted server session is restored. Recover auth in place rather
+      // than navigating away from Commissioner HQ.
+      if(requestCommissionerAuthRecovery()) return;
     }
   }
 
@@ -8180,7 +8195,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='6.1.2.4';
+  const PERFORMANCE_CERTIFICATION_RELEASE='6.1.2.5';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -8428,9 +8443,12 @@ function canonicalPlayerDashboardStats(playerId='') {
           break;
         }
         if (!access) {
-          showToast('Commissioner access required','Your authenticated league membership does not include Commissioner capabilities.');
-          setRoute('home');
-          return;
+          if(requestCommissionerAuthRecovery()) {
+            pageContent.innerHTML='<section class="empty-state"><strong>Restoring Commissioner session…</strong><p>Franchise HQ is restoring your persistent Discord session.</p></section>';
+            break;
+          }
+          pageContent.innerHTML='<section class="empty-state"><strong>Commissioner access required</strong><p>This Discord account is not currently authorized as a commissioner for this league.</p></section>';
+          break;
         }
         if(id==='platform-workspace'){
           if(window.FGC_TRADE?.renderPlatformWorkspace) window.FGC_TRADE.renderPlatformWorkspace();
@@ -9479,9 +9497,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 6.1.2.4';
+      node.textContent = 'Current Release - 6.1.2.5';
     });
-    document.documentElement.dataset.franchiseHqRelease = '6.1.2.4';
+    document.documentElement.dataset.franchiseHqRelease = '6.1.2.5';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9493,7 +9511,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'6.1.2.4',
+    release:'6.1.2.5',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9507,7 +9525,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'6.1.2.4',
+        release:'6.1.2.5',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -10134,7 +10152,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'6.1.2.4',
+    release:'6.1.2.5',
     mode:'read-only-stabilized',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
@@ -10203,7 +10221,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   // Free Agent ingestion remains source-only until Madden 27 export behavior is certified.
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.stabilization={
-    release:'6.1.2.4',
+    release:'6.1.2.5',
     transactionRepairsDisabled:true,
     freeAgentInferenceDisabled:true,
     sourceOfTruth:'active-madden-snapshot'
