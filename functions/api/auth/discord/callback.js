@@ -25,7 +25,7 @@ export async function onRequestGet(context) {
         {
           "Set-Cookie": clearSecureCookie(
             AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME,
-            "/api/auth/discord"
+            "/"
           )
         }
       );
@@ -46,13 +46,15 @@ export async function onRequestGet(context) {
       AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME
     );
 
+    // 6.1.0d: Discord can hand the callback back through a different mobile
+    // browser context, which may drop the temporary OAuth cookie even though
+    // the one-time state token is still valid. Treat the cookie as an
+    // additional same-browser signal, but make the expiring, single-use D1
+    // state record authoritative. This preserves CSRF state validation without
+    // breaking legitimate mobile/in-app-browser handoffs.
     if (!stateCookie || stateCookie !== returnedState) {
-      return jsonResponse(
-        {
-          ok: false,
-          error: "Discord login state validation failed."
-        },
-        400
+      console.warn(
+        "Discord OAuth state cookie missing or mismatched; validating against D1 state record."
       );
     }
 
@@ -277,7 +279,7 @@ export async function onRequestGet(context) {
       "/"
     );
 
-    // 6.1.0c: the public root is now a landing page, so a successful
+    // 6.1.0d: the public root is now a landing page, so a successful
     // Discord login must return the user to an actual league instead of /.
     // Resolve the destination from the authenticated user's active memberships
     // to preserve multi-tenant behavior and avoid hard-coding any league slug.
@@ -328,6 +330,15 @@ export async function onRequestGet(context) {
 
     headers.append("Set-Cookie", sessionCookie);
 
+    headers.append(
+      "Set-Cookie",
+      clearSecureCookie(
+        AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME,
+        "/"
+      )
+    );
+
+    // Clear the legacy path-scoped cookie from releases <= 6.1.0d as well.
     headers.append(
       "Set-Cookie",
       clearSecureCookie(

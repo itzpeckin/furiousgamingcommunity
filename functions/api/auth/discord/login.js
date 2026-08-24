@@ -87,7 +87,7 @@ export async function onRequestGet(context) {
       AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME,
       stateToken,
       AUTH_CONSTANTS.OAUTH_STATE_DURATION_SECONDS,
-      "/api/auth/discord"
+      "/"
     );
 
     return redirectResponse(authorizationUrl.toString(), {
