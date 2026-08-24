@@ -1,4 +1,4 @@
-const RELEASE = "6.1.2.1";
+const RELEASE = "6.1.2.2";
 import {
   AUTH_CONSTANTS,
   createSecureCookie,
@@ -19,23 +19,31 @@ export async function onRequestGet(context) {
       });
     }
 
-    return jsonResponse({
+    const headers = new Headers({
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store"
+    });
+    headers.append("Set-Cookie", createSecureCookie(
+      AUTH_CONSTANTS.SESSION_COOKIE_NAME,
+      session.rawSessionToken,
+      AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
+      "/"
+    ));
+    headers.append("Set-Cookie", createSecureCookie(
+      AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME,
+      session.rawSessionToken,
+      AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
+      "/"
+    ));
+
+    return new Response(JSON.stringify({
       ok: true,
       authenticated: true,
       user: session.user,
       membership: session.membership,
-      session: {
-        expiresAt: session.expiresAt
-      },
+      session: { expiresAt: session.expiresAt },
       release: RELEASE
-    }, 200, {
-      "Set-Cookie": createSecureCookie(
-        AUTH_CONSTANTS.SESSION_COOKIE_NAME,
-        session.rawSessionToken,
-        AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-        "/"
-      )
-    });
+    }, null, 2), { status: 200, headers });
   } catch (error) {
     console.error("Current-user lookup failed:", error);
 
