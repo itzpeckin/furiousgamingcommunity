@@ -1,9 +1,11 @@
 const SESSION_COOKIE_NAME = "franchise_hq_session";
 const OAUTH_STATE_COOKIE_NAME = "franchise_hq_oauth_state";
+const SESSION_RECOVERY_COOKIE_NAME = "franchise_hq_session_recovery";
 
 export const AUTH_CONSTANTS = {
   SESSION_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
+  SESSION_RECOVERY_COOKIE_NAME,
   SESSION_DURATION_SECONDS: 60 * 60 * 24 * 30,
   OAUTH_STATE_DURATION_SECONDS: 60 * 10
 };
@@ -224,10 +226,18 @@ export async function getCurrentSession(context, options = {}) {
     return delegated;
   }
 
-  const rawSessionToken = getCookie(
+  // 6.1.2.2: keep a second persistent recovery cookie for full/hard reloads.
+  // Both cookies point to the same revocable server-side session; this does not
+  // create a second login or bypass expiration/revocation.
+  const primarySessionToken = getCookie(
     context.request,
     AUTH_CONSTANTS.SESSION_COOKIE_NAME
   );
+  const recoverySessionToken = getCookie(
+    context.request,
+    AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME
+  );
+  const rawSessionToken = primarySessionToken || recoverySessionToken;
 
   if (!rawSessionToken) return null;
 
