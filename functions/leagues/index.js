@@ -3,7 +3,7 @@ import {
   redirectResponse
 } from "../_lib/auth.js";
 
-const RELEASE = "6.1.1";
+const RELEASE = "6.1.2";
 
 function esc(value) {
   return String(value ?? "")
@@ -30,7 +30,7 @@ function leagueCard(league) {
   </a>`;
 }
 
-function page({ user, memberships }) {
+function page({ user, memberships, pendingMemberships = [] }) {
   const hasMemberships = memberships.length > 0;
   return `<!doctype html>
 <html lang="en">
@@ -70,8 +70,9 @@ function page({ user, memberships }) {
       <section class="section">
         <div class="section-title"><h2>Your Leagues</h2><span>${memberships.length} connected</span></div>
         <div class="list">
-          ${hasMemberships ? memberships.map((l) => leagueCard(l)).join("") : `<div class="empty"><strong>No league access has been assigned yet.</strong><br>Your Discord account is signed in successfully, but a commissioner must add you to a Franchise HQ league before you can enter it.</div>`}
+          ${hasMemberships ? memberships.map((l) => leagueCard(l)).join("") : `<div class="empty"><strong>No active league access yet.</strong><br>Use the league URL your commissioner shared with you to request access.</div>`}
         </div>
+        ${pendingMemberships.length ? `<div class="section-title" style="margin-top:28px"><h2>Pending Approval</h2><span>${pendingMemberships.length} waiting</span></div><div class="list">${pendingMemberships.map((l)=>`<a class="league-card" href="/leagues/${encodeURIComponent(l.slug)}"><div class="league-mark">FH</div><div class="league-copy"><div class="league-meta">Waiting for commissioner</div><h2>${esc(l.name)}</h2><p>Your Discord account is connected. Team and role assignment are still pending.</p></div><span class="role">Pending</span><span class="arrow">→</span></a>`).join("")}</div>` : ""}
       </section>
     </main>
     <footer><span>Franchise HQ · Release ${RELEASE}</span><a class="logout" href="/api/auth/logout">Log out</a></footer>
@@ -86,6 +87,7 @@ export async function onRequestGet(context) {
     if (!session) return redirectResponse("/?auth=required");
 
     let memberships = [];
+    let pendingMemberships = [];
     try {
       const result = await context.env.DB.prepare(`
         SELECT leagues.id, leagues.slug, leagues.name, league_memberships.role, league_memberships.team_id
@@ -97,11 +99,22 @@ export async function onRequestGet(context) {
         ORDER BY leagues.name ASC
       `).bind(session.user.id).all();
       memberships = result?.results || [];
+      const pending = await context.env.DB.prepare(`
+        SELECT leagues.id, leagues.slug, leagues.name
+        FROM league_memberships
+        INNER JOIN leagues ON leagues.id = league_memberships.league_id
+        WHERE league_memberships.user_id = ?
+          AND league_memberships.active = 0
+          AND league_memberships.role = 'pending'
+          AND leagues.public_status = 'active'
+        ORDER BY leagues.name ASC
+      `).bind(session.user.id).all();
+      pendingMemberships = pending?.results || [];
     } catch (error) {
       console.error("League selector membership lookup failed:", error);
     }
 
-    return new Response(page({ user: session.user, memberships }), {
+    return new Response(page({ user: session.user, memberships, pendingMemberships }), {
       status: 200,
       headers: {
         "content-type": "text/html; charset=UTF-8",
