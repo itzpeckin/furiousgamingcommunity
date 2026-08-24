@@ -1,4 +1,6 @@
-const RELEASE='6.1.0e';
+import { onRequestGet as renderLeagueSelector } from "./index.js";
+
+const RELEASE='6.1.0f';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',
@@ -45,6 +47,13 @@ export async function onRequest(context){
   const request=context.request;
   if(request.method!=='GET'&&request.method!=='HEAD')return context.next();
   const parts=pathParts(request);
+
+  // 6.1.0f: /leagues is the authenticated league selector.
+  // This catch-all also matches the empty /leagues path on Cloudflare Pages,
+  // so handle it explicitly before the SPA fallback.
+  if(parts.length===0){
+    return renderLeagueSelector(context);
+  }
 
   // Existing index.html uses relative asset paths. On a nested league URL those
   // resolve under /leagues/. Map them back to their real root static paths.
