@@ -1,3 +1,4 @@
+const RELEASE = "6.1.1";
 import {
   getCurrentSession,
   jsonResponse
@@ -23,7 +24,8 @@ export async function onRequestGet(context) {
       membership: session.membership,
       session: {
         expiresAt: session.expiresAt
-      }
+      },
+      release: RELEASE
     });
   } catch (error) {
     console.error("Current-user lookup failed:", error);
