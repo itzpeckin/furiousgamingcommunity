@@ -57,7 +57,7 @@
     switch (permission) {
       case POLICIES.CREATE_TRADE:
       case POLICIES.MANAGE_TRADE_BLOCK:
-        return Boolean(teamId && ['owner', 'commissioner'].includes(role));
+        return Boolean(teamId && ['owner', 'committee', 'commissioner'].includes(role));
       case POLICIES.REVIEW_TRADES:
       case POLICIES.VOTE_ON_TRADES:
         return ['committee', 'commissioner'].includes(role);
