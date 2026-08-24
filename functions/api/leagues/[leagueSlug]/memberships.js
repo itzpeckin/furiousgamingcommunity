@@ -1,7 +1,7 @@
 import { createId, jsonResponse } from "../../../_lib/auth.js";
 import { requireCommissioner } from "../../../_lib/permissions.js";
 
-const RELEASE = "6.1.2.1";
+const RELEASE = "6.1.2.2";
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 
 async function resolveLeague(context) {
