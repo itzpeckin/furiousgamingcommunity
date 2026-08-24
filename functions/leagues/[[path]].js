@@ -1,4 +1,4 @@
-const RELEASE='6.1.0c';
+const RELEASE='6.1.0d';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',
