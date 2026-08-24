@@ -41,7 +41,7 @@ export async function onRequestPost({request,env,params}){
       headers:{
         accept:'application/json',
         authorization:`Bearer ${token}`,
-        'user-agent':'FranchiseHQ-EA-Auth-Discovery/6.0.3'
+        'user-agent':'FranchiseHQ-EA-Auth-Discovery/6.0.4a'
       }
     });
   }catch(error){

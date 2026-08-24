@@ -1,4 +1,4 @@
-const RELEASE='6.0.3';
+const RELEASE='6.0.4a';
 
 function json(data,status=200,headers={}){
   return new Response(JSON.stringify(data,null,2),{
