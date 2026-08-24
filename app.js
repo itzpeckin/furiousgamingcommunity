@@ -924,7 +924,7 @@
       // 6.5.1a — Home critical render path.
       // Teams / standings / schedule paint immediately. The large player/statistics
       // domains hydrate after first paint and never block a hard-refresh render.
-      const leagueSlug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
+      const leagueSlug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity';
       const criticalCacheKey=`fhq:home-critical:v6.5.1a:${leagueSlug}`;
       let cachedCritical=null;
       try{
@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'5.9.11.0',
+      release:'6.1.0',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -2767,7 +2767,7 @@
 
   async function loadIntegratedFreeAgents(){
     try{
-      const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community');
+      const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity');
       const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/players/free-agents`,{credentials:'include'});
       if(!response.ok)return[];
       const payload=await response.json();
@@ -6214,7 +6214,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(service?.canonical){
         payload=await service.canonical();
       }else{
-        const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community';
+        const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity';
         const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/transactions/canonical`,{
           credentials:'include',cache:'no-store',headers:{accept:'application/json'}
         });
@@ -6277,7 +6277,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ.transactionRecovery={
-    release:'5.9.11.0',
+    release:'6.1.0',
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
@@ -6285,7 +6285,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
-      release:'5.9.11.0',
+      release:'6.1.0',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
       route:routeBase(location.hash.slice(1))
@@ -6299,7 +6299,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'5.9.11.0',
+      release:'6.1.0',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6312,7 +6312,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'5.9.11.0',
+      release:'6.1.0',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -8180,7 +8180,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='5.9.11.0';
+  const PERFORMANCE_CERTIFICATION_RELEASE='6.1.0';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -9475,9 +9475,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 5.9.11.0';
+      node.textContent = 'Current Release - 6.1.0';
     });
-    document.documentElement.dataset.franchiseHqRelease = '5.9.11.0';
+    document.documentElement.dataset.franchiseHqRelease = '6.1.0';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9489,7 +9489,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'5.9.11.0',
+    release:'6.1.0',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9503,7 +9503,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'5.9.11.0',
+        release:'6.1.0',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -9544,10 +9544,11 @@ function canonicalPlayerDashboardStats(playerId='') {
     const routeMatch=location.pathname.match(/\/leagues\/([^/]+)/i);
     if(routeMatch?.[1])return decodeURIComponent(routeMatch[1]).toLowerCase();
     return String(
+      window.FranchiseHQ?.leagueTenant?.current?.()?.slug ||
       window.FranchiseHQ?.leagueSlug ||
       window.FranchiseHQ?.liveData?.leagueSlug ||
       window.FranchiseHQ?.leagueData?.currentSource?.()?.leagueSlug ||
-      'furious-gaming-community'
+      'furiousgamingcommunity'
     ).trim().toLowerCase();
   }
 
@@ -10096,7 +10097,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function freeAgentCaptureStatus(){
-    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community');
+    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity');
     const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/companion/free-agent-capture`,{
       credentials:'include',
       cache:'no-store'
@@ -10109,7 +10110,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function forwardTransactionDetectionStatus(){
-    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community');
+    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity');
     const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/transactions/forward-detection`,{
       credentials:'include',
       cache:'no-store'
@@ -10120,7 +10121,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function transactionClassificationStatus(){
-    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furious-gaming-community');
+    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity');
     const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/transactions/classification`,{credentials:'include',cache:'no-store'});
     const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
     if(!response.ok||payload?.ok===false)throw Object.assign(new Error(payload?.detail||payload?.error||'Transaction classification status failed.'),{payload});
@@ -10129,7 +10130,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'5.9.11.0',
+    release:'6.1.0',
     mode:'read-only-stabilized',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
@@ -10198,7 +10199,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   // Free Agent ingestion remains source-only until Madden 27 export behavior is certified.
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.stabilization={
-    release:'5.9.11.0',
+    release:'6.1.0',
     transactionRepairsDisabled:true,
     freeAgentInferenceDisabled:true,
     sourceOfTruth:'active-madden-snapshot'
