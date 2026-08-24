@@ -1,6 +1,7 @@
 import { onRequestGet as renderLeagueSelector } from "./index.js";
+import { getCurrentSession, redirectResponse } from "../_lib/auth.js";
 
-const RELEASE='6.1.0g';
+const RELEASE='6.1.1';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',
@@ -56,7 +57,7 @@ export async function onRequest(context){
   if(request.method!=='GET'&&request.method!=='HEAD')return context.next();
   const parts=pathParts(request);
 
-  // 6.1.0g: /leagues is the authenticated league selector.
+  // 6.1.1: /leagues is the authenticated league selector.
   // This catch-all also matches the empty /leagues path on Cloudflare Pages,
   // so handle it explicitly before the SPA fallback.
   if(parts.length===0){
@@ -67,7 +68,15 @@ export async function onRequest(context){
   // resolve under /leagues/. Map them back to their real root static paths.
   if(isStaticAsset(parts))return fetchRootAsset(context,request,parts.join('/'));
 
-  // Every league page/subpage is an SPA route. Serve the root shell while
-  // preserving the browser URL so the tenant router can resolve the league.
+  const requestedSlug=decodeURIComponent(parts[0]||'');
+  const league=await context.env.DB.prepare(`SELECT id,slug,name FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`).bind(requestedSlug).first();
+  if(!league)return new Response('League not found.',{status:404,headers:{'cache-control':'no-store'}});
+
+  const session=await getCurrentSession(context,{leagueId:league.id});
+  if(!session)return redirectResponse(`/api/auth/discord/login?returnTo=${encodeURIComponent(`/leagues/${league.slug}`)}`);
+  if(!session.membership?.active)return redirectResponse('/leagues?access=denied');
+
+  // Every authorized league page/subpage is an SPA route. Serve the root shell
+  // while preserving the browser URL so the tenant router resolves this league.
   return fetchSpaShell(context,request);
 }

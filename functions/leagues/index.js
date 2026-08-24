@@ -3,7 +3,7 @@ import {
   redirectResponse
 } from "../_lib/auth.js";
 
-const RELEASE = "6.1.0g";
+const RELEASE = "6.1.1";
 
 function esc(value) {
   return String(value ?? "")
@@ -14,25 +14,23 @@ function esc(value) {
     .replaceAll("'", "&#039;");
 }
 
-function leagueCard(league, owned) {
+function leagueCard(league) {
   const role = league.role
     ? `<span class="role">${esc(String(league.role).replaceAll("_", " "))}</span>`
     : `<span class="role role--available">Available</span>`;
   return `<a class="league-card" href="/leagues/${encodeURIComponent(league.slug)}">
     <div class="league-mark">FH</div>
     <div class="league-copy">
-      <div class="league-meta">${owned ? "Your League" : "Franchise HQ League"}</div>
+      <div class="league-meta">Your League</div>
       <h2>${esc(league.name)}</h2>
-      <p>${owned ? "Open your league dashboard and management tools." : "Open this active Franchise HQ league."}</p>
+      <p>${league.team_id ? `Assigned team: ${esc(league.team_id)}` : "Open your league dashboard and management tools."}</p>
     </div>
     ${role}
     <span class="arrow">→</span>
   </a>`;
 }
 
-function page({ user, memberships, available }) {
-  const yourLeagueIds = new Set(memberships.map((item) => item.id));
-  const otherAvailable = available.filter((item) => !yourLeagueIds.has(item.id));
+function page({ user, memberships }) {
   const hasMemberships = memberships.length > 0;
   return `<!doctype html>
 <html lang="en">
@@ -72,10 +70,9 @@ function page({ user, memberships, available }) {
       <section class="section">
         <div class="section-title"><h2>Your Leagues</h2><span>${memberships.length} connected</span></div>
         <div class="list">
-          ${hasMemberships ? memberships.map((l) => leagueCard(l, true)).join("") : `<div class="empty">Your Discord account is authenticated, but it has not been assigned a Franchise HQ league membership yet. You can still open an active league below.</div>`}
+          ${hasMemberships ? memberships.map((l) => leagueCard(l)).join("") : `<div class="empty"><strong>No league access has been assigned yet.</strong><br>Your Discord account is signed in successfully, but a commissioner must add you to a Franchise HQ league before you can enter it.</div>`}
         </div>
       </section>
-      ${otherAvailable.length ? `<section class="section"><div class="section-title"><h2>Available Leagues</h2><span>${otherAvailable.length} active</span></div><div class="list">${otherAvailable.map((l) => leagueCard(l, false)).join("")}</div></section>` : ""}
     </main>
     <footer><span>Franchise HQ · Release ${RELEASE}</span><a class="logout" href="/api/auth/logout">Log out</a></footer>
   </div>
@@ -91,7 +88,7 @@ export async function onRequestGet(context) {
     let memberships = [];
     try {
       const result = await context.env.DB.prepare(`
-        SELECT leagues.id, leagues.slug, leagues.name, league_memberships.role
+        SELECT leagues.id, leagues.slug, leagues.name, league_memberships.role, league_memberships.team_id
         FROM league_memberships
         INNER JOIN leagues ON leagues.id = league_memberships.league_id
         WHERE league_memberships.user_id = ?
@@ -104,20 +101,7 @@ export async function onRequestGet(context) {
       console.error("League selector membership lookup failed:", error);
     }
 
-    let available = [];
-    try {
-      const result = await context.env.DB.prepare(`
-        SELECT id, slug, name
-        FROM leagues
-        WHERE public_status = 'active'
-        ORDER BY name ASC
-      `).all();
-      available = result?.results || [];
-    } catch (error) {
-      console.error("League selector available lookup failed:", error);
-    }
-
-    return new Response(page({ user: session.user, memberships, available }), {
+    return new Response(page({ user: session.user, memberships }), {
       status: 200,
       headers: {
         "content-type": "text/html; charset=UTF-8",
