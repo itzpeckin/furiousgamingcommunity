@@ -210,7 +210,7 @@
         logoutButton.hidden = !authenticated;
       }
 
-      renderSimulationIdentity();
+      retireSimulationControls();
     } finally {
       isRendering = false;
     }
@@ -267,8 +267,12 @@
       return;
     }
 
-    window.location.assign('/');
-    return;
+    renderAuthenticatedAccount();
+
+    FranchiseHQ.ui?.toast?.(
+      'Signed out',
+      'Your Discord session has been securely ended.'
+    );
   }
 
   function handleDocumentClick(event) {
@@ -319,7 +323,16 @@
     }
   }
 
+
+  function retireSimulationControls() {
+    const simulationTrigger = document.querySelector('[data-open-simulation]');
+    simulationTrigger?.closest('.profile-menu__section')?.remove();
+    document.querySelectorAll('[data-open-dev]').forEach((node) => node.remove());
+    document.querySelectorAll('[data-dev-account],[data-dev-commissioner],[data-login-account]').forEach((node) => node.remove());
+  }
+
   function initialize() {
+    retireSimulationControls();
     document.addEventListener(
       'click',
       handleDocumentClick,
@@ -331,10 +344,6 @@
       renderAuthenticatedAccount
     );
 
-    FranchiseHQ.events?.on?.(
-      'simulation-changed',
-      renderSimulationIdentity
-    );
 
     renderAuthenticatedAccount();
     FranchiseHQ.lifecycle?.markCheckpoint?.('ui:initialized', true);
