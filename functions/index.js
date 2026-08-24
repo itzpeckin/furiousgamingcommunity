@@ -1,4 +1,4 @@
-const RELEASE = "6.1.0e";
+const RELEASE = "6.1.0f";
 
 function page() {
   return `<!doctype html>
