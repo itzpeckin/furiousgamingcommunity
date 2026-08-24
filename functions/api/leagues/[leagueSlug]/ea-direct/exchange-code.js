@@ -89,7 +89,7 @@ export async function onRequestPost({request,env,params}){
   }
 
   const summary=tokenSummary(payload);
-  // 6.0.4a1 deliberately does not persist or return token values.
+  // 6.0.4a2 deliberately does not persist or return token values.
   return json({
     ok:Boolean(summary.accessTokenPresent),
     release:RELEASE,
@@ -104,7 +104,7 @@ export async function onRequestPost({request,env,params}){
     clientSecretReturned:false,
     canonicalWrites:0,
     next:summary.accessTokenPresent
-      ? '6.0.4a1 validated. Next build can use the server-side token in the same request flow for Madden persona/session discovery.'
+      ? '6.0.4a2 validated. Next build can use the server-side token in the same request flow for Madden persona/session discovery.'
       : 'EA responded successfully but no access token was detected.'
   },summary.accessTokenPresent?200:502);
 }
