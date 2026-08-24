@@ -1,4 +1,4 @@
-const RELEASE = "6.1.2.2";
+const RELEASE = "6.1.2.3";
 import {
   AUTH_CONSTANTS,
   createSecureCookie,
