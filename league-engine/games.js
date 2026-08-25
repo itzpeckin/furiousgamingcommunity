@@ -3,16 +3,19 @@
   const HQ=global.FranchiseHQ=global.FranchiseHQ||{};
   const KEY='franchisehq:confidence-pool:v1';
   const BASELINE=50;
+  let canonicalScheduleRows=[];
+  let canonicalTeamRows=[];
+  let canonicalSeasonContext=null;
   const clone=v=>JSON.parse(JSON.stringify(v));
   const freeze=v=>{if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.values(v).forEach(freeze);Object.freeze(v)}return v};
   const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')||{seasons:{}}}catch{return{seasons:{}}}};
   const write=s=>localStorage.setItem(KEY,JSON.stringify(s));
   const gameTeamId=(g,side)=>String(g?.[`${side}Id`]||g?.[`${side}TeamId`]||g?.[`${side}Team`]?.id||'');
   const normalizeGame=(g)=>({id:String(g.id||g.gameId||g.scheduleId||''),week:Number(g.week||g.weekIndex||g.scheduleWeek||1),homeId:gameTeamId(g,'home'),awayId:gameTeamId(g,'away'),homeScore:Number.isFinite(Number(g.homeScore))?Number(g.homeScore):Number.isFinite(Number(g.homePoints))?Number(g.homePoints):null,awayScore:Number.isFinite(Number(g.awayScore))?Number(g.awayScore):Number.isFinite(Number(g.awayPoints))?Number(g.awayPoints):null,status:String(g.status||g.gameStatus||(/final|complete/i.test(String(g.state||''))?'final':'scheduled')).toLowerCase(),phase:g.phase||g.gameType||g.seasonType||'regular',day:g.day||g.dayOfWeek||'',time:g.time||g.kickoff||'TBD'});
-  const games=()=>{const snapshot=HQ.leagueData?.current?.();const rows=Array.isArray(snapshot?.games)?snapshot.games:[];if(rows.length){const by=new Map();rows.map(normalizeGame).filter(g=>g.id).forEach(g=>{if(!by.has(g.week))by.set(g.week,[]);by.get(g.week).push(g)});return [...by.entries()].sort((a,b)=>a[0]-b[0]).map(([week,items])=>({week,games:items}))}return global.FGC_APP?.schedule||[]};
-  const seasonId=()=>String(HQ.leagueData?.current?.()?.league?.season||HQ.currentSeasonContext?.season||global.FGC_APP?.leagueYear?.()||2026);
+  const games=()=>{const snapshot=HQ.leagueData?.current?.();const rows=canonicalScheduleRows.length?canonicalScheduleRows:(Array.isArray(snapshot?.games)?snapshot.games:[]);if(rows.length){const by=new Map();rows.map(normalizeGame).filter(g=>g.id).forEach(g=>{if(!by.has(g.week))by.set(g.week,[]);by.get(g.week).push(g)});return [...by.entries()].sort((a,b)=>a[0]-b[0]).map(([week,items])=>({week,games:items}))}return global.FGC_APP?.schedule||[]};
+  const seasonId=()=>String(canonicalSeasonContext?.season||HQ.leagueData?.current?.()?.league?.season||HQ.currentSeasonContext?.season||global.FGC_APP?.leagueYear?.()||2026);
   const account=()=>{const snap=HQ.auth?.getSnapshot?.()||{};if(snap.authenticated&&snap.user)return{id:String(snap.user.id),name:HQ.auth?.getDisplayName?.()||snap.user.displayName||snap.user.discordUsername||'Member',teamId:snap.membership?.teamId||null,role:snap.membership?.role||'team_owner'};return{id:'anonymous',name:'Member',teamId:null,role:'guest'}};
-  const teams=()=>{const snapshot=HQ.leagueData?.current?.();return Array.isArray(snapshot?.teams)&&snapshot.teams.length?snapshot.teams.map(t=>({id:String(t.id||t.teamId||t.externalId||''),abbr:t.abbr||t.teamAbbr||t.abbreviation||'',name:t.name||t.teamName||'',fullName:t.fullName||t.displayName||t.name||t.teamName||''})):global.FGC_APP?.teams||[]};
+  const teams=()=>{const snapshot=HQ.leagueData?.current?.();const rows=canonicalTeamRows.length?canonicalTeamRows:(Array.isArray(snapshot?.teams)?snapshot.teams:[]);return rows.length?rows.map(t=>({id:String(t.id||t.teamId||t.externalId||''),abbr:t.abbr||t.teamAbbr||t.abbreviation||'',name:t.name||t.teamName||'',fullName:t.fullName||t.displayName||t.name||t.teamName||''})):global.FGC_APP?.teams||[]};
   function ensure(){const s=read(),id=seasonId(),maxWeek=Math.max(1,...games().map(w=>Number(w.week)||0));if(!s.seasons[id])s.seasons[id]={season:id,status:'open',openWeeks:Array.from({length:maxWeek},(_,i)=>i+1),openedAt:new Date().toISOString(),lockedAt:null,entries:{}};const c=s.seasons[id];if(!Array.isArray(c.openWeeks))c.openWeeks=c.status==='open'?Array.from({length:maxWeek},(_,i)=>i+1):[];Object.values(c.entries||{}).forEach(e=>{e.submittedWeeks=e.submittedWeeks||{}});write(s);return s}
   function config(){const s=ensure(),c=s.seasons[seasonId()];return freeze(clone(c))}
   function setStatus(status){if(!['open','locked','final'].includes(status))throw new Error('Invalid pool status');const s=ensure(),c=s.seasons[seasonId()],maxWeek=Math.max(1,...games().map(w=>Number(w.week)||0));c.status=status;if(status==='open'&&!c.openWeeks.length)c.openWeeks=Array.from({length:maxWeek},(_,i)=>i+1);if(status!=='open')c.openWeeks=[];c[status==='open'?'openedAt':status==='locked'?'lockedAt':'finalizedAt']=new Date().toISOString();write(s);return config()}
@@ -29,6 +32,14 @@
     snapshotGames.forEach(g=>extra.push({...g,season:String(g.season||snapshot?.league?.season||seasonId()),phase:g.phase||g.gameType||g.seasonType||'regular'}));
     const map=new Map();[...extra,...current].forEach(g=>{if(g?.id)map.set(String(g.id),g)});return [...map.values()]
   }
+
+  function hydrateCanonicalSchedule(rows=[],teamRows=[],context=null){
+    canonicalScheduleRows=Array.isArray(rows)?rows.map(clone):[];
+    canonicalTeamRows=Array.isArray(teamRows)?teamRows.map(clone):[];
+    canonicalSeasonContext=context&&typeof context==='object'?clone(context):null;
+    return diagnostics();
+  }
+  function clearCanonicalSchedule(){canonicalScheduleRows=[];canonicalTeamRows=[];canonicalSeasonContext=null;return diagnostics()}
   function getWeek(week){const w=games().find(x=>Number(x.week)===Number(week));return freeze(clone(w||{week:Number(week),games:[]}))}
   function getGame(id){return allGames().find(g=>g.id===id)||null}
   function getTeamSchedule(teamId){return freeze(allGames().filter(g=>g.homeId===teamId||g.awayId===teamId))}
@@ -85,8 +96,8 @@
   function submit(userId=account().id){const valid=validateEntry(userId);if(!valid.valid)return{ok:false,error:'Complete every game and use each weekly confidence value once.',validation:valid};const s=ensure(),c=s.seasons[seasonId()],e=c.entries[userId];e.status='submitted';e.submittedAt=new Date().toISOString();write(s);return{ok:true,entry:entry(userId)}}
   function score(userId=account().id){const e=entry(userId);let total=0,correct=0;const weeks={};allGames().forEach(g=>{const p=e.picks[g.id];if(!p)return;const winner=winnerFor(g),final=Boolean(winner);const points=!final?0:winner==='tie'?p.confidence/2:winner===p.selectedTeamId?p.confidence:0;if(points>0&&winner!=='tie')correct++;total+=points;(weeks[g.week]||(weeks[g.week]={week:g.week,points:0,correct:0,finalGames:0})).points+=points;if(points>0&&winner!=='tie')weeks[g.week].correct++;if(final)weeks[g.week].finalGames++});return freeze({userId,totalPoints:total,correctPicks:correct,weeks:Object.values(weeks)})}
   function leaderboard(){const s=ensure(),c=s.seasons[seasonId()];const current=account();return freeze(Object.keys(c.entries).map(id=>{const a=id===current.id?current:{id,name:id,teamId:null};return{...score(id),name:a.name||id,teamId:a.teamId,status:c.entries[id].status}}).sort((a,b)=>b.totalPoints-a.totalPoints))}
-  function diagnostics(){const c=config();return freeze({service:'games',version:'6.3.1',season:c.season,poolStatus:c.status,gameCount:allGames().length,currentWeek:currentWeek(),entryCount:Object.keys(c.entries).length,ownerRatingBaseline:BASELINE,ownerRankingCount:ownerHistory().length})}
+  function diagnostics(){const c=config();return freeze({service:'games',version:'6.3.2',season:c.season,poolStatus:c.status,gameCount:allGames().length,currentWeek:currentWeek(),entryCount:Object.keys(c.entries).length,ownerRatingBaseline:BASELINE,ownerRankingCount:ownerHistory().length})}
   const confidence={config,setStatus,setSubmissionWindow,closeSubmissionWindow,isWeekOpen,getEntry:entry,saveSelection,saveConfidence,savePick,clearWeek,clearSeason,autoAssign,validateWeek,submitWeek,validateEntry,submit,score,leaderboard,getOwnerStrength:ownerStrength,getOwnerRankings:()=>freeze(clone(ownerHistory())),getMatchupPrediction:matchupPrediction,predictionDiagnostics:matchupPrediction};
-  const service={getSeason:()=>freeze({id:seasonId(),phase:'regular',currentWeek:currentWeek()}),getWeek,getGame,getTeamSchedule,getUpcomingGames:()=>freeze(allGames().filter(g=>g.status==='scheduled')),getCompletedGames:()=>freeze(allGames().filter(g=>g.status==='final')),getCurrentWeek:currentWeek,getAllGames:allGames,confidence,diagnostics};
+  const service={getSeason:()=>freeze({id:seasonId(),phase:canonicalSeasonContext?.phase||'regular',currentWeek:currentWeek()}),getWeek,getGame,getTeamSchedule,getUpcomingGames:()=>freeze(allGames().filter(g=>g.status==='scheduled')),getCompletedGames:()=>freeze(allGames().filter(g=>g.status==='final')),getCurrentWeek:currentWeek,getAllGames:allGames,hydrateCanonicalSchedule,clearCanonicalSchedule,confidence,diagnostics};
   if(HQ.defineModuleService)HQ.defineModuleService('league','games',service,{alias:'leagueGames',replace:true});else{HQ.modules=HQ.modules||{};HQ.modules.league=HQ.modules.league||{};HQ.modules.league.games=service;HQ.leagueGames=service}
 })(window);

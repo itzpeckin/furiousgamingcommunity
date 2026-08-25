@@ -133,7 +133,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '6.3.1',
+      version: '6.3.2',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -439,7 +439,7 @@
   });
 
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '6.3.1',
+    version: '6.3.2',
     modes: MODES,
     current,
     exportCurrent,
@@ -474,7 +474,7 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '6.3.1',
+    version: '6.3.2',
     dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
     capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'public-api-compatibility', 'source-metadata', 'normalized-events', 'event-compatibility', 'import-status']
   });
