@@ -202,9 +202,9 @@
   const schedule = buildSchedule();
   const newsArticles = buildNews();
   const pageNames = {
-    home: 'League Home', 'league-activity': 'League Activity', teams: 'Teams', players: 'Players', standings: 'Standings', stats: 'Stats & Leaders',
-    schedule: 'Schedule', news: 'League News', transactions: 'Transactions', 'trade-center': 'Trade Center', 'trade-block': 'Trade Block',
-    commissioner: 'Commissioner HQ', 'player-stats-certification': 'Player Statistics Certification', 'design-system': 'Design System'
+    home: 'League Home', teams: 'Teams', players: 'Players', standings: 'Standings', stats: 'Stats & Leaders',
+    schedule: 'Schedule', news: 'News', transactions: 'Transactions', 'trade-center': 'Trade Center', 'trade-block': 'Trade Block',
+    commissioner: 'Commissioner HQ', 'player-stats-certification': 'Player Statistics Certification',
   };
 
   function firstNames() {
@@ -2474,7 +2474,7 @@
     const failures=checks.filter(check=>!check.pass && check.severity==='error');
     const warnings=checks.filter(check=>!check.pass && check.severity==='warning');
     return {
-      release:'6.1.2.8',
+      release:'6.3.0',
       passed:failures.length===0,
       status:failures.length?'FAIL':warnings.length?'PASS WITH WARNINGS':'PASS',
       checks,
@@ -6277,7 +6277,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   window.FranchiseHQ.transactionRecovery={
-    release:'6.1.2.8',
+    release:'6.3.0',
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
@@ -6285,7 +6285,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
-      release:'6.1.2.8',
+      release:'6.3.0',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
       route:routeBase(location.hash.slice(1))
@@ -6299,7 +6299,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     ageMs:()=>canonicalTransactionUiCache.loadedAt?Date.now()-canonicalTransactionUiCache.loadedAt:null,
     prewarm:()=>{prewarmCanonicalTransactions();return true;},
     print:()=>console.log('[Transaction Performance]',{
-      release:'6.1.2.8',
+      release:'6.3.0',
       cached:Boolean(canonicalTransactionUiCache.payload),
       loading:Boolean(canonicalTransactionUiCache.promise),
       loadedAt:canonicalTransactionUiCache.loadedAt||null,
@@ -6312,7 +6312,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ.coldBootPerformance={
     print:()=>console.log('[Cold Boot Performance]',{
-      release:'6.1.2.8',
+      release:'6.3.0',
       domContentLoadedMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd||null,
       loadEventMs:performance.getEntriesByType('navigation')[0]?.loadEventEnd||null,
       transactionCached:Boolean(canonicalTransactionUiCache.payload),
@@ -7231,6 +7231,11 @@ function canonicalPlayerDashboardStats(playerId='') {
     return `<article class="card confidence-results"><div class="card-header"><div><span class="eyebrow">Season leaderboard preview</span><h3>Confidence Pool Results</h3></div></div><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Owner</th><th>Team</th><th>Points</th><th>Correct</th><th>Status</th></tr></thead><tbody>${board.map((row,i)=>`<tr><td><strong>#${i+1}</strong></td><td>${escapeHtml(row.name)}</td><td>${escapeHtml(teamById(row.teamId)?.abbr||'—')}</td><td><strong>${row.totalPoints}</strong></td><td>${row.correctPicks}</td><td><span class="pill ${row.status==='submitted'?'pill--success':'pill--neutral'}">${titleCase(row.status)}</span></td></tr>`).join('')||`<tr><td colspan="6">No Confidence Pool entries have been saved yet.</td></tr>`}</tbody></table></div></article>`;
   }
 
+
+  const confidenceDirtyWeeks=new Set();
+  function confidenceCurrentIdentity(){const snap=window.FranchiseHQ?.auth?.getSnapshot?.()||{};return snap.authenticated&&snap.user?{id:String(snap.user.id),name:window.FranchiseHQ?.auth?.getDisplayName?.()||snap.user.displayName||'Member',teamId:snap.membership?.teamId||null}:{id:'anonymous',name:'Member',teamId:null}}
+  function confidenceUnsavedPrompt(){return !confidenceDirtyWeeks.size||confirm('You have Confidence Pool picks that have not been submitted for this week. Leave without submitting them?')}
+  function renderScheduleConfidence(week,teamMap){const service=scheduleService(),identity=confidenceCurrentIdentity();if(!service?.confidence||identity.id==='anonymous')return'';const poolWeek=service.getWeek(week),entry=service.confidence.getEntry(identity.id),open=service.confidence.isWeekOpen(week,identity.id),submitted=Boolean(entry.submittedWeeks?.[String(week)]);if(!poolWeek?.games?.length)return'';return `<section class="schedule-confidence-shell"><div class="card schedule-confidence-head"><div><span class="eyebrow">Confidence Pool</span><h2>Week ${week} Picks</h2><p>Choose each winner and confidence value. Submit or clear this week independently.</p></div><div class="confidence-week-actions"><button class="button button--ghost" data-confidence-clear-week="${week}" ${!open?'disabled':''}>Clear Week</button><button class="button button--primary" data-confidence-submit-week="${week}" ${!open?'disabled':''}>${submitted?'Week Submitted':'Submit Week'}</button></div></div><div class="confidence-pick-list">${poolWeek.games.map(game=>{const away=teamMap.get(String(game.awayId))||teamById(game.awayId),home=teamMap.get(String(game.homeId))||teamById(game.homeId),pick=entry.picks?.[game.id]||{};return `<article class="card confidence-pick-card"><div class="confidence-matchup"><strong>${escapeHtml(away?.abbr||game.awayId)} @ ${escapeHtml(home?.abbr||game.homeId)}</strong></div><div class="confidence-team-choice"><button type="button" data-confidence-team="${game.id}:${game.awayId}" class="${pick.selectedTeamId===game.awayId?'is-selected':''}" ${!open?'disabled':''}>${away?renderTeamMark(away,'mini-team'):''}<span>${escapeHtml(away?.abbr||game.awayId)}</span></button><button type="button" data-confidence-team="${game.id}:${game.homeId}" class="${pick.selectedTeamId===game.homeId?'is-selected':''}" ${!open?'disabled':''}>${home?renderTeamMark(home,'mini-team'):''}<span>${escapeHtml(home?.abbr||game.homeId)}</span></button></div><label class="field confidence-value"><span>Confidence</span><select data-confidence-value="${game.id}" ${!open?'disabled':''}><option value="">Select</option>${poolWeek.games.map((_,i)=>`<option value="${i+1}" ${Number(pick.confidence)===i+1?'selected':''}>${i+1}</option>`).join('')}</select></label></article>`}).join('')}</div></section>`}
   async function renderSchedule() {
     preloadScheduleMatchupData();
     pageContent.innerHTML='<section class="empty-state"><strong>Loading live schedule…</strong><p>Reading the active franchise snapshot.</p></section>';
@@ -7266,7 +7271,7 @@ function canonicalPlayerDashboardStats(playerId='') {
           <label class="field"><span>Filter team</span><select data-schedule-team><option value="All">All teams</option>${liveTeams.map(team=>`<option value="${team.id}" ${String(state.scheduleTeam)===String(team.id)?'selected':''}>${escapeHtml(team.abbr)} · ${escapeHtml(team.fullName)}</option>`).join('')}</select></label>
           <span class="pill pill--success">${escapeHtml(current.displayLabel)} current</span>
         </div>
-        <div class="schedule-grid">${filtered.length?filtered.map(game=>renderLiveScheduleCard(game,teamMap,current)).join(''):`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No captured games</h3><p>No live schedule records were captured for this phase and week.</p></div></article>`}</div>`;
+        <div class="schedule-grid">${filtered.length?filtered.map(game=>renderLiveScheduleCard(game,teamMap,current)).join(''):`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No captured games</h3><p>No live schedule records were captured for this phase and week.</p></div></article>`}</div>${state.schedulePhase==='regular'?renderScheduleConfidence(Number(state.scheduleWeek),teamMap):''}`;
     }catch(error){
       pageContent.innerHTML=`<section class="empty-state"><strong>Live schedule unavailable</strong><p>${escapeHtml(error?.message||'The active schedule could not be loaded.')}</p></section>`;
     }
@@ -8075,6 +8080,8 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function setRoute(route, options={}) {
+    if(routeBase(location.hash.slice(1))==='schedule'&&routeBase(route)!=='schedule'&&!confidenceUnsavedPrompt())return false;
+    if(routeBase(route)!=='schedule')confidenceDirtyWeeks.clear();
     const navigation=window.FranchiseHQ?.navigation;
     if (navigation?.go) return navigation.go(route,{source:options.source||'legacy-app',replace:options.replace===true});
     const normalized=String(route||'home').replace(/^#\/?/,'').replace(/^\//,'')||'home';
@@ -8195,7 +8202,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   else startCommissionerImportObserver();
 
 
-  const PERFORMANCE_CERTIFICATION_RELEASE='6.1.2.8';
+  const PERFORMANCE_CERTIFICATION_RELEASE='6.3.0';
   const PERFORMANCE_PAGE_TARGET_MS=1000;
   let performanceCertificationResult=null;
   let performanceCertificationRunning=false;
@@ -8507,6 +8514,13 @@ function canonicalPlayerDashboardStats(playerId='') {
     }).join('')}`:`<div class="command-empty"><strong>No results</strong><p>Try a player name, team, page, or news category.</p></div>`;
   }
 
+
+  function apply630NavigationCleanup(){
+    document.querySelectorAll('[data-route="league-activity"],[href="#league-activity"],[data-route="design-system"],[href="#design-system"]').forEach(node=>node.closest('li')?.remove()||node.remove());
+    document.querySelectorAll('[data-route="news"],[href="#news"]').forEach(node=>{const text=node.querySelector('span:last-child');if(text&&/league news/i.test(text.textContent||''))text.textContent='News';else if(/league news/i.test(node.textContent||''))node.childNodes.forEach(n=>{if(n.nodeType===3)n.textContent=n.textContent.replace(/League News/ig,'News')})});
+    if(!document.querySelector('link[data-release-630-css]')){const link=document.createElement('link');link.rel='stylesheet';link.href='/release-6.3.0.css';link.dataset.release630Css='true';document.head.appendChild(link)}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply630NavigationCleanup,{once:true});else apply630NavigationCleanup();
   function pageIcon(route) {
     return {home:'icon-home',teams:'icon-shield',players:'icon-users',standings:'icon-table',stats:'icon-chart',schedule:'icon-calendar',news:'icon-news',transactions:'icon-activity','trade-center':'icon-swap','trade-block':'icon-tag',commissioner:'icon-sliders','design-system':'icon-palette'}[route]||'icon-search';
   }
@@ -8599,14 +8613,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     const phase=event.target.closest('[data-live-schedule-phase]');
     if(!phase)return;
     event.preventDefault();
-    state.schedulePhase=phase.dataset.liveSchedulePhase;
+    if(!confidenceUnsavedPrompt())return;confidenceDirtyWeeks.clear();state.schedulePhase=phase.dataset.liveSchedulePhase;
     state.scheduleWeek=1;
     renderSchedule();
   });
 
   document.addEventListener('change', event => {
     if(event.target.matches('[data-live-schedule-week]')){
-      state.scheduleWeek=Number(event.target.value);
+      if(!confidenceUnsavedPrompt()){event.target.value=state.scheduleWeek;return;}confidenceDirtyWeeks.clear();state.scheduleWeek=Number(event.target.value);
       renderSchedule();
     }
   });
@@ -8944,14 +8958,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     const confidenceWeekChange=event.target.closest('[data-confidence-week-change]');
     if(confidenceWeekChange){state.confidenceWeek=clamp(state.confidenceWeek+Number(confidenceWeekChange.dataset.confidenceWeekChange),1,schedule.length);renderSchedule();return;}
     const confidenceTeam=event.target.closest('[data-confidence-team]');
-    if(confidenceTeam){const [gameId,teamId]=confidenceTeam.dataset.confidenceTeam.split(':');const result=scheduleService()?.confidence?.saveSelection(gameId,teamId);if(!result?.ok)showToast('Pick not saved',result?.error||'Unable to save pick.');renderSchedule();return;}
+    if(confidenceTeam){confidenceDirtyWeeks.add(Number(state.scheduleWeek));const [gameId,teamId]=confidenceTeam.dataset.confidenceTeam.split(':');const result=scheduleService()?.confidence?.saveSelection(gameId,teamId);if(!result?.ok)showToast('Pick not saved',result?.error||'Unable to save pick.');renderSchedule();return;}
     const confidenceClearWeek=event.target.closest('[data-confidence-clear-week]');
-    if(confidenceClearWeek){const week=Number(confidenceClearWeek.dataset.confidenceClearWeek);if(confirm(`Clear every winner and confidence value for Week ${week}? This cannot be undone.`)){const result=scheduleService()?.confidence?.clearWeek(week);showToast(result?.ok?'Week cleared':'Unable to clear week',result?.error||`Week ${week} selections were removed.`);renderSchedule();}return;}
+    if(confidenceClearWeek){const week=Number(confidenceClearWeek.dataset.confidenceClearWeek);if(confirm(`Clear every winner and confidence value for Week ${week}? This cannot be undone.`)){const result=scheduleService()?.confidence?.clearWeek(week);if(result?.ok)confidenceDirtyWeeks.delete(week);showToast(result?.ok?'Week cleared':'Unable to clear week',result?.error||`Week ${week} selections were removed.`);renderSchedule();}return;}
     const confidenceClearSeason=event.target.closest('[data-confidence-clear-season]');
     if(confidenceClearSeason){const confirmation=prompt(`Type CLEAR to remove every Confidence Pool pick for Season ${scheduleService()?.confidence?.config?.()?.season||''}.`);if(confirmation==='CLEAR'){const result=scheduleService()?.confidence?.clearSeason();showToast(result?.ok?'Season entry cleared':'Unable to clear season',result?.error||'All season selections were removed.');renderSchedule();}else if(confirmation!==null){showToast('Season not cleared','The confirmation text did not match CLEAR.');}return;}
     const confidenceAuto=event.target.closest('[data-confidence-auto]');
     if(confidenceAuto){const result=scheduleService()?.confidence?.autoAssign(Number(confidenceAuto.dataset.confidenceAuto));showToast(result?.ok?'Week predicted and assigned':'Unable to assign',result?.error||`Week ${state.confidenceWeek} picks and confidence values were assigned from league history.`);renderSchedule();return;}
-    const submitWeekButton=event.target.closest('[data-confidence-submit-week]');if(submitWeekButton){const week=Number(submitWeekButton.dataset.confidenceSubmitWeek);const result=scheduleService()?.confidence?.submitWeek(week);showToast(result?.ok?`Week ${week} submitted`:'Week incomplete',result?.error||`Week ${week} is locked and ready for scoring.`);renderSchedule();return;}
+    const submitWeekButton=event.target.closest('[data-confidence-submit-week]');if(submitWeekButton){const week=Number(submitWeekButton.dataset.confidenceSubmitWeek);const result=scheduleService()?.confidence?.submitWeek(week);if(result?.ok)confidenceDirtyWeeks.delete(week);showToast(result?.ok?`Week ${week} submitted`:'Week incomplete',result?.error||`Week ${week} is locked and ready for scoring.`);renderSchedule();return;}
 
     const weekButton=event.target.closest('[data-week]');
     if (weekButton) { state.scheduleWeek=Number(weekButton.dataset.week); renderSchedule(); return; }
@@ -9497,9 +9511,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 6.1.2.8';
+      node.textContent = 'Current Release - 6.3.0';
     });
-    document.documentElement.dataset.franchiseHqRelease = '6.1.2.8';
+    document.documentElement.dataset.franchiseHqRelease = '6.3.0';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9511,7 +9525,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.playerLiveSync={
-    release:'6.1.2.8',
+    release:'6.3.0',
     refresh:async()=>{
       await syncTradeCenterLiveBridge({rerender:true,forceLive:true});
       return window.FranchiseHQ.playerLiveSync.status();
@@ -9525,7 +9539,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       liveIds.forEach(id=>{if(id&&!serviceIds.has(id))missingFromService++});
       serviceIds.forEach(id=>{if(id&&!liveIds.has(id))staleInService++});
       return{
-        release:'6.1.2.8',
+        release:'6.3.0',
         snapshotId:String(liveTeamDirectory?.snapshot?.id||liveTeamDirectory?.snapshot?.snapshotId||''),
         livePlayerCount:live.length,
         playerServiceCount:serviceRows.length,
@@ -10152,7 +10166,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactions={
-    release:'6.1.2.8',
+    release:'6.3.0',
     mode:'read-only-stabilized',
     audit:()=>transactionDiscoveryAudit(),
     fieldCoverage:async()=>{
@@ -10221,7 +10235,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   // Free Agent ingestion remains source-only until Madden 27 export behavior is certified.
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.stabilization={
-    release:'6.1.2.8',
+    release:'6.3.0',
     transactionRepairsDisabled:true,
     freeAgentInferenceDisabled:true,
     sourceOfTruth:'active-madden-snapshot'
