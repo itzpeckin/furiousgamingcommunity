@@ -7,9 +7,7 @@
   }
 
   const MODES = Object.freeze(['auto', 'empty', 'demo', 'live']);
-  const STORAGE_KEY_BASE = 'league.data.mode';
-  const storageKey = () => HQ?.leagueTenant?.scopedKey?.(STORAGE_KEY_BASE) || `${STORAGE_KEY_BASE}.league.${HQ?.leagueTenant?.current?.()?.slug || 'unresolved'}`;
-  const isFgcTenant = () => HQ?.leagueTenant?.current?.()?.slug === 'furiousgamingcommunity';
+  const STORAGE_KEY = 'league.data.mode';
   const LEGACY_MODE_KEY = 'fgc-league-data-mode';
   const listeners = new Set();
   const PERSISTED_MODES = Object.freeze(['empty', 'demo', 'live']);
@@ -33,7 +31,7 @@
     try {
       storageAvailable = HQ.storage?.diagnostics?.().localAvailable === true;
       if (storageAvailable) {
-        rawValue = HQ.storage.get(storageKey(), null);
+        rawValue = HQ.storage.get(STORAGE_KEY, null);
         source = rawValue == null ? 'none' : 'platform-storage';
       }
     } catch (_) {
@@ -51,11 +49,11 @@
       return { mode: 'empty', source: 'invalid-value', storageAvailable, migrated: false };
     }
 
-    const legacyMode = isFgcTenant() ? normalizePersistedMode(readLegacyMode()) : null;
+    const legacyMode = normalizePersistedMode(readLegacyMode());
     if (legacyMode) {
       let migrated = false;
       if (storageAvailable) {
-        try { migrated = HQ.storage.set(storageKey(), legacyMode) === true; } catch (_) {}
+        try { migrated = HQ.storage.set(STORAGE_KEY, legacyMode) === true; } catch (_) {}
       }
       return { mode: legacyMode, source: 'legacy-storage', storageAvailable, migrated };
     }
@@ -66,7 +64,7 @@
   const startupPreference = readPersistedMode();
   let requestedMode = startupPreference.mode;
   let persistenceState = {
-    key: storageKey(),
+    key: STORAGE_KEY,
     available: startupPreference.storageAvailable,
     restoredFrom: startupPreference.source,
     migratedLegacyValue: startupPreference.migrated,
@@ -135,7 +133,7 @@
     const demo = hasDemo();
     return Object.freeze({
       service: 'leagueDataState',
-      version: '6.1.0',
+      version: '6.3.0',
       requestedMode,
       activeMode,
       authority: activeMode === 'live' ? 'madden' : activeMode,
@@ -293,7 +291,7 @@
     if (!PERSISTED_MODES.includes(mode)) return false;
     let succeeded = false;
     try {
-      succeeded = HQ.storage?.set?.(storageKey(), mode) === true;
+      succeeded = HQ.storage?.set?.(STORAGE_KEY, mode) === true;
     } catch (_) {
       succeeded = false;
     }
@@ -422,7 +420,7 @@
       ...state,
       modes: MODES,
       persistedModes: PERSISTED_MODES,
-      storageKey: storageKey(),
+      storageKey: STORAGE_KEY,
       persistence: Object.freeze({ ...persistenceState }),
       storage: HQ.storage?.diagnostics?.() || null,
       subscriberCount: listeners.size,
@@ -440,22 +438,8 @@
     notify('live-snapshot-installed');
   });
 
-  window.addEventListener('franchisehq:league-tenant-changed', () => {
-    const restored = readPersistedMode();
-    requestedMode = restored.mode;
-    persistenceState = {
-      ...persistenceState,
-      key: storageKey(),
-      restoredFrom: restored.source,
-      migratedLegacyValue: restored.migrated,
-      lastPersistedMode: restored.mode
-    };
-    emptySnapshot = makeEmptySnapshot();
-    notify('tenant-changed');
-  });
-
   const service = HQ.defineModuleService('league', 'leagueDataState', {
-    version: '6.1.0',
+    version: '6.3.0',
     modes: MODES,
     current,
     exportCurrent,
@@ -490,8 +474,8 @@
     id: 'league-data-state',
     service: 'leagueDataState',
     script: 'league-engine/data-state.js',
-    version: '6.1.0',
-    dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter', 'leagueTenant'],
+    version: '6.3.0',
+    dependencies: ['leagueSchema', 'leagueRepository', 'leagueMockAdapter'],
     capabilities: ['empty-state', 'demo-state', 'live-state', 'snapshot-switching', 'read-state-helpers', 'public-api-compatibility', 'source-metadata', 'normalized-events', 'event-compatibility', 'import-status']
   });
 })();
