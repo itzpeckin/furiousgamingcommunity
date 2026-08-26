@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.3",
+  "validatedOn": "2026-08-26",
+  "status": "validated-review-candidate",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "repositoryLint": { "passed": true },
+    "javascriptSyntax": { "passed": true },
+    "htmlAssets": { "passed": true, "entrypoints": 1 },
+    "secretScan": { "passed": true, "highConfidenceFindings": 0 },
+    "environmentContract": { "passed": true },
+    "migrationBaseline": { "passed": true, "registeredInheritedIssues": 7, "newIssues": 0 },
+    "automatedTests": { "passed": true, "passedTests": 33, "failedTests": 0 },
+    "securityTests": { "passed": true, "passedTests": 26, "failedTests": 0 },
+    "sessionRefreshRecovery": { "passed": true },
+    "specialRouteRefreshRegression": { "passed": true },
+    "canonicalDocumentRedirect": { "passed": true },
+    "discordCallbackAvailability": { "passed": true },
+    "canonicalOauthAudience": { "passed": true },
+    "canonicalInviteOrigin": { "passed": true },
+    "membershipSchemaFallback": { "passed": true },
+    "membershipAuditRepair": { "passed": true, "idempotent": true, "existingMembershipRowsPreserved": true },
+    "membershipRequestDeduplication": { "passed": true },
+    "systemInventory": { "passed": true },
+    "releaseContract": { "passed": true },
+    "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" }
+  },
+  "external": {
+    "githubPullRequest": { "status": "not-started" },
+    "hostedChecks": { "status": "not-started" },
+    "stagingDeployment": { "status": "not-authorized" },
+    "productionDeployment": { "authorized": false, "status": "unchanged", "url": "https://franchisehq.app/" },
+    "productionMigration": { "authorized": false, "status": "not-run", "migration": "0015_membership_audit_repair.sql" }
+  },
+  "liveReadOnlyDiagnosis": {
+    "database": "franchise-hq-db",
+    "membershipTablePresent": true,
+    "membershipAuditTablePresent": false,
+    "schemaMigrationLedgerMaximumObserved": 10,
+    "productionRowsChanged": 0
+  },
+  "manualAcceptance": {
+    "status": "pending-owner-check",
+    "runbook": "docs/AUTH-ONBOARDING.md"
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}

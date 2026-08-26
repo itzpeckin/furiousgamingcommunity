@@ -843,7 +843,9 @@ function renderLeagueTenantPanel(){
  return `<article class="card league-tenant-card" data-league-tenant-panel><div class="card-header"><div><span class="eyebrow">v5.9.4.2a · Platform owner identity</span><h3>League Tenant</h3><p>Your current site is now registered as one tenant inside a multi-league platform.</p></div><span class="pill pill--success">Active</span></div><div class="league-import-framework-grid"><div><span>League Name</span><strong>${escapeHtml(league.name)}</strong></div><div><span>League ID</span><strong>${escapeHtml(league.id)}</strong></div><div><span>League Slug</span><strong>${escapeHtml(league.slug)}</strong></div><div><span>Registered Leagues</span><strong>${d.leagueCount}</strong></div><div><span>Public Route</span><strong>${escapeHtml(tenant.publicPath())}</strong></div><div><span>Future Export API</span><strong>${escapeHtml(tenant.exportEndpoint())}</strong></div></div><div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span>The existing root URL still opens this league automatically. Snapshots, import history, and refresh events are now scoped to ${escapeHtml(league.id)}.</span></div></article>`;
 }
 
+const FRANCHISEHQ_PUBLIC_ORIGIN='https://franchisehq.app';
 let commissionerMembersCache=null;
+let commissionerMembersPromise=null;
 function commissionerLeagueSlug(){return window.FranchiseHQ?.leagueTenant?.current?.()?.slug||decodeURIComponent(location.pathname.match(/\/leagues\/([^/?#]+)/i)?.[1]||'')}
 function commissionerMemberRoleLabel(role){return role==='commissioner'?'Commissioner':role==='trade_committee'?'Trade Committee':role==='team_owner'?'Team Owner':role==='pending'?'Pending':'Member'}
 function commissionerMemberTeamName(teamId){const t=teams.find(v=>String(v.id)===String(teamId));return t?.fullName||t?.name||t?.abbr||teamId||'Unassigned'}
@@ -852,7 +854,7 @@ function commissionerMembershipRows(){return Array.isArray(commissionerMembersCa
 function commissionerDiscordName(member){return member?.displayName||member?.discordGlobalName||member?.discordUsername||'Discord Member'}
 function commissionerMembershipForTeam(teamId){return commissionerMembershipRows().find(member=>member.status==='active'&&String(member.teamId||'')===String(teamId||''))||null}
 function commissionerAssignableMembers(){return commissionerMembershipRows().filter(member=>member.status!=='disabled')}
-function commissionerInviteUrl(){const slug=commissionerLeagueSlug();return `${location.origin}/leagues/${encodeURIComponent(slug)}`}
+function commissionerInviteUrl(){const slug=commissionerLeagueSlug();return `${FRANCHISEHQ_PUBLIC_ORIGIN}/leagues/${encodeURIComponent(slug)}`}
 function renderCommissionerInviteCard(){const invite=commissionerInviteUrl();return `<section class="card commissioner-invite-card"><div><span class="eyebrow">Secure league onboarding</span><h2>Invite League Members</h2><p>Share this league link. New users connect Discord and stay Pending until a commissioner assigns their role and, when required, their team.</p></div><div class="commissioner-invite-copy"><input readonly value="${escapeHtml(invite)}" data-league-invite-url aria-label="League invite link"><button class="button button--primary" data-copy-league-invite>Copy Invite Link</button></div><ol><li>Send the link privately to the league member.</li><li>They connect their own Discord account.</li><li>Approve them below; the link never grants league access by itself.</li></ol></section>`}
 function renderActiveMemberAssignments(rows){
  const active=rows.filter(member=>member.status==='active');if(!active.length)return'';
@@ -870,8 +872,17 @@ async function restoreLeagueMemberPending(userId){
  try{const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/memberships`,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({action:'restore_pending',userId})});const data=await response.json();if(!response.ok)throw new Error(data?.error||`Request failed (${response.status})`);showToast('Member restored','The member is Pending and can be assigned again.');await loadCommissionerMembers();renderCommissioner('teams')}catch(error){showToast('Member not restored',error.message||String(error))}
 }
 async function loadCommissionerMembers(rerenderTeams=false){
- const slug=commissionerLeagueSlug();
- try{const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/memberships`,{credentials:'same-origin',headers:{accept:'application/json'}});const data=await response.json();if(!response.ok)throw new Error(data?.error||`Request failed (${response.status})`);commissionerMembersCache=data;if(rerenderTeams&&commissionerTab()==='teams')renderCommissioner('teams');return data}catch(error){showToast('Discord members unavailable',error.message||String(error));return null}
+ if(!commissionerMembersPromise){
+  const slug=commissionerLeagueSlug();
+  commissionerMembersPromise=(async()=>{
+   try{const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/memberships`,{credentials:'same-origin',headers:{accept:'application/json'}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||`Request failed (${response.status})`);commissionerMembersCache=data;return data}catch(error){showToast('Discord members unavailable',error.message||String(error));return null}
+  })();
+ }
+ const request=commissionerMembersPromise;
+ const data=await request;
+ if(commissionerMembersPromise===request)commissionerMembersPromise=null;
+ if(data&&rerenderTeams&&commissionerTab()==='teams')renderCommissioner('teams');
+ return data;
 }
 async function saveLeagueMemberDirect(userId,role,teamId){
  const slug=commissionerLeagueSlug();if(role==='team_owner'&&!teamId){showToast('Team required','Assign a team before activating a Team Owner.');return false}

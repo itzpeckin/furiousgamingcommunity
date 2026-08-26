@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.3",
+  "releaseType": "corrective-authentication-membership",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.0.2",
+    "commit": "1418d0bba1074f5ab9f4e50453d6837d72dde809",
+    "tree": "8622e731be992f5d0ec887860141ce1adca10e1b",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.0.3",
+  "environmentContract": "config/environment-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [
+    "migration.duplicate-version.0001",
+    "migration.duplicate-version.0002",
+    "migration.fresh-apply.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0002_create_authentication.sql",
+    "migration.missing-ledger-write.0013_league_membership_access_control.sql",
+    "migration.missing-ledger-write.0014_league_rules.sql"
+  ],
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-started",
+    "reason": "Local candidate work does not authorize a hosted deployment."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "unchanged",
+    "url": "https://franchisehq.app/",
+    "scope": "One application publication plus the idempotent membership-audit repair migration after explicit owner authorization.",
+    "reason": "Production application and database changes require a separate owner approval after review of this complete batch."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/AUTH-ONBOARDING.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "migrations/0015_membership_audit_repair.sql",
+    "releases/7.0.3/release-record.md",
+    "releases/7.0.3/validation-evidence.json",
+    "tests/security/containment.test.mjs",
+    "tests/security/session.test.mjs",
+    "tests/security/onboarding.test.mjs"
+  ]
+}

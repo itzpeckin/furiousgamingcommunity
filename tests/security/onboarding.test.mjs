@@ -1,16 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { DatabaseSync } from 'node:sqlite';
 
 import {
   normalizeMembershipInput,
+  onRequestGet as listMemberships,
   onRequestDelete as deactivateMembership,
   onRequestPost as saveMembership
 } from '../../functions/api/leagues/[leagueSlug]/memberships.js';
 
-function membershipDatabase({ targetMembership = null, occupied = null } = {}) {
+function membershipDatabase({ targetMembership = null, occupied = null, membershipRows = [] } = {}) {
+  const preparedSql = [];
   return {
+    preparedSql,
     prepare(sql) {
+      preparedSql.push(sql);
       return {
         sql,
         values: [],
@@ -50,6 +55,7 @@ function membershipDatabase({ targetMembership = null, occupied = null } = {}) {
           if (sql.includes('SELECT COUNT(*) AS count')) return { count:1 };
           return null;
         },
+        async all() { return { results:membershipRows }; },
         async run() { return { meta:{ changes:1 } }; }
       };
     }
@@ -87,6 +93,52 @@ test('commissioner cannot activate a global user who did not accept the league i
   ));
   assert.equal(response.status, 409);
   assert.match((await response.json()).error, /invite link/i);
+});
+
+test('member listing remains available before the membership audit repair is applied', async () => {
+  const db = membershipDatabase({
+    membershipRows:[{
+      id:'pending-1', userId:'invitee-user', role:'team_owner', teamId:null,
+      active:0, status:'pending', displayName:'Invitee'
+    }]
+  });
+  const response = await listMemberships({
+    request:new Request('https://franchisehq.app/api/leagues/fgc/memberships', {
+      headers:{ cookie:'franchise_hq_session=valid-session-token' }
+    }),
+    params:{ leagueSlug:'fgc' },
+    env:{ DB:db }
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).memberships[0].status, 'pending');
+  const listSql = db.preparedSql.find(sql => sql.includes('ORDER BY CASE WHEN lm.active=0')) || '';
+  assert.ok(listSql.includes("lm.active=0 AND lm.role='team_owner' AND lm.team_id IS NULL"));
+  assert.equal(listSql.includes('FROM league_membership_audit a'), false);
+});
+
+test('membership audit repair is idempotent and preserves existing membership rows', async () => {
+  const migration = await readFile(new URL('../../migrations/0015_membership_audit_repair.sql', import.meta.url), 'utf8');
+  const db = new DatabaseSync(':memory:');
+  db.exec(`
+    PRAGMA foreign_keys = ON;
+    CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE leagues (id TEXT PRIMARY KEY);
+    CREATE TABLE users (id TEXT PRIMARY KEY);
+    CREATE TABLE league_memberships (
+      id TEXT PRIMARY KEY, league_id TEXT NOT NULL, user_id TEXT NOT NULL,
+      role TEXT NOT NULL, team_id TEXT, active INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO leagues (id) VALUES ('league-1');
+    INSERT INTO users (id) VALUES ('user-1');
+    INSERT INTO league_memberships (id, league_id, user_id, role, team_id, active)
+    VALUES ('membership-1', 'league-1', 'user-1', 'commissioner', NULL, 1);
+  `);
+  db.exec(migration);
+  db.exec(migration);
+  assert.equal(db.prepare(`SELECT COUNT(*) AS count FROM league_memberships`).get().count, 1);
+  assert.equal(db.prepare(`SELECT COUNT(*) AS count FROM league_membership_audit`).get().count, 0);
+  assert.equal(db.prepare(`SELECT name FROM schema_migrations WHERE version=15`).get().name, 'membership_audit_repair');
+  db.close();
 });
 
 test('commissioner cannot assign two active users to the same team', async () => {
@@ -145,6 +197,8 @@ test('refresh and onboarding source guards remain wired to the real Discord sess
   assert.equal(tradeModule.includes('if(!userId)openLogin()'), false);
   assert.ok(tradeModule.includes('function commissionerMembershipRows()'));
   assert.ok(tradeModule.includes('data-copy-league-invite'));
+  assert.ok(tradeModule.includes("FRANCHISEHQ_PUBLIC_ORIGIN='https://franchisehq.app'"));
+  assert.ok(tradeModule.includes('commissionerMembersPromise'));
   assert.ok(authClient.includes('restoreLoginRoute()'));
   assert.ok(authClient.includes('franchisehq:auth:return-route:v1'));
   assert.ok(app.includes("['commissioner','trade-center','trade-block'].includes(activeBase)"));

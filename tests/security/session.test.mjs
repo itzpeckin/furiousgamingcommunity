@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 
 import {
   AUTH_CONSTANTS,
+  decodeOpaqueContext,
   encodeOpaqueContext,
   getCurrentSession,
   hashToken
 } from '../../functions/_lib/auth.js';
 import { onRequestPost as claimSession } from '../../functions/api/auth/session/claim.js';
+import { onRequestGet as startDiscordLogin } from '../../functions/api/auth/discord/login.js';
 import { requireCommissioner } from '../../functions/_lib/permissions.js';
 
 function sessionDatabase(validHash) {
@@ -181,4 +183,37 @@ test('session handoff is origin-bound, one-time, and never accepted from a URL',
   const replay = await claimSession(makeContext());
   assert.equal(replay.status, 400);
   assert.equal(db.sessions.length, 1);
+});
+
+test('Discord login begun on pages.dev establishes its session on franchisehq.app', async () => {
+  let storedStateId = '';
+  const db = {
+    prepare(sql) {
+      return {
+        values:[],
+        bind(...values) { this.values = values; return this; },
+        async first() {
+          if (sql.includes('SELECT id, slug FROM leagues')) return { id:'league-1', slug:'fgc' };
+          return null;
+        },
+        async run() {
+          if (sql.includes('INSERT INTO oauth_states')) storedStateId = this.values[0];
+          return { meta:{ changes:1 } };
+        }
+      };
+    }
+  };
+  const response = await startDiscordLogin({
+    request:new Request('https://franchise-hq.pages.dev/api/auth/discord/login?returnTo=%2Fleagues%2Ffgc'),
+    env:{
+      DB:db,
+      DISCORD_CLIENT_ID:'client-id',
+      DISCORD_REDIRECT_URI:'https://franchise-hq.pages.dev/api/auth/discord/callback'
+    }
+  });
+  assert.equal(response.status, 302);
+  const encoded = storedStateId.split('.')[1];
+  const context = decodeOpaqueContext(encoded);
+  assert.equal(context.origin, 'https://franchisehq.app');
+  assert.equal(context.joinLeagueSlug, 'fgc');
 });

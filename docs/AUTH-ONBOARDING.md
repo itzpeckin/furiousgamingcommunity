@@ -1,4 +1,4 @@
-# FranchiseHQ 7.0.2 Member Onboarding Runbook
+# FranchiseHQ 7.0.3 Member Onboarding Runbook
 
 ## Goal
 
@@ -40,21 +40,22 @@ Use **Disable Access** to revoke a member. The current commissioner cannot disab
 
 A person who discovers the league URL can create a Pending request but cannot enter the league. Commissioners should approve only recognized Discord identities. Tokenized, expiring invitations remain a future multi-tenant enhancement if Pending-request spam becomes a real operational concern.
 
-## 7.0.2 phone acceptance checklist
+## 7.0.3 phone acceptance checklist
 
 Use one commissioner browser and one separate member browser or private window.
 
-1. Refresh Homepage, Commissioner HQ, Trade Center, and Trade Block. None should require a new login.
-2. Copy the invite link from Teams & Owners.
-3. Open it as a different Discord user and confirm the Pending page appears.
-4. Confirm that user cannot enter the league before approval.
-5. Activate the member as Team Owner with one team.
-6. Reopen the league link and confirm the assigned team and member pages survive refresh.
-7. Attempt to assign the same team to another Pending user and confirm FranchiseHQ blocks it.
-8. Disable the test member and confirm league entry is denied.
-9. Restore the member to Pending, activate them again, sign in again, and confirm the old disabled state does not return.
-10. On phone and desktop, confirm the Teams & Owners Pending/Active/Disabled controls fit without horizontal page scrolling.
+1. Begin from `https://franchisehq.app/leagues/fgc`, complete one fresh Discord login if requested, and refresh Homepage, Commissioner HQ, Trade Center, and Trade Block. None should require another login.
+2. Open the old `https://franchise-hq.pages.dev/` address and confirm the browser moves to `https://franchisehq.app/`.
+3. Copy the invite link from Teams & Owners and confirm it begins with `https://franchisehq.app/`.
+4. Open it as a different Discord user and confirm the Pending page appears.
+5. Confirm that user cannot enter the league before approval.
+6. Activate the member as Team Owner with one team.
+7. Reopen the league link and confirm the assigned team and member pages survive refresh.
+8. Attempt to assign the same team to another Pending user and confirm FranchiseHQ blocks it.
+9. Disable the test member and confirm league entry is denied.
+10. Restore the member to Pending, activate them again, sign in again, and confirm the old disabled state does not return.
+11. On phone and desktop, confirm the Teams & Owners Pending/Active/Disabled controls fit without horizontal page scrolling and no duplicate error notice appears.
 
 ## Known boundary
 
-Trade Center, Trade Block, GOTW, and Confidence Pool workflow records remain browser-local controlled-beta data in 7.0.2. This release fixes their authenticated page/session behavior; it does not make those workflow records authoritative or shared.
+Trade Center, Trade Block, GOTW, and Confidence Pool workflow records remain browser-local controlled-beta data in 7.0.3. This release fixes their authenticated page/session behavior; it does not make those workflow records authoritative or shared.

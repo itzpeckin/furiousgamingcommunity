@@ -1,7 +1,7 @@
 import { createId, jsonResponse } from "../../../_lib/auth.js";
 import { requireCommissioner } from "../../../_lib/permissions.js";
 
-const RELEASE = "7.0.2";
+const RELEASE = "7.0.3";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -65,16 +65,51 @@ async function authorizedLeague(context) {
   return { auth, league };
 }
 
-async function findMembership(db, leagueId, userId) {
-  return db.prepare(`
-    SELECT lm.id, lm.user_id AS userId, lm.role, lm.team_id AS teamId, lm.active,
-      (SELECT a.action FROM league_membership_audit a
+async function membershipAuditAvailable(db) {
+  try {
+    const row = await db.prepare(`
+      SELECT 1 AS available
+      FROM sqlite_schema
+      WHERE type='table' AND name='league_membership_audit'
+      LIMIT 1
+    `).first();
+    return Number(row?.available || 0) === 1;
+  } catch (error) {
+    console.warn("Membership audit schema check failed:", error?.message || error);
+    return false;
+  }
+}
+
+function lastAccessActionSql(withAudit) {
+  if (withAudit) {
+    return `(SELECT a.action FROM league_membership_audit a
        WHERE a.league_id=lm.league_id AND a.subject_user_id=lm.user_id
          AND a.action IN ('membership_deactivated','membership_restored_pending')
-       ORDER BY a.created_at DESC, a.rowid DESC LIMIT 1) AS lastAccessAction
+       ORDER BY a.created_at DESC, a.rowid DESC LIMIT 1)`;
+  }
+  return `CASE
+      WHEN lm.active=0 AND lm.role='team_owner' AND lm.team_id IS NULL
+        THEN 'membership_restored_pending'
+      WHEN lm.active=0 THEN 'membership_deactivated'
+      ELSE NULL
+    END`;
+}
+
+async function findMembership(db, leagueId, userId) {
+  const withAudit = await membershipAuditAvailable(db);
+  const read = (includeAudit) => db.prepare(`
+    SELECT lm.id, lm.user_id AS userId, lm.role, lm.team_id AS teamId, lm.active,
+      ${lastAccessActionSql(includeAudit)} AS lastAccessAction
     FROM league_memberships lm
     WHERE lm.league_id=? AND lm.user_id=? LIMIT 1
   `).bind(leagueId, userId).first();
+  try {
+    return await read(withAudit);
+  } catch (error) {
+    if (!withAudit) throw error;
+    console.warn("Membership audit read failed; using membership-state fallback:", error?.message || error);
+    return read(false);
+  }
 }
 
 async function activeCommissionerCount(db, leagueId) {
@@ -87,16 +122,12 @@ export async function onRequestGet(context) {
   if (access.response) return access.response;
   const { league } = access;
 
-  const rows = await context.env.DB.prepare(`
+  const withAudit = await membershipAuditAvailable(context.env.DB);
+  const read = (includeAudit) => context.env.DB.prepare(`
     SELECT lm.id, lm.role, lm.team_id AS teamId, lm.active,
            CASE
              WHEN lm.active=1 THEN 'active'
-             WHEN COALESCE((
-               SELECT a.action FROM league_membership_audit a
-               WHERE a.league_id=lm.league_id AND a.subject_user_id=lm.user_id
-                 AND a.action IN ('membership_deactivated','membership_restored_pending')
-               ORDER BY a.created_at DESC, a.rowid DESC LIMIT 1
-             ), '')='membership_deactivated' THEN 'disabled'
+             WHEN COALESCE(${lastAccessActionSql(includeAudit)}, '')='membership_deactivated' THEN 'disabled'
              ELSE 'pending'
            END AS status,
            lm.created_at AS createdAt, lm.updated_at AS updatedAt,
@@ -108,6 +139,15 @@ export async function onRequestGet(context) {
     ORDER BY CASE WHEN lm.active=0 THEN 0 ELSE 1 END, lower(u.display_name) ASC
     LIMIT 500
   `).bind(league.id).all();
+
+  let rows;
+  try {
+    rows = await read(withAudit);
+  } catch (error) {
+    if (!withAudit) throw error;
+    console.warn("Membership audit list failed; using membership-state fallback:", error?.message || error);
+    rows = await read(false);
+  }
 
   return jsonResponse({ ok:true, release:RELEASE, league, memberships:rows?.results || [] });
 }

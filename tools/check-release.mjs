@@ -68,6 +68,28 @@ if (version === '7.0.2') {
     errors.push('Unauthorized 7.0.2 candidate work must not claim production authorization or deployment.');
   }
 }
+if (version === '7.0.3') {
+  for (const check of [
+    'securityTests',
+    'sessionRefreshRecovery',
+    'specialRouteRefreshRegression',
+    'canonicalDocumentRedirect',
+    'discordCallbackAvailability',
+    'canonicalOauthAudience',
+    'canonicalInviteOrigin',
+    'membershipSchemaFallback',
+    'membershipAuditRepair',
+    'membershipRequestDeduplication'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.0.3 corrective evidence is incomplete: ${check}.`);
+  }
+  if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+    errors.push('7.0.3 candidate work must not claim production authorization or deployment.');
+  }
+  if (evidence.external?.productionMigration?.authorized !== false || evidence.external?.productionMigration?.status !== 'not-run') {
+    errors.push('7.0.3 candidate work must not claim an authorized or completed production migration.');
+  }
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {
