@@ -7,13 +7,19 @@ const errors = [];
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
 if (manifest.version !== '7.0.0') errors.push('Release version must be 7.0.0.');
-if (manifest.status !== 'validated-local') errors.push('Release status must be validated-local.');
+if (manifest.status !== 'validated-production-authorized') {
+  errors.push('Release status must record the owner-authorized production baseline.');
+}
 if (manifest.sourceBaseline?.commit !== '4d0a4e979f98a99a8faea7c53fdd7366edc975f9') {
   errors.push('Source baseline commit does not match the audited 6.3.2 commit.');
 }
 if (manifest.sourceBaseline?.tag !== 'v6.3.2-baseline') errors.push('Rollback baseline tag is missing.');
-if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
-  errors.push('7.0.0 must not authorize or record a production deployment.');
+if (manifest.production?.authorized !== true || manifest.production?.deployed !== false) {
+  errors.push('7.0.0 must record the narrow production authorization without claiming deployment.');
+}
+if (evidence.external?.productionDeployment?.authorized !== true ||
+    evidence.external?.productionDeployment?.scope !== 'controlled-7.0.0-squash-merge') {
+  errors.push('Validation evidence must record the controlled 7.0.0 production authorization.');
 }
 if (manifest.staging?.deployed !== false) errors.push('Staging must remain undeployed until external bindings are verified.');
 if (evidence.baselineGate?.passed !== true || evidence.baselineGate?.unregisteredFailures !== 0) {
@@ -49,4 +55,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log('Release contract passed: 7.0.0 is tied to the audited baseline and cannot authorize production.');
+console.log('Release contract passed: 7.0.0 is tied to the audited baseline and records only the controlled production authorization.');
