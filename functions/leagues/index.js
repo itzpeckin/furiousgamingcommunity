@@ -5,7 +5,7 @@ import {
   redirectResponse
 } from "../_lib/auth.js";
 
-const RELEASE = "7.0.1";
+const RELEASE = "7.0.2";
 
 function esc(value) {
   return String(value ?? "")

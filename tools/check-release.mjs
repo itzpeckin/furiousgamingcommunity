@@ -47,6 +47,27 @@ if (version === '7.0.1') {
     errors.push('7.0.1 candidate work must not claim production authorization or deployment.');
   }
 }
+if (version === '7.0.2') {
+  for (const check of [
+    'securityTests',
+    'sessionRefreshRecovery',
+    'specialRouteRefreshRegression',
+    'inviteOnlyActivation',
+    'membershipRoleBoundary',
+    'duplicateTeamAssignment',
+    'commissionerLockoutProtection',
+    'restoreAfterDisable'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.0.2 onboarding evidence is incomplete: ${check}.`);
+  }
+  if (manifest.status === 'validated-production-authorized') {
+    if (manifest.production?.authorized !== true || manifest.production?.deployed !== false) {
+      errors.push('Authorized 7.0.2 candidate must record authorization without claiming deployment.');
+    }
+  } else if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+    errors.push('Unauthorized 7.0.2 candidate work must not claim production authorization or deployment.');
+  }
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

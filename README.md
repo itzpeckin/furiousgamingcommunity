@@ -4,10 +4,10 @@ FranchiseHQ is a league-management platform. FGC is the first customer league; l
 
 ## Current release
 
-- Product baseline: 6.3.2 at commit `4d0a4e979f98a99a8faea7c53fdd7366edc975f9`
-- Engineering baseline: 7.0.0, locally validated
-- Production deployment: not authorized by 7.0.0
-- Next product work: 7.0.1 security containment, then 7.0.2 Madden NFL 27 intake
+- Production baseline: 7.0.1 at commit `af9d12573e29ec1cbf4e9a14024f8e7bcb39ebca`
+- Current candidate: 7.0.2 persistent login and controlled league onboarding
+- Production deployment: unchanged until the owner authorizes the 7.0.2 publication cycle
+- Next product work: Madden NFL 27 intake after a stable Companion App export is available
 
 ## Local quality gate
 
@@ -31,6 +31,7 @@ npm run ci
 - [Mobile validation matrix](docs/MOBILE-TEST-MATRIX.md)
 - [Release process](RELEASE-PROCESS.md)
 - [7.0.0 release record](releases/7.0.0/release-record.md)
+- [7.0.2 onboarding runbook](docs/AUTH-ONBOARDING.md)
 - [Generated system inventory](docs/generated/system-inventory.md)
 
 ## Safety rules

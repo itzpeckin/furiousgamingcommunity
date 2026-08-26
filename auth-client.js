@@ -11,6 +11,8 @@
     throw new Error('platform/api.js must load before auth-client.js.');
   }
 
+  const LOGIN_RETURN_KEY = 'franchisehq:auth:return-route:v1';
+  const LOGIN_RETURN_MAX_AGE_MS = 15 * 60 * 1000;
   const boot = window.__FHQ_AUTH_BOOTSTRAP__ && typeof window.__FHQ_AUTH_BOOTSTRAP__ === 'object' ? window.__FHQ_AUTH_BOOTSTRAP__ : null;
 
   const authState = {
@@ -46,6 +48,36 @@
     authState.membership = null;
     authState.session = null;
     authState.error = null;
+  }
+
+  function currentLeaguePath() {
+    const match = location.pathname.match(/^\/leagues\/([^/?#]+)$/i);
+    return match ? `/leagues/${encodeURIComponent(decodeURIComponent(match[1]))}` : null;
+  }
+
+  function rememberLoginRoute() {
+    const path = currentLeaguePath();
+    const hash = String(location.hash || '');
+    try {
+      if (!path || !/^#[A-Za-z0-9][A-Za-z0-9/_-]*$/.test(hash)) {
+        sessionStorage.removeItem(LOGIN_RETURN_KEY);
+        return;
+      }
+      sessionStorage.setItem(LOGIN_RETURN_KEY, JSON.stringify({ path, hash, savedAt:Date.now() }));
+    } catch {}
+  }
+
+  function restoreLoginRoute() {
+    let saved = null;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(LOGIN_RETURN_KEY) || 'null');
+      sessionStorage.removeItem(LOGIN_RETURN_KEY);
+    } catch { return false; }
+    if (!saved || Date.now() - Number(saved.savedAt || 0) > LOGIN_RETURN_MAX_AGE_MS) return false;
+    if (saved.path !== currentLeaguePath() || !/^#[A-Za-z0-9][A-Za-z0-9/_-]*$/.test(String(saved.hash || ''))) return false;
+    if (location.hash) return false;
+    history.replaceState(history.state, '', `${location.pathname}${location.search}${saved.hash}`);
+    return true;
   }
 
   function applyAuthResponse(payload) {
@@ -114,7 +146,8 @@
   }
 
   function login() {
-    const joinPath = location.pathname.match(/^\/leagues\/[^/?#]+$/i) ? location.pathname : null;
+    rememberLoginRoute();
+    const joinPath = currentLeaguePath();
     window.location.assign(api.buildUrl('/api/auth/discord/login', joinPath ? { returnTo: joinPath } : null));
   }
 
@@ -209,5 +242,6 @@
     getAvatarUrl
   }, { replace: true });
 
+  restoreLoginRoute();
   refresh();
 })();

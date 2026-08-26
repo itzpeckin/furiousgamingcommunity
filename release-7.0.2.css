@@ -1,0 +1,91 @@
+@import url("./release-7.0.1.css");
+
+.commissioner-invite-card,
+.commissioner-member-access {
+  margin-bottom: 14px;
+}
+
+.commissioner-invite-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.commissioner-invite-card h2,
+.commissioner-invite-card p {
+  margin-bottom: 6px;
+}
+
+.commissioner-invite-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.commissioner-invite-copy input {
+  width: 100%;
+  min-width: 0;
+}
+
+.commissioner-invite-card ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+  color: var(--text-secondary, #c6d0df);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.commissioner-member-list {
+  display: grid;
+}
+
+.commissioner-member-list article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.commissioner-member-list article > div {
+  min-width: 0;
+}
+
+.commissioner-member-list strong,
+.commissioner-member-list small {
+  display: block;
+}
+
+.commissioner-member-list small {
+  margin-top: 3px;
+  color: var(--text-secondary, #aab6c8);
+}
+
+@media (max-width: 720px) {
+  .commissioner-invite-copy {
+    grid-template-columns: 1fr;
+  }
+
+  .commissioner-invite-copy .button,
+  article[data-league-member-row] .button {
+    width: 100%;
+  }
+
+  article[data-league-member-row] {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+  }
+
+  .commissioner-member-list article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .commissioner-member-list article .button {
+    width: 100%;
+  }
+}
+

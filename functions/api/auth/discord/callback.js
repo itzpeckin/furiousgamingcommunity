@@ -307,12 +307,14 @@ export async function onRequestGet(context) {
           } else if (Number(existing.active)) {
             destination = `/leagues/${encodeURIComponent(league.slug)}?auth=success`;
           } else {
-            const explicitDisable = await context.env.DB.prepare(`
-              SELECT 1 AS disabled FROM league_membership_audit
-              WHERE league_id=? AND subject_user_id=? AND action='membership_deactivated'
+            const latestAccessAction = await context.env.DB.prepare(`
+              SELECT action FROM league_membership_audit
+              WHERE league_id=? AND subject_user_id=?
+                AND action IN ('membership_deactivated','membership_restored_pending')
+              ORDER BY created_at DESC, rowid DESC
               LIMIT 1
             `).bind(league.id, user.id).first().catch(() => null);
-            if (explicitDisable) {
+            if (latestAccessAction?.action === 'membership_deactivated') {
               destination = `/leagues?access=disabled`;
             } else {
               // Old failed/premature join records are normalized back to the

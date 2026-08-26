@@ -124,14 +124,14 @@
   },
   "files": {
     "byExtension": {
-      ".css": 5,
+      ".css": 6,
       ".example": 1,
       ".html": 2,
       ".js": 154,
       ".json": 4,
       ".jsonc": 1,
-      ".md": 275,
-      ".mjs": 16,
+      ".md": 276,
+      ".mjs": 17,
       ".png": 1,
       ".sql": 16,
       ".txt": 1,
@@ -140,7 +140,7 @@
     },
     "largest": [
       {
-        "bytes": 603240,
+        "bytes": 603302,
         "file": "app.js"
       },
       {
@@ -148,7 +148,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 366029,
+        "bytes": 370158,
         "file": "trade-module.js"
       },
       {
@@ -156,7 +156,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74834,
+        "bytes": 74836,
         "file": "index.html"
       },
       {
@@ -220,7 +220,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js"
       }
     ],
-    "total": 479
+    "total": 482
   },
   "frontend": {
     "assets": [
@@ -230,7 +230,7 @@
         "versioned": true
       },
       {
-        "path": "release-7.0.1.css",
+        "path": "release-7.0.2.css",
         "type": "link",
         "versioned": true
       },
@@ -392,7 +392,7 @@
       {
         "path": "auth-client.js",
         "type": "script",
-        "versioned": false
+        "versioned": true
       },
       {
         "path": "platform/league.js",
@@ -1147,6 +1147,7 @@
       "files": [
         "FHQ-6126-index.html",
         "app.js",
+        "auth-client.js",
         "index.html",
         "league-engine/companion-player-mapper.js",
         "league-engine/companion-team-mapper.js",
@@ -1164,7 +1165,7 @@
         "platform/store.js",
         "trade-module.js"
       ],
-      "occurrences": 67
+      "occurrences": 71
     },
     "hardCodedFgc": {
       "files": [
@@ -1311,7 +1312,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.0.1",
+  "release": "7.0.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
