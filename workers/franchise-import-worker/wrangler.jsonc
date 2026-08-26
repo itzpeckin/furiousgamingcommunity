@@ -1,4 +1,5 @@
 {
+  // Cloudflare Git build root: /workers/franchise-import-worker
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "franchise-hq-import-worker",
   "main": "src/index.js",
