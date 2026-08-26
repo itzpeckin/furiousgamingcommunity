@@ -136,7 +136,7 @@
       ".sql": 16,
       ".txt": 1,
       ".yml": 1,
-      "[none]": 3
+      "[none]": 2
     },
     "largest": [
       {
@@ -220,7 +220,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js"
       }
     ],
-    "total": 480
+    "total": 479
   },
   "frontend": {
     "assets": [

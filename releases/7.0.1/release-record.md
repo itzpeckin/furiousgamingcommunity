@@ -18,6 +18,7 @@ Contain the known public data, credential, browser-origin, and session-handoff r
 - Replaced raw snapshot payloads with an allowlisted compatibility projection after the final UI review found that inherited roster, player-card, schedule, and standings views still depended on approved fields inside the old raw object.
 - Corrected the generated inventory to stamp the current package release instead of retaining a hard-coded 7.0.0 label, and added a regression test.
 - Updated the page metadata and cache keys for the modified application/read-model assets so browsers cannot retain the pre-7.0.1 session and pagination code after deployment.
+- The first hosted GitHub run passed all 22 application/security/tooling tests but exposed a worktree-only inventory mismatch: Windows represented `.git` as a pointer file while GitHub represented it as a directory. Repository metadata is now excluded in both forms and a 23rd regression test prevents recurrence.
 
 ## Security containment implemented
 
@@ -49,8 +50,8 @@ Contain the known public data, credential, browser-origin, and session-handoff r
 - HTML assets: one entrypoint passed.
 - Secret scan: 478 files passed with no high-confidence credential literals.
 - Migration baseline: seven inherited issues, zero new issues; strict mode remains intentionally blocked until 7.1.0.
-- Automated tests: 22 passed, including 16 focused negative security/session cases.
-- System inventory: 480 tracked files and 58 Pages Function routes verified.
+- Automated tests: 23 passed, including 16 focused negative security/session cases.
+- System inventory: 479 tracked files and 58 Pages Function routes verified.
 - GitHub and Cloudflare review checks: not yet published; one final candidate push is planned to limit redundant builds and credit use.
 
 ## Deployment status

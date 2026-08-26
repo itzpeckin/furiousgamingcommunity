@@ -4,7 +4,7 @@
 **Roadmap revision:** 1.9
 **Starting point:** FranchiseHQ 6.3.x  
 **Target:** A secure, polished FranchiseHQ platform with FGC as its first production league and with application/data boundaries ready for future multi-tenant operation.  
-**Current status:** FranchiseHQ 7.0.0 is released on `main` as squash commit `de01cff5e8127e1123c7433fd14e5f3972eb032f` and immutable tag `v7.0.0`. Production GitHub quality, Cloudflare Pages, import-Worker, and direct Pages smoke checks passed. The owner then completed the 7.0.0 phone acceptance check and authorized 7.0.1. The 7.0.1 security-containment candidate passed its complete local baseline gate with 22 tests on `codex/franchisehq-7.0.1`; production remains unchanged.
+**Current status:** FranchiseHQ 7.0.0 is released on `main` as squash commit `de01cff5e8127e1123c7433fd14e5f3972eb032f` and immutable tag `v7.0.0`. Production GitHub quality, Cloudflare Pages, import-Worker, and direct Pages smoke checks passed. The owner then completed the 7.0.0 phone acceptance check and authorized 7.0.1. The 7.0.1 security-containment candidate passed its complete local baseline gate with 23 tests on `codex/franchisehq-7.0.1`; production remains unchanged.
 **Next gate:** Publish the single 7.0.1 review candidate, confirm hosted GitHub checks, validate with isolated staging bindings, and request explicit production approval.
 
 ## 1. The commitment
@@ -26,7 +26,7 @@ The current 6.3.x work is not discarded. Useful components will be retained wher
 - **Revision 1.6:** Squash-merged pull request #2 into `main` as `de01cff`, passed production GitHub and Cloudflare checks, activated import-Worker version `fa6c2d38`, published `v7.0.0`, and disconnected the redundant assets-only Worker's Git automation.
 - **Revision 1.7:** Limited the import Worker's Cloudflare build watch path to `workers/franchise-import-worker/*`, preventing unrelated repository changes from rebuilding that service.
 - **Revision 1.8:** Recorded successful owner phone acceptance of 7.0.0 plus three mobile findings: session loss after refresh, player-card model/layout problems, and awkward scrolling. Absorbed refresh persistence into 7.0.1 as a release blocker; retained player-card and scroll remediation in the mobile-first 7.0.3 scope. Began 7.0.1 security containment after explicit owner authorization.
-- **Revision 1.9:** Completed the local 7.0.1 security/session implementation and passed the full baseline gate with 22 automated tests. The final compatibility pass found inherited UI dependence on raw snapshot objects, so those objects were replaced with an explicit allowlisted projection that preserves approved roster, player-card, schedule, and standings fields without returning private export data. Corrected a hard-coded release label in generated inventory evidence and added a regression check. Production remains unchanged pending hosted review, isolated staging, and owner approval.
+- **Revision 1.9:** Completed the local 7.0.1 security/session implementation and passed the full baseline gate with 23 automated tests. The final compatibility pass found inherited UI dependence on raw snapshot objects, so those objects were replaced with an explicit allowlisted projection that preserves approved roster, player-card, schedule, and standings fields without returning private export data. Corrected a hard-coded release label in generated inventory evidence. The first GitHub run then exposed a `.git` file-versus-directory difference between Windows worktrees and Linux checkouts; both are now excluded with a regression check. Production remains unchanged pending hosted review, isolated staging, and owner approval.
 
 The change log is append-only. Later discoveries, owner decisions, bugs, and scope changes will be recorded here and in the affected release record rather than silently changing the plan.
 
@@ -35,7 +35,7 @@ The change log is append-only. Later discoveries, owner decisions, bugs, and sco
 | Version | Status | Primary outcome |
 |---|---|---|
 | 7.0.0 | Released — `main` commit `de01cff`, tag `v7.0.0`; production quality, Pages, import-Worker, and phone acceptance passed | Controlled engineering and deployment baseline |
-| 7.0.1 | Validated local review candidate — 22 tests passed; production unchanged | Immediate security containment and refresh-session reliability |
+| 7.0.1 | Validated local review candidate — 23 tests passed; production unchanged | Immediate security containment and refresh-session reliability |
 | 7.0.2 | Newly prioritized | Madden NFL 27 intake and controlled FGC data reset |
 | 7.0.3 | Newly prioritized | Mobile roster preview, player permalinks, and Trade Block Lite |
 | 7.1.0–7.3.0 | Planned | Canonical database, tenant boundaries, and authentication |
