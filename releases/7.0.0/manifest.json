@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.0.0",
   "releaseType": "controlled-engineering-baseline",
-  "status": "validated-local",
+  "status": "validated-production-authorized",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "6.3.2",
@@ -29,8 +29,10 @@
     "reason": "Repository controls are implemented; external staging resources and bindings are not yet provisioned or verified."
   },
   "production": {
-    "authorized": false,
-    "deployed": false
+    "authorized": true,
+    "deployed": false,
+    "authorizedOn": "2026-08-26",
+    "scope": "Squash-merge pull request #2 and observe the resulting 7.0.0 baseline deployment only."
   },
   "requiredArtifacts": [
     "README.md",

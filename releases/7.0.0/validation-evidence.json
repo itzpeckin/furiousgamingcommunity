@@ -16,7 +16,7 @@
     "environmentContract": { "passed": true, "discoveredBindings": 18 },
     "migrationBaseline": { "passed": true, "registeredInheritedIssues": 7, "newIssues": 0 },
     "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" },
-    "toolingTests": { "passed": true, "passedTests": 4, "failedTests": 0 },
+    "toolingTests": { "passed": true, "passedTests": 5, "failedTests": 0 },
     "systemInventory": { "passed": true, "trackedFiles": 473, "pagesFunctionRoutes": 58 },
     "releaseContract": { "passed": true },
     "gitDiffCheck": { "passed": true }
@@ -38,18 +38,22 @@
       "remoteContentMatchedLocalCandidate": true
     },
     "githubWorkflowRun": {
-      "status": "not-indexed-from-review-branch",
+      "status": "passed",
       "workflowPresent": true,
       "reviewBranchPushesAttempted": true,
       "defaultBranchChanged": false,
-      "localQualityGatePassed": true
+      "localQualityGatePassed": true,
+      "runId": 32992901857,
+      "commit": "47bbf36",
+      "initialFailure": "cross-platform-generated-inventory-mismatch",
+      "regressionTestAdded": true
     },
     "stagingDeployment": {
       "status": "preview-deployed-unconfigured",
-      "deploymentId": "ab908c60-8924-4271-8c00-47dc61770cd6",
+      "deploymentId": "00b6b900-a9de-4423-8a92-97f4c1d7a054",
       "url": "https://codex-franchisehq-7-0-0.franchise-hq.pages.dev",
-      "uniqueUrl": "https://ab908c60.franchise-hq.pages.dev",
-      "commit": "16210a1",
+      "uniqueUrl": "https://00b6b900.franchise-hq.pages.dev",
+      "commit": "47bbf36",
       "entrypointSmokePassed": true,
       "bindingsConfigured": false
     },
@@ -67,7 +71,11 @@
       "legacyAssetsWorkerNonProductionBuildsEnabled": false,
       "productionChanged": false
     },
-    "productionDeployment": null
+    "productionDeployment": {
+      "authorized": true,
+      "scope": "controlled-7.0.0-squash-merge",
+      "status": "pending-final-evidence-head-checks"
+    }
   },
   "productionChanged": false,
   "dataChanged": false,

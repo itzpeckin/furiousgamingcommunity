@@ -1,8 +1,8 @@
 # FranchiseHQ 7.0.0 Release Record
 
 **Release type:** Controlled engineering baseline  
-**Status:** Review branch published; Pages and import-Worker preview checks passed; hosted CI indexing and isolated staging activation remain
-**Production authorized:** No  
+**Status:** Final candidate validated; controlled squash merge authorized and awaiting final evidence-head checks
+**Production authorized:** Yes — controlled 7.0.0 baseline squash merge only
 **Production deployed:** No
 
 ## Scope
@@ -16,7 +16,7 @@
 - Establish a mobile/browser validation contract.
 - Establish this living release record and the version-controlled master roadmap.
 
-Excluded: application feature behavior, security-route remediation, database repair, Madden NFL 27 import changes, data deletion/reset, credential rotation, staging provisioning, and all production deployment.
+Excluded: application feature behavior, security-route remediation, database repair, Madden NFL 27 import changes, data deletion/reset, credential rotation, and staging provisioning. Production authorization is limited to the validated 7.0.0 baseline squash merge; it does not authorize later release work or resource changes.
 
 ## Added during delivery
 
@@ -38,7 +38,10 @@ Excluded: application feature behavior, security-route remediation, database rep
 - Normalized and saved the import Worker's Cloudflare Git build root as `/workers/franchise-import-worker/`, matching the checked-in Wrangler configuration location and Cloudflare's monorepo convention. A fresh review build still reported its separate trigger root as `/`, proving the displayed root had not propagated to that trigger.
 - Changed only the import Worker's non-production branch command to `cd workers/franchise-import-worker && npx wrangler versions upload`. This makes the review trigger enter the checked-in Worker project before creating a preview version while leaving the production command unchanged. The checked-in root comment records the intended dashboard boundary without changing executable behavior.
 - Verified that the corrected command passed at review commit `16210a1`, uploaded preview Worker version `d0aeb677`, and left the active production version unchanged. The same commit's Pages preview also passed; GitHub reported both Cloudflare checks successful.
-- Confirmed that GitHub has not indexed the repository's first custom Actions workflow while it exists only on the review branch, despite follow-up pushes and an exact branch trigger. The workflow remains reviewable in pull request #2, local `npm run ci` is the authoritative 7.0.0 gate, and no workflow-only commit will be merged to `main` because `main` automatically deploys the production Pages project.
+- Confirmed that GitHub initially did not index the repository's first custom Actions workflow while it existed only on the review branch. GitHub later activated both pull-request and push runs without a default-branch change.
+- Diagnosed the first hosted failure as nondeterministic generated inventory: Windows newline conversion and locale-dependent sorting could produce evidence different from the Linux runner. Normalized text reads, introduced code-point ordering with deterministic tie-breaking, regenerated the inventory, and added an operating-system-independence regression test.
+- Verified all three hosted review checks at commit `47bbf36`: GitHub quality, Cloudflare Pages preview, and the import-Worker preview.
+- Received owner authorization to squash-merge the validated 7.0.0 baseline into `main` and monitor its production deployment. This authorization does not extend to 7.0.1, data reset, staging resource creation, credential changes, or application feature work.
 
 ## Known inherited blockers
 
@@ -58,23 +61,24 @@ Excluded: application feature behavior, security-route remediation, database rep
 - Environment contract: all discovered bindings are classified and local/staging/production resource identities are separated.
 - Migration baseline: seven inherited issues matched the registered debt exactly; zero new migration issues were found.
 - Strict migration gate: failed as designed on those seven inherited issues; it remains blocked until 7.1.0.
-- Tooling tests: four passed, zero failed.
+- Tooling tests: five passed, zero failed, including cross-platform evidence determinism.
 - Generated inventory: 473 tracked files, 58 Pages Function routes, 18 discovered environment bindings.
-- Release contract: passed and confirmed that 7.0.0 cannot authorize production.
+- Release contract: passed and confirmed that production authorization is limited to the controlled 7.0.0 baseline squash merge without claiming deployment.
 - Git whitespace/conflict check: passed.
 - Remote branch comparison: the published 35-file candidate matched the validated local candidate exactly before the workflow-trigger correction.
 - Cloudflare Pages preview build: passed at commit `6bae30c22cdc06803b2ca116e3e2e17dd503c7f7`.
 - Latest Cloudflare Pages preview build: passed at commit `16210a1`; unique preview `https://ab908c60.franchise-hq.pages.dev` and stable branch preview `https://codex-franchisehq-7-0-0.franchise-hq.pages.dev`.
 - Import Worker preview build: passed at commit `16210a1` using the review-only folder command and created unpromoted version `d0aeb677`; the active production version did not change.
 - Preview entrypoint smoke test: passed; title and landing content rendered without browser console errors.
+- GitHub Actions quality run: passed at review commit `47bbf36` in run `32992901857` after the deterministic-inventory correction.
 - Machine-readable evidence: `releases/7.0.0/validation-evidence.json`.
 
 ## Deployment status
 
 - Staging: a Pages preview is deployed successfully, but it is not accepted as usable staging because the preview environment has no isolated variables, secrets, D1, R2, KV, or service bindings.
-- GitHub: pull request #2 is open from `codex/franchisehq-7.0.0` to `main`. The first custom Actions workflow is not yet indexed from the non-default review branch, so hosted FranchiseHQ CI remains pending; the complete local quality gate passes.
+- GitHub: pull request #2 is open from `codex/franchisehq-7.0.0` to `main`. The hosted FranchiseHQ quality gate is active and passed on the validated review head; the owner authorized a squash merge after the final evidence-only head passes.
 - Worker build boundaries: passed for the current review commit. Non-production builds are disabled for the redundant assets-only Worker. The import Worker root is saved as `/workers/franchise-import-worker/`, and its review-only command explicitly enters that folder because Cloudflare's preview trigger continues to report `/`; commit `16210a1` successfully created an unpromoted Worker version.
-- Production: not authorized and not deployed.
+- Production: the controlled 7.0.0 baseline squash merge is authorized but not yet deployed at the time this evidence was recorded.
 - No database, R2, KV, OAuth, Workflow, secret, deployed Worker runtime, or production application state was changed. Only non-production Git build settings were corrected.
 
 ## Rollback
@@ -83,8 +87,8 @@ Excluded: application feature behavior, security-route remediation, database rep
 - Source baseline tag: `v6.3.2-baseline`.
 - Source baseline tree: `e92b84054af2c9b58c7859b176bd2c7709f97917`.
 - Detailed procedure: `docs/ROLLBACK.md`.
-- Because 7.0.0 has no application, migration, or production deployment, abandoning the release branch returns to the complete prior state.
+- Because 7.0.0 changes no application behavior or migrations, source rollback returns `main` to the exact 6.3.2 baseline; Cloudflare's previous Pages and Worker versions remain the deployment rollback points.
 
 ## Owner acceptance
 
-Pending owner evidence review. Acceptance of 7.0.0 does not authorize 7.0.1, 7.0.2 data reset, staging provisioning, or a production deployment.
+Granted on August 26, 2026 for a controlled squash merge of the validated 7.0.0 baseline and observation of its resulting production deployment. Acceptance does not authorize 7.0.1, the 7.0.2 data reset, staging provisioning, credential changes, or any application feature release.
