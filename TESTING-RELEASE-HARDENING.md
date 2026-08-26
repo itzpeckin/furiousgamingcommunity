@@ -1,29 +1,45 @@
-# Testing and Release Hardening
+# FranchiseHQ Testing and Release Hardening
 
-## Automated validation
+## Repository gate
 
-`FranchiseHQ.validate.run()` remains the detailed test runner. Version 4.20 adds security and release-hardening tests.
+Run the complete dependency-free 7.0.0 baseline with:
 
-## Release preflight
-
-```javascript
-await FranchiseHQ.release.preflight()
+```sh
+npm run ci
 ```
 
-A release is ready only when lifecycle, manifest, runtime, validation, and security checks all pass.
+It validates:
 
-## Support bundle
+- Engineering/release files and JSON structure.
+- JavaScript syntax across browser, Pages Functions, Workers, and tooling code.
+- Local assets referenced by the application entrypoint.
+- High-confidence committed-secret patterns without printing secret values.
+- Explicit local/staging/production resource separation.
+- Current SQL migration behavior against an in-memory SQLite database.
+- Tooling unit tests.
+- Route, binding, storage, migration, and legacy-code inventory freshness.
+- The 7.0.0 release manifest and production-authorization guard.
 
-```javascript
-FranchiseHQ.release.supportBundle()
+## Strict gate
+
+```sh
+npm run check:strict
 ```
 
-returns a redacted object containing build, lifecycle, manifest, runtime, validation, API, error, configuration, feature, and browser diagnostics.
+Strict mode fails on all inherited database migration issues. Baseline mode permits only the exact issues registered in `config/quality-baseline.json`; any new issue fails immediately. The migration register is removed as defects are fixed in 7.1.0.
 
-To download it:
+## Browser/platform diagnostics
+
+The existing in-app diagnostics remain useful secondary evidence:
 
 ```javascript
-FranchiseHQ.release.downloadSupportBundle()
+await FranchiseHQ.validate.run();
+await FranchiseHQ.release.preflight();
+await FranchiseHQ.release.certify();
 ```
 
-Support bundles should still be reviewed before being shared externally.
+They do not replace server authorization tests, clean migration tests, or staging acceptance.
+
+## Manual matrix
+
+Every user-facing release follows `docs/MOBILE-TEST-MATRIX.md` and adds role, tenant, data-state, time-state, and failure-state checks appropriate to its scope.
