@@ -74,7 +74,8 @@
     "productionDeployment": {
       "authorized": true,
       "scope": "controlled-7.0.0-squash-merge",
-      "status": "pending-final-evidence-head-checks"
+      "status": "pending-final-evidence-head-checks",
+      "finalHeadHostedGateRequired": true
     }
   },
   "productionChanged": false,
