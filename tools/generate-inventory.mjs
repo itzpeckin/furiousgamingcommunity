@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { fileExists, readText, sha256, stableJson, walkFiles, writeText } from './lib/project.mjs';
+import { compareText, fileExists, readText, sha256, stableJson, walkFiles, writeText } from './lib/project.mjs';
 import { functionRoutePath, requestHandlers } from './lib/routes.mjs';
 
 const verify = process.argv.includes('--verify');
@@ -7,7 +7,7 @@ const excludedPrefixes = ['docs/generated/', 'releases/'];
 const files = (await walkFiles()).filter(file => !excludedPrefixes.some(prefix => file.startsWith(prefix)));
 const sourceFiles = files.filter(file => /\.(?:html|js|json|jsonc|mjs|sql|css)$/.test(file));
 const functionFiles = files.filter(file => file.startsWith('functions/') && file.endsWith('.js'));
-const migrationFiles = files.filter(file => /^migrations\/\d+_.+\.sql$/.test(file)).sort();
+const migrationFiles = files.filter(file => /^migrations\/\d+_.+\.sql$/.test(file)).sort(compareText);
 
 const routes = [];
 const bindingUsage = new Map();
@@ -99,7 +99,7 @@ const inventory = {
   files: {
     total: files.length,
     byExtension: extensionCounts,
-    largest: largestFiles.sort((left, right) => right.bytes - left.bytes).slice(0, 20)
+    largest: largestFiles.sort((left, right) => right.bytes - left.bytes || compareText(left.file, right.file)).slice(0, 20)
   },
   frontend: {
     entrypoint: 'index.html',
@@ -109,19 +109,19 @@ const inventory = {
   },
   functions: {
     routeCount: routes.length,
-    routes: routes.sort((left, right) => left.route.localeCompare(right.route) || left.file.localeCompare(right.file))
+    routes: routes.sort((left, right) => compareText(left.route, right.route) || compareText(left.file, right.file))
   },
   environmentBindings: Object.fromEntries(
-    [...bindingUsage.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([name, paths]) => [name, [...paths].sort()])
+    [...bindingUsage.entries()].sort(([left], [right]) => compareText(left, right)).map(([name, paths]) => [name, [...paths].sort(compareText)])
   ),
   browserStorage: {
     literalKeys: Object.fromEntries(
-      [...storageKeys.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([name, paths]) => [name, [...paths].sort()])
+      [...storageKeys.entries()].sort(([left], [right]) => compareText(left, right)).map(([name, paths]) => [name, [...paths].sort(compareText)])
     )
   },
   migrations,
   legacyMarkers: Object.fromEntries(
-    Object.entries(legacyMarkers).map(([name, value]) => [name, { occurrences: value.occurrences, files: [...value.files].sort() }])
+    Object.entries(legacyMarkers).map(([name, value]) => [name, { occurrences: value.occurrences, files: [...value.files].sort(compareText) }])
   )
 };
 
