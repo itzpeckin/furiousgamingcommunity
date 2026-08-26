@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.0",
+  "validatedOn": "2026-08-26",
+  "status": "passed-with-registered-inherited-migration-debt",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "repositoryLint": { "passed": true, "files": 34 },
+    "javascriptSyntax": { "passed": true, "modules": 166 },
+    "htmlAssets": { "passed": true, "entrypoints": 1 },
+    "secretScan": { "passed": true, "files": 470, "highConfidenceFindings": 0 },
+    "environmentContract": { "passed": true, "discoveredBindings": 18 },
+    "migrationBaseline": { "passed": true, "registeredInheritedIssues": 7, "newIssues": 0 },
+    "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" },
+    "toolingTests": { "passed": true, "passedTests": 4, "failedTests": 0 },
+    "systemInventory": { "passed": true, "trackedFiles": 473, "pagesFunctionRoutes": 58 },
+    "releaseContract": { "passed": true },
+    "gitDiffCheck": { "passed": true }
+  },
+  "external": {
+    "cloudflareAuthenticatedSession": true,
+    "githubAuthenticatedSession": true,
+    "cloudflareInspection": {
+      "pagesProject": "franchise-hq",
+      "productionBranch": "main",
+      "previewBranches": "all-non-production",
+      "previewVariablesConfigured": false,
+      "previewBindingsConfigured": false
+    },
+    "githubWorkflowRun": null,
+    "stagingDeployment": null,
+    "productionDeployment": null
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}

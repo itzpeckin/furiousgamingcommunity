@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.0",
+  "releaseType": "controlled-engineering-baseline",
+  "status": "validated-local",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "6.3.2",
+    "commit": "4d0a4e979f98a99a8faea7c53fdd7366edc975f9",
+    "tree": "e92b84054af2c9b58c7859b176bd2c7709f97917",
+    "tag": "v6.3.2-baseline"
+  },
+  "implementationBranch": "codex/franchisehq-7.0.0",
+  "environmentContract": "config/environment-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [
+    "migration.duplicate-version.0001",
+    "migration.duplicate-version.0002",
+    "migration.fresh-apply.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0002_create_authentication.sql",
+    "migration.missing-ledger-write.0013_league_membership_access_control.sql",
+    "migration.missing-ledger-write.0014_league_rules.sql"
+  ],
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "reason": "Repository controls are implemented; external staging resources and bindings are not yet provisioned or verified."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false
+  },
+  "requiredArtifacts": [
+    "README.md",
+    "RELEASE-PROCESS.md",
+    "TESTING-RELEASE-HARDENING.md",
+    "config/environment-contract.json",
+    "config/quality-baseline.json",
+    "docs/BRANCH-POLICY.md",
+    "docs/ENVIRONMENTS.md",
+    "docs/MOBILE-TEST-MATRIX.md",
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.0.0/release-record.md",
+    "releases/7.0.0/validation-evidence.json"
+  ]
+}
