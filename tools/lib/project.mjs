@@ -5,6 +5,18 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+export function compareText(left, right) {
+  const leftText = String(left);
+  const rightText = String(right);
+  if (leftText < rightText) return -1;
+  if (leftText > rightText) return 1;
+  return 0;
+}
+
+export function normalizeText(value) {
+  return String(value).replace(/\r\n?/g, '\n');
+}
+
 const EXCLUDED_DIRECTORIES = new Set([
   '.git',
   '.wrangler',
@@ -23,7 +35,7 @@ export async function walkFiles(start = ROOT, options = {}) {
 
   async function visit(directory) {
     const entries = await fs.readdir(directory, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => compareText(left.name, right.name));
     for (const entry of entries) {
       if (entry.isDirectory() && excluded.has(entry.name)) continue;
       const absolute = path.join(directory, entry.name);
@@ -40,7 +52,8 @@ export async function walkFiles(start = ROOT, options = {}) {
 }
 
 export async function readText(relativePath) {
-  return fs.readFile(path.join(ROOT, relativePath), 'utf8');
+  const source = await fs.readFile(path.join(ROOT, relativePath), 'utf8');
+  return normalizeText(source);
 }
 
 export async function readJson(relativePath) {
@@ -69,7 +82,7 @@ function normalize(value) {
   if (value && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareText(left, right))
         .map(([key, item]) => [key, normalize(item)])
     );
   }
