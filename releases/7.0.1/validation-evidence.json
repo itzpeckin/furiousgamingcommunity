@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.0.1",
   "validatedOn": "2026-08-26",
-  "status": "local-baseline-passed",
+  "status": "hosted-review-passed-staging-blocked",
   "baselineGate": {
     "passed": true,
     "unregisteredFailures": 0
@@ -30,7 +30,20 @@
   },
   "external": {
     "githubPullRequest": { "status": "ready-to-publish" },
-    "stagingDeployment": { "status": "not-deployed", "bindingsIsolated": false },
+    "hostedChecks": {
+      "status": "passed",
+      "githubQualityRun": 33002149544,
+      "cloudflarePagesDeployment": "94f8df4a-4a3f-4db1-9003-ddf1b7978eeb",
+      "importWorkerBuild": "5ea1cc7e-6d70-4c06-a653-665b5b7d670b"
+    },
+    "stagingDeployment": {
+      "status": "preview-deployed-bindings-missing",
+      "previewUrl": "https://codex-franchisehq-7-0-1.franchise-hq.pages.dev/",
+      "publicSmokePassed": true,
+      "protectedLeagueSmokePassed": false,
+      "bindingsIsolated": false,
+      "reason": "The preview has no isolated D1, R2, KV, or OAuth resources; fresh D1 creation is additionally blocked by the seven inherited migration defects assigned to 7.1.0."
+    },
     "productionDeployment": { "authorized": false, "status": "not-requested" }
   },
   "productionChanged": false,

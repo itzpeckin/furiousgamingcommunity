@@ -25,8 +25,11 @@
   ],
   "staging": {
     "authorized": true,
-    "deployed": false,
-    "reason": "The local baseline and security matrix passed; one hosted review deployment is authorized next."
+    "deployed": true,
+    "bindingsIsolated": false,
+    "validated": false,
+    "previewUrl": "https://codex-franchisehq-7-0-1.franchise-hq.pages.dev/",
+    "reason": "The hosted Pages preview, GitHub quality workflow, and import-Worker build passed. Public landing and security-header smoke checks passed, but protected league validation is blocked because isolated preview D1, R2, KV, and OAuth resources are not provisioned. Production bindings were not used."
   },
   "production": {
     "authorized": false,

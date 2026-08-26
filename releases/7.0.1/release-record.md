@@ -1,6 +1,6 @@
 # FranchiseHQ 7.0.1 Release Record
 
-**Status:** Validated local review candidate  
+**Status:** Hosted review passed; isolated staging blocked
 **Production authorized:** No  
 **Production changed:** No
 
@@ -19,6 +19,7 @@ Contain the known public data, credential, browser-origin, and session-handoff r
 - Corrected the generated inventory to stamp the current package release instead of retaining a hard-coded 7.0.0 label, and added a regression test.
 - Updated the page metadata and cache keys for the modified application/read-model assets so browsers cannot retain the pre-7.0.1 session and pagination code after deployment.
 - The first hosted GitHub run passed all 22 application/security/tooling tests but exposed a worktree-only inventory mismatch: Windows represented `.git` as a pointer file while GitHub represented it as a directory. Repository metadata is now excluded in both forms and a 23rd regression test prevents recurrence.
+- Updated the server-rendered public landing page release label and response header from the inherited 6.3.2 value to 7.0.1.
 
 ## Security containment implemented
 
@@ -52,14 +53,18 @@ Contain the known public data, credential, browser-origin, and session-handoff r
 - Migration baseline: seven inherited issues, zero new issues; strict mode remains intentionally blocked until 7.1.0.
 - Automated tests: 23 passed, including 16 focused negative security/session cases.
 - System inventory: 479 tracked files and 58 Pages Function routes verified.
-- GitHub and Cloudflare review checks: not yet published; one final candidate push is planned to limit redundant builds and credit use.
+- GitHub quality workflow: passed on the hosted review branch.
+- Cloudflare Pages preview build: passed; the public landing page returned `200` with the expected security headers.
+- Cloudflare import-Worker build: passed.
+- Protected league staging smoke: blocked because the preview has no isolated D1, R2, KV, or OAuth resources. The protected route fails before application validation because no preview D1 binding exists.
 
 ## Deployment status
 
 - Local branch: `codex/franchisehq-7.0.1` from `v7.0.0` / `de01cff`.
-- Staging: not deployed.
+- Staging preview: deployed at `https://codex-franchisehq-7-0-1.franchise-hq.pages.dev/`; public smoke passed, but the environment is not a valid isolated application staging environment because its data/auth bindings are absent.
 - Production: unchanged and not authorized.
 - Database, league data, and credentials: unchanged.
+- Production resources were deliberately not connected to the preview.
 
 ## Rollback
 
@@ -69,4 +74,4 @@ Contain the known public data, credential, browser-origin, and session-handoff r
 
 ## Owner acceptance
 
-Implementation authorization was granted on August 26, 2026. Production approval has not been granted and will be requested only after the full local gate, one hosted review candidate, isolated staging validation, and a concise acceptance checklist are complete.
+Implementation authorization was granted on August 26, 2026. The full local gate and hosted review checks have passed. Production approval has not been granted. Protected staging validation remains blocked until isolated Cloudflare resources can be created safely; the inherited fresh-database migration defects that prevent that are assigned to 7.1.0.
