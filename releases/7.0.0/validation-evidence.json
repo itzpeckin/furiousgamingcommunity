@@ -37,7 +37,13 @@
       "branch": "codex/franchisehq-7.0.0",
       "remoteContentMatchedLocalCandidate": true
     },
-    "githubWorkflowRun": null,
+    "githubWorkflowRun": {
+      "status": "not-indexed-from-review-branch",
+      "workflowPresent": true,
+      "reviewBranchPushesAttempted": true,
+      "defaultBranchChanged": false,
+      "localQualityGatePassed": true
+    },
     "stagingDeployment": {
       "status": "preview-deployed-unconfigured",
       "deploymentId": "8cb32f46-442e-4360-a1bb-b6ce86a9f315",
@@ -46,10 +52,15 @@
       "entrypointSmokePassed": true,
       "bindingsConfigured": false
     },
-    "legacyWorkerBuilds": {
+    "workerBuildBoundaries": {
       "passed": false,
-      "expected": false,
-      "rootConfigurationMismatch": true,
+      "importWorkerRoot": "/workers/franchise-import-worker/",
+      "importWorkerCorrectionSaved": true,
+      "previewTriggerReportedRoot": "/",
+      "previewCommand": "cd workers/franchise-import-worker && npx wrangler versions upload",
+      "previewCommandCorrectionSaved": true,
+      "importWorkerValidationPending": true,
+      "legacyAssetsWorkerNonProductionBuildsEnabled": false,
       "productionChanged": false
     },
     "productionDeployment": null
