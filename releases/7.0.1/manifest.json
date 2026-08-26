@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.1",
+  "releaseType": "security-containment",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.0.0",
+    "commit": "de01cff5e8127e1123c7433fd14e5f3972eb032f",
+    "tree": "a9246efe17dd6de8fd5e2812c901d0a374f1cd13",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.0.1",
+  "environmentContract": "config/environment-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [
+    "migration.duplicate-version.0001",
+    "migration.duplicate-version.0002",
+    "migration.fresh-apply.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0002_create_authentication.sql",
+    "migration.missing-ledger-write.0013_league_membership_access_control.sql",
+    "migration.missing-ledger-write.0014_league_rules.sql"
+  ],
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "reason": "The local baseline and security matrix passed; one hosted review deployment is authorized next."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "reason": "Production requires completed staging evidence and separate owner approval."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/SECURITY-CONTAINMENT.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.0.1/release-record.md",
+    "releases/7.0.1/validation-evidence.json",
+    "tests/security/containment.test.mjs",
+    "tests/security/session.test.mjs"
+  ]
+}

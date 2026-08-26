@@ -1,8 +1,143 @@
 import { jsonResponse } from "../../../_lib/auth.js";
-import { requireCommissioner } from "../../../_lib/permissions.js";
-const RELEASE="6.3.2a";
-const starter={categories:[]};
-async function ensureRulesTable(db){await db.prepare(`CREATE TABLE IF NOT EXISTS league_rules_documents (league_id TEXT PRIMARY KEY,rules_json TEXT NOT NULL DEFAULT '{"categories":[]}',updated_by_user_id TEXT,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();}
-async function league(context){const slug=String(context.params?.leagueSlug||'').trim();if(!slug)return null;return context.env.DB.prepare(`SELECT id, slug, name FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`).bind(slug).first()}
-export async function onRequestGet(context){await ensureRulesTable(context.env.DB);const l=await league(context);if(!l)return jsonResponse({ok:false,error:'League not found.'},404);let row=await context.env.DB.prepare(`SELECT rules_json AS rulesJson, updated_at AS updatedAt FROM league_rules_documents WHERE league_id=? LIMIT 1`).bind(l.id).first();let rules=starter;try{if(row?.rulesJson)rules=JSON.parse(row.rulesJson)}catch{}return jsonResponse({ok:true,release:RELEASE,league:l,rules,updatedAt:row?.updatedAt||null})}
-export async function onRequestPut(context){await ensureRulesTable(context.env.DB);const auth=await requireCommissioner(context);if(!auth.authorized)return auth.response;const l=await league(context);if(!l||auth.session.membership?.leagueId!==l.id)return jsonResponse({ok:false,error:'Not found.'},404);const body=await context.request.json().catch(()=>({}));const categories=Array.isArray(body.categories)?body.categories:null;if(!categories)return jsonResponse({ok:false,error:'categories is required.'},400);const rules={categories};await context.env.DB.prepare(`INSERT INTO league_rules_documents (league_id,rules_json,updated_by_user_id,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(league_id) DO UPDATE SET rules_json=excluded.rules_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP`).bind(l.id,JSON.stringify(rules),auth.session.user.id).run();return jsonResponse({ok:true,release:RELEASE,rules})}
+import {
+  requireActiveMembership,
+  requireCommissioner
+} from "../../../_lib/permissions.js";
+import {
+  canonicalLeagueSlug,
+  resolveLeague
+} from "../../../_lib/cloud-platform.js";
+
+const RELEASE = "7.0.1";
+const EMPTY_RULES = Object.freeze({ categories: [] });
+const MAX_DOCUMENT_BYTES = 256 * 1024;
+const MAX_CATEGORIES = 50;
+const MAX_SECTIONS_PER_CATEGORY = 50;
+const MAX_RULES_PER_SECTION = 100;
+const MAX_TEXT_LENGTH = 10_000;
+
+function notFound() {
+  return jsonResponse({ ok: false, error: "Not found." }, 404);
+}
+
+function cleanText(value, field, { required = false, max = MAX_TEXT_LENGTH } = {}) {
+  const text = String(value ?? "").trim();
+  if (required && !text) throw new Error(`${field} is required.`);
+  if (text.length > max) throw new Error(`${field} exceeds ${max} characters.`);
+  return text;
+}
+
+function normalizeRulesDocument(body) {
+  if (!Array.isArray(body?.categories)) throw new Error("categories is required.");
+  if (body.categories.length > MAX_CATEGORIES) {
+    throw new Error(`Rules may contain at most ${MAX_CATEGORIES} categories.`);
+  }
+
+  const categoryIds = new Set();
+  const sectionIds = new Set();
+  const ruleIds = new Set();
+  const categories = body.categories.map((category, categoryIndex) => {
+    if (!category || typeof category !== "object" || Array.isArray(category)) {
+      throw new Error(`Category ${categoryIndex + 1} must be an object.`);
+    }
+    const id = cleanText(category.id || `category-${categoryIndex + 1}`, "Category id", { required: true, max: 80 });
+    if (categoryIds.has(id)) throw new Error(`Duplicate category id: ${id}.`);
+    categoryIds.add(id);
+
+    const sourceSections = Array.isArray(category.sections) ? category.sections : [];
+    if (sourceSections.length > MAX_SECTIONS_PER_CATEGORY) {
+      throw new Error(`Category ${id} may contain at most ${MAX_SECTIONS_PER_CATEGORY} sections.`);
+    }
+    const sections = sourceSections.map((section, sectionIndex) => {
+      if (!section || typeof section !== "object" || Array.isArray(section)) {
+        throw new Error(`Section ${sectionIndex + 1} in ${id} must be an object.`);
+      }
+      const sectionId = cleanText(section.id || `${id}-section-${sectionIndex + 1}`, "Section id", { required: true, max: 100 });
+      if (sectionIds.has(sectionId)) throw new Error(`Duplicate section id: ${sectionId}.`);
+      sectionIds.add(sectionId);
+      const sourceRules = Array.isArray(section.rules) ? section.rules : [];
+      if (sourceRules.length > MAX_RULES_PER_SECTION) {
+        throw new Error(`Section ${sectionId} may contain at most ${MAX_RULES_PER_SECTION} rules.`);
+      }
+      const rules = sourceRules.map((rule, ruleIndex) => {
+        if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+          throw new Error(`Rule ${ruleIndex + 1} in ${sectionId} must be an object.`);
+        }
+        const ruleId = cleanText(rule.id || `${sectionId}-rule-${ruleIndex + 1}`, "Rule id", { required: true, max: 100 });
+        if (ruleIds.has(ruleId)) throw new Error(`Duplicate rule id: ${ruleId}.`);
+        ruleIds.add(ruleId);
+        return {
+          id: ruleId,
+          title: cleanText(rule.title, "Rule title", { max: 200 }),
+          text: cleanText(rule.text ?? rule.description, "Rule text", { required: true })
+        };
+      });
+      return {
+        id: sectionId,
+        title: cleanText(section.title || section.name, "Section title", { required: true, max: 200 }),
+        rules
+      };
+    });
+    return {
+      id,
+      title: cleanText(category.title || category.name, "Category title", { required: true, max: 200 }),
+      sections
+    };
+  });
+
+  const document = { categories };
+  if (new TextEncoder().encode(JSON.stringify(document)).byteLength > MAX_DOCUMENT_BYTES) {
+    throw new Error("Rules document exceeds the 256 KB limit.");
+  }
+  return document;
+}
+
+export { normalizeRulesDocument };
+
+async function authorizedLeague(context, authorization) {
+  const league = await resolveLeague(context.env, canonicalLeagueSlug(context.params?.leagueSlug));
+  if (!league || authorization.session.membership?.leagueId !== league.id) return null;
+  return { id: league.id, slug: league.slug, name: league.name };
+}
+
+export async function onRequestGet(context) {
+  const authorization = await requireActiveMembership(context);
+  if (!authorization.authorized) return authorization.response;
+  const league = await authorizedLeague(context, authorization);
+  if (!league) return notFound();
+  const row = await context.env.DB.prepare(`
+    SELECT rules_json AS rulesJson, updated_at AS updatedAt
+    FROM league_rules_documents
+    WHERE league_id = ?
+    LIMIT 1
+  `).bind(league.id).first();
+  let rules = EMPTY_RULES;
+  try { if (row?.rulesJson) rules = JSON.parse(row.rulesJson); } catch {}
+  return jsonResponse({ ok: true, release: RELEASE, league, rules, updatedAt: row?.updatedAt || null });
+}
+
+export async function onRequestPut(context) {
+  const authorization = await requireCommissioner(context);
+  if (!authorization.authorized) return authorization.response;
+  const league = await authorizedLeague(context, authorization);
+  if (!league) return notFound();
+  const declaredLength = Number(context.request.headers.get("content-length") || 0);
+  if (declaredLength > MAX_DOCUMENT_BYTES) {
+    return jsonResponse({ ok: false, error: "Rules document exceeds the 256 KB limit." }, 413);
+  }
+  let body;
+  try { body = await context.request.json(); }
+  catch { return jsonResponse({ ok: false, error: "Request body must be valid JSON." }, 400); }
+  let rules;
+  try { rules = normalizeRulesDocument(body); }
+  catch (error) { return jsonResponse({ ok: false, error: error.message }, 400); }
+  await context.env.DB.prepare(`
+    INSERT INTO league_rules_documents (league_id, rules_json, updated_by_user_id, updated_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(league_id) DO UPDATE SET
+      rules_json = excluded.rules_json,
+      updated_by_user_id = excluded.updated_by_user_id,
+      updated_at = CURRENT_TIMESTAMP
+  `).bind(league.id, JSON.stringify(rules), authorization.session.user.id).run();
+  return jsonResponse({ ok: true, release: RELEASE, rules });
+}

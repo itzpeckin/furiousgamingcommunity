@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.1",
+  "validatedOn": "2026-08-26",
+  "status": "local-baseline-passed",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "repositoryLint": { "passed": true, "files": 40 },
+    "javascriptSyntax": { "passed": true, "modules": 170 },
+    "htmlAssets": { "passed": true, "entrypoints": 1 },
+    "secretScan": { "passed": true, "files": 478, "highConfidenceFindings": 0 },
+    "environmentContract": { "passed": true },
+    "migrationBaseline": { "passed": true, "registeredInheritedIssues": 7, "newIssues": 0 },
+    "automatedTests": { "passed": true, "passedTests": 22, "failedTests": 0 },
+    "securityTests": { "passed": true, "passedTests": 16, "failedTests": 0 },
+    "guestAuthorization": { "passed": true },
+    "memberAuthorization": { "passed": true },
+    "commissionerAuthorization": { "passed": true },
+    "sessionRefreshRecovery": { "passed": true },
+    "sessionHandoffReplay": { "passed": true },
+    "corsAndCsrf": { "passed": true },
+    "safeErrorsAndHeaders": { "passed": true },
+    "systemInventory": { "passed": true, "trackedFiles": 480, "pagesFunctionRoutes": 58 },
+    "releaseContract": { "passed": true },
+    "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" }
+  },
+  "external": {
+    "githubPullRequest": { "status": "ready-to-publish" },
+    "stagingDeployment": { "status": "not-deployed", "bindingsIsolated": false },
+    "productionDeployment": { "authorized": false, "status": "not-requested" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}

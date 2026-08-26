@@ -1,6 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
+import { requireActiveMembership } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.10.6.5.2c';
+const RELEASE = '7.0.1';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -17,66 +18,133 @@ function sourceRecord(raw = {}) {
   const nested = typeof raw.source_record_json === 'string'
     ? parse(raw.source_record_json)
     : (raw.source_record_json || raw.sourceRecord || raw.source || null);
-  return nested && typeof nested === 'object' ? {...raw, ...nested} : raw;
+  // The mapper's canonical columns are validated and must win over any
+  // similarly named value retained in the original external record.
+  return nested && typeof nested === 'object' ? {...nested, ...raw} : raw;
 }
 
-function normalizeTeam(raw = {}) {
+const numeric = value => {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const text = value => value === null || value === undefined || value === '' ? null : String(value);
+
+function safeRatings(raw = {}) {
+  const parsed = parse(raw.ratings_json) ?? raw.ratings ?? {};
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  return Object.fromEntries(Object.entries(parsed)
+    .filter(([key, value]) =>
+      /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)
+      && /(rating|speed|accel|agility|awareness|strength|throw|catch|route|tackle|coverage|block|power|finesse|pursuit|playrec|^spd$|^str$|^agi$|^acc$|^awr$|^aws$)/i.test(key)
+      && numeric(value) !== null
+      && numeric(value) >= 0
+      && numeric(value) <= 100)
+    .slice(0, 150)
+    .map(([key, value]) => [key, numeric(value)]));
+}
+
+export function normalizeTeam(raw = {}) {
   raw = sourceRecord(raw);
+  const id = String(raw.external_id ?? raw.team_id ?? raw.teamId ?? '');
+  const displayName = text(raw.display_name ?? raw.displayName ?? raw.teamName);
+  const city = text(raw.city_name ?? raw.cityName);
+  const nickname = text(raw.nickname ?? raw.nickName);
+  const abbreviation = text(raw.abbreviation ?? raw.abbrName);
+  const conference = text(raw.conference_name ?? raw.conferenceName ?? raw.confName);
+  const division = text(raw.division_name ?? raw.divisionName ?? raw.divName);
+  const logo = text(raw.logo_url ?? raw.logoUrl);
+  const primaryColor = text(raw.primary_color ?? raw.primaryColor);
+  const secondaryColor = text(raw.secondary_color ?? raw.secondaryColor);
+  const owner = text(raw.owner_name ?? raw.ownerName ?? raw.userName);
+  const wins = numeric(raw.wins ?? raw.totalWins) ?? 0;
+  const losses = numeric(raw.losses ?? raw.totalLosses) ?? 0;
+  const ties = numeric(raw.ties ?? raw.totalTies) ?? 0;
+  const approved = {
+    teamId:id, displayName, cityName:city, nickName:nickname, abbrName:abbreviation,
+    conferenceName:conference, divisionName:division, logoUrl:logo, primaryColor,
+    secondaryColor, userName:owner, ownerName:owner, totalWins:wins, totalLosses:losses,
+    totalTies:ties, overall:numeric(raw.overall ?? raw.ovr_rating ?? raw.ovrRating),
+    capAvailable:numeric(raw.capAvailable ?? raw.cap_available ?? raw.capRoom),
+    ptsFor:numeric(raw.ptsFor ?? raw.pointsFor), ptsAgainst:numeric(raw.ptsAgainst ?? raw.pointsAgainst),
+    coachName:text(raw.coachName ?? raw.headCoach), stadiumName:text(raw.stadiumName ?? raw.stadium)
+  };
   return {
-    id: String(raw.external_id ?? raw.team_id ?? raw.teamId ?? ''),
-    displayName: raw.display_name ?? raw.displayName ?? raw.teamName ?? null,
-    city: raw.city_name ?? raw.cityName ?? null,
-    nickname: raw.nickname ?? raw.nickName ?? null,
-    abbreviation: raw.abbreviation ?? raw.abbrName ?? null,
-    conference: raw.conference_name ?? raw.conferenceName ?? null,
-    division: raw.division_name ?? raw.divisionName ?? raw.divName ?? null,
-    logo: raw.logo_url ?? raw.logoUrl ?? null,
-    primaryColor: raw.primary_color ?? raw.primaryColor ?? null,
-    secondaryColor: raw.secondary_color ?? raw.secondaryColor ?? null,
-    owner: raw.owner_name ?? raw.ownerName ?? raw.userName ?? null,
-    overall: raw.overall ?? raw.ovr_rating ?? raw.ovrRating ?? null,
-    source: raw
+    id, displayName, city, nickname, abbreviation, conference, division, logo,
+    primaryColor, secondaryColor, owner, overall:approved.overall,
+    record:{wins,losses,ties}, source:approved
   };
 }
 
-function normalizePlayer(raw = {}) {
+export function normalizePlayer(raw = {}) {
   raw = sourceRecord(raw);
+  const id = String(raw.external_id ?? raw.player_id ?? raw.playerId ?? '');
+  const teamId = String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? raw.teamID ?? raw.rosterTeamId ?? raw.roster_team_id ?? raw.currentTeamId ?? '');
+  const firstName = text(raw.first_name ?? raw.firstName);
+  const lastName = text(raw.last_name ?? raw.lastName);
+  const displayName = text(raw.display_name ?? raw.displayName) ?? ([firstName,lastName].filter(Boolean).join(' ') || null);
+  const position = text(raw.position ?? raw.position_name ?? raw.positionName ?? raw.pos);
+  const overall = numeric(raw.overall ?? raw.overall_rating ?? raw.overallRating ?? raw.ovrRating ?? raw.playerBestOvr ?? raw.bestOverall ?? raw.playerOverall ?? raw.ovr);
+  const devTrait = text(raw.development_trait ?? raw.dev_trait ?? raw.devTrait ?? raw.developmentTrait ?? raw.development);
+  const contract = {
+    yearsRemaining:numeric(raw.contract_years_remaining ?? raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.contractLength ?? raw.contractYears ?? raw.yearsRemaining ?? raw.yearsLeft ?? raw.contractLengthRemaining),
+    length:numeric(raw.contractLength ?? raw.contractYears ?? raw.totalContractYears),
+    currentYearSalary:numeric(raw.salary ?? raw.currentYearSalary ?? raw.currentSalary ?? raw.capSalary ?? raw.currentSeasonSalary),
+    capHit:numeric(raw.cap_hit ?? raw.capHit ?? raw.salaryCapHit ?? raw.currentCapHit),
+    currentYearBonus:numeric(raw.currentYearBonus ?? raw.contractBonus ?? raw.signingBonus),
+    totalSalary:numeric(raw.totalSalary ?? raw.contractTotalSalary ?? raw.contractValue),
+    releaseNetSavings:numeric(raw.capReleaseNetSavings ?? raw.releaseNetSavings ?? raw.capSavings),
+    releasePenalty:numeric(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney)
+  };
+  const ratings = safeRatings(raw);
+  const approved = {
+    playerId:id, teamId, firstName, lastName, displayName, position, overall,
+    archetype:text(raw.archetype ?? raw.playerArchetype), age:numeric(raw.age),
+    yearsPro:numeric(raw.years_pro ?? raw.yearsPro ?? raw.experience), devTrait,
+    developmentTrait:devTrait, jerseyNumber:numeric(raw.jersey_number ?? raw.jerseyNumber),
+    heightInches:numeric(raw.height_inches ?? raw.heightInches), weightLbs:numeric(raw.weight_lbs ?? raw.weightLbs),
+    college:text(raw.college ?? raw.collegeName ?? raw.school),
+    injuryStatus:text(raw.injury_status ?? raw.injuryStatus ?? raw.injury),
+    isInjured:Boolean(Number(raw.is_injured ?? raw.isInjured ?? 0)),
+    rosterStatus:text(raw.rosterStatus ?? raw.roster_status ?? raw.playerStatus ?? raw.status) ?? 'active',
+    depthOrder:numeric(raw.depthOrder ?? raw.depthChartOrder ?? raw.depth_chart_order ?? raw.depth),
+    depthPosition:text(raw.depthPosition ?? raw.depthChartPosition ?? raw.depth_chart_position),
+    portraitId:text(raw.portrait_id ?? raw.portraitId), contract
+  };
   return {
-    id: String(raw.external_id ?? raw.player_id ?? raw.playerId ?? ''),
-    teamId: String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? raw.teamID ?? raw.rosterTeamId ?? raw.roster_team_id ?? raw.currentTeamId ?? ''),
-    firstName: raw.first_name ?? raw.firstName ?? null,
-    lastName: raw.last_name ?? raw.lastName ?? null,
-    displayName: raw.display_name ?? raw.displayName ?? ([raw.first_name ?? raw.firstName, raw.last_name ?? raw.lastName].filter(Boolean).join(' ') || null),
-    position: raw.position ?? raw.position_name ?? raw.positionName ?? raw.pos ?? null,
-    overall: raw.overall ?? raw.overall_rating ?? raw.overallRating ?? raw.ovrRating ?? raw.playerBestOvr ?? raw.bestOverall ?? raw.playerOverall ?? raw.ovr ?? null,
-    age: raw.age ?? null,
-    devTrait: raw.dev_trait ?? raw.devTrait ?? raw.development_trait ?? null,
-    jerseyNumber: raw.jersey_number ?? raw.jerseyNumber ?? null,
-    contract: raw.contract ?? {
-      yearsRemaining: raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.contractLength ?? raw.contractYears ?? raw.yearsRemaining ?? raw.yearsLeft ?? raw.contractLengthRemaining ?? null,
-      currentYearSalary: raw.currentYearSalary ?? raw.currentSalary ?? raw.capSalary ?? raw.currentSeasonSalary ?? null,
-      capHit: raw.capHit ?? raw.salaryCapHit ?? raw.currentCapHit ?? null,
-      bonus: raw.contractBonus ?? raw.signingBonus ?? null
-    },
-    source: raw
+    id, teamId, firstName, lastName, displayName, position, overall,
+    age:approved.age, devTrait, jerseyNumber:approved.jerseyNumber,
+    archetype:approved.archetype, yearsPro:approved.yearsPro,
+    heightInches:approved.heightInches, weightLbs:approved.weightLbs,
+    college:approved.college, injuryStatus:approved.injuryStatus,
+    isInjured:approved.isInjured, rosterStatus:approved.rosterStatus,
+    depthOrder:approved.depthOrder, depthPosition:approved.depthPosition,
+    portraitId:approved.portraitId, contract, ratings, source:approved
   };
 }
 
-function normalizeGame(raw = {}) {
+export function normalizeGame(raw = {}) {
   raw = sourceRecord(raw);
-  return {
-    id: String(raw.external_id ?? raw.game_id ?? raw.gameId ?? ''),
-    season: raw.season_year ?? raw.seasonYear ?? null,
-    stage: raw.stage ?? raw.stage_name ?? raw.stageName ?? null,
-    week: raw.week_index ?? raw.weekIndex ?? null,
-    homeTeamId: String(raw.home_team_external_id ?? raw.home_team_id ?? raw.homeTeamId ?? ''),
-    awayTeamId: String(raw.away_team_external_id ?? raw.away_team_id ?? raw.awayTeamId ?? ''),
-    homeScore: raw.home_score ?? raw.homeScore ?? null,
-    awayScore: raw.away_score ?? raw.awayScore ?? null,
-    status: raw.status ?? raw.game_status ?? raw.gameStatus ?? null,
-    scheduledAt: raw.scheduled_at ?? raw.scheduledAt ?? null,
-    source: raw
+  const id = String(raw.external_id ?? raw.game_id ?? raw.gameId ?? '');
+  const season = numeric(raw.season_year ?? raw.seasonYear);
+  const stage = text(raw.stage ?? raw.stage_name ?? raw.stageName);
+  const week = numeric(raw.week_index ?? raw.weekIndex);
+  const homeTeamId = String(raw.home_team_external_id ?? raw.home_team_id ?? raw.homeTeamId ?? '');
+  const awayTeamId = String(raw.away_team_external_id ?? raw.away_team_id ?? raw.awayTeamId ?? '');
+  const homeScore = numeric(raw.home_score ?? raw.homeScore);
+  const awayScore = numeric(raw.away_score ?? raw.awayScore);
+  const status = text(raw.status ?? raw.game_status ?? raw.gameStatus);
+  const scheduledAt = text(raw.scheduled_at ?? raw.scheduledAt);
+  const approved = {
+    gameId:id, seasonYear:season, stage, stageName:stage,
+    stageIndex:numeric(raw.stageIndex), weekIndex:week,
+    homeTeamId, awayTeamId, homeScore, awayScore, status, scheduledAt,
+    stadiumName:text(raw.stadiumName ?? raw.stadium),
+    network:text(raw.network ?? raw.broadcastNetwork),
+    roundName:text(raw.roundName ?? raw.playoffRound)
   };
+  return {id,season,stage,week,homeTeamId,awayTeamId,homeScore,awayScore,status,scheduledAt,source:approved};
 }
 
 function normalizeStatistic(raw = {}) {
@@ -89,8 +157,7 @@ function normalizeStatistic(raw = {}) {
     season: raw.season_year ?? raw.seasonYear ?? null,
     stage: raw.stage ?? null,
     week: raw.week_index ?? raw.weekIndex ?? null,
-    metrics: parse(raw.metrics_json) ?? raw.metrics ?? {},
-    source: raw
+    metrics: parse(raw.metrics_json) ?? raw.metrics ?? {}
   };
 }
 
@@ -122,21 +189,29 @@ function normalizeStatisticCompact(raw = {}) {
   };
 }
 
-function normalizeStanding(raw = {}) {
+export function normalizeStanding(raw = {}) {
   raw = sourceRecord(raw);
-  return {
-    teamId: String(raw.teamId ?? raw.team_id ?? raw.external_id ?? ''),
-    teamName: raw.teamName ?? raw.team_name ?? null,
-    wins: raw.totalWins ?? raw.wins ?? 0,
-    losses: raw.totalLosses ?? raw.losses ?? 0,
-    ties: raw.totalTies ?? raw.ties ?? 0,
-    winPct: raw.winPct ?? raw.win_pct ?? null,
-    conference: raw.conferenceName ?? raw.conference_name ?? null,
-    division: raw.divisionName ?? raw.division_name ?? null,
-    rank: raw.rank ?? null,
-    seed: raw.seed ?? null,
-    source: raw
+  const teamId = String(raw.teamId ?? raw.team_id ?? raw.external_id ?? '');
+  const teamName = text(raw.teamName ?? raw.team_name);
+  const wins = numeric(raw.totalWins ?? raw.wins) ?? 0;
+  const losses = numeric(raw.totalLosses ?? raw.losses) ?? 0;
+  const ties = numeric(raw.totalTies ?? raw.ties) ?? 0;
+  const winPct = numeric(raw.winPct ?? raw.win_pct);
+  const conference = text(raw.conferenceName ?? raw.conference_name);
+  const division = text(raw.divisionName ?? raw.division_name);
+  const rank = numeric(raw.rank);
+  const seed = numeric(raw.seed);
+  const approved = {
+    teamId, teamName, totalWins:wins, totalLosses:losses, totalTies:ties, winPct,
+    conferenceName:conference, divisionName:division, rank, seed,
+    divWins:numeric(raw.divWins), divLosses:numeric(raw.divLosses), divTies:numeric(raw.divTies),
+    confWins:numeric(raw.confWins), confLosses:numeric(raw.confLosses), confTies:numeric(raw.confTies),
+    ptsFor:numeric(raw.ptsFor ?? raw.pointsFor), ptsAgainst:numeric(raw.ptsAgainst ?? raw.pointsAgainst),
+    netPts:numeric(raw.netPts), winLossStreak:numeric(raw.winLossStreak),
+    stageIndex:numeric(raw.stageIndex), weekIndex:numeric(raw.weekIndex),
+    seasonYear:numeric(raw.seasonYear ?? raw.calendarYear)
   };
+  return {teamId,teamName,wins,losses,ties,winPct,conference,division,rank,seed,source:approved};
 }
 
 function normalize(domain, raw) {
@@ -158,43 +233,7 @@ async function activeSnapshot(db, leagueId) {
   `).bind(leagueId).first();
 }
 
-async function bulkDomainRows(db,leagueId,snapshotId,domain){
-  const result=await rows(db,`
-    SELECT external_id,data_json
-    FROM league_snapshot_records
-    WHERE league_id=? AND snapshot_id=? AND domain=?
-    ORDER BY external_id
-  `,leagueId,snapshotId,domain);
-  return {
-    records:result.map(row=>normalize(domain,parse(row.data_json)||{})),
-    nextCursor:null,
-    complete:true,
-    pageSize:result.length,
-    bulk:true
-  };
-}
-
-async function bulkStatisticsRows(db,leagueId,snapshotId,compact=false){
-  const result=await rows(db,`
-    SELECT external_id,data_json
-    FROM league_snapshot_records
-    WHERE league_id=? AND snapshot_id=? AND domain='statistics'
-    ORDER BY external_id
-  `,leagueId,snapshotId);
-  return {
-    records:result.map(row=>{
-      const raw=parse(row.data_json)||{};
-      return compact?normalizeStatisticCompact(raw):normalizeStatistic(raw);
-    }),
-    nextCursor:null,
-    complete:true,
-    pageSize:result.length,
-    bulk:true,
-    compact:Boolean(compact)
-  };
-}
-
-async function domainRows(db, leagueId, snapshotId, domain, cursor = null, limit = 150) {
+async function domainRows(db, leagueId, snapshotId, domain, cursor = null, limit = 150, compact = false) {
   const safeLimit = Math.max(25, Math.min(500, Number(limit) || 150));
   let result;
   if (cursor) {
@@ -214,19 +253,26 @@ async function domainRows(db, leagueId, snapshotId, domain, cursor = null, limit
       LIMIT ?
     `, leagueId, snapshotId, domain, safeLimit);
   }
-  const records = result.map(row => normalize(domain, parse(row.data_json) || {}));
+  const records = result.map(row => {
+    const raw = parse(row.data_json) || {};
+    return domain === 'statistics' && compact ? normalizeStatisticCompact(raw) : normalize(domain, raw);
+  });
   const nextCursor = result.length === safeLimit ? String(result[result.length - 1]?.external_id || '') : null;
   return {records, nextCursor, complete: !nextCursor, pageSize: safeLimit};
 }
 
 export async function onRequestGet(context) {
   try {
+  const authorization = await requireActiveMembership(context);
+  if (!authorization.authorized) return authorization.response;
   const slug = normalizeLeagueSlug(context);
   if (!validLeagueSlug(slug)) return json({ok:false,error:'Invalid league slug.'},400);
 
   const db = database(context.env);
   const league = await resolveLeague(context.env, slug);
-  if (!db || !league) return json({ok:false,error:'League not found.'},404);
+  if (!db || !league || authorization.session.membership?.leagueId !== league.id) {
+    return json({ok:false,error:'Not found.'},404);
+  }
 
   const active = await activeSnapshot(db, league.id);
   if (!active) {
@@ -271,19 +317,13 @@ export async function onRequestGet(context) {
   };
 
   if (ALLOWED_DOMAINS.has(domain)) {
-    const bulk = String(url.searchParams.get('bulk')||'') === '1';
-    if(bulk && ['teams','players','games','standings'].includes(domain)){
-      const page=await bulkDomainRows(db,league.id,active.id,domain);
-      return json({...base,domain,...page});
-    }
-    if(bulk && domain==='statistics'){
-      const compact=String(url.searchParams.get('compact')||'')==='1';
-      const page=await bulkStatisticsRows(db,league.id,active.id,compact);
-      return json({...base,domain,...page});
+    if (String(url.searchParams.get('bulk') || '') === '1') {
+      return json({ok:false,error:'Bulk snapshot downloads are disabled. Use bounded pagination.'},400);
     }
     const cursor = String(url.searchParams.get('cursor') || '').trim() || null;
     const limit = Number(url.searchParams.get('limit') || 150);
-    const page = await domainRows(db,league.id,active.id,domain,cursor,limit);
+    const compact = domain === 'statistics' && String(url.searchParams.get('compact') || '') === '1';
+    const page = await domainRows(db,league.id,active.id,domain,cursor,limit,compact);
     return json({...base,domain,...page});
   }
 
@@ -297,8 +337,7 @@ export async function onRequestGet(context) {
     return json({
       ok:false,
       release:RELEASE,
-      error:'Live snapshot read failed.',
-      detail:error?.message||String(error)
+      error:'Live snapshot read failed.'
     },500);
   }
 }

@@ -22,3 +22,11 @@ test('generated evidence is deterministic across operating systems', () => {
   assert.deepEqual(['z', 'a', '_', 'A'].sort(compareText), ['A', '_', 'a', 'z']);
   assert.equal(stableJson({ z: 1, A: 2, a: 3 }), '{\n  "A": 2,\n  "a": 3,\n  "z": 1\n}\n');
 });
+
+test('generated system evidence is stamped with the current release', async () => {
+  const [packageJson, inventory] = await Promise.all([
+    readJson('package.json'),
+    readJson('docs/generated/system-inventory.json')
+  ]);
+  assert.equal(inventory.release, packageJson.version);
+});

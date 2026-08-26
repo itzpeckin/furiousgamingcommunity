@@ -1,12 +1,17 @@
 import { json, database, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
+import { requireCommissioner } from '../../../../_lib/permissions.js';
 
 export async function onRequestGet(context) {
   const slug = String(context.params?.leagueSlug || '').trim().toLowerCase();
   if (!validLeagueSlug(slug)) return json({ ok:false, error:'Invalid league slug.' }, 400);
+  const authorization = await requireCommissioner(context);
+  if (!authorization.authorized) return authorization.response;
   const db = database(context.env);
   if (!db) return json({ ok:false, error:'D1 is not configured.' }, 503);
   const league = await resolveLeague(context.env, slug);
-  if (!league) return json({ ok:false, error:'League not found.' }, 404);
+  if (!league || authorization.session.membership?.leagueId !== league.id) {
+    return json({ ok:false, error:'Not found.' }, 404);
+  }
   const rows = await db.prepare(`SELECT id, discovery_session_id, route_path, request_method, content_type,
       byte_length, top_level_keys_json, collections_json, received_at
     FROM companion_route_captures WHERE league_id = ? ORDER BY received_at DESC LIMIT 250`)
@@ -24,7 +29,7 @@ export async function onRequestGet(context) {
     if (!current.latestReceivedAt) { current.latestReceivedAt=capture.receivedAt; current.latestByteLength=capture.byteLength; current.topLevelKeys=capture.topLevelKeys; current.collections=capture.collections; }
     byRoute.set(capture.routePath,current);
   }
-  return json({ ok:true, release:'5.9.3.1', leagueId:league.id, leagueSlug:slug,
+  return json({ ok:true, release:'7.0.1', leagueId:league.id, leagueSlug:slug,
     sessionCount:new Set(captures.map(row=>row.discoverySessionId)).size,
     routeCount:byRoute.size, captureCount:captures.length, routes:[...byRoute.values()], captures,
     activationPerformed:false, rawPayloadReturned:false });

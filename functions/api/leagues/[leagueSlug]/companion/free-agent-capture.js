@@ -1,6 +1,7 @@
 import { json, database, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
+import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.10.6.2e';
+const RELEASE='7.0.1';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 const TEAM_ROSTER_ROUTE=/\/team\/[^/]+\/roster\/?$/i;
 
@@ -22,10 +23,12 @@ async function payload(env,row){
 export async function onRequestGet(context){
   const slug=String(context.params?.leagueSlug||'').trim().toLowerCase();
   if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.',release:RELEASE},400);
+  const authorization=await requireCommissioner(context);
+  if(!authorization.authorized)return authorization.response;
   const db=database(context.env);
   if(!db)return json({ok:false,error:'D1 is not configured.',release:RELEASE},503);
   const league=await resolveLeague(context.env,slug);
-  if(!league)return json({ok:false,error:'League not found.',release:RELEASE},404);
+  if(!league||authorization.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.',release:RELEASE},404);
 
   const rows=await routeRows(db,league.id);
   const teamRows=rows.filter(row=>TEAM_ROSTER_ROUTE.test(String(row.route_path||'')));

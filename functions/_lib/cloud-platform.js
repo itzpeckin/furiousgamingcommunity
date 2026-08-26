@@ -29,8 +29,7 @@ export const CLOUD_BINDINGS = Object.freeze({
 
 export const JSON_HEADERS = Object.freeze({
   'content-type': 'application/json; charset=utf-8',
-  'cache-control': 'no-store',
-  'access-control-allow-origin': '*'
+  'cache-control': 'no-store'
 });
 
 export function json(body, status = 200, extraHeaders = {}) {
@@ -69,10 +68,9 @@ export async function configuredExportToken(env, slug) {
 }
 
 export function suppliedExportToken(request) {
-  const url = new URL(request.url);
   return request.headers.get('x-franchisehq-export-token')
     || request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-    || url.searchParams.get('token') || '';
+    || '';
 }
 
 export function safeEqual(left, right) {

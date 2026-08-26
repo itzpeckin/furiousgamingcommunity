@@ -1,9 +1,11 @@
 import {
+  AUTH_CONSTANTS,
+  createSecureCookie,
   getCurrentSession,
   redirectResponse
 } from "../_lib/auth.js";
 
-const RELEASE = "6.1.2.7";
+const RELEASE = "7.0.1";
 
 function esc(value) {
   return String(value ?? "")
@@ -51,7 +53,7 @@ function page({ user, memberships, pendingMemberships = [] }) {
     .list{display:grid;gap:12px}.league-card{display:grid;grid-template-columns:54px 1fr auto 24px;gap:16px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(17,27,41,.88),rgba(9,14,22,.9));text-decoration:none;color:inherit;transition:.15s ease}.league-card:hover{transform:translateY(-1px);border-color:rgba(44,144,255,.48);background:var(--panel2)}
     .league-mark{width:54px;height:54px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#0878ff,#00a7ff);font-weight:950}.league-meta{color:#6fbfff;text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:900}.league-copy h2{margin:4px 0 3px;font-size:18px}.league-copy p{margin:0;color:var(--muted);font-size:13px}.role{padding:7px 10px;border-radius:999px;background:rgba(8,120,255,.14);color:#8dcaff;font-size:11px;font-weight:850;text-transform:capitalize}.role--available{background:rgba(255,255,255,.06);color:#b8c3d3}.arrow{font-size:21px;color:#79bdff}
     .empty{padding:18px;border:1px dashed rgba(147,163,186,.25);border-radius:14px;color:var(--muted);background:rgba(255,255,255,.02);line-height:1.55}
-    footer{display:flex;justify-content:space-between;gap:16px;padding-top:20px;border-top:1px solid var(--line);color:#68778e;font-size:12px}.logout{color:#9db5d2;text-decoration:none}
+    footer{display:flex;justify-content:space-between;gap:16px;padding-top:20px;border-top:1px solid var(--line);color:#68778e;font-size:12px}.logout{color:#9db5d2;text-decoration:none;background:none;border:0;padding:0;font:inherit;cursor:pointer}
     @media(max-width:620px){.shell{width:min(100% - 24px,980px);padding-top:18px}header{align-items:flex-start}.account strong{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}main{padding-top:36px}.league-card{grid-template-columns:48px 1fr 20px;gap:12px}.league-mark{width:48px;height:48px}.role{grid-column:2;justify-self:start}.arrow{grid-column:3;grid-row:1 / span 2}.section-title{align-items:flex-start;flex-direction:column}}
   </style>
 </head>
@@ -75,7 +77,7 @@ function page({ user, memberships, pendingMemberships = [] }) {
         ${pendingMemberships.length ? `<div class="section-title" style="margin-top:28px"><h2>Pending Approval</h2><span>${pendingMemberships.length} waiting</span></div><div class="list">${pendingMemberships.map((l)=>`<a class="league-card" href="/leagues/${encodeURIComponent(l.slug)}"><div class="league-mark">FH</div><div class="league-copy"><div class="league-meta">Waiting for commissioner</div><h2>${esc(l.name)}</h2><p>Your Discord account is connected. Team and role assignment are still pending.</p></div><span class="role">Pending</span><span class="arrow">→</span></a>`).join("")}</div>` : ""}
       </section>
     </main>
-    <footer><span>Franchise HQ · Release ${RELEASE}</span><a class="logout" href="/api/auth/logout">Log out</a></footer>
+    <footer><span>Franchise HQ · Release ${RELEASE}</span><form method="post" action="/api/auth/logout"><button class="logout" type="submit">Log out</button></form></footer>
   </div>
 </body>
 </html>`;
@@ -115,15 +117,27 @@ export async function onRequestGet(context) {
       console.error("League selector membership lookup failed:", error);
     }
 
-    return new Response(page({ user: session.user, memberships, pendingMemberships }), {
-      status: 200,
-      headers: {
-        "content-type": "text/html; charset=UTF-8",
-        "cache-control": "no-store",
-        "x-franchisehq-release": RELEASE,
-        "x-franchisehq-surface": "league-selector"
-      }
+    const headers = new Headers({
+      "content-type": "text/html; charset=UTF-8",
+      "cache-control": "no-store",
+      "x-franchisehq-release": RELEASE,
+      "x-franchisehq-surface": "league-selector"
     });
+    if (session.rawSessionToken) {
+      headers.append("Set-Cookie", createSecureCookie(
+        AUTH_CONSTANTS.SESSION_COOKIE_NAME,
+        session.rawSessionToken,
+        AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
+        "/"
+      ));
+      headers.append("Set-Cookie", createSecureCookie(
+        AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME,
+        session.rawSessionToken,
+        AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
+        "/"
+      ));
+    }
+    return new Response(page({ user: session.user, memberships, pendingMemberships }), { status: 200, headers });
   } catch (error) {
     console.error("League selector failed:", error);
     return new Response("Unable to load league selection.", { status: 500 });

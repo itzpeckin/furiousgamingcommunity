@@ -1,14 +1,25 @@
 import {
   AUTH_CONSTANTS,
+  addSecondsToNow,
   clearSecureCookie,
   createId,
-  createSessionTransferToken,
+  createRandomToken,
   decodeOpaqueContext,
+  encodeOpaqueContext,
   getCookie,
   hashToken,
   jsonResponse,
   redirectResponse
 } from "../../../_lib/auth.js";
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 export async function onRequestGet(context) {
   try {
@@ -108,17 +119,6 @@ export async function onRequestGet(context) {
         joinLeagueSlug = decodeOpaqueContext(encoded) || null;
       } catch {}
     }
-
-    await context.env.DB
-      .prepare(
-        `
-        UPDATE oauth_states
-        SET used_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-        `
-      )
-      .bind(storedState.id)
-      .run();
 
     const tokenBody = new URLSearchParams({
       client_id: context.env.DISCORD_CLIENT_ID,
@@ -267,6 +267,21 @@ export async function onRequestGet(context) {
         .run();
     }
 
+    // Consume OAuth state only after the upstream exchange, identity lookup,
+    // and local user write succeed. A transient failure no longer destroys a
+    // valid login attempt, while the conditional update prevents state replay.
+    const stateConsumption = await context.env.DB.prepare(`
+      UPDATE oauth_states
+      SET used_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+    `).bind(storedState.id).run();
+    if (Number(stateConsumption?.meta?.changes || 0) !== 1) {
+      return jsonResponse({
+        ok: false,
+        error: "The Discord login request expired or was already used."
+      }, 400);
+    }
+
     // A shared league URL creates an inactive/unassigned membership. We do NOT
     // write role='pending' because the production membership schema restricts
     // role to real league roles. Pending is a workflow state, not a permission.
@@ -316,38 +331,47 @@ export async function onRequestGet(context) {
       }
     }
 
-    // 6.1.2.7: OAuth may complete on the pages.dev callback host while the
-    // user actually entered through franchisehq.app. Cookies cannot cross
-    // those hosts. Hand the authenticated Discord identity back to the origin
-    // that initiated login with a short-lived signed transfer token; that
-    // origin then creates the D1 session and sets its own persistent cookies.
-    const transferSecret = context.env.SESSION_SIGNING_SECRET || context.env.DISCORD_CLIENT_SECRET;
-    const transferToken = await createSessionTransferToken(transferSecret, {
+    // OAuth may complete on pages.dev while the user entered through the custom
+    // domain. Send a random, hashed, one-time code in a POST body so no session
+    // credential appears in browser history, referrers, or request URLs.
+    const handoffCode = createRandomToken(32);
+    const handoffHash = await hashToken(handoffCode);
+    const handoffContext = encodeOpaqueContext({
       userId: user.id,
       destination,
-      exp: Math.floor(Date.now() / 1000) + AUTH_CONSTANTS.SESSION_TRANSFER_DURATION_SECONDS
+      audience: new URL(loginOrigin).origin
     });
+    const handoffId = `handoff.${handoffContext}.${crypto.randomUUID()}`;
+    await context.env.DB.prepare(`
+      INSERT INTO oauth_states (id, state_token_hash, expires_at)
+      VALUES (?, ?, ?)
+    `).bind(
+      handoffId,
+      handoffHash,
+      addSecondsToNow(AUTH_CONSTANTS.SESSION_TRANSFER_DURATION_SECONDS)
+    ).run();
+
     const claimUrl = new URL("/api/auth/session/claim", loginOrigin);
-    claimUrl.searchParams.set("token", transferToken);
+    const nonce = createRandomToken(18);
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Completing sign in · FranchiseHQ</title></head><body><main><h1>Completing sign in…</h1><p>FranchiseHQ is securely returning you to your league.</p><form id="handoff" method="post" action="${escapeHtml(claimUrl.toString())}"><input type="hidden" name="code" value="${escapeHtml(handoffCode)}"><button type="submit">Continue</button></form></main><script nonce="${nonce}">document.getElementById('handoff').submit();</script></body></html>`;
 
     const headers = new Headers({
-      Location: claimUrl.toString(),
-      "Cache-Control": "no-store"
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+      "Content-Security-Policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'none'; form-action ${claimUrl.origin}; base-uri 'none'; frame-ancestors 'none'`
     });
     headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME, "/"));
     headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME, "/api/auth/discord"));
 
-    return new Response(null, { status: 302, headers });
+    return new Response(html, { status: 200, headers });
   } catch (error) {
     console.error("Discord callback failed:", error);
 
     return jsonResponse(
       {
         ok: false,
-        error: "Discord login could not be completed.",
-        details: error instanceof Error
-          ? error.message
-          : String(error)
+        error: "Discord login could not be completed."
       },
       500
     );

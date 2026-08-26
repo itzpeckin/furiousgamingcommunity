@@ -3,16 +3,21 @@ import {
   companionMetadataKey, configuredExportToken, suppliedExportToken,
   safeEqual, resolveLeague, publicExport
 } from '../../../../_lib/cloud-platform.js';
+import { requireCommissioner } from '../../../../_lib/permissions.js';
 
 export async function onRequestOptions() { return new Response(null, { status: 204, headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,x-franchisehq-export-token,authorization' } }); }
 
 export async function onRequestGet(context) {
   const slug = normalizeLeagueSlug(context);
   if (!validLeagueSlug(slug)) return json({ ok: false, error: 'Invalid league slug.' }, 400);
+  const authorization = await requireCommissioner(context);
+  if (!authorization.authorized) return authorization.response;
   const db = database(context.env);
   if (!db) return json({ ok: false, error: 'D1 is not configured.' }, 503);
   const league = await resolveLeague(context.env, slug);
-  if (!league) return json({ ok: false, error: 'League not found.' }, 404);
+  if (!league || authorization.session.membership?.leagueId !== league.id) {
+    return json({ ok: false, error: 'Not found.' }, 404);
+  }
   const rows = await db.prepare(`SELECT * FROM companion_exports WHERE league_id = ? ORDER BY received_at DESC LIMIT 25`).bind(league.id).all();
   const counts = await db.prepare(`SELECT status, COUNT(*) AS count FROM companion_exports WHERE league_id = ? GROUP BY status`).bind(league.id).all();
   return json({ ok: true, leagueId: league.id, leagueSlug: slug, exports: (rows.results || []).map(publicExport), counts: Object.fromEntries((counts.results || []).map(row => [row.status, Number(row.count || 0)])), rawPayloadReturned: false });

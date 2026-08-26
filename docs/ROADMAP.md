@@ -1,11 +1,11 @@
 # FranchiseHQ Platform Roadmap: FGC First-League Launch
 
 **Roadmap baseline:** August 26, 2026  
-**Roadmap revision:** 1.5
+**Roadmap revision:** 1.9
 **Starting point:** FranchiseHQ 6.3.x  
 **Target:** A secure, polished FranchiseHQ platform with FGC as its first production league and with application/data boundaries ready for future multi-tenant operation.  
-**Current status:** FranchiseHQ 7.0.0 is controlled through pull request #2. Its validated review head `47bbf36` passed the GitHub quality gate, Cloudflare Pages preview, and import-Worker preview. The first hosted quality run exposed an operating-system-dependent inventory generator; newline normalization, deterministic ordering, regenerated evidence, and a regression test corrected it. The owner authorized a controlled squash merge to `main` after the final evidence-only head passes. The redundant assets-only Worker's non-production builds remain disabled, and no data reset or credential change is part of this release.
-**Next gate:** Complete and observe the authorized squash merge, then provision isolated staging resources before beginning separately authorized 7.0.1 security work.
+**Current status:** FranchiseHQ 7.0.0 is released on `main` as squash commit `de01cff5e8127e1123c7433fd14e5f3972eb032f` and immutable tag `v7.0.0`. Production GitHub quality, Cloudflare Pages, import-Worker, and direct Pages smoke checks passed. The owner then completed the 7.0.0 phone acceptance check and authorized 7.0.1. The 7.0.1 security-containment candidate passed its complete local baseline gate with 22 tests on `codex/franchisehq-7.0.1`; production remains unchanged.
+**Next gate:** Publish the single 7.0.1 review candidate, confirm hosted GitHub checks, validate with isolated staging bindings, and request explicit production approval.
 
 ## 1. The commitment
 
@@ -23,6 +23,10 @@ The current 6.3.x work is not discarded. Useful components will be retained wher
 - **Revision 1.3:** Published pull request #2, verified the review branch against the local candidate, validated the Cloudflare Pages preview, and registered two legacy Worker Git-root configuration failures discovered by hosted checks. Added a release-branch workflow trigger so the first FranchiseHQ quality workflow can validate before any merge to `main`.
 - **Revision 1.4:** Disabled non-production builds for the redundant assets-only Worker, saved the import Worker's monorepo build root, and added a review-only command that enters the Worker folder after Cloudflare's separate preview trigger continued to report `/`. Verified passing Pages and import-Worker preview checks at commit `16210a1`, and recorded GitHub's failure to index the repository's first custom workflow from the non-default review branch. No deployed runtime or production resource changed.
 - **Revision 1.5:** GitHub activated the first custom workflow and exposed a cross-platform inventory mismatch on Linux. Normalized text input, replaced locale-dependent ordering, added a deterministic-evidence regression test, regenerated the inventory, and passed all three hosted checks at `47bbf36`. Recorded owner authorization for a controlled 7.0.0 squash merge; 7.0.1 and all data work remain separately gated.
+- **Revision 1.6:** Squash-merged pull request #2 into `main` as `de01cff`, passed production GitHub and Cloudflare checks, activated import-Worker version `fa6c2d38`, published `v7.0.0`, and disconnected the redundant assets-only Worker's Git automation.
+- **Revision 1.7:** Limited the import Worker's Cloudflare build watch path to `workers/franchise-import-worker/*`, preventing unrelated repository changes from rebuilding that service.
+- **Revision 1.8:** Recorded successful owner phone acceptance of 7.0.0 plus three mobile findings: session loss after refresh, player-card model/layout problems, and awkward scrolling. Absorbed refresh persistence into 7.0.1 as a release blocker; retained player-card and scroll remediation in the mobile-first 7.0.3 scope. Began 7.0.1 security containment after explicit owner authorization.
+- **Revision 1.9:** Completed the local 7.0.1 security/session implementation and passed the full baseline gate with 22 automated tests. The final compatibility pass found inherited UI dependence on raw snapshot objects, so those objects were replaced with an explicit allowlisted projection that preserves approved roster, player-card, schedule, and standings fields without returning private export data. Corrected a hard-coded release label in generated inventory evidence and added a regression check. Production remains unchanged pending hosted review, isolated staging, and owner approval.
 
 The change log is append-only. Later discoveries, owner decisions, bugs, and scope changes will be recorded here and in the affected release record rather than silently changing the plan.
 
@@ -30,8 +34,8 @@ The change log is append-only. Later discoveries, owner decisions, bugs, and sco
 
 | Version | Status | Primary outcome |
 |---|---|---|
-| 7.0.0 | PR #2 final candidate; GitHub quality, Pages, and import-Worker previews passed; controlled squash merge authorized | Controlled engineering and staging baseline |
-| 7.0.1 | Planned | Immediate security containment |
+| 7.0.0 | Released — `main` commit `de01cff`, tag `v7.0.0`; production quality, Pages, import-Worker, and phone acceptance passed | Controlled engineering and deployment baseline |
+| 7.0.1 | Validated local review candidate — 22 tests passed; production unchanged | Immediate security containment and refresh-session reliability |
 | 7.0.2 | Newly prioritized | Madden NFL 27 intake and controlled FGC data reset |
 | 7.0.3 | Newly prioritized | Mobile roster preview, player permalinks, and Trade Block Lite |
 | 7.1.0–7.3.0 | Planned | Canonical database, tenant boundaries, and authentication |
@@ -156,6 +160,9 @@ Each release is completed in its own reviewable change set. It receives a versio
 - Replace replayable session-transfer links with short-lived, one-time, hashed handoff codes delivered in the URL fragment or a secure POST flow.
 - Define route-level rate limits and safe, structured error responses.
 - Add automated negative tests proving guests and ordinary members cannot call protected operations.
+- Repair session recovery so a stale primary cookie cannot mask a still-valid persistent session after refresh.
+- Add enforced browser security headers, cross-origin mutation rejection, POST-only logout, and bounded authentication attempt handling.
+- Label Trade Center, Trade Block, GOTW, and Confidence Pool as device-local controlled-beta workflows until their server-backed releases.
 
 **Why:** These are launch blockers, not polish items.
 
@@ -195,6 +202,8 @@ Each release is completed in its own reviewable change set. It receives a versio
 - Make player names clickable from rosters, Free Agents, search, team pages, and Trade Block entries.
 - Make direct player links survive refresh, Discord/mobile-app opening, authentication return, and later snapshot activation.
 - Show a consistent player profile using fields verified in the export, such as team or Free Agent status, position, overall, age, contract, abilities/development, ratings, and season statistics. Unavailable fields are omitted or labeled unavailable rather than fabricated.
+- Replace the current mobile player-card model/layout with a deliberately sized phone presentation that keeps the player image, identity, ratings, and actions inside the viewport.
+- Remove nested or competing scroll regions from roster/player interactions, preserve the user's page position when cards open and close, and verify touch scrolling on representative iOS and Android browsers.
 - Add a server-backed Trade Block Lite. An authenticated controller may list or remove only an eligible player on their assigned team; the server revalidates membership and current ownership.
 - Publish Trade Block entries with team, player summary, profile permalink, listed-by actor, timestamp, and optional league-approved note/interest fields.
 - Automatically flag or resolve stale entries after a new import changes player ownership, eligibility, or identity.

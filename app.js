@@ -1803,7 +1803,7 @@
 
       <div class="player-inspector-json-grid">
         <article class="card"><div class="card-header"><div><span class="eyebrow">Application Contract</span><h3>Normalized Player JSON</h3></div></div><div class="card-body"><details open><summary>Normalized record</summary><pre>${escapeHtml(JSON.stringify(normalized,null,2))}</pre></details></div></article>
-        <article class="card"><div class="card-header"><div><span class="eyebrow">Madden Source</span><h3>Raw Player Source JSON</h3></div></div><div class="card-body"><details><summary>Raw source record</summary><pre>${escapeHtml(JSON.stringify(player.source||{},null,2))}</pre></details></div></article>
+        <article class="card"><div class="card-header"><div><span class="eyebrow">Madden Source</span><h3>Approved Player Data</h3></div></div><div class="card-body"><details><summary>Normalized source fields</summary><pre>${escapeHtml(JSON.stringify(player.source||{},null,2))}</pre></details></div></article>
       </div>
     </section>`;
   }
@@ -2733,7 +2733,7 @@
   function liveRosterPlayerShape(player={}) {
     const source=player.source||{};
     const contract=canonicalContract({...player,raw:source,source});
-    const ratings={};
+    const ratings={...(player.ratings||{})};
     Object.entries(source).forEach(([key,value])=>{
       const numeric=Number(value);
       if(Number.isFinite(numeric) && /rating|speed|acceleration|awareness|strength|agility|throw|catch|route|tackle|coverage|block|power|finesse|^spd$|^str$|^agi$|^acc$|^awr$|^aws$/i.test(key)) ratings[key]=numeric;
@@ -9517,9 +9517,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 6.3.2';
+      node.textContent = 'Current Release - 7.0.1';
     });
-    document.documentElement.dataset.franchiseHqRelease = '6.3.2';
+    document.documentElement.dataset.franchiseHqRelease = '7.0.1';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });

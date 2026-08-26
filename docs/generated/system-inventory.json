@@ -71,8 +71,7 @@
       "functions/api/auth/discord/login.js"
     ],
     "DISCORD_CLIENT_SECRET": [
-      "functions/api/auth/discord/callback.js",
-      "functions/api/auth/session/claim.js"
+      "functions/api/auth/discord/callback.js"
     ],
     "DISCORD_REDIRECT_URI": [
       "functions/api/auth/discord/callback.js",
@@ -121,31 +120,27 @@
       "functions/api/leagues/[leagueSlug]/companion/statistics-capture-inspector.js",
       "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
       "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
-    ],
-    "SESSION_SIGNING_SECRET": [
-      "functions/api/auth/discord/callback.js",
-      "functions/api/auth/session/claim.js"
     ]
   },
   "files": {
     "byExtension": {
-      ".css": 4,
+      ".css": 5,
       ".example": 1,
       ".html": 2,
-      ".js": 152,
+      ".js": 154,
       ".json": 4,
       ".jsonc": 1,
-      ".md": 274,
-      ".mjs": 14,
+      ".md": 275,
+      ".mjs": 16,
       ".png": 1,
       ".sql": 16,
       ".txt": 1,
       ".yml": 1,
-      "[none]": 2
+      "[none]": 3
     },
     "largest": [
       {
-        "bytes": 603212,
+        "bytes": 603240,
         "file": "app.js"
       },
       {
@@ -161,12 +156,12 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74551,
-        "file": "FHQ-6126-index.html"
+        "bytes": 74834,
+        "file": "index.html"
       },
       {
         "bytes": 74551,
-        "file": "index.html"
+        "file": "FHQ-6126-index.html"
       },
       {
         "bytes": 37540,
@@ -205,6 +200,10 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-teams.js"
       },
       {
+        "bytes": 16478,
+        "file": "functions/api/leagues/[leagueSlug]/snapshot/read-model.js"
+      },
+      {
         "bytes": 16260,
         "file": "platform/runtime.js"
       },
@@ -219,18 +218,19 @@
       {
         "bytes": 15767,
         "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js"
-      },
-      {
-        "bytes": 15178,
-        "file": "core.js"
       }
     ],
-    "total": 473
+    "total": 480
   },
   "frontend": {
     "assets": [
       {
         "path": "styles.css",
+        "type": "link",
+        "versioned": true
+      },
+      {
+        "path": "release-7.0.1.css",
         "type": "link",
         "versioned": true
       },
@@ -667,7 +667,7 @@
     ],
     "entrypoint": "index.html",
     "scriptCount": 86,
-    "stylesheetCount": 1
+    "stylesheetCount": 2
   },
   "functions": {
     "routeCount": 58,
@@ -711,7 +711,8 @@
       {
         "file": "functions/api/auth/session/claim.js",
         "handlers": [
-          "onRequestGet"
+          "onRequestGet",
+          "onRequestPost"
         ],
         "route": "/api/auth/session/claim"
       },
@@ -1310,7 +1311,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.0.0",
+  "release": "7.0.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
