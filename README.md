@@ -1,43 +1,42 @@
-# Franchise HQ — TC-011.5 League Identity & Ownership
+# FranchiseHQ
 
-Built from the accepted TC-011.4 baseline.
+FranchiseHQ is a league-management platform. FGC is the first customer league; league branding and rules are configuration, not the identity of the application.
 
-## Preserved
+## Current release
 
-- Developer Mode and user switching
-- Trade Center
-- Unified contextual player cards
-- Commissioner Operations
-- Commissioner-only navigation
+- Product baseline: 6.3.2 at commit `4d0a4e979f98a99a8faea7c53fdd7366edc975f9`
+- Engineering baseline: 7.0.0, locally validated
+- Production deployment: not authorized by 7.0.0
+- Next product work: 7.0.1 security containment, then 7.0.2 Madden NFL 27 intake
 
-## Teams & Owners
+## Local quality gate
 
-Commissioner HQ now supports:
+Node.js 22.5 or newer is required. The baseline has no third-party root dependencies.
 
-- User and CPU franchise control
-- Owner assignment
-- Commissioner, Co-Commissioner, Team Owner, and CPU roles
-- Discord connection status
-- Team display-name customization
-- Primary and secondary team colors
-- Logo abbreviation customization
-- Ownership history and permission audit trail
-- Persistent browser-saved ownership state
-- Team and owner search
+```sh
+npm run inventory
+npm run ci
+```
 
-## Ownership management
+`npm run ci` checks repository policy, JavaScript syntax, HTML assets, high-confidence secret patterns, environment separation, the registered migration baseline, tooling tests, generated inventory, and the release contract.
 
-Use the Manage button for any franchise to:
+`npm run check:strict` also treats every inherited migration defect as a failure. It is intentionally blocked until the canonical migration repair in 7.1.0.
 
-- Assign or unassign a league identity
-- Change control type
-- Change permission role
-- Connect or disconnect Discord
-- Update franchise branding
-- Review ownership history
+## Controlling documents
 
-Replace all six files together.
+- [Roadmap](docs/ROADMAP.md)
+- [Environment separation](docs/ENVIRONMENTS.md)
+- [Branch and repository policy](docs/BRANCH-POLICY.md)
+- [Rollback process](docs/ROLLBACK.md)
+- [Mobile validation matrix](docs/MOBILE-TEST-MATRIX.md)
+- [Release process](RELEASE-PROCESS.md)
+- [7.0.0 release record](releases/7.0.0/release-record.md)
+- [Generated system inventory](docs/generated/system-inventory.md)
 
-Suggested commit:
+## Safety rules
 
-`Apply TC-011.5 League Identity and Ownership`
+- Do not commit secrets or populated `.dev.vars` files.
+- Do not upload loose production files.
+- Do not point staging at production D1, R2, KV, OAuth, workflow, or service resources.
+- Do not run production migrations or deploy production without recorded owner approval.
+- Do not treat browser-local data as an authoritative league record.

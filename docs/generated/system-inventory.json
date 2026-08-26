@@ -1,0 +1,1322 @@
+{
+  "browserStorage": {
+    "literalKeys": {
+      "fhq:performance-certification:v6.5.2": [
+        "app.js"
+      ],
+      "franchisehq.import.history.v1": [
+        "league-engine/import-history.js"
+      ],
+      "franchisehq.import.snapshots.v1": [
+        "league-engine/snapshot-manager.js"
+      ],
+      "franchisehq:trade-live-cache:v1": [
+        "FHQ-6126-index.html",
+        "index.html"
+      ]
+    }
+  },
+  "environmentBindings": {
+    "ASSETS": [
+      "functions/leagues/[[path]].js"
+    ],
+    "COMPANION_EXPORTS": [
+      "functions/_lib/cloud-platform.js",
+      "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+      "functions/api/leagues/[leagueSlug]/companion/classify.js",
+      "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
+      "functions/api/leagues/[leagueSlug]/companion/export.js",
+      "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
+      "functions/api/leagues/[leagueSlug]/companion/free-agent-capture.js",
+      "functions/api/leagues/[leagueSlug]/companion/inspect.js",
+      "functions/api/leagues/[leagueSlug]/companion/map-players.js",
+      "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
+      "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+      "functions/api/leagues/[leagueSlug]/companion/map-teams.js",
+      "functions/api/leagues/[leagueSlug]/companion/statistics-capture-inspector.js",
+      "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
+      "functions/api/leagues/[leagueSlug]/companion/test.js",
+      "functions/api/leagues/[leagueSlug]/players/free-agents.js",
+      "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
+    ],
+    "COMPANION_EXPORT_META": [
+      "functions/_lib/cloud-platform.js",
+      "functions/api/leagues/[leagueSlug]/companion/export.js",
+      "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
+      "functions/api/leagues/[leagueSlug]/companion/exports.js",
+      "functions/api/leagues/[leagueSlug]/companion/inspect.js",
+      "functions/api/leagues/[leagueSlug]/companion/test.js"
+    ],
+    "COMPANION_EXPORT_TOKEN": [
+      "functions/_lib/cloud-platform.js"
+    ],
+    "D1": [
+      "functions/api/leagues/[leagueSlug]/ea-direct/_common.js"
+    ],
+    "DB": [
+      "functions/_lib/auth.js",
+      "functions/_lib/cloud-platform.js",
+      "functions/api/auth/discord/callback.js",
+      "functions/api/auth/discord/login.js",
+      "functions/api/auth/logout.js",
+      "functions/api/auth/session/claim.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/_common.js",
+      "functions/api/leagues/[leagueSlug]/memberships.js",
+      "functions/api/leagues/[leagueSlug]/rules.js",
+      "functions/leagues/[[path]].js",
+      "functions/leagues/index.js"
+    ],
+    "DISCORD_CLIENT_ID": [
+      "functions/api/auth/discord/callback.js",
+      "functions/api/auth/discord/login.js"
+    ],
+    "DISCORD_CLIENT_SECRET": [
+      "functions/api/auth/discord/callback.js",
+      "functions/api/auth/session/claim.js"
+    ],
+    "DISCORD_REDIRECT_URI": [
+      "functions/api/auth/discord/callback.js",
+      "functions/api/auth/discord/login.js"
+    ],
+    "EA_DIRECT_ACCESS_TOKEN": [
+      "functions/api/leagues/[leagueSlug]/ea-direct/auth-status.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/probe.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/session-test.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/status.js"
+    ],
+    "EA_DIRECT_DISCOVERY_URL": [
+      "functions/api/leagues/[leagueSlug]/ea-direct/auth-status.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/probe.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/session-test.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/status.js"
+    ],
+    "EA_MADDEN_CLIENT_SECRET": [
+      "functions/api/leagues/[leagueSlug]/ea-direct/exchange-code.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/exchange-status.js"
+    ],
+    "FRANCHISE_HQ_DB": [
+      "functions/_lib/cloud-platform.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/_common.js"
+    ],
+    "FRANCHISE_IMPORT_WORKER": [
+      "functions/api/leagues/[leagueSlug]/companion/import-job.js"
+    ],
+    "FRANCHISE_IMPORT_WORKFLOW": [
+      "workers/franchise-import-worker/src/index.js"
+    ],
+    "LEAGUE_CONFIG": [
+      "functions/_lib/cloud-platform.js"
+    ],
+    "PLATFORM_OWNER_ACCOUNT_ID": [
+      "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+      "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
+      "functions/api/leagues/[leagueSlug]/companion/import-certification.js",
+      "functions/api/leagues/[leagueSlug]/companion/import-job.js",
+      "functions/api/leagues/[leagueSlug]/companion/import-orchestrator.js",
+      "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
+      "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+      "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js",
+      "functions/api/leagues/[leagueSlug]/companion/snapshot-verification.js",
+      "functions/api/leagues/[leagueSlug]/companion/statistics-capture-diagnostics.js",
+      "functions/api/leagues/[leagueSlug]/companion/statistics-capture-inspector.js",
+      "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
+      "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
+    ],
+    "SESSION_SIGNING_SECRET": [
+      "functions/api/auth/discord/callback.js",
+      "functions/api/auth/session/claim.js"
+    ]
+  },
+  "files": {
+    "byExtension": {
+      ".css": 4,
+      ".example": 1,
+      ".html": 2,
+      ".js": 152,
+      ".json": 4,
+      ".jsonc": 1,
+      ".md": 274,
+      ".mjs": 14,
+      ".png": 1,
+      ".sql": 16,
+      ".txt": 1,
+      ".yml": 1,
+      "[none]": 2
+    },
+    "largest": [
+      {
+        "bytes": 603212,
+        "file": "app.js"
+      },
+      {
+        "bytes": 384120,
+        "file": "styles.css"
+      },
+      {
+        "bytes": 366029,
+        "file": "trade-module.js"
+      },
+      {
+        "bytes": 121019,
+        "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
+      },
+      {
+        "bytes": 74551,
+        "file": "FHQ-6126-index.html"
+      },
+      {
+        "bytes": 74551,
+        "file": "index.html"
+      },
+      {
+        "bytes": 37540,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
+      },
+      {
+        "bytes": 37341,
+        "file": "league-engine/one-click-import.js"
+      },
+      {
+        "bytes": 37212,
+        "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
+      },
+      {
+        "bytes": 23791,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
+      },
+      {
+        "bytes": 22790,
+        "file": "platform/validate.js"
+      },
+      {
+        "bytes": 21302,
+        "file": "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
+      },
+      {
+        "bytes": 20250,
+        "file": "league-engine/games.js"
+      },
+      {
+        "bytes": 18095,
+        "file": "league-engine/rosters.js"
+      },
+      {
+        "bytes": 16605,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-teams.js"
+      },
+      {
+        "bytes": 16260,
+        "file": "platform/runtime.js"
+      },
+      {
+        "bytes": 16251,
+        "file": "league-engine/data-state.js"
+      },
+      {
+        "bytes": 16204,
+        "file": "workers/franchise-import-worker/src/index.js"
+      },
+      {
+        "bytes": 15767,
+        "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js"
+      },
+      {
+        "bytes": 15178,
+        "file": "core.js"
+      }
+    ],
+    "total": 473
+  },
+  "frontend": {
+    "assets": [
+      {
+        "path": "styles.css",
+        "type": "link",
+        "versioned": true
+      },
+      {
+        "path": "platform/core.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "platform/manifest.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "platform/storage.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/config.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/features.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/security.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/contract.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/events.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/state.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/ui.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/theme.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/ui-manager.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/errors.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/api.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/runtime.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/validate.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "platform/release.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "platform/store.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/simulation.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/navigation.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "app/router.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "app/sidebar.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "trade/state.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "trade/events.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "trade/diagnostics.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "trade/negotiations.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "trade/service.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "league-engine/league-banner.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/empty-state.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/status-widget.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/foundation-completion.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "auth-client.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "platform/league.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "league-engine/schema.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/entities.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/import-contract.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/validate.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/import-validator.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/import-quarantine.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/adapters/madden-json.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/repository.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/selectors.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/migrations.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/adapters/mock-data.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/league-tenant.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/import-state.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/snapshot-manager.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/validation-engine.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/import-history.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/league-data-events.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/import-service.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/import-framework-ui.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/cloud-platform-foundation.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-export-receiver.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-route-discovery.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-dataset-classification.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-team-mapper.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-player-mapper.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-schedule-mapper.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-statistics-engine.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/platform-owner-identity.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/data-explorer.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/league-snapshot-builder.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/snapshot-lifecycle.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/snapshot-verification.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/live-read-model.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/one-click-import.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/platform-workspace.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/developer-mode.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-json-mapper.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-teams-importer.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/companion-import-ui.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/data-state.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/live-snapshot-boot.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/rosters.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/index.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/games.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/standings.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/statistics.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "league-engine/trade-assets.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "app.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "platform/domains.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "platform/permissions.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "trade-module.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
+        "path": "auth-ui.js",
+        "type": "script",
+        "versioned": false
+      },
+      {
+        "path": "dev-mode.js",
+        "type": "script",
+        "versioned": false
+      }
+    ],
+    "entrypoint": "index.html",
+    "scriptCount": 86,
+    "stylesheetCount": 1
+  },
+  "functions": {
+    "routeCount": 58,
+    "routes": [
+      {
+        "file": "functions/index.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/"
+      },
+      {
+        "file": "functions/api/auth/discord/callback.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/auth/discord/callback"
+      },
+      {
+        "file": "functions/api/auth/discord/login.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/auth/discord/login"
+      },
+      {
+        "file": "functions/api/auth/logout.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/auth/logout"
+      },
+      {
+        "file": "functions/api/auth/me.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/auth/me"
+      },
+      {
+        "file": "functions/api/auth/session/claim.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/auth/session/claim"
+      },
+      {
+        "file": "functions/api/health.js",
+        "handlers": [
+          "onRequest"
+        ],
+        "route": "/api/health"
+      },
+      {
+        "file": "functions/api/league.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/league"
+      },
+      {
+        "file": "functions/api/leagues/index.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/index.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/build-snapshot"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/change-check.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/change-check"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/classify.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/classify"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/data-explorer"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/discovery.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/discovery"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/export.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestOptions",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/export"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
+        "handlers": [
+          "onRequest",
+          "onRequestOptions"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/export/:token/*datasetPath"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/exports.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestOptions",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/exports"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/free-agent-capture.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/free-agent-capture"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/import-certification"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/import-job.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/import-job"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/import-orchestrator.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/import-orchestrator"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/inspect.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestOptions"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/inspect"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/map-players"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/map-schedule"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/map-statistics"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-teams.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/map-teams"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/released-player-locator.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/released-player-locator"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/snapshot-lifecycle"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-verification.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/snapshot-verification"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/statistics-capture-diagnostics.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/statistics-capture-diagnostics"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/statistics-capture-inspector.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/statistics-capture-inspector"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/statistics-route-alignment"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/storage-preflight.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/storage-preflight"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/test.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/test"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/auth-status.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/auth-status"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/capture.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/capture"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/discovery-plan.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/discovery-plan"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/exchange-code.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/exchange-code"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/exchange-status.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/exchange-status"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/login.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/login"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/multitenant-status.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/multitenant-status"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/oauth-config.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/oauth-config"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/probe.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/probe"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/public-exchange.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/public-exchange"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/session-test.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/session-test"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/status.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/status"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/validate-redirect.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/validate-redirect"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/memberships.js",
+        "handlers": [
+          "onRequestDelete",
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/memberships"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/players/free-agents.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/players/free-agents"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/rules.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPut"
+        ],
+        "route": "/api/leagues/:leagueSlug/rules"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/snapshot/read-model.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/snapshot/read-model"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/transactions/canonical"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/transactions/classification.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/transactions/classification"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/transactions/forward-detection"
+      },
+      {
+        "file": "functions/api/platform/status.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/platform/status"
+      },
+      {
+        "file": "functions/leagues/index.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/leagues"
+      },
+      {
+        "file": "functions/leagues/[[path]].js",
+        "handlers": [
+          "onRequest"
+        ],
+        "route": "/leagues/*path"
+      }
+    ]
+  },
+  "legacyMarkers": {
+    "FGC_APP": {
+      "files": [
+        "FHQ-6126-index.html",
+        "app.js",
+        "dev-mode.js",
+        "index.html",
+        "league-engine/games.js",
+        "league-engine/standings.js",
+        "league-engine/statistics.js",
+        "platform/contract.js",
+        "platform/domains.js",
+        "platform/navigation.js",
+        "platform/simulation.js",
+        "trade-module.js"
+      ],
+      "occurrences": 29
+    },
+    "FGC_TRADE": {
+      "files": [
+        "app.js",
+        "dev-mode.js",
+        "league-engine/companion-schedule-mapper.js",
+        "league-engine/companion-statistics-engine.js",
+        "league-engine/data-explorer.js",
+        "league-engine/league-snapshot-builder.js",
+        "league-engine/live-read-model.js",
+        "league-engine/one-click-import.js",
+        "league-engine/platform-owner-identity.js",
+        "league-engine/platform-workspace.js",
+        "league-engine/snapshot-lifecycle.js",
+        "league-engine/snapshot-verification.js",
+        "platform/contract.js",
+        "platform/simulation.js",
+        "trade-module.js"
+      ],
+      "occurrences": 61
+    },
+    "browserStorageCalls": {
+      "files": [
+        "FHQ-6126-index.html",
+        "app.js",
+        "index.html",
+        "league-engine/companion-player-mapper.js",
+        "league-engine/companion-team-mapper.js",
+        "league-engine/data-state.js",
+        "league-engine/developer-mode.js",
+        "league-engine/games.js",
+        "league-engine/import-framework-ui.js",
+        "league-engine/import-history.js",
+        "league-engine/league-tenant.js",
+        "league-engine/live-read-model.js",
+        "league-engine/one-click-import.js",
+        "league-engine/platform-workspace.js",
+        "league-engine/snapshot-manager.js",
+        "platform/contract.js",
+        "platform/store.js",
+        "trade-module.js"
+      ],
+      "occurrences": 67
+    },
+    "hardCodedFgc": {
+      "files": [
+        "FHQ-6126-index.html",
+        "app.js",
+        "functions/_lib/cloud-platform.js",
+        "functions/api/leagues/[leagueSlug]/ea-direct/discovery-plan.js",
+        "index.html",
+        "league-engine/companion-schedule-mapper.js",
+        "league-engine/companion-statistics-engine.js",
+        "league-engine/data-explorer.js",
+        "league-engine/league-snapshot-builder.js",
+        "league-engine/league-tenant.js",
+        "league-engine/live-read-model.js",
+        "league-engine/one-click-import.js",
+        "league-engine/snapshot-lifecycle.js",
+        "league-engine/snapshot-verification.js",
+        "migrations/0001_cloud_platform_foundation.sql",
+        "migrations/0001_create_leagues.sql"
+      ],
+      "occurrences": 32
+    },
+    "ownerTb": {
+      "files": [
+        "FHQ-6126-index.html",
+        "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+        "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
+        "functions/api/leagues/[leagueSlug]/companion/import-certification.js",
+        "functions/api/leagues/[leagueSlug]/companion/import-job.js",
+        "functions/api/leagues/[leagueSlug]/companion/import-orchestrator.js",
+        "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
+        "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+        "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js",
+        "functions/api/leagues/[leagueSlug]/companion/snapshot-verification.js",
+        "functions/api/leagues/[leagueSlug]/companion/statistics-capture-diagnostics.js",
+        "functions/api/leagues/[leagueSlug]/companion/statistics-capture-inspector.js",
+        "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
+        "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js",
+        "import-orchestrator.js",
+        "index.html",
+        "league-engine/platform-owner-identity.js",
+        "league-engine/platform-workspace.js",
+        "trade-module.js"
+      ],
+      "occurrences": 21
+    }
+  },
+  "migrations": [
+    {
+      "file": "migrations/0001_cloud_platform_foundation.sql",
+      "recordsLedger": true,
+      "sha256": "1a20af5dc59bac45a9a0712e2f50548fd5de5e7465f245eecc90b07b88df77bd",
+      "version": "0001"
+    },
+    {
+      "file": "migrations/0001_create_leagues.sql",
+      "recordsLedger": false,
+      "sha256": "d25bf3ef44889567ef2adce888d32705d5865512c97240b9a96d920d0f35a977",
+      "version": "0001"
+    },
+    {
+      "file": "migrations/0002_companion_storage_layer.sql",
+      "recordsLedger": true,
+      "sha256": "22423a9a1bc3db3fe29d1b9b037ba39511a33646d2c0d21514b7f0c71c2c55c3",
+      "version": "0002"
+    },
+    {
+      "file": "migrations/0002_create_authentication.sql",
+      "recordsLedger": false,
+      "sha256": "825217b5648228d679d6cfdb04622709574a566f75477e1123cf6ff7de33a093",
+      "version": "0002"
+    },
+    {
+      "file": "migrations/0003_madden_companion_route_discovery.sql",
+      "recordsLedger": true,
+      "sha256": "c477367fee05a48be9d6f8e052ad4dd003803fd05d8b9e1de2e82405f81cb307",
+      "version": "0003"
+    },
+    {
+      "file": "migrations/0004_dataset_classification.sql",
+      "recordsLedger": true,
+      "sha256": "cfb02c1a929d862e0c97538be3d71fce57ecd37bd9550b41eeeea16c67bf09a0",
+      "version": "0004"
+    },
+    {
+      "file": "migrations/0005_canonical_team_mapper_preview.sql",
+      "recordsLedger": true,
+      "sha256": "a61236b08cf286ab5d1330b261d1fc4b065b765298aeddd8eaf8d196f0d0c426",
+      "version": "0005"
+    },
+    {
+      "file": "migrations/0006_canonical_player_mapper_preview.sql",
+      "recordsLedger": true,
+      "sha256": "be80d5222101c9beb8aceed123c2ea2eb824a9fde5986a96b23ab6952273077c",
+      "version": "0006"
+    },
+    {
+      "file": "migrations/0007_canonical_schedule_mapper_preview.sql",
+      "recordsLedger": true,
+      "sha256": "adb744adc932d45301f1b06cbf6e9c9712f459c59e728dd4c35e48b64bce605c",
+      "version": "0007"
+    },
+    {
+      "file": "migrations/0008_canonical_statistics_engine_preview.sql",
+      "recordsLedger": true,
+      "sha256": "651eda25c890afa840867a3c3802b6999c520a7907d1605241dff2c49144d9c5",
+      "version": "0008"
+    },
+    {
+      "file": "migrations/0009_complete_pending_snapshot_builder.sql",
+      "recordsLedger": true,
+      "sha256": "3af158d56dab622e786e593cc7a314ff9152f61986867edf21db31582a5163ff",
+      "version": "0009"
+    },
+    {
+      "file": "migrations/0010_snapshot_validation_activation.sql",
+      "recordsLedger": true,
+      "sha256": "30ff298c5474548acf1790dfcfe014ba0c7bbfe2cdbd156e6441cba549139e20",
+      "version": "0010"
+    },
+    {
+      "file": "migrations/0011_incremental_import_orchestrator.sql",
+      "recordsLedger": true,
+      "sha256": "ff97cf4dec3a77c3c8a3a0173a26544801493a169b44dbda2df5e86378ac11ea",
+      "version": "0011"
+    },
+    {
+      "file": "migrations/0012_canonical_transactions.sql",
+      "recordsLedger": true,
+      "sha256": "0951746dc460589ccc2c7ef29d881a2529c28b66acfe4c5028e09681f8522249",
+      "version": "0012"
+    },
+    {
+      "file": "migrations/0013_league_membership_access_control.sql",
+      "recordsLedger": false,
+      "sha256": "e321be67459b0e23340a263f1894538ea51fc8200e2370d8e8ad4441180442b1",
+      "version": "0013"
+    },
+    {
+      "file": "migrations/0014_league_rules.sql",
+      "recordsLedger": false,
+      "sha256": "76195823f306ecc98b8ad6958253be14a3b9ae55c64cae247cfb22a2a085bdaf",
+      "version": "0014"
+    }
+  ],
+  "product": "FranchiseHQ",
+  "release": "7.0.0",
+  "schemaVersion": 1,
+  "scope": {
+    "excludedPrefixes": [
+      "docs/generated/",
+      "releases/"
+    ],
+    "note": "Generated inventory and release evidence are excluded so verification remains deterministic."
+  }
+}

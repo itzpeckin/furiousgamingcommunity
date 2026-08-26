@@ -1,0 +1,10 @@
+# Local-only example. Copy to .dev.vars and replace placeholders locally.
+# Never commit the populated .dev.vars file.
+APP_ENV=local
+APP_VERSION=7.0.0
+DISCORD_CLIENT_ID=replace-with-local-discord-client-id
+DISCORD_CLIENT_SECRET=replace-with-local-discord-client-secret
+DISCORD_REDIRECT_URI=http://localhost:8788/api/auth/discord/callback
+SESSION_SIGNING_SECRET=replace-with-at-least-32-random-bytes
+COMPANION_EXPORT_TOKEN=replace-with-at-least-32-random-bytes
+PLATFORM_OWNER_ACCOUNT_ID=replace-with-local-test-owner-id

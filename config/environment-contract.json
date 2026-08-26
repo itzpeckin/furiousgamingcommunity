@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "release": "7.0.0",
+  "configurationAuthority": "Cloudflare dashboard export until a reviewed Wrangler configuration is adopted",
+  "deploymentPolicy": {
+    "productionBranch": "main",
+    "stagingBranch": "staging",
+    "directProductionUploadsAllowed": false,
+    "previewDeploymentsRequired": true,
+    "productionApprovalRequired": true
+  },
+  "pages": {
+    "bindings": [
+      { "name": "DB", "kind": "d1", "logicalResource": "primaryDatabase", "required": true },
+      { "name": "FRANCHISE_HQ_DB", "kind": "d1", "logicalResource": "primaryDatabase", "required": true },
+      { "name": "COMPANION_EXPORTS", "kind": "r2", "logicalResource": "companionExports", "required": true },
+      { "name": "COMPANION_EXPORT_META", "kind": "kv", "logicalResource": "companionMetadata", "required": true },
+      { "name": "LEAGUE_CONFIG", "kind": "kv", "logicalResource": "leagueConfiguration", "required": true },
+      { "name": "FRANCHISE_IMPORT_WORKER", "kind": "service", "logicalResource": "importWorker", "required": false },
+      { "name": "ASSETS", "kind": "pages-assets", "logicalResource": "staticAssets", "required": true, "platformManaged": true }
+    ],
+    "variables": [
+      "APP_ENV",
+      "APP_VERSION",
+      "DISCORD_CLIENT_ID",
+      "DISCORD_REDIRECT_URI",
+      "PLATFORM_OWNER_ACCOUNT_ID"
+    ],
+    "secrets": [
+      "DISCORD_CLIENT_SECRET",
+      "SESSION_SIGNING_SECRET",
+      "COMPANION_EXPORT_TOKEN"
+    ],
+    "forbiddenUntilSecurityContainment": [
+      "EA_DIRECT_ACCESS_TOKEN",
+      "EA_DIRECT_DISCOVERY_URL",
+      "EA_MADDEN_CLIENT_SECRET"
+    ],
+    "legacyUnprovisionedBindings": [
+      "D1"
+    ]
+  },
+  "importWorker": {
+    "bindings": [
+      { "name": "FRANCHISE_IMPORT_WORKFLOW", "kind": "workflow", "logicalResource": "importWorkflow", "required": true }
+    ],
+    "secrets": []
+  },
+  "environments": {
+    "local": {
+      "mode": "local-emulation",
+      "resourceNamespace": "franchisehq-local",
+      "resources": {
+        "DB": "local:primary-database",
+        "FRANCHISE_HQ_DB": "local:primary-database",
+        "COMPANION_EXPORTS": "local:companion-exports",
+        "COMPANION_EXPORT_META": "local:companion-metadata",
+        "LEAGUE_CONFIG": "local:league-configuration",
+        "FRANCHISE_IMPORT_WORKER": "local:import-worker",
+        "FRANCHISE_IMPORT_WORKFLOW": "local:import-workflow"
+      },
+      "variables": {
+        "APP_ENV": "local",
+        "APP_VERSION": "7.0.0",
+        "DISCORD_CLIENT_ID": "local-discord-application",
+        "DISCORD_REDIRECT_URI": "http://localhost:8788/api/auth/discord/callback",
+        "PLATFORM_OWNER_ACCOUNT_ID": "local-test-owner"
+      },
+      "secretNames": [
+        "DISCORD_CLIENT_SECRET",
+        "SESSION_SIGNING_SECRET",
+        "COMPANION_EXPORT_TOKEN"
+      ]
+    },
+    "staging": {
+      "mode": "cloudflare-preview",
+      "resourceNamespace": "franchisehq-staging",
+      "resources": {
+        "DB": "cloudflare:staging:primary-database",
+        "FRANCHISE_HQ_DB": "cloudflare:staging:primary-database",
+        "COMPANION_EXPORTS": "cloudflare:staging:companion-exports",
+        "COMPANION_EXPORT_META": "cloudflare:staging:companion-metadata",
+        "LEAGUE_CONFIG": "cloudflare:staging:league-configuration",
+        "FRANCHISE_IMPORT_WORKER": "cloudflare:staging:import-worker",
+        "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:staging:import-workflow"
+      },
+      "variables": {
+        "APP_ENV": "staging",
+        "APP_VERSION": "7.0.0",
+        "DISCORD_CLIENT_ID": "staging-discord-application",
+        "DISCORD_REDIRECT_URI": "set-in-cloudflare-staging",
+        "PLATFORM_OWNER_ACCOUNT_ID": "set-in-cloudflare-staging"
+      },
+      "secretNames": [
+        "DISCORD_CLIENT_SECRET",
+        "SESSION_SIGNING_SECRET",
+        "COMPANION_EXPORT_TOKEN"
+      ]
+    },
+    "production": {
+      "mode": "cloudflare-production",
+      "resourceNamespace": "franchisehq-production",
+      "resources": {
+        "DB": "cloudflare:production:primary-database",
+        "FRANCHISE_HQ_DB": "cloudflare:production:primary-database",
+        "COMPANION_EXPORTS": "cloudflare:production:companion-exports",
+        "COMPANION_EXPORT_META": "cloudflare:production:companion-metadata",
+        "LEAGUE_CONFIG": "cloudflare:production:league-configuration",
+        "FRANCHISE_IMPORT_WORKER": "cloudflare:production:import-worker",
+        "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:production:import-workflow"
+      },
+      "variables": {
+        "APP_ENV": "production",
+        "APP_VERSION": "7.0.0",
+        "DISCORD_CLIENT_ID": "production-discord-application",
+        "DISCORD_REDIRECT_URI": "set-in-cloudflare-production",
+        "PLATFORM_OWNER_ACCOUNT_ID": "set-in-cloudflare-production"
+      },
+      "secretNames": [
+        "DISCORD_CLIENT_SECRET",
+        "SESSION_SIGNING_SECRET",
+        "COMPANION_EXPORT_TOKEN"
+      ]
+    }
+  }
+}

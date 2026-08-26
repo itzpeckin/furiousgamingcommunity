@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.0",
+  "validatedOn": "2026-08-26",
+  "status": "passed-with-registered-inherited-migration-debt",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "repositoryLint": { "passed": true, "files": 34 },
+    "javascriptSyntax": { "passed": true, "modules": 166 },
+    "htmlAssets": { "passed": true, "entrypoints": 1 },
+    "secretScan": { "passed": true, "files": 470, "highConfidenceFindings": 0 },
+    "environmentContract": { "passed": true, "discoveredBindings": 18 },
+    "migrationBaseline": { "passed": true, "registeredInheritedIssues": 7, "newIssues": 0 },
+    "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" },
+    "toolingTests": { "passed": true, "passedTests": 5, "failedTests": 0 },
+    "systemInventory": { "passed": true, "trackedFiles": 473, "pagesFunctionRoutes": 58 },
+    "releaseContract": { "passed": true },
+    "gitDiffCheck": { "passed": true }
+  },
+  "external": {
+    "cloudflareAuthenticatedSession": true,
+    "githubAuthenticatedSession": true,
+    "cloudflareInspection": {
+      "pagesProject": "franchise-hq",
+      "productionBranch": "main",
+      "previewBranches": "all-non-production",
+      "previewVariablesConfigured": false,
+      "previewBindingsConfigured": false
+    },
+    "githubPullRequest": {
+      "number": 2,
+      "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/2",
+      "branch": "codex/franchisehq-7.0.0",
+      "remoteContentMatchedLocalCandidate": true
+    },
+    "githubWorkflowRun": {
+      "status": "passed",
+      "workflowPresent": true,
+      "reviewBranchPushesAttempted": true,
+      "defaultBranchChanged": false,
+      "localQualityGatePassed": true,
+      "runId": 32992901857,
+      "commit": "47bbf36",
+      "initialFailure": "cross-platform-generated-inventory-mismatch",
+      "regressionTestAdded": true
+    },
+    "stagingDeployment": {
+      "status": "preview-deployed-unconfigured",
+      "deploymentId": "00b6b900-a9de-4423-8a92-97f4c1d7a054",
+      "url": "https://codex-franchisehq-7-0-0.franchise-hq.pages.dev",
+      "uniqueUrl": "https://00b6b900.franchise-hq.pages.dev",
+      "commit": "47bbf36",
+      "entrypointSmokePassed": true,
+      "bindingsConfigured": false
+    },
+    "workerBuildBoundaries": {
+      "passed": true,
+      "importWorkerRoot": "/workers/franchise-import-worker/",
+      "importWorkerCorrectionSaved": true,
+      "previewTriggerReportedRoot": "/",
+      "previewCommand": "cd workers/franchise-import-worker && npx wrangler versions upload",
+      "previewCommandCorrectionSaved": true,
+      "importWorkerValidationPending": false,
+      "importWorkerPreviewBuildId": "45e8360e-2cbb-46f8-b195-6b82f6fe5d9f",
+      "importWorkerPreviewCommit": "16210a1",
+      "importWorkerPreviewVersion": "d0aeb677",
+      "legacyAssetsWorkerNonProductionBuildsEnabled": false,
+      "productionChanged": false
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "scope": "controlled-7.0.0-squash-merge",
+      "status": "pending-final-evidence-head-checks",
+      "finalHeadHostedGateRequired": true
+    }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}
