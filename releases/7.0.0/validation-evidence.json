@@ -46,20 +46,24 @@
     },
     "stagingDeployment": {
       "status": "preview-deployed-unconfigured",
-      "deploymentId": "8cb32f46-442e-4360-a1bb-b6ce86a9f315",
+      "deploymentId": "ab908c60-8924-4271-8c00-47dc61770cd6",
       "url": "https://codex-franchisehq-7-0-0.franchise-hq.pages.dev",
-      "commit": "6bae30c22cdc06803b2ca116e3e2e17dd503c7f7",
+      "uniqueUrl": "https://ab908c60.franchise-hq.pages.dev",
+      "commit": "16210a1",
       "entrypointSmokePassed": true,
       "bindingsConfigured": false
     },
     "workerBuildBoundaries": {
-      "passed": false,
+      "passed": true,
       "importWorkerRoot": "/workers/franchise-import-worker/",
       "importWorkerCorrectionSaved": true,
       "previewTriggerReportedRoot": "/",
       "previewCommand": "cd workers/franchise-import-worker && npx wrangler versions upload",
       "previewCommandCorrectionSaved": true,
-      "importWorkerValidationPending": true,
+      "importWorkerValidationPending": false,
+      "importWorkerPreviewBuildId": "45e8360e-2cbb-46f8-b195-6b82f6fe5d9f",
+      "importWorkerPreviewCommit": "16210a1",
+      "importWorkerPreviewVersion": "d0aeb677",
       "legacyAssetsWorkerNonProductionBuildsEnabled": false,
       "productionChanged": false
     },

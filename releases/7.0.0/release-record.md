@@ -1,7 +1,7 @@
 # FranchiseHQ 7.0.0 Release Record
 
 **Release type:** Controlled engineering baseline  
-**Status:** Review branch published and pull request open; hosted CI indexing, import-Worker validation, and isolated staging activation in progress
+**Status:** Review branch published; Pages and import-Worker preview checks passed; hosted CI indexing and isolated staging activation remain
 **Production authorized:** No  
 **Production deployed:** No
 
@@ -36,7 +36,8 @@ Excluded: application feature behavior, security-route remediation, database rep
 - Investigated two failing legacy Worker checks. Both Git integrations were running at repository root instead of their intended build boundary: the import Worker could not find its existing `workers/franchise-import-worker/wrangler.jsonc`, while the legacy `furiousgamingcommunity` Worker invoked root-level Wrangler against a Pages repository.
 - Disabled non-production branch builds for the redundant assets-only `furiousgamingcommunity` Worker and verified that the setting persisted. This prevents review branches from attempting its root-level production-style deploy command; the deployed Worker runtime was not changed.
 - Normalized and saved the import Worker's Cloudflare Git build root as `/workers/franchise-import-worker/`, matching the checked-in Wrangler configuration location and Cloudflare's monorepo convention. A fresh review build still reported its separate trigger root as `/`, proving the displayed root had not propagated to that trigger.
-- Changed only the import Worker's non-production branch command to `cd workers/franchise-import-worker && npx wrangler versions upload`. This makes the review trigger enter the checked-in Worker project before creating a preview version while leaving the production command unchanged. The checked-in root comment records the intended dashboard boundary without changing executable behavior; a fresh hosted build remains required to prove the review-command correction.
+- Changed only the import Worker's non-production branch command to `cd workers/franchise-import-worker && npx wrangler versions upload`. This makes the review trigger enter the checked-in Worker project before creating a preview version while leaving the production command unchanged. The checked-in root comment records the intended dashboard boundary without changing executable behavior.
+- Verified that the corrected command passed at review commit `16210a1`, uploaded preview Worker version `d0aeb677`, and left the active production version unchanged. The same commit's Pages preview also passed; GitHub reported both Cloudflare checks successful.
 - Confirmed that GitHub has not indexed the repository's first custom Actions workflow while it exists only on the review branch, despite follow-up pushes and an exact branch trigger. The workflow remains reviewable in pull request #2, local `npm run ci` is the authoritative 7.0.0 gate, and no workflow-only commit will be merged to `main` because `main` automatically deploys the production Pages project.
 
 ## Known inherited blockers
@@ -63,6 +64,8 @@ Excluded: application feature behavior, security-route remediation, database rep
 - Git whitespace/conflict check: passed.
 - Remote branch comparison: the published 35-file candidate matched the validated local candidate exactly before the workflow-trigger correction.
 - Cloudflare Pages preview build: passed at commit `6bae30c22cdc06803b2ca116e3e2e17dd503c7f7`.
+- Latest Cloudflare Pages preview build: passed at commit `16210a1`; unique preview `https://ab908c60.franchise-hq.pages.dev` and stable branch preview `https://codex-franchisehq-7-0-0.franchise-hq.pages.dev`.
+- Import Worker preview build: passed at commit `16210a1` using the review-only folder command and created unpromoted version `d0aeb677`; the active production version did not change.
 - Preview entrypoint smoke test: passed; title and landing content rendered without browser console errors.
 - Machine-readable evidence: `releases/7.0.0/validation-evidence.json`.
 
@@ -70,7 +73,7 @@ Excluded: application feature behavior, security-route remediation, database rep
 
 - Staging: a Pages preview is deployed successfully, but it is not accepted as usable staging because the preview environment has no isolated variables, secrets, D1, R2, KV, or service bindings.
 - GitHub: pull request #2 is open from `codex/franchisehq-7.0.0` to `main`. The first custom Actions workflow is not yet indexed from the non-default review branch, so hosted FranchiseHQ CI remains pending; the complete local quality gate passes.
-- Worker build boundaries: non-production builds are disabled for the redundant assets-only Worker. The import Worker root is saved as `/workers/franchise-import-worker/`, and its review-only command explicitly enters that folder because Cloudflare's preview trigger continued to run from `/`. A fresh review-branch build must confirm the import Worker now discovers its Wrangler configuration.
+- Worker build boundaries: passed for the current review commit. Non-production builds are disabled for the redundant assets-only Worker. The import Worker root is saved as `/workers/franchise-import-worker/`, and its review-only command explicitly enters that folder because Cloudflare's preview trigger continues to report `/`; commit `16210a1` successfully created an unpromoted Worker version.
 - Production: not authorized and not deployed.
 - No database, R2, KV, OAuth, Workflow, secret, deployed Worker runtime, or production application state was changed. Only non-production Git build settings were corrected.
 
