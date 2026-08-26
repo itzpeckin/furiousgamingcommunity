@@ -46,9 +46,9 @@ export async function requireActiveMembership(context) {
       response: jsonResponse(
         {
           ok: false,
-          error: "An active league membership is required."
+          error: "Not found."
         },
-        403
+        404
       )
     };
   }

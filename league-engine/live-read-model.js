@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.2c';
+  const VERSION = '7.0.1';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();
@@ -40,7 +40,7 @@
   }
 
   function storageKey(snapshotId,domain){
-    return `fhq:live-read:5.9.10.6.5.2c:${leagueSlug()}:${snapshotId}:${domain}`;
+    return `fhq:live-read:7.0.1:${leagueSlug()}:${snapshotId}:${domain}`;
   }
 
   function readPersisted(snapshotId,domain){
@@ -99,32 +99,22 @@
     if(inFlight.has(flightKey))return inFlight.get(flightKey);
 
     const work=(async()=>{
-      // Teams, standings, games and players are bounded league datasets.
-      // Fetch them in one read instead of dozens of 100-row HTTP round trips.
-      if(['teams','standings','games','players','statistics'].includes(domain)){
-        const params={domain,bulk:'1'};
-        if(domain==='statistics')params.compact='1';
-        const payload=await request(params);
-        const records=payload.records||[];
-        domainCache.set(domainKey,records);
-        persist(snapshot?.id,domain,records);
-        return records;
-      }
-
       const limit=500;
       let cursor=null;
       const records=[];
       let guard=0;
       do {
         const params={domain,limit};
+        if(domain==='statistics')params.compact='1';
         if(cursor)params.cursor=cursor;
         const payload=await request(params);
         records.push(...(payload.records||[]));
         cursor=payload.nextCursor||null;
         guard++;
-        if(guard>1000)throw new Error(`Live ${domain} read exceeded 1000 pages.`);
+        if(guard>100||records.length>50000)throw new Error(`Live ${domain} read exceeded the safe pagination limit.`);
       } while(cursor);
       domainCache.set(domainKey,records);
+      persist(snapshot?.id,domain,records);
       return records;
     })();
 

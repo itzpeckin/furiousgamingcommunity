@@ -1,7 +1,7 @@
 const SESSION_COOKIE_NAME = "franchise_hq_session";
 const OAUTH_STATE_COOKIE_NAME = "franchise_hq_oauth_state";
 const SESSION_RECOVERY_COOKIE_NAME = "franchise_hq_session_recovery";
-const SESSION_TRANSFER_DURATION_SECONDS = 60 * 3;
+const SESSION_TRANSFER_DURATION_SECONDS = 60 * 2;
 
 export const AUTH_CONSTANTS = {
   SESSION_COOKIE_NAME,
@@ -177,47 +177,6 @@ export function decodeOpaqueContext(value) {
   }
 }
 
-export async function createSessionTransferToken(secret, payload = {}) {
-  if (!secret) throw new Error("Session transfer signing secret is unavailable.");
-  const body = encodeOpaqueContext(payload);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(String(secret)),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
-  return `${body}.${bytesToBase64Url(new Uint8Array(signature))}`;
-}
-
-export async function verifySessionTransferToken(secret, token) {
-  if (!secret || !token) return null;
-  const [body, signatureText, extra] = String(token).split(".");
-  if (!body || !signatureText || extra) return null;
-  try {
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(String(secret)),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["verify"]
-    );
-    const valid = await crypto.subtle.verify(
-      "HMAC",
-      key,
-      base64UrlToBytes(signatureText),
-      new TextEncoder().encode(body)
-    );
-    if (!valid) return null;
-    const payload = decodeOpaqueContext(body);
-    if (!payload || Number(payload.exp || 0) <= Math.floor(Date.now() / 1000)) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 export function clearSecureCookie(name, path = "/") {
   return [
     `${name}=`,
@@ -315,9 +274,9 @@ export async function getCurrentSession(context, options = {}) {
     return delegated;
   }
 
-  // 6.1.2.2: keep a second persistent recovery cookie for full/hard reloads.
-  // Both cookies point to the same revocable server-side session; this does not
-  // create a second login or bypass expiration/revocation.
+  // During the 6.x transition some browsers retained only one of the two
+  // persistent cookies. Try every distinct candidate instead of allowing a
+  // stale primary cookie to mask a still-valid recovery cookie on refresh.
   const primarySessionToken = getCookie(
     context.request,
     AUTH_CONSTANTS.SESSION_COOKIE_NAME
@@ -326,15 +285,14 @@ export async function getCurrentSession(context, options = {}) {
     context.request,
     AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME
   );
-  const rawSessionToken = primarySessionToken || recoverySessionToken;
-
-  if (!rawSessionToken) return null;
-
-  const sessionTokenHash = await hashToken(rawSessionToken);
+  const sessionTokens = [...new Set([primarySessionToken, recoverySessionToken].filter(Boolean))];
+  if (!sessionTokens.length) return null;
   const requestedLeagueId = await resolveRequestedLeagueId(context, options);
-
-  const record = await context.env.DB
-    .prepare(
+  let record = null;
+  let rawSessionToken = null;
+  for (const candidate of sessionTokens) {
+    const sessionTokenHash = await hashToken(candidate);
+    record = await context.env.DB.prepare(
       `
       SELECT
         sessions.id AS session_id,
@@ -364,9 +322,12 @@ export async function getCurrentSession(context, options = {}) {
         AND sessions.expires_at > CURRENT_TIMESTAMP
       LIMIT 1
       `
-    )
-    .bind(requestedLeagueId || "__no_matching_league__", sessionTokenHash)
-    .first();
+    ).bind(requestedLeagueId || "__no_matching_league__", sessionTokenHash).first();
+    if (record) {
+      rawSessionToken = candidate;
+      break;
+    }
+  }
 
   if (!record) return null;
 

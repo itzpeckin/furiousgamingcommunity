@@ -1,4 +1,4 @@
-const RELEASE = "6.1.2.7";
+const RELEASE = "7.0.1";
 import {
   AUTH_CONSTANTS,
   createSecureCookie,
@@ -50,11 +50,7 @@ export async function onRequestGet(context) {
     return jsonResponse(
       {
         ok: false,
-        error: "Unable to load the current user.",
-        details:
-          error instanceof Error
-            ? error.message
-            : String(error)
+        error: "Unable to load the current user."
       },
       500
     );

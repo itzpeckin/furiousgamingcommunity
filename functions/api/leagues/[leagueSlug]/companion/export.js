@@ -4,6 +4,7 @@ import {
   suppliedExportToken, safeEqual, sha256Hex, resolveLeague,
   detectCompanionMetadata, publicExport, bindingStatus
 } from '../../../../_lib/cloud-platform.js';
+import { requireCommissioner } from '../../../../_lib/permissions.js';
 
 const ACTIONABLE = "('pending','inspected','mapped')";
 
@@ -23,12 +24,14 @@ async function latestExport(db, leagueId) {
 export async function onRequestGet(context) {
   const slug = normalizeLeagueSlug(context);
   if (!validLeagueSlug(slug)) return json({ ok: false, error: 'Invalid league slug.' }, 400);
+  const authorization = await requireCommissioner(context);
+  if (!authorization.authorized) return authorization.response;
   const bindings = bindingStatus(context.env);
   const db = database(context.env);
   const league = db ? await resolveLeague(context.env, slug) : null;
   const tokenConfigured = Boolean(await configuredExportToken(context.env, slug));
   let latest = null, pendingCount = 0, kvPointer = null;
-  if (db && league) {
+  if (db && league && authorization.session.membership?.leagueId === league.id) {
     latest = await latestExport(db, league.id);
     const count = await db.prepare(`SELECT COUNT(*) AS count FROM companion_exports WHERE league_id = ? AND status IN ${ACTIONABLE}`)
       .bind(league.id).first();
@@ -36,6 +39,9 @@ export async function onRequestGet(context) {
   }
   if (context.env.COMPANION_EXPORT_META?.get) {
     kvPointer = await context.env.COMPANION_EXPORT_META.get(companionMetadataKey(slug), { type: 'json' });
+  }
+  if (!league || authorization.session.membership?.leagueId !== league.id) {
+    return json({ ok: false, error: 'Not found.' }, 404);
   }
   return json({
     ok: true,

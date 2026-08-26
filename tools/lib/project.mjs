@@ -37,7 +37,10 @@ export async function walkFiles(start = ROOT, options = {}) {
     const entries = await fs.readdir(directory, { withFileTypes: true });
     entries.sort((left, right) => compareText(left.name, right.name));
     for (const entry of entries) {
-      if (entry.isDirectory() && excluded.has(entry.name)) continue;
+      // A normal checkout exposes .git as a directory, while a Git worktree
+      // exposes it as a pointer file. Both are repository metadata and must be
+      // excluded so generated evidence is identical on every checkout type.
+      if (excluded.has(entry.name)) continue;
       const absolute = path.join(directory, entry.name);
       if (entry.isDirectory()) {
         await visit(absolute);

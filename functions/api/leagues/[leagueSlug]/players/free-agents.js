@@ -1,6 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
+import { requireActiveMembership } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.11.0';
+const RELEASE='7.0.1';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 const text=v=>v==null?null:(String(v).trim()||null);
 const int=v=>{const n=Number.parseInt(v,10);return Number.isFinite(n)?n:null};
@@ -29,7 +30,7 @@ function playerShape(raw,index){
     yearsPro:int(raw.yearsPro??raw.experience??raw.exp),devTrait:normalizeDev(raw.developmentTrait??raw.devTrait??raw.development),
     developmentTrait:normalizeDev(raw.developmentTrait??raw.devTrait??raw.development),jerseyNumber:int(raw.jerseyNumber??raw.jersey??raw.number),
     salary:money(raw.salary??raw.totalSalary??raw.contractSalary),capHit:money(raw.capHit??raw.salaryCapHit??raw.cap),
-    portraitId:text(raw.portraitId??raw.portraitID??raw.headshotId),source:{...raw,teamId:'FA',rosterStatus:'free-agent',status:'free-agent'}};
+    portraitId:text(raw.portraitId??raw.portraitID??raw.headshotId)};
 }
 async function payloadFor(context,capture){
   if(!capture?.r2_object_key)return null;
@@ -47,8 +48,10 @@ async function captures(db,leagueId){
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);
   if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.',release:RELEASE},400);
+  const authorization=await requireActiveMembership(context);
+  if(!authorization.authorized)return authorization.response;
   const db=database(context.env),league=db?await resolveLeague(context.env,slug):null;
-  if(!db||!league)return json({ok:false,error:'League not found.',release:RELEASE},404);
+  if(!db||!league||authorization.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.',release:RELEASE},404);
 
   const rows=await captures(db,league.id);
   const attempts=[];

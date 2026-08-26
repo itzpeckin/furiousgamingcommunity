@@ -7,7 +7,7 @@ on:
     branches:
       - main
       - staging
-      - codex/franchisehq-7.0.0
+      - 'codex/franchisehq-*'
 
 permissions:
   contents: read

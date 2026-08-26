@@ -3,10 +3,10 @@ import {
   clearSecureCookie,
   getCookie,
   hashToken,
-  redirectResponse
+  jsonResponse
 } from "../../_lib/auth.js";
 
-const RELEASE = "6.1.2.8";
+const RELEASE = "7.0.1";
 
 async function revokeSession(context) {
   const candidates = [
@@ -34,20 +34,24 @@ function clearCookieHeaders(headers) {
 }
 
 export async function onRequestGet(context) {
-  await revokeSession(context);
-  const response = redirectResponse("/?logout=success");
-  clearCookieHeaders(response.headers);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+  return jsonResponse({
+    ok: false,
+    error: "Logout requires POST."
+  }, 405, { Allow: "POST" });
 }
 
 export async function onRequestPost(context) {
   await revokeSession(context);
+  const wantsHtml = String(context.request.headers.get("accept") || "").includes("text/html");
   const headers = new Headers({
-    "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store"
   });
   clearCookieHeaders(headers);
+  if (wantsHtml) {
+    headers.set("Location", "/?logout=success");
+    return new Response(null, { status: 303, headers });
+  }
+  headers.set("Content-Type", "application/json; charset=utf-8");
   return new Response(JSON.stringify({
     ok: true,
     authenticated: false,
