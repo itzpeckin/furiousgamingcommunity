@@ -13,7 +13,8 @@ const checks = [
     'tests/tooling/environment.test.mjs',
     'tests/tooling/routes.test.mjs',
     'tests/security/containment.test.mjs',
-    'tests/security/session.test.mjs'
+    'tests/security/session.test.mjs',
+    'tests/security/onboarding.test.mjs'
   ]],
   ['System inventory', 'tools/generate-inventory.mjs', ['--verify']],
   ['Release contract', 'tools/check-release.mjs', []]
@@ -29,4 +30,4 @@ for (const [label, script, argumentsList] of checks) {
   }
 }
 
-console.log(`\nFranchiseHQ 7.0.1 ${strict ? 'strict' : 'baseline'} quality gate passed.`);
+console.log(`\nFranchiseHQ 7.0.2 ${strict ? 'strict' : 'baseline'} quality gate passed.`);

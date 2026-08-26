@@ -43,7 +43,7 @@ Cloudflare account-level rate limiting remains the required long-term distribute
 
 ## Import compatibility note
 
-The current Companion route-discovery receiver still supports its existing token-in-path URL because the external Madden exporter cannot yet be assumed to support a custom authorization header. It is a private compatibility endpoint, never linked publicly, and does not return raw payloads. Release 7.0.2 must replace or formally constrain this mechanism during the Madden NFL 27 adapter work, including token rotation and log-redaction verification. Query-string credentials are not accepted anywhere in 7.0.1.
+The current Companion route-discovery receiver still supports its existing token-in-path URL because the external Madden exporter cannot yet be assumed to support a custom authorization header. It is a private compatibility endpoint, never linked publicly, and does not return raw payloads. Release 7.0.3 must replace or formally constrain this mechanism during the Madden NFL 27 adapter work, including token rotation and log-redaction verification. Query-string credentials are not accepted anywhere in 7.0.1.
 
 ## User-facing controlled-beta disclosure
 

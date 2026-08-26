@@ -1,11 +1,11 @@
 # FranchiseHQ Platform Roadmap: FGC First-League Launch
 
 **Roadmap baseline:** August 26, 2026  
-**Roadmap revision:** 1.10
+**Roadmap revision:** 1.13
 **Starting point:** FranchiseHQ 6.3.x  
 **Target:** A secure, polished FranchiseHQ platform with FGC as its first production league and with application/data boundaries ready for future multi-tenant operation.  
-**Current status:** FranchiseHQ 7.0.0 is released on `main` as squash commit `de01cff5e8127e1123c7433fd14e5f3972eb032f` and immutable tag `v7.0.0`. The 7.0.1 security-containment candidate passed its complete local baseline gate with 23 tests plus hosted GitHub quality, Cloudflare Pages, and import-Worker builds on `codex/franchisehq-7.0.1`. Public preview and security-header smoke passed. Protected league staging validation is blocked because isolated preview D1, R2, KV, and OAuth resources are not provisioned; production remains unchanged.
-**Next gate:** Publish the 7.0.1 pull request for review. Do not request or perform a production merge until the owner reviews the staging limitation and the isolated environment/fresh-migration foundation is resolved; that repair remains assigned to 7.1.0.
+**Current status:** FranchiseHQ 7.0.1 is released on `main` as squash commit `af9d12573e29ec1cbf4e9a14024f8e7bcb39ebca`. The complete 7.0.2 local gate passed 28 tests with zero new migration issues. On August 26, 2026, the owner authorized one controlled 7.0.2 GitHub pull-request/production cycle. Production remains unchanged until that cycle completes.
+**Next gate:** Commit and push the validated candidate once, open one pull request, require every hosted check to pass, then squash-merge to `main` and observe production. Madden NFL 27 intake remains paused until the Companion App can provide a representative stable export.
 
 ## 1. The commitment
 
@@ -28,6 +28,9 @@ The current 6.3.x work is not discarded. Useful components will be retained wher
 - **Revision 1.8:** Recorded successful owner phone acceptance of 7.0.0 plus three mobile findings: session loss after refresh, player-card model/layout problems, and awkward scrolling. Absorbed refresh persistence into 7.0.1 as a release blocker; retained player-card and scroll remediation in the mobile-first 7.0.3 scope. Began 7.0.1 security containment after explicit owner authorization.
 - **Revision 1.9:** Completed the local 7.0.1 security/session implementation and passed the full baseline gate with 23 automated tests. The final compatibility pass found inherited UI dependence on raw snapshot objects, so those objects were replaced with an explicit allowlisted projection that preserves approved roster, player-card, schedule, and standings fields without returning private export data. Corrected a hard-coded release label in generated inventory evidence. The first GitHub run then exposed a `.git` file-versus-directory difference between Windows worktrees and Linux checkouts; both are now excluded with a regression check. Production remains unchanged pending hosted review, isolated staging, and owner approval.
 - **Revision 1.10:** Passed the hosted GitHub quality, Cloudflare Pages, and import-Worker builds for 7.0.1. Public preview and security-header smoke checks passed. Protected league smoke exposed the expected environment gap: the preview has no isolated D1, R2, KV, or OAuth resources, and the seven inherited migration defects prevent safely creating a clean staging database before 7.1.0. Production bindings were not used. Corrected the public landing page's inherited 6.3.2 release label. Production remains unchanged.
+- **Revision 1.11:** Squash-merged pull request #3 into `main` as `af9d125`; production GitHub quality, GitHub Pages, and Cloudflare Pages checks passed. Owner validation confirmed persistent refresh on Homepage, Teams, My Team, Standings, and Stats & Leaders, then isolated repeated login to the three legacy trade-module routes.
+- **Revision 1.12:** Reprioritized 7.0.2 after the owner reported upstream Madden Companion App instability. Paused Madden NFL 27 intake and made 7.0.2 the controlled-member-onboarding release: repaired special-route refresh, preserved deep routes through Discord login, removed the legacy automatic login redirect, added invite/Pending/Active/Disabled controls, enforced invite acceptance before activation, blocked duplicate team control and commissioner self-lockout, corrected restore-after-disable behavior, and added focused security tests. Moved Madden NFL 27 intake/reset to 7.0.3 and the dependent mobile roster/player-link/Trade Block work to 7.0.4.
+- **Revision 1.13:** Recorded owner authorization for one controlled 7.0.2 publication cycle: one candidate commit/push, one pull request, mandatory green hosted checks, then a squash merge to `main` and production observation. The authorization does not include database migrations, league-data changes, credential changes, Companion import work, or unrelated feature expansion.
 
 The change log is append-only. Later discoveries, owner decisions, bugs, and scope changes will be recorded here and in the affected release record rather than silently changing the plan.
 
@@ -36,9 +39,10 @@ The change log is append-only. Later discoveries, owner decisions, bugs, and sco
 | Version | Status | Primary outcome |
 |---|---|---|
 | 7.0.0 | Released — `main` commit `de01cff`, tag `v7.0.0`; production quality, Pages, import-Worker, and phone acceptance passed | Controlled engineering and deployment baseline |
-| 7.0.1 | Hosted review passed; isolated protected staging blocked by missing preview bindings and inherited migrations; production unchanged | Immediate security containment and refresh-session reliability |
-| 7.0.2 | Newly prioritized | Madden NFL 27 intake and controlled FGC data reset |
-| 7.0.3 | Newly prioritized | Mobile roster preview, player permalinks, and Trade Block Lite |
+| 7.0.1 | Released — `main` commit `af9d125`; production quality, GitHub Pages, Cloudflare Pages, and owner refresh validation passed | Immediate security containment and general refresh-session reliability |
+| 7.0.2 | Local gate passed; one publication cycle authorized; production unchanged until merge | Persistent Discord login plus secure member onboarding and team access management |
+| 7.0.3 | Paused pending stable Companion App export | Madden NFL 27 intake and controlled FGC data reset |
+| 7.0.4 | Planned after 7.0.3 | Mobile roster preview, player permalinks, and Trade Block Lite |
 | 7.1.0–7.3.0 | Planned | Canonical database, tenant boundaries, and authentication |
 | 7.4.0–7.8.0 | Planned | Full import platform and authoritative league workflows |
 | 7.9.0 | Planned | Full Trade Center and advanced Trade Block workflow |
@@ -169,7 +173,27 @@ Each release is completed in its own reviewable change set. It receives a versio
 
 **Release gate:** Security regression tests pass for guest, member, commissioner, and invalid/replayed session cases; no protected raw data is available from public endpoints.
 
-### 7.0.2 — Madden NFL 27 Intake and Controlled FGC Data Reset
+### 7.0.2 — Persistent Login and Controlled League Onboarding
+
+**Purpose:** Let FGC begin joining FranchiseHQ safely while Madden NFL 27 export work is paused.
+
+**Build:**
+
+- Stop Commissioner HQ, Trade Center, and Trade Block from invoking a legacy browser-local login redirect after refresh.
+- Re-render all three special routes only after the real server-backed Discord session resolves.
+- Preserve a safe league hash route through an explicit Discord login without putting session credentials in a URL.
+- Provide a commissioner-copyable league invite URL. Opening the URL creates only an inactive Pending membership; the link grants no active league permission.
+- Require invite acceptance before a commissioner can activate a user.
+- Let commissioners review Pending, Active, and Disabled Discord members, assign league roles and teams, deactivate access, and restore a member to Pending.
+- Prevent duplicate active team assignments, invalid roles/identifiers, oversized membership requests, commissioner self-demotion/deactivation, and removal of the league's last active commissioner.
+- Correct access-state history so a restored member is not permanently treated as disabled on the next Discord login.
+- Keep Madden imports, league data, credentials, and database schema unchanged.
+
+**Why:** League invitations are useful only if refresh is reliable and no shared link, stale simulation identity, or unsafe team assignment can grant unintended access.
+
+**Release gate:** Existing session/security tests and new onboarding tests pass; commissioner and invited-member phone checks complete the Pending → Active → refresh → Disabled → restored flow; production publication requires explicit owner approval.
+
+### 7.0.3 — Madden NFL 27 Intake and Controlled FGC Data Reset
 
 **Purpose:** Safely replace the currently active imported league-season data with the first verified Madden NFL 27 Companion App export.
 
@@ -191,7 +215,7 @@ Each release is completed in its own reviewable change set. It receives a versio
 
 **Release gate:** The staging reset manifest reconciles to the pre-reset backup; no old active league-season records or caches appear afterward; the Madden NFL 27 import counts reconcile to the source; Free Agents are either imported and counted or explicitly proven absent from that export; rollback restores the prior state.
 
-### 7.0.3 — Mobile Roster Preview, Player Permalinks, and Trade Block Lite
+### 7.0.4 — Mobile Roster Preview, Player Permalinks, and Trade Block Lite
 
 **Purpose:** Give FGC members an immediately useful, trustworthy first FranchiseHQ experience while the broader production roadmap continues.
 
@@ -274,7 +298,7 @@ Each release is completed in its own reviewable change set. It receives a versio
 **Build:**
 
 - Define and version a canonical import/snapshot schema.
-- Promote the Madden NFL 27 adapter proven in 7.0.2 into the canonical import pipeline.
+- Promote the Madden NFL 27 adapter proven in 7.0.3 into the canonical import pipeline.
 - Support versioned source adapters for Companion App exports and approved CSV/Excel formats without changing downstream league features.
 - Investigate a policy-compliant direct-EA connector using authorized league/commissioner credentials only if EA exposes or permits the required mechanism. Undocumented credential-exchange routes are not an acceptable production dependency.
 - Treat Free Agents as a first-class canonical player state, with source-section discovery and record reconciliation for every supported input.
@@ -297,7 +321,7 @@ Each release is completed in its own reviewable change set. It receives a versio
 **Build:**
 
 - Move Home, teams, rosters, players, standings, statistics, and schedule to versioned canonical read APIs.
-- Stabilize the player permalink and player-profile contracts introduced in 7.0.3 as product-wide FranchiseHQ APIs.
+- Stabilize the player permalink and player-profile contracts introduced in 7.0.4 as product-wide FranchiseHQ APIs.
 - Create deliberately limited public response models and richer member response models.
 - Remove silent mock-data and stale-cache fallbacks from production; show clear empty, stale, and unavailable states.
 - Normalize team identity, season, week, time zone, score, opponent, and game status formatting.
@@ -366,7 +390,7 @@ Each release is completed in its own reviewable change set. It receives a versio
 
 **Build:**
 
-- Extend the server-backed Trade Block Lite from 7.0.3 and store offers, versions, messages, votes/approvals, commissioner decisions, and status history server-side.
+- Extend the server-backed Trade Block Lite from 7.0.4 and store offers, versions, messages, votes/approvals, commissioner decisions, and status history server-side.
 - Validate player/team ownership and asset eligibility against the active snapshot.
 - Define a formal state machine: draft, sent, countered, accepted, rejected, withdrawn, expired, commissioner review, approved, denied, completed.
 - Add optimistic concurrency/version checks so two devices cannot silently overwrite each other.
@@ -518,7 +542,7 @@ Calendar estimates are planning ranges, not guarantees; they depend on access to
 
 ### Rapid Madden NFL 27 Roster Preview
 
-Versions 7.0.0 through 7.0.3: approximately **1–3 focused weeks** after access and a representative Companion App export are available. This is an invite-only usable baseline, not the declaration that every FranchiseHQ production feature is complete.
+Versions 7.0.0 through 7.0.4: approximately **1–3 focused weeks** after access and a representative Companion App export are available. This is an invite-only usable baseline, not the declaration that every FranchiseHQ production feature is complete.
 
 ### Recommended FranchiseHQ Core Launch for FGC
 
@@ -569,4 +593,4 @@ The first safe authorization is:
 
 > **Approve FranchiseHQ 7.0.0 — Controlled Engineering Baseline. Do not deploy or modify production. Build the release workflow, staging separation, inventory, automated checks, and rollback baseline, then return with evidence for my review.**
 
-This permission does not authorize production deployment, data deletion, credential rotation, or later releases. Those remain explicit checkpoints. In particular, 7.0.2 will require a separate approval after the exact reset manifest and verified backup/restore evidence are presented.
+This permission does not authorize production deployment, data deletion, credential rotation, or later releases. Those remain explicit checkpoints. In particular, 7.0.3 will require separate approval after the exact reset manifest and verified backup/restore evidence are presented.

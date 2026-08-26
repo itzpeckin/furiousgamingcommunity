@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.2",
+  "validatedOn": "2026-08-26",
+  "status": "local-candidate-production-authorized",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "repositoryLint": { "passed": true },
+    "javascriptSyntax": { "passed": true },
+    "htmlAssets": { "passed": true, "entrypoints": 1 },
+    "secretScan": { "passed": true, "highConfidenceFindings": 0 },
+    "environmentContract": { "passed": true },
+    "migrationBaseline": { "passed": true, "registeredInheritedIssues": 7, "newIssues": 0 },
+    "automatedTests": { "passed": true, "passedTests": 28, "failedTests": 0 },
+    "securityTests": { "passed": true, "passedTests": 21, "failedTests": 0 },
+    "sessionRefreshRecovery": { "passed": true },
+    "specialRouteRefreshRegression": { "passed": true },
+    "inviteOnlyActivation": { "passed": true },
+    "membershipRoleBoundary": { "passed": true },
+    "duplicateTeamAssignment": { "passed": true },
+    "commissionerLockoutProtection": { "passed": true },
+    "restoreAfterDisable": { "passed": true },
+    "systemInventory": { "passed": true },
+    "releaseContract": { "passed": true },
+    "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" }
+  },
+  "external": {
+    "githubPullRequest": { "status": "not-requested" },
+    "hostedChecks": { "status": "not-requested" },
+    "stagingDeployment": { "status": "not-requested" },
+    "productionDeployment": { "authorized": true, "status": "authorized-not-started" }
+  },
+  "manualAcceptance": {
+    "status": "pending-owner-check",
+    "runbook": "docs/AUTH-ONBOARDING.md"
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}

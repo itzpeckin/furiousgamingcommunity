@@ -1,6 +1,6 @@
 {
   "name": "franchisehq",
-  "version": "7.0.1",
+  "version": "7.0.2",
   "private": true,
   "type": "module",
   "description": "FranchiseHQ league-management platform",
@@ -20,7 +20,7 @@
     "check:release": "node tools/check-release.mjs",
     "inventory": "node tools/generate-inventory.mjs",
     "inventory:verify": "node tools/generate-inventory.mjs --verify",
-    "test": "node --test tests/tooling/environment.test.mjs tests/tooling/routes.test.mjs tests/security/containment.test.mjs tests/security/session.test.mjs",
+    "test": "node --test tests/tooling/environment.test.mjs tests/tooling/routes.test.mjs tests/security/containment.test.mjs tests/security/session.test.mjs tests/security/onboarding.test.mjs",
     "ci": "node tools/run-quality.mjs"
   }
 }

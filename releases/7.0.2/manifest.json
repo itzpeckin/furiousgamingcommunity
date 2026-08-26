@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.2",
+  "releaseType": "authentication-onboarding",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.0.1",
+    "commit": "af9d12573e29ec1cbf4e9a14024f8e7bcb39ebca",
+    "tree": "31c15b94009f8daa556cc616dc22c4923c39fb3d",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.0.2",
+  "environmentContract": "config/environment-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [
+    "migration.duplicate-version.0001",
+    "migration.duplicate-version.0002",
+    "migration.fresh-apply.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0002_create_authentication.sql",
+    "migration.missing-ledger-write.0013_league_membership_access_control.sql",
+    "migration.missing-ledger-write.0014_league_rules.sql"
+  ],
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "reason": "Owner authorized one GitHub pull-request, hosted-check, and production cycle on August 26, 2026."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "authorizedOn": "2026-08-26",
+    "scope": "Commit and push the validated 7.0.2 candidate once, open one pull request, require green hosted checks, then squash-merge to main and observe the resulting production deployment.",
+    "reason": "Owner explicitly authorized the controlled 7.0.2 publication cycle."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/AUTH-ONBOARDING.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.0.2/release-record.md",
+    "releases/7.0.2/validation-evidence.json",
+    "tests/security/containment.test.mjs",
+    "tests/security/session.test.mjs",
+    "tests/security/onboarding.test.mjs"
+  ]
+}

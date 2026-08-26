@@ -9175,9 +9175,10 @@ function canonicalPlayerDashboardStats(playerId='') {
   window.addEventListener('franchisehq:auth-changed', event=>{
     if(event.detail?.status!=='ready') return;
     syncCommissionerAccess();
-    if (routeBase(location.hash.slice(1))==='commissioner') {
-      const currentCommissionerRoute=location.hash.slice(1)||'commissioner';
-      renderRoute(currentCommissionerRoute);
+    const activeBase=routeBase(location.hash.slice(1));
+    if (['commissioner','trade-center','trade-block'].includes(activeBase)) {
+      const currentProtectedRoute=location.hash.slice(1)||activeBase;
+      renderRoute(currentProtectedRoute);
     }
   });
 
@@ -9517,9 +9518,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 7.0.1';
+      node.textContent = 'Current Release - 7.0.2';
     });
-    document.documentElement.dataset.franchiseHqRelease = '7.0.1';
+    document.documentElement.dataset.franchiseHqRelease = '7.0.2';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
