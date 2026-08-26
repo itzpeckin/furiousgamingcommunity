@@ -31,8 +31,27 @@
       "previewVariablesConfigured": false,
       "previewBindingsConfigured": false
     },
+    "githubPullRequest": {
+      "number": 2,
+      "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/2",
+      "branch": "codex/franchisehq-7.0.0",
+      "remoteContentMatchedLocalCandidate": true
+    },
     "githubWorkflowRun": null,
-    "stagingDeployment": null,
+    "stagingDeployment": {
+      "status": "preview-deployed-unconfigured",
+      "deploymentId": "8cb32f46-442e-4360-a1bb-b6ce86a9f315",
+      "url": "https://codex-franchisehq-7-0-0.franchise-hq.pages.dev",
+      "commit": "6bae30c22cdc06803b2ca116e3e2e17dd503c7f7",
+      "entrypointSmokePassed": true,
+      "bindingsConfigured": false
+    },
+    "legacyWorkerBuilds": {
+      "passed": false,
+      "expected": false,
+      "rootConfigurationMismatch": true,
+      "productionChanged": false
+    },
     "productionDeployment": null
   },
   "productionChanged": false,
