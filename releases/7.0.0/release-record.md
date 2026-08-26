@@ -31,6 +31,7 @@ Excluded: application feature behavior, security-route remediation, database rep
 - Inspected the `franchise-hq` Pages project without changing it. Production tracks `main` with automatic deployments enabled; previews cover all non-production branches; and the preview environment currently has no variables, secrets, or resource bindings.
 - Published the 35-file candidate to `codex/franchisehq-7.0.0`, verified the remote content matches the locally validated candidate file-for-file, and opened pull request #2.
 - Added a release-branch `push` trigger after the repository's first custom workflow did not start from the initial pull-request event; this permits hosted validation without merging to `main`.
+- Narrowed the hosted trigger to the exact `codex/franchisehq-7.0.0` branch after GitHub did not register the initial wildcard attempt; no default-branch file was changed.
 - Verified the Cloudflare Pages preview deployed successfully at `https://codex-franchisehq-7-0-0.franchise-hq.pages.dev` and the public application entrypoint rendered with no browser console errors.
 - Investigated two failing legacy Worker checks. Both Git integrations run at repository root instead of their intended Worker directory: the import Worker cannot find its existing `workers/franchise-import-worker/wrangler.jsonc`, while the legacy `furiousgamingcommunity` Worker invokes root-level Wrangler against a Pages repository. No Worker setting was changed.
 
