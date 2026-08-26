@@ -1,11 +1,11 @@
 # FranchiseHQ Platform Roadmap: FGC First-League Launch
 
 **Roadmap baseline:** August 26, 2026  
-**Roadmap revision:** 1.4
+**Roadmap revision:** 1.5
 **Starting point:** FranchiseHQ 6.3.x  
 **Target:** A secure, polished FranchiseHQ platform with FGC as its first production league and with application/data boundaries ready for future multi-tenant operation.  
-**Current status:** FranchiseHQ 7.0.0 is published in pull request #2. Its latest commit has passing Cloudflare Pages and import-Worker preview checks, and the public entrypoint smoke test passed. The redundant assets-only Worker's non-production builds are disabled. Cloudflare saved the import Worker's production root as `/workers/franchise-import-worker/`, but its separate review-branch trigger continued to execute from `/`; the review-only command now enters that folder explicitly and successfully uploaded an unpromoted Worker version. GitHub has not indexed the first custom Actions workflow from the non-default review branch, and the Pages preview still lacks isolated staging bindings. No production deployment, production binding change, data reset, credential change, or deployed Worker runtime change has occurred.
-**Next gate:** Resolve or formally accept the hosted GitHub Actions indexing limitation for 7.0.0, provision and bind isolated staging resources, then complete owner evidence review and request separate authorization for 7.0.1.
+**Current status:** FranchiseHQ 7.0.0 is controlled through pull request #2. Its validated review head `47bbf36` passed the GitHub quality gate, Cloudflare Pages preview, and import-Worker preview. The first hosted quality run exposed an operating-system-dependent inventory generator; newline normalization, deterministic ordering, regenerated evidence, and a regression test corrected it. The owner authorized a controlled squash merge to `main` after the final evidence-only head passes. The redundant assets-only Worker's non-production builds remain disabled, and no data reset or credential change is part of this release.
+**Next gate:** Complete and observe the authorized squash merge, then provision isolated staging resources before beginning separately authorized 7.0.1 security work.
 
 ## 1. The commitment
 
@@ -22,6 +22,7 @@ The current 6.3.x work is not discarded. Useful components will be retained wher
 - **Revision 1.2:** Began 7.0.0 against the real audited Git commit; added the version-controlled release record, automated baseline/strict quality gates, generated system inventory, environment separation contract, branch policy, mobile matrix, and rollback controls. Aligned the 7.0.0 gate with the planned 7.1.0 database repair: 7.0.0 must detect and register inherited migration blockers without hiding new failures; 7.1.0 must make the strict fresh-database gate pass.
 - **Revision 1.3:** Published pull request #2, verified the review branch against the local candidate, validated the Cloudflare Pages preview, and registered two legacy Worker Git-root configuration failures discovered by hosted checks. Added a release-branch workflow trigger so the first FranchiseHQ quality workflow can validate before any merge to `main`.
 - **Revision 1.4:** Disabled non-production builds for the redundant assets-only Worker, saved the import Worker's monorepo build root, and added a review-only command that enters the Worker folder after Cloudflare's separate preview trigger continued to report `/`. Verified passing Pages and import-Worker preview checks at commit `16210a1`, and recorded GitHub's failure to index the repository's first custom workflow from the non-default review branch. No deployed runtime or production resource changed.
+- **Revision 1.5:** GitHub activated the first custom workflow and exposed a cross-platform inventory mismatch on Linux. Normalized text input, replaced locale-dependent ordering, added a deterministic-evidence regression test, regenerated the inventory, and passed all three hosted checks at `47bbf36`. Recorded owner authorization for a controlled 7.0.0 squash merge; 7.0.1 and all data work remain separately gated.
 
 The change log is append-only. Later discoveries, owner decisions, bugs, and scope changes will be recorded here and in the affected release record rather than silently changing the plan.
 
@@ -29,7 +30,7 @@ The change log is append-only. Later discoveries, owner decisions, bugs, and sco
 
 | Version | Status | Primary outcome |
 |---|---|---|
-| 7.0.0 | PR #2 open; Pages and import-Worker preview checks passed; hosted CI indexing, staging activation, and owner review remain | Controlled engineering and staging baseline |
+| 7.0.0 | PR #2 final candidate; GitHub quality, Pages, and import-Worker previews passed; controlled squash merge authorized | Controlled engineering and staging baseline |
 | 7.0.1 | Planned | Immediate security containment |
 | 7.0.2 | Newly prioritized | Madden NFL 27 intake and controlled FGC data reset |
 | 7.0.3 | Newly prioritized | Mobile roster preview, player permalinks, and Trade Block Lite |
