@@ -30,4 +30,4 @@ for (const [label, script, argumentsList] of checks) {
   }
 }
 
-console.log(`\nFranchiseHQ 7.0.2 ${strict ? 'strict' : 'baseline'} quality gate passed.`);
+console.log(`\nFranchiseHQ 7.0.3 ${strict ? 'strict' : 'baseline'} quality gate passed.`);

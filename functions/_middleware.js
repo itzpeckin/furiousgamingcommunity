@@ -1,3 +1,5 @@
+import { canonicalDocumentRedirect } from "./_lib/origin.js";
+
 const CSP_REPORT_ONLY = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -86,6 +88,18 @@ export async function onRequest(context) {
   const id = requestId(context.request);
   const pathname = new URL(context.request.url).pathname;
   let response;
+  const canonicalLocation = canonicalDocumentRedirect(context.request);
+  if (canonicalLocation) {
+    response = new Response(null, {
+      status: 302,
+      headers: {
+        location: canonicalLocation,
+        "cache-control": "no-store",
+        "x-franchisehq-canonical-host": "franchisehq.app"
+      }
+    });
+    return applySecurityHeaders(response, id, context.request);
+  }
   const retryAfter = rateLimit(context.request, pathname);
   if (retryAfter) {
     response = new Response(JSON.stringify({

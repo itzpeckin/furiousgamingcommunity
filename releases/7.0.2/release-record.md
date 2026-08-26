@@ -1,8 +1,8 @@
 # FranchiseHQ 7.0.2 Release Record
 
-**Status:** Validated and authorized for one controlled publication cycle  
+**Status:** Released to production; owner phone acceptance pending
 **Production authorized:** Yes — August 26, 2026  
-**Production changed:** No
+**Production changed:** Yes — application artifact only; no database, data, credential, binding, or import-Worker change
 
 ## Scope
 
@@ -36,6 +36,7 @@ Make FranchiseHQ login persistence and FGC member onboarding safe enough to begi
 ## Known inherited blockers
 
 - Seven registered migration defects remain assigned to 7.1.0; strict migration validation is expected to fail.
+- The successful GitHub Pages run emitted a non-blocking warning that `actions/upload-artifact@v4` still targets Node 20 and is being forced onto Node 24; upgrade or replacement is tracked as release-hygiene maintenance.
 - The protected preview environment still lacks isolated D1, R2, KV, and OAuth resources, so authenticated hosted staging cannot be claimed.
 - The shared league link can create Pending requests from any Discord user who knows the URL. It cannot grant access; tokenized/expiring invitations remain a future multi-tenant enhancement if operational spam requires them.
 - Trade Center, Trade Block, GOTW, and Confidence Pool records remain browser-local controlled-beta workflows.
@@ -48,14 +49,17 @@ Make FranchiseHQ login persistence and FGC member onboarding safe enough to begi
 - The original 16 focused session/security tests passed unchanged.
 - Five new onboarding tests passed for input validation, invite-only activation, duplicate-team blocking, commissioner self-lockout prevention, and refresh/onboarding wiring.
 - The complete local baseline quality gate reports zero unregistered failures and preserves the seven expected migration blockers.
+- Pull request #4 passed all four hosted checks before merge.
+- The `main` production quality gate, Cloudflare Pages deployment, and GitHub Pages deployment passed after merge.
+- Direct observation of `https://franchise-hq.pages.dev/` returned the FranchiseHQ landing page labeled Release 7.0.2.
 - Manual commissioner/member phone acceptance remains pending and is documented in `docs/AUTH-ONBOARDING.md`.
 
 ## Deployment status
 
-- Local branch: `codex/franchisehq-7.0.2` from production `main` / `af9d125`.
-- GitHub pull request: authorized but not yet created at the recorded candidate boundary.
-- Hosted review/staging: authorized; green checks are required before merge.
-- Production: unchanged at 7.0.1 until the authorized 7.0.2 cycle completes.
+- Candidate: `codex/franchisehq-7.0.2` at `c248b1514f0a0240201760476dc70aa319246e08`.
+- GitHub pull request: [#4](https://github.com/itzpeckin/furiousgamingcommunity/pull/4), squash-merged after all four checks passed.
+- Production: `main` commit `1418d0bba1074f5ab9f4e50453d6837d72dde809`; `https://franchise-hq.pages.dev/` observed serving Release 7.0.2.
+- GitHub quality, GitHub Pages, and Cloudflare Pages: passed.
 - Database, league data, credentials, Cloudflare bindings, and import Worker: unchanged.
 
 ## Rollback
@@ -67,4 +71,4 @@ Make FranchiseHQ login persistence and FGC member onboarding safe enough to begi
 
 ## Owner acceptance
 
-Implementation was authorized after the owner prioritized reliable login and team onboarding over the temporarily blocked Madden Companion work. On August 26, 2026, the owner authorized one controlled publication cycle: commit and push the validated candidate once, open one pull request, require green hosted checks, then squash-merge to `main` and observe the resulting production deployment. The phone checklist in the onboarding runbook remains the final owner acceptance gate.
+Implementation was authorized after the owner prioritized reliable login and team onboarding over the temporarily blocked Madden Companion work. On August 26, 2026, the owner authorized one controlled publication cycle. That cycle completed as pull request #4 and production commit `1418d0b`; every hosted and production check passed, and the canonical Cloudflare URL served Release 7.0.2. The phone checklist in the onboarding runbook remains the final owner acceptance gate.

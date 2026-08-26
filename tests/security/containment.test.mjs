@@ -73,6 +73,30 @@ test('edge middleware adds browser protections and redacts server failures', asy
   assert.ok(response.headers.get('content-security-policy-report-only'));
 });
 
+test('pages.dev document requests are sent to the canonical FranchiseHQ domain', async () => {
+  let reachedHandler = false;
+  const response = await securityMiddleware({
+    request:new Request('https://preview.franchise-hq.pages.dev/leagues/fgc?source=invite', {
+      headers:{ accept:'text/html', 'sec-fetch-dest':'document' }
+    }),
+    next:async () => { reachedHandler = true; return new Response(null, { status:204 }); }
+  });
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get('location'), 'https://franchisehq.app/leagues/fgc?source=invite');
+  assert.equal(response.headers.get('x-franchisehq-canonical-host'), 'franchisehq.app');
+  assert.equal(reachedHandler, false);
+});
+
+test('pages.dev API callbacks remain reachable for the configured Discord handoff', async () => {
+  let reachedHandler = false;
+  const response = await securityMiddleware({
+    request:new Request('https://franchise-hq.pages.dev/api/auth/discord/callback?code=test'),
+    next:async () => { reachedHandler = true; return new Response(null, { status:204 }); }
+  });
+  assert.equal(response.status, 204);
+  assert.equal(reachedHandler, true);
+});
+
 test('edge middleware rejects cross-origin state changes', async () => {
   let reachedHandler = false;
   const response = await securityMiddleware({

@@ -124,16 +124,16 @@
   },
   "files": {
     "byExtension": {
-      ".css": 6,
+      ".css": 7,
       ".example": 1,
       ".html": 2,
-      ".js": 154,
+      ".js": 155,
       ".json": 4,
       ".jsonc": 1,
       ".md": 276,
       ".mjs": 17,
       ".png": 1,
-      ".sql": 16,
+      ".sql": 17,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
@@ -148,7 +148,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 370158,
+        "bytes": 370535,
         "file": "trade-module.js"
       },
       {
@@ -220,7 +220,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js"
       }
     ],
-    "total": 482
+    "total": 485
   },
   "frontend": {
     "assets": [
@@ -230,7 +230,7 @@
         "versioned": true
       },
       {
-        "path": "release-7.0.2.css",
+        "path": "release-7.0.3.css",
         "type": "link",
         "versioned": true
       },
@@ -1309,10 +1309,16 @@
       "recordsLedger": false,
       "sha256": "76195823f306ecc98b8ad6958253be14a3b9ae55c64cae247cfb22a2a085bdaf",
       "version": "0014"
+    },
+    {
+      "file": "migrations/0015_membership_audit_repair.sql",
+      "recordsLedger": true,
+      "sha256": "511a4ce1551ec009d068f4011cef8f18779b9db0c39b368740d15147a1f32246",
+      "version": "0015"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.0.2",
+  "release": "7.0.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

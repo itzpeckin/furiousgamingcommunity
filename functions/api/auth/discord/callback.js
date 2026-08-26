@@ -11,6 +11,7 @@ import {
   jsonResponse,
   redirectResponse
 } from "../../../_lib/auth.js";
+import { canonicalAuthenticationOrigin } from "../../../_lib/origin.js";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -109,7 +110,7 @@ export async function onRequestGet(context) {
         joinLeagueId = oauthContext.joinLeagueId || null;
         joinLeagueSlug = oauthContext.joinLeagueSlug || null;
         if (/^https:\/\//i.test(String(oauthContext.origin || ""))) {
-          loginOrigin = String(oauthContext.origin);
+          loginOrigin = canonicalAuthenticationOrigin(String(oauthContext.origin));
         }
       }
     } else if (String(storedState.id || "").startsWith("oauthjoin.")) {

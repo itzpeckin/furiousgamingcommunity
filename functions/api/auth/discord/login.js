@@ -9,6 +9,7 @@ import {
   jsonResponse,
   redirectResponse
 } from "../../../_lib/auth.js";
+import { canonicalAuthenticationOrigin } from "../../../_lib/origin.js";
 
 export async function onRequestGet(context) {
   try {
@@ -36,6 +37,7 @@ export async function onRequestGet(context) {
     // lets the callback hand the finished login back to the exact FranchiseHQ
     // origin that initiated it.
     const requestUrl = new URL(context.request.url);
+    const loginOrigin = canonicalAuthenticationOrigin(requestUrl);
     const rawReturnTo = String(requestUrl.searchParams.get("returnTo") || "");
     const returnMatch = rawReturnTo.match(/^\/leagues\/([^/?#]+)$/i);
     let joinLeague = null;
@@ -47,7 +49,7 @@ export async function onRequestGet(context) {
         .first();
     }
     const oauthContext = encodeOpaqueContext({
-      origin: requestUrl.origin,
+      origin: loginOrigin,
       joinLeagueId: joinLeague?.id || null,
       joinLeagueSlug: joinLeague?.slug || null
     });
