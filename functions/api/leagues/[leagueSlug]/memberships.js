@@ -1,7 +1,13 @@
 import { createId, jsonResponse } from "../../../_lib/auth.js";
 import { requireCommissioner } from "../../../_lib/permissions.js";
+import {
+  activeLeagueTeams,
+  activeTeamAssignments,
+  publicLeagueTeams,
+  resolveTeam
+} from "../../../_lib/league-teams.js";
 
-const RELEASE = "7.0.3";
+const RELEASE = "7.0.4";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -149,7 +155,24 @@ export async function onRequestGet(context) {
     rows = await read(false);
   }
 
-  return jsonResponse({ ok:true, release:RELEASE, league, memberships:rows?.results || [] });
+  const teams = await activeLeagueTeams(context.env.DB, league.id);
+  const assignments = await activeTeamAssignments(context.env.DB, league.id, teams);
+  const memberships = (rows?.results || []).map(member => {
+    const team = resolveTeam(teams, member.teamId);
+    return {
+      ...member,
+      teamId:team?.teamKey || null,
+      teamName:team?.displayName || null,
+      active:Boolean(Number(member.active))
+    };
+  });
+  return jsonResponse({
+    ok:true,
+    release:RELEASE,
+    league,
+    memberships,
+    teams:publicLeagueTeams(teams, assignments)
+  });
 }
 
 export async function onRequestPost(context) {
@@ -182,6 +205,13 @@ export async function onRequestPost(context) {
   const input = normalizeMembershipInput(body);
   if (!input.ok) return jsonResponse({ ok:false, error:input.error }, 400);
 
+  const teams = await activeLeagueTeams(context.env.DB, league.id);
+  const requestedTeam = input.teamId ? resolveTeam(teams, input.teamId) : null;
+  if (input.teamId && !requestedTeam) {
+    return jsonResponse({ ok:false, error:"Choose a team from the active Madden franchise import." }, 400);
+  }
+  const teamId = requestedTeam?.teamKey || null;
+
   let user = null;
   if (input.userId) user = await context.env.DB.prepare(`SELECT id, discord_user_id, display_name FROM users WHERE id=? LIMIT 1`).bind(input.userId).first();
   if (!user && input.discordUserId) user = await context.env.DB.prepare(`SELECT id, discord_user_id, display_name FROM users WHERE discord_user_id=? LIMIT 1`).bind(input.discordUserId).first();
@@ -201,16 +231,15 @@ export async function onRequestPost(context) {
     return jsonResponse({ ok:false, error:"A league must retain at least one active commissioner." }, 409);
   }
 
-  if (input.teamId) {
-    const occupied = await context.env.DB.prepare(`
-      SELECT u.display_name AS displayName FROM league_memberships lm
-      INNER JOIN users u ON u.id=lm.user_id
-      WHERE lm.league_id=? AND lm.team_id=? AND lm.active=1 AND lm.user_id<>? LIMIT 1
-    `).bind(league.id, input.teamId, user.id).first();
-    if (occupied) return jsonResponse({ ok:false, error:`That team is already assigned to ${occupied.displayName || 'another member'}.` }, 409);
+  if (teamId) {
+    const assignments = await activeTeamAssignments(context.env.DB, league.id, teams);
+    const occupied = assignments.get(teamId);
+    if (occupied && occupied.userId !== user.id) {
+      return jsonResponse({ ok:false, error:`That team is already assigned to ${occupied.displayName || 'another member'}.` }, 409);
+    }
   }
 
-  const update = input.teamId
+  const update = teamId
     ? context.env.DB.prepare(`
         UPDATE league_memberships
         SET role=?, team_id=?, active=1, updated_at=CURRENT_TIMESTAMP
@@ -219,7 +248,7 @@ export async function onRequestPost(context) {
             SELECT 1 FROM league_memberships occupied
             WHERE occupied.league_id=? AND occupied.team_id=? AND occupied.active=1 AND occupied.user_id<>?
           )
-      `).bind(input.role, input.teamId, league.id, user.id, league.id, input.teamId, user.id)
+      `).bind(input.role, teamId, league.id, user.id, league.id, teamId, user.id)
     : context.env.DB.prepare(`
         UPDATE league_memberships
         SET role=?, team_id=NULL, active=1, updated_at=CURRENT_TIMESTAMP
@@ -233,14 +262,14 @@ export async function onRequestPost(context) {
   const action = Number(existing.active) ? "membership_updated" : "membership_activated";
   await audit(context.env.DB, league.id, auth.session.user.id, user.id, action, {
     role:input.role,
-    teamId:input.teamId,
+    teamId,
     previousRole:existing.role,
     previousTeamId:existing.teamId || null
   });
   return jsonResponse({
     ok:true,
     release:RELEASE,
-    membership:{ id:existing.id, leagueId:league.id, userId:user.id, role:input.role, teamId:input.teamId, active:true }
+    membership:{ id:existing.id, leagueId:league.id, userId:user.id, role:input.role, teamId, active:true }
   });
 }
 

@@ -1,4 +1,4 @@
-# FranchiseHQ 7.0.3 Member Onboarding Runbook
+# FranchiseHQ 7.0.4 Member Onboarding Runbook
 
 ## Goal
 
@@ -40,22 +40,21 @@ Use **Disable Access** to revoke a member. The current commissioner cannot disab
 
 A person who discovers the league URL can create a Pending request but cannot enter the league. Commissioners should approve only recognized Discord identities. Tokenized, expiring invitations remain a future multi-tenant enhancement if Pending-request spam becomes a real operational concern.
 
-## 7.0.3 phone acceptance checklist
+## 7.0.4 phone and desktop acceptance checklist
 
 Use one commissioner browser and one separate member browser or private window.
 
 1. Begin from `https://franchisehq.app/leagues/fgc`, complete one fresh Discord login if requested, and refresh Homepage, Commissioner HQ, Trade Center, and Trade Block. None should require another login.
-2. Open the old `https://franchise-hq.pages.dev/` address and confirm the browser moves to `https://franchisehq.app/`.
-3. Copy the invite link from Teams & Owners and confirm it begins with `https://franchisehq.app/`.
-4. Open it as a different Discord user and confirm the Pending page appears.
-5. Confirm that user cannot enter the league before approval.
-6. Activate the member as Team Owner with one team.
-7. Reopen the league link and confirm the assigned team and member pages survive refresh.
-8. Attempt to assign the same team to another Pending user and confirm FranchiseHQ blocks it.
-9. Disable the test member and confirm league entry is denied.
-10. Restore the member to Pending, activate them again, sign in again, and confirm the old disabled state does not return.
-11. On phone and desktop, confirm the Teams & Owners Pending/Active/Disabled controls fit without horizontal page scrolling and no duplicate error notice appears.
+2. As Justin/Peckin, open `https://franchise-hq.pages.dev/leagues/fgc`, complete Discord login if requested, and confirm refresh stays signed in on that exact owner fallback.
+3. Open the Pages address as Gas or another non-commissioner and confirm FranchiseHQ sends that browser to `https://franchisehq.app/`.
+4. Copy the invite link from Teams & Owners and confirm it begins with `https://franchisehq.app/`.
+5. Confirm Teams & Owners lists exactly the teams, names, logos, and colors from the active Madden import and does not resurrect an old Madden owner label or browser-stored owner.
+6. Assign Justin/Peckin as Commissioner and Tampa Bay Buccaneers; assign Gas as Team Owner and Green Bay Packers; disable Saluki. Confirm a staff role and a team can coexist.
+7. Reopen the league as Justin and Gas and confirm My Team, Trade Center, and Trade Block all use the assigned Buccaneers and Packers respectively after refresh.
+8. Attempt to assign either occupied team to another Pending user and confirm FranchiseHQ blocks it.
+9. Open **Commissioner HQ → League Data → Prepare for Madden 27**, load the preview, and confirm accounts, sessions, rules, Justin, and Gas are listed for preservation while Saluki can remain unselected. Do not type the confirmation or execute the reset during ordinary acceptance.
+10. On phone and desktop, confirm Pending/Active/Disabled controls, Teams & Owners rows, the assignment dialog, and reset preview fit without horizontal page scrolling, trapped inner scrolling, or duplicate error notices.
 
 ## Known boundary
 
-Trade Center, Trade Block, GOTW, and Confidence Pool workflow records remain browser-local controlled-beta data in 7.0.3. This release fixes their authenticated page/session behavior; it does not make those workflow records authoritative or shared.
+Trade Center, Trade Block, GOTW, and Confidence Pool workflow records remain browser-local controlled-beta data in 7.0.4. This release makes their authenticated team identity canonical; it does not yet make those workflow records authoritative or shared. Madden NFL 27 schema adaptation, Free Agent verification, and any real FGC reset remain separately gated.

@@ -1,0 +1,64 @@
+@import url("./release-7.0.3.css");
+
+/* FranchiseHQ 7.0.4 — canonical team ownership and protected Madden reset */
+.commissioner-teams-card .ownership-table-head,
+.commissioner-teams-card .ownership-team-row {
+  grid-template-columns:minmax(220px,1.35fr) minmax(160px,1fr) minmax(130px,.8fr) minmax(130px,.8fr) auto;
+}
+
+.commissioner-teams-card .ownership-team-row > * { min-width:0; }
+.commissioner-teams-card .ownership-team-row > span:nth-child(2) strong { overflow-wrap:anywhere; }
+.commissioner-reset-card { display:grid; gap:18px; }
+.commissioner-reset-card .validation-errors { margin:0; }
+.commissioner-reset-card .commissioner-member-list { display:grid; gap:8px; }
+.commissioner-reset-card .commissioner-member-list label {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 14px;
+  border:1px solid var(--line-soft);
+  border-radius:12px;
+  background:rgba(255,255,255,.025);
+  cursor:pointer;
+}
+.commissioner-reset-card .commissioner-member-list label > span { display:grid; gap:3px; min-width:0; }
+.commissioner-reset-card .commissioner-member-list small { color:var(--muted); overflow-wrap:anywhere; }
+.commissioner-reset-card .commissioner-member-list input { inline-size:20px; block-size:20px; flex:0 0 auto; accent-color:var(--accent); }
+.commissioner-reset-card .commissioner-member-list input:disabled { opacity:.65; cursor:not-allowed; }
+.commissioner-reset-card > .field { max-width:520px; }
+
+@media(max-width:900px) {
+  .commissioner-teams-card .ownership-table-head { display:none; }
+  .commissioner-teams-card .ownership-team-row {
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:12px 18px;
+    align-items:center;
+    padding:16px;
+  }
+  .commissioner-teams-card .ownership-team-row > span:first-child { grid-column:1 / -1; }
+  .commissioner-teams-card .ownership-team-row > span:nth-child(2),
+  .commissioner-teams-card .ownership-team-row > span:nth-child(3),
+  .commissioner-teams-card .ownership-team-row > .discord-status { display:flex!important; }
+  .commissioner-teams-card .ownership-team-row > span:nth-child(2),
+  .commissioner-teams-card .ownership-team-row > span:nth-child(3) { flex-direction:column; align-items:flex-start; gap:3px; }
+  .commissioner-teams-card .ownership-team-row > span:nth-child(2)::before,
+  .commissioner-teams-card .ownership-team-row > span:nth-child(3)::before { color:var(--muted); font-size:.68rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+  .commissioner-teams-card .ownership-team-row > span:nth-child(2)::before { content:"Assigned owner"; }
+  .commissioner-teams-card .ownership-team-row > span:nth-child(3)::before { content:"League role"; }
+  .commissioner-teams-card .ownership-team-row > button { justify-self:end; }
+}
+
+@media(max-width:560px) {
+  .commissioner-teams-card .card-header,
+  .commissioner-reset-card .card-header { align-items:flex-start; }
+  .commissioner-team-search { width:100%; }
+  .commissioner-teams-card .ownership-team-row { grid-template-columns:minmax(0,1fr) auto; }
+  .commissioner-teams-card .ownership-team-row > span:nth-child(2) { grid-column:1 / -1; }
+  .commissioner-teams-card .ownership-team-row > span:nth-child(3),
+  .commissioner-teams-card .ownership-team-row > .discord-status { align-self:center; }
+  .commissioner-teams-card .ownership-team-row > button { grid-column:1 / -1; width:100%; justify-self:stretch; }
+  .commissioner-reset-card .commissioner-member-list label { align-items:flex-start; }
+  .commissioner-reset-card .heading-actions { display:grid; grid-template-columns:1fr; width:100%; }
+  .commissioner-reset-card .heading-actions .button { width:100%; }
+}

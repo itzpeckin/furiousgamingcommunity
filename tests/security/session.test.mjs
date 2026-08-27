@@ -11,6 +11,8 @@ import {
 import { onRequestPost as claimSession } from '../../functions/api/auth/session/claim.js';
 import { onRequestGet as startDiscordLogin } from '../../functions/api/auth/discord/login.js';
 import { requireCommissioner } from '../../functions/_lib/permissions.js';
+import { canonicalAuthenticationOrigin } from '../../functions/_lib/origin.js';
+import { isOwnerFallbackIdentity, ownerFallbackDiscordId } from '../../functions/_lib/owner-fallback.js';
 
 function sessionDatabase(validHash) {
   return {
@@ -185,7 +187,7 @@ test('session handoff is origin-bound, one-time, and never accepted from a URL',
   assert.equal(db.sessions.length, 1);
 });
 
-test('Discord login begun on pages.dev establishes its session on franchisehq.app', async () => {
+test('Discord login begun on the owner fallback preserves that origin for commissioner gating', async () => {
   let storedStateId = '';
   const db = {
     prepare(sql) {
@@ -214,6 +216,25 @@ test('Discord login begun on pages.dev establishes its session on franchisehq.ap
   assert.equal(response.status, 302);
   const encoded = storedStateId.split('.')[1];
   const context = decodeOpaqueContext(encoded);
-  assert.equal(context.origin, 'https://franchisehq.app');
+  assert.equal(context.origin, 'https://franchise-hq.pages.dev');
   assert.equal(context.joinLeagueSlug, 'fgc');
+});
+
+test('only the configured Discord identity can qualify for the exact owner fallback', () => {
+  const env = { OWNER_FALLBACK_DISCORD_ID:'100000000000000001' };
+  assert.equal(ownerFallbackDiscordId(env), '100000000000000001');
+  assert.equal(isOwnerFallbackIdentity(env, { discordUserId:'100000000000000001' }), true);
+  assert.equal(isOwnerFallbackIdentity(env, { discordUserId:'100000000000000002' }), false);
+  assert.equal(isOwnerFallbackIdentity({}, { discordUserId:'100000000000000001' }), false);
+});
+
+test('preview authentication is canonical while the exact owner fallback is preserved', () => {
+  assert.equal(
+    canonicalAuthenticationOrigin('https://feature-branch.franchise-hq.pages.dev/leagues/fgc'),
+    'https://franchisehq.app'
+  );
+  assert.equal(
+    canonicalAuthenticationOrigin('https://franchise-hq.pages.dev/leagues/fgc'),
+    'https://franchise-hq.pages.dev'
+  );
 });

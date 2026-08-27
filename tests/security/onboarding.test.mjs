@@ -10,8 +10,12 @@ import {
   onRequestPost as saveMembership
 } from '../../functions/api/leagues/[leagueSlug]/memberships.js';
 
-function membershipDatabase({ targetMembership = null, occupied = null, membershipRows = [] } = {}) {
+function membershipDatabase({ targetMembership = null, occupied = null, membershipRows = [], teamRows = null } = {}) {
   const preparedSql = [];
+  const canonicalTeamRows = teamRows || [
+    { external_id:'dal-live', data_json:JSON.stringify({ external_id:'dal-live', abbreviation:'DAL', display_name:'Dallas Cowboys' }) },
+    { external_id:'tb-live', data_json:JSON.stringify({ external_id:'tb-live', abbreviation:'TB', display_name:'Tampa Bay Buccaneers' }) }
+  ];
   return {
     preparedSql,
     prepare(sql) {
@@ -55,7 +59,14 @@ function membershipDatabase({ targetMembership = null, occupied = null, membersh
           if (sql.includes('SELECT COUNT(*) AS count')) return { count:1 };
           return null;
         },
-        async all() { return { results:membershipRows }; },
+        async all() {
+          if (sql.includes("r.domain='teams'")) return { results:canonicalTeamRows };
+          if (sql.includes('AS storedTeamId')) return { results:occupied ? [{
+            membershipId:'existing-membership', userId:'existing-user', role:'team_owner',
+            storedTeamId:'dal', displayName:occupied.displayName
+          }] : [] };
+          return { results:membershipRows };
+        },
         async run() { return { meta:{ changes:1 } }; }
       };
     }

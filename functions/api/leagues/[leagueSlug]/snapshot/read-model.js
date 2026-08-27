@@ -1,7 +1,8 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../../_lib/permissions.js';
+import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../../_lib/league-teams.js';
 
-const RELEASE = '7.0.1';
+const RELEASE = '7.0.4';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -57,14 +58,13 @@ export function normalizeTeam(raw = {}) {
   const logo = text(raw.logo_url ?? raw.logoUrl);
   const primaryColor = text(raw.primary_color ?? raw.primaryColor);
   const secondaryColor = text(raw.secondary_color ?? raw.secondaryColor);
-  const owner = text(raw.owner_name ?? raw.ownerName ?? raw.userName);
   const wins = numeric(raw.wins ?? raw.totalWins) ?? 0;
   const losses = numeric(raw.losses ?? raw.totalLosses) ?? 0;
   const ties = numeric(raw.ties ?? raw.totalTies) ?? 0;
   const approved = {
     teamId:id, displayName, cityName:city, nickName:nickname, abbrName:abbreviation,
     conferenceName:conference, divisionName:division, logoUrl:logo, primaryColor,
-    secondaryColor, userName:owner, ownerName:owner, totalWins:wins, totalLosses:losses,
+    secondaryColor, userName:null, ownerName:null, totalWins:wins, totalLosses:losses,
     totalTies:ties, overall:numeric(raw.overall ?? raw.ovr_rating ?? raw.ovrRating),
     capAvailable:numeric(raw.capAvailable ?? raw.cap_available ?? raw.capRoom),
     ptsFor:numeric(raw.ptsFor ?? raw.pointsFor), ptsAgainst:numeric(raw.ptsAgainst ?? raw.pointsAgainst),
@@ -72,9 +72,32 @@ export function normalizeTeam(raw = {}) {
   };
   return {
     id, displayName, city, nickname, abbreviation, conference, division, logo,
-    primaryColor, secondaryColor, owner, overall:approved.overall,
+    primaryColor, secondaryColor, owner:'Unassigned', ownerRole:null, teamKey:null, overall:approved.overall,
     record:{wins,losses,ties}, source:approved
   };
+}
+
+function applyAuthoritativeOwners(records, canonicalTeams, assignments) {
+  return records.map(record => {
+    const team = resolveTeam(canonicalTeams, record.id)
+      || resolveTeam(canonicalTeams, record.abbreviation)
+      || null;
+    const assignment = team ? assignments.get(team.teamKey) : null;
+    const owner = assignment?.displayName || 'Unassigned';
+    return {
+      ...record,
+      teamKey: team?.teamKey || null,
+      owner,
+      ownerRole: assignment?.role || null,
+      source: {
+        ...(record.source || {}),
+        teamKey: team?.teamKey || null,
+        userName: assignment?.displayName || null,
+        ownerName: assignment?.displayName || null,
+        ownerRole: assignment?.role || null
+      }
+    };
+  });
 }
 
 export function normalizePlayer(raw = {}) {
@@ -324,12 +347,23 @@ export async function onRequestGet(context) {
     const limit = Number(url.searchParams.get('limit') || 150);
     const compact = domain === 'statistics' && String(url.searchParams.get('compact') || '') === '1';
     const page = await domainRows(db,league.id,active.id,domain,cursor,limit,compact);
+    if (domain === 'teams') {
+      const canonicalTeams = await activeLeagueTeams(db, league.id);
+      const assignments = await activeTeamAssignments(db, league.id, canonicalTeams);
+      page.records = applyAuthoritativeOwners(page.records, canonicalTeams, assignments);
+    }
     return json({...base,domain,...page});
   }
 
   if (ALLOWED_DOMAINS.has(sample)) {
     const page = await domainRows(db,league.id,active.id,sample,null,1);
-    return json({...base,sample:{domain:sample,record:page.records[0] || null}});
+    let record = page.records[0] || null;
+    if (sample === 'teams' && record) {
+      const canonicalTeams = await activeLeagueTeams(db, league.id);
+      const assignments = await activeTeamAssignments(db, league.id, canonicalTeams);
+      record = applyAuthoritativeOwners([record], canonicalTeams, assignments)[0];
+    }
+    return json({...base,sample:{domain:sample,record}});
   }
 
   return json(base);

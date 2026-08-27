@@ -689,7 +689,7 @@
       primary:team.primaryColor||source.primaryColor||'#242a36',
       secondary:team.secondaryColor||source.secondaryColor||'#ffffff',
       logo:team.logo||source.logoUrl||source.logo||null,
-      owner:team.owner||source.userName||'Unassigned',
+      owner:team.owner||'Unassigned',
       wins,losses,ties,record:`${wins}-${losses}${ties?`-${ties}`:''}`
     };
   }
@@ -1305,32 +1305,9 @@
   const liveRosterPlayers = new Map();
 
 
-  function assignedAccountForLiveTeam(team={}) {
-    const id=String(team.id||'');
-    const direct=window.FGC_TRADE?.getTeamOwnerAssignment?.(id);
-    if(direct) return direct;
-
-    const abbr=String(team.abbr||team.abbreviation||'');
-    const byAbbr=window.FGC_TRADE?.getTeamOwnerAssignment?.(abbr);
-    if(byAbbr) return byAbbr;
-
-    const accounts=window.FGC_TRADE?.accounts||[];
-    const idLower=id.toLowerCase();
-    const abbrLower=abbr.toLowerCase();
-    return accounts.find(account=>{
-      const assigned=String(account?.teamId||'').toLowerCase();
-      return assigned && (assigned===idLower || assigned===abbrLower);
-    }) || null;
-  }
-
   function liveTeamOwnerName(team={}) {
-    const assignment=assignedAccountForLiveTeam(team);
-    return assignment?.handle
-      || assignment?.name
-      || team.owner
-      || team.source?.userName
-      || team.source?.ownerName
-      || 'Unassigned';
+    const owner=team.owner;
+    return owner && String(owner).trim() ? String(owner).trim() : 'Unassigned';
   }
 
   function liveOwnedTeamId() {
@@ -1396,9 +1373,10 @@
       stadium:source.stadiumName||source.stadium||'—',
       source
     };
-    const assignment=assignedAccountForLiveTeam(shaped);
-    shaped.owner=assignment?.handle||assignment?.name||team.owner||source.userName||source.ownerName||'Unassigned';
-    shaped.ownerAccountId=assignment?.id||null;
+    shaped.teamKey=team.teamKey||source.teamKey||String(shaped.abbr||'').toLowerCase();
+    shaped.owner=liveTeamOwnerName(team);
+    shaped.ownerRole=team.ownerRole||source.ownerRole||null;
+    shaped.ownerAccountId=null;
     return shaped;
   }
 
@@ -9234,6 +9212,8 @@ function canonicalPlayerDashboardStats(playerId='') {
       fullName:String(team.fullName||team.displayName||''),
       displayName:String(team.displayName||team.fullName||''),
       owner:String(team.owner||'Unassigned'),
+      ownerRole:team.ownerRole||null,
+      teamKey:team.teamKey||String(team.abbr||'').toLowerCase(),
       logo:team.logo||null,
       primary:team.primary||null,
       secondary:team.secondary||null
@@ -9289,7 +9269,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   let tradeCenterLiveBridgeState={mode:'development',snapshotId:null,teamCount:teams.length,playerCount:players.length};
 
   function tradeCenterStableTeamId(team={}) {
-    return String(team.abbr||team.abbreviation||team.source?.abbrName||team.id||'').trim().toLowerCase();
+    return String(team.teamKey||team.source?.teamKey||team.abbr||team.abbreviation||team.source?.abbrName||team.id||'').trim().toLowerCase();
   }
 
   function tradeCenterLiveTeamShape(team={}) {
@@ -9301,7 +9281,9 @@ function canonicalPlayerDashboardStats(playerId='') {
       abbr:String(team.abbr||team.abbreviation||id).toUpperCase(),
       fullName:team.fullName||team.displayName||[team.city,team.name].filter(Boolean).join(' ')||id.toUpperCase(),
       logo:team.logo||team.source?.logo_url||team.source?.logoUrl||null,
-      owner:team.owner||liveTeamOwnerName(team)||'Unassigned'
+      owner:liveTeamOwnerName(team),
+      ownerRole:team.ownerRole||team.source?.ownerRole||null,
+      teamKey:team.teamKey||team.source?.teamKey||id
     };
   }
 
@@ -9518,9 +9500,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 7.0.3';
+      node.textContent = 'Current Release - 7.0.4';
     });
-    document.documentElement.dataset.franchiseHqRelease = '7.0.3';
+    document.documentElement.dataset.franchiseHqRelease = '7.0.4';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });

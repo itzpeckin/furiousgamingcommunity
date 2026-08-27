@@ -25,6 +25,7 @@
       "APP_VERSION",
       "DISCORD_CLIENT_ID",
       "DISCORD_REDIRECT_URI",
+      "OWNER_FALLBACK_DISCORD_ID",
       "PLATFORM_OWNER_ACCOUNT_ID"
     ],
     "secrets": [
@@ -65,6 +66,7 @@
         "APP_VERSION": "7.0.0",
         "DISCORD_CLIENT_ID": "local-discord-application",
         "DISCORD_REDIRECT_URI": "http://localhost:8788/api/auth/discord/callback",
+        "OWNER_FALLBACK_DISCORD_ID": "100000000000000001",
         "PLATFORM_OWNER_ACCOUNT_ID": "local-test-owner"
       },
       "secretNames": [
@@ -90,6 +92,7 @@
         "APP_VERSION": "7.0.0",
         "DISCORD_CLIENT_ID": "staging-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-staging",
+        "OWNER_FALLBACK_DISCORD_ID": "set-to-staging-owner-discord-id",
         "PLATFORM_OWNER_ACCOUNT_ID": "set-in-cloudflare-staging"
       },
       "secretNames": [
@@ -115,6 +118,7 @@
         "APP_VERSION": "7.0.0",
         "DISCORD_CLIENT_ID": "production-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-production",
+        "OWNER_FALLBACK_DISCORD_ID": "set-to-justin-discord-id",
         "PLATFORM_OWNER_ACCOUNT_ID": "set-in-cloudflare-production"
       },
       "secretNames": [

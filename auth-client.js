@@ -202,7 +202,8 @@
   }
 
   function isTeamOwner() {
-    return hasRole('commissioner', 'team_owner');
+    return hasRole('commissioner', 'trade_committee', 'team_owner')
+      && Boolean(authState.membership?.teamId);
   }
 
   function getDisplayName() {

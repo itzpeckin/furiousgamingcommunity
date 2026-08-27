@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.0.3",
   "releaseType": "corrective-authentication-membership",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.0.2",
@@ -24,18 +24,20 @@
     "migration.missing-ledger-write.0014_league_rules.sql"
   ],
   "staging": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-started",
-    "reason": "Local candidate work does not authorize a hosted deployment."
+    "authorized": true,
+    "deployed": true,
+    "status": "hosted-preview-passed-without-isolated-bindings",
+    "reason": "The review branch passed hosted preview checks; protected authenticated staging remains unavailable until isolated bindings exist."
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "unchanged",
+    "authorized": true,
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
     "url": "https://franchisehq.app/",
+    "commit": "9c5401a6c09a27275573115ebcd09e4b0e61fb21",
+    "cloudflareDeploymentId": "f00a1839-ad9c-4458-b772-6b013bf39840",
     "scope": "One application publication plus the idempotent membership-audit repair migration after explicit owner authorization.",
-    "reason": "Production application and database changes require a separate owner approval after review of this complete batch."
+    "reason": "The owner authorized migration 0015 and the squash merge after the database postcheck preserved all membership rows."
   },
   "requiredArtifacts": [
     "docs/ROADMAP.md",

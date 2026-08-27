@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.0.1';
+  const VERSION = '7.0.4';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();
@@ -40,11 +40,11 @@
   }
 
   function storageKey(snapshotId,domain){
-    return `fhq:live-read:7.0.1:${leagueSlug()}:${snapshotId}:${domain}`;
+    return `fhq:live-read:7.0.4:${leagueSlug()}:${snapshotId}:${domain}`;
   }
 
   function readPersisted(snapshotId,domain){
-    if(!snapshotId||!['teams','standings','games','players','statistics'].includes(domain))return null;
+    if(!snapshotId||!['standings','games','players','statistics'].includes(domain))return null;
     try{
       const parsed=JSON.parse(sessionStorage.getItem(storageKey(snapshotId,domain))||'null');
       if(!parsed||!Array.isArray(parsed.records))return null;
@@ -53,7 +53,7 @@
   }
 
   function persist(snapshotId,domain,records){
-    if(!snapshotId||!['teams','standings','games','players','statistics'].includes(domain))return;
+    if(!snapshotId||!['standings','games','players','statistics'].includes(domain))return;
     try{
       sessionStorage.setItem(storageKey(snapshotId,domain),JSON.stringify({savedAt:Date.now(),records}));
     }catch{
@@ -128,6 +128,13 @@
   async function getStandings() { return getDomain('standings'); }
   async function getSchedule() { return getDomain('games'); }
   async function getStatistics() { return getDomain('statistics'); }
+
+  function invalidateOwnership() {
+    domainCache.delete(`${leagueSlug()}:teams`);
+    for (const key of [...cache.keys()]) {
+      if (key.includes('"domain":"teams"')) cache.delete(key);
+    }
+  }
 
   async function loadSample(domain) {
     busy = true; lastError = null; rerender();
@@ -228,7 +235,7 @@
     }catch{return false}
   }
 
-  const service = {refresh,warm,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,loadSample,renderPanel,diagnostics};
+  const service = {refresh,warm,invalidateOwnership,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,loadSample,renderPanel,diagnostics};
   HQ.defineModuleService('league','liveData',service,{replace:true,alias:'liveData'});
 
   const scheduleWarm=()=>setTimeout(()=>warm(),0);

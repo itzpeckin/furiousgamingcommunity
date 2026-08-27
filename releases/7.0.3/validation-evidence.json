@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.0.3",
   "validatedOn": "2026-08-26",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "baselineGate": {
     "passed": true,
     "unregisteredFailures": 0
@@ -31,24 +31,29 @@
     "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" }
   },
   "external": {
-    "githubPullRequest": { "status": "not-started" },
-    "hostedChecks": { "status": "not-started" },
-    "stagingDeployment": { "status": "not-authorized" },
-    "productionDeployment": { "authorized": false, "status": "unchanged", "url": "https://franchisehq.app/" },
-    "productionMigration": { "authorized": false, "status": "not-run", "migration": "0015_membership_audit_repair.sql" }
+    "githubPullRequest": { "status": "merged", "number": 5, "mergeCommit": "9c5401a6c09a27275573115ebcd09e4b0e61fb21" },
+    "hostedChecks": { "status": "passed", "pullRequestChecks": 4, "productionQualityRun": 36, "githubPagesRun": 1214 },
+    "stagingDeployment": { "status": "hosted-preview-passed-without-isolated-bindings", "commit": "d031e16e70a9e37662b47e2ab93e60ba2b73ddd5" },
+    "productionDeployment": { "authorized": true, "status": "success", "url": "https://franchisehq.app/", "commit": "9c5401a6c09a27275573115ebcd09e4b0e61fb21", "cloudflareDeploymentId": "f00a1839-ad9c-4458-b772-6b013bf39840" },
+    "productionMigration": { "authorized": true, "status": "applied-and-verified", "migration": "0015_membership_audit_repair.sql", "recoveryPointRecorded": true }
   },
   "liveReadOnlyDiagnosis": {
     "database": "franchise-hq-db",
     "membershipTablePresent": true,
-    "membershipAuditTablePresent": false,
-    "schemaMigrationLedgerMaximumObserved": 10,
-    "productionRowsChanged": 0
+    "membershipAuditTablePresent": true,
+    "schemaMigrationLedgerMaximumObserved": 15,
+    "membershipRowsBefore": 3,
+    "membershipRowsAfter": 3,
+    "membershipRowsChanged": 0,
+    "auditRowsAfter": 0,
+    "repairIndexesPresent": 4,
+    "schemaMigrationRowsChanged": 1
   },
   "manualAcceptance": {
     "status": "pending-owner-check",
     "runbook": "docs/AUTH-ONBOARDING.md"
   },
-  "productionChanged": false,
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false
 }

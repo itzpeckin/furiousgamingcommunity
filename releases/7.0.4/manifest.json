@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.4",
+  "releaseType": "identity-canonical-ownership-reset-readiness",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.0.3",
+    "commit": "9c5401a6c09a27275573115ebcd09e4b0e61fb21",
+    "tree": "23485ca37c98ec1ef3a45d6798bb26fda3773588",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.0.4",
+  "environmentContract": "config/environment-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [
+    "migration.duplicate-version.0001",
+    "migration.duplicate-version.0002",
+    "migration.fresh-apply.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0002_create_authentication.sql",
+    "migration.missing-ledger-write.0013_league_membership_access_control.sql",
+    "migration.missing-ledger-write.0014_league_rules.sql"
+  ],
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "reason": "Local implementation and validation are authorized; no hosted publication is authorized yet."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "unchanged",
+    "url": "https://franchisehq.app/",
+    "scope": "No production application, migration, membership assignment, credential, or league-data change is authorized by the build approval.",
+    "reason": "Publication, migrations 0016-0017, Justin/Gas assignment, Saluki disablement, and any real reset require a later explicit authorization boundary."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/AUTH-ONBOARDING.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "functions/_lib/league-teams.js",
+    "functions/_lib/owner-fallback.js",
+    "functions/api/leagues/[leagueSlug]/reset-data.js",
+    "migrations/0016_canonical_team_ownership.sql",
+    "migrations/0017_league_data_reset_audit.sql",
+    "release-7.0.4.css",
+    "releases/7.0.4/release-record.md",
+    "releases/7.0.4/validation-evidence.json",
+    "tests/security/ownership.test.mjs",
+    "tests/security/session.test.mjs"
+  ]
+}

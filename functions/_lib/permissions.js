@@ -110,8 +110,20 @@ export async function requireTradeCommitteeAccess(
 }
 
 export async function requireTeamOwnerAccess(context) {
-  return requireLeagueRole(context, [
+  const access = await requireLeagueRole(context, [
     LEAGUE_ROLES.COMMISSIONER,
+    LEAGUE_ROLES.TRADE_COMMITTEE,
     LEAGUE_ROLES.TEAM_OWNER
   ]);
+  if (!access.authorized) return access;
+  if (!access.session.membership?.teamId) {
+    return {
+      authorized:false,
+      response:jsonResponse({
+        ok:false,
+        error:"An active team assignment is required."
+      },403)
+    };
+  }
+  return access;
 }

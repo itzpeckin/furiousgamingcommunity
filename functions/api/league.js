@@ -14,7 +14,7 @@ export async function onRequestGet(context) {
     if (!session.membership?.active || session.membership.leagueId !== league.id) {
       return json({ok:false,error:'Not found.'},404);
     }
-    return json({ok:true,release:'7.0.3',league:{
+    return json({ok:true,release:'7.0.4',league:{
       id:league.id,name:league.name,productName:league.product_name || 'Franchise HQ',slug:league.slug,
       currentSeason:league.current_season,currentWeek:league.current_week,tradeStartWeek:league.trade_start_week,
       tradeDeadlineWeek:league.trade_deadline_week,discordGuildId:league.discord_guild_id,

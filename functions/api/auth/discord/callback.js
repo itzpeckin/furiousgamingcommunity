@@ -11,7 +11,12 @@ import {
   jsonResponse,
   redirectResponse
 } from "../../../_lib/auth.js";
-import { canonicalAuthenticationOrigin } from "../../../_lib/origin.js";
+import {
+  CANONICAL_APP_ORIGIN,
+  OWNER_FALLBACK_ORIGIN,
+  canonicalAuthenticationOrigin
+} from "../../../_lib/origin.js";
+import { isOwnerFallbackIdentity } from "../../../_lib/owner-fallback.js";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -332,6 +337,22 @@ export async function onRequestGet(context) {
       } catch (joinError) {
         console.error("League pending-membership registration failed:", joinError);
       }
+    }
+
+    // franchise-hq.pages.dev is a deliberate owner fallback for environments
+    // that block the custom domain. Only an active commissioner receives a
+    // durable session on that hostname; every other account is handed to the
+    // public custom domain.
+    if (new URL(loginOrigin).origin === OWNER_FALLBACK_ORIGIN) {
+      const fallbackAccess = isOwnerFallbackIdentity(context.env, discordUser.id)
+        ? await context.env.DB.prepare(`
+        SELECT 1 AS allowed
+        FROM league_memberships
+        WHERE user_id=? AND role='commissioner' AND active=1
+        LIMIT 1
+      `).bind(user.id).first()
+        : null;
+      if (!fallbackAccess?.allowed) loginOrigin = CANONICAL_APP_ORIGIN;
     }
 
     // OAuth may complete on pages.dev while the user entered through the custom
