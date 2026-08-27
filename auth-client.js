@@ -51,8 +51,17 @@
   }
 
   function currentLeaguePath() {
-    const match = location.pathname.match(/^\/leagues\/([^/?#]+)$/i);
+    const match = location.pathname.match(/^\/leagues\/([^/?#]+)\/?$/i);
     return match ? `/leagues/${encodeURIComponent(decodeURIComponent(match[1]))}` : null;
+  }
+
+  function currentLeagueDestination() {
+    const path = currentLeaguePath();
+    if (!path) return null;
+    const hash = String(location.hash || '');
+    return /^#[A-Za-z0-9][A-Za-z0-9._~:/%+-]{0,255}$/.test(hash)
+      ? `${path}${hash}`
+      : path;
   }
 
   function rememberLoginRoute() {
@@ -147,8 +156,8 @@
 
   function login() {
     rememberLoginRoute();
-    const joinPath = currentLeaguePath();
-    window.location.assign(api.buildUrl('/api/auth/discord/login', joinPath ? { returnTo: joinPath } : null));
+    const returnTo = currentLeagueDestination();
+    window.location.assign(api.buildUrl('/api/auth/discord/login', returnTo ? { returnTo } : null));
   }
 
   async function logout() {

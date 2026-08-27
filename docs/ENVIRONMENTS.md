@@ -57,10 +57,14 @@ EA direct-access secrets are intentionally excluded until the 7.0.1 security con
 - `APP_ENV`
 - `APP_VERSION`
 - `DISCORD_CLIENT_ID`
-- `DISCORD_REDIRECT_URI`
+- `DISCORD_REDIRECT_URI_PUBLIC` (optional explicit override; production value must be exactly `https://franchisehq.app/api/auth/discord/callback`)
+- `DISCORD_REDIRECT_URI_OWNER` (optional explicit override; production value must be exactly `https://franchise-hq.pages.dev/api/auth/discord/callback`)
+- `DISCORD_REDIRECT_URI` (legacy/local fallback only; known production origins use the separate public and owner contracts)
 - `OWNER_FALLBACK_DISCORD_ID` (Justin's numeric Discord user ID; permits only that identity to use the exact Pages owner fallback when the account is also an active commissioner)
 - `PLATFORM_OWNER_ACCOUNT_ID` (legacy transition variable; removed by tenant-ready authorization work)
 
+The public and owner callback URLs must both be registered in the production FranchiseHQ Discord application. They deliberately create host-scoped sessions; one callback must never silently stand in for the other. Preview Pages hostnames are not valid OAuth redirects.
+
 ## Verification gate
 
-Staging cannot be marked ready until a binding report proves no resource identifier or OAuth redirect is shared with production. Production remains untouched during 7.0.0.
+Staging cannot be marked ready until a binding report proves no resource identifier or OAuth redirect is shared with production. A release cannot claim authentication acceptance until each permitted production origin has completed its own callback and refresh test.

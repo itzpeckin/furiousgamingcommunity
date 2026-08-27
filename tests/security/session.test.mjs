@@ -10,8 +10,16 @@ import {
 } from '../../functions/_lib/auth.js';
 import { onRequestPost as claimSession } from '../../functions/api/auth/session/claim.js';
 import { onRequestGet as startDiscordLogin } from '../../functions/api/auth/discord/login.js';
+import { createDirectSession } from '../../functions/api/auth/discord/callback.js';
+import { onRequest as protectedLeagueDocument } from '../../functions/leagues/[[path]].js';
 import { requireCommissioner } from '../../functions/_lib/permissions.js';
-import { canonicalAuthenticationOrigin } from '../../functions/_lib/origin.js';
+import {
+  OWNER_DISCORD_REDIRECT_URI,
+  PUBLIC_DISCORD_REDIRECT_URI,
+  canonicalAuthenticationOrigin,
+  discordRedirectUriForOrigin,
+  normalizeLeagueReturnTo
+} from '../../functions/_lib/origin.js';
 import { isOwnerFallbackIdentity, ownerFallbackDiscordId } from '../../functions/_lib/owner-fallback.js';
 
 function sessionDatabase(validHash) {
@@ -187,6 +195,75 @@ test('session handoff is origin-bound, one-time, and never accepted from a URL',
   assert.equal(db.sessions.length, 1);
 });
 
+test('same-origin Discord completion creates a durable session without a cross-domain handoff', async () => {
+  const inserted = [];
+  const db = {
+    prepare(sql) {
+      return {
+        values:[],
+        bind(...values) { this.values=values; return this; },
+        async run() { inserted.push({ sql, values:this.values }); return { meta:{ changes:1 } }; }
+      };
+    }
+  };
+  const response = await createDirectSession({ env:{ DB:db } }, 'user-1', '/leagues/fgc#commissioner');
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get('location'), '/leagues/fgc#commissioner');
+  assert.match(response.headers.get('set-cookie') || '', /franchise_hq_session/);
+  assert.equal(response.headers.get('x-franchisehq-session-establishment'), 'same-origin');
+  assert.equal(inserted.length, 1);
+  assert.equal(inserted[0].values[1], 'user-1');
+});
+
+test('a missing league session uses the exact-route browser bridge instead of losing the hash', async () => {
+  const response = await protectedLeagueDocument({
+    request:new Request('https://franchisehq.app/leagues/fgc#commissioner'),
+    env:{
+      DB:{
+        prepare() {
+          return { bind() { return this; }, async first() { return { id:'league-1', slug:'fgc', name:'FGC' }; } };
+        }
+      }
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('x-franchisehq-auth-bridge'), 'exact-route');
+  const html = await response.text();
+  assert.match(html, /location\.hash/);
+  assert.match(html, /returnTo/);
+  assert.match(html, /exact league screen you refreshed/i);
+});
+
+test('public Discord login returns to franchisehq.app and preserves the exact protected route', async () => {
+  let storedStateId = '';
+  const db = {
+    prepare(sql) {
+      return {
+        values:[],
+        bind(...values) { this.values=values; return this; },
+        async first() {
+          if (sql.includes('SELECT id, slug FROM leagues')) return { id:'league-1', slug:'fgc' };
+          return null;
+        },
+        async run() {
+          if (sql.includes('INSERT INTO oauth_states')) storedStateId=this.values[0];
+          return { meta:{ changes:1 } };
+        }
+      };
+    }
+  };
+  const response = await startDiscordLogin({
+    request:new Request('https://franchisehq.app/api/auth/discord/login?returnTo=%2Fleagues%2Ffgc%23trade-center%2Fnew'),
+    env:{ DB:db, DISCORD_CLIENT_ID:'client-id', DISCORD_REDIRECT_URI:'https://franchise-hq.pages.dev/api/auth/discord/callback' }
+  });
+  const discordUrl = new URL(response.headers.get('location'));
+  assert.equal(discordUrl.searchParams.get('redirect_uri'), PUBLIC_DISCORD_REDIRECT_URI);
+  const context = decodeOpaqueContext(storedStateId.split('.')[1]);
+  assert.equal(context.origin, 'https://franchisehq.app');
+  assert.equal(context.redirectUri, PUBLIC_DISCORD_REDIRECT_URI);
+  assert.equal(context.returnTo, '/leagues/fgc#trade-center/new');
+});
+
 test('Discord login begun on the owner fallback preserves that origin for commissioner gating', async () => {
   let storedStateId = '';
   const db = {
@@ -218,6 +295,8 @@ test('Discord login begun on the owner fallback preserves that origin for commis
   const context = decodeOpaqueContext(encoded);
   assert.equal(context.origin, 'https://franchise-hq.pages.dev');
   assert.equal(context.joinLeagueSlug, 'fgc');
+  assert.equal(context.redirectUri, OWNER_DISCORD_REDIRECT_URI);
+  assert.equal(new URL(response.headers.get('location')).searchParams.get('redirect_uri'), OWNER_DISCORD_REDIRECT_URI);
 });
 
 test('only the configured Discord identity can qualify for the exact owner fallback', () => {
@@ -237,4 +316,14 @@ test('preview authentication is canonical while the exact owner fallback is pres
     canonicalAuthenticationOrigin('https://franchise-hq.pages.dev/leagues/fgc'),
     'https://franchise-hq.pages.dev'
   );
+});
+
+test('Discord callback selection and protected return routes fail closed', () => {
+  assert.equal(discordRedirectUriForOrigin({}, 'https://franchisehq.app'), PUBLIC_DISCORD_REDIRECT_URI);
+  assert.equal(discordRedirectUriForOrigin({}, 'https://franchise-hq.pages.dev'), OWNER_DISCORD_REDIRECT_URI);
+  assert.equal(normalizeLeagueReturnTo('/leagues/fgc#commissioner/league-data'), '/leagues/fgc#commissioner/league-data');
+  assert.equal(normalizeLeagueReturnTo('/leagues/fgc#trade-block'), '/leagues/fgc#trade-block');
+  assert.equal(normalizeLeagueReturnTo('https://attacker.example/leagues/fgc'), null);
+  assert.equal(normalizeLeagueReturnTo('//attacker.example/leagues/fgc'), null);
+  assert.equal(normalizeLeagueReturnTo('/leagues/fgc?next=https://attacker.example'), null);
 });

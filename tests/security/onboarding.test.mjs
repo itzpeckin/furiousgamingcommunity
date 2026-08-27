@@ -94,8 +94,17 @@ test('membership input requires a safe role, user, and owner team', () => {
   assert.equal(normalizeMembershipInput({ userId:'../user', role:'team_owner', teamId:'tb' }).ok, false);
   assert.deepEqual(
     normalizeMembershipInput({ userId:'user-1', role:'trade_committee', teamId:'' }),
-    { ok:true, role:'trade_committee', teamId:null, userId:'user-1', discordUserId:'' }
+    { ok:true, role:'trade_committee', teamId:null, userId:'user-1', discordUserId:'', reactivate:false }
   );
+});
+
+test('the FGC membership policy requires a team for every active league role', async () => {
+  const response = await saveMembership(requestContext(
+    { userId:'invitee-user', role:'trade_committee', teamId:null },
+    membershipDatabase({ targetMembership:{ id:'pending-1', active:0, lastAccessAction:null } })
+  ));
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /every active league member requires a team/i);
 });
 test('commissioner cannot activate a global user who did not accept the league invite', async () => {
   const response = await saveMembership(requestContext(
@@ -171,6 +180,26 @@ test('commissioner cannot assign two active users to the same team', async () =>
   assert.match((await response.json()).error, /Existing Owner/);
 });
 
+test('revoked access requires an explicit secure reactivation from Teams & Owners', async () => {
+  const targetMembership = {
+    id:'disabled-1', userId:'invitee-user', role:'team_owner', teamId:'dal',
+    active:0, lastAccessAction:'membership_deactivated'
+  };
+  const blocked = await saveMembership(requestContext(
+    { userId:'invitee-user', role:'team_owner', teamId:'dal' },
+    membershipDatabase({ targetMembership })
+  ));
+  assert.equal(blocked.status, 409);
+  assert.match((await blocked.json()).error, /explicitly reactivate this revoked member/i);
+
+  const restored = await saveMembership(requestContext(
+    { userId:'invitee-user', role:'team_owner', teamId:'dal', reactivate:true },
+    membershipDatabase({ targetMembership })
+  ));
+  assert.equal(restored.status, 200);
+  assert.equal((await restored.json()).membership.active, true);
+});
+
 test('commissioner cannot demote or deactivate their own account', async () => {
   const db = membershipDatabase({
     targetMembership:{
@@ -210,6 +239,11 @@ test('refresh and onboarding source guards remain wired to the real Discord sess
   assert.ok(tradeModule.includes('data-copy-league-invite'));
   assert.ok(tradeModule.includes("FRANCHISEHQ_PUBLIC_ORIGIN='https://franchisehq.app'"));
   assert.ok(tradeModule.includes('commissionerMembersPromise'));
+  assert.ok(tradeModule.includes('Revoke Platform Access'));
+  assert.equal(tradeModule.includes('Active Discord Members'), false);
+  assert.equal(tradeModule.includes('Disabled Discord Members'), false);
+  assert.equal(tradeModule.includes('renderCommissionerTeamsLegacy'), false);
+  assert.ok(tradeModule.includes('New players awaiting assignment'));
   assert.ok(authClient.includes('restoreLoginRoute()'));
   assert.ok(authClient.includes('franchisehq:auth:return-route:v1'));
   assert.ok(app.includes("['commissioner','trade-center','trade-block'].includes(activeBase)"));

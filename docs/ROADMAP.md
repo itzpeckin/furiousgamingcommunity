@@ -1,11 +1,11 @@
 # FranchiseHQ Platform Roadmap: FGC First-League Launch
 
 **Roadmap baseline:** August 26, 2026  
-**Roadmap revision:** 1.17
+**Roadmap revision:** 1.18
 **Starting point:** FranchiseHQ 6.3.x  
 **Target:** A secure, polished FranchiseHQ platform with FGC as its first production league and with application/data boundaries ready for future multi-tenant operation.  
-**Current status:** FranchiseHQ 7.0.3 remains the production baseline at squash commit `9c5401a6c09a27275573115ebcd09e4b0e61fb21`. After failed owner acceptance exposed host switching and legacy Team Owner precedence, local 7.0.4 implementation is authorized and in progress as one credit-conscious batch. Production, D1, credentials, and Cloudflare configuration remain unchanged.
-**Next gate:** Finish the complete local 7.0.4 quality gate and release evidence. Then review one candidate before requesting separate authorization for the pull request, migrations 0016–0017, publication, or any real FGC data reset. Madden NFL 27 schema adaptation remains paused until the Companion App provides a representative stable export.
+**Current status:** FranchiseHQ 7.0.4 is the production baseline at squash commit `60e8d46bf2c55894fff4f88c33d8b43ed2643bc4`; migrations 0016–0017 and the intended initial FGC membership assignments are applied, and no league-data reset has occurred. Owner validation passed the Pages fallback and server-backed access management but exposed an exact-route refresh defect, a mobile Discord browser-context handoff, and duplicated Commissioner membership panels. FranchiseHQ 7.0.5 is authorized as one corrective publication cycle; production remains on 7.0.4 until that cycle completes.
+**Next gate:** Complete the 7.0.5 local quality gate, register and verify both exact Discord callback URLs, publish one pull request, require green hosted checks, and perform one production merge/deployment. Then validate exact-route refresh and the consolidated Teams & Owners workflow on desktop and mobile. No database migration, membership edit, Madden import activation, or data reset is part of 7.0.5.
 
 ## 1. The commitment
 
@@ -35,6 +35,7 @@ The current 6.3.x work is not discarded. Useful components will be retained wher
 - **Revision 1.15:** Recorded failed 7.0.2 owner acceptance and live production diagnosis. The production D1 database has `league_memberships` but not `league_membership_audit`, so the Commish HQ member endpoint returns a redacted server error. Created 7.0.3 as a batched corrective release to make the endpoint rollout-compatible, add an idempotent audit-schema repair, deduplicate member loading, make every invite use `franchisehq.app`, return OAuth sessions to that canonical domain, and redirect Cloudflare Pages document traffic while retaining the configured Discord callback API. Shifted Madden NFL 27 intake/reset to 7.0.4 and the dependent mobile roster/player-link/Trade Block work to 7.0.5. No production mutation is authorized by this roadmap update.
 - **Revision 1.16:** Completed the owner-authorized 7.0.3 publication and database-repair cycle. Recorded a current D1 Time Travel recovery point, verified three memberships before the migration, applied migration 0015 one idempotent statement at a time, and verified the same three memberships, an empty audit table, the ledger entry, and four required indexes afterward. Pull request #5 passed four checks and squash-merged as `9c5401a`; production GitHub quality, GitHub Pages, and Cloudflare Pages passed. Cloudflare marked deployment `f00a1839-ad9c-4458-b772-6b013bf39840` successful with `franchisehq.app` attached. No user, membership, team, league, imported Madden, credential, or binding value was changed. Owner phone/desktop workflow acceptance remains pending.
 - **Revision 1.17:** Recorded the owner's failed 7.0.3 acceptance evidence: protected refresh begins on `franchisehq.app` but Discord returns the owner to `franchise-hq.pages.dev`, and Teams & Owners can still display imported or browser-local legacy identities. Reframed 7.0.4 as the immediate trust-boundary release: keep `franchisehq.app` public while allowing the exact Pages hostname only for Justin's configured Discord identity when it also has active commissioner access; derive team identity only from the active Madden snapshot; derive ownership and league staff roles only from authenticated memberships; allow staff to own teams; enforce one active controller per imported team; retire browser-local owner/demo precedence; and add a commissioner-previewed, typed, audited data reset that always preserves the acting commissioner and explicitly selected members. Justin/Peckin is intended for Tampa Bay, Gas for Green Bay, and Saluki disabled during the later owner-operated production assignment/reset step; those FGC identities are configuration, not hard-coded product behavior. Madden NFL 27 schema adaptation, Free Agent verification, and activation remain gated on a representative export. No publication, migration, membership edit, Cloudflare variable change, or data reset is authorized by this implementation decision.
+- **Revision 1.18:** Recorded the completed 7.0.4 production publication at `60e8d46`, the application of migrations 0016–0017, and the owner-approved FGC membership assignments without any Madden-data reset. Owner acceptance proved the exact Pages fallback and server-backed member access work, then isolated three 7.0.5 corrections: domain-specific Discord callbacks and same-origin sessions, preservation of the exact league hash route across refresh/login, and removal of the duplicated Active/Disabled panels in favor of one Teams & Owners management surface while retaining the new-player Pending queue. Made a team assignment the default requirement for every active FGC role, including commissioners and Trade Committee members, with a future per-league policy override rather than an FGC product hard-code. Replaced the former 7.0.5 roster/permalink scope with this authorized corrective release and moved that feature scope intact to 7.0.6. No migration, membership edit, import activation, or reset is part of 7.0.5.
 
 The change log is append-only. Later discoveries, owner decisions, bugs, and scope changes will be recorded here and in the affected release record rather than silently changing the plan.
 
@@ -45,9 +46,10 @@ The change log is append-only. Later discoveries, owner decisions, bugs, and sco
 | 7.0.0 | Released — `main` commit `de01cff`, tag `v7.0.0`; production quality, Pages, import-Worker, and phone acceptance passed | Controlled engineering and deployment baseline |
 | 7.0.1 | Released — `main` commit `af9d125`; production quality, GitHub Pages, Cloudflare Pages, and owner refresh validation passed | Immediate security containment and general refresh-session reliability |
 | 7.0.2 | Released — `main` commit `1418d0b`; hosted checks passed, but owner acceptance failed on protected-route refresh, member loading, and domain consistency | Superseded by the 7.0.3 corrective release |
-| 7.0.3 | Deployed — `main` commit `9c5401a`; database repair and production checks passed; owner phone/desktop acceptance pending | Canonical-domain session repair plus Commish HQ membership schema compatibility |
-| 7.0.4 | Implementation authorized — local candidate in progress; production unchanged | Durable dual-host owner access, canonical imported teams, authenticated ownership, and protected reset readiness |
-| 7.0.5 | Planned after 7.0.4 | Mobile roster preview, player permalinks, and Trade Block Lite |
+| 7.0.3 | Released — `main` commit `9c5401a`; database repair and production checks passed; later owner acceptance was superseded by 7.0.4 | Canonical-domain session repair plus Commish HQ membership schema compatibility |
+| 7.0.4 | Released — `main` commit `60e8d46`; production checks and data preflights passed, migrations 0016–0017 and initial memberships applied; owner acceptance partially passed | Durable dual-host owner access, canonical imported teams, authenticated ownership, and protected reset readiness |
+| 7.0.5 | Authorized corrective candidate — one PR/deployment cycle; no data or migration work | Exact-route dual-domain authentication and consolidated Commissioner member management |
+| 7.0.6 | Planned after 7.0.5 and a representative Madden NFL 27 export | Mobile roster preview, player permalinks, and Trade Block Lite |
 | 7.1.0–7.3.0 | Planned | Canonical database, tenant boundaries, and authentication |
 | 7.4.0–7.8.0 | Planned | Full import platform and authoritative league workflows |
 | 7.9.0 | Planned | Full Trade Center and advanced Trade Block workflow |
@@ -255,7 +257,27 @@ Each release is completed in its own reviewable change set. It receives a versio
 
 **Release gate:** For the current 7.0.4 candidate, all security/ownership/reset regressions and the full baseline quality gate pass; migrations are rehearsed locally; a production preflight proves the intended Justin/Gas preservation and Saluki disablement without changing data; and the owner separately authorizes publication, each migration, and any actual FGC reset. The later Madden NFL 27 activation gate remains: staging reset counts reconcile to the backup, no old active-season records or caches reappear, import counts reconcile to the representative source, Free Agents are imported and counted or explicitly proven absent, and rollback restores the prior state.
 
-### 7.0.5 — Mobile Roster Preview, Player Permalinks, and Trade Block Lite
+### 7.0.5 — Exact-Route Authentication and Commissioner Management Consolidation
+
+**Purpose:** Finish the login and member-management foundation needed to invite FGC users without duplicated controls, cross-domain session confusion, or refresh navigation loss.
+
+**Authorized build:**
+
+- Register and use separate exact Discord callback URLs for `franchisehq.app` and the owner-only `franchise-hq.pages.dev` fallback. A successful callback establishes the session on the same allowed origin that initiated login.
+- Preserve a safe league path and hash route such as Commissioner HQ, Trade Center, or Trade Block through refresh and OAuth return. An unauthenticated server document uses a small browser bridge so the hash is not lost before login begins.
+- When Discord opens its authorization result in a different mobile browser context and the original state cookie is unavailable, show the Discord identity and require a deliberate **Continue to FranchiseHQ** action before completing the one-time origin-bound session handoff.
+- Keep the Pages fallback restricted to the configured owner Discord identity plus active commissioner membership. It is an operational fallback, not a second public tenant domain.
+- Remove the standalone **Authorized Access (Active Discord Members)** and **Revoked Access (Disabled Discord Members)** panels.
+- Retain the **New players awaiting assignment** queue and make **Teams & Owners → Manage** the single commissioner surface for assigning a member, assigning a team, changing a role, revoking platform access, and explicitly reactivating a revoked member.
+- Require every active FGC league member—including a commissioner or Trade Committee member—to have a canonical imported team. Express this through a per-league server policy whose secure default requires a team, so a future league can deliberately choose a different rule without weakening FGC.
+- Preserve duplicate-team, current-commissioner self-lockout, last-commissioner, cross-league, CSRF/origin, and audit protections.
+- Add focused automated regressions for domain-specific callback selection, same-origin session creation, exact hash-route recovery, confirmed mobile handoff, consolidated Commissioner UI, team-required activation, and explicit reactivation.
+
+**Why:** FGC cannot be safely invited until a refresh behaves like a refresh, Discord returns users to the origin they chose, and commissioners have one understandable, server-authoritative management workflow.
+
+**Release gate:** The full baseline gate and focused security suite pass; both callback URLs are registered in Discord before production merge; one pull request passes hosted checks; production serves 7.0.5; and the owner validates exact-route refresh on desktop and mobile plus assign/role/revoke/reactivate in Teams & Owners. No data reset or schema migration runs.
+
+### 7.0.6 — Mobile Roster Preview, Player Permalinks, and Trade Block Lite
 
 **Purpose:** Give FGC members an immediately useful, trustworthy first FranchiseHQ experience while the broader production roadmap continues.
 

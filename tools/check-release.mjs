@@ -151,6 +151,48 @@ if (version === '7.0.4') {
     }
   }
 }
+if (version === '7.0.5') {
+  for (const check of [
+    'securityTests',
+    'domainSpecificDiscordCallbacks',
+    'sameOriginSessionEstablishment',
+    'exactRouteRefreshBridge',
+    'mobileIdentityConfirmation',
+    'ownerFallbackGating',
+    'commissionerManagementConsolidation',
+    'pendingQueuePreserved',
+    'membershipTeamPolicy',
+    'membershipReactivation',
+    'commissionerLockoutProtection',
+    'mobileOwnershipLayout'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.0.5 authentication/onboarding evidence is incomplete: ${check}.`);
+  }
+  if (isPostDeployment) {
+    if (manifest.production?.authorized !== true || manifest.production?.deployed !== true || manifest.production?.status !== 'success-pending-owner-acceptance') {
+      errors.push('Deployed 7.0.5 evidence must record the owner-authorized successful production publication.');
+    }
+    if (evidence.external?.githubPullRequest?.status !== 'merged' || evidence.external?.hostedChecks?.status !== 'passed') {
+      errors.push('Deployed 7.0.5 evidence must record the merged pull request and passing hosted checks.');
+    }
+    if (evidence.external?.productionDeployment?.authorized !== true || evidence.external?.productionDeployment?.status !== 'success') {
+      errors.push('Deployed 7.0.5 evidence must record the successful authorized Cloudflare deployment.');
+    }
+  } else {
+    if (manifest.production?.authorized !== true || manifest.production?.deployed !== false) {
+      errors.push('The owner-authorized 7.0.5 candidate must record publication authorization without claiming deployment.');
+    }
+    if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
+      errors.push('7.0.5 must not claim an authorized or completed production migration.');
+    }
+    if (evidence.external?.productionDataReset?.authorized !== false || evidence.external?.productionDataReset?.status !== 'not-run') {
+      errors.push('7.0.5 must not claim an authorized or completed production data reset.');
+    }
+    if (manifest.status === 'validated-production-authorized' && evidence.external?.discordOAuthConfiguration?.status !== 'registered-and-verified') {
+      errors.push('The validated 7.0.5 production candidate requires both exact Discord callbacks to be registered and verified.');
+    }
+  }
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

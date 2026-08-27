@@ -9,14 +9,17 @@ import {
   jsonResponse,
   redirectResponse
 } from "../../../_lib/auth.js";
-import { canonicalAuthenticationOrigin } from "../../../_lib/origin.js";
+import {
+  canonicalAuthenticationOrigin,
+  discordRedirectUriForOrigin,
+  normalizeLeagueReturnTo
+} from "../../../_lib/origin.js";
 
 export async function onRequestGet(context) {
   try {
     const missingVariables = [
       "DB",
-      "DISCORD_CLIENT_ID",
-      "DISCORD_REDIRECT_URI"
+      "DISCORD_CLIENT_ID"
     ].filter((name) => !context.env[name]);
 
     if (missingVariables.length > 0) {
@@ -38,8 +41,9 @@ export async function onRequestGet(context) {
     // origin that initiated it.
     const requestUrl = new URL(context.request.url);
     const loginOrigin = canonicalAuthenticationOrigin(requestUrl);
-    const rawReturnTo = String(requestUrl.searchParams.get("returnTo") || "");
-    const returnMatch = rawReturnTo.match(/^\/leagues\/([^/?#]+)$/i);
+    const redirectUri = discordRedirectUriForOrigin(context.env, loginOrigin);
+    const safeReturnTo = normalizeLeagueReturnTo(requestUrl.searchParams.get("returnTo"));
+    const returnMatch = safeReturnTo?.match(/^\/leagues\/([^/?#]+)(#[\s\S]+)?$/i) || null;
     let joinLeague = null;
     if (returnMatch) {
       const candidate = decodeURIComponent(returnMatch[1]);
@@ -50,8 +54,12 @@ export async function onRequestGet(context) {
     }
     const oauthContext = encodeOpaqueContext({
       origin: loginOrigin,
+      redirectUri,
       joinLeagueId: joinLeague?.id || null,
-      joinLeagueSlug: joinLeague?.slug || null
+      joinLeagueSlug: joinLeague?.slug || null,
+      returnTo: joinLeague
+        ? `/leagues/${joinLeague.slug}${returnMatch?.[2] || ""}`
+        : null
     });
     const stateId = `oauthctx.${oauthContext}.${crypto.randomUUID()}`;
     const expiresAt = addSecondsToNow(
@@ -83,7 +91,7 @@ export async function onRequestGet(context) {
 
     authorizationUrl.searchParams.set(
       "redirect_uri",
-      context.env.DISCORD_REDIRECT_URI
+      redirectUri
     );
 
     authorizationUrl.searchParams.set(

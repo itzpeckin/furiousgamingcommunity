@@ -1,0 +1,31 @@
+@import url("./release-7.0.4.css");
+
+/* FranchiseHQ 7.0.5 — durable authentication and unified member management */
+.commissioner-pending-members { margin-bottom:14px; }
+.commissioner-pending-member-row {
+  display:grid;
+  grid-template-columns:minmax(180px,1fr) minmax(150px,.8fr) minmax(180px,1fr) auto;
+  gap:10px;
+  align-items:end;
+  padding:12px 0;
+  border-top:1px solid var(--line-soft);
+}
+.commissioner-pending-member-row > div { align-self:center; min-width:0; }
+.commissioner-pending-member-row > div strong,
+.commissioner-pending-member-row > div small { display:block; overflow-wrap:anywhere; }
+.commissioner-pending-member-row > div small { margin-top:3px; color:var(--muted); }
+.ownership-member-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px; }
+.ownership-assignment-note { display:block; margin-top:10px; color:var(--muted); line-height:1.5; }
+
+@media(max-width:760px) {
+  .commissioner-pending-member-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:end; }
+  .commissioner-pending-member-row > div { grid-column:1 / -1; }
+  .commissioner-pending-member-row > .button { grid-column:1 / -1; width:100%; }
+  .ownership-member-actions { display:grid; grid-template-columns:1fr; }
+  .ownership-member-actions .button { width:100%; }
+}
+
+@media(max-width:480px) {
+  .commissioner-pending-member-row { grid-template-columns:1fr; }
+  .commissioner-pending-member-row > * { grid-column:1; }
+}

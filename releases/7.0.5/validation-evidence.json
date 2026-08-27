@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.5",
+  "validatedOn": "2026-08-26",
+  "status": "local-validation-passed-production-authorized",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "repositoryLint": { "passed": true },
+    "javascriptSyntax": { "passed": true },
+    "htmlAssets": { "passed": true, "entrypoints": 1 },
+    "secretScan": { "passed": true, "highConfidenceFindings": 0 },
+    "environmentContract": { "passed": true },
+    "migrationBaseline": { "passed": true, "registeredInheritedIssues": 7, "newIssues": 0 },
+    "automatedTests": { "passed": true, "passedTests": 46, "failedTests": 0 },
+    "securityTests": { "passed": true, "passedTests": 39, "failedTests": 0 },
+    "domainSpecificDiscordCallbacks": { "passed": true },
+    "sameOriginSessionEstablishment": { "passed": true },
+    "exactRouteRefreshBridge": { "passed": true },
+    "mobileIdentityConfirmation": { "passed": true },
+    "ownerFallbackGating": { "passed": true },
+    "commissionerManagementConsolidation": { "passed": true },
+    "pendingQueuePreserved": { "passed": true },
+    "membershipTeamPolicy": { "passed": true, "secureDefault": "team-required", "perLeagueOverrideSupported": true },
+    "membershipReactivation": { "passed": true, "explicitIntentRequired": true },
+    "commissionerLockoutProtection": { "passed": true },
+    "mobileOwnershipLayout": { "passed": true, "sourceVerified": true, "deviceAcceptancePending": true },
+    "systemInventory": { "passed": true },
+    "releaseContract": { "passed": true },
+    "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" }
+  },
+  "external": {
+    "discordOAuthConfiguration": { "status": "registered-and-verified", "callbacks": ["https://franchisehq.app/api/auth/discord/callback", "https://franchise-hq.pages.dev/api/auth/discord/callback"], "verifiedBy": "Discord Developer Portal reload" },
+    "githubPullRequest": { "status": "not-created" },
+    "hostedChecks": { "status": "not-run" },
+    "stagingDeployment": { "status": "not-run" },
+    "productionDeployment": { "authorized": true, "status": "not-run", "url": "https://franchisehq.app/" },
+    "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [] },
+    "productionDataReset": { "authorized": false, "status": "not-run" }
+  },
+  "manualAcceptance": {
+    "status": "pending-production-and-owner-device-check",
+    "runbook": "docs/AUTH-ONBOARDING.md"
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}
