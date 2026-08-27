@@ -77,8 +77,14 @@
       "functions/api/auth/discord/callback.js"
     ],
     "DISCORD_REDIRECT_URI": [
-      "functions/api/auth/discord/callback.js",
-      "functions/api/auth/discord/login.js"
+      "functions/_lib/origin.js",
+      "functions/api/auth/discord/callback.js"
+    ],
+    "DISCORD_REDIRECT_URI_OWNER": [
+      "functions/_lib/origin.js"
+    ],
+    "DISCORD_REDIRECT_URI_PUBLIC": [
+      "functions/_lib/origin.js"
     ],
     "EA_DIRECT_ACCESS_TOKEN": [
       "functions/api/leagues/[leagueSlug]/ea-direct/auth-status.js",
@@ -107,7 +113,8 @@
       "workers/franchise-import-worker/src/index.js"
     ],
     "LEAGUE_CONFIG": [
-      "functions/_lib/cloud-platform.js"
+      "functions/_lib/cloud-platform.js",
+      "functions/api/leagues/[leagueSlug]/memberships.js"
     ],
     "OWNER_FALLBACK_DISCORD_ID": [
       "functions/_lib/owner-fallback.js"
@@ -130,7 +137,7 @@
   },
   "files": {
     "byExtension": {
-      ".css": 8,
+      ".css": 9,
       ".example": 1,
       ".html": 2,
       ".js": 158,
@@ -154,7 +161,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 378603,
+        "bytes": 371680,
         "file": "trade-module.js"
       },
       {
@@ -198,6 +205,10 @@
         "file": "league-engine/games.js"
       },
       {
+        "bytes": 18239,
+        "file": "functions/api/auth/discord/callback.js"
+      },
+      {
         "bytes": 18095,
         "file": "league-engine/rosters.js"
       },
@@ -220,13 +231,9 @@
       {
         "bytes": 16204,
         "file": "workers/franchise-import-worker/src/index.js"
-      },
-      {
-        "bytes": 15767,
-        "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js"
       }
     ],
-    "total": 492
+    "total": 493
   },
   "frontend": {
     "assets": [
@@ -236,7 +243,7 @@
         "versioned": true
       },
       {
-        "path": "release-7.0.4.css",
+        "path": "release-7.0.5.css",
         "type": "link",
         "versioned": true
       },
@@ -1344,7 +1351,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.0.4",
+  "release": "7.0.5",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -7,7 +7,7 @@ import {
   resolveTeam
 } from "../../../_lib/league-teams.js";
 
-const RELEASE = "7.0.4";
+const RELEASE = "7.0.5";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -18,6 +18,7 @@ export function normalizeMembershipInput(body = {}) {
   const teamId = body.teamId == null || body.teamId === "" ? null : String(body.teamId).trim();
   const userId = body.userId == null ? "" : String(body.userId).trim();
   const discordUserId = body.discordUserId == null ? "" : String(body.discordUserId).trim();
+  const reactivate = body.reactivate === true;
 
   if (!ROLES.has(role)) return { ok:false, error:"Invalid league role." };
   if (!userId && !discordUserId) return { ok:false, error:"userId is required." };
@@ -26,7 +27,7 @@ export function normalizeMembershipInput(body = {}) {
   if (teamId && !SAFE_TEAM_ID.test(teamId)) return { ok:false, error:"Invalid team assignment." };
   if (role === "team_owner" && !teamId) return { ok:false, error:"Team owners require a team assignment." };
 
-  return { ok:true, role, teamId, userId, discordUserId };
+  return { ok:true, role, teamId, userId, discordUserId, reactivate };
 }
 async function readJsonObject(request) {
   const declared = Number(request.headers.get("content-length") || 0);
@@ -50,6 +51,21 @@ async function resolveLeague(context) {
   const slug = String(context.params?.leagueSlug || "").trim();
   if (!/^[A-Za-z0-9-]{1,100}$/.test(slug)) return null;
   return context.env.DB.prepare(`SELECT id, slug, name FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`).bind(slug).first();
+}
+
+async function membershipPolicy(env, league) {
+  const fallback = { requireTeamAssignment:true };
+  if (!env?.LEAGUE_CONFIG?.get || !league?.id) return fallback;
+  try {
+    const raw = await env.LEAGUE_CONFIG.get(`league:${league.id}:membership-policy`);
+    const configured = raw ? JSON.parse(raw) : null;
+    return {
+      requireTeamAssignment:configured?.requireTeamAssignment !== false
+    };
+  } catch (error) {
+    console.warn("Membership policy unavailable; using the secure team-required default:", error?.message || error);
+    return fallback;
+  }
 }
 
 async function audit(db, leagueId, actorUserId, subjectUserId, action, detail) {
@@ -156,6 +172,7 @@ export async function onRequestGet(context) {
   }
 
   const teams = await activeLeagueTeams(context.env.DB, league.id);
+  const policy = await membershipPolicy(context.env, league);
   const assignments = await activeTeamAssignments(context.env.DB, league.id, teams);
   const memberships = (rows?.results || []).map(member => {
     const team = resolveTeam(teams, member.teamId);
@@ -171,7 +188,8 @@ export async function onRequestGet(context) {
     release:RELEASE,
     league,
     memberships,
-    teams:publicLeagueTeams(teams, assignments)
+    teams:publicLeagueTeams(teams, assignments),
+    policy
   });
 }
 
@@ -206,6 +224,10 @@ export async function onRequestPost(context) {
   if (!input.ok) return jsonResponse({ ok:false, error:input.error }, 400);
 
   const teams = await activeLeagueTeams(context.env.DB, league.id);
+  const policy = await membershipPolicy(context.env, league);
+  if (policy.requireTeamAssignment && !input.teamId) {
+    return jsonResponse({ ok:false, error:"Every active league member requires a team assignment." }, 400);
+  }
   const requestedTeam = input.teamId ? resolveTeam(teams, input.teamId) : null;
   if (input.teamId && !requestedTeam) {
     return jsonResponse({ ok:false, error:"Choose a team from the active Madden franchise import." }, 400);
@@ -221,8 +243,9 @@ export async function onRequestPost(context) {
   if (!existing) {
     return jsonResponse({ ok:false, error:"That user must open this league's invite link and connect Discord before activation." }, 409);
   }
-  if (!Number(existing.active) && existing.lastAccessAction === "membership_deactivated") {
-    return jsonResponse({ ok:false, error:"Restore this disabled member to Pending before activating access." }, 409);
+  const reactivating = !Number(existing.active) && existing.lastAccessAction === "membership_deactivated";
+  if (reactivating && !input.reactivate) {
+    return jsonResponse({ ok:false, error:"Use Teams & Owners to explicitly reactivate this revoked member." }, 409);
   }
   if (user.id === auth.session.user.id && existing.role === "commissioner" && input.role !== "commissioner") {
     return jsonResponse({ ok:false, error:"Commissioners cannot remove their own commissioner role." }, 409);
@@ -259,7 +282,9 @@ export async function onRequestPost(context) {
     return jsonResponse({ ok:false, error:"That assignment changed before it could be saved. Refresh and try again." }, 409);
   }
 
-  const action = Number(existing.active) ? "membership_updated" : "membership_activated";
+  const action = reactivating
+    ? "membership_reactivated"
+    : Number(existing.active) ? "membership_updated" : "membership_activated";
   await audit(context.env.DB, league.id, auth.session.user.id, user.id, action, {
     role:input.role,
     teamId,

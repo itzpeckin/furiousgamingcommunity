@@ -1,7 +1,7 @@
 import { createId, jsonResponse } from '../../../_lib/auth.js';
 import { requireCommissioner } from '../../../_lib/permissions.js';
 
-const RELEASE = '7.0.4';
+const RELEASE = '7.0.5';
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 const DELETE_ORDER = Object.freeze([

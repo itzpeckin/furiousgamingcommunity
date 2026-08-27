@@ -133,6 +133,9 @@ test('security-sensitive source cannot regress to URL tokens, raw DTOs, or unbou
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js', import.meta.url), 'utf8')
   ]);
   assert.equal(callback.includes('searchParams.set("token"'), false);
+  assert.ok(callback.includes('confirmed-mobile-handoff'));
+  assert.ok(callback.includes('Confirm your FranchiseHQ sign in'));
+  assert.ok(callback.includes('callbackOrigin === new URL(loginOrigin).origin && stateCookieMatched'));
   assert.equal(claim.includes('searchParams.get("token"'), false);
   assert.equal(cloud.includes("searchParams.get('token')"), false);
   assert.equal(readModel.includes('source: raw'), false);

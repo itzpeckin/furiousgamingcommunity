@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
+import { readJson } from './lib/project.mjs';
 
 const strict = process.argv.includes('--strict');
+const packageJson = await readJson('package.json');
 const checks = [
   ['Repository lint', 'tools/check-repository.mjs', []],
   ['JavaScript syntax', 'tools/check-syntax.mjs', []],
@@ -31,4 +33,4 @@ for (const [label, script, argumentsList] of checks) {
   }
 }
 
-console.log(`\nFranchiseHQ 7.0.4 ${strict ? 'strict' : 'baseline'} quality gate passed.`);
+console.log(`\nFranchiseHQ ${packageJson.version} ${strict ? 'strict' : 'baseline'} quality gate passed.`);

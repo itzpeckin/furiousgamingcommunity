@@ -1,60 +1,72 @@
-# FranchiseHQ 7.0.4 Member Onboarding Runbook
+# FranchiseHQ 7.0.5 Authentication and Member-Onboarding Runbook
 
 ## Goal
 
-Invite FGC members into FranchiseHQ without giving an invite link any league permission by itself. Discord proves the person's identity; a commissioner separately approves the league role and team.
+Invite FGC members through a predictable Discord login and manage each member from one server-backed Commissioner workflow. The public application remains `franchisehq.app`; the exact `franchise-hq.pages.dev` hostname is an owner-only operational fallback.
+
+## Domain and refresh behavior
+
+- A login begun on `franchisehq.app` uses `https://franchisehq.app/api/auth/discord/callback` and establishes a cookie only on that domain.
+- A login begun on the exact owner fallback uses `https://franchise-hq.pages.dev/api/auth/discord/callback` and establishes a separate cookie only on that domain.
+- The league path and safe hash route are carried through login. Refreshing Commissioner HQ, Trade Center, or Trade Block returns to that exact screen.
+- If Discord completes authorization in a different mobile browser context and the original short-lived state cookie is unavailable, FranchiseHQ displays the Discord identity and requires **Continue to FranchiseHQ** before completing the one-time handoff.
+- The Pages fallback still fails closed unless the configured owner Discord identity also has active commissioner membership. Other users and all Pages preview subdomains use `franchisehq.app`.
+
+Both exact callback URLs must be registered in the FranchiseHQ Discord application before 7.0.5 reaches production.
 
 ## Commissioner workflow
 
 1. Open **Commissioner HQ → Teams & Owners**.
-2. Select **Copy Invite Link** and send that league link privately to the intended member.
+2. Select **Copy Invite Link** and send the `franchisehq.app` league link privately to the intended member.
 3. Ask the member to open the link and connect their own Discord account.
-4. The member will see **Waiting for commissioner assignment**. They cannot enter the league while Pending.
-5. In **Teams & Owners**, select **Refresh Discord** if the Pending member is not already visible.
-6. Choose the member's role:
-   - **Team Owner** requires a team.
-   - **Trade Committee** may have a team or remain unassigned.
-   - **Commissioner** may have a team or remain unassigned.
-7. Choose the team when required and select **Activate**.
-8. Ask the member to select **Check Again** or reopen the same invite link.
+4. The member appears under **New players awaiting assignment** and cannot enter the league while Pending.
+5. Open that member's **Manage** dialog.
+6. Assign one canonical imported team and choose the league role: Team Owner, Trade Committee, or Commissioner.
+7. Select **Save Assignment**. Every active FGC member must have a team, including league staff.
+8. Ask the member to select **Check Again** or reopen the invite link.
 
-## Access management
+## Ongoing access management
 
-The Teams & Owners page lists the complete server-backed Discord membership state:
+**Teams & Owners** is the single management surface. It combines imported Madden team identity with authenticated FranchiseHQ membership identity. Use **Manage** to:
 
-- **Pending:** Discord is connected, but the account has no active league access.
-- **Active:** The account can enter the league with the displayed role and team.
-- **Disabled:** League access was explicitly revoked.
+- assign or change a member's imported team;
+- assign or change the member's league role;
+- revoke platform access;
+- explicitly reactivate a revoked member by selecting that identity and saving a valid team/role assignment.
 
-Use **Disable Access** to revoke a member. The current commissioner cannot disable or demote their own commissioner account. Use **Restore to Pending** before reassigning a disabled member.
+The standalone Active and Disabled Discord panels are intentionally removed. The Pending queue remains so commissioners can see new members requiring action. Revoked identities remain available inside **Manage** for deliberate recovery without restoring an obsolete second workflow.
 
 ## Security behavior
 
-- The invite URL is not a password and never activates a membership.
-- A commissioner can activate only a user who first accepted this league invite through Discord.
-- One team cannot have two active assigned members.
+- An invite URL is not a password and never activates membership by itself.
+- Active membership requires an accepted Discord identity, an allowed role, and a canonical imported team.
+- A revoked member cannot be reactivated accidentally; the management request must explicitly mark reactivation.
+- One imported team cannot have two active controlling members.
+- A current commissioner cannot revoke or demote their own active commissioner account, and the final commissioner is protected.
 - Invalid roles, identifiers, oversized requests, cross-league requests, and cross-origin mutations are rejected.
 - Session cookies are HTTP-only, Secure, SameSite=Lax, and renewed from a valid server session.
-- Discord OAuth state is short-lived and single-use; the final session handoff is origin-bound, one-time, and sent by POST.
-- Commissioner/member/team changes are written to the membership audit log.
+- Discord OAuth state is short-lived, origin-bound, and single-use. Same-origin completion creates the session directly; a context-switch handoff is one-time and requires visible confirmation when the state cookie is missing.
+- Commissioner member/team changes are written to the membership audit log.
 
-A person who discovers the league URL can create a Pending request but cannot enter the league. Commissioners should approve only recognized Discord identities. Tokenized, expiring invitations remain a future multi-tenant enhancement if Pending-request spam becomes a real operational concern.
+## 7.0.5 desktop and phone acceptance checklist
 
-## 7.0.4 phone and desktop acceptance checklist
+Use one commissioner browser and a separate ordinary-member browser or private window.
 
-Use one commissioner browser and one separate member browser or private window.
-
-1. Begin from `https://franchisehq.app/leagues/fgc`, complete one fresh Discord login if requested, and refresh Homepage, Commissioner HQ, Trade Center, and Trade Block. None should require another login.
-2. As Justin/Peckin, open `https://franchise-hq.pages.dev/leagues/fgc`, complete Discord login if requested, and confirm refresh stays signed in on that exact owner fallback.
-3. Open the Pages address as Gas or another non-commissioner and confirm FranchiseHQ sends that browser to `https://franchisehq.app/`.
-4. Copy the invite link from Teams & Owners and confirm it begins with `https://franchisehq.app/`.
-5. Confirm Teams & Owners lists exactly the teams, names, logos, and colors from the active Madden import and does not resurrect an old Madden owner label or browser-stored owner.
-6. Assign Justin/Peckin as Commissioner and Tampa Bay Buccaneers; assign Gas as Team Owner and Green Bay Packers; disable Saluki. Confirm a staff role and a team can coexist.
-7. Reopen the league as Justin and Gas and confirm My Team, Trade Center, and Trade Block all use the assigned Buccaneers and Packers respectively after refresh.
-8. Attempt to assign either occupied team to another Pending user and confirm FranchiseHQ blocks it.
-9. Open **Commissioner HQ → League Data → Prepare for Madden 27**, load the preview, and confirm accounts, sessions, rules, Justin, and Gas are listed for preservation while Saluki can remain unselected. Do not type the confirmation or execute the reset during ordinary acceptance.
-10. On phone and desktop, confirm Pending/Active/Disabled controls, Teams & Owners rows, the assignment dialog, and reset preview fit without horizontal page scrolling, trapped inner scrolling, or duplicate error notices.
+1. From `https://franchisehq.app/leagues/furious-gaming-community`, open Commissioner HQ, refresh, and confirm the same screen remains visible without another login.
+2. Repeat exact-screen refresh for Trade Center and Trade Block on desktop and phone.
+3. Start a fresh login on `franchisehq.app` and confirm Discord identifies `https://franchisehq.app` as the return site.
+4. As Justin/Peckin, start a fresh login on `https://franchise-hq.pages.dev/leagues/furious-gaming-community` and confirm Discord identifies `https://franchise-hq.pages.dev` as the return site.
+5. If Discord opens the result outside its embedded browser, confirm FranchiseHQ shows the expected Discord identity and requires **Continue to FranchiseHQ** before the league opens.
+6. Open the Pages address as Gas or another non-commissioner and confirm FranchiseHQ routes the browser to `https://franchisehq.app/`.
+7. Confirm Commissioner HQ contains **New players awaiting assignment** and **Teams & Owners**, but does not contain standalone Active or Disabled Discord member panels.
+8. Confirm the invite link begins with `https://franchisehq.app/`.
+9. Manage a Pending test member: choose an imported team and role, save, and confirm access becomes active. Attempting to activate without a team must fail.
+10. Change that member's role/team, then revoke access. Confirm the member cannot enter the league.
+11. Select the revoked identity from a team's **Manage** dialog, assign a valid team/role, and save. Confirm that explicit action reactivates access.
+12. Attempt to assign an occupied team and confirm FranchiseHQ blocks it. Confirm the acting commissioner cannot revoke or demote themself.
+13. Confirm My Team, Trade Center, and Trade Block use the authenticated member's assigned team after refresh.
+14. On representative phone widths, confirm Pending rows, Teams & Owners rows, and Manage actions fit without horizontal page scrolling or trapped inner scrolling.
 
 ## Known boundary
 
-Trade Center, Trade Block, GOTW, and Confidence Pool workflow records remain browser-local controlled-beta data in 7.0.4. This release makes their authenticated team identity canonical; it does not yet make those workflow records authoritative or shared. Madden NFL 27 schema adaptation, Free Agent verification, and any real FGC reset remain separately gated.
+Trade Center, Trade Block, GOTW, and Confidence Pool workflow records remain browser-local controlled-beta data in 7.0.5. Madden NFL 27 schema adaptation, Free Agent verification, and any real FGC data reset remain separately gated. The owner-only Pages hostname is a temporary operational fallback and is not a public multi-tenant domain strategy.

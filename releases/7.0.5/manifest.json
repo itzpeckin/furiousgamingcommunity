@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.5",
+  "releaseType": "exact-route-auth-commissioner-management",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.0.4",
+    "commit": "60e8d46bf2c55894fff4f88c33d8b43ed2643bc4",
+    "tree": "6d9790129e22cdd3932d71b4e49d0c61eb2a4840",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.0.5",
+  "environmentContract": "config/environment-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [
+    "migration.duplicate-version.0001",
+    "migration.duplicate-version.0002",
+    "migration.fresh-apply.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0001_create_leagues.sql",
+    "migration.missing-ledger-write.0002_create_authentication.sql",
+    "migration.missing-ledger-write.0013_league_membership_access_control.sql",
+    "migration.missing-ledger-write.0014_league_rules.sql"
+  ],
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "not-run",
+    "reason": "The owner authorized one consolidated 7.0.5 pull-request and publication cycle after local validation."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-pending-hosted-checks",
+    "url": "https://franchisehq.app/",
+    "scope": "Publish the 7.0.5 application correction after green local and hosted gates. No migration, membership edit, import activation, or data reset is authorized.",
+    "reason": "The owner explicitly authorized 7.0.5 and requested a credit-conscious single PR/deployment cycle."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/AUTH-ONBOARDING.md",
+    "docs/ENVIRONMENTS.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "functions/_lib/origin.js",
+    "functions/api/auth/discord/login.js",
+    "functions/api/auth/discord/callback.js",
+    "functions/leagues/[[path]].js",
+    "functions/api/leagues/[leagueSlug]/memberships.js",
+    "release-7.0.5.css",
+    "releases/7.0.5/release-record.md",
+    "releases/7.0.5/validation-evidence.json",
+    "tests/security/containment.test.mjs",
+    "tests/security/onboarding.test.mjs",
+    "tests/security/session.test.mjs"
+  ]
+}
