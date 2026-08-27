@@ -20,8 +20,9 @@ import {
   normalizeLeagueReturnTo
 } from "../../../_lib/origin.js";
 import { isOwnerFallbackIdentity } from "../../../_lib/owner-fallback.js";
+import { resolveTenant, resolveTenantById } from "../../../_lib/tenant-context.js";
 
-const RELEASE = "7.1.0";
+const RELEASE = "7.2.0";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -369,10 +370,9 @@ export async function onRequestGet(context) {
     let destination = "/leagues?auth=success";
     if (joinLeagueId || joinLeagueSlug) {
       try {
-        const league = await context.env.DB
-          .prepare(`SELECT id, slug FROM leagues WHERE (id=? OR lower(replace(slug,'-',''))=lower(replace(?,'-',''))) AND public_status='active' LIMIT 1`)
-          .bind(joinLeagueId || "", joinLeagueSlug || "")
-          .first();
+        const league = joinLeagueId
+          ? await resolveTenantById(context.env, joinLeagueId)
+          : await resolveTenant(context.env, joinLeagueSlug);
         if (league) {
           const existing = await context.env.DB
             .prepare(`SELECT id, active, role, team_id AS teamId FROM league_memberships WHERE league_id=? AND user_id=? LIMIT 1`)

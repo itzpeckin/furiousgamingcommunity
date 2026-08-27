@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": "7.2.0",
+  "resolution": {
+    "source": "server",
+    "requiresExplicitSlug": true,
+    "allowsFirstRowFallback": false,
+    "allowsProductHardCodedTenant": false,
+    "aliasesAreDatabaseRecords": true,
+    "requiredStatuses": {
+      "tenantStatus": "enabled",
+      "publicStatus": "active"
+    }
+  },
+  "globalTables": [
+    "leagues",
+    "oauth_states",
+    "schema_migrations",
+    "sessions",
+    "users"
+  ],
+  "featurePolicy": {
+    "unknownFeatureEnabled": false,
+    "configurationAuthority": "league_features"
+  },
+  "storagePolicy": {
+    "serverNamespaceTemplate": "tenant:{leagueId}:{namespace}",
+    "browserStorageAuthority": "ui-preferences-only"
+  },
+  "auditPolicy": {
+    "requiredContext": ["leagueId", "actorUserId", "requestId", "actionId", "action"]
+  },
+  "production": {
+    "enabledTenantCount": 1,
+    "firstTenant": "Furious Gaming Community"
+  }
+}

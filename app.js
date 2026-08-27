@@ -924,7 +924,7 @@
       // 6.5.1a — Home critical render path.
       // Teams / standings / schedule paint immediately. The large player/statistics
       // domains hydrate after first paint and never block a hard-refresh render.
-      const leagueSlug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity';
+      const leagueSlug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'';
       const criticalCacheKey=`fhq:home-critical:v6.5.1a:${leagueSlug}`;
       let cachedCritical=null;
       try{
@@ -2745,7 +2745,7 @@
 
   async function loadIntegratedFreeAgents(){
     try{
-      const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity');
+      const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'');
       const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/players/free-agents`,{credentials:'include'});
       if(!response.ok)return[];
       const payload=await response.json();
@@ -6192,7 +6192,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       if(service?.canonical){
         payload=await service.canonical();
       }else{
-        const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity';
+        const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'';
         const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/transactions/canonical`,{
           credentials:'include',cache:'no-store',headers:{accept:'application/json'}
         });
@@ -9500,9 +9500,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 7.1.0';
+      node.textContent = 'Current Release - 7.2.0';
     });
-    document.documentElement.dataset.franchiseHqRelease = '7.1.0';
+    document.documentElement.dataset.franchiseHqRelease = '7.2.0';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -9573,7 +9573,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       window.FranchiseHQ?.leagueSlug ||
       window.FranchiseHQ?.liveData?.leagueSlug ||
       window.FranchiseHQ?.leagueData?.currentSource?.()?.leagueSlug ||
-      'furiousgamingcommunity'
+      ''
     ).trim().toLowerCase();
   }
 
@@ -10122,7 +10122,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function freeAgentCaptureStatus(){
-    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity');
+    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'');
     const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/companion/free-agent-capture`,{
       credentials:'include',
       cache:'no-store'
@@ -10135,7 +10135,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function forwardTransactionDetectionStatus(){
-    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity');
+    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'');
     const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/transactions/forward-detection`,{
       credentials:'include',
       cache:'no-store'
@@ -10146,7 +10146,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function transactionClassificationStatus(){
-    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'furiousgamingcommunity');
+    const slug=typeof transactionLeagueSlug==='function'?transactionLeagueSlug():(location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'');
     const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/transactions/classification`,{credentials:'include',cache:'no-store'});
     const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
     if(!response.ok||payload?.ok===false)throw Object.assign(new Error(payload?.detail||payload?.error||'Transaction classification status failed.'),{payload});

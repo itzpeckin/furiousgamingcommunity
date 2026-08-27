@@ -1,3 +1,5 @@
+import { resolveTenant } from './tenant-context.js';
+
 const SESSION_COOKIE_NAME = "franchise_hq_session";
 const OAUTH_STATE_COOKIE_NAME = "franchise_hq_oauth_state";
 const SESSION_RECOVERY_COOKIE_NAME = "franchise_hq_session_recovery";
@@ -249,14 +251,11 @@ async function resolveRequestedLeagueId(context, options = {}) {
     } catch {}
   }
 
-  if (!routeSlug) return "franchise-hq-primary";
+  if (!routeSlug) return null;
 
   try {
-    const league = await context.env.DB
-      .prepare(`SELECT id FROM leagues WHERE lower(replace(slug,'-','')) = lower(replace(?,'-','')) LIMIT 1`)
-      .bind(String(routeSlug))
-      .first();
-    return league?.id || null;
+    const tenant = await resolveTenant(context.env, routeSlug);
+    return tenant?.id || null;
   } catch {
     return null;
   }

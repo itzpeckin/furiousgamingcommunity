@@ -119,7 +119,58 @@ test('the production-like legacy upgrade preserves identities and relationships'
     assert.equal(database.prepare(
       `SELECT user_id FROM sessions WHERE id='session-upgrade-test'`
     ).get().user_id, 'user-upgrade-test');
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 20);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 21);
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
+  } finally {
+    database.close();
+  }
+});
+
+test('tenant migration preserves shared documents and snapshot validation rows', async () => {
+  const database = new DatabaseSync(':memory:');
+  try {
+    database.exec('PRAGMA foreign_keys = ON;');
+    const files = await migrationFiles();
+    await applyFiles(database, files.filter(file => !file.startsWith('migrations/0021_')));
+    seedProtectedData(database);
+    database.prepare(`INSERT INTO league_rules_documents
+      (league_id,rules_json,updated_by_user_id) VALUES (?,?,?)`
+    ).run('league-upgrade-test','{"categories":[{"id":"preserved"}]}','user-upgrade-test');
+    database.prepare(`INSERT INTO league_settings
+      (league_id,revision,settings_json,updated_by_user_id) VALUES (?,?,?,?)`
+    ).run('league-upgrade-test',7,'{"tradeLimit":4}','user-upgrade-test');
+    database.prepare(`INSERT INTO league_snapshots
+      (id,league_id,status,manifest_json) VALUES (?,?,?,?)`
+    ).run('snapshot-upgrade-test','league-upgrade-test','active','{}');
+    database.prepare(`INSERT INTO league_active_snapshots
+      (league_id,snapshot_id) VALUES (?,?)`
+    ).run('league-upgrade-test','snapshot-upgrade-test');
+    database.prepare(`INSERT INTO snapshot_validation_jobs
+      (id,league_id,snapshot_id,status,phase) VALUES (?,?,?,?,?)`
+    ).run('validation-upgrade-test','league-upgrade-test','snapshot-upgrade-test','pending','players');
+    database.prepare(`INSERT INTO snapshot_validation_player_ids
+      (job_id,player_id) VALUES (?,?)`
+    ).run('validation-upgrade-test','player-upgrade-test');
+
+    await applyFiles(database, files.filter(file => file.startsWith('migrations/0021_')));
+
+    assert.equal(database.prepare(`SELECT rules_json value FROM league_rules_documents
+      WHERE league_id='league-upgrade-test'`).get().value, '{"categories":[{"id":"preserved"}]}');
+    assert.equal(database.prepare(`SELECT revision FROM league_settings
+      WHERE league_id='league-upgrade-test'`).get().revision, 7);
+    assert.equal(database.prepare(`SELECT snapshot_id FROM league_active_snapshots
+      WHERE league_id='league-upgrade-test'`).get().snapshot_id, 'snapshot-upgrade-test');
+    assert.deepEqual({...database.prepare(`SELECT league_id,job_id,player_id
+      FROM snapshot_validation_player_ids`).get()}, {
+      league_id:'league-upgrade-test',
+      job_id:'validation-upgrade-test',
+      player_id:'player-upgrade-test'
+    });
+    assert.deepEqual(database.prepare(`SELECT hostname FROM league_domains
+      WHERE league_id='league-upgrade-test' ORDER BY hostname`).all().map(row=>row.hostname), [
+      'franchise-hq.pages.dev',
+      'franchisehq.app'
+    ]);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {
     database.close();
@@ -173,7 +224,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 20', async () => {
+test('runtime schema verification fails closed before version 21', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -184,13 +235,13 @@ test('runtime schema verification fails closed before version 20', async () => {
     () => requireDatabaseSchema(outdated),
     error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 17
   );
-  observedVersion = 20;
-  assert.equal((await requireDatabaseSchema(outdated)).version, 20);
+  observedVersion = 21;
+  assert.equal((await requireDatabaseSchema(outdated)).version, 21);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 20, name: 'canonical_transaction_runtime_foundation' }) };
+      return { first: async () => ({ version: 21, name: 'tenant_ready_core' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 20);
+  assert.equal((await requireDatabaseSchema(current)).version, 21);
 });

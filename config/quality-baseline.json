@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "7.1.0",
+  "release": "7.2.0",
   "policy": "Only inherited issues listed here may be warnings in baseline mode. New issues always fail. Strict mode fails on every issue.",
   "knownIssues": []
 }

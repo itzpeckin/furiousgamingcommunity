@@ -22,13 +22,23 @@ import {
 } from '../../functions/_lib/origin.js';
 import { isOwnerFallbackIdentity, ownerFallbackDiscordId } from '../../functions/_lib/owner-fallback.js';
 
-function sessionDatabase(validHash) {
+function tenantRow(id = 'league-1', slug = 'fgc') {
+  return {
+    id, slug, name:slug === 'fgc' ? 'FGC' : 'Other League', product_name:'Franchise HQ',
+    public_status:'active', tenant_status:'enabled', timezone:'America/Chicago',
+    branding_json:'{}', configuration_json:'{}'
+  };
+}
+
+function sessionDatabase(validHash, resolvedTenant = tenantRow()) {
   return {
     prepare(sql) {
       return {
         values: [],
         bind(...values) { this.values = values; return this; },
         async first() {
+          if (sql.includes('FROM leagues') && sql.includes('WHERE lower(slug)')) return resolvedTenant;
+          if (sql.includes('FROM league_slug_aliases')) return null;
           if (!sql.includes('FROM sessions')) return null;
           if (this.values[1] !== validHash) return null;
           return {
@@ -48,6 +58,10 @@ function sessionDatabase(validHash) {
             team_id: null,
             membership_active: 1
           };
+        },
+        async all() {
+          if (sql.includes('FROM league_features') || sql.includes('FROM league_domains')) return { results:[] };
+          return { results:[] };
         },
         async run() { return { meta: { changes: 1 } }; }
       };
@@ -75,9 +89,6 @@ test('ordinary members cannot use commissioner operations', async () => {
   const db = sessionDatabase(validHash);
   const originalPrepare = db.prepare.bind(db);
   db.prepare = sql => {
-    if (sql.includes('SELECT id FROM leagues')) {
-      return { bind() { return this; }, async first() { return { id: 'league-1' }; } };
-    }
     const statement = originalPrepare(sql);
     const originalFirst = statement.first;
     statement.first = async function first() {
@@ -98,13 +109,6 @@ test('an active commissioner in the requested league passes the role boundary', 
   const validToken = 'commissioner-session-token';
   const validHash = await hashToken(validToken);
   const db = sessionDatabase(validHash);
-  const originalPrepare = db.prepare.bind(db);
-  db.prepare = sql => {
-    if (sql.includes('SELECT id FROM leagues')) {
-      return { bind() { return this; }, async first() { return { id: 'league-1' }; } };
-    }
-    return originalPrepare(sql);
-  };
   const request = new Request('https://franchisehq.app/api/leagues/fgc/companion/discovery', {
     headers: { Cookie: `${AUTH_CONSTANTS.SESSION_COOKIE_NAME}=${validToken}` }
   });
@@ -116,12 +120,9 @@ test('an active commissioner in the requested league passes the role boundary', 
 test('a signed-in user receives not-found for a league without membership', async () => {
   const validToken = 'cross-tenant-session-token';
   const validHash = await hashToken(validToken);
-  const db = sessionDatabase(validHash);
+  const db = sessionDatabase(validHash, tenantRow('league-2', 'other'));
   const originalPrepare = db.prepare.bind(db);
   db.prepare = sql => {
-    if (sql.includes('SELECT id FROM leagues')) {
-      return { bind() { return this; }, async first() { return { id: 'league-2' }; } };
-    }
     const statement = originalPrepare(sql);
     const originalFirst = statement.first;
     statement.first = async function first() {
@@ -220,8 +221,15 @@ test('a missing league session uses the exact-route browser bridge instead of lo
     request:new Request('https://franchisehq.app/leagues/fgc#commissioner'),
     env:{
       DB:{
-        prepare() {
-          return { bind() { return this; }, async first() { return { id:'league-1', slug:'fgc', name:'FGC' }; } };
+        prepare(sql) {
+          return {
+            bind() { return this; },
+            async first() {
+              if (sql.includes('FROM leagues') && sql.includes('WHERE lower(slug)')) return tenantRow();
+              return null;
+            },
+            async all() { return { results:[] }; }
+          };
         }
       }
     }
@@ -242,9 +250,10 @@ test('public Discord login returns to franchisehq.app and preserves the exact pr
         values:[],
         bind(...values) { this.values=values; return this; },
         async first() {
-          if (sql.includes('SELECT id, slug FROM leagues')) return { id:'league-1', slug:'fgc' };
+          if (sql.includes('FROM leagues') && sql.includes('WHERE lower(slug)')) return tenantRow();
           return null;
         },
+        async all() { return { results:[] }; },
         async run() {
           if (sql.includes('INSERT INTO oauth_states')) storedStateId=this.values[0];
           return { meta:{ changes:1 } };
@@ -272,9 +281,10 @@ test('Discord login begun on the owner fallback preserves that origin for commis
         values:[],
         bind(...values) { this.values = values; return this; },
         async first() {
-          if (sql.includes('SELECT id, slug FROM leagues')) return { id:'league-1', slug:'fgc' };
+          if (sql.includes('FROM leagues') && sql.includes('WHERE lower(slug)')) return tenantRow();
           return null;
         },
+        async all() { return { results:[] }; },
         async run() {
           if (sql.includes('INSERT INTO oauth_states')) storedStateId = this.values[0];
           return { meta:{ changes:1 } };

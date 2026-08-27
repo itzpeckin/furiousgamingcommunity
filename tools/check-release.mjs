@@ -2,6 +2,11 @@ import { fileExists, readJson, readText } from './lib/project.mjs';
 
 const packageJson = await readJson('package.json');
 const version = packageJson.version;
+const versionParts = version.split('.').map(part => Number(part));
+const isAtLeast = (major, minor) => (
+  versionParts[0] > major
+  || (versionParts[0] === major && versionParts[1] >= minor)
+);
 const releaseRoot = `releases/${version}`;
 const manifest = await readJson(`${releaseRoot}/manifest.json`);
 const baseline = await readJson('config/quality-baseline.json');
@@ -29,9 +34,9 @@ if (manifest.production?.deployed === true && manifest.production?.authorized !=
   errors.push('A release cannot claim a production deployment without owner authorization.');
 }
 if (evidence.baselineGate?.unregisteredFailures !== 0) errors.push('Validation evidence must report zero unregistered failures.');
-if (version === '7.1.0') {
+if (isAtLeast(7, 1)) {
   if (evidence.checks?.strictMigration?.expectedFailure !== false || evidence.checks?.strictMigration?.passed !== true) {
-    errors.push('7.1.0 must prove that the strict migration gate now passes.');
+    errors.push(`${version} must prove that the strict migration gate passes.`);
   }
 } else if (evidence.checks?.strictMigration?.expectedFailure !== true || evidence.checks?.strictMigration?.passed !== false) {
   errors.push('Pre-7.1.0 validation evidence must preserve the expected strict migration failure.');
@@ -223,6 +228,36 @@ if (version === '7.1.0') {
   }
   if (evidence.scopeBoundaries?.authenticationChanged !== false) {
     errors.push('7.1.0 must preserve the owner-approved authentication freeze.');
+  }
+}
+if (version === '7.2.0') {
+  for (const check of [
+    'tenantSchema',
+    'explicitTenantResolution',
+    'tenantAliasResolution',
+    'disabledTenantDenial',
+    'crossTenantIsolation',
+    'tenantFeatureDefaults',
+    'tenantScopedStorage',
+    'tenantAuditContext',
+    'hardCodedDefaultRemoval',
+    'validationPlayerScope',
+    'migrationPreservation',
+    'strictMigration'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.2.0 tenant evidence is incomplete: ${check}.`);
+  }
+  if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+    errors.push('7.2.0 candidate work must not claim production authorization or deployment.');
+  }
+  if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
+    errors.push('7.2.0 candidate work must not claim an authorized or completed production migration.');
+  }
+  if (evidence.external?.productionDataReset?.authorized !== false || evidence.external?.productionDataReset?.status !== 'not-run') {
+    errors.push('7.2.0 candidate work must not claim an authorized or completed production data reset.');
+  }
+  if (evidence.scopeBoundaries?.sessionRefreshRedesignChanged !== false) {
+    errors.push('7.2.0 must preserve the owner-approved session-refresh redesign freeze.');
   }
 }
 

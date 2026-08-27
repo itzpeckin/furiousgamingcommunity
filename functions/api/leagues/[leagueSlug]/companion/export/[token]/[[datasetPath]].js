@@ -10,6 +10,7 @@ import {
   bindingStatus,
   normalizeDiscoveryPath,
   companionRouteObjectKey,
+  companionDiscoveryKey,
   summarizePayloadShape
 } from '../../../../../../_lib/cloud-platform.js';
 
@@ -166,11 +167,6 @@ export async function onRequest(context) {
       return json({ ok: false, error: `Unsupported method ${method}.`, release: RELEASE }, 405);
     }
 
-    const expected = await configuredExportToken(context.env, slug);
-    if (!expected || !safeEqual(tokenOf(context), expected)) {
-      return json({ ok: false, error: 'Unauthorized export request.', release: RELEASE }, 401);
-    }
-
     const db = database(context.env);
     const bindings = bindingStatus(context.env);
     if (!db || !bindings.r2 || !bindings.kv) {
@@ -180,6 +176,11 @@ export async function onRequest(context) {
     const league = await resolveLeague(context.env, slug);
     if (!league) {
       return json({ ok: false, error: 'League not found.', release: RELEASE }, 404);
+    }
+
+    const expected = await configuredExportToken(context.env, league);
+    if (!expected || !safeEqual(tokenOf(context), expected)) {
+      return json({ ok: false, error: 'Unauthorized export request.', release: RELEASE }, 401);
     }
 
     if (method === 'GET') {
@@ -213,7 +214,7 @@ export async function onRequest(context) {
     const discoverySessionId = sessionId(context.request, slug);
     const payloadHash = await sha256Hex(rawBytes);
     const key = companionRouteObjectKey(
-      slug,
+      league.id,
       discoverySessionId,
       routePath,
       captureId,
@@ -312,7 +313,7 @@ export async function onRequest(context) {
 
     try {
       await context.env.COMPANION_EXPORT_META.put(
-        `league:${slug}:companion:discovery:latest`,
+        companionDiscoveryKey(league.id),
         JSON.stringify(pointer)
       );
     } catch (error) {

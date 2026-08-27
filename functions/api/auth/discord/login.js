@@ -14,6 +14,7 @@ import {
   discordRedirectUriForOrigin,
   normalizeLeagueReturnTo
 } from "../../../_lib/origin.js";
+import { resolveTenant } from "../../../_lib/tenant-context.js";
 
 export async function onRequestGet(context) {
   try {
@@ -47,10 +48,7 @@ export async function onRequestGet(context) {
     let joinLeague = null;
     if (returnMatch) {
       const candidate = decodeURIComponent(returnMatch[1]);
-      joinLeague = await context.env.DB
-        .prepare(`SELECT id, slug FROM leagues WHERE lower(replace(slug,'-',''))=lower(replace(?,'-','')) AND public_status='active' LIMIT 1`)
-        .bind(candidate)
-        .first();
+      joinLeague = await resolveTenant(context.env, candidate);
     }
     const oauthContext = encodeOpaqueContext({
       origin: loginOrigin,

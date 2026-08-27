@@ -25,7 +25,12 @@ function membershipDatabase({ targetMembership = null, occupied = null, membersh
         values: [],
         bind(...values) { this.values = values; return this; },
         async first() {
-          if (sql.includes('SELECT id FROM leagues WHERE lower(replace')) return { id:'league-1' };
+          if (sql.includes('FROM leagues') && sql.includes('WHERE lower(slug)')) return {
+            id:'league-1', slug:'fgc', name:'FGC', product_name:'Franchise HQ',
+            public_status:'active', tenant_status:'enabled', timezone:'America/Chicago',
+            branding_json:'{}', configuration_json:'{}'
+          };
+          if (sql.includes('FROM league_slug_aliases')) return null;
           if (sql.includes('FROM sessions')) {
             return {
               session_id:'session-1',
@@ -60,6 +65,7 @@ function membershipDatabase({ targetMembership = null, occupied = null, membersh
           return null;
         },
         async all() {
+          if (sql.includes('FROM league_features') || sql.includes('FROM league_domains')) return { results:[] };
           if (sql.includes("r.domain='teams'")) return { results:canonicalTeamRows };
           if (sql.includes('AS storedTeamId')) return { results:occupied ? [{
             membershipId:'existing-membership', userId:'existing-user', role:'team_owner',

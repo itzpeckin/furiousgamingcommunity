@@ -6,7 +6,7 @@ import {
   jsonResponse
 } from "../../_lib/auth.js";
 
-const RELEASE = "7.1.0";
+const RELEASE = "7.2.0";
 
 async function revokeSession(context) {
   const candidates = [

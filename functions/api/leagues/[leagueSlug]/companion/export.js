@@ -29,7 +29,7 @@ export async function onRequestGet(context) {
   const bindings = bindingStatus(context.env);
   const db = database(context.env);
   const league = db ? await resolveLeague(context.env, slug) : null;
-  const tokenConfigured = Boolean(await configuredExportToken(context.env, slug));
+  const tokenConfigured = Boolean(league && await configuredExportToken(context.env, league));
   let latest = null, pendingCount = 0, kvPointer = null;
   if (db && league && authorization.session.membership?.leagueId === league.id) {
     latest = await latestExport(db, league.id);
@@ -38,7 +38,7 @@ export async function onRequestGet(context) {
     pendingCount = Number(count?.count || 0);
   }
   if (context.env.COMPANION_EXPORT_META?.get) {
-    kvPointer = await context.env.COMPANION_EXPORT_META.get(companionMetadataKey(slug), { type: 'json' });
+    if (league) kvPointer = await context.env.COMPANION_EXPORT_META.get(companionMetadataKey(league.id), { type: 'json' });
   }
   if (!league || authorization.session.membership?.leagueId !== league.id) {
     return json({ ok: false, error: 'Not found.' }, 404);
@@ -72,7 +72,7 @@ export async function onRequestPost(context) {
   }
   const league = await resolveLeague(context.env, slug);
   if (!league) return json({ ok: false, error: 'No active Franchise HQ league matches this URL.' }, 404);
-  const expectedToken = await configuredExportToken(context.env, slug);
+  const expectedToken = await configuredExportToken(context.env, league);
   if (!expectedToken) return json({ ok: false, error: 'No export token is configured for this league.' }, 503);
   if (!safeEqual(suppliedExportToken(context.request), expectedToken)) return json({ ok: false, error: 'Unauthorized export request.' }, 401);
 
@@ -100,7 +100,7 @@ export async function onRequestPost(context) {
   const receivedAt = new Date().toISOString();
   const exportId = crypto.randomUUID();
   const detected = detectCompanionMetadata(payload);
-  const key = companionObjectKey(slug, exportId, receivedAt, detected.season, detected.week);
+  const key = companionObjectKey(league.id, exportId, receivedAt, detected.season, detected.week);
   await context.env.COMPANION_EXPORTS.put(key, raw, {
     httpMetadata: { contentType: 'application/json' },
     customMetadata: { leagueId: league.id, leagueSlug: slug, exportId, receivedAt, payloadHash }
@@ -122,6 +122,6 @@ export async function onRequestPost(context) {
     return json({ ok: false, error: 'The payload reached R2 but could not be recorded in D1. The temporary R2 object was removed.', detail: String(error?.message || error) }, 500);
   }
   const metadata = { exportId, leagueId: league.id, leagueSlug: slug, receivedAt, updatedAt: receivedAt, status: 'pending', byteLength, contentType: 'application/json', r2ObjectKey: key, payloadStored: true, payloadHash, ...detected };
-  await context.env.COMPANION_EXPORT_META.put(companionMetadataKey(slug), JSON.stringify(metadata));
+  await context.env.COMPANION_EXPORT_META.put(companionMetadataKey(league.id), JSON.stringify(metadata));
   return json({ ok: true, accepted: true, duplicate: false, message: 'Companion export stored in R2, recorded in D1, and marked pending in KV. No league data was activated.', pendingExport: publicExport({ id: exportId, league_id: league.id, received_at: receivedAt, status: 'pending', r2_object_key: key, byte_length: byteLength, content_type: 'application/json', season: detected.season, week: detected.week, team_count: detected.teamCount, player_count: detected.playerCount }) }, 202);
 }

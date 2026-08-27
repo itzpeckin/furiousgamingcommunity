@@ -8,7 +8,6 @@
     throw new Error('FranchiseHQ core must load before platform/league.js.');
   }
 
-  const PRIMARY_LEAGUE_ID = 'franchise-hq-primary';
   const STORAGE_KEY = 'franchisehq-active-league';
 
   const state = {
@@ -34,8 +33,6 @@
   }
 
   function displayNameForLeague(leagueId) {
-    if (leagueId === PRIMARY_LEAGUE_ID) return 'Franchise HQ Primary';
-
     return String(leagueId || 'League')
       .replace(/[-_]+/g, ' ')
       .replace(/\b\w/g, (letter) => letter.toUpperCase());

@@ -4,12 +4,6 @@
       "fhq:performance-certification:v6.5.2": [
         "app.js"
       ],
-      "franchisehq.import.history.v1": [
-        "league-engine/import-history.js"
-      ],
-      "franchisehq.import.snapshots.v1": [
-        "league-engine/snapshot-manager.js"
-      ],
       "franchisehq:trade-live-cache:v1": [
         "FHQ-6126-index.html",
         "index.html"
@@ -51,22 +45,17 @@
     "COMPANION_EXPORT_TOKEN": [
       "functions/_lib/cloud-platform.js"
     ],
-    "D1": [
-      "functions/api/leagues/[leagueSlug]/ea-direct/_common.js"
-    ],
     "DB": [
       "functions/_lib/auth.js",
-      "functions/_lib/cloud-platform.js",
+      "functions/_lib/tenant-context.js",
       "functions/api/auth/discord/callback.js",
       "functions/api/auth/discord/login.js",
       "functions/api/auth/logout.js",
       "functions/api/auth/session/claim.js",
-      "functions/api/leagues/[leagueSlug]/ea-direct/_common.js",
       "functions/api/leagues/[leagueSlug]/memberships.js",
       "functions/api/leagues/[leagueSlug]/reset-data.js",
       "functions/api/leagues/[leagueSlug]/rules.js",
       "functions/index.js",
-      "functions/leagues/[[path]].js",
       "functions/leagues/index.js"
     ],
     "DISCORD_CLIENT_ID": [
@@ -103,8 +92,7 @@
       "functions/api/leagues/[leagueSlug]/ea-direct/exchange-status.js"
     ],
     "FRANCHISE_HQ_DB": [
-      "functions/_lib/cloud-platform.js",
-      "functions/api/leagues/[leagueSlug]/ea-direct/_common.js"
+      "functions/_lib/tenant-context.js"
     ],
     "FRANCHISE_IMPORT_WORKER": [
       "functions/api/leagues/[leagueSlug]/companion/import-job.js"
@@ -140,20 +128,20 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 159,
-      ".json": 6,
+      ".js": 160,
+      ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 22,
+      ".mjs": 23,
       ".png": 1,
-      ".sql": 22,
+      ".sql": 23,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 602754,
+        "bytes": 602600,
         "file": "app.js"
       },
       {
@@ -169,7 +157,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74836,
+        "bytes": 74807,
         "file": "index.html"
       },
       {
@@ -177,7 +165,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 37341,
+        "bytes": 37245,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -209,7 +197,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
       },
       {
-        "bytes": 18239,
+        "bytes": 18207,
         "file": "functions/api/auth/discord/callback.js"
       },
       {
@@ -233,7 +221,7 @@
         "file": "league-engine/data-state.js"
       }
     ],
-    "total": 504
+    "total": 508
   },
   "frontend": {
     "assets": [
@@ -1186,28 +1174,18 @@
         "platform/store.js",
         "trade-module.js"
       ],
-      "occurrences": 74
+      "occurrences": 70
     },
     "hardCodedFgc": {
       "files": [
         "FHQ-6126-index.html",
-        "app.js",
-        "functions/_lib/cloud-platform.js",
+        "config/tenant-data-contract.json",
         "functions/api/leagues/[leagueSlug]/ea-direct/discovery-plan.js",
         "index.html",
-        "league-engine/companion-schedule-mapper.js",
-        "league-engine/companion-statistics-engine.js",
-        "league-engine/data-explorer.js",
-        "league-engine/league-snapshot-builder.js",
-        "league-engine/league-tenant.js",
-        "league-engine/live-read-model.js",
-        "league-engine/one-click-import.js",
-        "league-engine/snapshot-lifecycle.js",
-        "league-engine/snapshot-verification.js",
         "migrations/legacy/0001_cloud_platform_foundation.sql",
         "migrations/legacy/0001_create_leagues.sql"
       ],
-      "occurrences": 32
+      "occurrences": 11
     },
     "ownerTb": {
       "files": [
@@ -1252,10 +1230,16 @@
       "recordsLedger": true,
       "sha256": "03e7054b5f4584b313a3752fd58a7b0fb78312f09a3546a60c7565d116da343a",
       "version": "0020"
+    },
+    {
+      "file": "migrations/0021_tenant_ready_core.sql",
+      "recordsLedger": true,
+      "sha256": "d725f6c54c39689317cd32b0380a3b0a87c2bfe7cffb00aa4912b0187301a8c2",
+      "version": "0021"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.1.0",
+  "release": "7.2.0",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

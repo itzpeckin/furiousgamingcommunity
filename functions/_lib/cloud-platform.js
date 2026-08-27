@@ -1,23 +1,21 @@
+import {
+  normalizeTenantSlug,
+  resolveTenant,
+  tenantDatabase,
+  tenantNamespace,
+  tenantSlugFromContext,
+  validTenantSlug
+} from './tenant-context.js';
+
 const DEFAULT_MAX_BYTES = 20 * 1024 * 1024;
 
-export const DEFAULT_LEAGUE_SLUG = 'furiousgamingcommunity';
-export const LEGACY_LEAGUE_ALIASES = Object.freeze({
-  'furious-gaming-community': DEFAULT_LEAGUE_SLUG
-});
-
 export function canonicalLeagueSlug(value) {
-  const slug = String(value || '').trim().toLowerCase();
-  return LEGACY_LEAGUE_ALIASES[slug] || slug;
+  return normalizeTenantSlug(value);
 }
 
 export function leagueSlugCandidates(value) {
-  const requested = String(value || '').trim().toLowerCase();
-  const canonical = canonicalLeagueSlug(requested);
-  const candidates = new Set([canonical, requested]);
-  Object.entries(LEGACY_LEAGUE_ALIASES).forEach(([alias,target]) => {
-    if (target === canonical) candidates.add(alias);
-  });
-  return [...candidates].filter(Boolean);
+  const slug = canonicalLeagueSlug(value);
+  return slug ? [slug] : [];
 }
 
 export const CLOUD_BINDINGS = Object.freeze({
@@ -37,30 +35,37 @@ export function json(body, status = 200, extraHeaders = {}) {
 }
 
 export function database(env) {
-  return env.FRANCHISE_HQ_DB?.prepare ? env.FRANCHISE_HQ_DB : (env.DB?.prepare ? env.DB : null);
+  return tenantDatabase(env);
 }
 
 export function normalizeLeagueSlug(context) {
-  return canonicalLeagueSlug(context.params?.leagueSlug || '');
+  return tenantSlugFromContext(context) || '';
 }
 
 export function validLeagueSlug(slug) {
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(slug || ''));
+  return validTenantSlug(slug);
 }
 
-export function companionMetadataKey(slug) { return `league:${slug}:companion:latest`; }
-export function companionTokenKey(slug) { return `league:${slug}:companion:export-token`; }
-export function companionObjectKey(slug, exportId, receivedAt, season = null, week = null) {
+export function companionMetadataKey(tenantOrId) { return tenantNamespace(tenantOrId, 'companion', 'latest'); }
+export function companionTokenKey(tenantOrId) { return tenantNamespace(tenantOrId, 'companion', 'export-token'); }
+export function companionDiscoveryKey(tenantOrId) { return tenantNamespace(tenantOrId, 'companion', 'discovery:latest'); }
+export function companionObjectKey(tenantOrId, exportId, receivedAt, season = null, week = null) {
+  const tenantId = typeof tenantOrId === 'object' ? tenantOrId.id : tenantOrId;
   const date = receivedAt.slice(0, 10);
   const seasonPart = season == null ? 'season-unknown' : `season-${season}`;
   const weekPart = week == null ? 'week-unknown' : `week-${String(week).padStart(2, '0')}`;
-  return `companion-exports/${slug}/${seasonPart}/${weekPart}/${date}/${exportId}.json`;
+  return `companion-exports/by-tenant/${tenantId}/${seasonPart}/${weekPart}/${date}/${exportId}.json`;
 }
 
-export async function configuredExportToken(env, slug) {
+export async function configuredExportToken(env, tenantOrSlug) {
   if (env.LEAGUE_CONFIG?.get) {
-    for (const candidate of leagueSlugCandidates(slug)) {
-      const leagueToken = await env.LEAGUE_CONFIG.get(companionTokenKey(candidate));
+    const tenant = typeof tenantOrSlug === 'object' ? tenantOrSlug : null;
+    const keys = [];
+    if (tenant?.id) keys.push(companionTokenKey(tenant.id));
+    const slug = canonicalLeagueSlug(tenant?.slug || tenantOrSlug);
+    if (slug) keys.push(`league:${slug}:companion:export-token`);
+    for (const key of [...new Set(keys)]) {
+      const leagueToken = await env.LEAGUE_CONFIG.get(key);
       if (leagueToken) return leagueToken;
     }
   }
@@ -89,21 +94,7 @@ export async function sha256Hex(value) {
 }
 
 export async function resolveLeague(env, slug) {
-  const db = database(env);
-  if (!db) return null;
-  const canonical = canonicalLeagueSlug(slug);
-  const candidates = leagueSlugCandidates(canonical);
-  const marks = candidates.map(() => '?').join(',');
-  const row = await db.prepare(`SELECT id, name, product_name, slug, current_season, current_week,
-      trade_start_week, trade_deadline_week, discord_guild_id, discord_connected, public_status, created_at, updated_at
-    FROM leagues WHERE LOWER(slug) IN (${marks}) LIMIT 1`).bind(...candidates).first();
-  if (!row) return null;
-  return {
-    ...row,
-    storage_slug: row.slug,
-    requested_slug: String(slug || '').trim().toLowerCase(),
-    slug: canonicalLeagueSlug(row.slug)
-  };
+  return resolveTenant(env, slug);
 }
 
 export function detectCompanionMetadata(payload) {
@@ -166,7 +157,7 @@ export async function platformReadiness(env) {
   const bindings = bindingStatus(env);
   const dbStatus = await databaseStatus(env);
   const configured = bindings.d1 && bindings.r2 && bindings.kv && bindings.secret;
-  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '5.9.3.0a' };
+  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '7.2.0' };
 }
 
 
@@ -180,10 +171,11 @@ export function safeRouteSegment(value) {
   return String(value || 'root').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'root';
 }
 
-export function companionRouteObjectKey(slug, sessionId, routePath, captureId, receivedAt) {
+export function companionRouteObjectKey(tenantOrId, sessionId, routePath, captureId, receivedAt) {
+  const tenantId = typeof tenantOrId === 'object' ? tenantOrId.id : tenantOrId;
   const date = receivedAt.slice(0, 10);
   const route = String(routePath || 'root').split('/').map(safeRouteSegment).join('/');
-  return `companion-route-discovery/${slug}/${date}/${sessionId}/${route}/${captureId}.json`;
+  return `companion-route-discovery/by-tenant/${tenantId}/${date}/${sessionId}/${route}/${captureId}.json`;
 }
 
 export function summarizePayloadShape(payload) {

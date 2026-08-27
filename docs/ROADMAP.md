@@ -6,393 +6,236 @@
 
 **Updated:** August 27, 2026
 
-**Revision:** 1.21
+**Revision:** 1.23
 
-**Current production:** 7.1.0 database foundation and application release delivered through PR #8
+**Current production:** 7.1.0 database foundation, delivered through PR #8
 
-**Current work:** 7.2.0 tenant-ready core scope and implementation planning
+**Current work:** 7.2.0 repository publication, hosted checks, and isolated staging validation
 
-**Next decision gate:** Review and authorize the exact 7.2.0 scope. Do not begin tenant rewiring until the 7.1 observation checks remain clean.
+**Next gate:** Complete the authorized pull request and isolated staging migration/deployment, reconcile preservation evidence, then request a separate production decision.
 
-## Product decisions that govern every release
+## Product decisions
 
-- The application is **FranchiseHQ**. FGC is configuration and the first league, never the application identity or a product-wide hard-code.
-- FGC launches as the only enabled production tenant, but league-owned data is structured for enforced multi-tenant isolation from 7.2 onward.
-- Every feature must work at phone and desktop widths. A dedicated mobile/accessibility release completes the system-wide polish, but mobile is an acceptance requirement in every release.
-- Server data is authoritative for shared league features. Browser-local storage may hold temporary UI preferences, never Commissioner settings, ownership, rules, trades, confidence picks, GOTW, or other league records.
-- Madden imports are versioned source adapters feeding one canonical snapshot. Companion App, an approved direct-EA route, and CSV/Excel must not create separate downstream products.
-- Free Agents are a required first-class import dataset. Every supported source must either reconcile them or explicitly prove that the source did not provide them.
-- Production deployment, database migration, membership changes, and league-data reset are separate authorization decisions.
-- A completed release updates this document with requested additions, unexpected work, defects, deferrals, validation evidence, and the next exact gate.
-- The current refresh/login inconvenience is accepted temporarily. Authentication implementation is frozen until 7.5.1 unless evidence shows a real authorization or data-exposure vulnerability.
+- The product is **FranchiseHQ**. FGC is configuration and the first league, never the application identity or a product-wide hard-code.
+- FGC launches as the only enabled production tenant. League-owned data is tenant-scoped now so adding league two later is controlled activation, not a retrofit.
+- Server data is authoritative for shared league features. Browser storage is limited to temporary UI preferences.
+- Every release must work at phone and desktop widths. Mobile is an acceptance requirement, not a later port.
+- Madden sources feed one canonical snapshot model. Companion, approved direct-EA access, and CSV/Excel must not create separate downstream products.
+- Free Agents are a required first-class dataset. A source must provide and reconcile them or explicitly prove their absence.
+- Production publication, database migration, Discord configuration, membership edits, FGC reset, import, and snapshot activation are separate authorization decisions.
+- Every validated release updates this roadmap with requested additions, unexpected work, defects, deferrals, evidence, and the next exact gate.
+- The refresh/login inconvenience is accepted temporarily. Session redesign remains frozen until 7.5.0 unless evidence shows an authorization or data-exposure vulnerability.
 
 ## Current facts and accepted limitations
 
-- 7.0.5 is live and supports Discord onboarding, Commissioner access, canonical Madden-team ownership, and the owner-only Pages fallback.
-- A refresh on Commissioner HQ or Trade Center can return a user to Account or require another login, especially on mobile. This is a known UX defect, not considered a 7.1 blocker by the owner.
-- Commissioner settings can currently remain browser-local: one commissioner's update may not appear for another commissioner. This is a data-authority defect. 7.1 adds its canonical shared database contract; 7.3.3 moves the feature to that contract.
-- The Madden NFL 27 Companion App is not yet reliable enough to make its export the critical path. Database, tenant, URL, trade, transaction, Commissioner, rules, and mobile work proceed without waiting for it.
-- No FGC Madden-data reset has occurred. Reset and activation remain explicit, audited, recoverable operations in the import program.
+- 7.1.0 is production and established a reproducible database, continuous migration ledger, preservation checks, and target-locked migration command.
+- Refreshing Commissioner HQ or Trade Center can return a user to Account or require another login, especially on mobile. The owner accepted this as a temporary UX defect.
+- Commissioner settings can remain browser-local and disagree between commissioners. The shared schema exists; 7.4.2 moves the feature to server authority.
+- EA has restored Madden NFL 27 Companion data flow. After 7.2, discovery and a safe FGC teams/rosters/players activation are the immediate priority.
+- No FGC Madden reset has occurred. Reset and activation require preview, recovery evidence, staging rehearsal, and explicit owner approval.
 
 ## Release tracker
 
 | Version | Status | Outcome |
 | --- | --- | --- |
-| 7.0.0–7.0.5 | Production history | Controlled engineering baseline, security containment, onboarding, ownership, and Commissioner management foundations |
+| 7.0.0–7.0.5 | Production history | Engineering baseline, security containment, onboarding, ownership, and Commissioner-management foundations |
 | 7.1.0 | Production | Canonical database, target-locked migration, preservation, and recovery foundation |
-| 7.2.0 | Planned | Tenant-ready core with FGC as the only enabled league |
-| 7.3.0 | Planned | Stable player and team page URLs |
-| 7.3.1 | Planned | Full Trade Center and advanced Trade Block |
-| 7.3.2 | Planned | Transactions and league history |
-| 7.3.3 | Planned | Commissioner HQ, shared settings, Confidence Pool, GOTW, and Rules |
-| 7.3.4 | Planned | Mobile UX, accessibility, performance, and legacy-code removal |
-| 7.3.5 | Planned | Canonical league experience and cross-feature data consistency |
-| 7.3.6 | Planned | Monitoring, backups, security, and recovery |
-| 7.4.0 | Movable when source evidence is ready | Multi-source Madden import, Free Agents, validation, reset, and activation |
-| 7.5.0 | Planned after a verified Madden NFL 27 source | Madden NFL 27 league experience |
-| 7.5.1 | Deferred but required before release candidate | Authentication and session framework |
+| 7.2.0 | In local validation | Tenant-ready core with FGC as the only enabled league |
+| 7.3.0 | Next | Madden 27 payload discovery and source lock |
+| 7.3.1 | Planned | Canonical teams, players, rosters, and Free Agents mapping |
+| 7.3.2 | Planned | Recoverable FGC reset, import, validation, and activation |
+| 7.3.3 | Planned | Production team, roster, player, and Free Agent experience |
+| 7.3.4 | Planned | Stable shareable team and player URLs |
+| 7.3.5 | Planned | Team assignment, My Team, and ownership reconciliation |
+| 7.3.6 | Planned | Incremental Madden updates and freshness reporting |
+| 7.3.7 | Research gate | Approved direct-EA and CSV/Excel adapters |
+| 7.4.0–7.4.6 | Planned | Core platform features, mobile polish, consistency, and operations |
+| 7.5.0 | Required before RC | Authentication and session framework |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
-| 8.1.0 | Planned | Multi-league identity, administration, and operations |
+| 8.1.0 | Planned | Multi-league administration and operations |
 
 ## 7.1.0 — Database Foundation
 
-**What we build**
+**Delivered**
 
-- Preserve every historical migration file but remove it from the replayable sequence.
-- Establish one immutable active sequence that can initialize an empty database and upgrade the current production-shaped database.
-- Define a machine-readable schema contract and a continuous migration ledger.
-- Create the shared league-settings and revision foundation required to eliminate per-browser Commissioner settings.
-- Move every table/index creation out of normal API requests and into migrations.
-- Make protected database operations fail safely when the expected database version is absent.
-- Validate fresh install, legacy upgrade, identity preservation, relationships, foreign keys, backup, restore, and request-time mutation removal.
-- Document staging, production, stop conditions, Time Travel recovery, and the no-improvised-drop rollback rule.
+- One active migration sequence initializes a clean database and upgrades production-shaped legacy data.
+- Shared settings/revisions, import/snapshot, transaction, and runtime tables moved into migrations; request handlers no longer create schema.
+- Runtime guards fail closed below the required schema version.
+- Fresh install, legacy upgrade, identity preservation, foreign keys, backup/restore, and production target checks passed.
+- Production reached a continuous ledger through version 20 with protected counts and ownership unchanged.
 
-**Why now**
+**Still deferred**
 
-Every shared feature and every future league depends on a database that can be reproduced, upgraded, and recovered without guesswork.
-
-**Explicitly excluded**
-
-- No live migration or deployment without a later authorization.
-- No authentication/session work, membership edit, Madden data reset, importer activation, or Discord configuration change.
-- 7.1 creates the shared-settings contract but does not yet rewire the Commissioner UI.
-
-**Release gate**
-
-- One strict local gate passes with no registered migration exceptions.
-- A clean database reaches version 20 with all required tables and columns.
-- A production-like database upgrades without changing tested identities or relationships.
-- Backup/restore and foreign-key checks pass.
-- Read-only production inventory is recorded.
-- Isolated staging migration and recovery rehearsal pass before production approval is requested.
-
-**Completion evidence — August 27, 2026**
-
-- Local migration, legacy-upgrade, backup/restore, schema-mutation, target-confirmation, and preservation tests passed.
-- Isolated staging reached version 20 with 50 application tables and zero foreign-key violations; a marker-write and Time Travel restore rehearsal preserved the complete schema and removed the marker.
-- Production was bookmarked, migrated in order from legacy max version 17 to a continuous 1–20 ledger, and bookmarked again.
-- Production retained exactly 1 league, 8 users, 8 memberships, 7 active team assignments, 97 sessions, and the complete pre-change ownership distribution.
-- Production increased only from 47 to the expected 50 application tables and retained zero foreign-key violations.
-- The release adds a committed, target-locked D1 plan/apply command so later schema releases do not depend on manual dashboard batches.
-- PR #8 is the single source and deployment record for the application release; no Madden reset, membership edit, Discord change, or authentication rewrite was included.
+- Shared settings are schema only until 7.4.2.
+- No Madden reset/import, membership edit, Discord change, or session redesign was included.
 
 ## 7.2.0 — Tenant-Ready Core
 
 **What we build**
 
-- One trusted league-resolution service for paths, APIs, jobs, and imports.
-- Mandatory `league_id` scope for every league-owned read and write.
-- Central query helpers that cannot silently fall back to FGC or the first database row.
-- FGC as the first league record with branding, slug/domain, timezone, configuration, and enabled features.
-- Server-enforced feature configuration with safe defaults.
-- Audit context containing league, actor, request, and action IDs.
-- Cross-league isolation tests using an internal test tenant that never becomes user-facing.
-- Removal of fixed FGC strings, fixed owner/team IDs, and default-league authorization assumptions.
+- One trusted server resolver for league routes, aliases, login joins, APIs, imports, and jobs.
+- Explicit tenant identity with status, timezone, branding, configuration, domains, aliases, and feature controls.
+- No fallback to FGC, a first database row, a product-coded league ID, or a browser-seeded tenant.
+- Mandatory direct `league_id` scope on every league-owned table, including legacy validation and one-row-per-league tables.
+- Tenant-ID namespaces for new KV/R2 Companion data while retained D1 object references keep existing stored captures readable.
+- Tenant audit context with league, actor, request, action, resource, outcome, and details.
+- Two-tenant regressions proving identical team IDs and membership assignments remain isolated.
+- FGC remains the sole enabled production tenant; future league records default disabled.
 
-**Why**
+**Explicit exclusions**
 
-Building a secure single-tenant launch on tenant-scoped foundations avoids a costly and risky retrofit when league two arrives.
-
-**Release gate**
-
-- Automated tests prove identical IDs in two leagues cannot read, update, delete, enumerate, or infer one another's data.
-- Background jobs, exports, audit records, and cache keys carry league scope.
-- Only FGC is enabled in production.
-
-## 7.3.0 — Player and Team Page URLs
-
-**What we build**
-
-- Stable, league-scoped public identities for teams and players.
-- Shareable routes such as `/leagues/{leagueSlug}/teams/{teamSlug}` and `/leagues/{leagueSlug}/players/{publicPlayerId}`.
-- Player links from rosters, Free Agents, search, statistics, transactions, Trade Block, and trade proposals.
-- Team links from standings, schedule, transactions, and Commissioner screens.
-- Direct-link refresh and authentication-return behavior covered by tests, while the wider session redesign remains deferred.
-- Open Graph/social metadata with safe public fields and no private account details.
-- Mobile player and team layouts that do not overflow or create nested-scroll traps.
+- No second production league, FGC reset/import, active-snapshot switch, team reassignment, shared-settings UI rewrite, trade rewrite, or session-refresh redesign.
+- Building and testing migration 21 does not authorize applying it to staging or production.
 
 **Release gate**
 
-- Two users opening the same URL see the same active player/team.
-- Imports preserve valid links and safely resolve traded, released, renamed, or missing records.
-- Raw internal row IDs are not the public URL contract.
+- Clean install and production-shaped upgrade reach version 21 with zero foreign-key violations.
+- Existing rules, settings, active snapshot pointer, and validation-player rows survive the migration.
+- Unknown tenants/features fail closed and disabled tenants cannot resolve publicly.
+- Runtime scans find no hard-coded FGC/default tenant and no independent league resolver.
+- One consolidated strict gate passes before review.
 
-## 7.3.1 — Full Trade Center and Advanced Trade Block
+## 7.3.0 — Madden 27 Payload Discovery and Source Lock
 
-**What we build**
+- Privately capture one current Companion export without activation.
+- Inventory every route, dataset, field, identifier, relationship, and season/week marker.
+- Locate and count Free Agents explicitly, then create sanitized regression fixtures.
+- Gate: source league/version/season/week are verified; teams, players, rosters, and Free Agents are located or precisely reported absent; no user-facing data changes.
 
-- Server-backed Trade Block listings with current roster/team eligibility checks.
-- Multi-asset proposals, counters, decline/withdraw flows, status history, notes, and notifications.
-- Commissioner and Trade Committee review using explicit server capabilities.
-- Concurrency/version checks so two users cannot overwrite the same proposal.
-- Automatic stale-listing handling after roster changes or snapshot activation.
-- Canonical player/team links throughout sharing and negotiation.
-- Responsive phone workflows for listing, composing, reviewing, and deciding a trade.
+## 7.3.1 — Canonical Madden Mapping
 
-**Release gate**
+- Map teams, players, roster membership, and Free Agents into one canonical candidate snapshot.
+- Preserve source IDs/provenance and generate stable internal identities.
+- Validate counts, duplicates, missing teams, invalid fields, and unassigned records without inventing data.
+- Gate: the candidate reconciles to source, each player is on one roster or in Free Agents, and a mapping failure cannot change the active snapshot.
 
-- Two accounts can complete the full permitted lifecycle and see the same state.
-- Unauthorized, cross-team, cross-league, stale, duplicate, and replayed actions fail safely.
-- Browser-local legacy trade data cannot override the server record.
+## 7.3.2 — Safe FGC Reset, Import, and Activation
 
-## 7.3.2 — Transactions and League History
+- Add an exact reset preview, protected identity/membership preservation, recovery bookmark, typed confirmation, tenant audit, and atomic active-snapshot switch.
+- Rehearse backup → reset → import → validate → activate → rollback in staging.
+- Preserve Justin and Gas identities for later imported-team assignment; disabled users remain disabled.
+- Gate: failures leave the last good snapshot visible, and the owner separately approves the exact production reset/import/activation.
 
-**What we build**
+## 7.3.3 — Team, Roster, Player, and Free Agent Experience
 
-- Canonical transaction feed for trades, signings, releases, roster movements, and supported Commissioner adjustments.
-- Evidence links back to source snapshots and movement classification.
-- Team, player, season, week, and transaction permalinks.
-- League-history views for seasons, champions, standings, records, awards, and major events as reliable data becomes available.
-- Correction/amendment records instead of silent history rewrites.
-- Import deduplication and idempotency for repeated evidence.
+- Serve team pages, roster groups, player profiles, and Free Agent browsing from one active Madden 27 snapshot.
+- Show source-supported ratings, contracts, abilities, positions, and freshness; use honest unavailable/stale states.
+- Build phone-first layouts without player-card overflow or nested-scroll traps.
+- Gate: phone and desktop counts/identities reconcile to the active FGC snapshot with no old-owner, logo, color, player, or demo fallback.
 
-**Release gate**
+## 7.3.4 — Stable Team and Player URLs
 
-- Reprocessing the same source does not duplicate history.
-- Transactions reconcile to before/after roster states.
-- Corrections are attributable and the prior evidence remains available.
+- Add league-scoped `/teams/{teamSlug}` and `/players/{publicPlayerId}` routes.
+- Link players from rosters, Free Agents, statistics, transactions, Trade Block, and proposals; link teams throughout the platform.
+- Preserve valid links through trades/releases/renames and expose only safe social metadata.
+- Gate: two users opening one URL see the same active identity; raw database row IDs are not the public contract.
 
-## 7.3.3 — Commissioner HQ, Confidence Pool, GOTW, and Rules
+## 7.3.5 — Ownership Reconciliation and My Team
 
-**What we build**
+- Match imported teams to FranchiseHQ memberships without trusting owner names in Madden data.
+- Add Commissioner assignment/reassignment with duplicate-team and lockout protections.
+- Drive My Team, ownership badges, and team-dependent features from the same authority.
+- Gate: Justin resolves to Buccaneers and Gas to Packers after reviewed assignment; no active duplicate owner or cross-tenant inference is possible.
 
-- Move Commissioner settings from browser-local state into `league_settings` with revision history and server validation.
-- Add optimistic concurrency so one commissioner is warned instead of silently overwriting another's newer settings.
-- Make every session read the same authoritative setting after save/refresh.
-- Consolidate Commissioner dashboards, pending work, role/team administration, audit history, and feature controls.
-- Server-backed Rules with sections, revisions, publish/draft status, and shareable public view.
-- Schedule-sourced GOTW with nomination/selection, lock times, results, and audit history.
-- Schedule-sourced Confidence Pool weeks, games, picks, confidence uniqueness, deadlines, scoring, and standings.
-- Refuse to open/score a week when the active schedule snapshot is incomplete or ambiguous.
+## 7.3.6 — Incremental Madden Updates
 
-**Release gate**
+- Intake later Companion exports without a destructive full reset.
+- Compare snapshots, report freshness/warnings, and activate teams, rosters, transactions, schedule, standings, and statistics atomically as supported.
+- Gate: duplicate exports are idempotent, successful updates are coherent, and failure/rollback retains the previous complete experience.
 
-- Commissioner A changes a setting and Commissioner B sees the same revision after a normal refresh.
-- Concurrent edits produce a visible conflict, not silent data loss.
-- GOTW and Confidence Pool reference canonical games from one active snapshot.
-- Lock, scoring, correction, and permission tests pass across phone and desktop.
+## 7.3.7 — Additional Madden Source Adapters
 
-## 7.3.4 — Mobile UX, Accessibility, Performance, and Legacy Removal
+- Investigate policy-compliant direct-EA connectivity using documented/authorized access only.
+- Add CSV/Excel intake where commissioner exports are available.
+- Make every adapter feed the same validator and snapshot activation contract.
+- Gate: no undocumented credential exchange, prohibited scraping, or unstable private endpoint becomes a production dependency.
 
-**What we build**
+## 7.4.0 — Full Trade Center and Advanced Trade Block
 
-- Audit every route at representative iOS, Android, tablet, and desktop widths.
-- Replace oversized player cards, competing scroll regions, touch traps, and layout shifts.
-- Keyboard navigation, visible focus, semantic labels, contrast, reduced-motion behavior, and screen-reader landmarks.
-- Shared design tokens/components for navigation, cards, tables, forms, dialogs, notices, loading, empty, and error states.
-- Route-level performance budgets and reduced initial JavaScript/data loading.
-- Inventory and remove dead renderers, duplicate modules, stale local-storage authorities, seeded demo identity, and unused styles.
-- Regression coverage before each legacy path is removed.
+- Server-backed listings, multi-asset offers, counters, decisions, review, status history, concurrency, notifications, and canonical links.
+- Gate: two accounts see one lifecycle; unauthorized, stale, duplicate, replayed, and cross-tenant actions fail safely.
 
-**Release gate**
+## 7.4.1 — Transactions and League History
 
-- Critical journeys pass WCAG-oriented automated checks plus manual keyboard/screen-reader review.
-- No critical phone route requires horizontal page scrolling.
-- Core screens meet documented performance budgets on a representative cellular profile.
+- Canonical trades, signings, releases, movements, evidence, corrections, season history, and permanent links.
+- Gate: repeated evidence is idempotent and each transaction reconciles to before/after roster states.
 
-## 7.3.5 — Canonical League Experience and Data Consistency
+## 7.4.2 — Commissioner HQ and Rules
 
-**What we build**
+- Move settings to `league_settings` with revisions, validation, and optimistic concurrency.
+- Consolidate member/team/role administration, feature controls, audit history, and Rules drafts/publication.
+- Gate: Commissioner A's saved revision becomes authoritative for Commissioner B and conflicts cannot silently overwrite newer work.
 
-- One server-owned active-season/week context consumed by Home, Teams, My Team, Standings, Schedule, Stats, Trades, GOTW, and Confidence Pool.
-- Consistent loading, unavailable, stale, incomplete-import, and no-active-season states.
-- Shared search across teams, players, Free Agents, transactions, rules, and history.
-- Notification center for assignments, trades, deadlines, Commissioner decisions, and import status.
-- Data-freshness indicators tied to the active snapshot and last verified source.
-- Cross-feature reconciliation checks so ownership, roster, schedule, and statistics cannot present contradictory active state.
+## 7.4.3 — GOTW and Confidence Pool
 
-**Release gate**
+- Build schedule-backed GOTW selection and Confidence Pool weeks, picks, locks, scoring, standings, corrections, and audit.
+- Gate: incomplete/ambiguous schedules cannot open or score, and phone/desktop permission and timing tests pass.
 
-- Every core screen reports the same league, season, week, active snapshot, team ownership, and data-freshness state.
-- Search and notifications honor tenant and role boundaries.
-- No stale browser cache can supersede server-authoritative league data.
+## 7.4.4 — Mobile UX, Accessibility, Performance, and Legacy Removal
 
-## 7.3.6 — Monitoring, Backups, Security, and Recovery
+- Audit all routes at phone, tablet, and desktop widths; complete keyboard, focus, screen-reader, contrast, reduced-motion, and performance work.
+- Remove nested-scroll traps, oversized cards, dead renderers, duplicate modules, stale local authorities, seeded identities, and unused styles behind regressions.
+- Gate: critical journeys have no horizontal page scroll and pass automated plus manual accessibility/phone acceptance.
 
-**What we build**
+## 7.4.5 — Canonical League Consistency
 
-- Structured logs with correlation IDs and secret/personal-data redaction.
-- Health signals for authentication, APIs, imports, snapshots, scheduled jobs, and client failures.
-- Alerts with severity, ownership, and a human response runbook.
-- D1 recovery bookmarks plus retained encrypted exports appropriate to the recovery window.
-- Restore rehearsals that measure recovery-point and recovery-time objectives.
-- Rate limits, abuse protection, secure headers, dependency review, secret rotation procedure, and audit retention.
-- Incident, degraded-mode, maintenance, and recovery communications.
+- Use one server season/week/snapshot and shared team/player/game selectors across all features.
+- Standardize loading, empty, unavailable, stale, and incomplete-import states.
+- Gate: no feature silently falls back to demo/local data and all core pages report the same identities/context.
 
-**Release gate**
+## 7.4.6 — Monitoring, Backups, Security, and Recovery
 
-- A simulated application failure and database-recovery exercise are detected, contained, restored, and documented.
-- Alerts are actionable rather than noisy, and secrets/private data do not appear in logs.
-- Backup evidence is usable, not merely present.
+- Add tenant-safe logs, request/action IDs, useful alerts, retained backups, restore drills, rate limits, dependency/secret procedures, and incident communications.
+- Gate: a simulated failure is detected, contained, restored, reconciled, and documented without exposing private data.
 
-## 7.4.0 — Multi-Source Madden Import
+## 7.5.0 — Authentication and Session Framework
 
-This release can move earlier or later relative to 7.3.x when a reliable Madden NFL 27 sample becomes available. It may run in parallel conceptually, but production activation still obeys the database and tenant contracts.
+**Cost-control rule:** Capture the cookie/origin/callback/route evidence once, approve one design, implement once, run one consolidated automated gate, and perform one device acceptance cycle. No speculative patch loop.
 
-**What we build**
-
-- Versioned canonical import/snapshot schema and source provenance.
-- Companion App adapter based on verified Madden NFL 27 payloads.
-- CSV/Excel adapter for commissioner-exported datasets.
-- Policy-compliant direct-EA investigation; no undocumented credential exchange or prohibited scraping becomes a production dependency.
-- Dataset discovery that inventories every section rather than assuming old export names.
-- First-class Free Agent discovery, mapping, counts, validation, and activation.
-- Private source artifact storage, integrity hashes, import states, warnings, blocking errors, and audit evidence.
-- Idempotent build and atomic activation: users see the old complete snapshot or the new complete snapshot, never a partial mix.
-- Commissioner-only reset preview with typed confirmation, preserve/reset/remap manifest, backup reference, audit event, and safe failure behavior.
-- Sanitized representative regression fixtures for each supported source/version.
-
-**Companion App contingency**
-
-- If the Companion App remains unreliable, 7.4 proceeds with fixture discovery and approved CSV/Excel intake.
-- No release gate depends on pretending an unavailable dataset exists.
-- Direct-EA work remains research until authorization, policy, identity, rate-limit, and stability requirements are proven.
-
-**Release gate**
-
-- Duplicate, malformed, partial, wrong-league, wrong-season/week, missing-section, and activation-failure tests preserve the last good snapshot.
-- Teams, rosters, players, Free Agents, schedule, standings, statistics, and transactions reconcile to the source or report a precise absence.
-- Staging backup → reset → import → validate → activate → rollback is proven before FGC production data is touched.
-
-## 7.5.0 — Madden NFL 27 Experience
-
-**What we build**
-
-- Production-quality rosters, depth/position views, player profiles, Free Agent browsing, teams, schedule, standings, statistics, and leaders from the active Madden NFL 27 snapshot.
-- Madden-version-aware labels and fields; unavailable source fields are omitted or marked unavailable, never invented.
-- Import freshness, warnings, and Commissioner action status surfaced clearly.
-- Player comparison, roster needs, and league insights only where canonical data supports them.
-- Phone-first navigation and sharing for the high-frequency league workflows.
-
-**Release gate**
-
-- A representative FGC import reconciles across every surfaced dataset.
-- The same snapshot identity is visible throughout the platform.
-- Commissioner and member acceptance passes on phone and desktop.
-
-## 7.5.1 — Authentication and Session Framework
-
-This release is intentionally after the core platform work and before the private release candidate. It is not being repeatedly patched during 7.1–7.5.
-
-**What we build**
-
-- Reproduce the refresh/domain/mobile handoff issue once with captured request, cookie, origin, callback, and route evidence.
-- Establish one documented public-domain session model plus a controlled owner recovery path.
-- Centralize Discord OAuth, session issue/rotation/expiry/revocation, logout, CSRF, and capability checks.
-- Preserve safe direct routes through refresh and authentication return.
-- Invalidate sessions appropriately after membership/role/access changes.
-- Add end-to-end browser tests for mobile Discord, mobile browser, desktop, expiry, logout, revocation, replay, and protected routes.
-
-**Cost-control rule**
-
-- No speculative patch cycles. Diagnosis produces one evidence package, one approved implementation, one consolidated automated gate, and one device acceptance cycle.
-
-**Release gate**
-
-- Refresh stays on the requested route without an unnecessary login when the session is valid.
-- Sign-in, logout, expiry, role change, revoke, replay, CSRF, and cross-league protections pass.
-- Phone and desktop validation use the same published candidate that passed automation.
+- Establish one public-domain session model plus a controlled owner recovery path.
+- Centralize Discord OAuth, issue/rotation/expiry/revocation, logout, CSRF, and capability checks.
+- Preserve safe direct routes through refresh and authentication return; invalidate access after role/revoke changes.
+- Gate: refresh, login, logout, expiry, replay, revoke, CSRF, cross-league, mobile Discord, mobile browser, and desktop tests pass.
 
 ## 7.6.0-rc.1 — Private FGC Release Candidate
 
-**What we do**
-
-- Freeze scope except release-blocking defects.
-- Use a representative private FGC cohort across commissioners, committee members, and owners.
-- Execute onboarding, ownership, roster, player link, trade, transaction, rules, GOTW, confidence, import, mobile, recovery, and session checklists.
-- Rehearse production deployment and rollback from exact immutable artifacts.
-- Publish privacy, terms, support, incident, data-retention, and user-help material.
-
-**Release gate**
-
-- No unresolved critical/high release blocker.
-- Data migration/import and rollback reconcile.
-- Monitoring and support ownership are active.
-- The owner signs off on one documented candidate.
+- Freeze scope except release blockers and test a representative private cohort of commissioners, committee members, and owners.
+- Validate onboarding, ownership, Madden data, URLs, trades, transactions, rules, GOTW, confidence, mobile, recovery, and sessions.
+- Rehearse deployment/rollback from exact artifacts; publish privacy, terms, support, retention, incident, and help material.
+- Gate: no unresolved critical/high blocker, recovery reconciles, monitoring/support are active, and the owner accepts one exact candidate.
 
 ## 7.7.0 — FGC Production Launch
 
-**What we do**
-
-- Deploy the exact accepted release-candidate commit.
-- Apply only pre-authorized migrations/import/reset operations with recorded recovery evidence.
-- Invite FGC in controlled waves and observe authentication, errors, data freshness, imports, trades, and Commissioner workflows.
-- Keep a documented rollback window and publish acceptance results.
-
-**Release gate**
-
-- Owner acceptance completes on the production build.
-- Observation-window signals remain within thresholds.
-- The release record, roadmap, support notes, known limitations, and recovery evidence are complete.
+- Deploy the accepted RC commit, execute only pre-authorized migrations/imports, invite FGC in waves, and observe key signals.
+- Gate: owner acceptance passes on production and the observation window, release record, roadmap, support notes, and recovery evidence are complete.
 
 ## 8.0.0 — Multi-League Activation
 
-**What we build**
+- Enable controlled creation of additional leagues with isolated branding, domains, features, roles, imports, storage, jobs, rate limits, logs, backup/export, suspension, and deletion.
+- Gate: two real leagues operate concurrently and every recovery/lifecycle exercise affects only its selected tenant while FGC stays unchanged.
 
-- Enable creation of additional leagues through controlled administration.
-- Per-league branding, slug/custom-domain readiness, features, schedules, rules, roles, imports, retention, and usage controls.
-- Tenant-aware background work, cache isolation, storage namespaces, rate limits, observability, export, deletion, and recovery.
-- Onboarding and suspension/offboarding workflows that cannot affect another league.
-- Capacity and cost controls suitable for multiple active leagues.
+## 8.1.0 — Multi-League Administration and Operations
 
-**Release gate**
+- Support different roles/teams per account, safe league switching, platform-owner separation, lifecycle administration, quotas/billing readiness, support/audit tools, and custom-domain automation.
+- Gate: role/team/domain/lifecycle changes cannot cross tenants and platform operations are separately authorized and audited.
 
-- Two real isolated league configurations operate concurrently under automated boundary tests.
-- Backup, restore, export, suspension, and deletion exercises affect only the selected league.
-- FGC behavior and data remain unchanged unless explicitly configured.
+## Delivery method for every version
 
-## 8.1.0 — Multi-League Identity, Administration, and Operations
-
-**What we build**
-
-- One FranchiseHQ account can hold different roles and teams in different leagues.
-- Safe league switching with explicit current-league context.
-- Platform-owner administration separated from league-commissioner authority.
-- League lifecycle, billing-readiness, quotas, support tooling, audit search, and operational dashboards.
-- Custom-domain/callback automation that preserves tenant routing and secure session boundaries.
-
-**Release gate**
-
-- Role and team changes in one league do not alter another league.
-- Platform operations are separately authorized and audited.
-- Custom-domain login, switching, suspension, recovery, and offboarding pass without cross-tenant leakage.
-
-## How each version is delivered
-
-1. Confirm scope, exclusions, and authorization boundary in its release record.
+1. Confirm scope, exclusions, and authorization boundary.
 2. Start from the exact accepted production commit and create one version branch.
-3. Implement related work together rather than publishing partial file patches.
-4. Add regression tests for every defect and a contract test for every new shared authority.
-5. Run one consolidated local quality gate and update this roadmap with discoveries.
-6. Review the candidate and request separate staging authorization when needed.
-7. Require isolated staging, recovery evidence, and hosted checks before production approval.
-8. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
+3. Implement related work together; do not publish partial patch chains.
+4. Add regressions for each defect and contract tests for each new authority.
+5. Run one consolidated strict gate and update this roadmap with discoveries.
+6. Review the candidate, then request separate staging and production authorizations when applicable.
+7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
 
-- **Revision 1.18:** Recorded 7.0.5 domain-specific authentication and Commissioner management work, plus its production publication and partial owner acceptance.
-- **Revision 1.19:** Accepted refresh/login as a temporary limitation; elevated shared Commissioner settings as a core data-authority defect; replaced the former numbering with the owner-approved 7.1–8.1 sequence; deferred authentication to 7.5.1 after core platform features but before the private release candidate; added Madden Companion contingency, multi-source import, Free Agent discovery, per-release mobile requirements, and the 7.1 database candidate/evidence rules.
-- **Revision 1.20:** Recorded the owner's authorization for one consolidated 7.1.0 commit, branch push, pull request, and hosted-check cycle. Staging migration, production migration/deployment, authentication, memberships, and Madden data remain outside that authorization.
-- **Revision 1.21:** Completed the isolated staging migration/recovery rehearsal; added a dependency-free, target-locked D1 release command; recorded the owner's production authorization; applied and reconciled migrations 18–20 without changing protected data or ownership; and advanced the roadmap to the 7.2.0 decision gate.
+- **Revision 1.18:** Recorded 7.0.5 domain-specific authentication and Commissioner management work and its partial owner acceptance.
+- **Revision 1.19:** Accepted refresh/login temporarily; elevated shared settings; adopted the 7.1–8.1 sequence; deferred authentication until after core platform work; retained Free Agents, multi-source import, and mobile requirements.
+- **Revision 1.20:** Recorded authorization for one consolidated 7.1 commit, push, pull request, and hosted-check cycle.
+- **Revision 1.21:** Completed staging recovery rehearsal and production migrations 18–20 with protected data reconciled; advanced to the 7.2 decision gate.
+- **Revision 1.22:** Recorded the authorized 7.2 tenant-ready implementation; centralized tenant resolution, scoping, feature/domain configuration, storage namespaces, and audit context; moved verified Madden 27 discovery/import/activation directly after 7.2; retained session redesign at 7.5.0 before the private RC.
+- **Revision 1.23:** Recorded the owner's consolidated authorization for one 7.2 commit, branch push, pull request, hosted checks, staging migration 21, and deployment of the exact candidate to the registered isolated staging environment. Production remains outside this authorization.

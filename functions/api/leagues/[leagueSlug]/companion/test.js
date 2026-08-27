@@ -28,11 +28,11 @@ async function latestTestExport(db, leagueId) {
     ORDER BY ce.received_at DESC LIMIT 1`).bind(leagueId, TEST_EVENT).first();
 }
 
-async function refreshKvPointer(env, slug, leagueId) {
+async function refreshKvPointer(env, leagueSlug, leagueId) {
   const latest = await database(env).prepare(`SELECT * FROM companion_exports
     WHERE league_id = ? AND status IN ('pending','inspected','mapped')
     ORDER BY received_at DESC LIMIT 1`).bind(leagueId).first();
-  const key = companionMetadataKey(slug);
+  const key = companionMetadataKey(leagueId);
   if (!latest) {
     await env.COMPANION_EXPORT_META.delete(key);
     return null;
@@ -40,7 +40,7 @@ async function refreshKvPointer(env, slug, leagueId) {
   const pointer = {
     exportId: latest.id,
     leagueId,
-    leagueSlug: slug,
+    leagueSlug,
     receivedAt: latest.received_at,
     updatedAt: new Date().toISOString(),
     status: latest.status,
@@ -65,7 +65,7 @@ async function createTest(context, league, slug) {
   const exportId = crypto.randomUUID();
   const payloadHash = await sha256Hex(raw);
   const byteLength = new TextEncoder().encode(raw).byteLength;
-  const key = companionObjectKey(slug, exportId, receivedAt, payload.season, payload.week);
+  const key = companionObjectKey(league.id, exportId, receivedAt, payload.season, payload.week);
 
   await context.env.COMPANION_EXPORTS.put(key, raw, {
     httpMetadata: { contentType: 'application/json' },
@@ -117,7 +117,7 @@ async function verifyTest(context, league) {
   const row = await latestTestExport(db, league.id);
   if (!row) return { action: 'verify', found: false, message: 'No development test export exists yet.' };
   const r2 = row.r2_object_key ? await context.env.COMPANION_EXPORTS.head(row.r2_object_key) : null;
-  const pointer = await context.env.COMPANION_EXPORT_META.get(companionMetadataKey(league.slug), { type: 'json' });
+  const pointer = await context.env.COMPANION_EXPORT_META.get(companionMetadataKey(league.id), { type: 'json' });
   const checks = {
     d1Record: true,
     r2Object: Boolean(r2),

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.2.0",
+  "validatedOn": "2026-08-27",
+  "status": "local-strict-validation-passed-review-pending",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "tenantSchema": { "passed": true, "requiredTables": ["league_slug_aliases", "league_domains", "league_features", "tenant_audit_events"] },
+    "explicitTenantResolution": { "passed": true, "allowsFirstRowFallback": false },
+    "tenantAliasResolution": { "passed": true, "authority": "league_slug_aliases" },
+    "disabledTenantDenial": { "passed": true },
+    "crossTenantIsolation": { "passed": true, "testTenants": 2, "identicalTeamIds": true },
+    "tenantFeatureDefaults": { "passed": true, "unknownFeatureEnabled": false },
+    "tenantScopedStorage": { "passed": true, "namespace": "tenant:{leagueId}:{namespace}", "existingR2ReferencesPreserved": true },
+    "tenantAuditContext": { "passed": true, "fields": ["leagueId", "actorUserId", "requestId", "actionId", "action"] },
+    "hardCodedDefaultRemoval": { "passed": true, "runtimeFindings": 0 },
+    "validationPlayerScope": { "passed": true, "directLeagueIdNotNull": true },
+    "migrationPreservation": { "passed": true, "records": ["rules", "settings", "activeSnapshot", "validationPlayerIds"] },
+    "canonicalMigrationSequence": { "passed": true, "activeVersions": [18, 19, 20, 21], "archivedLegacyFiles": 19 },
+    "freshDatabase": { "passed": true, "requiredTables": 54, "finalVersion": 21 },
+    "foreignKeyIntegrity": { "passed": true, "violations": 0 },
+    "runtimeSchemaGuard": { "passed": true, "minimumVersion": 21 },
+    "automatedTests": { "passed": true, "passedTests": 60, "failedTests": 0, "scope": "full-consolidated-release-gate" },
+    "strictMigration": { "passed": true, "expectedFailure": false, "blockingIssues": 0, "finalVersion": 21 },
+    "strictRepositoryGate": { "passed": true, "javascriptModules": 183, "secretScanFiles": 521, "inventoryFiles": 508, "routes": 59 }
+  },
+  "scopeBoundaries": {
+    "sessionRefreshRedesignChanged": false,
+    "membershipDataChanged": false,
+    "maddenDataChanged": false,
+    "activeSnapshotChanged": false,
+    "discordConfigurationChanged": false,
+    "secondTenantEnabled": false,
+    "productionInfrastructureChanged": false
+  },
+  "external": {
+    "githubPullRequest": { "authorized": true, "status": "authorized-pending-creation" },
+    "hostedChecks": { "status": "not-run" },
+    "stagingDeployment": { "authorized": true, "status": "authorized-not-run" },
+    "stagingMigrations": { "authorized": true, "status": "authorized-not-run", "migrations": [21] },
+    "productionDeployment": { "authorized": false, "status": "not-run", "url": "https://franchisehq.app/" },
+    "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [21] },
+    "productionDataReset": { "authorized": false, "status": "not-run" },
+    "maddenImportActivation": { "authorized": false, "status": "not-run" }
+  },
+  "manualAcceptance": {
+    "status": "not-applicable-to-local-tenant-foundation",
+    "nextGate": "owner-review-and-repository-publication-authorization"
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}

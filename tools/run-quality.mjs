@@ -15,11 +15,13 @@ const checks = [
     '--test-isolation=none',
     'tests/tooling/environment.test.mjs',
     'tests/tooling/routes.test.mjs',
+    'tests/tooling/d1-release.test.mjs',
     'tests/database/migrations.test.mjs',
     'tests/security/containment.test.mjs',
     'tests/security/session.test.mjs',
     'tests/security/onboarding.test.mjs',
-    'tests/security/ownership.test.mjs'
+    'tests/security/ownership.test.mjs',
+    'tests/security/tenancy.test.mjs'
   ]],
   ['System inventory', 'tools/generate-inventory.mjs', ['--verify']],
   ['Release contract', 'tools/check-release.mjs', []]

@@ -1,7 +1,7 @@
 (()=>{'use strict';
 const HQ=window.FranchiseHQ,VERSION='5.9.3.8';let data=null,busy=false,lastError=null;
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const account=()=>window.FGC_TRADE?.getCurrentAccount?.()||null;const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||'furiousgamingcommunity';
+const account=()=>window.FGC_TRADE?.getCurrentAccount?.()||null;const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||null;
 const endpoint=sample=>`/api/leagues/${encodeURIComponent(slug())}/companion/snapshot-verification${sample?`?sample=${encodeURIComponent(sample)}`:''}`;
 const headers=()=>({'x-franchisehq-platform-owner-account-id':String(account()?.id||'')});
 async function load(sample=''){busy=true;lastError=null;rerender();try{const r=await fetch(endpoint(sample),{headers:headers(),credentials:'same-origin',cache:'no-store'});const p=await r.json().catch(()=>({ok:false,error:`HTTP ${r.status}`}));if(!r.ok||p.ok===false)throw Object.assign(new Error(p.error||'Verification failed.'),{payload:p});data=p;return p}catch(e){lastError=e.message;console.error('[Snapshot Verification]',e.payload||e);throw e}finally{busy=false;rerender()}}

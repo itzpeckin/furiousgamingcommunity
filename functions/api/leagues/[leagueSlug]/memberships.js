@@ -1,13 +1,18 @@
 import { createId, jsonResponse } from "../../../_lib/auth.js";
 import { requireCommissioner } from "../../../_lib/permissions.js";
 import {
+  createTenantAuditContext,
+  resolveRequestTenant,
+  writeTenantAuditEvent
+} from "../../../_lib/tenant-context.js";
+import {
   activeLeagueTeams,
   activeTeamAssignments,
   publicLeagueTeams,
   resolveTeam
 } from "../../../_lib/league-teams.js";
 
-const RELEASE = "7.1.0";
+const RELEASE = "7.2.0";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -47,12 +52,6 @@ async function readJsonObject(request) {
   }
 }
 
-async function resolveLeague(context) {
-  const slug = String(context.params?.leagueSlug || "").trim();
-  if (!/^[A-Za-z0-9-]{1,100}$/.test(slug)) return null;
-  return context.env.DB.prepare(`SELECT id, slug, name FROM leagues WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1`).bind(slug).first();
-}
-
 async function membershipPolicy(env, league) {
   const fallback = { requireTeamAssignment:true };
   if (!env?.LEAGUE_CONFIG?.get || !league?.id) return fallback;
@@ -68,10 +67,17 @@ async function membershipPolicy(env, league) {
   }
 }
 
-async function audit(db, leagueId, actorUserId, subjectUserId, action, detail) {
+async function audit(context, league, session, subjectUserId, action, detail) {
+  const db = context.env.DB;
   try {
     await db.prepare(`INSERT INTO league_membership_audit (id, league_id, actor_user_id, subject_user_id, action, detail_json) VALUES (?, ?, ?, ?, ?, ?)`)
-      .bind(createId("membership_audit"), leagueId, actorUserId, subjectUserId, action, JSON.stringify(detail || {})).run();
+      .bind(createId("membership_audit"), league.id, session.user.id, subjectUserId, action, JSON.stringify(detail || {})).run();
+    const tenantAudit = createTenantAuditContext(context, league, session, action);
+    await writeTenantAuditEvent(db, tenantAudit, {
+      resourceType:"league_membership",
+      resourceId:subjectUserId,
+      detail
+    });
   } catch (error) {
     console.warn("Membership audit unavailable:", error?.message || error);
   }
@@ -80,7 +86,7 @@ async function audit(db, leagueId, actorUserId, subjectUserId, action, detail) {
 async function authorizedLeague(context) {
   const auth = await requireCommissioner(context);
   if (!auth.authorized) return { response:auth.response };
-  const league = await resolveLeague(context);
+  const league = await resolveRequestTenant(context);
   if (!league || auth.session.membership?.leagueId !== league.id) {
     return { response:jsonResponse({ ok:false, error:"Not found." }, 404) };
   }
@@ -213,7 +219,7 @@ export async function onRequestPost(context) {
       WHERE league_id=? AND user_id=? AND active=0
     `).bind(league.id, userId).run();
     if (Number(result?.meta?.changes || 0) !== 1) return jsonResponse({ ok:false, error:"Membership state changed. Refresh and try again." }, 409);
-    await audit(context.env.DB, league.id, auth.session.user.id, userId, "membership_restored_pending", {
+    await audit(context, league, auth.session, userId, "membership_restored_pending", {
       previousRole:existing.role,
       previousTeamId:existing.teamId || null
     });
@@ -285,7 +291,7 @@ export async function onRequestPost(context) {
   const action = reactivating
     ? "membership_reactivated"
     : Number(existing.active) ? "membership_updated" : "membership_activated";
-  await audit(context.env.DB, league.id, auth.session.user.id, user.id, action, {
+  await audit(context, league, auth.session, user.id, action, {
     role:input.role,
     teamId,
     previousRole:existing.role,
@@ -320,7 +326,7 @@ export async function onRequestDelete(context) {
     WHERE league_id=? AND user_id=? AND active=1
   `).bind(league.id, userId).run();
   if (Number(result?.meta?.changes || 0) !== 1) return jsonResponse({ ok:false, error:"Membership state changed. Refresh and try again." }, 409);
-  await audit(context.env.DB, league.id, auth.session.user.id, userId, "membership_deactivated", {
+  await audit(context, league, auth.session, userId, "membership_deactivated", {
     previousRole:existing.role,
     previousTeamId:existing.teamId || null
   });

@@ -28,10 +28,10 @@ export async function onRequestPost(context) {
   if (!validLeagueSlug(slug)) return json({ ok: false, error: 'Invalid league slug.' }, 400);
   const db = database(context.env);
   if (!db || !context.env.COMPANION_EXPORT_META?.put) return json({ ok: false, error: 'D1 or KV is not configured.' }, 503);
-  const token = await configuredExportToken(context.env, slug);
-  if (!token || !safeEqual(suppliedExportToken(context.request), token)) return json({ ok: false, error: 'Unauthorized export-management request.' }, 401);
   const league = await resolveLeague(context.env, slug);
   if (!league) return json({ ok: false, error: 'League not found.' }, 404);
+  const token = await configuredExportToken(context.env, league);
+  if (!token || !safeEqual(suppliedExportToken(context.request), token)) return json({ ok: false, error: 'Unauthorized export-management request.' }, 401);
   let body; try { body = await context.request.json(); } catch (_) { return json({ ok: false, error: 'Request body must be JSON.' }, 400); }
   if (body?.action !== 'reject' || !body?.exportId) return json({ ok: false, error: 'Supported action: reject with exportId.' }, 400);
   const row = await db.prepare(`SELECT * FROM companion_exports WHERE id = ? AND league_id = ? LIMIT 1`).bind(body.exportId, league.id).first();
@@ -45,9 +45,9 @@ export async function onRequestPost(context) {
   ]);
   const next = await db.prepare(`SELECT * FROM companion_exports WHERE league_id = ? AND status IN ('pending','inspected','mapped') ORDER BY received_at DESC LIMIT 1`).bind(league.id).first();
   if (next) {
-    await context.env.COMPANION_EXPORT_META.put(companionMetadataKey(slug), JSON.stringify({ exportId: next.id, leagueId: league.id, leagueSlug: slug, receivedAt: next.received_at, updatedAt: now, status: next.status, byteLength: next.byte_length, contentType: next.content_type, r2ObjectKey: next.r2_object_key, payloadStored: true, season: next.season, week: next.week, teamCount: next.team_count, playerCount: next.player_count }));
+    await context.env.COMPANION_EXPORT_META.put(companionMetadataKey(league.id), JSON.stringify({ exportId: next.id, leagueId: league.id, leagueSlug: league.slug, receivedAt: next.received_at, updatedAt: now, status: next.status, byteLength: next.byte_length, contentType: next.content_type, r2ObjectKey: next.r2_object_key, payloadStored: true, season: next.season, week: next.week, teamCount: next.team_count, playerCount: next.player_count }));
   } else {
-    await context.env.COMPANION_EXPORT_META.delete(companionMetadataKey(slug));
+    await context.env.COMPANION_EXPORT_META.delete(companionMetadataKey(league.id));
   }
   return json({ ok: true, rejected: true, export: publicExport({ ...row, status: 'rejected', processed_at: now }), rawPayloadRetained: true, nextPendingExport: publicExport(next) });
 }

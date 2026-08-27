@@ -1,7 +1,8 @@
 import { createId, jsonResponse } from '../../../_lib/auth.js';
 import { requireCommissioner } from '../../../_lib/permissions.js';
+import { createTenantAuditContext, resolveRequestTenant } from '../../../_lib/tenant-context.js';
 
-const RELEASE = '7.1.0';
+const RELEASE = '7.2.0';
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 const DELETE_ORDER = Object.freeze([
@@ -32,15 +33,6 @@ const DELETE_ORDER = Object.freeze([
   'companion_route_captures'
 ]);
 
-async function resolveLeague(context) {
-  const slug = String(context.params?.leagueSlug || '').trim();
-  if (!/^[A-Za-z0-9-]{1,100}$/.test(slug)) return null;
-  return context.env.DB.prepare(`
-    SELECT id, slug, name FROM leagues
-    WHERE lower(slug)=lower(?) AND public_status='active' LIMIT 1
-  `).bind(slug).first();
-}
-
 async function hasLeagueId(db, table) {
   try {
     const result = await db.prepare(`PRAGMA table_info(${table})`).all();
@@ -65,7 +57,7 @@ async function counts(db, leagueId) {
 async function access(context) {
   const auth = await requireCommissioner(context);
   if (!auth.authorized) return {response:auth.response};
-  const league = await resolveLeague(context);
+  const league = await resolveRequestTenant(context);
   if (!league || auth.session.membership?.leagueId !== league.id) {
     return {response:jsonResponse({ok:false,error:'Not found.'},404)};
   }
@@ -125,6 +117,17 @@ export async function onRequestPost(context) {
   `).bind(
     createId('data_reset'), state.league.id, state.auth.session.user.id,
     JSON.stringify(preserved), JSON.stringify(deletedCounts)
+  ));
+  const tenantAudit = createTenantAuditContext(context, state.league, state.auth.session, 'league_data_reset');
+  statements.push(context.env.DB.prepare(`
+    INSERT INTO tenant_audit_events
+      (id, league_id, actor_user_id, request_id, action_id, action,
+       resource_type, resource_id, outcome, detail_json)
+    VALUES (?, ?, ?, ?, ?, ?, 'league_data', ?, 'success', ?)
+  `).bind(
+    createId('tenant_audit'), state.league.id, state.auth.session.user.id,
+    tenantAudit.requestId, tenantAudit.actionId, tenantAudit.action,
+    state.league.id, JSON.stringify({preservedUserIds:preserved,deletedCounts})
   ));
   await context.env.DB.batch(statements);
   let objectDeleteFailures = 0;

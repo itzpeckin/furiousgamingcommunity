@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.2.0",
+  "releaseType": "tenant-ready-core",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.1.0",
+    "commit": "4045e02980c93491b47910f17fcb2e48fae76c68",
+    "tree": "c090eb27500c93dff91d23f79a82706e175acfb0",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.2.0",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-pending-commit-push-and-pull-request",
+    "scope": "One consolidated 7.2 commit, branch push, pull request, and hosted-check cycle."
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-pending-migration-and-deployment",
+    "scope": "Migration 21 and the exact 7.2 candidate may be applied only to the registered isolated staging environment."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-authorized",
+    "url": "https://franchisehq.app/",
+    "scope": "No production deployment, migration, second-tenant activation, membership edit, Madden import, data reset, or session redesign is authorized."
+  },
+  "requiredArtifacts": [
+    "config/database-schema-contract.json",
+    "config/tenant-data-contract.json",
+    "docs/DATABASE-OPERATIONS.md",
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "functions/_lib/tenant-context.js",
+    "migrations/0021_tenant_ready_core.sql",
+    "releases/7.2.0/release-record.md",
+    "releases/7.2.0/validation-evidence.json",
+    "tests/database/migrations.test.mjs",
+    "tests/security/tenancy.test.mjs"
+  ]
+}

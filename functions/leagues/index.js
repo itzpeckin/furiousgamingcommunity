@@ -7,7 +7,7 @@ import {
 import { CANONICAL_APP_ORIGIN, isOwnerFallbackHost } from "../_lib/origin.js";
 import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
 
-const RELEASE = "7.1.0";
+const RELEASE = "7.2.0";
 
 function esc(value) {
   return String(value ?? "")
@@ -100,6 +100,7 @@ export async function onRequestGet(context) {
         WHERE league_memberships.user_id = ?
           AND league_memberships.active = 1
           AND leagues.public_status = 'active'
+          AND leagues.tenant_status = 'enabled'
         ORDER BY leagues.name ASC
       `).bind(session.user.id).all();
       memberships = result?.results || [];
@@ -112,6 +113,7 @@ export async function onRequestGet(context) {
           AND league_memberships.role = 'team_owner'
           AND league_memberships.team_id IS NULL
           AND leagues.public_status = 'active'
+          AND leagues.tenant_status = 'enabled'
         ORDER BY leagues.name ASC
       `).bind(session.user.id).all();
       pendingMemberships = pending?.results || [];

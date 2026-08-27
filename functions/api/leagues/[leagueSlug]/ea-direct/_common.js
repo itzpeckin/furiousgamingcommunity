@@ -1,4 +1,6 @@
-const RELEASE='6.0.4a2';
+import { resolveTenant, tenantDatabase } from '../../../../_lib/tenant-context.js';
+
+const RELEASE='7.2.0';
 
 function json(data,status=200,headers={}){
   return new Response(JSON.stringify(data,null,2),{
@@ -22,10 +24,10 @@ function allowedEaHost(hostname){
 }
 
 async function resolveLeague(env,slug){
-  const db=env?.DB||env?.D1||env?.FRANCHISE_HQ_DB;
+  const db=tenantDatabase(env);
   if(!db)return {db:null,league:null};
   try{
-    const league=await db.prepare(`SELECT * FROM leagues WHERE slug=? LIMIT 1`).bind(slug).first();
+    const league=await resolveTenant(env,slug);
     return {db,league};
   }catch{return {db,league:null}}
 }

@@ -13,9 +13,10 @@
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const account = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
-  const leagueSlug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || 'furiousgamingcommunity';
+  const leagueSlug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || null;
 
   function endpoint(params = {}) {
+    if (!leagueSlug()) throw new Error('A server-resolved tenant route is required.');
     const url = new URL(`/api/leagues/${encodeURIComponent(leagueSlug())}/snapshot/read-model`, location.origin);
     Object.entries(params).forEach(([key,value]) => value && url.searchParams.set(key,value));
     return url.toString();

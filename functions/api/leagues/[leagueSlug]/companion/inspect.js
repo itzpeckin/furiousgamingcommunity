@@ -35,11 +35,11 @@ export async function onRequestGet(context) {
   if (!validLeagueSlug(slug)) return json({ ok: false, error: 'Invalid league slug.' }, 400);
   const db = database(context.env);
   if (!db || !context.env.COMPANION_EXPORTS?.get || !context.env.COMPANION_EXPORT_META?.put) return json({ ok: false, error: 'Companion storage is not configured.' }, 503);
-  const token = await configuredExportToken(context.env, slug);
-  if (!token) return json({ ok: false, error: 'No export token is configured for this league.' }, 503);
-  if (!safeEqual(suppliedExportToken(context.request), token)) return json({ ok: false, error: 'Unauthorized inspection request.' }, 401);
   const league = await resolveLeague(context.env, slug);
   if (!league) return json({ ok: false, error: 'League not found.' }, 404);
+  const token = await configuredExportToken(context.env, league);
+  if (!token) return json({ ok: false, error: 'No export token is configured for this league.' }, 503);
+  if (!safeEqual(suppliedExportToken(context.request), token)) return json({ ok: false, error: 'Unauthorized inspection request.' }, 401);
   const row = await db.prepare(`SELECT * FROM companion_exports WHERE league_id = ? AND status IN ('pending','inspected','mapped') ORDER BY received_at DESC LIMIT 1`).bind(league.id).first();
   if (!row?.r2_object_key) return json({ ok: false, error: 'No pending Companion export is available.' }, 404);
   const object = await context.env.COMPANION_EXPORTS.get(row.r2_object_key);
@@ -52,6 +52,6 @@ export async function onRequestGet(context) {
     db.prepare(`INSERT INTO companion_export_events (id, export_id, league_id, event_type, detail_json, created_at) VALUES (?, ?, ?, 'inspected', ?, ?)`).bind(crypto.randomUUID(), row.id, league.id, JSON.stringify({ collectionCount: inspection.collections.length }), now)
   ]);
   const pointer = { exportId: row.id, leagueId: league.id, leagueSlug: slug, receivedAt: row.received_at, updatedAt: now, status: 'inspected', byteLength: row.byte_length, contentType: row.content_type, r2ObjectKey: row.r2_object_key, payloadStored: true, season: row.season, week: row.week, teamCount: row.team_count, playerCount: row.player_count };
-  await context.env.COMPANION_EXPORT_META.put(companionMetadataKey(slug), JSON.stringify(pointer));
+  await context.env.COMPANION_EXPORT_META.put(companionMetadataKey(league.id), JSON.stringify(pointer));
   return json({ ok: true, leagueSlug: slug, export: publicExport({ ...row, status: 'inspected', inspection_json: JSON.stringify(inspection) }), inspection });
 }

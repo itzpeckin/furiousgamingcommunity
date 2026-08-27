@@ -2,8 +2,9 @@ import { onRequestGet as renderLeagueSelector } from "./index.js";
 import { AUTH_CONSTANTS, createSecureCookie, getCurrentSession, redirectResponse } from "../_lib/auth.js";
 import { CANONICAL_APP_ORIGIN, isOwnerFallbackHost } from "../_lib/origin.js";
 import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
+import { resolveTenant } from "../_lib/tenant-context.js";
 
-const RELEASE='7.1.0';
+const RELEASE='7.2.0';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',
@@ -102,7 +103,7 @@ export async function onRequest(context){
   if(isStaticAsset(parts))return fetchRootAsset(context,request,parts.join('/'));
 
   const requestedSlug=decodeURIComponent(parts[0]||'');
-  const league=await context.env.DB.prepare(`SELECT id,slug,name FROM leagues WHERE lower(replace(slug,'-',''))=lower(replace(?,'-','')) AND public_status='active' LIMIT 1`).bind(requestedSlug).first();
+  const league=await resolveTenant(context.env,requestedSlug);
   if(!league)return new Response('League not found.',{status:404,headers:{'cache-control':'no-store'}});
 
   const session=await getCurrentSession(context,{leagueId:league.id});

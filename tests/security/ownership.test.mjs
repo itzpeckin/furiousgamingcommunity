@@ -129,7 +129,23 @@ test('commissioner reset atomically clears Madden data and preserves only select
       id TEXT PRIMARY KEY, discord_user_id TEXT, discord_username TEXT,
       discord_global_name TEXT, display_name TEXT, avatar_url TEXT
     );
-    CREATE TABLE leagues (id TEXT PRIMARY KEY, slug TEXT, name TEXT, public_status TEXT);
+    CREATE TABLE leagues (
+      id TEXT PRIMARY KEY, name TEXT, product_name TEXT DEFAULT 'Franchise HQ', slug TEXT,
+      current_season INTEGER, current_week INTEGER, trade_start_week INTEGER,
+      trade_deadline_week INTEGER, discord_guild_id TEXT, discord_connected INTEGER DEFAULT 0,
+      public_status TEXT, tenant_status TEXT DEFAULT 'disabled', timezone TEXT DEFAULT 'UTC',
+      branding_json TEXT DEFAULT '{}', configuration_json TEXT DEFAULT '{}',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE league_slug_aliases (alias_slug TEXT PRIMARY KEY, league_id TEXT NOT NULL);
+    CREATE TABLE league_domains (
+      id TEXT PRIMARY KEY, league_id TEXT NOT NULL, hostname TEXT NOT NULL,
+      is_primary INTEGER DEFAULT 0, enabled INTEGER DEFAULT 1
+    );
+    CREATE TABLE league_features (
+      league_id TEXT NOT NULL, feature_key TEXT NOT NULL, enabled INTEGER DEFAULT 0,
+      configuration_json TEXT DEFAULT '{}', PRIMARY KEY (league_id, feature_key)
+    );
     CREATE TABLE league_memberships (
       id TEXT PRIMARY KEY, league_id TEXT, user_id TEXT, role TEXT, team_id TEXT,
       active INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -155,12 +171,22 @@ test('commissioner reset atomically clears Madden data and preserves only select
       preserved_user_ids_json TEXT NOT NULL, deleted_counts_json TEXT NOT NULL,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE tenant_audit_events (
+      id TEXT PRIMARY KEY, league_id TEXT NOT NULL, actor_user_id TEXT,
+      request_id TEXT NOT NULL, action_id TEXT NOT NULL, action TEXT NOT NULL,
+      resource_type TEXT, resource_id TEXT, outcome TEXT NOT NULL,
+      detail_json TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   const insertUser = database.prepare('INSERT INTO users VALUES (?,?,?,?,?,?)');
   insertUser.run('justin','1001','peckin','Peckin','Peckin',null);
   insertUser.run('gas','1002','gas','Gas','Gas',null);
   insertUser.run('saluki','1003','saluki','Saluki','Saluki',null);
-  database.prepare('INSERT INTO leagues VALUES (?,?,?,?)').run('league-1','fgc','FGC','active');
+  database.prepare(`INSERT INTO leagues
+    (id,name,product_name,slug,public_status,tenant_status,timezone)
+    VALUES (?,?,?,?,?,?,?)`).run(
+      'league-1','FGC','Franchise HQ','fgc','active','enabled','America/Chicago'
+    );
   const insertMembership = database.prepare('INSERT INTO league_memberships (id,league_id,user_id,role,team_id,active) VALUES (?,?,?,?,?,?)');
   insertMembership.run('m-justin','league-1','justin','commissioner','tb',1);
   insertMembership.run('m-gas','league-1','gas','team_owner','gb',1);

@@ -4,6 +4,7 @@ import {
   assertExactTarget,
   assertFinalState,
   assertProtectedCountsPreserved,
+  loadCanonicalMigrations,
   pendingMigrations,
   targetConfirmation
 } from '../../tools/lib/d1-release.mjs';
@@ -41,6 +42,18 @@ test('only missing canonical migrations are planned', () => {
   const migrations = [18, 19, 20].map(version => ({ version }));
   const ledger = Array.from({ length: 18 }, (_, index) => ({ version: index + 1 }));
   assert.deepEqual(pendingMigrations(ledger, migrations).map(item => item.version), [19, 20]);
+});
+
+test('canonical migration loading includes the current tenant-ready migration', async () => {
+  const { contract, migrations } = await loadCanonicalMigrations();
+  assert.equal(contract.currentVersion, 21);
+  assert.equal(migrations.at(-1)?.version, 21);
+  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0021_tenant_ready_core.sql');
+  assert.equal(
+    migrations.at(-1)?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,
+    7,
+    'D1-compatible feature seeds must remain separate statements'
+  );
 });
 
 test('protected identity and league-data counts must remain unchanged', () => {

@@ -7,8 +7,9 @@ import {
   canonicalLeagueSlug,
   resolveLeague
 } from "../../../_lib/cloud-platform.js";
+import { createTenantAuditContext, tenantAuditStatement } from "../../../_lib/tenant-context.js";
 
-const RELEASE = "7.0.1";
+const RELEASE = "7.2.0";
 const EMPTY_RULES = Object.freeze({ categories: [] });
 const MAX_DOCUMENT_BYTES = 256 * 1024;
 const MAX_CATEGORIES = 50;
@@ -131,13 +132,17 @@ export async function onRequestPut(context) {
   let rules;
   try { rules = normalizeRulesDocument(body); }
   catch (error) { return jsonResponse({ ok: false, error: error.message }, 400); }
-  await context.env.DB.prepare(`
+  const audit = createTenantAuditContext(context, league, authorization.session, 'league_rules_update');
+  await context.env.DB.batch([context.env.DB.prepare(`
     INSERT INTO league_rules_documents (league_id, rules_json, updated_by_user_id, updated_at)
     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(league_id) DO UPDATE SET
       rules_json = excluded.rules_json,
       updated_by_user_id = excluded.updated_by_user_id,
       updated_at = CURRENT_TIMESTAMP
-  `).bind(league.id, JSON.stringify(rules), authorization.session.user.id).run();
-  return jsonResponse({ ok: true, release: RELEASE, rules });
+  `).bind(league.id, JSON.stringify(rules), authorization.session.user.id), tenantAuditStatement(context.env.DB, audit, {
+    resourceType:'league_rules', resourceId:league.id,
+    detail:{categoryCount:rules.categories.length}
+  })]);
+  return jsonResponse({ ok: true, release: RELEASE, rules, requestId:audit.requestId });
 }
