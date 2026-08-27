@@ -37,6 +37,7 @@
       "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
       "functions/api/leagues/[leagueSlug]/companion/test.js",
       "functions/api/leagues/[leagueSlug]/players/free-agents.js",
+      "functions/api/leagues/[leagueSlug]/reset-data.js",
       "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
     ],
     "COMPANION_EXPORT_META": [
@@ -62,7 +63,9 @@
       "functions/api/auth/session/claim.js",
       "functions/api/leagues/[leagueSlug]/ea-direct/_common.js",
       "functions/api/leagues/[leagueSlug]/memberships.js",
+      "functions/api/leagues/[leagueSlug]/reset-data.js",
       "functions/api/leagues/[leagueSlug]/rules.js",
+      "functions/index.js",
       "functions/leagues/[[path]].js",
       "functions/leagues/index.js"
     ],
@@ -106,6 +109,9 @@
     "LEAGUE_CONFIG": [
       "functions/_lib/cloud-platform.js"
     ],
+    "OWNER_FALLBACK_DISCORD_ID": [
+      "functions/_lib/owner-fallback.js"
+    ],
     "PLATFORM_OWNER_ACCOUNT_ID": [
       "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
       "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
@@ -124,23 +130,23 @@
   },
   "files": {
     "byExtension": {
-      ".css": 7,
+      ".css": 8,
       ".example": 1,
       ".html": 2,
-      ".js": 155,
+      ".js": 158,
       ".json": 4,
       ".jsonc": 1,
       ".md": 276,
-      ".mjs": 17,
+      ".mjs": 18,
       ".png": 1,
-      ".sql": 17,
+      ".sql": 19,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 603302,
+        "bytes": 602754,
         "file": "app.js"
       },
       {
@@ -148,7 +154,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 370535,
+        "bytes": 378603,
         "file": "trade-module.js"
       },
       {
@@ -196,12 +202,12 @@
         "file": "league-engine/rosters.js"
       },
       {
-        "bytes": 16605,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-teams.js"
+        "bytes": 17885,
+        "file": "functions/api/leagues/[leagueSlug]/snapshot/read-model.js"
       },
       {
-        "bytes": 16478,
-        "file": "functions/api/leagues/[leagueSlug]/snapshot/read-model.js"
+        "bytes": 16605,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-teams.js"
       },
       {
         "bytes": 16260,
@@ -220,7 +226,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js"
       }
     ],
-    "total": 485
+    "total": 492
   },
   "frontend": {
     "assets": [
@@ -230,7 +236,7 @@
         "versioned": true
       },
       {
-        "path": "release-7.0.3.css",
+        "path": "release-7.0.4.css",
         "type": "link",
         "versioned": true
       },
@@ -670,7 +676,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 58,
+    "routeCount": 59,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1044,6 +1050,14 @@
         "route": "/api/leagues/:leagueSlug/players/free-agents"
       },
       {
+        "file": "functions/api/leagues/[leagueSlug]/reset-data.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/reset-data"
+      },
+      {
         "file": "functions/api/leagues/[leagueSlug]/rules.js",
         "handlers": [
           "onRequestGet",
@@ -1121,7 +1135,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 29
+      "occurrences": 30
     },
     "FGC_TRADE": {
       "files": [
@@ -1141,7 +1155,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 61
+      "occurrences": 58
     },
     "browserStorageCalls": {
       "files": [
@@ -1165,7 +1179,7 @@
         "platform/store.js",
         "trade-module.js"
       ],
-      "occurrences": 71
+      "occurrences": 74
     },
     "hardCodedFgc": {
       "files": [
@@ -1210,7 +1224,7 @@
         "league-engine/platform-workspace.js",
         "trade-module.js"
       ],
-      "occurrences": 21
+      "occurrences": 19
     }
   },
   "migrations": [
@@ -1315,10 +1329,22 @@
       "recordsLedger": true,
       "sha256": "511a4ce1551ec009d068f4011cef8f18779b9db0c39b368740d15147a1f32246",
       "version": "0015"
+    },
+    {
+      "file": "migrations/0016_canonical_team_ownership.sql",
+      "recordsLedger": true,
+      "sha256": "b29ee08850d0bcee02accafab46c0bfa537499b8997bb02050c14b5ba84fd39c",
+      "version": "0016"
+    },
+    {
+      "file": "migrations/0017_league_data_reset_audit.sql",
+      "recordsLedger": true,
+      "sha256": "75dfec80bf8273a184cae016d27a1c86d8451f85119ed68124f4fdfcc36e3224",
+      "version": "0017"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.0.3",
+  "release": "7.0.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

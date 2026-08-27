@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.0.4",
+  "validatedOn": "2026-08-26",
+  "status": "local-validation-in-progress",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "repositoryLint": { "passed": true },
+    "javascriptSyntax": { "passed": true },
+    "htmlAssets": { "passed": true, "entrypoints": 1 },
+    "secretScan": { "passed": true, "highConfidenceFindings": 0 },
+    "environmentContract": { "passed": true },
+    "migrationBaseline": { "passed": true, "registeredInheritedIssues": 7, "newIssues": 0 },
+    "automatedTests": { "passed": true, "passedTests": 40, "failedTests": 0 },
+    "securityTests": { "passed": true, "passedTests": 33, "failedTests": 0 },
+    "sessionRefreshRecovery": { "passed": true },
+    "ownerFallbackGating": { "passed": true, "configuredDiscordIdentityRequired": true, "previewSubdomainsCanonicalized": true },
+    "canonicalTeamAuthority": { "passed": true },
+    "importedOwnerIgnored": { "passed": true },
+    "authenticatedMembershipOwnership": { "passed": true },
+    "staffTeamIndependence": { "passed": true },
+    "duplicateTeamAssignment": { "passed": true, "databaseEnforced": true },
+    "legacyOwnerRetirement": { "passed": true },
+    "resetCommissionerBoundary": { "passed": true },
+    "resetAtomicRehearsal": { "passed": true, "environment": "isolated-in-memory" },
+    "resetPreservation": { "passed": true, "preserved": ["acting commissioner", "selected member"], "disabled": ["unselected member"] },
+    "mobileOwnershipLayout": { "passed": true, "sourceVerified": true, "deviceAcceptancePending": true },
+    "systemInventory": { "passed": true },
+    "releaseContract": { "passed": true },
+    "strictMigration": { "passed": false, "expectedFailure": true, "blockingIssues": 7, "targetRelease": "7.1.0" }
+  },
+  "external": {
+    "githubPullRequest": { "status": "not-created" },
+    "hostedChecks": { "status": "not-run" },
+    "stagingDeployment": { "status": "not-run" },
+    "productionDeployment": { "authorized": false, "status": "not-run", "url": "https://franchisehq.app/" },
+    "productionMigrations": { "authorized": false, "status": "not-run", "migrations": ["0016_canonical_team_ownership.sql", "0017_league_data_reset_audit.sql"] },
+    "productionDataReset": { "authorized": false, "status": "not-run" }
+  },
+  "configurationIntent": {
+    "hardCoded": false,
+    "members": [
+      { "displayName": "Justin/Peckin", "role": "commissioner", "team": "Tampa Bay Buccaneers", "productionApplied": false },
+      { "displayName": "Gas", "role": "team_owner", "team": "Green Bay Packers", "productionApplied": false },
+      { "displayName": "Saluki", "status": "disabled", "productionApplied": false }
+    ]
+  },
+  "manualAcceptance": {
+    "status": "pending-candidate-and-owner-device-check",
+    "runbook": "docs/AUTH-ONBOARDING.md"
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}

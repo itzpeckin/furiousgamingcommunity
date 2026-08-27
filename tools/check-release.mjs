@@ -12,8 +12,13 @@ const allowedStatuses = new Set([
   'validated-review-candidate',
   'staging-validated',
   'validated-production-authorized',
+  'production-deployed-pending-owner-acceptance',
   'released'
 ]);
+const isPostDeployment = new Set([
+  'production-deployed-pending-owner-acceptance',
+  'released'
+]).has(manifest.status);
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
 if (manifest.version !== version || evidence.version !== version) errors.push('Package, manifest, and evidence versions must match.');
@@ -27,8 +32,11 @@ if (evidence.baselineGate?.unregisteredFailures !== 0) errors.push('Validation e
 if (evidence.checks?.strictMigration?.expectedFailure !== true || evidence.checks?.strictMigration?.passed !== false) {
   errors.push('Validation evidence must preserve the expected strict migration failure until 7.1.0.');
 }
-if (evidence.productionChanged !== false || evidence.dataChanged !== false || evidence.credentialsChanged !== false) {
+if (!isPostDeployment && (evidence.productionChanged !== false || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
   errors.push(`${version} evidence must accurately preserve unchanged production, data, and credentials during candidate work.`);
+}
+if (isPostDeployment && (evidence.productionChanged !== true || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
+  errors.push(`${version} post-deployment evidence must record the production publication without claiming league-data or credential changes.`);
 }
 if (version === '7.0.1') {
   for (const check of [
@@ -83,11 +91,64 @@ if (version === '7.0.3') {
   ]) {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.0.3 corrective evidence is incomplete: ${check}.`);
   }
-  if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
-    errors.push('7.0.3 candidate work must not claim production authorization or deployment.');
+  if (isPostDeployment) {
+    if (manifest.production?.authorized !== true || manifest.production?.deployed !== true || manifest.production?.status !== 'success-pending-owner-acceptance') {
+      errors.push('Deployed 7.0.3 evidence must record the owner-authorized successful production publication.');
+    }
+    if (evidence.external?.githubPullRequest?.status !== 'merged' || evidence.external?.hostedChecks?.status !== 'passed') {
+      errors.push('Deployed 7.0.3 evidence must record the merged pull request and passing hosted checks.');
+    }
+    if (evidence.external?.productionDeployment?.authorized !== true || evidence.external?.productionDeployment?.status !== 'success') {
+      errors.push('Deployed 7.0.3 evidence must record the successful authorized Cloudflare deployment.');
+    }
+    if (evidence.external?.productionMigration?.authorized !== true || evidence.external?.productionMigration?.status !== 'applied-and-verified') {
+      errors.push('Deployed 7.0.3 evidence must record the authorized and verified production migration.');
+    }
+    if (
+      evidence.liveReadOnlyDiagnosis?.membershipRowsBefore !== evidence.liveReadOnlyDiagnosis?.membershipRowsAfter ||
+      evidence.liveReadOnlyDiagnosis?.membershipRowsChanged !== 0 ||
+      evidence.liveReadOnlyDiagnosis?.membershipAuditTablePresent !== true ||
+      evidence.liveReadOnlyDiagnosis?.repairIndexesPresent !== 4
+    ) {
+      errors.push('Deployed 7.0.3 evidence must prove membership preservation and the completed audit-schema repair.');
+    }
+  } else {
+    if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+      errors.push('7.0.3 candidate work must not claim production authorization or deployment.');
+    }
+    if (evidence.external?.productionMigration?.authorized !== false || evidence.external?.productionMigration?.status !== 'not-run') {
+      errors.push('7.0.3 candidate work must not claim an authorized or completed production migration.');
+    }
   }
-  if (evidence.external?.productionMigration?.authorized !== false || evidence.external?.productionMigration?.status !== 'not-run') {
-    errors.push('7.0.3 candidate work must not claim an authorized or completed production migration.');
+}
+if (version === '7.0.4') {
+  for (const check of [
+    'securityTests',
+    'sessionRefreshRecovery',
+    'ownerFallbackGating',
+    'canonicalTeamAuthority',
+    'importedOwnerIgnored',
+    'authenticatedMembershipOwnership',
+    'staffTeamIndependence',
+    'duplicateTeamAssignment',
+    'legacyOwnerRetirement',
+    'resetCommissionerBoundary',
+    'resetAtomicRehearsal',
+    'resetPreservation',
+    'mobileOwnershipLayout'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.0.4 ownership/reset evidence is incomplete: ${check}.`);
+  }
+  if (!isPostDeployment) {
+    if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+      errors.push('Unpublished 7.0.4 candidate work must not claim production authorization or deployment.');
+    }
+    if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
+      errors.push('Unpublished 7.0.4 candidate work must not claim an authorized or completed production migration.');
+    }
+    if (evidence.external?.productionDataReset?.authorized !== false || evidence.external?.productionDataReset?.status !== 'not-run') {
+      errors.push('Unpublished 7.0.4 candidate work must not claim an authorized or completed production data reset.');
+    }
   }
 }
 

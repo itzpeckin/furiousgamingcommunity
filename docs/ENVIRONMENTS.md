@@ -58,6 +58,7 @@ EA direct-access secrets are intentionally excluded until the 7.0.1 security con
 - `APP_VERSION`
 - `DISCORD_CLIENT_ID`
 - `DISCORD_REDIRECT_URI`
+- `OWNER_FALLBACK_DISCORD_ID` (Justin's numeric Discord user ID; permits only that identity to use the exact Pages owner fallback when the account is also an active commissioner)
 - `PLATFORM_OWNER_ACCOUNT_ID` (legacy transition variable; removed by tenant-ready authorization work)
 
 ## Verification gate

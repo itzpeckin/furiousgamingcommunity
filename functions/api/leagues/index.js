@@ -1,5 +1,5 @@
 import { json, database, canonicalLeagueSlug } from '../../_lib/cloud-platform.js';
-const RELEASE='7.0.3';
+const RELEASE='7.0.4';
 export async function onRequestGet(context){
   const db=database(context.env);
   if(!db)return json({ok:false,release:RELEASE,error:'Database binding is missing.'},503);

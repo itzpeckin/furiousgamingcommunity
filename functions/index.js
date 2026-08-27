@@ -1,4 +1,8 @@
-const RELEASE = "7.0.3";
+import { getCurrentSession, redirectResponse } from "./_lib/auth.js";
+import { CANONICAL_APP_ORIGIN, isOwnerFallbackHost } from "./_lib/origin.js";
+import { isOwnerFallbackIdentity } from "./_lib/owner-fallback.js";
+
+const RELEASE = "7.0.4";
 
 function page() {
   return `<!doctype html>
@@ -167,7 +171,19 @@ function page() {
 </html>`;
 }
 
-export async function onRequestGet() {
+export async function onRequestGet(context) {
+  if (isOwnerFallbackHost(new URL(context.request.url).hostname)) {
+    const session = await getCurrentSession(context);
+    if (!session) return redirectResponse('/api/auth/discord/login');
+    if (!isOwnerFallbackIdentity(context.env, session.user)) return redirectResponse(CANONICAL_APP_ORIGIN);
+    const allowed = await context.env.DB.prepare(`
+      SELECT 1 AS allowed FROM league_memberships
+      WHERE user_id=? AND role='commissioner' AND active=1 LIMIT 1
+    `).bind(session.user.id).first();
+    return allowed?.allowed
+      ? redirectResponse('/leagues')
+      : redirectResponse(CANONICAL_APP_ORIGIN);
+  }
   return new Response(page(), {
     status: 200,
     headers: {
