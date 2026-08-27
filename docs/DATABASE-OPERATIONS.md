@@ -52,6 +52,20 @@ npx wrangler d1 migrations apply <staging-database> --remote
 
 Do not replace `<staging-database>` with the production name during rehearsal.
 
+### Repeatable target-locked release command
+
+`tools/run-d1-release.mjs` is the supported release path beginning with 7.1. It uses Cloudflare's authenticated D1 REST API, reads the committed target registry, verifies the returned database name and UUID, captures the recovery bookmark, applies only missing canonical versions, and refuses completion when protected counts, required tables, ledger continuity, or foreign keys do not reconcile.
+
+Set a short-lived `CLOUDFLARE_API_TOKEN` with D1 Read for a plan or D1 Write for an application. Never commit or paste the token into a command, document, issue, or pull request.
+
+```sh
+npm run db:plan -- --target staging
+npm run db:plan -- --target production
+npm run db:apply -- --target production --confirm-target production:franchise-hq-db:d21fb8c2-1b26-4766-9249-73af5d8b6678
+```
+
+The production confirmation is intentionally exact. The command validates Cloudflare metadata against `config/d1-database-targets.json`, records migration hashes and before/after evidence, and stops deployment when any preservation check fails. Recovery is never automatic because a Time Travel restore overwrites the database and requires separate owner approval.
+
 ## Required verification queries
 
 Run these as read-only checks before and after a cloud migration:
@@ -103,3 +117,19 @@ When production authorization is eventually granted, add these values to the 7.1
 - application deployment result;
 - observation-window result;
 - rollback decision and, if used, recovery bookmark.
+
+### 7.1.0 production record — August 27, 2026
+
+- Owner authorization: Justin/Peckin, August 27, 2026.
+- Migration source commit: `a5b772897fa39f3f7040dc9bf61d1d2fbae0c075` (migration files unchanged in the final release candidate).
+- Target: `franchise-hq-db` / `d21fb8c2-1b26-4766-9249-73af5d8b6678`.
+- Migration hashes:
+  - 0018: `42750b55a40dd34a80f94798dc071890165245dabc405c471aa4802c1504690d`
+  - 0019: `6dac19fd955c7baddf921a1c46b6a765d92d830a2966e318ca21a37b52886780`
+  - 0020: `f3e2e768460697c68d3f8021ae56030ecb4ea7cfc5363610befac7b07f09e789`
+- Recovery evidence: exact bookmarks retained in the private owner session; repository-safe SHA-256 fingerprints are `4fb88a0ac9d4ac393785527f01da73945f6eed04b9de5212a2377c3b48f073f2` before and `dd897d3dd75dd4545f10678dcda020ff7f344605552e1af6f1aedc56d4aefd4d` after.
+- Before: ledger max 17 with 13 recorded legacy rows; 47 application tables; 1 league; 8 users; 8 memberships; 7 active team assignments; 0 teams; 0 players; 0 snapshots; 1 active-snapshot pointer; 97 sessions; 0 foreign-key violations.
+- After: continuous ledger versions 1–20; 50 application tables; every protected count and exact role/team ownership aggregate unchanged; 0 foreign-key violations.
+- Migration result: 0018, 0019, and 0020 applied in order with no failed statement.
+- Rollback decision: not required. The additive schema and all preservation checks passed.
+- Application result: PR #8 is the single deployment candidate; its merge publishes 7.1.0 after all hosted checks pass.

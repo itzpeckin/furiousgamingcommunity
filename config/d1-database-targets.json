@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "accountId": "cc973c5a4c4ed410382f376244af078f",
+  "targets": {
+    "staging": {
+      "databaseName": "franchise-hq-staging-db",
+      "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816"
+    },
+    "production": {
+      "databaseName": "franchise-hq-db",
+      "databaseId": "d21fb8c2-1b26-4766-9249-73af5d8b6678"
+    }
+  }
+}

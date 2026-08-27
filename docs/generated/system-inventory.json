@@ -141,10 +141,10 @@
       ".example": 1,
       ".html": 2,
       ".js": 159,
-      ".json": 5,
+      ".json": 6,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 19,
+      ".mjs": 22,
       ".png": 1,
       ".sql": 22,
       ".txt": 1,
@@ -233,7 +233,7 @@
         "file": "league-engine/data-state.js"
       }
     ],
-    "total": 500
+    "total": 504
   },
   "frontend": {
     "assets": [

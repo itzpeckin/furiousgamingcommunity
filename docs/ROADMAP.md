@@ -6,13 +6,13 @@
 
 **Updated:** August 27, 2026
 
-**Revision:** 1.20
+**Revision:** 1.21
 
-**Current production:** 7.0.5 at `f3c7366048223c8baa188e5dbd98d4d0fb51c9e3`
+**Current production:** 7.1.0 database foundation and application release delivered through PR #8
 
-**Current work:** 7.1.0 validated local database-foundation candidate
+**Current work:** 7.2.0 tenant-ready core scope and implementation planning
 
-**Next decision gate:** Publish the one authorized 7.1 pull request and require green hosted checks. Do not migrate or deploy until isolated staging and production actions are separately authorized.
+**Next decision gate:** Review and authorize the exact 7.2.0 scope. Do not begin tenant rewiring until the 7.1 observation checks remain clean.
 
 ## Product decisions that govern every release
 
@@ -39,7 +39,7 @@
 | Version | Status | Outcome |
 | --- | --- | --- |
 | 7.0.0–7.0.5 | Production history | Controlled engineering baseline, security containment, onboarding, ownership, and Commissioner management foundations |
-| 7.1.0 | Local strict gate passed; one PR/check cycle authorized | Canonical database and migration foundation |
+| 7.1.0 | Production | Canonical database, target-locked migration, preservation, and recovery foundation |
 | 7.2.0 | Planned | Tenant-ready core with FGC as the only enabled league |
 | 7.3.0 | Planned | Stable player and team page URLs |
 | 7.3.1 | Planned | Full Trade Center and advanced Trade Block |
@@ -87,6 +87,16 @@ Every shared feature and every future league depends on a database that can be r
 - Backup/restore and foreign-key checks pass.
 - Read-only production inventory is recorded.
 - Isolated staging migration and recovery rehearsal pass before production approval is requested.
+
+**Completion evidence — August 27, 2026**
+
+- Local migration, legacy-upgrade, backup/restore, schema-mutation, target-confirmation, and preservation tests passed.
+- Isolated staging reached version 20 with 50 application tables and zero foreign-key violations; a marker-write and Time Travel restore rehearsal preserved the complete schema and removed the marker.
+- Production was bookmarked, migrated in order from legacy max version 17 to a continuous 1–20 ledger, and bookmarked again.
+- Production retained exactly 1 league, 8 users, 8 memberships, 7 active team assignments, 97 sessions, and the complete pre-change ownership distribution.
+- Production increased only from 47 to the expected 50 application tables and retained zero foreign-key violations.
+- The release adds a committed, target-locked D1 plan/apply command so later schema releases do not depend on manual dashboard batches.
+- PR #8 is the single source and deployment record for the application release; no Madden reset, membership edit, Discord change, or authentication rewrite was included.
 
 ## 7.2.0 — Tenant-Ready Core
 
@@ -385,3 +395,4 @@ This release is intentionally after the core platform work and before the privat
 - **Revision 1.18:** Recorded 7.0.5 domain-specific authentication and Commissioner management work, plus its production publication and partial owner acceptance.
 - **Revision 1.19:** Accepted refresh/login as a temporary limitation; elevated shared Commissioner settings as a core data-authority defect; replaced the former numbering with the owner-approved 7.1–8.1 sequence; deferred authentication to 7.5.1 after core platform features but before the private release candidate; added Madden Companion contingency, multi-source import, Free Agent discovery, per-release mobile requirements, and the 7.1 database candidate/evidence rules.
 - **Revision 1.20:** Recorded the owner's authorization for one consolidated 7.1.0 commit, branch push, pull request, and hosted-check cycle. Staging migration, production migration/deployment, authentication, memberships, and Madden data remain outside that authorization.
+- **Revision 1.21:** Completed the isolated staging migration/recovery rehearsal; added a dependency-free, target-locked D1 release command; recorded the owner's production authorization; applied and reconciled migrations 18–20 without changing protected data or ownership; and advanced the roadmap to the 7.2.0 decision gate.
