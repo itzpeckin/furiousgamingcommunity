@@ -2,7 +2,7 @@
 
 ## Repository gate
 
-Run the complete dependency-free 7.0.0 baseline with:
+Run the complete dependency-free release gate with:
 
 ```sh
 npm run ci
@@ -18,7 +18,7 @@ It validates:
 - Current SQL migration behavior against an in-memory SQLite database.
 - Tooling unit tests.
 - Route, binding, storage, migration, and legacy-code inventory freshness.
-- The 7.0.0 release manifest and production-authorization guard.
+- The current release manifest and production-authorization guard.
 
 ## Strict gate
 
@@ -26,7 +26,7 @@ It validates:
 npm run check:strict
 ```
 
-Strict mode fails on all inherited database migration issues. Baseline mode permits only the exact issues registered in `config/quality-baseline.json`; any new issue fails immediately. The migration register is removed as defects are fixed in 7.1.0.
+Beginning with 7.1.0, strict mode must pass. It validates the canonical sequence, fresh database, required schema, ledger continuity, foreign keys, and absence of request-time schema creation. No inherited migration issue remains registered.
 
 ## Browser/platform diagnostics
 

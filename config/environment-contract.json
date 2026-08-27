@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "FranchiseHQ",
-  "release": "7.0.5",
+  "release": "7.1.0",
   "configurationAuthority": "Cloudflare dashboard export until a reviewed Wrangler configuration is adopted",
   "deploymentPolicy": {
     "productionBranch": "main",
@@ -65,7 +65,7 @@
       },
       "variables": {
         "APP_ENV": "local",
-        "APP_VERSION": "7.0.5",
+        "APP_VERSION": "7.1.0",
         "DISCORD_CLIENT_ID": "local-discord-application",
         "DISCORD_REDIRECT_URI": "http://localhost:8788/api/auth/discord/callback",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
@@ -93,7 +93,7 @@
       },
       "variables": {
         "APP_ENV": "staging",
-        "APP_VERSION": "7.0.5",
+        "APP_VERSION": "7.1.0",
         "DISCORD_CLIENT_ID": "staging-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-staging",
         "DISCORD_REDIRECT_URI_PUBLIC": "set-in-cloudflare-staging-public",
@@ -121,7 +121,7 @@
       },
       "variables": {
         "APP_ENV": "production",
-        "APP_VERSION": "7.0.5",
+        "APP_VERSION": "7.1.0",
         "DISCORD_CLIENT_ID": "production-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-production",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",

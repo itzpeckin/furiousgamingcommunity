@@ -3,7 +3,7 @@ import { AUTH_CONSTANTS, createSecureCookie, getCurrentSession, redirectResponse
 import { CANONICAL_APP_ORIGIN, isOwnerFallbackHost } from "../_lib/origin.js";
 import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
 
-const RELEASE='7.0.5';
+const RELEASE='7.1.0';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',

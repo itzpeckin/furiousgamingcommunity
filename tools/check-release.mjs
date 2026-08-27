@@ -29,8 +29,12 @@ if (manifest.production?.deployed === true && manifest.production?.authorized !=
   errors.push('A release cannot claim a production deployment without owner authorization.');
 }
 if (evidence.baselineGate?.unregisteredFailures !== 0) errors.push('Validation evidence must report zero unregistered failures.');
-if (evidence.checks?.strictMigration?.expectedFailure !== true || evidence.checks?.strictMigration?.passed !== false) {
-  errors.push('Validation evidence must preserve the expected strict migration failure until 7.1.0.');
+if (version === '7.1.0') {
+  if (evidence.checks?.strictMigration?.expectedFailure !== false || evidence.checks?.strictMigration?.passed !== true) {
+    errors.push('7.1.0 must prove that the strict migration gate now passes.');
+  }
+} else if (evidence.checks?.strictMigration?.expectedFailure !== true || evidence.checks?.strictMigration?.passed !== false) {
+  errors.push('Pre-7.1.0 validation evidence must preserve the expected strict migration failure.');
 }
 if (!isPostDeployment && (evidence.productionChanged !== false || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
   errors.push(`${version} evidence must accurately preserve unchanged production, data, and credentials during candidate work.`);
@@ -191,6 +195,34 @@ if (version === '7.0.5') {
     if (manifest.status === 'validated-production-authorized' && evidence.external?.discordOAuthConfiguration?.status !== 'registered-and-verified') {
       errors.push('The validated 7.0.5 production candidate requires both exact Discord callbacks to be registered and verified.');
     }
+  }
+}
+if (version === '7.1.0') {
+  for (const check of [
+    'canonicalMigrationSequence',
+    'freshDatabase',
+    'legacyUpgrade',
+    'identityPreservation',
+    'foreignKeyIntegrity',
+    'backupRestore',
+    'requestTimeSchemaRemoval',
+    'runtimeSchemaGuard',
+    'sharedSettingsSchema',
+    'strictMigration'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.1.0 database evidence is incomplete: ${check}.`);
+  }
+  if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+    errors.push('7.1.0 candidate work must not claim production authorization or deployment.');
+  }
+  if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
+    errors.push('7.1.0 candidate work must not claim an authorized or completed production migration.');
+  }
+  if (evidence.external?.productionDataReset?.authorized !== false || evidence.external?.productionDataReset?.status !== 'not-run') {
+    errors.push('7.1.0 candidate work must not claim an authorized or completed production data reset.');
+  }
+  if (evidence.scopeBoundaries?.authenticationChanged !== false) {
+    errors.push('7.1.0 must preserve the owner-approved authentication freeze.');
   }
 }
 

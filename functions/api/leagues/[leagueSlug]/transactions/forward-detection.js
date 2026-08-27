@@ -1,5 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='5.9.10.6.3P.4',DEFAULT_OWNER_ACCOUNT_ID='owner-tb',DEFAULT_BATCH=750;
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -21,43 +22,7 @@ async function state(context,write=false){
   return{db,league,slug};
 }
 async function ensureSchema(db){
-  const sqls=[
-    `CREATE TABLE IF NOT EXISTS forward_roster_movements (
-      id TEXT PRIMARY KEY, league_id TEXT NOT NULL, previous_snapshot_id TEXT NOT NULL,
-      current_snapshot_id TEXT NOT NULL, player_id TEXT NOT NULL, player_name TEXT,
-      previous_team_id TEXT, current_team_id TEXT, previous_roster_status TEXT,
-      current_roster_status TEXT, position TEXT, detection_type TEXT NOT NULL,
-      season INTEGER, week INTEGER, evidence_json TEXT NOT NULL DEFAULT '{}',
-      detected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (league_id,previous_snapshot_id,current_snapshot_id,player_id)
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_forward_roster_movements_pair ON forward_roster_movements (league_id,previous_snapshot_id,current_snapshot_id)`,
-    `CREATE TABLE IF NOT EXISTS forward_detection_jobs (
-      id TEXT PRIMARY KEY, league_id TEXT NOT NULL, previous_snapshot_id TEXT,
-      current_snapshot_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'running',
-      phase TEXT NOT NULL DEFAULT 'current', current_offset INTEGER NOT NULL DEFAULT 0,
-      exit_offset INTEGER NOT NULL DEFAULT 0, current_total INTEGER NOT NULL DEFAULT 0,
-      exit_total INTEGER NOT NULL DEFAULT 0, compared_count INTEGER NOT NULL DEFAULT 0,
-      movement_count INTEGER NOT NULL DEFAULT 0, team_change_count INTEGER NOT NULL DEFAULT 0,
-      roster_entry_count INTEGER NOT NULL DEFAULT 0, roster_exit_count INTEGER NOT NULL DEFAULT 0,
-      status_change_count INTEGER NOT NULL DEFAULT 0, error_json TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      completed_at TEXT, UNIQUE (league_id,current_snapshot_id)
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_forward_detection_jobs_league ON forward_detection_jobs (league_id,created_at DESC)`
-  ];
-  for(const sql of sqls)await db.prepare(sql).run();
-
-  // P.4: keyset cursors replace OFFSET scans. Self-heal existing D1 schema.
-  const columns=(await db.prepare(`PRAGMA table_info(forward_detection_jobs)`).all()).results||[];
-  const names=new Set(columns.map(row=>String(row.name)));
-  if(!names.has('current_cursor'))await db.prepare(`ALTER TABLE forward_detection_jobs ADD COLUMN current_cursor TEXT`).run();
-  if(!names.has('exit_cursor'))await db.prepare(`ALTER TABLE forward_detection_jobs ADD COLUMN exit_cursor TEXT`).run();
-
-  // The league_snapshot_records PK already begins with snapshot_id/domain/external_id,
-  // but this index optimizes the exact league-scoped player comparison pattern used here.
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_snapshot_records_player_compare
-    ON league_snapshot_records (league_id,snapshot_id,domain,external_id)`).run();
+  return requireDatabaseSchema(db);
 }
 function canonicalState(externalId,dataJson){
   const data=parse(dataJson)||{},source=parse(data.source_record_json)||{};

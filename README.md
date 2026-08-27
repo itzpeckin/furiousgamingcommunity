@@ -4,10 +4,10 @@ FranchiseHQ is a league-management platform. FGC is the first customer league; l
 
 ## Current release
 
-- Production baseline: 7.0.4 at commit `60e8d46bf2c55894fff4f88c33d8b43ed2643bc4`; owner acceptance partially passed
-- Current candidate: authorized 7.0.5 exact-route dual-domain authentication and consolidated Commissioner member management
-- Production database and Madden data: unchanged by 7.0.5; this release has no migration or reset
-- Next product work: mobile roster preview, stable player permalinks, and Trade Block Lite in 7.0.6 after a representative Madden NFL 27 export is available
+- Production baseline: 7.0.5 at commit `f3c7366048223c8baa188e5dbd98d4d0fb51c9e3`; authentication refresh acceptance remains deferred
+- Current candidate: authorized local 7.1.0 canonical database and migration foundation
+- Production database and Madden data: unchanged; the 7.1 candidate has not been migrated or deployed
+- Next product work: 7.2 tenant-ready core, followed by the 7.3.x core platform series
 
 ## Local quality gate
 
@@ -20,7 +20,7 @@ npm run ci
 
 `npm run ci` checks repository policy, JavaScript syntax, HTML assets, high-confidence secret patterns, environment separation, the registered migration baseline, tooling tests, generated inventory, and the release contract.
 
-`npm run check:strict` also treats every inherited migration defect as a failure. It is intentionally blocked until the canonical migration repair in 7.1.0.
+`npm run check:strict` requires a clean database, a production-like legacy upgrade, a continuous migration ledger, integrity checks, and every other release contract to pass. No inherited migration exception remains in 7.1.0.
 
 ## Controlling documents
 
@@ -28,10 +28,12 @@ npm run ci
 - [Environment separation](docs/ENVIRONMENTS.md)
 - [Branch and repository policy](docs/BRANCH-POLICY.md)
 - [Rollback process](docs/ROLLBACK.md)
+- [Database operations and recovery](docs/DATABASE-OPERATIONS.md)
 - [Mobile validation matrix](docs/MOBILE-TEST-MATRIX.md)
 - [Release process](RELEASE-PROCESS.md)
 - [7.0.0 release record](releases/7.0.0/release-record.md)
 - [7.0.5 authentication and onboarding runbook](docs/AUTH-ONBOARDING.md)
+- [7.1.0 release record](releases/7.1.0/release-record.md)
 - [Generated system inventory](docs/generated/system-inventory.md)
 
 ## Safety rules

@@ -1,6 +1,6 @@
 {
   "name": "franchisehq",
-  "version": "7.0.5",
+  "version": "7.1.0",
   "private": true,
   "type": "module",
   "description": "FranchiseHQ league-management platform",
@@ -18,9 +18,11 @@
     "check:migrations": "node tools/check-migrations.mjs",
     "check:migrations:strict": "node tools/check-migrations.mjs --strict",
     "check:release": "node tools/check-release.mjs",
+    "db:plan": "node tools/run-d1-release.mjs --plan",
+    "db:apply": "node tools/run-d1-release.mjs --apply",
     "inventory": "node tools/generate-inventory.mjs",
     "inventory:verify": "node tools/generate-inventory.mjs --verify",
-    "test": "node --test tests/tooling/environment.test.mjs tests/tooling/routes.test.mjs tests/security/containment.test.mjs tests/security/session.test.mjs tests/security/onboarding.test.mjs tests/security/ownership.test.mjs",
+    "test": "node --test --test-isolation=none tests/tooling/environment.test.mjs tests/tooling/routes.test.mjs tests/tooling/d1-release.test.mjs tests/database/migrations.test.mjs tests/security/containment.test.mjs tests/security/session.test.mjs tests/security/onboarding.test.mjs tests/security/ownership.test.mjs",
     "ci": "node tools/run-quality.mjs"
   }
 }

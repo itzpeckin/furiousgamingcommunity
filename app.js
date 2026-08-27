@@ -9500,9 +9500,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.8c — authoritative visible release marker.
   function syncVisibleReleaseMarker() {
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 7.0.5';
+      node.textContent = 'Current Release - 7.1.0';
     });
-    document.documentElement.dataset.franchiseHqRelease = '7.0.5';
+    document.documentElement.dataset.franchiseHqRelease = '7.1.0';
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });

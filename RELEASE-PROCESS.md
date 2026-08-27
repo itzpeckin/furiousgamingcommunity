@@ -28,6 +28,8 @@ No unexpected failure may be waived. Inherited issues are warnings only when the
 npm run check:strict
 ```
 
+Beginning with 7.1.0, the strict gate must pass. Database releases also follow `docs/DATABASE-OPERATIONS.md`; a local pass never authorizes a cloud migration.
+
 ## 4. Review through Git
 
 - Open a pull request; do not upload individual files to the production branch.

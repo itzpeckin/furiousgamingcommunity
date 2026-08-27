@@ -1,38 +1,12 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='5.9.10.6.4.1';
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 
 async function ensureSchema(db){
-  const sqls=[
-    `CREATE TABLE IF NOT EXISTS transaction_movement_classifications (
-      id TEXT PRIMARY KEY,
-      league_id TEXT NOT NULL,
-      movement_id TEXT NOT NULL,
-      previous_snapshot_id TEXT NOT NULL,
-      current_snapshot_id TEXT NOT NULL,
-      player_id TEXT NOT NULL,
-      classification TEXT NOT NULL,
-      transaction_family TEXT NOT NULL,
-      confidence TEXT NOT NULL,
-      candidate_trade INTEGER NOT NULL DEFAULT 0,
-      candidate_trade_group_key TEXT,
-      free_agent_confirmation_required INTEGER NOT NULL DEFAULT 0,
-      source_type TEXT NOT NULL DEFAULT 'snapshot-diff',
-      classification_json TEXT NOT NULL DEFAULT '{}',
-      classified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (league_id,movement_id)
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_movement_classifications_current
-      ON transaction_movement_classifications (league_id,current_snapshot_id,classification)`,
-    `CREATE INDEX IF NOT EXISTS idx_movement_classifications_player
-      ON transaction_movement_classifications (league_id,player_id,classified_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_movement_classifications_trade_group
-      ON transaction_movement_classifications (league_id,candidate_trade_group_key)`
-  ];
-  for(const sql of sqls)await db.prepare(sql).run();
+  return requireDatabaseSchema(db);
 }
 
 async function requestState(context,write=false){

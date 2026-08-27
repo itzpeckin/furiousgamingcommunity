@@ -12,8 +12,10 @@ const checks = [
   ['Migration baseline', 'tools/check-migrations.mjs', strict ? ['--strict'] : []],
   ['Automated tests', null, [
     '--test',
+    '--test-isolation=none',
     'tests/tooling/environment.test.mjs',
     'tests/tooling/routes.test.mjs',
+    'tests/database/migrations.test.mjs',
     'tests/security/containment.test.mjs',
     'tests/security/session.test.mjs',
     'tests/security/onboarding.test.mjs',

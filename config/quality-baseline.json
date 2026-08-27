@@ -1,49 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "7.0.0",
+  "release": "7.1.0",
   "policy": "Only inherited issues listed here may be warnings in baseline mode. New issues always fail. Strict mode fails on every issue.",
-  "knownIssues": [
-    {
-      "id": "migration.duplicate-version.0001",
-      "severity": "blocker",
-      "targetRelease": "7.1.0",
-      "summary": "Two migration files use version 0001."
-    },
-    {
-      "id": "migration.duplicate-version.0002",
-      "severity": "blocker",
-      "targetRelease": "7.1.0",
-      "summary": "Two migration files use version 0002."
-    },
-    {
-      "id": "migration.fresh-apply.0001_create_leagues.sql",
-      "severity": "blocker",
-      "targetRelease": "7.1.0",
-      "summary": "The current migration sequence cannot build a fresh database."
-    },
-    {
-      "id": "migration.missing-ledger-write.0001_create_leagues.sql",
-      "severity": "high",
-      "targetRelease": "7.1.0",
-      "summary": "Migration does not record itself in schema_migrations."
-    },
-    {
-      "id": "migration.missing-ledger-write.0002_create_authentication.sql",
-      "severity": "high",
-      "targetRelease": "7.1.0",
-      "summary": "Migration does not record itself in schema_migrations."
-    },
-    {
-      "id": "migration.missing-ledger-write.0013_league_membership_access_control.sql",
-      "severity": "high",
-      "targetRelease": "7.1.0",
-      "summary": "Migration does not record itself in schema_migrations."
-    },
-    {
-      "id": "migration.missing-ledger-write.0014_league_rules.sql",
-      "severity": "high",
-      "targetRelease": "7.1.0",
-      "summary": "Migration does not record itself in schema_migrations."
-    }
-  ]
+  "knownIssues": []
 }

@@ -1,32 +1,13 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='5.9.11.0',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const STAGES=['map-teams','map-players','map-schedule','map-statistics','build-snapshot','validate-snapshot','activate-snapshot','verify-active-snapshot'];
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 const parse=(v,f={})=>{try{return JSON.parse(v||'')}catch{return f}};
 const text=v=>v==null?null:(String(v).trim()||null);
-let orchestratorSchemaReady=false;
-async function ensureOrchestratorSchema(db){
-  if(orchestratorSchemaReady)return;
-  await db.prepare(`CREATE TABLE IF NOT EXISTS companion_import_orchestrator_runs (
-    id TEXT PRIMARY KEY,
-    league_id TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'running',
-    current_stage TEXT NOT NULL DEFAULT 'map-teams',
-    stage_index INTEGER NOT NULL DEFAULT 0,
-    stage_state_json TEXT NOT NULL DEFAULT '{}',
-    statistics_mapping_run_id TEXT,
-    snapshot_id TEXT,
-    error_json TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    completed_at TEXT,
-    FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-  )`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_import_orchestrator_league_created ON companion_import_orchestrator_runs (league_id, created_at DESC)`).run();
-  orchestratorSchemaReady=true;
-}
+async function ensureOrchestratorSchema(db){return requireDatabaseSchema(db)}
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth}
 async function state(context){const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return{response:json({ok:false,error:'Invalid league slug.'},400)};const auth=await requirePlatformOwner(context);if(!auth.authorized)return{response:auth.response};const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return{response:json({ok:false,error:'Not found.'},404)};await ensureOrchestratorSchema(db);return{db,league,slug}}
 function publicRun(run){if(!run)return null;return{id:run.id,status:run.status,currentStage:run.current_stage,stageIndex:Number(run.stage_index||0),stages:STAGES,stageState:parse(run.stage_state_json,{}),statisticsMappingRunId:run.statistics_mapping_run_id||null,snapshotId:run.snapshot_id||null,error:parse(run.error_json,null),createdAt:run.created_at,updatedAt:run.updated_at,completedAt:run.completed_at||null}}

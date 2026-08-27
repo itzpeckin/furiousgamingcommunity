@@ -1,6 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../_lib/permissions.js';
-const RELEASE='7.0.5';
+const RELEASE='7.1.0';
 
 async function activeSnapshot(db,leagueId){
   return db.prepare(`SELECT s.id,s.status,s.season_year,s.week_index,s.activated_at,s.team_count,s.player_count,s.game_count,s.statistic_count,s.standing_count

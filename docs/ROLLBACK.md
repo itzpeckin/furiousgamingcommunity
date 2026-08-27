@@ -1,14 +1,15 @@
 # FranchiseHQ Rollback and Recovery
 
-## 7.0.0 impact
+## 7.1.0 candidate impact
 
-Version 7.0.0 adds repository controls, checks, environment contracts, inventories, and documentation. It does not change application behavior, run a database migration, deploy staging, deploy production, delete data, or rotate credentials.
+The local 7.1.0 candidate adds canonical migration files, tests, runtime schema-version guards, and operations documentation. It has not run a cloud migration, deployed staging or production, changed authentication, deleted data, edited memberships, or rotated credentials.
 
-The pre-7.0 source baseline is:
+The current production rollback target is:
 
-- Commit: `4d0a4e979f98a99a8faea7c53fdd7366edc975f9`
-- Local preservation tag: `v6.3.2-baseline`
-- Git tree: `e92b84054af2c9b58c7859b176bd2c7709f97917`
+- Version: 7.0.5
+- Commit: `f3c7366048223c8baa188e5dbd98d4d0fb51c9e3`
+- Git tree: `c5ca091d89fc2b83ca4a8af8796586bfa48b663e`
+- Existing immutable recovery tag: `v7.0.0`
 
 ## Code rollback
 
@@ -19,7 +20,7 @@ The pre-7.0 source baseline is:
 
 ## Database recovery
 
-7.0.0 has no database change. Future releases that change data must add:
+The exact 7.1 migration and recovery procedure is `docs/DATABASE-OPERATIONS.md`. A future cloud execution record must include:
 
 - Pre-change backup identifier and verification.
 - Staging restore rehearsal evidence.
@@ -27,7 +28,7 @@ The pre-7.0 source baseline is:
 - Record-count and relationship reconciliation.
 - The exact point after which rollback is unsafe.
 
-Do not apply the current 6.3.x migrations to a new or production database as a release step; the registered migration blockers are assigned to 7.1.0.
+Never replay `migrations/legacy/`. Apply only the active immutable migration sequence and only after separate authorization. The normal application rollback retains additive 7.1 tables. Do not improvise a rollback by dropping tables; a database restore uses the recorded D1 Time Travel bookmark and its own authorization.
 
 ## Object storage and cache recovery
 

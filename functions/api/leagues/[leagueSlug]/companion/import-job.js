@@ -2,6 +2,7 @@
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
+import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='5.9.10.6.5.4h-p3d';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
@@ -20,15 +21,7 @@ function origin(request){
 }
 
 async function ensureDelegationSchema(db){
-  await db.prepare(`CREATE TABLE IF NOT EXISTS server_import_delegations (
-    token_hash TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
-    league_id TEXT NOT NULL,
-    expires_at TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_server_import_delegations_expiry
-    ON server_import_delegations (expires_at)`).run();
+  return requireDatabaseSchema(db);
 }
 
 async function createDelegation(db,session,leagueId){
