@@ -1,6 +1,7 @@
 /* FHQ_BUILD: 5.9.11.0 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 const RELEASE='5.9.11.0',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
@@ -29,26 +30,7 @@ async function validateSnapshot(db,leagueId,snapshot){const records=await rows(d
  const scores=Object.values(domains).map(x=>x.score);const score=scores.length?Math.round((scores.reduce((a,b)=>a+b,0)/scores.length)*10)/10:0;
  const status=errors.length?'failed':'ready';return{release:RELEASE,status,score,errorCount:errors.length,warningCount:warnings.length,errors,warnings,domains,validatedAt:new Date().toISOString()};}
 
-async function ensureValidationSchema(db){
-  const statements=[
-    `CREATE TABLE IF NOT EXISTS snapshot_validation_jobs (
-      id TEXT PRIMARY KEY,
-      league_id TEXT NOT NULL,
-      snapshot_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      phase TEXT NOT NULL,
-      phase_offset INTEGER NOT NULL DEFAULT 0,
-      processed_count INTEGER NOT NULL DEFAULT 0,
-      total_count INTEGER NOT NULL DEFAULT 0,
-      context_json TEXT NOT NULL DEFAULT '{}',
-      report_json TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (league_id, snapshot_id)
-    )`
-  ];
-  for(const sql of statements)await db.prepare(sql).run();
-}
+async function ensureValidationSchema(db){return requireDatabaseSchema(db)}
 function emptyValidationContext(counts={},snapshotWarningCount=0){
   const domains={};
   for(const d of ['teams','players','games','statistics','standings'])domains[d]={count:Number(counts[d]||0),score:100,errors:[],warnings:[]};
@@ -418,53 +400,7 @@ async function nextSnapshotValidation(db,leagueId,snapshot,limit=100){
 }
 
 async function event(db,leagueId,snapshotId,type,actor,detail={}){await db.prepare(`INSERT INTO league_snapshot_lifecycle_events (id,league_id,snapshot_id,event_type,actor_id,detail_json) VALUES (?,?,?,?,?,?)`).bind(crypto.randomUUID(),leagueId,snapshotId,type,actor||null,JSON.stringify(detail)).run();}
-async function ensureForwardSchema(db){
-  const statements=[
-    `CREATE TABLE IF NOT EXISTS forward_roster_movements (
-      id TEXT PRIMARY KEY,
-      league_id TEXT NOT NULL,
-      previous_snapshot_id TEXT NOT NULL,
-      current_snapshot_id TEXT NOT NULL,
-      player_id TEXT NOT NULL,
-      player_name TEXT,
-      previous_team_id TEXT,
-      current_team_id TEXT,
-      previous_roster_status TEXT,
-      current_roster_status TEXT,
-      position TEXT,
-      detection_type TEXT NOT NULL,
-      season INTEGER,
-      week INTEGER,
-      evidence_json TEXT NOT NULL DEFAULT '{}',
-      detected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (league_id, previous_snapshot_id, current_snapshot_id, player_id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_forward_roster_movements_pair
-      ON forward_roster_movements (league_id, previous_snapshot_id, current_snapshot_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_forward_roster_movements_player
-      ON forward_roster_movements (league_id, player_id, detected_at DESC)`,
-    `CREATE TABLE IF NOT EXISTS forward_detection_runs (
-      id TEXT PRIMARY KEY,
-      league_id TEXT NOT NULL,
-      previous_snapshot_id TEXT,
-      current_snapshot_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      previous_player_count INTEGER NOT NULL DEFAULT 0,
-      current_player_count INTEGER NOT NULL DEFAULT 0,
-      movement_count INTEGER NOT NULL DEFAULT 0,
-      team_change_count INTEGER NOT NULL DEFAULT 0,
-      roster_entry_count INTEGER NOT NULL DEFAULT 0,
-      roster_exit_count INTEGER NOT NULL DEFAULT 0,
-      status_change_count INTEGER NOT NULL DEFAULT 0,
-      note TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (league_id, current_snapshot_id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )`
-  ];
-  for(const sql of statements)await db.prepare(sql).run();
-}
+async function ensureForwardSchema(db){return requireDatabaseSchema(db)}
 
 function canonicalPlayerState(row){
   const data=parse(row?.data_json)||{};

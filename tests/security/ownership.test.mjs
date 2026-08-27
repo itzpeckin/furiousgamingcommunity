@@ -109,7 +109,7 @@ test('the database prevents two active memberships from owning the same canonica
       active INTEGER NOT NULL DEFAULT 1
     );
   `);
-  const migration = await readFile(new URL('../../migrations/0016_canonical_team_ownership.sql', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../../migrations/legacy/0016_canonical_team_ownership.sql', import.meta.url), 'utf8');
   database.exec(migration);
   const insert = database.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,team_id,active) VALUES (?,?,?,?,?,?)`);
   insert.run('membership-1','league-1','user-1','commissioner','tb',1);

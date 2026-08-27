@@ -1,6 +1,7 @@
 /* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='5.9.10.6.5.4h-p3d';
 const RECORD_CHUNK_SIZE=40;
@@ -29,66 +30,8 @@ const text=v=>v==null?null:(String(v).trim()||null);
 const int=v=>Number.isFinite(Number.parseInt(v,10))?Number.parseInt(v,10):null;
 const safeParse=(value,fallback)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
-let statisticsSchemaReady=false;
 async function ensureStatisticsSchema(db){
-  if(statisticsSchemaReady)return;
-  await db.prepare(`CREATE TABLE IF NOT EXISTS companion_statistics_mapping_batches (
-    id TEXT PRIMARY KEY,
-    mapping_run_id TEXT NOT NULL,
-    league_id TEXT NOT NULL,
-    capture_id TEXT NOT NULL,
-    discovery_session_id TEXT,
-    route_path TEXT NOT NULL,
-    r2_object_key TEXT NOT NULL,
-    source_category TEXT NOT NULL,
-    stage TEXT NOT NULL,
-    week_index INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    record_count INTEGER NOT NULL DEFAULT 0,
-    resolved_player_count INTEGER NOT NULL DEFAULT 0,
-    unresolved_player_count INTEGER NOT NULL DEFAULT 0,
-    warning_count INTEGER NOT NULL DEFAULT 0,
-    warnings_json TEXT NOT NULL DEFAULT '[]',
-    record_offset INTEGER NOT NULL DEFAULT 0,
-    record_total INTEGER,
-    error_json TEXT,
-    started_at TEXT,
-    completed_at TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (mapping_run_id, route_path),
-    FOREIGN KEY (mapping_run_id) REFERENCES companion_statistics_mapping_runs(id) ON DELETE CASCADE,
-    FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-  )`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_statistics_batches_run_status ON companion_statistics_mapping_batches (mapping_run_id, status, route_path)`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_statistics_batches_league_created ON companion_statistics_mapping_batches (league_id, created_at DESC)`).run();
-  const columns=await db.prepare(`PRAGMA table_info(companion_statistics_mapping_batches)`).all();
-  const names=new Set((columns.results||[]).map(row=>String(row.name||'')));
-  if(!names.has('record_offset'))await db.prepare(`ALTER TABLE companion_statistics_mapping_batches ADD COLUMN record_offset INTEGER NOT NULL DEFAULT 0`).run();
-  if(!names.has('record_total'))await db.prepare(`ALTER TABLE companion_statistics_mapping_batches ADD COLUMN record_total INTEGER`).run();
-  if(!names.has('payload_hash'))await db.prepare(`ALTER TABLE companion_statistics_mapping_batches ADD COLUMN payload_hash TEXT`).run();
-  if(!names.has('season_year'))await db.prepare(`ALTER TABLE companion_statistics_mapping_batches ADD COLUMN season_year INTEGER`).run();
-
-  await db.prepare(`CREATE TABLE IF NOT EXISTS canonical_statistics_snapshot_manifest (
-    league_id TEXT NOT NULL,
-    snapshot_id TEXT NOT NULL,
-    route_path TEXT NOT NULL,
-    payload_hash TEXT NOT NULL,
-    season_year INTEGER,
-    stage TEXT NOT NULL,
-    week_index INTEGER NOT NULL,
-    source_category TEXT NOT NULL,
-    record_count INTEGER NOT NULL DEFAULT 0,
-    mapping_run_id TEXT,
-    committed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (league_id,snapshot_id,route_path)
-  )`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_statistics_manifest_snapshot
-    ON canonical_statistics_snapshot_manifest (league_id,snapshot_id,stage,week_index,source_category)`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_statistics_manifest_hash
-    ON canonical_statistics_snapshot_manifest (league_id,route_path,payload_hash)`).run();
-
-  statisticsSchemaReady=true;
+  return requireDatabaseSchema(db);
 }
 
 async function requirePlatformOwner(context){

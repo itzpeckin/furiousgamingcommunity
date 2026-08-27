@@ -140,13 +140,13 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 158,
-      ".json": 4,
+      ".js": 159,
+      ".json": 5,
       ".jsonc": 1,
-      ".md": 276,
-      ".mjs": 18,
+      ".md": 277,
+      ".mjs": 19,
       ".png": 1,
-      ".sql": 19,
+      ".sql": 22,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
@@ -165,7 +165,7 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 121019,
+        "bytes": 116225,
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
@@ -177,16 +177,16 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 37540,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
-      },
-      {
         "bytes": 37341,
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 37212,
+        "bytes": 34765,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
+      },
+      {
+        "bytes": 34437,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
         "bytes": 23791,
@@ -197,12 +197,16 @@
         "file": "platform/validate.js"
       },
       {
-        "bytes": 21302,
-        "file": "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
+        "bytes": 20354,
+        "file": "migrations/0019_canonical_import_snapshot_foundation.sql"
       },
       {
         "bytes": 20250,
         "file": "league-engine/games.js"
+      },
+      {
+        "bytes": 18703,
+        "file": "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
       },
       {
         "bytes": 18239,
@@ -227,13 +231,9 @@
       {
         "bytes": 16251,
         "file": "league-engine/data-state.js"
-      },
-      {
-        "bytes": 16204,
-        "file": "workers/franchise-import-worker/src/index.js"
       }
     ],
-    "total": 493
+    "total": 500
   },
   "frontend": {
     "assets": [
@@ -1204,8 +1204,8 @@
         "league-engine/one-click-import.js",
         "league-engine/snapshot-lifecycle.js",
         "league-engine/snapshot-verification.js",
-        "migrations/0001_cloud_platform_foundation.sql",
-        "migrations/0001_create_leagues.sql"
+        "migrations/legacy/0001_cloud_platform_foundation.sql",
+        "migrations/legacy/0001_create_leagues.sql"
       ],
       "occurrences": 32
     },
@@ -1236,122 +1236,26 @@
   },
   "migrations": [
     {
-      "file": "migrations/0001_cloud_platform_foundation.sql",
+      "file": "migrations/0018_canonical_core_foundation.sql",
       "recordsLedger": true,
-      "sha256": "1a20af5dc59bac45a9a0712e2f50548fd5de5e7465f245eecc90b07b88df77bd",
-      "version": "0001"
+      "sha256": "bb3bb4a32e9a854d98df9062141c774f203f3bc3a0f183681abd7dfb2d301a7a",
+      "version": "0018"
     },
     {
-      "file": "migrations/0001_create_leagues.sql",
-      "recordsLedger": false,
-      "sha256": "d25bf3ef44889567ef2adce888d32705d5865512c97240b9a96d920d0f35a977",
-      "version": "0001"
-    },
-    {
-      "file": "migrations/0002_companion_storage_layer.sql",
+      "file": "migrations/0019_canonical_import_snapshot_foundation.sql",
       "recordsLedger": true,
-      "sha256": "22423a9a1bc3db3fe29d1b9b037ba39511a33646d2c0d21514b7f0c71c2c55c3",
-      "version": "0002"
+      "sha256": "563f66b5316829454dca25a0d7bccef84dc8987806d249758f1b8b839ea3fb2b",
+      "version": "0019"
     },
     {
-      "file": "migrations/0002_create_authentication.sql",
-      "recordsLedger": false,
-      "sha256": "825217b5648228d679d6cfdb04622709574a566f75477e1123cf6ff7de33a093",
-      "version": "0002"
-    },
-    {
-      "file": "migrations/0003_madden_companion_route_discovery.sql",
+      "file": "migrations/0020_canonical_transaction_runtime_foundation.sql",
       "recordsLedger": true,
-      "sha256": "c477367fee05a48be9d6f8e052ad4dd003803fd05d8b9e1de2e82405f81cb307",
-      "version": "0003"
-    },
-    {
-      "file": "migrations/0004_dataset_classification.sql",
-      "recordsLedger": true,
-      "sha256": "cfb02c1a929d862e0c97538be3d71fce57ecd37bd9550b41eeeea16c67bf09a0",
-      "version": "0004"
-    },
-    {
-      "file": "migrations/0005_canonical_team_mapper_preview.sql",
-      "recordsLedger": true,
-      "sha256": "a61236b08cf286ab5d1330b261d1fc4b065b765298aeddd8eaf8d196f0d0c426",
-      "version": "0005"
-    },
-    {
-      "file": "migrations/0006_canonical_player_mapper_preview.sql",
-      "recordsLedger": true,
-      "sha256": "be80d5222101c9beb8aceed123c2ea2eb824a9fde5986a96b23ab6952273077c",
-      "version": "0006"
-    },
-    {
-      "file": "migrations/0007_canonical_schedule_mapper_preview.sql",
-      "recordsLedger": true,
-      "sha256": "adb744adc932d45301f1b06cbf6e9c9712f459c59e728dd4c35e48b64bce605c",
-      "version": "0007"
-    },
-    {
-      "file": "migrations/0008_canonical_statistics_engine_preview.sql",
-      "recordsLedger": true,
-      "sha256": "651eda25c890afa840867a3c3802b6999c520a7907d1605241dff2c49144d9c5",
-      "version": "0008"
-    },
-    {
-      "file": "migrations/0009_complete_pending_snapshot_builder.sql",
-      "recordsLedger": true,
-      "sha256": "3af158d56dab622e786e593cc7a314ff9152f61986867edf21db31582a5163ff",
-      "version": "0009"
-    },
-    {
-      "file": "migrations/0010_snapshot_validation_activation.sql",
-      "recordsLedger": true,
-      "sha256": "30ff298c5474548acf1790dfcfe014ba0c7bbfe2cdbd156e6441cba549139e20",
-      "version": "0010"
-    },
-    {
-      "file": "migrations/0011_incremental_import_orchestrator.sql",
-      "recordsLedger": true,
-      "sha256": "ff97cf4dec3a77c3c8a3a0173a26544801493a169b44dbda2df5e86378ac11ea",
-      "version": "0011"
-    },
-    {
-      "file": "migrations/0012_canonical_transactions.sql",
-      "recordsLedger": true,
-      "sha256": "0951746dc460589ccc2c7ef29d881a2529c28b66acfe4c5028e09681f8522249",
-      "version": "0012"
-    },
-    {
-      "file": "migrations/0013_league_membership_access_control.sql",
-      "recordsLedger": false,
-      "sha256": "e321be67459b0e23340a263f1894538ea51fc8200e2370d8e8ad4441180442b1",
-      "version": "0013"
-    },
-    {
-      "file": "migrations/0014_league_rules.sql",
-      "recordsLedger": false,
-      "sha256": "76195823f306ecc98b8ad6958253be14a3b9ae55c64cae247cfb22a2a085bdaf",
-      "version": "0014"
-    },
-    {
-      "file": "migrations/0015_membership_audit_repair.sql",
-      "recordsLedger": true,
-      "sha256": "511a4ce1551ec009d068f4011cef8f18779b9db0c39b368740d15147a1f32246",
-      "version": "0015"
-    },
-    {
-      "file": "migrations/0016_canonical_team_ownership.sql",
-      "recordsLedger": true,
-      "sha256": "b29ee08850d0bcee02accafab46c0bfa537499b8997bb02050c14b5ba84fd39c",
-      "version": "0016"
-    },
-    {
-      "file": "migrations/0017_league_data_reset_audit.sql",
-      "recordsLedger": true,
-      "sha256": "75dfec80bf8273a184cae016d27a1c86d8451f85119ed68124f4fdfcc36e3224",
-      "version": "0017"
+      "sha256": "03e7054b5f4584b313a3752fd58a7b0fb78312f09a3546a60c7565d116da343a",
+      "version": "0020"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.0.5",
+  "release": "7.1.0",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

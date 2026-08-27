@@ -7,7 +7,7 @@ import {
   resolveTeam
 } from "../../../_lib/league-teams.js";
 
-const RELEASE = "7.0.5";
+const RELEASE = "7.1.0";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;

@@ -137,7 +137,7 @@ test('member listing remains available before the membership audit repair is app
 });
 
 test('membership audit repair is idempotent and preserves existing membership rows', async () => {
-  const migration = await readFile(new URL('../../migrations/0015_membership_audit_repair.sql', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../../migrations/legacy/0015_membership_audit_repair.sql', import.meta.url), 'utf8');
   const db = new DatabaseSync(':memory:');
   db.exec(`
     PRAGMA foreign_keys = ON;

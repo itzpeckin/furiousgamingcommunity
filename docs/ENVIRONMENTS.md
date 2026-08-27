@@ -49,8 +49,7 @@ References:
 - `SESSION_SIGNING_SECRET`
 - `COMPANION_EXPORT_TOKEN`
 
-EA direct-access secrets are intentionally excluded until the 7.0.1 security containment release defines and protects those routes.
-`EA_DIRECT_DISCOVERY_URL` is also forbidden until that release. The legacy `D1` fallback is inventoried but is not provisioned; `DB` and `FRANCHISE_HQ_DB` are the classified D1 bindings for the transition baseline.
+EA direct-access secrets and `EA_DIRECT_DISCOVERY_URL` remain forbidden until the policy-compliant 7.4 investigation defines and protects an approved route. The legacy `D1` fallback is inventoried but is not provisioned; `DB` and `FRANCHISE_HQ_DB` are the classified D1 bindings for the transition baseline.
 
 ## Required non-secret variables
 

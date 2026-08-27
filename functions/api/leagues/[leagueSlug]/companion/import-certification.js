@@ -1,5 +1,6 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='5.9.10.6.3P.5f';
 const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
@@ -35,22 +36,7 @@ async function tableExists(db,name){
 }
 
 async function ensureSchema(db){
-  await db.prepare(`CREATE TABLE IF NOT EXISTS import_performance_certifications (
-    id TEXT PRIMARY KEY,
-    league_id TEXT NOT NULL,
-    orchestrator_run_id TEXT,
-    snapshot_id TEXT NOT NULL,
-    previous_snapshot_id TEXT,
-    certification_mode TEXT NOT NULL DEFAULT 'weekly-delta',
-    passed INTEGER NOT NULL DEFAULT 0,
-    score INTEGER NOT NULL DEFAULT 0,
-    wall_clock_ms INTEGER,
-    report_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (league_id,snapshot_id)
-  )`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_import_cert_league_created
-    ON import_performance_certifications (league_id,created_at DESC)`).run();
+  return requireDatabaseSchema(db);
 }
 
 function check(id,label,passed,detail,severity='required'){

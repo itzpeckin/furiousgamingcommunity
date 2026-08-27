@@ -1,9 +1,9 @@
 /* FHQ_BUILD: 5.9.11.0 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='5.9.11.0';
-let schemaReady=false;
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
 const now=()=>new Date().toISOString();
@@ -17,121 +17,7 @@ const samePair=(a=[],b=[])=>{
 const freeAgentTeam=value=>!clean(value)||['0','fa','free-agent','free_agent','unassigned','none','null'].includes(String(value).toLowerCase());
 
 async function ensureSchema(db){
-  if(schemaReady)return;
-  const statements=[
-    `CREATE TABLE IF NOT EXISTS canonical_transactions (
-      id TEXT PRIMARY KEY,
-      league_id TEXT NOT NULL,
-      event_type TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'recorded',
-      authority TEXT NOT NULL DEFAULT 'snapshot-inferred',
-      execution_status TEXT NOT NULL DEFAULT 'observed',
-      season INTEGER,
-      week INTEGER,
-      occurred_at TEXT,
-      team_ids_json TEXT NOT NULL DEFAULT '[]',
-      player_ids_json TEXT NOT NULL DEFAULT '[]',
-      workflow_trade_id TEXT,
-      first_snapshot_id TEXT,
-      last_snapshot_id TEXT,
-      confidence TEXT NOT NULL DEFAULT 'inferred',
-      details_json TEXT NOT NULL DEFAULT '{}',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_canonical_transactions_league_created
-      ON canonical_transactions (league_id, created_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_canonical_transactions_workflow
-      ON canonical_transactions (league_id, workflow_trade_id)`,
-    `CREATE TABLE IF NOT EXISTS canonical_transaction_evidence (
-      id TEXT PRIMARY KEY,
-      league_id TEXT NOT NULL,
-      transaction_id TEXT NOT NULL,
-      source_type TEXT NOT NULL,
-      source_key TEXT NOT NULL,
-      snapshot_id TEXT,
-      evidence_json TEXT NOT NULL DEFAULT '{}',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (league_id, source_type, source_key),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
-      FOREIGN KEY (transaction_id) REFERENCES canonical_transactions(id) ON DELETE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_transaction_evidence_transaction
-      ON canonical_transaction_evidence (transaction_id, created_at)`,
-    `CREATE TABLE IF NOT EXISTS canonical_roster_snapshots (
-      league_id TEXT NOT NULL,
-      snapshot_id TEXT NOT NULL,
-      season INTEGER,
-      week INTEGER,
-      captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      player_count INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY (league_id, snapshot_id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )`,
-    `CREATE TABLE IF NOT EXISTS canonical_roster_snapshot_players (
-      league_id TEXT NOT NULL,
-      snapshot_id TEXT NOT NULL,
-      player_id TEXT NOT NULL,
-      player_name TEXT,
-      team_id TEXT,
-      roster_status TEXT,
-      position TEXT,
-      PRIMARY KEY (league_id, snapshot_id, player_id),
-      FOREIGN KEY (league_id, snapshot_id) REFERENCES canonical_roster_snapshots(league_id, snapshot_id) ON DELETE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_roster_snapshot_players_league_player
-      ON canonical_roster_snapshot_players (league_id, player_id, snapshot_id)`,
-    `CREATE TABLE IF NOT EXISTS canonical_free_agents (
-      league_id TEXT NOT NULL,
-      player_id TEXT NOT NULL,
-      player_name TEXT,
-      position TEXT,
-      overall INTEGER,
-      age INTEGER,
-      dev_trait TEXT,
-      source_route TEXT,
-      source_capture_id TEXT,
-      raw_json TEXT NOT NULL DEFAULT '{}',
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (league_id, player_id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_canonical_free_agents_league_name
-      ON canonical_free_agents (league_id, player_name)`,
-    `CREATE TABLE IF NOT EXISTS canonical_historical_player_states (
-      league_id TEXT NOT NULL,
-      snapshot_id TEXT NOT NULL,
-      player_id TEXT NOT NULL,
-      player_name TEXT,
-      team_id TEXT,
-      roster_status TEXT,
-      position TEXT,
-      raw_json TEXT NOT NULL DEFAULT '{}',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (league_id, snapshot_id, player_id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_historical_player_states_player
-      ON canonical_historical_player_states (league_id, player_id, snapshot_id)`
-,
-    `CREATE TABLE IF NOT EXISTS canonical_capture_lifecycle_sessions (
-      league_id TEXT NOT NULL,
-      session_id TEXT NOT NULL,
-      received_at TEXT,
-      team_route_count INTEGER NOT NULL DEFAULT 0,
-      player_count INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'pending',
-      processed_at TEXT,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (league_id, session_id),
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_capture_lifecycle_sessions_order
-      ON canonical_capture_lifecycle_sessions (league_id, received_at)`
-  ];
-  for(const sql of statements)await db.prepare(sql).run();
-  schemaReady=true;
+  return requireDatabaseSchema(db);
 }
 
 async function requestState(context){

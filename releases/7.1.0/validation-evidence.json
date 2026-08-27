@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.1.0",
+  "validatedOn": "2026-08-27",
+  "status": "local-validation-passed-review-pending",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "repositoryLint": { "passed": true },
+    "javascriptSyntax": { "passed": true },
+    "htmlAssets": { "passed": true, "entrypoints": 1 },
+    "secretScan": { "passed": true, "highConfidenceFindings": 0 },
+    "environmentContract": { "passed": true },
+    "canonicalMigrationSequence": { "passed": true, "activeVersions": [18, 19, 20], "archivedLegacyFiles": 19 },
+    "freshDatabase": { "passed": true, "requiredTables": 50, "finalVersion": 20 },
+    "legacyUpgrade": { "passed": true, "sourceShape": "production-like-7.0.5", "finalVersion": 20 },
+    "identityPreservation": { "passed": true, "relationshipsReconciled": true },
+    "foreignKeyIntegrity": { "passed": true, "violations": 0 },
+    "backupRestore": { "passed": true, "method": "isolated-file-copy-and-reopen", "relationshipsReconciled": true },
+    "requestTimeSchemaRemoval": { "passed": true, "mutationStatementsInRequestHandlers": 0 },
+    "runtimeSchemaGuard": { "passed": true, "minimumVersion": 20 },
+    "sharedSettingsSchema": { "passed": true, "tables": ["league_settings", "league_setting_revisions"] },
+    "automatedTests": { "passed": true, "passedTests": 51, "failedTests": 0 },
+    "securityTests": { "passed": true, "passedTests": 39, "failedTests": 0 },
+    "systemInventory": { "passed": true },
+    "releaseContract": { "passed": true },
+    "strictMigration": { "passed": true, "expectedFailure": false, "blockingIssues": 0, "finalVersion": 20 }
+  },
+  "scopeBoundaries": {
+    "authenticationChanged": false,
+    "membershipsChanged": false,
+    "maddenDataChanged": false,
+    "discordConfigurationChanged": false,
+    "productionInfrastructureChanged": false
+  },
+  "productionReadOnlyEvidence": {
+    "database": "franchise-hq-db",
+    "observedTables": 47,
+    "observedHighestMigration": 17,
+    "missingHistoricalLedgerVersions": [11, 12, 13, 14],
+    "foreignKeyCheckViolations": 0,
+    "mutated": false
+  },
+  "external": {
+    "githubPullRequest": { "authorized": true, "status": "authorized-pending-creation" },
+    "hostedChecks": { "status": "pending-pull-request" },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": { "authorized": false, "status": "not-run", "url": "https://franchisehq.app/" },
+    "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [18, 19, 20] },
+    "productionDataReset": { "authorized": false, "status": "not-run" }
+  },
+  "manualAcceptance": {
+    "status": "not-applicable-to-local-database-candidate",
+    "nextGate": "isolated-staging-migration-and-recovery-rehearsal"
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false
+}
