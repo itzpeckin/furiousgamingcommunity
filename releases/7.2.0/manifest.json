@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.2.0",
   "releaseType": "tenant-ready-core",
-  "status": "validated-review-candidate",
+  "status": "staging-validated",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.1.0",
@@ -19,13 +19,18 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-pending-commit-push-and-pull-request",
+    "status": "published-pr-open-hosted-checks-passed",
+    "commit": "5799c35675c85695194234119fbe28f8dda76ed1",
+    "pullRequest": "https://github.com/itzpeckin/furiousgamingcommunity/pull/9",
     "scope": "One consolidated 7.2 commit, branch push, pull request, and hosted-check cycle."
   },
   "staging": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-pending-migration-and-deployment",
+    "deployed": true,
+    "status": "migration-and-preview-deployment-validated",
+    "deploymentId": "041c8c85-54e6-4927-b5bb-f8fc460e3be2",
+    "deploymentUrl": "https://041c8c85.franchise-hq.pages.dev",
+    "branchAlias": "https://codex-franchisehq-7-2-0.franchise-hq.pages.dev",
     "scope": "Migration 21 and the exact 7.2 candidate may be applied only to the registered isolated staging environment."
   },
   "production": {

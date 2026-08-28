@@ -9,6 +9,10 @@ test('maps Pages Function file names to stable route patterns', () => {
     functionRoutePath('functions/api/leagues/[leagueSlug]/players/free-agents.js'),
     '/api/leagues/:leagueSlug/players/free-agents'
   );
+  assert.equal(
+    functionRoutePath('functions/api/leagues/[leagueSlug]/companion/discovery-report.js'),
+    '/api/leagues/:leagueSlug/companion/discovery-report'
+  );
   assert.equal(functionRoutePath('functions/leagues/[[path]].js'), '/leagues/*path');
   assert.equal(functionRoutePath('functions/_lib/auth.js'), null);
   assert.equal(functionRoutePath('functions/api/example/_common.js'), null);

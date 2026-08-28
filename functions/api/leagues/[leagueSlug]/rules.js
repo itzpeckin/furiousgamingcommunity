@@ -9,7 +9,7 @@ import {
 } from "../../../_lib/cloud-platform.js";
 import { createTenantAuditContext, tenantAuditStatement } from "../../../_lib/tenant-context.js";
 
-const RELEASE = "7.2.0";
+const RELEASE = "7.3.0";
 const EMPTY_RULES = Object.freeze({ categories: [] });
 const MAX_DOCUMENT_BYTES = 256 * 1024;
 const MAX_CATEGORIES = 50;

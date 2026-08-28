@@ -13,8 +13,9 @@ import {
   companionDiscoveryKey,
   summarizePayloadShape
 } from '../../../../../../_lib/cloud-platform.js';
+import { hashToken } from '../../../../../../_lib/auth.js';
 
-const RELEASE = '5.9.10.6.2e';
+const RELEASE = '7.3.0';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
 
 function slugOf(context) {
@@ -131,6 +132,29 @@ function freeAgentCaptureAssessment(routePath,parsed){
   };
 }
 
+async function discoverySessionFor(db, leagueId, token) {
+  const tokenHash = await hashToken(token);
+  return db.prepare(`SELECT id,expires_at FROM madden_discovery_sessions
+    WHERE league_id=? AND token_hash=? AND status='open'
+      AND datetime(expires_at)>CURRENT_TIMESTAMP
+    LIMIT 1`).bind(leagueId, tokenHash).first();
+}
+
+async function linkSessionCapture(db, leagueId, discoverySessionId, captureId, routePath, observedAt) {
+  if (!discoverySessionId) return;
+  await db.batch([
+    db.prepare(`INSERT OR IGNORE INTO madden_discovery_session_captures
+      (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`)
+      .bind(leagueId, discoverySessionId, captureId, routePath, observedAt),
+    db.prepare(`UPDATE madden_discovery_sessions
+      SET capture_count=(SELECT COUNT(*) FROM madden_discovery_session_captures
+        WHERE league_id=? AND session_id=?),last_capture_at=?,updated_at=?
+      WHERE league_id=? AND id=?`).bind(
+        leagueId, discoverySessionId, observedAt, observedAt, leagueId, discoverySessionId
+      )
+  ]);
+}
+
 function successResponse(details, status = 200) {
   return json({
     ok: true,
@@ -178,8 +202,11 @@ export async function onRequest(context) {
       return json({ ok: false, error: 'League not found.', release: RELEASE }, 404);
     }
 
+    const suppliedToken = tokenOf(context);
+    const discoverySession = await discoverySessionFor(db, league.id, suppliedToken);
     const expected = await configuredExportToken(context.env, league);
-    if (!expected || !safeEqual(tokenOf(context), expected)) {
+    const legacyAuthorized = Boolean(expected && safeEqual(suppliedToken, expected));
+    if (!discoverySession && !legacyAuthorized) {
       return json({ ok: false, error: 'Unauthorized export request.', release: RELEASE }, 401);
     }
 
@@ -190,6 +217,8 @@ export async function onRequest(context) {
         mode: 'route-discovery',
         leagueSlug: slug,
         routePath,
+        discoverySessionId: discoverySession?.id || null,
+        expiresAt: discoverySession?.expires_at || null,
         release: RELEASE
       });
     }
@@ -211,7 +240,7 @@ export async function onRequest(context) {
     const parsed = parseBody(rawBytes, contentType);
     const receivedAt = new Date().toISOString();
     const captureId = crypto.randomUUID();
-    const discoverySessionId = sessionId(context.request, slug);
+    const discoverySessionId = discoverySession?.id || sessionId(context.request, slug);
     const payloadHash = await sha256Hex(rawBytes);
     const key = companionRouteObjectKey(
       league.id,
@@ -227,11 +256,15 @@ export async function onRequest(context) {
       .first();
 
     if (duplicate) {
+      if (discoverySession) {
+        await linkSessionCapture(db, league.id, discoverySession.id, duplicate.id, routePath, receivedAt);
+      }
       return json({
         ok: true,
         accepted: false,
         duplicate: true,
         captureId: duplicate.id,
+        discoverySessionId,
         routePath,
         requestMethod: method,
         bodyFormat: parsed.bodyFormat,
@@ -264,7 +297,7 @@ export async function onRequest(context) {
     });
 
     try {
-      await db.prepare(`INSERT INTO companion_route_captures
+      const statements = [db.prepare(`INSERT INTO companion_route_captures
         (id, league_id, discovery_session_id, route_path, request_method, content_type, byte_length,
          payload_hash, r2_object_key, top_level_keys_json, collections_json, request_headers_json, received_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -283,7 +316,18 @@ export async function onRequest(context) {
           JSON.stringify(requestHeaders),
           receivedAt
         )
-        .run();
+      ];
+      if (discoverySession) {
+        statements.push(
+          db.prepare(`INSERT OR IGNORE INTO madden_discovery_session_captures
+            (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`)
+            .bind(league.id, discoverySession.id, captureId, routePath, receivedAt),
+          db.prepare(`UPDATE madden_discovery_sessions
+            SET capture_count=capture_count+1,last_capture_at=?,updated_at=?
+            WHERE league_id=? AND id=?`).bind(receivedAt, receivedAt, league.id, discoverySession.id)
+        );
+      }
+      await db.batch(statements);
     } catch (error) {
       await context.env.COMPANION_EXPORTS.delete(key).catch(() => {});
       return json({

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "7.2.0",
+  "release": "7.3.0",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 21,
+  "currentVersion": 22,
   "requiredTables": [
     "canonical_capture_lifecycle_sessions",
     "canonical_free_agents",
@@ -48,6 +48,9 @@
     "league_snapshots",
     "league_slug_aliases",
     "leagues",
+    "madden_discovery_reports",
+    "madden_discovery_session_captures",
+    "madden_discovery_sessions",
     "oauth_states",
     "players",
     "schema_migrations",
@@ -71,6 +74,8 @@
     "league_settings": ["league_id", "revision", "settings_json", "updated_by_user_id", "updated_at"],
     "league_setting_revisions": ["id", "league_id", "revision", "settings_json", "changed_by_user_id", "change_reason", "created_at"],
     "league_snapshots": ["id", "league_id", "status", "manifest_json", "validation_status", "validation_score", "created_at", "updated_at"],
-    "sessions": ["id", "user_id", "session_token_hash", "expires_at", "last_seen_at", "revoked_at"]
+    "sessions": ["id", "user_id", "session_token_hash", "expires_at", "last_seen_at", "revoked_at"],
+    "madden_discovery_sessions": ["id", "league_id", "token_hash", "status", "capture_count", "expires_at", "created_at", "updated_at"],
+    "madden_discovery_reports": ["id", "league_id", "session_id", "status", "route_count", "capture_count", "source_verification_json", "report_hash", "generated_at"]
   }
 }

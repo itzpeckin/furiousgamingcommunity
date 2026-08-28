@@ -22,7 +22,7 @@ import {
 import { isOwnerFallbackIdentity } from "../../../_lib/owner-fallback.js";
 import { resolveTenant, resolveTenantById } from "../../../_lib/tenant-context.js";
 
-const RELEASE = "7.2.0";
+const RELEASE = "7.3.0";
 
 function escapeHtml(value) {
   return String(value ?? "")

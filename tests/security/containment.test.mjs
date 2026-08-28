@@ -13,6 +13,8 @@ import {
 } from '../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js';
 import { normalizeRulesDocument, onRequestGet as readRules } from '../../functions/api/leagues/[leagueSlug]/rules.js';
 import { onRequestGet as readDiscovery } from '../../functions/api/leagues/[leagueSlug]/companion/discovery.js';
+import { onRequestGet as readDiscoverySession } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-session.js';
+import { onRequestGet as readDiscoveryReport } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js';
 import { onRequestGet as logoutWithGet } from '../../functions/api/auth/logout.js';
 import { onRequestGet as claimWithGet } from '../../functions/api/auth/session/claim.js';
 import { JSON_HEADERS, suppliedExportToken } from '../../functions/_lib/cloud-platform.js';
@@ -42,7 +44,7 @@ test('protected league data rejects guests before touching storage', async () =>
     params: { leagueSlug: 'fgc' },
     env: {}
   };
-  for (const handler of [readSnapshot, readRules, readDiscovery]) {
+  for (const handler of [readSnapshot, readRules, readDiscovery, readDiscoverySession, readDiscoveryReport]) {
     const response = await handler(context);
     assert.equal(response.status, 401);
     assert.equal((await response.json()).error, 'Authentication required.');

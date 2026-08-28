@@ -1,6 +1,6 @@
 # FranchiseHQ 7.2.0 Release Record
 
-**Status:** Local strict validation passed; consolidated repository publication, hosted checks, staging migration 21, and staging deployment authorized
+**Status:** Staging validated; production not authorized
 
 **Production authorized:** No
 
@@ -43,8 +43,11 @@ Make the current single-league FranchiseHQ launch structurally tenant-safe witho
 
 - Candidate branch: `codex/franchisehq-7.2.0`.
 - Source production baseline: merged 7.1.0 commit `4045e02980c93491b47910f17fcb2e48fae76c68`, tree `c090eb27500c93dff91d23f79a82706e175acfb0`.
-- Repository publication/pull request: authorized by Justin/Peckin on August 27, 2026; not yet created at this record boundary.
-- Staging migration 21 and staging deployment: authorized for the registered isolated staging environment only; not yet run at this record boundary.
+- Repository publication/pull request: exact commit `5799c35675c85695194234119fbe28f8dda76ed1` is published in PR #9 and all four hosted checks passed.
+- Staging migration 21: applied and verified only on `franchise-hq-staging-db` (`3d74929a-3bf1-49e8-a7ef-8ba28ed66816`); schema version 21, 54 required tables, and zero foreign-key violations were confirmed.
+- Staging resources: Preview `DB` and `FRANCHISE_HQ_DB` point to the isolated staging D1 database; `COMPANION_EXPORTS`, `COMPANION_EXPORT_META`, and `LEAGUE_CONFIG` point to newly provisioned, empty staging R2/KV resources; staging-only session/import secrets and environment variables are present.
+- Staging deployment: Cloudflare Preview deployment `041c8c85-54e6-4927-b5bb-f8fc460e3be2` compiled and deployed exact commit `5799c35` successfully in 15 seconds at `https://041c8c85.franchise-hq.pages.dev`.
+- Validation limitation: the owner's computer security blocks direct `pages.dev` requests, so `/api/platform/status` could not be invoked without bypassing that security control. Cloudflare's deployment and configuration records were used for the final non-invasive verification.
 - Production migration/deployment: not authorized and not run.
 - FGC Madden reset/import/activation and membership/team changes: not authorized and not run.
 

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.0",
+  "releaseType": "madden-27-payload-discovery",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.2.0",
+    "commit": "5799c35675c85695194234119fbe28f8dda76ed1",
+    "tree": "2141749a4bab1de52c6a253e2b7ec594a5424ee2",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.0",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "scope": "Local implementation and validation only. Commit, push, pull request, and hosted checks require separate owner authorization."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Migration 22, Preview deployment, and one real FGC discovery capture require separate owner authorization."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-authorized",
+    "url": "https://franchisehq.app/",
+    "scope": "No production deployment, migration, Madden capture, data reset, import, snapshot activation, or membership/team change is authorized."
+  },
+  "requiredArtifacts": [
+    "MADDEN-IMPORT-CONTRACT-v1.md",
+    "config/database-schema-contract.json",
+    "docs/DATABASE-OPERATIONS.md",
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/madden-discovery.js",
+    "functions/api/leagues/[leagueSlug]/companion/discovery-report.js",
+    "functions/api/leagues/[leagueSlug]/companion/discovery-session.js",
+    "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
+    "league-engine/companion-route-discovery.js",
+    "migrations/0022_madden_27_discovery_foundation.sql",
+    "releases/7.3.0/release-record.md",
+    "releases/7.3.0/validation-evidence.json",
+    "tests/import/madden-discovery.test.mjs"
+  ]
+}

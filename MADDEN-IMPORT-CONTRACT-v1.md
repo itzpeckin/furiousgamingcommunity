@@ -31,6 +31,7 @@ Supported optional collections are:
 - franchises
 - owners
 - rosters
+- freeAgents
 - games
 - standings
 - stats
@@ -39,3 +40,7 @@ Supported optional collections are:
 - draftPicks
 
 Missing optional collections remain unavailable. Franchise HQ does not invent replacement values.
+
+## Madden NFL 27 source-lock requirement
+
+Before a Madden NFL 27 adapter can publish, its discovery report must explicitly locate teams, team rosters, players, Free Agents, standings, schedule, and statistics. Free Agents may be reported as empty only when a successful explicit source route returns an empty collection. A missing or failed Free Agent response is not equivalent to an empty league and blocks source lock.

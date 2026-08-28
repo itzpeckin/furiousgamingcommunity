@@ -1,4 +1,4 @@
-const RELEASE = '7.2.0';
+const RELEASE = '7.3.0';
 const SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SAFE_NAMESPACE = /^[a-z0-9][a-z0-9._:-]{0,127}$/i;
 
