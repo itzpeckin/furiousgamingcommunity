@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.0",
   "validatedOn": "2026-08-28",
-  "status": "local-validated-live-source-pending",
+  "status": "staging-deployed-live-source-pending",
   "baselineGate": {
     "passed": true,
     "unregisteredFailures": 0
@@ -45,11 +45,11 @@
     "productionInfrastructureChanged": false
   },
   "external": {
-    "githubPullRequest": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "status": "not-run" },
-    "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "stagingMigrations": { "authorized": false, "status": "not-run", "migrations": [22] },
-    "realMaddenCapture": { "authorized": false, "status": "not-run" },
+    "githubPullRequest": { "authorized": true, "status": "form-ready-branch-pushed", "base": "codex/franchisehq-7.2.0", "head": "codex/franchisehq-7.3.0", "commit": "d4362fabcc44142de59ca96d5f7a6e7c8d740a43" },
+    "hostedChecks": { "status": "passed", "passed": 3, "failed": 0, "commit": "d4362fabcc44142de59ca96d5f7a6e7c8d740a43" },
+    "stagingDeployment": { "authorized": true, "status": "success", "deploymentId": "3dc10c9a-6c4a-48da-aaf9-9b3a2dbdb44b", "url": "https://3dc10c9a.franchise-hq.pages.dev", "branchAlias": "https://codex-franchisehq-7-3-0.franchise-hq.pages.dev", "durationSeconds": 18, "commit": "d4362fabcc44142de59ca96d5f7a6e7c8d740a43" },
+    "stagingMigrations": { "authorized": true, "status": "applied-verified", "migrations": [22], "databaseName": "franchise-hq-staging-db", "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816", "schemaVersion": 22, "ledgerEntries": 22, "tableCount": 58, "discoveryTables": 3, "discoveryIndexes": 5, "foreignKeyViolations": 0, "protectedCounts": { "leagues": 0, "users": 0, "memberships": 0, "activeSnapshots": 0 } },
+    "realMaddenCapture": { "authorized": true, "status": "pending-session-capture" },
     "productionDeployment": { "authorized": false, "status": "not-run", "url": "https://franchisehq.app/" },
     "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [21, 22] },
     "productionDataReset": { "authorized": false, "status": "not-run" },
@@ -57,9 +57,11 @@
   },
   "manualAcceptance": {
     "status": "pending-live-madden-27-capture",
-    "nextGate": "owner-review-and-separate-publication-staging-capture-authorization"
+    "nextGate": "issue-one-short-lived-fgc-session-and-complete-owner-companion-export"
   },
   "productionChanged": false,
   "dataChanged": false,
+  "stagingSchemaChanged": true,
+  "productionDataChanged": false,
   "credentialsChanged": false
 }

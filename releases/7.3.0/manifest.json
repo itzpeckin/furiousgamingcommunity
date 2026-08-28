@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.0",
   "releaseType": "madden-27-payload-discovery",
-  "status": "validated-review-candidate",
+  "status": "staging-validated",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.2.0",
@@ -18,15 +18,18 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-run",
-    "scope": "Local implementation and validation only. Commit, push, pull request, and hosted checks require separate owner authorization."
+    "authorized": true,
+    "status": "branch-pushed-checks-passed-pr-form-ready",
+    "commit": "d4362fabcc44142de59ca96d5f7a6e7c8d740a43",
+    "scope": "The 7.3.0 branch is published and hosted checks pass. The stacked pull request awaits final GitHub submission."
   },
   "staging": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-run",
-    "scope": "Migration 22, Preview deployment, and one real FGC discovery capture require separate owner authorization."
+    "authorized": true,
+    "deployed": true,
+    "status": "migration-and-preview-verified-live-capture-pending",
+    "deploymentId": "3dc10c9a-6c4a-48da-aaf9-9b3a2dbdb44b",
+    "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
+    "scope": "Migration 22 and the exact 7.3.0 Preview candidate are verified on isolated staging. One short-lived FGC discovery capture remains pending."
   },
   "production": {
     "authorized": false,

@@ -1,10 +1,10 @@
 # FranchiseHQ 7.3.0 Release Record
 
-**Status:** Local candidate validated; live Madden 27 source lock pending
+**Status:** Isolated staging candidate deployed and migration-verified; live Madden 27 source lock pending
 
 **Production authorized:** No
 
-**Production changed:** No application, database, Madden data, active snapshot, membership, Discord configuration, credential, or hosted resource has been changed.
+**Production changed:** No. Production remains on FranchiseHQ 7.1.0. Only the isolated Preview deployment and staging database were changed.
 
 ## Scope
 
@@ -43,10 +43,11 @@ Create the private, non-activating Madden NFL 27 discovery layer needed to inspe
 
 - Local branch: `codex/franchisehq-7.3.0`.
 - Source baseline: staging-validated 7.2.0 commit `5799c35675c85695194234119fbe28f8dda76ed1`.
-- Repository commit/push/pull request: not authorized and not run.
-- Migration 22 on staging or production: not authorized and not run.
-- Preview/production deployment: not authorized and not run.
-- Real FGC Madden 27 capture/source lock: not authorized and not run.
+- Repository commit `d4362fabcc44142de59ca96d5f7a6e7c8d740a43` was pushed to `codex/franchisehq-7.3.0`; GitHub reports 3/3 hosted checks passing. The stacked pull-request form against `codex/franchisehq-7.2.0` is prepared and awaits final GitHub submission.
+- Migration 22 was applied only to `franchise-hq-staging-db` (`3d74929a-3bf1-49e8-a7ef-8ba28ed66816`) after recording a private recovery bookmark. Verification shows schema version 22, 22 ledger entries, 58 application tables, all three discovery tables, all five discovery indexes, zero foreign-key violations, and zero staging leagues, users, memberships, or active snapshots before discovery setup.
+- Cloudflare Preview deployment `3dc10c9a-6c4a-48da-aaf9-9b3a2dbdb44b` succeeded from exact commit `d4362fa` in 18 seconds at `https://3dc10c9a.franchise-hq.pages.dev` with branch alias `https://codex-franchisehq-7-3-0.franchise-hq.pages.dev`.
+- The owner's network cannot resolve the canonical `franchisehq.app` redirect reached by Preview document requests. This does not affect the non-document `/api/...` Companion destination, which will be verified with the short-lived discovery session before source lock is accepted.
+- One isolated FGC Madden 27 capture/source-lock session is authorized and pending issuance/use; no source payload has been received yet.
 - FGC reset/import/activation: not authorized and not run.
 
 ## Rollback
