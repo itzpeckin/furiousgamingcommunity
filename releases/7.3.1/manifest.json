@@ -19,14 +19,15 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-pending-publication",
-    "scope": "Publish the validated 7.3.1 candidate on codex/franchisehq-7.3.1 without changing Main."
+    "status": "local-commit-push-blocked-authentication",
+    "commit": "2f825b52897ef57c2287fd5de69417a68da206f9",
+    "scope": "The validated candidate is committed on codex/franchisehq-7.3.1. GitHub publication is blocked because this host has no usable HTTPS credential or trusted SSH connection. Main is unchanged."
   },
   "staging": {
     "authorized": true,
     "deployed": false,
-    "status": "authorized-pending",
-    "scope": "Apply migration 23 only to the registered isolated staging database and deploy only to isolated Preview."
+    "status": "blocked-cloudflare-authentication",
+    "scope": "Migration 23 and isolated Preview deployment are authorized but not run because no Cloudflare API token or authenticated Wrangler session is available on this host."
   },
   "production": {
     "authorized": false,

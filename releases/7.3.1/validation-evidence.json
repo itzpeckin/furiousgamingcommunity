@@ -28,12 +28,12 @@
     "stagingDataChanged": false
   },
   "external": {
-    "githubPullRequest": { "authorized": false, "status": "not-changed", "existingPullRequest": 10 },
+    "githubPullRequest": { "authorized": true, "status": "push-blocked-host-authentication", "existingPullRequest": 10, "localCommit": "2f825b52897ef57c2287fd5de69417a68da206f9" },
     "hostedChecks": { "status": "not-run" },
-    "stagingDeployment": { "authorized": true, "status": "pending" },
-    "stagingMigrations": { "authorized": true, "status": "pending", "migrations": [23] },
-    "authenticatedDiscoveryAnalysis": { "authorized": true, "status": "commissioner-action-pending" },
-    "privateIdentityPreview": { "authorized": true, "status": "pending-authenticated-analysis", "expectedTeams": 32, "expectedRosteredPlayers": 2044 },
+    "stagingDeployment": { "authorized": true, "status": "blocked-cloudflare-authentication" },
+    "stagingMigrations": { "authorized": true, "status": "blocked-cloudflare-authentication", "migrations": [23] },
+    "authenticatedDiscoveryAnalysis": { "authorized": true, "status": "blocked-browser-unavailable" },
+    "privateIdentityPreview": { "authorized": true, "status": "blocked-authenticated-analysis-and-deployment", "expectedTeams": 32, "expectedRosteredPlayers": 2044 },
     "productionDeployment": { "authorized": false, "status": "not-run" },
     "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [21, 22, 23] },
     "productionDataReset": { "authorized": false, "status": "not-run" },

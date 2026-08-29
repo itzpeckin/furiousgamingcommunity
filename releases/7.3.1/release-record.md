@@ -38,7 +38,10 @@ Add permanent franchise-season, player/source-alias, player-season, GM-person, a
 
 - Baseline: `codex/franchisehq-7.3.0` commit `5c062e5b91b9b7690c3717ff4fe6bef761999e48`.
 - Branch `codex/franchisehq-7.3.1` was created from the exact 7.3.0 baseline after authorization.
-- Commit, push, staging migration 23, staging deployment, and live private preview are authorized and pending execution; Main remains excluded.
+- Local commit `2f825b52897ef57c2287fd5de69417a68da206f9` contains the exact validated candidate.
+- GitHub push was attempted over HTTPS and SSH. HTTPS had no usable credential; SSH host trust/authentication was unavailable. Nothing was published and Main is unchanged.
+- The isolated staging database/deployment steps were not run because this host has no Cloudflare API token or authenticated Wrangler session.
+- The authenticated analysis action was not run because the available in-app browser rejected both the exact Preview and canonical FranchiseHQ URLs before page load; no connected Chrome session was available.
 - Production, Main, data reset, import, snapshot activation, and membership changes: not authorized and not run.
 
 ## Rollback
