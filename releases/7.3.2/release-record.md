@@ -26,6 +26,7 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - The Production cold rehearsal completed in 74.387 seconds, above the sub-60 target. The same exact implementation completed its isolated-staging rehearsal in 23.456 seconds. Correctness is verified, but Production cold performance remains pending diagnosis and re-validation.
 - The Production Cloudflare configuration still lacks a dedicated `LEAGUE_CONFIG` KV binding and an explicit `PLATFORM_OWNER_ACCOUNT_ID` variable. Existing commissioner candidate routes work, but these inherited contract gaps remain visible.
 - The first direct Pages upload (`1bee7993`) omitted Functions and was discarded. Complete deployment `ebcf42ec` superseded it and passed Functions/auth smoke checks.
+- The direct acceptance upload temporarily changed the Git-build output directory to a local absolute path. Evidence commit `237bb3d` therefore failed its first automatic Preview in seven seconds with `build output directory is outside of the repository`. The project setting was restored to the repository root, isolated Preview `9bdb6209` verified the corrected configuration, and retry `791c66a6` restored PR #12 to 4/4 passing checks.
 - The former Madden 26 D1 rows were not deleted in place. Safety review rejected destructive remote SQL, so the database was detached from Production and retained as an additional recovery archive. It is not reachable through the active application.
 
 ## Validation evidence
@@ -43,6 +44,7 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - Runtime source: exact authorized commit `4f5e81b4cc924e72bc9b8499ae12164bfd12620c` (tree `67ce5f5356174bafd270f2b22782346140c0b8a6`).
 - Branch: `codex/franchisehq-7.3.2`; PR #12 remains open and clean with 4/4 hosted checks passing. Git Main remains `4045e02980c93491b47910f17fcb2e48fae76c68`.
 - Complete Pages Production deployment: `ebcf42ec-5a7c-4efa-8e88-891f6c06fcaa`, available at `https://franchisehq.app` and `https://ebcf42ec.franchise-hq.pages.dev`.
+- Hosted branch-build repair: failed Preview `0227f1eb` was superseded by successful same-commit retry `791c66a6-2ce2-4e23-9c91-a69535449319`; the durable build output setting is `/` again.
 - Worker Production version: `3b883a17-04bf-4c46-8b2d-e5ab5b98658e` at 100%.
 - Active D1: `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`; continuous ledger through migration 24 and zero foreign-key violations.
 - Detached Madden 26 D1: `franchise-hq-db` / `d21fb8c2-1b26-4766-9249-73af5d8b6678`.
