@@ -4,7 +4,8 @@ import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='7.3.2';
-const RECORD_CHUNK_SIZE=40;
+const RECORD_CHUNK_SIZE=200;
+const ROUTE_INSPECTION_CONCURRENCY=4;
 const MAX_STORED_WARNINGS_PER_BATCH=25;
 const WEEKLY_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/(defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
 // Madden can emit empty /week/reg/0/* routes as lifecycle placeholders.
@@ -144,15 +145,14 @@ async function capturedRoutes(db,env,leagueId,discoverySessionId){
   const grouped=await capturedRouteCandidates(db,leagueId,discoverySessionId);
   const selected=[];
 
-  for(const [routePath,rows] of grouped.entries()){
+  const inspectRoute=async([routePath,rows])=>{
     const meta=routeMeta(routePath);
-    if(!meta)continue;
-
+    if(!meta)return null;
     let chosen=null;
     const audit=[];
-    // Only inspect a bounded number of recent candidates; this keeps weekly imports fast.
+    // Candidate inspection remains ordered within a route while independent
+    // routes use bounded R2 concurrency.
     const candidates=rows.filter(obviousCaptureCandidate).slice(0,12);
-
     for(const candidate of candidates){
       const shape=await inspectCaptureShape(env,candidate,meta);
       audit.push({
@@ -168,23 +168,19 @@ async function capturedRoutes(db,env,leagueId,discoverySessionId){
         break;
       }
     }
-
     if(!chosen){
-      const fallback=rows[0];
-      selected.push({
-        ...fallback,
-        captureUsable:false,
-        candidateAudit:audit,
+      return{
+        ...rows[0],captureUsable:false,candidateAudit:audit,
         selectionError:`No usable statistics capture found for ${routePath}.`
-      });
-    }else{
-      selected.push({
-        ...chosen,
-        captureUsable:true,
-        candidateAudit:audit,
-        selectionError:null
-      });
+      };
     }
+    return{...chosen,captureUsable:true,candidateAudit:audit,selectionError:null};
+  };
+
+  const entries=[...grouped.entries()];
+  for(let offset=0;offset<entries.length;offset+=ROUTE_INSPECTION_CONCURRENCY){
+    const batch=await Promise.all(entries.slice(offset,offset+ROUTE_INSPECTION_CONCURRENCY).map(inspectRoute));
+    selected.push(...batch.filter(Boolean));
   }
 
   return selected.sort((a,b)=>a.route_path.localeCompare(b.route_path));

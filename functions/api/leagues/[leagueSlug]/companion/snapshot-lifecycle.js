@@ -591,7 +591,12 @@ export async function onRequestPost(context){const c=await contextData(context);
  }
  if(action==='validate-next'){
    try{
-     const result=await nextSnapshotValidation(c.db,c.league.id,snapshot,body.limit);
+     const requestedBatches=Math.max(1,Math.min(4,Number(body.batches)||1));
+     let result=null;
+     for(let index=0;index<requestedBatches;index++){
+       result=await nextSnapshotValidation(c.db,c.league.id,snapshot,body.limit);
+       if(result.complete)break;
+     }
      if(result.complete&&result.report)await event(c.db,c.league.id,snapshot.id,'validated',actor,result.report);
      return json({ok:true,release:RELEASE,action:'validate-next',complete:Boolean(result.complete),validationJob:validationProgress(result.job,parse(result.job?.context_json)||{}),report:result.report,...await listSnapshots(c.db,c.league.id)});
    }catch(error){

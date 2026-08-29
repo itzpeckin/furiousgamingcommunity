@@ -135,6 +135,35 @@ export async function onRequestPost(context) {
   const rows = await captureRows(current.db, current.league.id, session.id);
   if (!rows.length) return json({ ok: false, error: 'This discovery session has not received any Madden routes yet.', release: RELEASE }, 422);
 
+  // Discovery captures are immutable source-lock evidence. A candidate retry can
+  // safely reuse the retained report only while it still covers the exact closed
+  // capture set (count, bytes, and newest observation). This removes 43 redundant
+  // R2 reads from the cold candidate path without weakening source validation.
+  const retained = body.reuseExisting === true
+    ? await current.db.prepare(`SELECT * FROM madden_discovery_reports
+      WHERE league_id=? AND session_id=? LIMIT 1`).bind(current.league.id, session.id).first()
+    : null;
+  const totalBytes = rows.reduce((sum, row) => sum + Number(row.byte_length || 0), 0);
+  const newestObservedAt = rows.reduce((latest, row) => {
+    const value = Date.parse(row.session_observed_at || row.received_at || '') || 0;
+    return Math.max(latest, value);
+  }, 0);
+  const reportGeneratedAt = Date.parse(retained?.generated_at || '') || 0;
+  if (retained
+    && Number(retained.capture_count || 0) === rows.length
+    && Number(retained.total_bytes || 0) === totalBytes
+    && reportGeneratedAt >= newestObservedAt) {
+    return json({
+      ok: true,
+      release: RELEASE,
+      report: publicReport(retained),
+      reusedExisting: true,
+      rawPayloadReturned: false,
+      activationPerformed: false,
+      activeSnapshotChanged: false
+    });
+  }
+
   const captures = await inspectCaptures(context.env, rows);
   const report = buildMaddenDiscoveryReport(captures, {
     discoverySessionId: session.id,

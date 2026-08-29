@@ -80,13 +80,16 @@ test('one private destination and one idempotent candidate run are enforced per 
 });
 
 test('commissioner candidate paths cannot activate, reset, prune, or reinterpret Free Agents', async () => {
-  const [candidate,builder,lifecycle,ui,worker,job]=await Promise.all([
+  const [candidate,builder,lifecycle,ui,worker,job,report,classifier,statistics]=await Promise.all([
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js',import.meta.url),'utf8'),
     readFile(new URL('../../league-engine/one-click-import.js',import.meta.url),'utf8'),
     readFile(new URL('../../workers/franchise-import-worker/src/index.js',import.meta.url),'utf8'),
-    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/import-job.js',import.meta.url),'utf8')
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/import-job.js',import.meta.url),'utf8'),
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js',import.meta.url),'utf8'),
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/classify.js',import.meta.url),'utf8'),
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js',import.meta.url),'utf8')
   ]);
   assert.match(candidate,/requireCommissioner\(context\)/);
   assert.doesNotMatch(candidate,/requirePlatformOwner/);
@@ -119,4 +122,18 @@ test('commissioner candidate paths cannot activate, reset, prune, or reinterpret
   assert.match(ui,/discoverySessionId/);
   assert.match(job,/15\*60\*1000/);
   assert.doesNotMatch(job,/x-franchisehq-platform-owner-account-id/);
+
+  // Production cold-path remediation reuses only exact immutable source-lock
+  // evidence, bounds R2 concurrency, and reduces D1/HTTP round trips.
+  assert.match(report,/body\.reuseExisting === true/);
+  assert.match(report,/reportGeneratedAt >= newestObservedAt/);
+  assert.match(classifier,/INSPECTION_CONCURRENCY = 8/);
+  assert.match(classifier,/reusedInspectionCount/);
+  assert.match(classifier,/madden_discovery_session_captures/);
+  assert.match(worker,/classify'\),'POST',\{discoverySessionId:context\.discoverySessionId\}/);
+  assert.match(statistics,/RECORD_CHUNK_SIZE=200/);
+  assert.match(statistics,/ROUTE_INSPECTION_CONCURRENCY=4/);
+  assert.match(lifecycle,/Math\.min\(4,Number\(body\.batches\)/);
+  assert.match(worker,/limit:500,batches:4/);
+  assert.match(worker,/reuseExisting:true/);
 });

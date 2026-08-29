@@ -32,10 +32,12 @@ try{
    schedule:String(body?.scheduleMappingRunId||'').trim(),
    statistics:String(body?.statisticsMappingRunId||'').trim()
  };
- const teamRun=await selectedRun(db,'companion_team_mapping_runs',league.id,requested.team);
- const playerRun=await selectedRun(db,'companion_player_mapping_runs',league.id,requested.player);
- const scheduleRun=await selectedRun(db,'companion_schedule_mapping_runs',league.id,requested.schedule);
- const statisticsRun=await selectedRun(db,'companion_statistics_mapping_runs',league.id,requested.statistics);
+ const [teamRun,playerRun,scheduleRun,statisticsRun]=await Promise.all([
+   selectedRun(db,'companion_team_mapping_runs',league.id,requested.team),
+   selectedRun(db,'companion_player_mapping_runs',league.id,requested.player),
+   selectedRun(db,'companion_schedule_mapping_runs',league.id,requested.schedule),
+   selectedRun(db,'companion_statistics_mapping_runs',league.id,requested.statistics)
+ ]);
  const missing=[];if(!teamRun)missing.push('teams');if(!playerRun)missing.push('players');if(!scheduleRun)missing.push('schedule');if(!statisticsRun)missing.push('statistics');if(missing.length)return json({ok:false,error:`Map required domains before building a snapshot: ${missing.join(', ')}.`},422);
  const pinned={team:candidateRun.team_mapping_run_id,player:candidateRun.player_mapping_run_id,schedule:candidateRun.schedule_mapping_run_id,statistics:candidateRun.statistics_mapping_run_id};
  const mismatch=Object.entries(pinned).filter(([key,value])=>value&&String(value)!==String(requested[key]||''));
@@ -47,11 +49,13 @@ try{
  // identity, or active-pointer row is pruned during commissioner review.
  const retention={mode:'non-destructive',deletedSnapshots:0,deletedPreviewRows:0};
 
- const teams=await rows(db,`SELECT * FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id=?`,league.id,teamRun.id);
- const players=await rows(db,`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=?`,league.id,playerRun.id);
- const games=await rows(db,`SELECT * FROM companion_canonical_games_preview WHERE league_id=? AND mapping_run_id=?`,league.id,scheduleRun.id);
- const statistics=await rows(db,`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=?`,league.id,statisticsRun.id);
- const standingSource=await standings(context,league.id,candidateRun.discovery_session_id),standingRows=standingSource.records;
+ const [teams,players,games,statistics,standingSource]=await Promise.all([
+   rows(db,`SELECT * FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id=?`,league.id,teamRun.id),
+   rows(db,`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=?`,league.id,playerRun.id),
+   rows(db,`SELECT * FROM companion_canonical_games_preview WHERE league_id=? AND mapping_run_id=?`,league.id,scheduleRun.id),
+   rows(db,`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=?`,league.id,statisticsRun.id),
+   standings(context,league.id,candidateRun.discovery_session_id)
+ ]),standingRows=standingSource.records;
  const warnings=[];
  if(teams.length!==32)warnings.push(`Expected 32 teams; found ${teams.length}.`);
  if(!players.length)warnings.push('No players were available.');
@@ -68,6 +72,6 @@ try{
  await db.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warning_count,warnings_json,manifest_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(snapshotId,league.id,'pending-validation',Number(candidateRun.destination_season_year)|| (seasonCandidates.length?Math.max(...seasonCandidates):null),weekCandidates.length?Math.max(...weekCandidates):null,teams.length,players.length,games.length,statistics.length,standingRows.length,warnings.length,JSON.stringify(warnings),JSON.stringify(manifest)).run();
  const inserts=[];const add=(domain,items,idFn)=>items.forEach((item,i)=>inserts.push(db.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`).bind(snapshotId,league.id,domain,String(idFn(item,i)),JSON.stringify(item))));
  add('teams',teams,(x,i)=>x.external_id||i);add('players',players,(x,i)=>x.external_id||i);add('games',games,(x,i)=>x.external_id||i);add('statistics',statistics,(x,i)=>x.external_key||i);add('standings',standingRows,(x,i)=>x.teamId||x.teamName||i);
- for(let i=0;i<inserts.length;i+=75)await db.batch(inserts.slice(i,i+75));
+ for(let i=0;i<inserts.length;i+=150)await db.batch(inserts.slice(i,i+150));
  const snapshot=publicSnapshot(await db.prepare(`SELECT * FROM league_snapshots WHERE id=? AND league_id=?`).bind(snapshotId,league.id).first());return json({ok:true,release:RELEASE,snapshotAvailable:true,snapshot,storageRetention:retention,mappingRunIds:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},playerCount:players.length,privateCandidate:true,activeSnapshotChanged:false,activationPerformed:false});
 }catch(error){return json({ok:false,error:'Pending snapshot build failed.',detail:error?.message||String(error),release:RELEASE},500)}}

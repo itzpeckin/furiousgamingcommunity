@@ -166,11 +166,11 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 34962,
+        "bytes": 35151,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 34567,
+        "bytes": 34790,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {

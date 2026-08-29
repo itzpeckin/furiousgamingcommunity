@@ -72,7 +72,7 @@ async function mapStatistics(context,step){
     guard+=1;
   }
   if(!result.complete)throw new Error('Statistics mapping exceeded the 5,000-batch safety limit.');
-  const final=await step.do('map-statistics-result',()=>call(context,companion(context.slug,'map-statistics')));
+  const final=result;
   const failed=Number(final?.progress?.failed??final?.delta?.failedRoutes??0);
   if(failed)throw new Error(`${failed} statistics route(s) failed; candidate build stopped safely.`);
   return{...final,mappingRun:{...(final.mappingRun||{}),id:runId}};
@@ -85,7 +85,7 @@ async function validateCandidate(context,step,snapshotId){
   let guard=0;
   while(!result.complete&&guard<500){
     result=await step.do(`validate-candidate-next-${guard+1}`,()=>call(
-      context,companion(context.slug,'snapshot-lifecycle'),'POST',{action:'validate-next',snapshotId,limit:250}
+      context,companion(context.slug,'snapshot-lifecycle'),'POST',{action:'validate-next',snapshotId,limit:500,batches:4}
     ));
     guard+=1;
   }
@@ -127,14 +127,16 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
     };
 
     const analyzed=await phase(context,step,'analyze-source',()=>call(
-      context,companion(context.slug,'discovery-report'),'POST',{sessionId:started.source?.discoverySessionId}
+      context,companion(context.slug,'discovery-report'),'POST',{
+        sessionId:started.source?.discoverySessionId,reuseExisting:true
+      }
     ),payload=>({
       summary:`${Number(payload.report?.captureCount||0)} captures analyzed`,
       counts:{captures:Number(payload.report?.captureCount||0),routes:Number(payload.report?.routeCount||0)}
     }));
 
     await phase(context,step,'classify-captures',()=>call(
-      context,companion(context.slug,'classify'),'POST',{}
+      context,companion(context.slug,'classify'),'POST',{discoverySessionId:context.discoverySessionId}
     ),payload=>({
       summary:`${Number(payload.inspectedRouteCount||0)} captures classified`,
       counts:{classifiedCaptures:Number(payload.inspectedRouteCount||0)}
