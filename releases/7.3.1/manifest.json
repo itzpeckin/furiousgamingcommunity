@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.1",
+  "releaseType": "permanent-identity-private-preview",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.0",
+    "commit": "5c062e5b91b9b7690c3717ff4fe6bef761999e48",
+    "tree": "pending-local-validation",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-pending-publication",
+    "scope": "Publish the validated 7.3.1 candidate on codex/franchisehq-7.3.1 without changing Main."
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-pending",
+    "scope": "Apply migration 23 only to the registered isolated staging database and deploy only to isolated Preview."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-authorized",
+    "url": "https://franchisehq.app/",
+    "scope": "No production deployment, migration, Madden data reset, import, snapshot activation, or membership change is authorized."
+  },
+  "requiredArtifacts": [
+    "config/database-schema-contract.json",
+    "docs/ROADMAP.md",
+    "functions/_lib/permanent-identity.js",
+    "functions/api/leagues/[leagueSlug]/companion/identity-preview.js",
+    "migrations/0023_permanent_identity_preview.sql",
+    "releases/7.3.1/release-record.md",
+    "releases/7.3.1/validation-evidence.json",
+    "tests/import/permanent-identity.test.mjs"
+  ]
+}

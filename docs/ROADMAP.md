@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** August 28, 2026
+**Updated:** August 29, 2026
 
-**Revision:** 1.28
+**Revision:** 1.29
 
 **Current production:** 7.1.0 database foundation, delivered through PR #8
 
-**Current work:** 7.3.0 completion candidate based on the real FGC Madden 27 capture; rostered-player source is locked and the upstream Free Agent failure is explicitly deferred
+**Current work:** 7.3.1 local implementation candidate for permanent season/player/GM identity and the private rostered-player mapping preview
 
-**Next gate:** Review and publish the exact 7.3.0 completion candidate, redeploy it only to isolated staging, generate the updated structural report, and then begin 7.3.1 stable season/player identity plus the 2,044-player roster preview. Production reset/import/activation remain separately authorized and excluded.
+**Next gate:** An authenticated commissioner/platform-owner selects “Analyze Captured Export” in isolated staging. After separate authorization, migration 23 and the exact 7.3.1 candidate may be deployed to isolated staging to generate the private 32-team/2,044-player identity preview. Production, Main, data reset, import, and snapshot activation remain separately authorized and excluded.
 
 ## Product decisions
 
@@ -45,7 +45,7 @@
 | 7.1.0 | Production | Canonical database, target-locked migration, preservation, and recovery foundation |
 | 7.2.0 | Staging validated | Tenant-ready core with FGC as the only enabled league; migration 21 and isolated Preview resources verified without production changes |
 | 7.3.0 | Completion candidate | Real Madden 27 source captured; 2,044 rostered players certified as preview-ready; Free Agents honestly blocked upstream and deferred |
-| 7.3.1 | Next | Stable season/player identity plus FGC team and rostered-player mapping preview |
+| 7.3.1 | Local implementation candidate | Permanent season/player/GM identity plus private FGC team and rostered-player mapping preview; staging report action remains pending |
 | 7.3.2 | Planned | Certified sub-60-second Madden 27 import engine |
 | 7.3.3 | Planned | Recoverable Madden reset, season archive, and transition controls |
 | 7.3.4 | Planned | Real FGC Madden 27 staging import and recovery certification |
@@ -122,6 +122,10 @@
 - Make GM history person-owned rather than team/name-owned so career results survive team changes.
 - Map the 32 captured teams and 2,044 certified rostered players into a private FGC preview without waiting for the blocked Free Agent route; label the preview as rostered-player-only until Free Agents are accepted.
 - Gate: players and owners survive new seasons, team changes, and later Madden editions without losing or merging identities incorrectly.
+- Local candidate adds migration 23, permanent source aliases, person-owned GM records, non-overlapping ownership periods, and a platform-owner-only identity preview endpoint.
+- The preview requires an explicitly reviewed source-season key; it does not guess a season from the current capture.
+- When Madden Free Agents are blocked, the preview records `rostered-players-only`, stores a null Free Agent count, and visibly states that the failure is not proof of zero Free Agents.
+- No production, Main, reset, import, active-snapshot, or membership authority is included.
 
 ## 7.3.2 — Sub-60-Second Madden 27 Import Engine
 
