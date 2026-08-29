@@ -268,6 +268,9 @@ if (version === '7.3.0') {
     'duplicatePayloadSessionLinking',
     'maddenDatasetInventory',
     'freeAgentProofContract',
+    'rosteredPlayerAssignmentEvidence',
+    'freeAgentCohortIsolation',
+    'successfulEmptyFreeAgentResponse',
     'sanitizedFixturePrivacy',
     'sourceLockNoActivation',
     'strictMigration'

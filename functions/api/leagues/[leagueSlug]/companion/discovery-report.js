@@ -35,6 +35,7 @@ async function state(context) {
 
 function publicReport(row) {
   if (!row) return null;
+  const requirements = parse(row.requirement_results_json, {});
   return {
     id: row.id,
     discoverySessionId: row.session_id,
@@ -48,7 +49,8 @@ function publicReport(row) {
     datasetInventory: parse(row.dataset_inventory_json, []),
     fieldInventory: parse(row.field_inventory_json, []),
     relationshipInventory: parse(row.relationship_inventory_json, []),
-    requirements: parse(row.requirement_results_json, {}),
+    requirements,
+    playerImportReadiness: requirements?.players?.assignmentEvidence || null,
     freeAgentEvidence: parse(row.free_agent_evidence_json, {}),
     sanitizedFixture: parse(row.sanitized_fixture_json, {}),
     reportHash: row.report_hash,

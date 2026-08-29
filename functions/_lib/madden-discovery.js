@@ -32,6 +32,11 @@ const MARKER_ALIASES = Object.freeze({
   stage: ['stage', 'seasontype', 'seasonstage']
 });
 
+const PLAYER_IDENTIFIER_ALIASES = Object.freeze(['playerId', 'playerID', 'rosterId', 'assetId', 'id']);
+const PLAYER_TEAM_ALIASES = Object.freeze(['teamId', 'teamID', 'team_id', 'clubId', 'franchiseId']);
+const PLAYER_FREE_AGENT_ALIASES = Object.freeze(['isFreeAgent', 'freeAgent', 'is_free_agent']);
+const PLAYER_ACTIVE_ALIASES = Object.freeze(['isActive', 'active', 'is_active']);
+
 function text(value) {
   return String(value ?? '').trim();
 }
@@ -51,6 +56,31 @@ function safeScalar(value) {
   if (!['string', 'number', 'boolean'].includes(typeof value)) return null;
   const candidate = text(value).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 160);
   return candidate || null;
+}
+
+function recordValue(record, aliases) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return undefined;
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(record, alias)) return record[alias];
+  }
+  const actualNames = new Map(Object.keys(record).map(name => [normalizedKey(name), name]));
+  for (const alias of aliases) {
+    const actualName = actualNames.get(normalizedKey(alias));
+    if (actualName) return record[actualName];
+  }
+  return undefined;
+}
+
+function booleanState(value) {
+  if (value === undefined || value === null || value === '') return 'missing';
+  if (value === true || value === 1 || ['true', 'yes', '1'].includes(text(value).toLowerCase())) return 'true';
+  if (value === false || value === 0 || ['false', 'no', '0'].includes(text(value).toLowerCase())) return 'false';
+  return 'invalid';
+}
+
+function rosterTeamId(routeValue) {
+  const match = normalizeMaddenRoute(routeValue).match(/(?:^|\/)team\/([^/]+)\/roster(?:\/|$)/i);
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 export function normalizeMaddenRoute(value) {
@@ -278,6 +308,89 @@ function aggregateRequirements(analyses) {
   return result;
 }
 
+function buildPlayerImportReadiness(captures, requirements) {
+  const teamRosterCaptures = (captures || []).filter(capture => routeDataset(capture?.routePath) === 'team-rosters');
+  const seenPlayerIds = new Set();
+  let successfulRoutes = 0;
+  let failedRoutes = 0;
+  let emptyRoutes = 0;
+  let recordCount = 0;
+  let missingPlayerIds = 0;
+  let duplicatePlayerIds = 0;
+  let assignedTeamIds = 0;
+  let missingTeamIds = 0;
+  let zeroTeamIds = 0;
+  let routeTeamMismatches = 0;
+  const freeAgentFlags = { true: 0, false: 0, missing: 0, invalid: 0 };
+  const activeFlags = { true: 0, false: 0, missing: 0, invalid: 0 };
+
+  for (const capture of teamRosterCaptures) {
+    const payload = capture?.payload;
+    const collection = primaryCollection(payload);
+    const rows = collection?.values?.filter(item => item && typeof item === 'object' && !Array.isArray(item)) || [];
+    if (payload && typeof payload === 'object' && payload.success === false) failedRoutes += 1;
+    else if (!rows.length) emptyRoutes += 1;
+    else successfulRoutes += 1;
+
+    const sourceTeamId = rosterTeamId(capture?.routePath);
+    for (const row of rows) {
+      recordCount += 1;
+      const playerId = text(recordValue(row, PLAYER_IDENTIFIER_ALIASES));
+      if (!playerId) missingPlayerIds += 1;
+      else if (seenPlayerIds.has(playerId)) duplicatePlayerIds += 1;
+      else seenPlayerIds.add(playerId);
+
+      const teamId = text(recordValue(row, PLAYER_TEAM_ALIASES));
+      if (!teamId) missingTeamIds += 1;
+      else if (['0', '-1', 'null', 'undefined'].includes(teamId.toLowerCase())) zeroTeamIds += 1;
+      else {
+        assignedTeamIds += 1;
+        if (sourceTeamId && teamId !== sourceTeamId) routeTeamMismatches += 1;
+      }
+
+      freeAgentFlags[booleanState(recordValue(row, PLAYER_FREE_AGENT_ALIASES))] += 1;
+      activeFlags[booleanState(recordValue(row, PLAYER_ACTIVE_ALIASES))] += 1;
+    }
+  }
+
+  const expectedTeamCount = Number(requirements?.teams?.recordCount || 0);
+  const routeCount = new Set(teamRosterCaptures.map(capture => normalizeMaddenRoute(capture?.routePath))).size;
+  const teamRouteCoverageComplete = expectedTeamCount > 0 && routeCount === expectedTeamCount;
+  const blockingIssueCount = failedRoutes + emptyRoutes + missingPlayerIds + duplicatePlayerIds
+    + missingTeamIds + zeroTeamIds + routeTeamMismatches + freeAgentFlags.true + freeAgentFlags.invalid;
+  const status = recordCount > 0 && teamRouteCoverageComplete && blockingIssueCount === 0
+    ? 'ready'
+    : 'review_required';
+  const freeAgentStatus = requirements?.['free-agents']?.status || 'missing';
+  const freeAgentSourceAccepted = ['located', 'empty-confirmed'].includes(freeAgentStatus);
+
+  return {
+    status,
+    scope: 'rostered-players',
+    canBuildRosteredPlayerPreview: status === 'ready',
+    canClaimCompletePlayerPool: status === 'ready' && freeAgentSourceAccepted,
+    freeAgentSourceAccepted,
+    freeAgentStatus,
+    expectedTeamCount,
+    routeCount,
+    successfulRoutes,
+    failedRoutes,
+    emptyRoutes,
+    teamRouteCoverageComplete,
+    recordCount,
+    uniquePlayerIds: seenPlayerIds.size,
+    missingPlayerIds,
+    duplicatePlayerIds,
+    assignedTeamIds,
+    missingTeamIds,
+    zeroTeamIds,
+    routeTeamMismatches,
+    freeAgentFlags,
+    activeFlags,
+    blockingIssueCount
+  };
+}
+
 function sourceGate(markers) {
   const acceptable = new Set(['matched', 'observed']);
   const gameRelease = markers.gameRelease?.status === 'matched'
@@ -304,7 +417,7 @@ function sanitizedRoutePattern(routeValue) {
   return segments.join('/');
 }
 
-function fixtureFor(analyses, requirements, markers) {
+function fixtureFor(analyses, requirements, markers, playerImportReadiness) {
   return {
     schemaVersion: 1,
     product: 'FranchiseHQ',
@@ -312,6 +425,7 @@ function fixtureFor(analyses, requirements, markers) {
     rawValuesIncluded: false,
     sourceMarkerStatuses: Object.fromEntries(Object.entries(markers).map(([key, item]) => [key, item.status])),
     requirements: Object.fromEntries(Object.entries(requirements).map(([key, item]) => [key, { status: item.status, recordCount: item.recordCount }])),
+    playerImportReadiness,
     datasets: analyses.map(item => ({
       routePath: sanitizedRoutePattern(item.routePath),
       datasetType: item.datasetType,
@@ -326,6 +440,8 @@ function fixtureFor(analyses, requirements, markers) {
 export function buildMaddenDiscoveryReport(captures, options = {}) {
   const analyses = (captures || []).map(analyzeMaddenCapture);
   const requirements = aggregateRequirements(analyses);
+  const playerImportReadiness = buildPlayerImportReadiness(captures, requirements);
+  requirements.players.assignmentEvidence = playerImportReadiness;
   const markers = mergeMarkers(analyses, options.expected || {});
   const sourceVerification = sourceGate(markers);
   const datasetsPassed = REQUIRED_DATASETS.every(type => {
@@ -372,11 +488,12 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
     sourceMarkers: markers,
     sourceVerification,
     requirements,
+    playerImportReadiness,
     freeAgentEvidence,
     datasetInventory,
     fieldInventory,
     relationshipInventory,
-    sanitizedFixture: fixtureFor(analyses, requirements, markers),
+    sanitizedFixture: fixtureFor(analyses, requirements, markers, playerImportReadiness),
     rawPayloadReturned: false,
     activationPerformed: false,
     activeSnapshotChanged: false

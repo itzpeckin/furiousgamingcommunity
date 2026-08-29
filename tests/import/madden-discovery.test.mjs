@@ -8,6 +8,10 @@ import {
   buildMaddenDiscoveryReport,
   normalizeMaddenRoute
 } from '../../functions/_lib/madden-discovery.js';
+import {
+  assessFreeAgentPayload,
+  captureBelongsToRosterCohort
+} from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as startDiscoverySession } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-session.js';
 import { onRequestPost as generateDiscoveryReport } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js';
@@ -93,7 +97,7 @@ function capture(routePath, payload, receivedOffset = 0) {
   };
 }
 
-function completeCaptureSet(freeAgents = [{ playerId: 'fa-1', firstName: 'Private', lastName: 'Free Agent', position: 'QB' }]) {
+function completeCaptureSet(freeAgents = [{ playerId: 'fa-1', firstName: 'Sensitive', lastName: 'UnsignedPerson', position: 'QB' }]) {
   return [
     capture('xbsx/franchise/fr-1/league', {
       success: true,
@@ -109,7 +113,7 @@ function completeCaptureSet(freeAgents = [{ playerId: 'fa-1', firstName: 'Privat
     }, 2_000),
     capture('xbsx/fr-1/team/team-1/roster', {
       success: true,
-      rosterInfoList: [{ playerId: 'player-1', teamId: 'team-1', firstName: 'Secret', lastName: 'Player', position: 'QB' }]
+      rosterInfoList: [{ playerId: 'player-1', teamId: 'team-1', firstName: 'Secret', lastName: 'ConfidentialSurname', position: 'QB' }]
     }, 4_000),
     capture('xbsx/fr-1/freeagents/roster', {
       success: true,
@@ -124,6 +128,60 @@ function completeCaptureSet(freeAgents = [{ playerId: 'fa-1', firstName: 'Privat
     capture('xbsx/fr-1/week/reg/3/passing', {
       playerPassingStatInfoList: [{ playerId: 'player-1', teamId: 'team-1', passingYards: 250 }]
     }, 12_000)
+  ];
+}
+
+function liveLikeRosterCaptureSet() {
+  const teams = Array.from({ length: 32 }, (_, index) => ({
+    teamId: `team-${index + 1}`,
+    displayName: `Private Team ${index + 1}`
+  }));
+  let playerNumber = 0;
+  const rosters = teams.map((team, teamIndex) => {
+    const rosterSize = teamIndex < 28 ? 64 : 63;
+    const rows = Array.from({ length: rosterSize }, () => {
+      playerNumber += 1;
+      return {
+        rosterId: `player-${playerNumber}`,
+        teamId: team.teamId,
+        firstName: 'Private',
+        lastName: `Player ${playerNumber}`,
+        position: playerNumber % 2 ? 'QB' : 'WR',
+        isFreeAgent: false,
+        isActive: playerNumber > 13
+      };
+    });
+    return capture(`xbsx/742482/team/${team.teamId}/roster`, {
+      success: true,
+      rosterInfoList: rows
+    }, 3_000 + teamIndex * 10);
+  });
+  return [
+    capture('xbsx/742482/league', {
+      success: true,
+      gameVersion: 'Madden NFL 27',
+      platform: 'xbsx',
+      franchiseId: '742482',
+      leagueName: 'Furious Gaming Community',
+      season: 1,
+      week: 1
+    }, 0),
+    capture('xbsx/742482/leagueteams', { leagueTeamInfoList: teams }, 2_000),
+    ...rosters,
+    capture('xbsx/742482/freeagents/roster', {
+      success: false,
+      message: 'Export error: Failed to retrieve team roster.',
+      rosterInfoList: []
+    }, 3_500),
+    capture('xbsx/742482/standings', {
+      teamStandingInfoList: teams.map(team => ({ teamId: team.teamId, wins: 0, losses: 0 }))
+    }, 3_600),
+    capture('xbsx/742482/schedules', {
+      gameScheduleInfoList: [{ gameId: 'game-1', homeTeamId: 'team-1', awayTeamId: 'team-2', week: 1 }]
+    }, 3_700),
+    capture('xbsx/742482/week/reg/1/passing', {
+      playerPassingStatInfoList: [{ playerId: 'player-1', teamId: 'team-1', passingYards: 0 }]
+    }, 3_800)
   ];
 }
 
@@ -165,7 +223,7 @@ test('builds a passing structural source-lock report without exposing player or 
   assert.equal(JSON.stringify(report.sanitizedFixture).includes('fr-1'), false);
   assert.equal(JSON.stringify(report.sanitizedFixture).includes('team-1'), false);
   const serialized = JSON.stringify(report);
-  for (const secretValue of ['Private Team', 'Secret', 'Player', 'Private', 'Free Agent']) {
+  for (const secretValue of ['Private Team', 'Secret', 'ConfidentialSurname', 'Sensitive', 'UnsignedPerson']) {
     assert.equal(serialized.includes(secretValue), false);
   }
 });
@@ -205,6 +263,69 @@ test('does not accept an unsuccessful Free Agent response as an empty league', (
   const report = buildMaddenDiscoveryReport(captures, { expected });
   assert.equal(report.status, 'review_required');
   assert.equal(report.requirements['free-agents'].status, 'blocked');
+});
+
+test('certifies rostered-player readiness independently when the Madden Free Agent request fails upstream', () => {
+  const report = buildMaddenDiscoveryReport(liveLikeRosterCaptureSet(), { expected });
+  assert.equal(report.status, 'review_required');
+  assert.equal(report.requirements['free-agents'].status, 'blocked');
+  assert.equal(report.playerImportReadiness.status, 'ready');
+  assert.equal(report.playerImportReadiness.scope, 'rostered-players');
+  assert.equal(report.playerImportReadiness.canBuildRosteredPlayerPreview, true);
+  assert.equal(report.playerImportReadiness.canClaimCompletePlayerPool, false);
+  assert.equal(report.playerImportReadiness.expectedTeamCount, 32);
+  assert.equal(report.playerImportReadiness.routeCount, 32);
+  assert.equal(report.playerImportReadiness.successfulRoutes, 32);
+  assert.equal(report.playerImportReadiness.recordCount, 2_044);
+  assert.equal(report.playerImportReadiness.uniquePlayerIds, 2_044);
+  assert.equal(report.playerImportReadiness.duplicatePlayerIds, 0);
+  assert.equal(report.playerImportReadiness.missingTeamIds, 0);
+  assert.equal(report.playerImportReadiness.zeroTeamIds, 0);
+  assert.equal(report.playerImportReadiness.routeTeamMismatches, 0);
+  assert.deepEqual(report.playerImportReadiness.freeAgentFlags, { true: 0, false: 2_044, missing: 0, invalid: 0 });
+  assert.deepEqual(report.playerImportReadiness.activeFlags, { true: 2_031, false: 13, missing: 0, invalid: 0 });
+  assert.equal(report.requirements.players.assignmentEvidence.status, 'ready');
+});
+
+test('player mapping accepts a successful empty Free Agent response but blocks a failed one', () => {
+  assert.deepEqual(assessFreeAgentPayload({ success: true, rosterInfoList: [] }), {
+    status: 'empty-confirmed',
+    accepted: true,
+    objects: [],
+    collectionPath: '$.rosterInfoList',
+    payloadSuccess: true,
+    message: null
+  });
+  const failed = assessFreeAgentPayload({
+    success: false,
+    message: 'Export error: Failed to retrieve team roster.',
+    rosterInfoList: []
+  });
+  assert.equal(failed.status, 'blocked');
+  assert.equal(failed.accepted, false);
+  assert.equal(failed.objects.length, 0);
+});
+
+test('player mapping refuses a stale Free Agent capture from an older roster cohort', () => {
+  const source = {
+    sessionDiagnostics: ['current-session'],
+    cohort: {
+      latestReceivedAt: '2026-08-28T12:00:00.000Z',
+      windowMs: 20 * 60 * 1_000
+    }
+  };
+  assert.equal(captureBelongsToRosterCohort({
+    discovery_session_id: 'current-session',
+    received_at: '2026-08-28T11:00:00.000Z'
+  }, source), true);
+  assert.equal(captureBelongsToRosterCohort({
+    discovery_session_id: 'older-session',
+    received_at: '2026-08-28T11:50:00.000Z'
+  }, source), false);
+  assert.equal(captureBelongsToRosterCohort({
+    discovery_session_id: 'older-session',
+    received_at: '2026-08-28T11:00:00.000Z'
+  }, source), false);
 });
 
 test('short-lived capture sessions store only token hashes and own the export session identity', async () => {

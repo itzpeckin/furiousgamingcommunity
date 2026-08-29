@@ -183,12 +183,16 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 23791,
+        "bytes": 25681,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
         "bytes": 22790,
         "file": "platform/validate.js"
+      },
+      {
+        "bytes": 21293,
+        "file": "functions/_lib/madden-discovery.js"
       },
       {
         "bytes": 20354,
@@ -197,6 +201,10 @@
       {
         "bytes": 20250,
         "file": "league-engine/games.js"
+      },
+      {
+        "bytes": 19144,
+        "file": "tests/import/madden-discovery.test.mjs"
       },
       {
         "bytes": 18703,
@@ -217,14 +225,6 @@
       {
         "bytes": 16605,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-teams.js"
-      },
-      {
-        "bytes": 16297,
-        "file": "functions/_lib/madden-discovery.js"
-      },
-      {
-        "bytes": 16260,
-        "file": "platform/runtime.js"
       }
     ],
     "total": 513

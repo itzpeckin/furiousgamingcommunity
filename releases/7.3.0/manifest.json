@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.0",
   "releaseType": "madden-27-payload-discovery",
-  "status": "staging-validated",
+  "status": "validated-review-candidate",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.2.0",
@@ -19,17 +19,17 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "branch-pushed-checks-passed-pr-form-ready",
+    "status": "prior-candidate-pushed-completion-changes-local",
     "commit": "d4362fabcc44142de59ca96d5f7a6e7c8d740a43",
-    "scope": "The 7.3.0 branch is published and hosted checks pass. The stacked pull request awaits final GitHub submission."
+    "scope": "The prior 7.3.0 candidate is published and hosted checks pass. Live-capture reconciliation and roster-readiness changes are local, uncommitted, and not deployed."
   },
   "staging": {
     "authorized": true,
     "deployed": true,
-    "status": "migration-and-preview-verified-live-capture-pending",
+    "status": "migration-preview-and-live-capture-verified-completion-redeploy-pending",
     "deploymentId": "3dc10c9a-6c4a-48da-aaf9-9b3a2dbdb44b",
     "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
-    "scope": "Migration 22 and the exact 7.3.0 Preview candidate are verified on isolated staging. One short-lived FGC discovery capture remains pending."
+    "scope": "Migration 22 and the prior 7.3.0 Preview candidate are verified on isolated staging. The real FGC capture completed with 2,044 rostered players ready and the Free Agent route blocked upstream; the local completion candidate still requires review and isolated-staging redeployment."
   },
   "production": {
     "authorized": false,
@@ -48,6 +48,7 @@
     "functions/api/leagues/[leagueSlug]/companion/discovery-report.js",
     "functions/api/leagues/[leagueSlug]/companion/discovery-session.js",
     "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
+    "functions/api/leagues/[leagueSlug]/companion/map-players.js",
     "league-engine/companion-route-discovery.js",
     "migrations/0022_madden_27_discovery_foundation.sql",
     "releases/7.3.0/release-record.md",

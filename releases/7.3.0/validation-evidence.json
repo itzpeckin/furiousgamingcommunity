@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.0",
   "validatedOn": "2026-08-28",
-  "status": "staging-deployed-live-source-pending",
+  "status": "local-completion-candidate-live-source-reconciled",
   "baselineGate": {
     "passed": true,
     "unregisteredFailures": 0
@@ -15,23 +15,40 @@
     "duplicatePayloadSessionLinking": { "passed": true, "duplicatesR2Object": false },
     "maddenDatasetInventory": { "passed": true, "required": ["teams", "team-rosters", "players", "free-agents", "standings", "schedule", "statistics"] },
     "freeAgentProofContract": { "passed": true, "states": ["located", "empty-confirmed", "missing", "blocked"] },
+    "rosteredPlayerAssignmentEvidence": { "passed": true, "teamRoutes": 32, "recordCount": 2044, "uniquePlayerIds": 2044, "duplicatePlayerIds": 0, "unassignedPlayers": 0, "freeAgentTrueFlags": 0, "activePlayers": 2031, "inactivePlayers": 13 },
+    "freeAgentCohortIsolation": { "passed": true, "staleSuccessfulCaptureReuseAllowed": false },
+    "successfulEmptyFreeAgentResponse": { "passed": true, "status": "empty-confirmed", "accepted": true },
     "sanitizedFixturePrivacy": { "passed": true, "rawValuesIncluded": false },
     "sourceLockNoActivation": { "passed": true, "activeSnapshotChanged": false },
     "canonicalMigrationSequence": { "passed": true, "activeVersions": [18, 19, 20, 21, 22], "archivedLegacyFiles": 19 },
     "freshDatabase": { "passed": true, "requiredTables": 57, "finalVersion": 22 },
     "foreignKeyIntegrity": { "passed": true, "violations": 0 },
     "runtimeSchemaGuard": { "passed": true, "minimumVersion": 22 },
-    "automatedTests": { "passed": true, "passedTests": 69, "failedTests": 0, "scope": "full-consolidated-release-gate" },
+    "automatedTests": { "passed": true, "passedTests": 72, "failedTests": 0, "scope": "full-consolidated-release-gate" },
     "strictMigration": { "passed": true, "expectedFailure": false, "blockingIssues": 0, "finalVersion": 22 },
     "strictRepositoryGate": { "passed": true, "javascriptModules": 187, "secretScanFiles": 529, "inventoryFiles": 513, "routes": 61 }
   },
   "liveSourceGate": {
-    "status": "pending-owner-capture",
+    "status": "rostered-player-source-locked-free-agent-upstream-blocked",
     "gameRelease": "Madden NFL 27",
-    "sourceLeagueVerified": false,
+    "platform": "xbsx",
+    "sourceFranchiseId": "742482",
+    "sourceLeagueVerified": true,
     "seasonVerified": false,
     "weekVerified": false,
     "freeAgentsVerified": false,
+    "freeAgentStatus": "blocked",
+    "rosteredPlayersReady": true,
+    "completePlayerPoolReady": false,
+    "requestCount": 43,
+    "totalMegabytes": 10.17,
+    "captureDurationSeconds": 0.448,
+    "teamCount": 32,
+    "teamRosterRouteCount": 32,
+    "rosteredPlayerCount": 2044,
+    "standingCount": 32,
+    "currentWeekGameCount": 14,
+    "statisticsRowCount": 510,
     "activationPerformed": false
   },
   "scopeBoundaries": {
@@ -42,26 +59,28 @@
     "rawPayloadReturned": false,
     "discordConfigurationChanged": false,
     "secondTenantEnabled": false,
-    "productionInfrastructureChanged": false
+    "productionInfrastructureChanged": false,
+    "stagingCaptureDataChanged": true
   },
   "external": {
     "githubPullRequest": { "authorized": true, "status": "form-ready-branch-pushed", "base": "codex/franchisehq-7.2.0", "head": "codex/franchisehq-7.3.0", "commit": "d4362fabcc44142de59ca96d5f7a6e7c8d740a43" },
     "hostedChecks": { "status": "passed", "passed": 3, "failed": 0, "commit": "d4362fabcc44142de59ca96d5f7a6e7c8d740a43" },
     "stagingDeployment": { "authorized": true, "status": "success", "deploymentId": "3dc10c9a-6c4a-48da-aaf9-9b3a2dbdb44b", "url": "https://3dc10c9a.franchise-hq.pages.dev", "branchAlias": "https://codex-franchisehq-7-3-0.franchise-hq.pages.dev", "durationSeconds": 18, "commit": "d4362fabcc44142de59ca96d5f7a6e7c8d740a43" },
     "stagingMigrations": { "authorized": true, "status": "applied-verified", "migrations": [22], "databaseName": "franchise-hq-staging-db", "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816", "schemaVersion": 22, "ledgerEntries": 22, "tableCount": 58, "discoveryTables": 3, "discoveryIndexes": 5, "foreignKeyViolations": 0, "protectedCounts": { "leagues": 0, "users": 0, "memberships": 0, "activeSnapshots": 0 } },
-    "realMaddenCapture": { "authorized": true, "status": "pending-session-capture" },
+    "realMaddenCapture": { "authorized": true, "status": "completed-rostered-source-ready-free-agent-blocked", "sessionId": "m27_ad4c07b8-0725-4329-9a07-9d8ac0f97a3c", "requestCount": 43, "rosteredPlayerCount": 2044, "activationPerformed": false },
     "productionDeployment": { "authorized": false, "status": "not-run", "url": "https://franchisehq.app/" },
     "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [21, 22] },
     "productionDataReset": { "authorized": false, "status": "not-run" },
     "maddenImportActivation": { "authorized": false, "status": "not-run" }
   },
   "manualAcceptance": {
-    "status": "pending-live-madden-27-capture",
-    "nextGate": "issue-one-short-lived-fgc-session-and-complete-owner-companion-export"
+    "status": "completion-candidate-ready-for-review",
+    "nextGate": "authorize-one-consolidated-commit-push-and-isolated-staging-redeployment"
   },
   "productionChanged": false,
   "dataChanged": false,
   "stagingSchemaChanged": true,
+  "stagingCaptureDataChanged": true,
   "productionDataChanged": false,
   "credentialsChanged": false
 }
