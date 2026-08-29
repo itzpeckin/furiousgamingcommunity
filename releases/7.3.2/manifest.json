@@ -3,12 +3,12 @@
   "product": "FranchiseHQ",
   "version": "7.3.2",
   "releaseType": "commissioner-private-candidate-import",
-  "status": "staging-validated",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.1",
     "commit": "483c4b81ba55509c9ce9542827f307d6192585e1",
-    "tree": "pending-local-validation",
+    "tree": "35b62f41e9cd6f37d8485a3f57d61adf9d9ba92d",
     "tag": "v7.0.0"
   },
   "implementationBranch": "codex/franchisehq-7.3.2",
@@ -20,10 +20,10 @@
   "repositoryPublication": {
     "authorized": true,
     "status": "pull-request-open-hosted-checks-passed",
-    "commit": "a17801a8d749ea34a74f6a94db5432a40752cb4a",
+    "commit": "4f5e81b4cc924e72bc9b8499ae12164bfd12620c",
     "pullRequest": 12,
     "hostedChecksPassed": 4,
-    "scope": "The staging-validated implementation is published on codex/franchisehq-7.3.2 with a stacked pull request against codex/franchisehq-7.3.1. Main is unchanged."
+    "scope": "PR #12 remains open from codex/franchisehq-7.3.2 to codex/franchisehq-7.3.1. Git Main is unchanged."
   },
   "staging": {
     "authorized": true,
@@ -31,18 +31,23 @@
     "status": "private-candidate-import-verified",
     "deploymentId": "6d7f2591-944b-4060-b1e6-b1c9c562a521",
     "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
-    "scope": "Migration 24 and exact runtime commit a17801a are verified in isolated staging. One 2026 private candidate reached validation-ready in 23.456 seconds with 32 teams, 2,044 rostered players, blocked/null Free Agents, and zero active snapshots."
+    "scope": "The exact importer completed the authenticated 2026 isolated candidate in 23.456 seconds with validation ready and no activation."
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-authorized",
+    "authorized": true,
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
     "url": "https://franchisehq.app/",
-    "scope": "No production deployment, migration, data reset, snapshot activation, or Main change is authorized."
+    "deploymentId": "ebcf42ec-5a7c-4efa-8e88-891f6c06fcaa",
+    "commit": "4f5e81b4cc924e72bc9b8499ae12164bfd12620c",
+    "scope": "The private candidate is correct and validation-ready with no active snapshot. Production cold-path performance is not yet accepted because the first cold rehearsal took 74.387 seconds."
   },
   "requiredArtifacts": [
     "config/database-schema-contract.json",
+    "config/d1-database-targets.json",
+    "docs/DATABASE-OPERATIONS.md",
     "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
     "functions/_lib/candidate-import.js",
     "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
     "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",

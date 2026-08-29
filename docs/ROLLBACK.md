@@ -1,5 +1,17 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.2 Production acceptance impact
+
+Production Pages deployment `ebcf42ec-5a7c-4efa-8e88-891f6c06fcaa` and Worker version `3b883a17-04bf-4c46-8b2d-e5ab5b98658e` run exact source commit `4f5e81b4cc924e72bc9b8499ae12164bfd12620c`. Git `main` remains `4045e02980c93491b47910f17fcb2e48fae76c68`; PR #12 remains open.
+
+The active Pages bindings now point to `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`. The former database `franchise-hq-db` / `d21fb8c2-1b26-4766-9249-73af5d8b6678` is detached and retained as the Madden 26 relational archive. Do not delete or restore either database as an improvised rollback.
+
+The private Madden 26 archive prefix is `game-year/madden-26/league/franchise-hq-primary/2026-08-29` in `franchise-hq-game-year-archives`. Its verified manifest covers 38 domain tables and 76,712 rows. The 1,295 former raw Companion R2 objects were permanently deleted and cannot be restored from that source bucket.
+
+Application rollback may restore Pages deployment `4b1d6840-69d3-485a-957b-e4af9491d727`, but its expected D1 binding must be reviewed deliberately. Restoring code without reviewing the database binding can reconnect the archived Madden 26 data or present an incompatible schema. A snapshot rollback is neither needed nor authorized because no active snapshot exists.
+
+The 7.3.2 Production candidate is validation-ready but its first cold rehearsal took 74.387 seconds. Do not represent the sub-60 Production cold target as accepted; the isolated-staging rehearsal remains the only measured passing cold run at 23.456 seconds.
+
 ## 7.3.0 candidate impact
 
 The local 7.3.0 candidate adds migration 22, short-lived hashed Madden 27 discovery sessions, duplicate-payload session links, structural dataset/source reports, explicit Free Agent proof states, and a private Platform Workspace capture flow. It has not been committed, published, migrated to staging/production, given a real FGC export, reset any data, or changed an active snapshot.
@@ -48,3 +60,4 @@ Never replay `migrations/legacy/` and never improvise rollback by dropping tenan
 - FGC is not the sole enabled production tenant.
 - Existing rules, settings, active snapshot, imports, memberships, or stored captures become unavailable.
 - Critical user flows fail or monitoring cannot identify the release state.
+- A rollback would reconnect a detached game-year database without explicit review.

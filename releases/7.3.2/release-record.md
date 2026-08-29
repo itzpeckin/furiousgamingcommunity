@@ -1,57 +1,58 @@
 # FranchiseHQ 7.3.2 Release Record
 
-**Status:** Isolated-staging validated; the commissioner-operated 2026 private candidate import completed in 23.456 seconds
+**Status:** Production acceptance candidate deployed; data integrity verified, Production cold-path performance pending
 
-**Production authorized:** No
+**Production authorized:** Yes, for exact source commit `4f5e81b4cc924e72bc9b8499ae12164bfd12620c`, additive migrations, the Madden 26-to-27 data-plane transition, and one candidate-import rehearsal
 
-**Production changed:** No. Production remains FranchiseHQ 7.1.0.
+**Production changed:** Yes. Git Main and the active-snapshot pointer are unchanged.
 
 ## Scope
 
-Provide an authenticated commissioner with one explicit private 2026 season destination and a measured Madden 27 workflow that analyzes the captured export, pins exact mapper runs, builds an append-only candidate, validates it, and stops at preview-ready. The target is under 60 seconds for the real 32-team/2,044-rostered-player source.
+Deploy the commissioner-operated Madden 27 candidate importer to Production, transition the live data plane from Madden 26 to Madden 27 while preserving platform identities and policy data, apply migrations 21–24, and run one authenticated candidate-only rehearsal. Madden game year is explicitly separate from franchise season year: leagues persist across editions while Madden-derived data can be archived and removed from the active application at the next edition transition.
 
 ## Added during delivery
 
-- Added migration 24 with tenant-scoped private import destinations and durable candidate-run state keyed by a source fingerprint.
-- Added a commissioner-only candidate API with bounded phases, counts, warnings, elapsed time, retry guidance, exact mapping IDs, and active-snapshot before/after verification.
-- Rebuilt the Commissioner One-Click Import workspace around explicit destination creation and the non-activating candidate pipeline.
-- Replaced the server Worker activation flow with the same delegated-commissioner candidate workflow and a 15-minute delegation.
-- Made analysis, schedule mapping, statistics mapping, candidate building, and validation commissioner-operable while preserving platform-owner authorization for activation and rollback.
-- Changed candidate building to append-only storage and pinned all four exact mapping runs. No prior snapshots or previews are pruned.
-- Preserved blocked Madden Free Agents as unknown/null and labeled the candidate `rostered-players-only`.
+- Deployed the exact 7.3.2 Pages/Functions source and import Worker without merging or moving Git Main.
+- Created a clean Madden 27 Production D1, applied the continuous schema through migration 24, and rebound the Production runtime to it.
+- Preserved one league, eight users, 104 pre-existing sessions, eight memberships, and six membership-audit rows. All eight legacy Madden 26 team assignments were cleared for reviewed Madden 27 remapping. No rules/settings rows existed to copy.
+- Archived 38 Madden-domain tables / 76,712 rows under a verified private Madden 26 game-year manifest and retained the former D1 as a detached relational archive.
+- Permanently deleted 1,295 obsolete Madden 26 raw-source R2 objects / 241,070,631 bytes and removed two obsolete Companion KV pointers.
+- Loaded the certified Madden 27 source lock: 43 captures / 10,150,363 bytes, one reviewed 2026 franchise season, 32 team identities, and 2,044 rostered-player identities.
+- Created one 15-minute commissioner acceptance session, completed the private candidate workflow, revoked the session, and retained its two audit rows.
 
 ## Known inherited blockers
 
-- Madden's explicit Free Agent route remains blocked upstream. FranchiseHQ cannot claim a complete player pool and must not report zero Free Agents.
-- The Madden payload did not provide source-franchise or season markers. The already reviewed permanent season identity fixes this candidate to season year 2026.
-- The accepted refresh/login inconvenience remains frozen until 7.5.0.
+- Madden's explicit Free Agent route remains blocked upstream. The candidate is `rostered-players-only`; Free Agent count is unknown/null and is never interpreted as zero.
+- The Production cold rehearsal completed in 74.387 seconds, above the sub-60 target. The same exact implementation completed its isolated-staging rehearsal in 23.456 seconds. Correctness is verified, but Production cold performance remains pending diagnosis and re-validation.
+- The Production Cloudflare configuration still lacks a dedicated `LEAGUE_CONFIG` KV binding and an explicit `PLATFORM_OWNER_ACCOUNT_ID` variable. Existing commissioner candidate routes work, but these inherited contract gaps remain visible.
+- The first direct Pages upload (`1bee7993`) omitted Functions and was discarded. Complete deployment `ebcf42ec` superseded it and passed Functions/auth smoke checks.
+- The former Madden 26 D1 rows were not deleted in place. Safety review rejected destructive remote SQL, so the database was detached from Production and retained as an additional recovery archive. It is not reachable through the active application.
 
 ## Validation evidence
 
-- Migration and contract tests cover a fresh database, production-shaped upgrade, one destination per reviewed season, source-fingerprint idempotency, foreign-key integrity, and runtime schema version 24.
-- Source guards prove commissioner authorization, append-only candidate building, exact mapping pins, protected activation/rollback, no active-pointer write, no reset, and no legacy/demo fallback.
-- The UI and Worker report every bounded phase and duration, return retry guidance on failure, and explicitly stop at private preview-ready.
-- The isolated-staging rehearsal verified the real 2026 source: 43 captures, 32 teams, 2,044 rostered players, 14 games, 510 canonical statistic rows, and 32 standings rows.
-- The candidate reached `preview-ready` with validation `ready`, zero validation errors, `rostered-players-only`, blocked/null Free Agents, and a 23.456-second wall-clock duration.
-- Active snapshot IDs were null before and after, the active-snapshot table remained empty, and foreign-key verification returned zero violations.
+- The consolidated strict gate passed before deployment: 77/77 tests, 194 JavaScript modules, 544 secret-scanned files, 522 inventory files, 63 routes, 68 required tables, schema 24, and zero registered/unregistered failures.
+- Production `/api/platform/status` reports configured/ready with D1, R2, KV, secret, schema 24, and `commissioner_candidate_import`. The canonical Discord login endpoint returns an HTTP 302 rather than a broken file URL; the guest candidate endpoint returns HTTP 401.
+- The authenticated Production candidate contains 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. Validation is `ready` with zero errors and foreign-key verification returns zero violations.
+- Free Agents remain `blocked` with a null count. Completeness is `rostered-players-only`.
+- The active snapshot ID was null before and after. `league_active_snapshots` remains empty; activation was never called.
+- The one Production rehearsal session is revoked, no rehearsal session remains active, no membership role was changed, and team assignments remain zero.
+- Production cold duration was 74.387 seconds. Phase evidence identifies statistics mapping (20.995 seconds), candidate build (10.546 seconds), and validation (13.370 seconds) as the largest phases. This performance result is retained as a failed acceptance check.
 
 ## Deployment status
 
-- Baseline: exact commit `483c4b81ba55509c9ce9542827f307d6192585e1`.
-- Branch: `codex/franchisehq-7.3.2`.
-- The consolidated strict gate passes: 77/77 automated tests, 194 JavaScript modules, 544 secret-scanned text files, 522 inventory files, 63 routes, 68 required tables, and zero registered or unregistered failures.
-- PR #12 is open from `codex/franchisehq-7.3.2` into `codex/franchisehq-7.3.1`. Exact implementation commit `a17801a8d749ea34a74f6a94db5432a40752cb4a` passed all four hosted checks.
-- Cloudflare Pages Preview deployment `6d7f2591-944b-4060-b1e6-b1c9c562a521` succeeded from `a17801a` at `https://6d7f2591.franchise-hq.pages.dev`.
-- The hosted Worker check built successfully but did not deploy a new Worker version; Worker deployment history remains unchanged since August 26, 2026.
-- Migration 24 was applied only to `franchise-hq-staging-db` after bookmark `00000021-00000000-000050d6-9df61ce517ecc2bdce67316ce773ce34`. Post-migration bookmark: `00000021-00000008-000050d6-ddd53183152b9a536b0d09f6ead868f5`.
-- Staging advanced from ledger 23/66 tables to ledger 24/68 tables. Protected counts were unchanged and foreign-key violations remained zero.
-- Candidate destination `import_destination_39ba5a64-0bec-4641-9cd8-2d125b845abb`, run `candidate_import_8ed066b0-be0e-472d-8fa5-775da40aa22b`, and snapshot `555f89cb-eacd-438f-861a-be4621eadfac` are retained for review.
-- One 15-minute simulated commissioner session was created for this rehearsal and then revoked. The retained membership is inactive; all four retained staging sessions are revoked, active sessions are zero, and all identity/candidate/audit rows remain.
-- Production, Main, data reset, and snapshot activation were not run.
-- Production, Main, data reset, and snapshot activation are not authorized and will not run.
+- Runtime source: exact authorized commit `4f5e81b4cc924e72bc9b8499ae12164bfd12620c` (tree `67ce5f5356174bafd270f2b22782346140c0b8a6`).
+- Branch: `codex/franchisehq-7.3.2`; PR #12 remains open and clean with 4/4 hosted checks passing. Git Main remains `4045e02980c93491b47910f17fcb2e48fae76c68`.
+- Complete Pages Production deployment: `ebcf42ec-5a7c-4efa-8e88-891f6c06fcaa`, available at `https://franchisehq.app` and `https://ebcf42ec.franchise-hq.pages.dev`.
+- Worker Production version: `3b883a17-04bf-4c46-8b2d-e5ab5b98658e` at 100%.
+- Active D1: `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`; continuous ledger through migration 24 and zero foreign-key violations.
+- Detached Madden 26 D1: `franchise-hq-db` / `d21fb8c2-1b26-4766-9249-73af5d8b6678`.
+- Production candidate destination `import_destination_8bbd1c19-864f-4d57-b53a-49501e370fad`, run `candidate_import_0fec6fdd-e27c-4d89-ad0d-dcc7ff054fe0`, and validated private snapshot `c7023ac0-e6d8-476c-949b-483092830fdd` are retained for owner review.
+- No snapshot was activated, no Git Main change was made, and no credentials were changed.
 
 ## Rollback
 
-- Before isolated-staging migration, discard only the 7.3.2 branch commit; all environments remain unchanged.
-- After the authorized staging migration, migration 24 is additive and remains in the staging ledger during code rollback.
-- Candidate, audit, and identity rows are retained. Any removal requires exact-target review and separate authorization.
+- Code rollback target is Pages deployment `4b1d6840-69d3-485a-957b-e4af9491d727`, but the D1 binding must be reviewed explicitly before rollback. Reconnecting the detached Madden 26 database by accident is prohibited.
+- The clean Madden 27 D1 and additive schema remain forward-compatible during a code rollback. Do not drop migrations 21–24.
+- The detached Madden 26 D1 and verified private archive remain the recovery sources. The 1,295 deleted raw R2 objects are not recoverable from the former raw-source bucket.
+- Candidate, identity, session-audit, and game-year-transition audit rows are retained. Their removal requires a new exact-target authorization.
+- Snapshot rollback is not applicable because the active-snapshot table is empty.

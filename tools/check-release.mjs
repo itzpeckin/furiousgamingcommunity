@@ -24,6 +24,8 @@ const isPostDeployment = new Set([
   'production-deployed-pending-owner-acceptance',
   'released'
 ]).has(manifest.status);
+const isAuthorizedGameYearTransition = version === '7.3.2'
+  && evidence.scopeBoundaries?.gameYearTransition === true;
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
 if (manifest.version !== version || evidence.version !== version) errors.push('Package, manifest, and evidence versions must match.');
@@ -44,8 +46,14 @@ if (isAtLeast(7, 1)) {
 if (!isPostDeployment && (evidence.productionChanged !== false || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
   errors.push(`${version} evidence must accurately preserve unchanged production, data, and credentials during candidate work.`);
 }
-if (isPostDeployment && (evidence.productionChanged !== true || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
-  errors.push(`${version} post-deployment evidence must record the production publication without claiming league-data or credential changes.`);
+if (isPostDeployment && (
+  evidence.productionChanged !== true
+  || evidence.credentialsChanged !== false
+  || (isAuthorizedGameYearTransition
+    ? (evidence.dataChanged !== true || evidence.productionDataChanged !== true)
+    : evidence.dataChanged !== false)
+)) {
+  errors.push(`${version} post-deployment evidence must accurately record the authorized production, data, and credential scope.`);
 }
 if (version === '7.0.1') {
   for (const check of [
@@ -339,14 +347,32 @@ if (version === '7.3.2') {
   ]) {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.2 candidate-import evidence is incomplete: ${check}.`);
   }
-  if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
-    errors.push('7.3.2 candidate work must not claim production authorization or deployment.');
-  }
-  if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
-    errors.push('7.3.2 candidate work must not claim an authorized or completed production migration.');
-  }
-  if (evidence.external?.productionDataReset?.authorized !== false || evidence.external?.productionDataReset?.status !== 'not-run') {
-    errors.push('7.3.2 candidate work must not claim an authorized or completed production data reset.');
+  if (isPostDeployment) {
+    if (manifest.production?.authorized !== true || manifest.production?.deployed !== true || manifest.production?.status !== 'success-pending-owner-acceptance') {
+      errors.push('Deployed 7.3.2 evidence must record the owner-authorized Production acceptance publication.');
+    }
+    if (evidence.external?.productionDeployment?.authorized !== true || evidence.external?.productionDeployment?.status !== 'success') {
+      errors.push('Deployed 7.3.2 evidence must record the successful authorized Pages deployment.');
+    }
+    if (evidence.external?.productionMigrations?.authorized !== true || evidence.external?.productionMigrations?.status !== 'applied-verified') {
+      errors.push('Deployed 7.3.2 evidence must record migrations 21–24 as applied and verified.');
+    }
+    if (evidence.external?.productionGameYearTransition?.status !== 'archived-detached-clean-active-plane') {
+      errors.push('Deployed 7.3.2 evidence must record the exact game-year archive/detach transition.');
+    }
+    if (evidence.external?.candidateImportRehearsal?.status !== 'completed-verified-performance-pending') {
+      errors.push('Deployed 7.3.2 evidence must retain the Production rehearsal and its pending performance result.');
+    }
+  } else {
+    if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+      errors.push('Unpublished 7.3.2 candidate work must not claim production authorization or deployment.');
+    }
+    if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
+      errors.push('Unpublished 7.3.2 candidate work must not claim an authorized or completed production migration.');
+    }
+    if (evidence.external?.productionDataReset?.authorized !== false || evidence.external?.productionDataReset?.status !== 'not-run') {
+      errors.push('Unpublished 7.3.2 candidate work must not claim an authorized or completed production data reset.');
+    }
   }
   if (evidence.external?.maddenImportActivation?.authorized !== false || evidence.external?.maddenImportActivation?.status !== 'not-run') {
     errors.push('7.3.2 candidate work must not claim an authorized or completed Madden activation.');

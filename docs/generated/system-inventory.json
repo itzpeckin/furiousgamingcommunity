@@ -186,16 +186,16 @@
         "file": "functions/_lib/madden-discovery.js"
       },
       {
+        "bytes": 20920,
+        "file": "tools/check-release.mjs"
+      },
+      {
         "bytes": 20354,
         "file": "migrations/0019_canonical_import_snapshot_foundation.sql"
       },
       {
         "bytes": 20250,
         "file": "league-engine/games.js"
-      },
-      {
-        "bytes": 19354,
-        "file": "tools/check-release.mjs"
       },
       {
         "bytes": 19144,
