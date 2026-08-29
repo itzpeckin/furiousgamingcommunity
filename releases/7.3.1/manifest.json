@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.1",
   "releaseType": "permanent-identity-private-preview",
-  "status": "validated-review-candidate",
+  "status": "staging-validated",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.0",
@@ -20,18 +20,18 @@
   "repositoryPublication": {
     "authorized": true,
     "status": "pull-request-open-hosted-checks-passed",
-    "commit": "5742bd735e1f8d0e17901aaeb1134c22a668c4f3",
+    "commit": "40cbc63132963a9633b85124f4ed70eb60bd90ad",
     "pullRequest": 11,
     "hostedChecksPassed": 4,
-    "scope": "The validated candidate is published on codex/franchisehq-7.3.1 with a stacked pull request against codex/franchisehq-7.3.0. Main is unchanged."
+    "scope": "The staging-validated candidate is published on codex/franchisehq-7.3.1 with a stacked pull request against codex/franchisehq-7.3.0. Main is unchanged."
   },
   "staging": {
     "authorized": true,
     "deployed": true,
-    "status": "migration-and-preview-verified-authenticated-data-gate-blocked",
-    "deploymentId": "c6a30d62-f254-47e8-a954-58e5d6797164",
+    "status": "private-identity-preview-verified",
+    "deploymentId": "c8df85cf-f69c-41ea-b47b-ee899abdf97c",
     "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
-    "scope": "Migration 23 and exact commit 5742bd7 are verified in isolated staging. Report and identity-preview actions remain blocked because staging has zero users and memberships."
+    "scope": "Migration 23 and runtime commit 40cbc63 are verified in isolated staging. The authenticated report, 32-team/2,044-rostered-player mappings, and private identity preview completed. The temporary membership is inactive, all temporary sessions are revoked, Free Agents remain blocked with a null count, and no snapshot was activated."
   },
   "production": {
     "authorized": false,
