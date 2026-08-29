@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.2",
   "validatedOn": "2026-08-29",
-  "status": "validated-review-candidate",
+  "status": "staging-validated",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "commissionerCandidateAuthority": { "passed": true, "platformOwnerAssistanceRequired": false },
@@ -15,6 +15,10 @@
     "measuredPhaseProgress": { "passed": true, "phaseCount": 9, "sub60SecondTarget": true },
     "freeAgentBlockedPreserved": { "passed": true, "status": "blocked", "count": null, "interpretedAsZero": false },
     "sourceLockNoActivation": { "passed": true, "activeSnapshotChanged": false },
+    "authenticatedStagingWorkflow": { "passed": true, "seasonYear": 2026, "capturedRoutesAnalyzed": 43, "capturedRoutesClassified": 43, "durationMs": 23456, "performanceTargetMet": true },
+    "privateCandidatePreview": { "passed": true, "candidateSnapshotId": "555f89cb-eacd-438f-861a-be4621eadfac", "validationStatus": "ready", "validationErrors": 0, "teams": 32, "rosteredPlayers": 2044, "games": 14, "statistics": 510, "standings": 32 },
+    "stagingAccessCleanup": { "passed": true, "temporaryMembershipActive": false, "rehearsalSessionsCreated": 1, "rehearsalSessionsRevoked": 1, "allRetainedSessions": 4, "allRetainedSessionsRevoked": 4, "activeSessions": 0 },
+    "stagingForeignKeyIntegrity": { "passed": true, "violations": 0 },
     "strictMigration": { "passed": true, "expectedFailure": false, "blockingIssues": 0 },
     "automatedTests": { "passed": true, "passedTests": 77, "failedTests": 0, "scope": "full-consolidated-release-gate" },
     "strictRepositoryGate": { "passed": true, "javascriptModules": 194, "secretScanFiles": 544, "inventoryFiles": 522, "routes": 63, "requiredTables": 68 }
@@ -24,24 +28,28 @@
     "activeSnapshotChanged": false,
     "freeAgentInterpretedAsZero": false,
     "productionInfrastructureChanged": false,
-    "stagingDataChanged": false,
-    "stagingDataChangeScope": "migration and candidate rehearsal pending"
+    "stagingDataChanged": true,
+    "stagingDataChangeScope": "migration 24, one retained destination/candidate snapshot, exact pending-preview mappings, validation rows, and retained audit/session rows only",
+    "temporaryStagingMembershipActive": false,
+    "temporaryStagingSessionsActive": 0
   },
   "external": {
-    "githubPullRequest": { "authorized": true, "status": "pending", "pullRequest": null, "base": "codex/franchisehq-7.3.1", "head": "codex/franchisehq-7.3.2", "commit": null },
-    "hostedChecks": { "status": "pending", "passed": 0, "failed": 0, "commit": null },
-    "stagingDeployment": { "authorized": true, "status": "pending", "deploymentId": null, "url": null, "commit": null },
-    "stagingMigrations": { "authorized": true, "status": "pending", "migrations": [24], "schemaVersion": 23, "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816" },
-    "candidateImportRehearsal": { "authorized": true, "status": "pending", "seasonYear": 2026, "expectedTeams": 32, "expectedRosteredPlayers": 2044, "expectedFreeAgentStatus": "blocked", "activationPerformed": false },
+    "githubPullRequest": { "authorized": true, "status": "open", "pullRequest": 12, "base": "codex/franchisehq-7.3.1", "head": "codex/franchisehq-7.3.2", "commit": "a17801a8d749ea34a74f6a94db5432a40752cb4a" },
+    "hostedChecks": { "status": "passed", "passed": 4, "failed": 0, "commit": "a17801a8d749ea34a74f6a94db5432a40752cb4a" },
+    "stagingDeployment": { "authorized": true, "status": "success", "deploymentId": "6d7f2591-944b-4060-b1e6-b1c9c562a521", "url": "https://6d7f2591.franchise-hq.pages.dev", "commit": "a17801a8d749ea34a74f6a94db5432a40752cb4a" },
+    "workerHostedBuild": { "status": "passed-build-only", "productionDeploymentChanged": false, "lastDeploymentAt": "2026-08-26T17:28:29.030Z" },
+    "stagingMigrations": { "authorized": true, "status": "applied-verified", "migrations": [24], "schemaVersion": 24, "tableCount": 68, "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816", "preMigrationBookmark": "00000021-00000000-000050d6-9df61ce517ecc2bdce67316ce773ce34", "postMigrationBookmark": "00000021-00000008-000050d6-ddd53183152b9a536b0d09f6ead868f5", "protectedCountsChanged": false, "foreignKeyViolations": 0 },
+    "candidateImportRehearsal": { "authorized": true, "status": "completed-verified", "seasonYear": 2026, "destinationId": "import_destination_39ba5a64-0bec-4641-9cd8-2d125b845abb", "runId": "candidate_import_8ed066b0-be0e-472d-8fa5-775da40aa22b", "candidateSnapshotId": "555f89cb-eacd-438f-861a-be4621eadfac", "durationMs": 23456, "performanceTargetMet": true, "teamCount": 32, "rosteredPlayerCount": 2044, "gameCount": 14, "statisticCount": 510, "standingCount": 32, "validationStatus": "ready", "freeAgentStatus": "blocked", "freeAgentCount": null, "activeSnapshotBefore": null, "activeSnapshotAfter": null, "activationPerformed": false },
+    "temporaryStagingAccess": { "authorized": true, "status": "revoked-and-deactivated", "membershipRetained": true, "membershipActive": false, "rehearsalSessionsCreated": 1, "rehearsalSessionsRevoked": 1, "allRetainedSessions": 4, "allRetainedSessionsRevoked": 4, "activeSessions": 0, "membershipAuditRows": 8, "tenantAuditRows": 11 },
     "productionDeployment": { "authorized": false, "status": "not-run" },
     "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [24] },
     "productionDataReset": { "authorized": false, "status": "not-run" },
     "maddenImportActivation": { "authorized": false, "status": "not-run" }
   },
   "manualAcceptance": {
-    "status": "authorized-pending-rehearsal",
+    "status": "passed-isolated-staging",
     "ownerConfirmedSeasonYear": 2026,
-    "nextGate": "complete local gate, publish PR, pass hosted checks, and verify isolated-staging candidate preview"
+    "nextGate": "review the 7.3.2 staging evidence and separately authorize the 7.3.3 safe reset and season-transition implementation"
   },
   "productionChanged": false,
   "dataChanged": false,
