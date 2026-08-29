@@ -6,10 +6,10 @@ import {
   resolveLeague,
   sha256Hex
 } from '../../../../_lib/cloud-platform.js';
-import { requirePlatformOwner } from '../../../../_lib/permissions.js';
+import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { buildMaddenDiscoveryReport } from '../../../../_lib/madden-discovery.js';
 
-const RELEASE = '7.3.0';
+const RELEASE = '7.3.2';
 const MAX_CAPTURE_COUNT = 250;
 const READ_CONCURRENCY = 8;
 
@@ -20,7 +20,7 @@ function parse(value, fallback) {
 async function state(context) {
   const slug = normalizeLeagueSlug(context);
   if (!validLeagueSlug(slug)) return { response: json({ ok: false, error: 'Invalid league slug.', release: RELEASE }, 400) };
-  const authorization = await requirePlatformOwner(context);
+  const authorization = await requireCommissioner(context);
   if (!authorization.authorized) return { response: authorization.response };
   const db = database(context.env);
   const league = db ? await resolveLeague(context.env, slug) : null;

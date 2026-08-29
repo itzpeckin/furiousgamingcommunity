@@ -6,13 +6,13 @@
 
 **Updated:** August 29, 2026
 
-**Revision:** 1.31
+**Revision:** 1.32
 
 **Current production:** 7.1.0 database foundation, delivered through PR #8
 
-**Current work:** 7.3.1 isolated-staging validation complete for permanent season/player/GM identity and the private rostered-player mapping preview
+**Current work:** 7.3.2 commissioner-operated, sub-60-second private Madden candidate importer
 
-**Next gate:** Review the 7.3.1 isolated-staging evidence and separately authorize 7.3.2 implementation. Production, Main, data reset, import, and snapshot activation remain separately authorized and excluded.
+**Next gate:** Publish and validate one 7.3.2 candidate, then complete the authorized isolated-staging candidate-import rehearsal. Production, Main, data reset, and snapshot activation remain separately authorized and excluded.
 
 ## Product decisions
 
@@ -46,7 +46,7 @@
 | 7.2.0 | Staging validated | Tenant-ready core with FGC as the only enabled league; migration 21 and isolated Preview resources verified without production changes |
 | 7.3.0 | Completion candidate | Real Madden 27 source captured; 2,044 rostered players certified as preview-ready; Free Agents honestly blocked upstream and deferred |
 | 7.3.1 | Staging validated | One reviewed 2026 season, 32 teams, and 2,044 rostered-player identities are retained in a private preview; Free Agents remain blocked/unknown and no snapshot is active |
-| 7.3.2 | Planned | Certified sub-60-second Madden 27 import engine |
+| 7.3.2 | Implementation authorized | Commissioner-created private destination, measured candidate phases, exact source pins, validation, and preview-ready stop; isolated-staging rehearsal pending |
 | 7.3.3 | Planned | Recoverable Madden reset, season archive, and transition controls |
 | 7.3.4 | Planned | Real FGC Madden 27 staging import and recovery certification |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
@@ -137,6 +137,10 @@
 - Commissioners review the candidate before any activation; the workspace must distinguish complete, rostered-player-only, explicitly empty, stale, and failed datasets without silently falling back to legacy/demo data.
 - Measure source download, each mapping phase, validation, activation, record counts, bytes, cold runs, and warm runs.
 - Gate: an authorized FGC commissioner can complete the real click-to-preview workflow without platform-owner assistance; repeated realistic imports finish under 60 seconds, FranchiseHQ processing targets under 45 seconds, and any failure leaves the last complete snapshot active.
+- Authorized implementation adds migration 24, one private destination per reviewed season, durable/idempotent source-fingerprint runs, exact mapper-run pinning, append-only candidate snapshots, and commissioner validation.
+- The browser and server Worker share the same non-activating boundary: both stop at `preview-ready`, report per-phase and wall-clock duration, and never call reset or activation.
+- The 2026 reviewed season is the staging destination. Madden Free Agents remain `blocked` with a null/unknown count, so the candidate is explicitly `rostered-players-only`.
+- Publication, hosted checks, Preview deployment, staging migration 24, and one isolated candidate rehearsal are authorized. Production, Main, reset, and snapshot activation are not.
 
 ## 7.3.3 — Safe Reset and Season Transition
 
@@ -278,3 +282,4 @@
 - **Revision 1.27:** Reconciled the real FGC capture: 43 requests, 10.17 MB, 0.448-second source delivery, 32 teams/rosters, 2,044 unique assigned rostered players, standings, 14 current-week games, and 510 statistics rows. Added privacy-safe roster assignment certification, prevented stale Free Agent payload blending, accepted successful explicit zero-player responses, and kept the failed Free Agent route as a visible upstream blocker that does not discard the rostered-player dataset. 7.3.1 now begins with stable identity and a private 2,044-player roster preview; production remains unchanged.
 - **Revision 1.28:** Made the commissioner-operated importer an explicit 7.3.2 deliverable: authorized commissioners create the destination, monitor sub-60-second phases, review counts/warnings/completeness, and reach a private candidate preview without platform-owner assistance. Activation, reset, and season transition remain separately protected by the 7.3.3–7.3.4 gates.
 - **Revision 1.31:** Completed the authorized 7.3.1 isolated-staging acceptance against Preview deployment `c8df85cf`: analyzed 43 captures, mapped 32 teams and 2,044 rostered players, created the owner-reviewed 2026 private identity preview, retained audit/identity rows, revoked every temporary session, deactivated the simulated membership, preserved blocked Free Agents as unknown/null, and confirmed zero active snapshots and zero foreign-key violations. Production, Main, reset, import, and activation remain unchanged and unauthorized.
+- **Revision 1.32:** Authorized 7.3.2 from exact commit `483c4b81`: a commissioner-only private candidate importer with one reviewed 2026 destination, durable idempotency, measured progress, exact mapping pins, append-only build, validation, and a hard stop at preview-ready. Authorized one consolidated branch/PR/check cycle and isolated-staging rehearsal while keeping Production, Main, resets, and activation excluded.

@@ -4,14 +4,13 @@ import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '.
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
-const RELEASE='5.9.10.6.5.4h-p3d';
+const RELEASE='7.3.2';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
 });
 const text=v=>String(v??'').trim();
 
-const platformOwnerId=env=>text(env?.PLATFORM_OWNER_ACCOUNT_ID||'owner-tb');
 function worker(context){
   return context.env?.FRANCHISE_IMPORT_WORKER || null;
 }
@@ -30,7 +29,7 @@ async function createDelegation(db,session,leagueId){
   await db.prepare(`DELETE FROM server_import_delegations WHERE expires_at <= CURRENT_TIMESTAMP`).run().catch(()=>{});
   const token=createRandomToken(32);
   const tokenHash=await hashToken(token);
-  const expiresAt=new Date(Date.now()+2*60*60*1000).toISOString();
+  const expiresAt=new Date(Date.now()+15*60*1000).toISOString();
   await db.prepare(`INSERT INTO server_import_delegations
     (token_hash,session_id,league_id,expires_at)
     VALUES (?,?,?,?)`)
@@ -63,26 +62,28 @@ async function latestCaptureSession(db,leagueId){
     ORDER BY MAX(received_at) DESC LIMIT 1`).bind(leagueId).first();
 }
 
-async function currentActiveSnapshot(db,leagueId){
-  return db.prepare(`SELECT s.id,s.activated_at,s.season_year,s.week_index
-    FROM league_active_snapshots a
-    JOIN league_snapshots s ON s.id=a.snapshot_id
-    WHERE a.league_id=? LIMIT 1`).bind(leagueId).first();
-}
-
 async function latestImportRun(db,leagueId){
-  const row=await db.prepare(`SELECT * FROM companion_import_orchestrator_runs
+  const row=await db.prepare(`SELECT * FROM companion_candidate_import_runs
     WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first().catch(()=>null);
   if(!row)return null;
   return{
     id:row.id,
     status:row.status,
-    currentStage:row.current_stage,
-    stageIndex:Number(row.stage_index||0),
-    stageState:parseJson(row.stage_state_json,{}),
+    currentStage:row.current_phase,
+    stageIndex:Number(row.phase_index||0),
+    stageState:parseJson(row.phase_state_json,{}),
+    completenessStatus:row.completeness_status,
+    teamMappingRunId:row.team_mapping_run_id||null,
+    playerMappingRunId:row.player_mapping_run_id||null,
+    scheduleMappingRunId:row.schedule_mapping_run_id||null,
     statisticsMappingRunId:row.statistics_mapping_run_id||null,
-    snapshotId:row.snapshot_id||null,
-    error:parseJson(row.error_json,null),
+    snapshotId:row.candidate_snapshot_id||null,
+    warnings:parseJson(row.warnings_json,[]),
+    retry:parseJson(row.retry_json,{}),
+    durationMs:row.duration_ms===null?null:Number(row.duration_ms),
+    private:true,
+    activationPerformed:false,
+    activeSnapshotChanged:false,
     createdAt:row.created_at,
     updatedAt:row.updated_at,
     completedAt:row.completed_at||null
@@ -101,32 +102,13 @@ export async function onRequestPost(context){
     return json({ok:false,release:RELEASE,error:'No Madden Companion export is available.'},400);
   }
 
-  const active=await currentActiveSnapshot(state.db,state.league.id);
-  const latestMs=Date.parse(String(latest.received_at||''));
-  const activeMs=Date.parse(String(active?.activated_at||''));
-
-  // Fastest path: no new Companion capture exists after the LIVE snapshot.
-  if(active?.id&&Number.isFinite(latestMs)&&Number.isFinite(activeMs)&&latestMs<=activeMs){
-    return json({
-      ok:true,
-      release:RELEASE,
-      completed:true,
-      noNewExport:true,
-      snapshotId:active.id,
-      workflowKey:String(latest.session_id),
-      durationMs:0
-    });
-  }
-
   const delegation=await createDelegation(state.db,state.auth.session,state.league.id);
-  const ownerAccountId=platformOwnerId(context.env);
 
   const response=await binding.fetch('https://franchise-import.internal/start',{
     method:'POST',
     headers:{'content-type':'application/json','accept':'application/json'},
     body:JSON.stringify({
       leagueSlug:state.leagueSlug,
-      ownerAccountId,
       origin:origin(context.request),
       workflowKey:String(latest.session_id),
       importAuthToken:delegation.token,
@@ -165,6 +147,9 @@ export async function onRequestGet(context){
     workflowStatus:workerStatus?.workflowStatus||null,
     workflowState:workerStatus?.workflowState||'unknown',
     workflowOutput:workerStatus?.workflowOutput||null,
-    orchestrator:{run}
+    candidate:{run},
+    private:true,
+    activationPerformed:false,
+    activeSnapshotChanged:false
   });
 }

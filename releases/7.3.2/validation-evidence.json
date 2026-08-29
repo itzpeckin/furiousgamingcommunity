@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.2",
+  "validatedOn": "2026-08-29",
+  "status": "validated-review-candidate",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "commissionerCandidateAuthority": { "passed": true, "platformOwnerAssistanceRequired": false },
+    "privateSeasonDestination": { "passed": true, "onePerReviewedSeason": true, "seasonYear": 2026 },
+    "idempotentSourceFingerprint": { "passed": true, "scope": ["league", "destination", "report", "orderedCapturePayloadHashes", "identityPreview"] },
+    "exactMappingRunPins": { "passed": true, "domains": ["teams", "players", "schedule", "statistics"] },
+    "appendOnlyCandidateBuild": { "passed": true, "snapshotPruning": false, "previewPruning": false },
+    "candidateValidation": { "passed": true, "activationRequired": false },
+    "measuredPhaseProgress": { "passed": true, "phaseCount": 9, "sub60SecondTarget": true },
+    "freeAgentBlockedPreserved": { "passed": true, "status": "blocked", "count": null, "interpretedAsZero": false },
+    "sourceLockNoActivation": { "passed": true, "activeSnapshotChanged": false },
+    "strictMigration": { "passed": true, "expectedFailure": false, "blockingIssues": 0 },
+    "automatedTests": { "passed": true, "passedTests": 77, "failedTests": 0, "scope": "full-consolidated-release-gate" },
+    "strictRepositoryGate": { "passed": true, "javascriptModules": 194, "secretScanFiles": 544, "inventoryFiles": 522, "routes": 63, "requiredTables": 68 }
+  },
+  "scopeBoundaries": {
+    "sessionRefreshRedesignChanged": false,
+    "activeSnapshotChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "productionInfrastructureChanged": false,
+    "stagingDataChanged": false,
+    "stagingDataChangeScope": "migration and candidate rehearsal pending"
+  },
+  "external": {
+    "githubPullRequest": { "authorized": true, "status": "pending", "pullRequest": null, "base": "codex/franchisehq-7.3.1", "head": "codex/franchisehq-7.3.2", "commit": null },
+    "hostedChecks": { "status": "pending", "passed": 0, "failed": 0, "commit": null },
+    "stagingDeployment": { "authorized": true, "status": "pending", "deploymentId": null, "url": null, "commit": null },
+    "stagingMigrations": { "authorized": true, "status": "pending", "migrations": [24], "schemaVersion": 23, "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816" },
+    "candidateImportRehearsal": { "authorized": true, "status": "pending", "seasonYear": 2026, "expectedTeams": 32, "expectedRosteredPlayers": 2044, "expectedFreeAgentStatus": "blocked", "activationPerformed": false },
+    "productionDeployment": { "authorized": false, "status": "not-run" },
+    "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [24] },
+    "productionDataReset": { "authorized": false, "status": "not-run" },
+    "maddenImportActivation": { "authorized": false, "status": "not-run" }
+  },
+  "manualAcceptance": {
+    "status": "authorized-pending-rehearsal",
+    "ownerConfirmedSeasonYear": 2026,
+    "nextGate": "complete local gate, publish PR, pass hosted checks, and verify isolated-staging candidate preview"
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

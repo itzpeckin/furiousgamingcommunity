@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.2",
+  "releaseType": "commissioner-private-candidate-import",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.1",
+    "commit": "483c4b81ba55509c9ce9542827f307d6192585e1",
+    "tree": "pending-local-validation",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.2",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "validated-pending-publication",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "scope": "Publish one validated commit from codex/franchisehq-7.3.2 as a stacked pull request without changing Main."
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "candidate-rehearsal-pending",
+    "deploymentId": null,
+    "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
+    "scope": "Apply migration 24 and rehearse a private, non-activating commissioner candidate import only in isolated staging."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-authorized",
+    "url": "https://franchisehq.app/",
+    "scope": "No production deployment, migration, data reset, snapshot activation, or Main change is authorized."
+  },
+  "requiredArtifacts": [
+    "config/database-schema-contract.json",
+    "docs/ROADMAP.md",
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "league-engine/one-click-import.js",
+    "migrations/0024_commissioner_candidate_import.sql",
+    "releases/7.3.2/release-record.md",
+    "releases/7.3.2/validation-evidence.json",
+    "tests/import/candidate-import.test.mjs",
+    "workers/franchise-import-worker/src/index.js"
+  ]
+}

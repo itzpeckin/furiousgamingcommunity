@@ -1,380 +1,254 @@
-/* FHQ_BUILD: 5.9.11.0 */
+/* FHQ_BUILD: 7.3.2 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='5.9.11.0';
+const RELEASE='7.3.2';
+const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
-  status,
-  headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
+  status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
 });
-const text=v=>String(v??'').trim();
-const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const companion=(slug,path)=>`/api/leagues/${encodeURIComponent(slug)}/companion/${path}`;
 
-function apiHeaders(ownerAccountId,importAuthToken){
-  const ownerId=ownerAccountId&&typeof ownerAccountId==='object'
-    ? String(ownerAccountId.id||'')
-    : String(ownerAccountId||'');
-  const delegatedToken=importAuthToken||(
-    ownerAccountId&&typeof ownerAccountId==='object'
-      ? ownerAccountId.importAuthToken||''
-      : ''
-  );
-  const headers={
-    accept:'application/json',
-    'content-type':'application/json',
-    'x-franchisehq-platform-owner-account-id':ownerId
-  };
-  if(delegatedToken)headers['x-franchisehq-import-token']=String(delegatedToken);
-  return headers;
-}
-async function call(origin,path,ownerAccountId,method='GET',body,importAuthToken=''){
-  const response=await fetch(`${origin}${path}`,{
+async function call(context,path,method='GET',body){
+  const response=await fetch(`${context.origin}${path}`,{
     method,
-    headers:apiHeaders(ownerAccountId,importAuthToken),
+    headers:{
+      accept:'application/json',
+      'content-type':'application/json',
+      'x-franchisehq-import-token':context.token
+    },
     body:body===undefined?undefined:JSON.stringify(body)
   });
   const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
   if(!response.ok||payload?.ok===false){
-    const err=new Error(payload?.detail||payload?.error||`Import request failed (${response.status}).`);
-    err.payload=payload;
-    throw err;
+    const error=new Error(payload?.detail||payload?.error||`Candidate import request failed (${response.status}).`);
+    error.payload=payload;
+    throw error;
   }
   return payload;
 }
-const companion=(slug,path)=>`/api/leagues/${encodeURIComponent(slug)}/companion/${path}`;
-const transactions=(slug,path)=>`/api/leagues/${encodeURIComponent(slug)}/transactions/${path}`;
 
-async function report(ctx,stage,ok,extra={}){
-  if(!ctx.runId)return null;
-  const payload=await call(ctx.origin,companion(ctx.slug,'import-orchestrator'),ctx.owner,'POST',{
-    action:'report',runId:ctx.runId,stage,ok,...extra
+async function report(context,phase,startedAt,summary={}){
+  return call(context,companion(context.slug,'candidate-import'),'POST',{
+    action:'report-phase',runId:context.runId,phase,ok:true,
+    durationMs:Math.max(0,Date.now()-startedAt),
+    totalDurationMs:Math.max(0,Date.now()-context.wallStartedAt),
+    summary:summary.summary||'Complete',counts:summary.counts||{},warnings:summary.warnings||[],
+    teamMappingRunId:summary.teamMappingRunId,
+    playerMappingRunId:summary.playerMappingRunId,
+    scheduleMappingRunId:summary.scheduleMappingRunId,
+    statisticsMappingRunId:summary.statisticsMappingRunId,
+    candidateSnapshotId:summary.candidateSnapshotId
   });
-  return payload;
 }
-async function stage(ctx,step,name,fn){
+
+async function phase(context,step,id,work,summarize){
+  const startedAt=Date.now();
   try{
-    const result=await step.do(name,{retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'15 minutes'},fn);
+    const result=await step.do(id,{retries:{limit:2,delay:'1 second',backoff:'exponential'},timeout:'2 minutes'},work);
+    await step.do(`${id}-report`,()=>report(context,id,startedAt,summarize(result)||{}));
     return result;
   }catch(error){
-    await report(ctx,name,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
+    await call(context,companion(context.slug,'candidate-import'),'POST',{
+      action:'report-phase',runId:context.runId,phase:id,ok:false,
+      durationMs:Math.max(0,Date.now()-startedAt),
+      totalDurationMs:Math.max(0,Date.now()-context.wallStartedAt),
+      summary:error.message,error:{message:error.message}
+    }).catch(()=>{});
     throw error;
   }
 }
-async function simple(ctx,step,name,path,summaryFn){
-  const payload=await stage(ctx,step,name,()=>call(ctx.origin,companion(ctx.slug,path),ctx.owner,'POST',{}));
-  const summary=summaryFn?summaryFn(payload):'Complete';
-  await report(ctx,name,true,{summary});
-  return payload;
+
+async function mapStatistics(context,step){
+  let result=await step.do('map-statistics-start',()=>call(
+    context,companion(context.slug,'map-statistics'),'POST',{action:'start',discoverySessionId:context.discoverySessionId}
+  ));
+  const runId=result?.mappingRun?.id;
+  if(!runId)throw new Error('Statistics mapper did not return its exact run ID.');
+  let guard=0;
+  while(!result.complete&&guard<5000){
+    result=await step.do(`map-statistics-next-${guard+1}`,()=>call(
+      context,companion(context.slug,'map-statistics'),'POST',{action:'next',runId}
+    ));
+    guard+=1;
+  }
+  if(!result.complete)throw new Error('Statistics mapping exceeded the 5,000-batch safety limit.');
+  const final=await step.do('map-statistics-result',()=>call(context,companion(context.slug,'map-statistics')));
+  const failed=Number(final?.progress?.failed??final?.delta?.failedRoutes??0);
+  if(failed)throw new Error(`${failed} statistics route(s) failed; candidate build stopped safely.`);
+  return{...final,mappingRun:{...(final.mappingRun||{}),id:runId}};
 }
 
-export class FranchiseImportWorkflow extends WorkflowEntrypoint {
+async function validateCandidate(context,step,snapshotId){
+  let result=await step.do('validate-candidate-start',()=>call(
+    context,companion(context.slug,'snapshot-lifecycle'),'POST',{action:'validate-start',snapshotId}
+  ));
+  let guard=0;
+  while(!result.complete&&guard<500){
+    result=await step.do(`validate-candidate-next-${guard+1}`,()=>call(
+      context,companion(context.slug,'snapshot-lifecycle'),'POST',{action:'validate-next',snapshotId,limit:250}
+    ));
+    guard+=1;
+  }
+  if(!result.complete)throw new Error('Candidate validation exceeded the 500-batch safety limit.');
+  const snapshot=(result.snapshots||[]).find(item=>item.snapshotId===snapshotId);
+  const validation=result.report||snapshot?.validationReport||{};
+  const status=String(snapshot?.validationStatus||validation.status||'').toLowerCase();
+  if(status!=='ready'||Number(snapshot?.errorCount||validation.errorCount||0)){
+    throw new Error(`Candidate validation failed: ${(validation.errors||[]).slice(0,5).join(' | ')||status||'not ready'}`);
+  }
+  return{...result,snapshot};
+}
+
+export class FranchiseImportWorkflow extends WorkflowEntrypoint{
   async run(event,step){
-    const payload=event.payload||{};
-    const workflowStartedAt=Date.now();
-    const ctx={
-      slug:text(payload.leagueSlug),
-      owner:{
-        id:text(payload.ownerAccountId),
-        importAuthToken:text(payload.importAuthToken)
-      },
-      origin:text(payload.origin).replace(/\/+$/,''),
-      runId:null,
-      snapshotId:null,
-      playerMappingRunId:null,
-      importAuthToken:text(payload.importAuthToken),
-      lifecycleReconciliation:{processedSessions:0,eventCount:0,freeAgents:null,skipped:true}
+    const input=event.payload||{};
+    const context={
+      slug:text(input.leagueSlug),
+      origin:text(input.origin).replace(/\/+$/,''),
+      token:text(input.importAuthToken),
+      wallStartedAt:Date.now(),
+      runId:null
     };
-    if(!ctx.slug||!ctx.owner.id||!ctx.origin||!ctx.importAuthToken)throw new Error('Workflow payload is incomplete.');
-    ctx.call=(path,method='GET',body)=>call(ctx.origin,path,ctx.owner,method,body,ctx.importAuthToken);
+    if(!context.slug||!context.origin||!context.token)throw new Error('Candidate workflow payload is incomplete.');
 
-    // Discover and the no-new-export gate happen before an orchestrator run exists.
-    // The original proven browser pipeline also performed storage preflight before
-    // creating the orchestrator. Once the run starts, its first expected stage is map-teams.
-    const delta=await step.do('discover',async()=>call(
-      ctx.origin,companion(ctx.slug,'change-check'),ctx.owner
+    await step.do('create-private-destination',()=>call(
+      context,companion(context.slug,'candidate-import'),'POST',{action:'create-destination'}
     ));
+    const started=await step.do('start-candidate-import',()=>call(
+      context,companion(context.slug,'candidate-import'),'POST',{action:'start',retry:Boolean(input.retry)}
+    ));
+    context.runId=started?.run?.id||null;
+    context.discoverySessionId=started?.source?.discoverySessionId||null;
+    if(!context.runId)throw new Error('Candidate importer did not return a durable run ID.');
+    if(started.warm&&started.run?.status==='preview-ready')return{
+      ok:true,release:RELEASE,reusedExisting:true,run:started.run,
+      candidateSnapshotId:started.run.candidateSnapshotId,durationMs:Date.now()-context.wallStartedAt,
+      private:true,activationPerformed:false,activeSnapshotChanged:false
+    };
 
-    if(delta?.unchanged&&delta?.activeSnapshot?.id){
-      ctx.snapshotId=String(delta.activeSnapshot.id);
-      return {
-        ok:true,
-        release:RELEASE,
-        noChange:true,
-        noNewExport:Boolean(delta.noNewExport),
-        snapshotId:ctx.snapshotId,
-        runId:null,
-        durationMs:Date.now()-workflowStartedAt
+    const analyzed=await phase(context,step,'analyze-source',()=>call(
+      context,companion(context.slug,'discovery-report'),'POST',{sessionId:started.source?.discoverySessionId}
+    ),payload=>({
+      summary:`${Number(payload.report?.captureCount||0)} captures analyzed`,
+      counts:{captures:Number(payload.report?.captureCount||0),routes:Number(payload.report?.routeCount||0)}
+    }));
+
+    await phase(context,step,'classify-captures',()=>call(
+      context,companion(context.slug,'classify'),'POST',{}
+    ),payload=>({
+      summary:`${Number(payload.inspectedRouteCount||0)} captures classified`,
+      counts:{classifiedCaptures:Number(payload.inspectedRouteCount||0)}
+    }));
+
+    const teams=await phase(context,step,'map-teams',()=>call(
+      context,companion(context.slug,'map-teams'),'POST',{discoverySessionId:context.discoverySessionId}
+    ),payload=>({
+      summary:`${Number(payload.mappingRun?.teamCount??payload.teams?.length??0)} teams mapped`,
+      counts:{teams:Number(payload.mappingRun?.teamCount??payload.teams?.length??0)},
+      teamMappingRunId:payload.mappingRun?.id
+    }));
+
+    const players=await phase(context,step,'map-players',()=>call(
+      context,companion(context.slug,'map-players'),'POST',{compact:true,discoverySessionId:context.discoverySessionId}
+    ),payload=>{
+      const count=Number(payload.mappingRun?.playerCount??payload.playerCount??0);
+      const freeAgentStatus=payload.mappingCompleteness==='complete'
+        ?'located':String(analyzed.report?.freeAgentEvidence?.status||'missing');
+      const warnings=[...(payload.mappingRun?.warnings||[])];
+      if(freeAgentStatus==='blocked')warnings.push('Madden Free Agents are blocked upstream; count remains unknown.');
+      return{
+        summary:`${count} rostered players mapped`,
+        counts:{players:count,rosteredPlayers:Number(payload.mappingRun?.rosteredCount??count),freeAgentStatus,
+          freeAgentCount:['located','empty-confirmed'].includes(freeAgentStatus)?Number(payload.mappingRun?.freeAgentCount||0):null},
+        warnings,playerMappingRunId:payload.mappingRun?.id
       };
-    }
-
-    const reusePlayers=Boolean(delta?.canReusePlayers&&!delta?.rosterChanged);
-
-    const storage=await step.do(
-      'storage-preflight',
-      {retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'15 minutes'},
-      ()=>call(
-        ctx.origin,companion(ctx.slug,'storage-preflight'),ctx.owner,'POST',
-        {preservePlayers:reusePlayers}
-      )
-    );
-
-    const started=await step.do('create-import-run',async()=>call(
-      ctx.origin,companion(ctx.slug,'import-orchestrator'),ctx.owner,'POST',{action:'start'}
-    ));
-    ctx.runId=started?.run?.id||null;
-    if(!ctx.runId)throw new Error('Import orchestrator did not return a run ID.');
-
-    await simple(ctx,step,'map-teams','map-teams',p=>`${p.teams?.length??p.mappingRun?.teamCount??'?'} teams mapped`);
-
-    if(reusePlayers){
-      await report(ctx,'map-players',true,{
-        summary:`${Number(delta?.reusablePlayerPreviewCount||0)} players reused · roster unchanged`,
-        reused:true
-      });
-    }else{
-      const mappedPlayers=await stage(ctx,step,'map-players',()=>call(
-        ctx.origin,companion(ctx.slug,'map-players'),ctx.owner,'POST',{compact:true}
-      ));
-      ctx.playerMappingRunId=mappedPlayers?.mappingRun?.id||null;
-      if(!ctx.playerMappingRunId)throw new Error('Map Players completed without returning its exact mapping run ID.');
-      const total=mappedPlayers?.mappingRun?.playerCount??mappedPlayers?.playerCount??'?';
-      const fas=mappedPlayers?.mappingRun?.freeAgentCount??0;
-      await report(ctx,'map-players',true,{summary:`${total} players mapped · ${fas} source Free Agent(s)`});
-    }
-
-    await simple(ctx,step,'map-schedule','map-schedule',p=>`${p.games?.length??p.mappingRun?.gameCount??'?'} games mapped`);
-
-    let stats=await step.do('statistics-start',{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
-      ctx.origin,companion(ctx.slug,'map-statistics'),ctx.owner,'POST',{action:'start'}
-    ));
-    const statsRunId=stats?.mappingRun?.id;
-    if(!statsRunId)throw new Error('Statistics mapper did not return a run ID.');
-    let statsGuard=0;
-    while(!stats.complete&&statsGuard<5000){
-      stats=await step.do(`statistics-next-${statsGuard+1}`,{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
-        ctx.origin,companion(ctx.slug,'map-statistics'),ctx.owner,'POST',{action:'next',runId:statsRunId}
-      ));
-      statsGuard++;
-    }
-    if(statsGuard>=5000)throw new Error('Statistics mapping stopped after 5000 chunks.');
-    const statsFinal=await step.do('statistics-final',()=>call(ctx.origin,companion(ctx.slug,'map-statistics'),ctx.owner));
-    const failed=Number(statsFinal?.progress?.failed??statsFinal?.delta?.failedRoutes??0);
-    if(failed>0)throw new Error(`${failed} statistics route(s) failed mapping. Snapshot build blocked.`);
-    await report(ctx,'map-statistics',true,{
-      summary:`${statsFinal?.mappingRun?.recordCount??0} new/changed statistics records mapped`,
-      statisticsMappingRunId:statsRunId
     });
 
-    const built=await stage(ctx,step,'build-snapshot',()=>call(
-      ctx.origin,companion(ctx.slug,'build-snapshot'),ctx.owner,'POST',
-      {playerMappingRunId:ctx.playerMappingRunId}
+    const schedule=await phase(context,step,'map-schedule',()=>call(
+      context,companion(context.slug,'map-schedule'),'POST',{discoverySessionId:context.discoverySessionId}
+    ),payload=>({
+      summary:`${Number(payload.mappingRun?.gameCount??payload.games?.length??0)} games mapped`,
+      counts:{games:Number(payload.mappingRun?.gameCount??payload.games?.length??0)},
+      warnings:payload.mappingRun?.warnings||[],scheduleMappingRunId:payload.mappingRun?.id
+    }));
+
+    const statistics=await phase(context,step,'map-statistics',()=>mapStatistics(context,step),payload=>({
+      summary:`${Number(payload.mappingRun?.recordCount||0)} statistics mapped`,
+      counts:{statistics:Number(payload.mappingRun?.recordCount||0)},
+      warnings:payload.mappingRun?.warnings||[],statisticsMappingRunId:payload.mappingRun?.id
+    }));
+
+    const mappingRunIds={
+      teamMappingRunId:teams.mappingRun?.id,
+      playerMappingRunId:players.mappingRun?.id,
+      scheduleMappingRunId:schedule.mappingRun?.id,
+      statisticsMappingRunId:statistics.mappingRun?.id
+    };
+    const built=await phase(context,step,'build-candidate',()=>call(
+      context,companion(context.slug,'build-snapshot'),'POST',{
+        candidateImportRunId:context.runId,...mappingRunIds
+      }
+    ),payload=>({
+      summary:`Private candidate ${payload.snapshot?.snapshotId||'built'}`,
+      counts:payload.snapshot?.counts||{},candidateSnapshotId:payload.snapshot?.snapshotId
+    }));
+    const snapshotId=built.snapshot?.snapshotId;
+    if(!snapshotId)throw new Error('Candidate builder did not return a snapshot ID.');
+
+    await phase(context,step,'validate-candidate',()=>validateCandidate(context,step,snapshotId),payload=>({
+      summary:'Private candidate validation ready',counts:payload.snapshot?.counts||{},candidateSnapshotId:snapshotId
+    }));
+
+    const durationMs=Date.now()-context.wallStartedAt;
+    const finalized=await step.do('finalize-preview-ready',()=>call(
+      context,companion(context.slug,'candidate-import'),'POST',{action:'finalize',runId:context.runId,durationMs}
     ));
-    ctx.snapshotId=built?.snapshot?.snapshotId||built?.snapshotId||null;
-    if(!ctx.snapshotId)throw new Error('Snapshot Builder completed without returning a Snapshot ID.');
-    await report(ctx,'build-snapshot',true,{
-      summary:`Snapshot ${ctx.snapshotId} built · players ${ctx.playerMappingRunId}`,
-      snapshotId:ctx.snapshotId,
-      playerMappingRunId:ctx.playerMappingRunId
-    });
-
-    let validation=await step.do('validation-start',{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
-      ctx.origin,companion(ctx.slug,'snapshot-lifecycle'),ctx.owner,'POST',{action:'validate-start',snapshotId:ctx.snapshotId}
-    ));
-    let validationGuard=0;
-    while(!validation.complete&&validationGuard<500){
-      validation=await step.do(`validation-next-${validationGuard+1}`,{retries:{limit:2,delay:'2 seconds'},timeout:'15 minutes'},()=>call(
-        ctx.origin,companion(ctx.slug,'snapshot-lifecycle'),ctx.owner,'POST',{action:'validate-next',snapshotId:ctx.snapshotId,limit:250}
-      ));
-      validationGuard++;
-    }
-    if(validationGuard>=500)throw new Error('Snapshot validation stopped after 500 batches.');
-
-    const validationSnapshot=validation?.snapshot||validation?.result?.snapshot||null;
-    const validationStatus=String(
-      validation?.validationStatus||
-      validationSnapshot?.validationStatus||
-      validation?.status||
-      validation?.validation?.status||
-      ''
-    ).toLowerCase();
-    const validationReport=
-      validation?.validationReport||
-      validationSnapshot?.validationReport||
-      validation?.report||
-      validation?.validation||
-      null;
-    const validationErrors=[
-      ...(Array.isArray(validation?.errors)?validation.errors:[]),
-      ...(Array.isArray(validationReport?.errors)?validationReport.errors:[])
-    ];
-
-    if(validationStatus==='failed'||validationSnapshot?.errorCount>0||validationErrors.length){
-      const summary=validationErrors.length
-        ? validationErrors.slice(0,8).join(' | ')
-        : `Snapshot validation status: ${validationStatus||'failed'}`;
-      await report(ctx,'validate-snapshot',false,{
-        summary,
-        snapshotId:ctx.snapshotId,
-        validationStatus:validationStatus||'failed',
-        validationReport,
-        validationErrors
-      }).catch(()=>{});
-      const error=new Error(`Snapshot validation failed: ${summary}`);
-      error.payload={snapshotId:ctx.snapshotId,validationStatus,validationReport,validationErrors};
-      throw error;
-    }
-
-    await report(ctx,'validate-snapshot',true,{
-      summary:'Validation ready',
-      snapshotId:ctx.snapshotId,
-      validationStatus:validationStatus||'ready'
-    });
-
-    await stage(ctx,step,'activate-snapshot',()=>call(
-      ctx.origin,companion(ctx.slug,'snapshot-lifecycle'),ctx.owner,'POST',{action:'activate',snapshotId:ctx.snapshotId}
-    ));
-    await report(ctx,'activate-snapshot',true,{summary:`LIVE · ${ctx.snapshotId}`,snapshotId:ctx.snapshotId});
-
-    // 5.9.11.0: transaction/FA reconstruction is quarantined from the import critical path.
-    const verified=await stage(ctx,step,'verify-active-snapshot',()=>call(
-      ctx.origin,companion(ctx.slug,'snapshot-verification'),ctx.owner
-    ));
-    const active=verified?.snapshot?.id||verified?.snapshot?.snapshotId||verified?.activeSnapshotId||null;
-    if(active&&String(active)!==String(ctx.snapshotId))throw new Error(`Verification returned different active snapshot (${active}).`);
-    await report(ctx,'verify-active-snapshot',true,{summary:'LIVE snapshot verified',snapshotId:ctx.snapshotId});
-
-    // Certification is server-side now as well. Failure here does not undo the already-verified LIVE snapshot.
-    await step.do('certification',{retries:{limit:1,delay:'2 seconds'},timeout:'5 minutes'},()=>call(
-      ctx.origin,companion(ctx.slug,'import-certification'),ctx.owner,'POST',
-      {snapshotId:ctx.snapshotId,runId:ctx.runId,serverSide:true}
-    )).catch(()=>null);
-
-    return {ok:true,release:RELEASE,noChange:false,snapshotId:ctx.snapshotId,runId:ctx.runId,durationMs:Date.now()-workflowStartedAt};
+    return{
+      ok:true,release:RELEASE,run:finalized.run,candidateSnapshotId:snapshotId,durationMs,
+      performanceTargetMet:durationMs<60000,private:true,activationPerformed:false,activeSnapshotChanged:false
+    };
   }
 }
 
-export default {
+async function workflowId(slug,workflowKey){
+  const encoded=new TextEncoder().encode(`${slug}:${workflowKey}`);
+  const digest=await crypto.subtle.digest('SHA-256',encoded);
+  return`fhq-${Array.from(new Uint8Array(digest)).slice(0,12).map(value=>value.toString(16).padStart(2,'0')).join('')}`;
+}
+
+export default{
   async fetch(request,env){
     try{
       const url=new URL(request.url);
-    if(url.pathname==='/start'&&request.method==='POST'){
-      const body=await request.json().catch(()=>({}));
-      const slug=text(body.leagueSlug);
-      const owner=text(body.ownerAccountId);
-      const origin=text(body.origin).replace(/\/+$/,'');
-      const token=text(body.importAuthToken);
-      const workflowKey=text(body.workflowKey);
-
-      if(!slug||!owner||!origin||!token||!workflowKey){
-        return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
-      }
-
-      const encoded=new TextEncoder().encode(`${slug}:${workflowKey}`);
-      const digest=await crypto.subtle.digest('SHA-256',encoded);
-      const shortHash=Array.from(new Uint8Array(digest))
-        .slice(0,12)
-        .map(v=>v.toString(16).padStart(2,'0'))
-        .join('');
-      const baseId=`fhq-${shortHash}`;
-
-      // Same Companion session = same Workflow while that Workflow is healthy/running/completed.
-      // A FAILED Workflow must never be reused for a retry because its Cloudflare step state
-      // contains the old failed statistics result.
-      let baseStatus=null;
-      let baseFailed=false;
-      try{
-        const existing=await env.FRANCHISE_IMPORT_WORKFLOW.get(baseId);
-        baseStatus=await existing.status().catch(()=>null);
-        const existingState=String(baseStatus?.status||'').toLowerCase();
-        baseFailed=['failed','errored','error','terminated','cancelled','canceled'].includes(existingState);
-
-        if(baseStatus&&!baseFailed){
-          return json({
-            ok:true,release:RELEASE,id:baseId,reusedExisting:true,
-            workflowKey,status:baseStatus
-          });
-        }
-      }catch(_){}
-
-      // If the deterministic ID belongs to a failed run, create a fresh retry ID immediately.
-      // Do not attempt to recreate or recover the failed base ID.
-      let id=baseFailed
-        ? `${baseId}-r${Date.now().toString(36)}`
-        : baseId;
-      let instance=null;
-
-      try{
-        instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
-      }catch(createError){
-        if(baseFailed){
-          // Extremely unlikely retry-ID collision: create another unique retry instance.
+      if(url.pathname==='/start'&&request.method==='POST'){
+        const body=await request.json().catch(()=>({}));
+        const slug=text(body.leagueSlug),origin=text(body.origin).replace(/\/+$/,''),token=text(body.importAuthToken);
+        const workflowKey=text(body.workflowKey);
+        if(!slug||!origin||!token||!workflowKey)return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
+        const baseId=await workflowId(slug,workflowKey);
+        let status=null;
+        try{status=await (await env.FRANCHISE_IMPORT_WORKFLOW.get(baseId)).status();}catch{}
+        const failed=['failed','errored','error','terminated','cancelled','canceled'].includes(String(status?.status||'').toLowerCase());
+        if(status&&!failed)return json({ok:true,release:RELEASE,id:baseId,reusedExisting:true,workflowKey,status});
+        let id=failed?`${baseId}-r${Date.now().toString(36)}`:baseId;
+        let instance;
+        try{instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});}
+        catch(error){
           id=`${baseId}-r${Date.now().toString(36)}-${crypto.randomUUID().slice(0,6)}`;
-          instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
-        }else{
-          // Healthy concurrent start race: another device may have created baseId first.
-          const raced=await env.FRANCHISE_IMPORT_WORKFLOW.get(baseId);
-          const racedStatus=await raced.status().catch(()=>null);
-          const racedState=String(racedStatus?.status||'').toLowerCase();
-
-          if(racedStatus&&!['failed','errored','error','terminated','cancelled','canceled'].includes(racedState)){
-            return json({
-              ok:true,release:RELEASE,id:baseId,reusedExisting:true,raced:true,
-              workflowKey,status:racedStatus
-            });
-          }
-
-          // The race target failed before recovery; start a clean retry instead.
-          id=`${baseId}-r${Date.now().toString(36)}-${crypto.randomUUID().slice(0,6)}`;
-          instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});
+          instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:{...body,retry:true}});
         }
+        return json({ok:true,release:RELEASE,id,reusedExisting:false,retryOfFailedWorkflow:failed,workflowKey,status:await instance.status().catch(()=>null)});
       }
-
-      return json({
-        ok:true,
-        release:RELEASE,
-        id,
-        reusedExisting:false,
-        retryOfFailedWorkflow:baseFailed,
-        workflowKey,
-        status:await instance.status().catch(()=>null)
-      });
-    }
-
-    if(url.pathname==='/status'&&request.method==='GET'){
-      const id=text(url.searchParams.get('id'));
-      let workflowStatus=null;
-
-      if(id){
-        try{
-          const instance=await env.FRANCHISE_IMPORT_WORKFLOW.get(id);
-          workflowStatus=await instance.status().catch(error=>({
-            status:'unknown',
-            error:String(error?.message||error)
-          }));
-        }catch(error){
-          workflowStatus={status:'unknown',error:String(error?.message||error)};
-        }
+      if(url.pathname==='/status'&&request.method==='GET'){
+        const id=text(url.searchParams.get('id'));
+        let status=null;
+        if(id)try{status=await (await env.FRANCHISE_IMPORT_WORKFLOW.get(id)).status();}catch(error){status={status:'unknown',error:String(error?.message||error)}}
+        return json({ok:true,release:RELEASE,id,workflowStatus:status,workflowState:String(status?.status||'unknown').toLowerCase(),workflowOutput:status?.output||null});
       }
-
-      return json({
-        ok:true,
-        release:RELEASE,
-        id,
-        workflowStatus,
-        workflowState:String(workflowStatus?.status||'unknown').toLowerCase(),
-        workflowOutput:workflowStatus?.output||null
-      });
-    }
-
       return json({ok:false,release:RELEASE,error:'Not found.'},404);
     }catch(error){
-      console.error('[Franchise Import Worker]',error);
-      return json({
-        ok:false,
-        release:RELEASE,
-        error:error?.message||'Server-side import Worker failed.',
-        stage:'worker-fetch',
-        detail:error?.stack||null
-      },500);
+      console.error('[Franchise Candidate Import Worker]',error);
+      return json({ok:false,release:RELEASE,error:error?.message||'Candidate import Worker failed.'},500);
     }
   }
 };
