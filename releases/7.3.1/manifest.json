@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.1",
   "releaseType": "permanent-identity-private-preview",
-  "status": "implementation-authorized",
+  "status": "validated-review-candidate",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.0",
@@ -19,15 +19,19 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "local-commit-push-blocked-authentication",
-    "commit": "2f825b52897ef57c2287fd5de69417a68da206f9",
-    "scope": "The validated candidate is committed on codex/franchisehq-7.3.1. GitHub publication is blocked because this host has no usable HTTPS credential or trusted SSH connection. Main is unchanged."
+    "status": "pull-request-open-hosted-checks-passed",
+    "commit": "5742bd735e1f8d0e17901aaeb1134c22a668c4f3",
+    "pullRequest": 11,
+    "hostedChecksPassed": 4,
+    "scope": "The validated candidate is published on codex/franchisehq-7.3.1 with a stacked pull request against codex/franchisehq-7.3.0. Main is unchanged."
   },
   "staging": {
     "authorized": true,
-    "deployed": false,
-    "status": "blocked-cloudflare-authentication",
-    "scope": "Migration 23 and isolated Preview deployment are authorized but not run because no Cloudflare API token or authenticated Wrangler session is available on this host."
+    "deployed": true,
+    "status": "migration-and-preview-verified-authenticated-data-gate-blocked",
+    "deploymentId": "c6a30d62-f254-47e8-a954-58e5d6797164",
+    "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
+    "scope": "Migration 23 and exact commit 5742bd7 are verified in isolated staging. Report and identity-preview actions remain blocked because staging has zero users and memberships."
   },
   "production": {
     "authorized": false,

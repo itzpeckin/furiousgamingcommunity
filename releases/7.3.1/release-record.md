@@ -1,6 +1,6 @@
 # FranchiseHQ 7.3.1 Release Record
 
-**Status:** Local implementation candidate; permanent identity and private preview are implemented but have not been deployed or run against staging capture data
+**Status:** Isolated-staging candidate; permanent identity and private preview UI are deployed, while authenticated report/mapping remains blocked by the empty staging identity set
 
 **Production authorized:** No
 
@@ -23,10 +23,10 @@ Add permanent franchise-season, player/source-alias, player-season, GM-person, a
 
 ## Known inherited blockers
 
-- The staging report still requires an authenticated commissioner/platform-owner to select “Analyze Captured Export.”
+- The staging report still requires an authenticated commissioner/platform-owner to select “Analyze Captured Export.” Staging currently has zero users and memberships, so a separately authorized staging-only identity bootstrap is required first.
 - Madden's explicit Free Agent route remains blocked upstream. FranchiseHQ cannot claim a complete player pool.
 - The accepted refresh/login inconvenience remains frozen until 7.5.0.
-- No 7.3.1 isolated-staging migration/deployment or live private preview run has been authorized.
+- No live private preview run or staging membership bootstrap has been authorized or performed.
 
 ## Validation evidence
 
@@ -39,10 +39,10 @@ Add permanent franchise-season, player/source-alias, player-season, GM-person, a
 
 - Baseline: `codex/franchisehq-7.3.0` commit `5c062e5b91b9b7690c3717ff4fe6bef761999e48`.
 - Branch `codex/franchisehq-7.3.1` was created from the exact 7.3.0 baseline after authorization.
-- Local commit `2f825b52897ef57c2287fd5de69417a68da206f9` contains the exact validated candidate.
-- GitHub push was attempted over HTTPS and SSH. HTTPS had no usable credential; SSH host trust/authentication was unavailable. Nothing was published and Main is unchanged.
-- The isolated staging database/deployment steps were not run because this host has no Cloudflare API token or authenticated Wrangler session.
-- The authenticated analysis action was not run because the available in-app browser rejected both the exact Preview and canonical FranchiseHQ URLs before page load; no connected Chrome session was available.
+- PR #11 is open from `codex/franchisehq-7.3.1` into `codex/franchisehq-7.3.0`; exact UI candidate commit `5742bd735e1f8d0e17901aaeb1134c22a668c4f3` has 4/4 hosted checks passing.
+- Migration 23 was applied only to `franchise-hq-staging-db` after Time Travel bookmark `0000001b-00000000-000050d6-d7b3a343ba157b0b8149ee047302b36a`. Verification shows ledger 23, 66 application tables, zero foreign-key violations, and unchanged protected counts. Post-migration bookmark: `0000001b-00000002-000050d6-8e74fd51e8b1e90f9529f08fe16e6ac0`.
+- Cloudflare Preview deployment `c6a30d62-f254-47e8-a954-58e5d6797164` succeeded from exact commit `5742bd7` at `https://c6a30d62.franchise-hq.pages.dev`.
+- The authenticated report and identity-preview actions were not run. Staging has one league, zero users, zero memberships, and zero active snapshots; no identity or membership data was inferred or changed.
 - Production, Main, data reset, import, snapshot activation, and membership changes: not authorized and not run.
 
 ## Rollback
@@ -53,4 +53,4 @@ Add permanent franchise-season, player/source-alias, player-season, GM-person, a
 
 ## Owner input required for the next gate
 
-Use an authenticated commissioner/platform-owner session in isolated staging to select “Analyze Captured Export.” Then separately review and authorize the exact 7.3.1 commit, migration 23 staging plan, isolated Preview deployment, and private 32-team/2,044-player preview run. No production authorization is implied.
+Separately authorize a staging-only commissioner/platform-owner identity bootstrap. That owner can select “Analyze Captured Export,” map teams and rostered players, enter the reviewed season key, and generate the private 32-team/2,044-player preview. No production authorization is implied.
