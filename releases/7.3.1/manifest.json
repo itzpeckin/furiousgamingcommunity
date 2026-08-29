@@ -41,6 +41,7 @@
     "docs/ROADMAP.md",
     "functions/_lib/permanent-identity.js",
     "functions/api/leagues/[leagueSlug]/companion/identity-preview.js",
+    "league-engine/identity-preview.js",
     "migrations/0023_permanent_identity_preview.sql",
     "releases/7.3.1/release-record.md",
     "releases/7.3.1/validation-evidence.json",

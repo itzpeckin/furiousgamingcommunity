@@ -96,13 +96,21 @@ test('blocked Free Agents remain unknown and force rostered-player-only preview'
 });
 
 test('private identity preview preserves authorization and activation boundaries', async () => {
-  const source = await readFile(new URL(
-    '../../functions/api/leagues/[leagueSlug]/companion/identity-preview.js', import.meta.url
-  ), 'utf8');
+  const [source, ui, workspace, html] = await Promise.all([
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/identity-preview.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../league-engine/identity-preview.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../league-engine/platform-workspace.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../index.html', import.meta.url), 'utf8')
+  ]);
   assert.match(source, /requirePlatformOwner\(context\)/);
   assert.match(source, /status='pending-preview'/);
   assert.match(source, /activationPerformed:false/);
   assert.match(source, /activeSnapshotChanged:false/);
   assert.match(source, /not proof of zero Free Agents/);
   assert.doesNotMatch(source, /UPDATE league_active_snapshots|INSERT INTO league_active_snapshots|DELETE FROM league_active_snapshots/);
+  assert.match(ui, /Free Agents blocked upstream/);
+  assert.match(ui, /data-identity-source-season/);
+  assert.match(ui, /activeSnapshotChanged:false/);
+  assert.match(workspace, /identity-preview/);
+  assert.match(html, /league-engine\/identity-preview\.js\?v=7\.3\.1/);
 });

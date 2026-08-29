@@ -17,6 +17,7 @@ Add permanent franchise-season, player/source-alias, player-season, GM-person, a
 - Player season summaries retain distinct season state and permanent career totals.
 - GM identity belongs to a person; partial unique indexes prevent one GM or team from having overlapping open ownership periods.
 - Added a platform-owner-only identity preview API that consumes only analyzed, pending-preview mappings.
+- Added a Platform Workspace identity-preview panel for entering the reviewed season key, generating the private preview, showing the 32-team roster distribution, and keeping the blocked Free Agent state visible.
 - A reviewed source franchise/season key is mandatory. The API does not infer the season from unverified capture metadata.
 - Blocked Free Agents produce `rostered-players-only`, a null Free Agent count, and an explicit warning that failure is not zero.
 

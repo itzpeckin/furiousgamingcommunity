@@ -134,7 +134,7 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 165,
+      ".js": 166,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
@@ -163,7 +163,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74802,
+        "bytes": 74868,
         "file": "index.html"
       },
       {
@@ -227,7 +227,7 @@
         "file": "tools/check-release.mjs"
       }
     ],
-    "total": 517
+    "total": 518
   },
   "frontend": {
     "assets": [
@@ -582,6 +582,11 @@
         "versioned": true
       },
       {
+        "path": "league-engine/identity-preview.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "league-engine/developer-mode.js",
         "type": "script",
         "versioned": true
@@ -673,7 +678,7 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 86,
+    "scriptCount": 87,
     "stylesheetCount": 2
   },
   "functions": {
@@ -1170,6 +1175,7 @@
         "league-engine/companion-schedule-mapper.js",
         "league-engine/companion-statistics-engine.js",
         "league-engine/data-explorer.js",
+        "league-engine/identity-preview.js",
         "league-engine/league-snapshot-builder.js",
         "league-engine/live-read-model.js",
         "league-engine/one-click-import.js",
@@ -1181,7 +1187,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 59
+      "occurrences": 60
     },
     "browserStorageCalls": {
       "files": [

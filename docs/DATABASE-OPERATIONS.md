@@ -53,7 +53,7 @@ npm run check:strict
 
 The gate must prove:
 
-- a clean database reaches ledger version 22;
+- a clean database reaches ledger version 23;
 - a production-like legacy database upgrades without changing league, user, membership, team assignment, or snapshot identity;
 - all required tables and core columns exist;
 - `PRAGMA foreign_key_check` returns no rows;
@@ -97,7 +97,7 @@ SELECT COUNT(*) AS active_snapshot_count FROM league_active_snapshots;
 PRAGMA foreign_key_check;
 ```
 
-After 7.3.0, the ledger must contain every version from 1 through 22 and the foreign-key check must return no rows. Migration 21 adds four application tables for tenant aliases, domains, features, and audit events. Migration 22 adds exactly three discovery tables and does not change existing league, user, membership, snapshot, import, team, player, or capture rows.
+After 7.3.1, the ledger must contain every version from 1 through 23 and the foreign-key check must return no rows. Migration 21 adds four application tables for tenant aliases, domains, features, and audit events. Migration 22 adds exactly three discovery tables. Migration 23 adds permanent identity and private preview tables without changing existing league, user, membership, snapshot, import, team, player, or capture rows.
 
 ## Stop conditions
 
@@ -106,11 +106,11 @@ Stop immediately and do not deploy the application when any of these occurs:
 - the target database identity is uncertain;
 - a Time Travel bookmark was not recorded;
 - a migration is applied out of order or only partly succeeds;
-- ledger versions 1 through 22 are not continuous;
+- ledger versions 1 through 23 are not continuous;
 - league, user, membership, team assignment, or snapshot counts unexpectedly change;
 - any foreign-key check row appears;
 - an expected production table or column is missing;
-- the staging application reports `DATABASE_MIGRATION_REQUIRED` after version 22 is recorded.
+- the staging application reports `DATABASE_MIGRATION_REQUIRED` after version 23 is recorded.
 
 ## Recovery and rollback
 

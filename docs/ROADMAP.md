@@ -122,7 +122,7 @@
 - Make GM history person-owned rather than team/name-owned so career results survive team changes.
 - Map the 32 captured teams and 2,044 certified rostered players into a private FGC preview without waiting for the blocked Free Agent route; label the preview as rostered-player-only until Free Agents are accepted.
 - Gate: players and owners survive new seasons, team changes, and later Madden editions without losing or merging identities incorrectly.
-- Local candidate adds migration 23, permanent source aliases, person-owned GM records, non-overlapping ownership periods, and a platform-owner-only identity preview endpoint.
+- Local candidate adds migration 23, permanent source aliases, person-owned GM records, non-overlapping ownership periods, and a Platform Workspace identity preview UI backed by a platform-owner-only endpoint.
 - The preview requires an explicitly reviewed source-season key; it does not guess a season from the current capture.
 - When Madden Free Agents are blocked, the preview records `rostered-players-only`, stores a null Free Agent count, and visibly states that the failure is not proof of zero Free Agents.
 - No production, Main, reset, import, active-snapshot, or membership authority is included.
