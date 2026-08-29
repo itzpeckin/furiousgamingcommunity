@@ -18,11 +18,19 @@ This runbook governs FranchiseHQ database changes beginning with 7.1.0. It is wr
 - The migration preserves existing rules, shared settings, active snapshot pointers, validation-player rows, users, sessions, memberships, imports, and R2 object references.
 - Future league records default disabled. Existing active production leagues are enabled without creating or activating a second league.
 
+## What 7.3.0 adds
+
+- `migrations/0022_madden_27_discovery_foundation.sql` advances the required schema to version 22.
+- It adds tenant-scoped, short-lived Madden discovery sessions; session-to-capture links; and structural source-lock reports.
+- Capture tokens are returned once and retained only as SHA-256 hashes. Raw Companion payloads remain in the existing private R2 binding.
+- Identical route payloads can be associated with a new discovery session without duplicating the same R2 object.
+- The migration does not reset, import, activate, archive, or publish Madden data and does not modify an active snapshot pointer.
+
 ## Authorization boundary
 
 Building and testing a migration does not authorize applying it to Cloudflare. Staging application and production application are separate decisions. A production migration requires a new, explicit owner authorization after the local candidate and recovery plan are reviewed.
 
-7.2.0 does not reset Madden data, activate an import, edit memberships, change Discord settings, or redesign session-refresh behavior.
+7.3.0 does not reset Madden data, activate an import, edit memberships, change Discord settings, or redesign session-refresh behavior. Applying migration 22, deploying Preview, running a real Companion capture, and applying anything to production are separate authorization decisions.
 
 ## Before any cloud migration
 
@@ -30,7 +38,7 @@ Building and testing a migration does not authorize applying it to Cloudflare. S
 2. Confirm the target is the intended staging database. Never point a preview at production.
 3. Record a D1 Time Travel bookmark immediately before the change.
 4. Record these read-only facts: migration ledger, table count, league count, user count, membership count, active snapshot count, and `PRAGMA foreign_key_check` result.
-5. Apply only the next unapplied migration in ledger order. For a production database already at 7.1, that is 0021. Stop on the first error.
+5. Apply only unapplied migrations in ledger order. A 7.1 production database must receive 0021 before 0022; the isolated 7.2 staging database requires only 0022. Stop on the first error.
 6. Re-run the read-only checks and compare all identity/relationship counts.
 
 Cloudflare documents that D1 captures a backup when `wrangler d1 migrations apply` runs and rolls back a failing migration while leaving earlier successful migrations applied. FranchiseHQ still records the pre-change bookmark and verifies every result. See [Cloudflare D1 migration commands](https://developers.cloudflare.com/d1/wrangler-commands/#d1-migrations-apply).
@@ -45,13 +53,13 @@ npm run check:strict
 
 The gate must prove:
 
-- a clean database reaches ledger version 21;
+- a clean database reaches ledger version 22;
 - a production-like legacy database upgrades without changing league, user, membership, team assignment, or snapshot identity;
 - all required tables and core columns exist;
 - `PRAGMA foreign_key_check` returns no rows;
 - a file backup restores to the same rows and relationships;
 - no request handler contains table or index creation SQL;
-- tenant migration preservation and two-tenant isolation tests pass.
+- tenant migration preservation, two-tenant isolation, hashed discovery-session storage, and source-lock privacy tests pass.
 
 Apply only unapplied migrations to an isolated staging database:
 
@@ -89,7 +97,7 @@ SELECT COUNT(*) AS active_snapshot_count FROM league_active_snapshots;
 PRAGMA foreign_key_check;
 ```
 
-After 7.2, the ledger must contain every version from 1 through 21 and the foreign-key check must return no rows. A database already on 7.1 should add exactly four application tables: tenant aliases, domains, features, and audit events. Rebuilding three existing scoped tables does not change their row counts or the net table count.
+After 7.3.0, the ledger must contain every version from 1 through 22 and the foreign-key check must return no rows. Migration 21 adds four application tables for tenant aliases, domains, features, and audit events. Migration 22 adds exactly three discovery tables and does not change existing league, user, membership, snapshot, import, team, player, or capture rows.
 
 ## Stop conditions
 
@@ -98,15 +106,15 @@ Stop immediately and do not deploy the application when any of these occurs:
 - the target database identity is uncertain;
 - a Time Travel bookmark was not recorded;
 - a migration is applied out of order or only partly succeeds;
-- ledger versions 1 through 21 are not continuous;
+- ledger versions 1 through 22 are not continuous;
 - league, user, membership, team assignment, or snapshot counts unexpectedly change;
 - any foreign-key check row appears;
 - an expected production table or column is missing;
-- the staging application reports `DATABASE_MIGRATION_REQUIRED` after version 21 is recorded.
+- the staging application reports `DATABASE_MIGRATION_REQUIRED` after version 22 is recorded.
 
 ## Recovery and rollback
 
-The normal application rollback is to restore the previous application commit while retaining the forward-compatible schema. Do not drop or reverse 7.1/7.2 tables as an improvised rollback.
+The normal application rollback is to restore the previous application commit while retaining the forward-compatible schema. Do not drop or reverse 7.1/7.2/7.3 tables as an improvised rollback.
 
 If a database restore is genuinely required, stop writes, record the current bookmark, and restore the pre-migration bookmark only with explicit owner approval. Cloudflare warns that Time Travel restore overwrites the database in place and cancels in-flight queries. It also returns the prior bookmark so the restore can be undone. See [Cloudflare D1 Time Travel and backups](https://developers.cloudflare.com/d1/reference/time-travel/).
 

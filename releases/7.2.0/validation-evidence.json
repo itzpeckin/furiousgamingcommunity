@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.2.0",
   "validatedOn": "2026-08-27",
-  "status": "local-strict-validation-passed-review-pending",
+  "status": "staging-validated-production-not-authorized",
   "baselineGate": {
     "passed": true,
     "unregisteredFailures": 0
@@ -24,7 +24,7 @@
     "freshDatabase": { "passed": true, "requiredTables": 54, "finalVersion": 21 },
     "foreignKeyIntegrity": { "passed": true, "violations": 0 },
     "runtimeSchemaGuard": { "passed": true, "minimumVersion": 21 },
-    "automatedTests": { "passed": true, "passedTests": 60, "failedTests": 0, "scope": "full-consolidated-release-gate" },
+    "automatedTests": { "passed": true, "passedTests": 61, "failedTests": 0, "scope": "full-consolidated-release-gate" },
     "strictMigration": { "passed": true, "expectedFailure": false, "blockingIssues": 0, "finalVersion": 21 },
     "strictRepositoryGate": { "passed": true, "javascriptModules": 183, "secretScanFiles": 521, "inventoryFiles": 508, "routes": 59 }
   },
@@ -38,18 +38,32 @@
     "productionInfrastructureChanged": false
   },
   "external": {
-    "githubPullRequest": { "authorized": true, "status": "authorized-pending-creation" },
-    "hostedChecks": { "status": "not-run" },
-    "stagingDeployment": { "authorized": true, "status": "authorized-not-run" },
-    "stagingMigrations": { "authorized": true, "status": "authorized-not-run", "migrations": [21] },
+    "githubPullRequest": { "authorized": true, "status": "open", "number": 9, "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/9" },
+    "hostedChecks": { "status": "passed", "passed": 4, "failed": 0, "commit": "5799c35675c85695194234119fbe28f8dda76ed1" },
+    "stagingDeployment": { "authorized": true, "status": "passed", "deploymentId": "041c8c85-54e6-4927-b5bb-f8fc460e3be2", "url": "https://041c8c85.franchise-hq.pages.dev", "commit": "5799c35675c85695194234119fbe28f8dda76ed1", "durationSeconds": 15 },
+    "stagingMigrations": { "authorized": true, "status": "applied-verified", "migrations": [21], "databaseName": "franchise-hq-staging-db", "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816", "schemaVersion": 21, "foreignKeyViolations": 0 },
+    "stagingResources": {
+      "status": "isolated-and-bound",
+      "bindings": {
+        "DB": "franchise-hq-staging-db",
+        "FRANCHISE_HQ_DB": "franchise-hq-staging-db",
+        "COMPANION_EXPORTS": "franchise-hq-staging-companion-exports",
+        "COMPANION_EXPORT_META": "franchise-hq-staging-companion-meta",
+        "LEAGUE_CONFIG": "franchise-hq-staging-league-config"
+      },
+      "variables": { "APP_ENV": "staging", "APP_VERSION": "7.2.0", "PLATFORM_OWNER_ACCOUNT_ID": "staging-owner" },
+      "secretNames": ["COMPANION_EXPORT_TOKEN", "SESSION_SIGNING_SECRET"],
+      "productionIdentifiersShared": false
+    },
     "productionDeployment": { "authorized": false, "status": "not-run", "url": "https://franchisehq.app/" },
     "productionMigrations": { "authorized": false, "status": "not-run", "migrations": [21] },
     "productionDataReset": { "authorized": false, "status": "not-run" },
     "maddenImportActivation": { "authorized": false, "status": "not-run" }
   },
   "manualAcceptance": {
-    "status": "not-applicable-to-local-tenant-foundation",
-    "nextGate": "owner-review-and-repository-publication-authorization"
+    "status": "cloudflare-configuration-and-deployment-verified",
+    "limitation": "The owner's computer security blocks direct pages.dev requests, so the public /api/platform/status smoke check could not be executed without bypassing a security control.",
+    "nextGate": "owner-review-and-separate-production-authorization"
   },
   "productionChanged": false,
   "dataChanged": false,

@@ -100,6 +100,46 @@ export async function requireCommissioner(context) {
   );
 }
 
+export async function requirePlatformOwner(context) {
+  const commissioner = await requireCommissioner(context);
+  if (!commissioner.authorized) return commissioner;
+
+  const configuredDiscordId = String(
+    context.env?.OWNER_FALLBACK_DISCORD_ID || ""
+  ).trim();
+  const sessionDiscordId = String(
+    commissioner.session?.user?.discordUserId || ""
+  ).trim();
+
+  if (configuredDiscordId && sessionDiscordId === configuredDiscordId) {
+    return commissioner;
+  }
+
+  // Local and isolated Preview environments may use the existing simulated
+  // Platform Workspace account until a staging Discord identity is connected.
+  // Production never falls back to a client-presented account identifier.
+  const environment = String(context.env?.APP_ENV || "production").trim().toLowerCase();
+  const configuredAccountId = String(
+    context.env?.PLATFORM_OWNER_ACCOUNT_ID || ""
+  ).trim();
+  const presentedAccountId = String(
+    context.request.headers.get("x-franchisehq-platform-owner-account-id") || ""
+  ).trim();
+
+  if (
+    environment !== "production"
+    && configuredAccountId
+    && presentedAccountId === configuredAccountId
+  ) {
+    return commissioner;
+  }
+
+  return {
+    authorized: false,
+    response: jsonResponse({ ok: false, error: "Not found." }, 404)
+  };
+}
+
 export async function requireTradeCommitteeAccess(
   context
 ) {

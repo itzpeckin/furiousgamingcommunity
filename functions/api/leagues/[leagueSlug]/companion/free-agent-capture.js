@@ -1,15 +1,21 @@
 import { json, database, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='7.0.1';
+const RELEASE='7.3.0';
 const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
 const TEAM_ROSTER_ROUTE=/\/team\/[^/]+\/roster\/?$/i;
 
 async function routeRows(db,leagueId){
-  const result=await db.prepare(`SELECT id,discovery_session_id,route_path,byte_length,r2_object_key,received_at
-    FROM companion_route_captures
-    WHERE league_id=?
-    ORDER BY received_at DESC LIMIT 300`).bind(leagueId).all();
+  const session=await db.prepare(`SELECT id FROM madden_discovery_sessions
+    WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
+  const result=session
+    ?await db.prepare(`SELECT c.id,link.session_id discovery_session_id,c.route_path,c.byte_length,c.r2_object_key,
+        link.observed_at received_at FROM madden_discovery_session_captures link
+      JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
+      WHERE link.league_id=? AND link.session_id=? ORDER BY link.observed_at DESC LIMIT 300`)
+      .bind(leagueId,session.id).all()
+    :await db.prepare(`SELECT id,discovery_session_id,route_path,byte_length,r2_object_key,received_at
+      FROM companion_route_captures WHERE league_id=? ORDER BY received_at DESC LIMIT 300`).bind(leagueId).all();
   return result.results||[];
 }
 

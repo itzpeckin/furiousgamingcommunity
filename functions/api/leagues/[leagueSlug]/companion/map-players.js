@@ -8,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.11.0';
+const RELEASE='7.3.0';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -144,7 +144,35 @@ async function rosterCaptureSet(db,leagueId){
   };
 }
 
-async function latestUsableFreeAgentCapture(db,env,leagueId){
+export function assessFreeAgentPayload(payload){
+  const collection=chooseCollection(payload);
+  const explicitList=Array.isArray(payload?.rosterInfoList)?payload.rosterInfoList:null;
+  const objects=explicitList||collection?.objects||[];
+  const payloadSuccess=payload?.success??null;
+  const status=payloadSuccess===false
+    ?'blocked'
+    :explicitList===null&&!collection
+      ?'blocked'
+      :objects.length?'located':'empty-confirmed';
+  return{
+    status,
+    accepted:status==='located'||status==='empty-confirmed',
+    objects,
+    collectionPath:explicitList!==null?'$.rosterInfoList':collection?.path||null,
+    payloadSuccess,
+    message:text(payload?.message)
+  };
+}
+export function captureBelongsToRosterCohort(capture,source){
+  const sourceSessions=new Set(source?.sessionDiagnostics||[]);
+  if(sourceSessions.size)return Boolean(capture?.discovery_session_id&&sourceSessions.has(String(capture.discovery_session_id)));
+  const receivedMs=Date.parse(capture?.received_at)||0;
+  const latestMs=Date.parse(source?.cohort?.latestReceivedAt)||0;
+  if(!receivedMs||!latestMs)return false;
+  const windowMs=Number(source?.cohort?.windowMs||20*60*1000);
+  return receivedMs>=latestMs-windowMs&&receivedMs<=latestMs+windowMs;
+}
+async function latestFreeAgentCapture(db,env,leagueId,source){
   const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,received_at,byte_length
     FROM companion_route_captures
     WHERE league_id=? AND LOWER(route_path) LIKE '%/freeagents/roster%'
@@ -153,34 +181,35 @@ async function latestUsableFreeAgentCapture(db,env,leagueId){
   const attempts=[];
   for(const capture of result.results||[]){
     if(!FREE_AGENT_ROUTE.test(String(capture.route_path||'')))continue;
+    if(!captureBelongsToRosterCohort(capture,source))continue;
     try{
       const payload=await parsePayload(env,capture);
-      const collection=chooseCollection(payload);
-      const explicitList=Array.isArray(payload?.rosterInfoList)?payload.rosterInfoList:null;
-      const objects=explicitList||collection?.objects||[];
-      const success=payload?.success!==false && objects.length>0;
+      const assessment=assessFreeAgentPayload(payload);
       attempts.push({
         captureId:capture.capture_id,
         routePath:capture.route_path,
         receivedAt:capture.received_at,
-        payloadSuccess:payload?.success??null,
-        recordCount:objects.length,
-        message:text(payload?.message),
-        usable:success
+        payloadSuccess:assessment.payloadSuccess,
+        recordCount:assessment.objects.length,
+        message:assessment.message,
+        status:assessment.status,
+        accepted:assessment.accepted
       });
-      if(success)return{capture,payload,objects,attempts};
+      return{capture,payload,objects:assessment.objects,assessment,attempts};
     }catch(error){
       attempts.push({
         captureId:capture.capture_id,
         routePath:capture.route_path,
         receivedAt:capture.received_at,
         recordCount:0,
-        usable:false,
+        status:'blocked',
+        accepted:false,
         message:error?.message||String(error)
       });
+      return{capture,payload:null,objects:[],assessment:{status:'blocked',accepted:false},attempts};
     }
   }
-  return{capture:null,payload:null,objects:[],attempts};
+  return{capture:null,payload:null,objects:[],assessment:{status:'missing',accepted:false},attempts};
 }
 function normalizePosition(v){const p=text(v)?.toUpperCase();const map={HB:'RB'};return p?map[p]||p:null;}
 function normalizeDev(v){const s=text(v);if(!s)return null;const n=Number(s);if(Number.isFinite(n)){return ({0:'Normal',1:'Star',2:'Superstar',3:'X-Factor'})[n]||s;}const l=s.toLowerCase().replace(/[_-]/g,' ');if(l.includes('x')&&l.includes('factor'))return 'X-Factor';if(l.includes('superstar'))return 'Superstar';if(l.includes('star'))return 'Star';if(l.includes('normal'))return 'Normal';return s;}
@@ -285,16 +314,18 @@ export async function onRequestPost(context){
       }
     }
 
-    // 5.9.10.6.1c: Madden exposes Free Agents as a separate league-level roster.
-    // Only merge a capture when the response is explicitly usable and non-empty.
-    const freeAgentSource=await latestUsableFreeAgentCapture(db,context.env,league.id);
-    if(freeAgentSource.capture){
+    // Madden exposes Free Agents as a separate league-level roster. Only the
+    // newest response from this roster cohort is authoritative; never blend an
+    // older successful Free Agent response into a fresh team-roster export.
+    const freeAgentSource=await latestFreeAgentCapture(db,context.env,league.id,source);
+    if(freeAgentSource.assessment.accepted){
       diagnostics.push({
         routePath:freeAgentSource.capture.route_path,
         sourceTeamId:'FA',
-        collectionPath:'$.rosterInfoList',
+        collectionPath:freeAgentSource.assessment.collectionPath,
         recordCount:freeAgentSource.objects.length,
         accepted:true,
+        status:freeAgentSource.assessment.status,
         dataset:'free-agents'
       });
       for(let i=0;i<freeAgentSource.objects.length;i++){
@@ -315,14 +346,15 @@ export async function onRequestPost(context){
     }else{
       const latestAttempt=freeAgentSource.attempts?.[0]||null;
       warnings.push(latestAttempt
-        ? `Free Agent roster was captured but is not usable yet: ${latestAttempt.message||'empty rosterInfoList or success=false'}.`
+        ? `Free Agent roster was captured but is blocked: ${latestAttempt.message||'the response failed or had no recognizable roster collection'}.`
         : 'No Free Agent roster capture is available yet. Export the Madden Free Agents roster, then rerun the import.');
       diagnostics.push({
-        routePath:'xbsx/{franchiseId}/freeagents/roster',
+        routePath:freeAgentSource.capture?.route_path||'xbsx/{franchiseId}/freeagents/roster',
         sourceTeamId:'FA',
         accepted:false,
+        status:freeAgentSource.assessment.status,
         dataset:'free-agents',
-        reason:latestAttempt?.message||'No successful non-empty Free Agent capture is available.',
+        reason:latestAttempt?.message||'No accepted Free Agent response is available in this roster export cohort.',
         attempts:freeAgentSource.attempts||[]
       });
     }
@@ -332,7 +364,7 @@ export async function onRequestPost(context){
     await db.prepare(`UPDATE companion_player_mapping_runs SET status='superseded',updated_at=? WHERE league_id=? AND status='pending-preview'`).bind(new Date().toISOString(),league.id).run();
     const runId=crypto.randomUUID(),now=new Date().toISOString();
     const representative=source.captures[0];
-    const routeSummary=`${source.captures.length} team roster routes + ${freeAgentSource.capture?'1 usable':'0 usable'} Free Agent roster route`;
+    const routeSummary=`${source.captures.length} team roster routes + ${freeAgentSource.assessment.accepted?'1 accepted':'0 accepted'} Free Agent roster route`;
     await db.prepare(`INSERT INTO companion_player_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,rostered_count,free_agent_count,warning_count,warnings_json,created_at,updated_at) VALUES (?,?,?,?,?,'pending-preview',?,?,?,?,?,?,?)`).bind(runId,league.id,source.sessionId||representative.discovery_session_id,representative.capture_id,routeSummary,players.length,rostered,freeAgents,warnings.length,JSON.stringify(warnings),now,now).run();
 
     const insertSql=`INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,team_external_id,first_name,last_name,display_name,position,archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id,ratings_json,source_record_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
@@ -345,8 +377,12 @@ export async function onRequestPost(context){
       playerCount:players.length,
       rosterRouteCount:source.captures.length,
       expectedTeamCount:validTeams.size,
+      rosteredPlayersReady:rostered>0,
+      mappingCompleteness:freeAgentSource.assessment.accepted?'complete':'rostered-players-only',
+      freeAgentsDeferred:!freeAgentSource.assessment.accepted,
       freeAgentCapture:{
-        usable:Boolean(freeAgentSource.capture),
+        accepted:freeAgentSource.assessment.accepted,
+        status:freeAgentSource.assessment.status,
         captureId:freeAgentSource.capture?.capture_id||null,
         routePath:freeAgentSource.capture?.route_path||'xbsx/{franchiseId}/freeagents/roster',
         recordCount:freeAgentSource.objects?.length||0,

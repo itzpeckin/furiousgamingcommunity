@@ -44,13 +44,14 @@ test('only missing canonical migrations are planned', () => {
   assert.deepEqual(pendingMigrations(ledger, migrations).map(item => item.version), [19, 20]);
 });
 
-test('canonical migration loading includes the current tenant-ready migration', async () => {
+test('canonical migration loading includes the Madden 27 discovery foundation', async () => {
   const { contract, migrations } = await loadCanonicalMigrations();
-  assert.equal(contract.currentVersion, 21);
-  assert.equal(migrations.at(-1)?.version, 21);
-  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0021_tenant_ready_core.sql');
+  assert.equal(contract.currentVersion, 22);
+  assert.equal(migrations.at(-1)?.version, 22);
+  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0022_madden_27_discovery_foundation.sql');
+  const tenantMigration = migrations.find(item => item.version === 21);
   assert.equal(
-    migrations.at(-1)?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,
+    tenantMigration?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,
     7,
     'D1-compatible feature seeds must remain separate statements'
   );

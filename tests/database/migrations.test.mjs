@@ -119,7 +119,7 @@ test('the production-like legacy upgrade preserves identities and relationships'
     assert.equal(database.prepare(
       `SELECT user_id FROM sessions WHERE id='session-upgrade-test'`
     ).get().user_id, 'user-upgrade-test');
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 21);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 22);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {
     database.close();
@@ -131,7 +131,7 @@ test('tenant migration preserves shared documents and snapshot validation rows',
   try {
     database.exec('PRAGMA foreign_keys = ON;');
     const files = await migrationFiles();
-    await applyFiles(database, files.filter(file => !file.startsWith('migrations/0021_')));
+    await applyFiles(database, files.filter(file => /^migrations\/(?:0018|0019|0020)_/.test(file)));
     seedProtectedData(database);
     database.prepare(`INSERT INTO league_rules_documents
       (league_id,rules_json,updated_by_user_id) VALUES (?,?,?)`
@@ -152,7 +152,7 @@ test('tenant migration preserves shared documents and snapshot validation rows',
       (job_id,player_id) VALUES (?,?)`
     ).run('validation-upgrade-test','player-upgrade-test');
 
-    await applyFiles(database, files.filter(file => file.startsWith('migrations/0021_')));
+    await applyFiles(database, files.filter(file => /^migrations\/(?:0021|0022)_/.test(file)));
 
     assert.equal(database.prepare(`SELECT rules_json value FROM league_rules_documents
       WHERE league_id='league-upgrade-test'`).get().value, '{"categories":[{"id":"preserved"}]}');
@@ -224,7 +224,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 21', async () => {
+test('runtime schema verification fails closed before version 22', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -235,13 +235,13 @@ test('runtime schema verification fails closed before version 21', async () => {
     () => requireDatabaseSchema(outdated),
     error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 17
   );
-  observedVersion = 21;
-  assert.equal((await requireDatabaseSchema(outdated)).version, 21);
+  observedVersion = 22;
+  assert.equal((await requireDatabaseSchema(outdated)).version, 22);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 21, name: 'tenant_ready_core' }) };
+      return { first: async () => ({ version: 22, name: 'madden_27_discovery_foundation' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 21);
+  assert.equal((await requireDatabaseSchema(current)).version, 22);
 });

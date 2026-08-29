@@ -2,7 +2,7 @@ import { createId, jsonResponse } from '../../../_lib/auth.js';
 import { requireCommissioner } from '../../../_lib/permissions.js';
 import { createTenantAuditContext, resolveRequestTenant } from '../../../_lib/tenant-context.js';
 
-const RELEASE = '7.2.0';
+const RELEASE = '7.3.0';
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 const DELETE_ORDER = Object.freeze([

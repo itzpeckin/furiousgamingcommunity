@@ -1,6 +1,6 @@
 import { resolveTenant, tenantDatabase } from '../../../../_lib/tenant-context.js';
 
-const RELEASE='7.2.0';
+const RELEASE='7.3.0';
 
 function json(data,status=200,headers={}){
   return new Response(JSON.stringify(data,null,2),{

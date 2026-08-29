@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.7.1';
+  const VERSION = '7.3.0';
   const OWNER_HANDLE = String(document.querySelector('meta[name="franchise-hq-platform-owner-handle"]')?.content || 'Peckin').trim().toLowerCase();
   const TAB_KEY = 'franchisehq:platform-workspace:tab';
   const VALID_TABS = new Set([
@@ -64,7 +64,7 @@
   function contentFor(tab) {
     switch (tab) {
       case 'one-click-import': return servicePanel('oneClickImport','One-Click Import');
-      case 'route-discovery': return servicePanel('leagueCompanionRouteDiscovery','Route Discovery');
+      case 'route-discovery': return servicePanel('leagueCompanionRouteDiscovery','Madden 27 Discovery');
       case 'classification': return servicePanel('leagueCompanionDatasetClassification','Dataset Classification');
       case 'team-mapper': return servicePanel('leagueCompanionTeamMapper','Team Mapper');
       case 'player-mapper': return servicePanel('leagueCompanionPlayerMapper','Player Mapper');
@@ -85,7 +85,7 @@
   }
 
   const tabs = [
-    ['overview','Overview'],['one-click-import','One-Click Import'],['route-discovery','Route Discovery'],['classification','Dataset Classification'],
+    ['overview','Overview'],['one-click-import','One-Click Import'],['route-discovery','Madden 27 Discovery'],['classification','Dataset Classification'],
     ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],['schedule-source-inspector','Schedule Source Inspector'],['game-detail-inspector','Game Detail Inspector'],['game-state-join-inspector','Game-State Join Inspector'],
     ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],['snapshot-lifecycle','Validation & Activation'],['snapshot-verification','Snapshot Verification'],['live-read-model','Live Read Model'],
     ['certification','Certification'],['diagnostics','Diagnostics']

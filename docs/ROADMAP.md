@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** August 27, 2026
+**Updated:** August 28, 2026
 
-**Revision:** 1.23
+**Revision:** 1.28
 
 **Current production:** 7.1.0 database foundation, delivered through PR #8
 
-**Current work:** 7.2.0 repository publication, hosted checks, and isolated staging validation
+**Current work:** 7.3.0 completion candidate based on the real FGC Madden 27 capture; rostered-player source is locked and the upstream Free Agent failure is explicitly deferred
 
-**Next gate:** Complete the authorized pull request and isolated staging migration/deployment, reconcile preservation evidence, then request a separate production decision.
+**Next gate:** Review and publish the exact 7.3.0 completion candidate, redeploy it only to isolated staging, generate the updated structural report, and then begin 7.3.1 stable season/player identity plus the 2,044-player roster preview. Production reset/import/activation remain separately authorized and excluded.
 
 ## Product decisions
 
@@ -32,6 +32,9 @@
 - Refreshing Commissioner HQ or Trade Center can return a user to Account or require another login, especially on mobile. The owner accepted this as a temporary UX defect.
 - Commissioner settings can remain browser-local and disagree between commissioners. The shared schema exists; 7.4.2 moves the feature to server authority.
 - EA has restored Madden NFL 27 Companion data flow. After 7.2, discovery and a safe FGC teams/rosters/players activation are the immediate priority.
+- The real FGC capture received 43 requests (10.17 MB) in 0.448 seconds. It contained 32 teams, all 32 team rosters, 2,044 unique rostered players, standings, 14 current-week games, and 510 statistics rows.
+- All 2,044 captured team-roster players have a valid team assignment and `isFreeAgent: false`; 2,031 are active and 13 are inactive. No duplicate roster identifiers or unassigned players were found.
+- Madden's explicit `xbsx/742482/freeagents/roster` response failed upstream with an empty `rosterInfoList`. This is recorded as **blocked**, not as proof of zero Free Agents. It does not block safe rostered-player preview work, but FranchiseHQ cannot claim a complete player pool until a successful or explicitly empty Free Agent response is received.
 - No FGC Madden reset has occurred. Reset and activation require preview, recovery evidence, staging rehearsal, and explicit owner approval.
 
 ## Release tracker
@@ -40,15 +43,17 @@
 | --- | --- | --- |
 | 7.0.0–7.0.5 | Production history | Engineering baseline, security containment, onboarding, ownership, and Commissioner-management foundations |
 | 7.1.0 | Production | Canonical database, target-locked migration, preservation, and recovery foundation |
-| 7.2.0 | In local validation | Tenant-ready core with FGC as the only enabled league |
-| 7.3.0 | Next | Madden 27 payload discovery and source lock |
-| 7.3.1 | Planned | Canonical teams, players, rosters, and Free Agents mapping |
-| 7.3.2 | Planned | Recoverable FGC reset, import, validation, and activation |
-| 7.3.3 | Planned | Production team, roster, player, and Free Agent experience |
-| 7.3.4 | Planned | Stable shareable team and player URLs |
-| 7.3.5 | Planned | Team assignment, My Team, and ownership reconciliation |
-| 7.3.6 | Planned | Incremental Madden updates and freshness reporting |
-| 7.3.7 | Research gate | Approved direct-EA and CSV/Excel adapters |
+| 7.2.0 | Staging validated | Tenant-ready core with FGC as the only enabled league; migration 21 and isolated Preview resources verified without production changes |
+| 7.3.0 | Completion candidate | Real Madden 27 source captured; 2,044 rostered players certified as preview-ready; Free Agents honestly blocked upstream and deferred |
+| 7.3.1 | Next | Stable season/player identity plus FGC team and rostered-player mapping preview |
+| 7.3.2 | Planned | Certified sub-60-second Madden 27 import engine |
+| 7.3.3 | Planned | Recoverable Madden reset, season archive, and transition controls |
+| 7.3.4 | Planned | Real FGC Madden 27 staging import and recovery certification |
+| 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
+| 7.3.6 | Planned | Stable shareable team and player URLs |
+| 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
+| 7.3.8 | Planned | Incremental Madden updates and freshness reporting |
+| 7.3.9 | Research gate | Approved direct-EA and CSV/Excel adapters |
 | 7.4.0–7.4.6 | Planned | Core platform features, mobile polish, consistency, and operations |
 | 7.5.0 | Required before RC | Authentication and session framework |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
@@ -99,53 +104,75 @@
 
 ## 7.3.0 — Madden 27 Payload Discovery and Source Lock
 
-- Privately capture one current Companion export without activation.
-- Inventory every route, dataset, field, identifier, relationship, and season/week marker.
-- Locate and count Free Agents explicitly, then create sanitized regression fixtures.
-- Gate: source league/version/season/week are verified; teams, players, rosters, and Free Agents are located or precisely reported absent; no user-facing data changes.
+- Create one short-lived discovery session URL whose token is returned once, retained only as a hash, expires after 30 minutes, and is cancelled when replaced.
+- Keep one real Companion run under one durable session ID even when the export crosses a minute boundary.
+- Link identical payloads into the current session without duplicating the same raw R2 object or losing route completeness.
+- Privately inventory every route, dataset, field/type, identifier relationship, source marker, record count, and capture duration without returning raw player/team values.
+- Prove Free Agents from an explicit route: populated, explicitly empty, missing, and Madden-failed responses remain distinct states.
+- Generate a sanitized structural regression fixture and source-lock report without activating, resetting, or publishing Madden data.
+- Independently certify rostered-player readiness from assignment evidence: team-route coverage, unique identifiers, valid team IDs, route/team agreement, active flags, and Free Agent flags.
+- Treat a failed Free Agent route as an upstream limitation while preserving the successful team-roster data; never describe failure as an empty league and never blend a stale Free Agent response into a fresh roster cohort.
+- Live result: the owner completed the real FGC export for Xbox Series X/S franchise `742482`; 32/32 team rosters and 2,044 unique assigned players are ready for canonical preview work. The explicit Free Agent request is blocked upstream and remains a required deferred dataset.
+- Release gate: migration 22, security/privacy regressions, roster-assignment evidence, and the consolidated strict gate pass. This release remains non-activating: no live Madden data, reset, snapshot, ownership, or production behavior changes.
 
-## 7.3.1 — Canonical Madden Mapping
+## 7.3.1 — Season, Player, and Ownership Identity Model
 
-- Map teams, players, roster membership, and Free Agents into one canonical candidate snapshot.
-- Preserve source IDs/provenance and generate stable internal identities.
-- Validate counts, duplicates, missing teams, invalid fields, and unassigned records without inventing data.
-- Gate: the candidate reconciles to source, each player is on one roster or in Free Agents, and a mapping failure cannot change the active snapshot.
+- Add permanent franchise seasons, stable player identities/source aliases, player season summaries, GM identities, and team ownership periods.
+- Preserve player career totals while allowing prior-season gamelogs to expire after season close.
+- Make GM history person-owned rather than team/name-owned so career results survive team changes.
+- Map the 32 captured teams and 2,044 certified rostered players into a private FGC preview without waiting for the blocked Free Agent route; label the preview as rostered-player-only until Free Agents are accepted.
+- Gate: players and owners survive new seasons, team changes, and later Madden editions without losing or merging identities incorrectly.
 
-## 7.3.2 — Safe FGC Reset, Import, and Activation
+## 7.3.2 — Sub-60-Second Madden 27 Import Engine
 
-- Add an exact reset preview, protected identity/membership preservation, recovery bookmark, typed confirmation, tenant audit, and atomic active-snapshot switch.
-- Rehearse backup → reset → import → validate → activate → rollback in staging.
-- Preserve Justin and Gas identities for later imported-team assignment; disabled users remain disabled.
-- Gate: failures leave the last good snapshot visible, and the owner separately approves the exact production reset/import/activation.
+- Map teams, players, rosters, Free Agents, standings, schedules, and statistics into one candidate snapshot using bounded parallel work.
+- Preserve source IDs/provenance, reject duplicates/invalid assignments, and make repeated identical exports idempotent.
+- Provide a commissioner-operated import workspace with one-time destination creation, live phase/progress display, elapsed time, source counts, validation warnings, retry guidance, and a clear preview-ready result.
+- Commissioners review the candidate before any activation; the workspace must distinguish complete, rostered-player-only, explicitly empty, stale, and failed datasets without silently falling back to legacy/demo data.
+- Measure source download, each mapping phase, validation, activation, record counts, bytes, cold runs, and warm runs.
+- Gate: an authorized FGC commissioner can complete the real click-to-preview workflow without platform-owner assistance; repeated realistic imports finish under 60 seconds, FranchiseHQ processing targets under 45 seconds, and any failure leaves the last complete snapshot active.
 
-## 7.3.3 — Team, Roster, Player, and Free Agent Experience
+## 7.3.3 — Safe Reset and Season Transition
 
-- Serve team pages, roster groups, player profiles, and Free Agent browsing from one active Madden 27 snapshot.
-- Show source-supported ratings, contracts, abilities, positions, and freshness; use honest unavailable/stale states.
-- Build phone-first layouts without player-card overflow or nested-scroll traps.
+- Provide separate Replace Current Import, Start New Season, and Full Madden Reset operations rather than one destructive button.
+- Preview exact affected counts, preserve accounts/memberships/roles/rules/settings/history, record a recovery bookmark and audit event, and require typed confirmation.
+- At season close, freeze player season totals and GM/postseason summaries while allowing old gamelogs and live operational records to be removed.
+- Gate: staging completes backup → reset → import → validate → activate → rollback; failures never expose partial data.
+
+## 7.3.4 — FGC Madden 27 Certification
+
+- Rehearse the full process on isolated staging with one actual FGC Madden 27 export.
+- Reconcile every source total, unknown route, duplicate, unassigned player, and Free Agent result before activation is considered.
+- Gate: teams, rosters, Free Agents, standings, schedules, and statistics match the source; rollback is proven; no legacy/demo data appears; production remains separately authorized.
+
+## 7.3.5 — Team, Roster, Player, Statistics, Standings, and Free Agent Experience
+
+- Serve team pages, roster groups, player profiles, Free Agent browsing, standings, and statistics from one active Madden 27 snapshot.
+- Show source-supported ratings, contracts, abilities, positions, freshness, and honest unavailable/stale states.
+- Build phone-first layouts without player-card overflow, horizontal page scrolling, or nested-scroll traps.
 - Gate: phone and desktop counts/identities reconcile to the active FGC snapshot with no old-owner, logo, color, player, or demo fallback.
 
-## 7.3.4 — Stable Team and Player URLs
+## 7.3.6 — Stable Team and Player URLs
 
 - Add league-scoped `/teams/{teamSlug}` and `/players/{publicPlayerId}` routes.
 - Link players from rosters, Free Agents, statistics, transactions, Trade Block, and proposals; link teams throughout the platform.
-- Preserve valid links through trades/releases/renames and expose only safe social metadata.
-- Gate: two users opening one URL see the same active identity; raw database row IDs are not the public contract.
+- Preserve valid links through trades, releases, season transitions, and display-name changes while exposing only safe social metadata.
+- Gate: two users opening one URL see the same active identity and raw database row IDs are not the public contract.
 
-## 7.3.5 — Ownership Reconciliation and My Team
+## 7.3.7 — Ownership, My Team, GM History, and Trophy Cases
 
 - Match imported teams to FranchiseHQ memberships without trusting owner names in Madden data.
-- Add Commissioner assignment/reassignment with duplicate-team and lockout protections.
-- Drive My Team, ownership badges, and team-dependent features from the same authority.
-- Gate: Justin resolves to Buccaneers and Gas to Packers after reviewed assignment; no active duplicate owner or cross-tenant inference is possible.
+- Record ownership periods and attribute each game to the owner controlling the team when that game occurred.
+- Track regular-season and playoff records, teams managed, playoff appearances, conference championships, Super Bowl appearances, and Super Bowl championships across teams.
+- Gate: Justin resolves to Buccaneers and Gas to Packers after reviewed assignment; no duplicate owner/cross-tenant inference is possible; career totals reconcile to season records.
 
-## 7.3.6 — Incremental Madden Updates
+## 7.3.8 — Incremental Madden Updates
 
 - Intake later Companion exports without a destructive full reset.
 - Compare snapshots, report freshness/warnings, and activate teams, rosters, transactions, schedule, standings, and statistics atomically as supported.
 - Gate: duplicate exports are idempotent, successful updates are coherent, and failure/rollback retains the previous complete experience.
 
-## 7.3.7 — Additional Madden Source Adapters
+## 7.3.9 — Additional Madden Source Adapters
 
 - Investigate policy-compliant direct-EA connectivity using documented/authorized access only.
 - Add CSV/Excel intake where commissioner exports are available.
@@ -239,3 +266,8 @@
 - **Revision 1.21:** Completed staging recovery rehearsal and production migrations 18–20 with protected data reconciled; advanced to the 7.2 decision gate.
 - **Revision 1.22:** Recorded the authorized 7.2 tenant-ready implementation; centralized tenant resolution, scoping, feature/domain configuration, storage namespaces, and audit context; moved verified Madden 27 discovery/import/activation directly after 7.2; retained session redesign at 7.5.0 before the private RC.
 - **Revision 1.23:** Recorded the owner's consolidated authorization for one 7.2 commit, branch push, pull request, hosted checks, staging migration 21, and deployment of the exact candidate to the registered isolated staging environment. Production remains outside this authorization.
+- **Revision 1.24:** Completed PR #9 publication and hosted checks; applied migration 21 only to `franchise-hq-staging-db`; provisioned isolated Preview D1, R2, and KV resources plus staging-only runtime secrets; redeployed exact commit `5799c35` successfully as Cloudflare Preview deployment `041c8c85-54e6-4927-b5bb-f8fc460e3be2`. Direct `pages.dev` browser smoke testing remains blocked by the owner's computer security, and production remains unchanged.
+- **Revision 1.25:** Authorized and began 7.3.0 on the staging-validated 7.2 baseline; added the Madden 27 secure discovery-session/source-lock design, explicit Free Agent proof states, duplicate-payload session linking, sanitized structural fixture contract, and revised 7.3.1–7.3.9 roadmap for stable history, sub-60-second import, safe season transitions, FGC certification, production experiences, URLs, GM history/trophies, incremental updates, and additional adapters. No cloud publication, migration 22, live capture, reset, import, or activation is included in this implementation authorization.
+- **Revision 1.26:** Published commit `d4362fa` to `codex/franchisehq-7.3.0`, confirmed 3/3 hosted checks, applied and verified migration 22 only on `franchise-hq-staging-db`, and confirmed successful Preview deployment `3dc10c9a-6c4a-48da-aaf9-9b3a2dbdb44b`. The stacked pull request is prepared, one isolated FGC discovery session is authorized, and live Madden source capture remains pending. Production, Main, reset, import, and snapshot activation remain unchanged and unauthorized.
+- **Revision 1.27:** Reconciled the real FGC capture: 43 requests, 10.17 MB, 0.448-second source delivery, 32 teams/rosters, 2,044 unique assigned rostered players, standings, 14 current-week games, and 510 statistics rows. Added privacy-safe roster assignment certification, prevented stale Free Agent payload blending, accepted successful explicit zero-player responses, and kept the failed Free Agent route as a visible upstream blocker that does not discard the rostered-player dataset. 7.3.1 now begins with stable identity and a private 2,044-player roster preview; production remains unchanged.
+- **Revision 1.28:** Made the commissioner-operated importer an explicit 7.3.2 deliverable: authorized commissioners create the destination, monitor sub-60-second phases, review counts/warnings/completeness, and reach a private candidate preview without platform-owner assistance. Activation, reset, and season transition remain separately protected by the 7.3.3–7.3.4 gates.

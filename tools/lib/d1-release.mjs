@@ -122,7 +122,8 @@ export async function loadCanonicalMigrations() {
       18: 'canonical_core_foundation',
       19: 'canonical_import_snapshot_foundation',
       20: 'canonical_transaction_runtime_foundation',
-      21: 'tenant_ready_core'
+      21: 'tenant_ready_core',
+      22: 'madden_27_discovery_foundation'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);

@@ -11,6 +11,9 @@
     }
   },
   "environmentBindings": {
+    "APP_ENV": [
+      "functions/_lib/permissions.js"
+    ],
     "ASSETS": [
       "functions/leagues/[[path]].js"
     ],
@@ -19,6 +22,7 @@
       "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
       "functions/api/leagues/[leagueSlug]/companion/classify.js",
       "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
+      "functions/api/leagues/[leagueSlug]/companion/discovery-report.js",
       "functions/api/leagues/[leagueSlug]/companion/export.js",
       "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
       "functions/api/leagues/[leagueSlug]/companion/free-agent-capture.js",
@@ -105,9 +109,11 @@
       "functions/api/leagues/[leagueSlug]/memberships.js"
     ],
     "OWNER_FALLBACK_DISCORD_ID": [
-      "functions/_lib/owner-fallback.js"
+      "functions/_lib/owner-fallback.js",
+      "functions/_lib/permissions.js"
     ],
     "PLATFORM_OWNER_ACCOUNT_ID": [
+      "functions/_lib/permissions.js",
       "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
       "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
       "functions/api/leagues/[leagueSlug]/companion/import-certification.js",
@@ -128,13 +134,13 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 160,
+      ".js": 163,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 23,
+      ".mjs": 24,
       ".png": 1,
-      ".sql": 23,
+      ".sql": 24,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
@@ -157,7 +163,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74807,
+        "bytes": 74802,
         "file": "index.html"
       },
       {
@@ -177,12 +183,16 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 23791,
+        "bytes": 25681,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
         "bytes": 22790,
         "file": "platform/validate.js"
+      },
+      {
+        "bytes": 21293,
+        "file": "functions/_lib/madden-discovery.js"
       },
       {
         "bytes": 20354,
@@ -191,6 +201,10 @@
       {
         "bytes": 20250,
         "file": "league-engine/games.js"
+      },
+      {
+        "bytes": 19144,
+        "file": "tests/import/madden-discovery.test.mjs"
       },
       {
         "bytes": 18703,
@@ -211,17 +225,9 @@
       {
         "bytes": 16605,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-teams.js"
-      },
-      {
-        "bytes": 16260,
-        "file": "platform/runtime.js"
-      },
-      {
-        "bytes": 16251,
-        "file": "league-engine/data-state.js"
       }
     ],
-    "total": 508
+    "total": 513
   },
   "frontend": {
     "assets": [
@@ -671,7 +677,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 59,
+    "routeCount": 61,
     "routes": [
       {
         "file": "functions/index.js",
@@ -781,6 +787,22 @@
           "onRequestGet"
         ],
         "route": "/api/leagues/:leagueSlug/companion/discovery"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/discovery-report.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/discovery-report"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/discovery-session.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/discovery-session"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/companion/export.js",
@@ -1136,6 +1158,7 @@
       "files": [
         "app.js",
         "dev-mode.js",
+        "league-engine/companion-route-discovery.js",
         "league-engine/companion-schedule-mapper.js",
         "league-engine/companion-statistics-engine.js",
         "league-engine/data-explorer.js",
@@ -1150,7 +1173,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 58
+      "occurrences": 59
     },
     "browserStorageCalls": {
       "files": [
@@ -1236,10 +1259,16 @@
       "recordsLedger": true,
       "sha256": "d725f6c54c39689317cd32b0380a3b0a87c2bfe7cffb00aa4912b0187301a8c2",
       "version": "0021"
+    },
+    {
+      "file": "migrations/0022_madden_27_discovery_foundation.sql",
+      "recordsLedger": true,
+      "sha256": "65d76eb495439f6bf8309bcb10e7fc9a5c96a65116df60bb48ce13f83dff182c",
+      "version": "0022"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.2.0",
+  "release": "7.3.0",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

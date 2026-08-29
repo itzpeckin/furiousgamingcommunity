@@ -157,7 +157,7 @@ export async function platformReadiness(env) {
   const bindings = bindingStatus(env);
   const dbStatus = await databaseStatus(env);
   const configured = bindings.d1 && bindings.r2 && bindings.kv && bindings.secret;
-  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '7.2.0' };
+  return { configured, ready: configured && dbStatus.migrated, bindings, database: dbStatus, release: '7.3.0' };
 }
 
 

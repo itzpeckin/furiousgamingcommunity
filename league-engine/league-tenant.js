@@ -3,7 +3,7 @@
   const HQ = window.FranchiseHQ;
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before league-tenant.js.');
 
-  const VERSION = '7.2.0';
+  const VERSION = '7.3.0';
   const REGISTRY_KEY = 'franchisehq.tenants.registry.v3';
   const ACTIVE_KEY = 'franchisehq.tenants.active.v3';
   let registry = [];
