@@ -18,6 +18,7 @@ const checks = [
     'tests/tooling/d1-release.test.mjs',
     'tests/database/migrations.test.mjs',
     'tests/import/madden-discovery.test.mjs',
+    'tests/import/permanent-identity.test.mjs',
     'tests/security/containment.test.mjs',
     'tests/security/session.test.mjs',
     'tests/security/onboarding.test.mjs',

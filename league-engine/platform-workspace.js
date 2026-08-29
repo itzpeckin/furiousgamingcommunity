@@ -68,6 +68,7 @@
       case 'classification': return servicePanel('leagueCompanionDatasetClassification','Dataset Classification');
       case 'team-mapper': return servicePanel('leagueCompanionTeamMapper','Team Mapper');
       case 'player-mapper': return servicePanel('leagueCompanionPlayerMapper','Player Mapper');
+      case 'identity-preview': return servicePanel('identityPreview','Private Identity Preview');
       case 'payload-inspector': return servicePanel('leagueDataExplorer','Data Explorer & Payload Inspector');
       case 'schedule-source-inspector': return servicePanel('scheduleSourceInspector','Schedule Source Inspector');
       case 'game-detail-inspector': return servicePanel('gameDetailInspector','Game Detail Inspector');
@@ -86,7 +87,7 @@
 
   const tabs = [
     ['overview','Overview'],['one-click-import','One-Click Import'],['route-discovery','Madden 27 Discovery'],['classification','Dataset Classification'],
-    ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['payload-inspector','Payload Inspector'],['schedule-source-inspector','Schedule Source Inspector'],['game-detail-inspector','Game Detail Inspector'],['game-state-join-inspector','Game-State Join Inspector'],
+    ['team-mapper','Team Mapper'],['player-mapper','Player Mapper'],['identity-preview','Identity Preview'],['payload-inspector','Payload Inspector'],['schedule-source-inspector','Schedule Source Inspector'],['game-detail-inspector','Game Detail Inspector'],['game-state-join-inspector','Game-State Join Inspector'],
     ['schedule-mapper','Schedule Mapper'],['statistics-mapper','Statistics Mapper'],['snapshot-builder','Snapshot Builder'],['snapshot-lifecycle','Validation & Activation'],['snapshot-verification','Snapshot Verification'],['live-read-model','Live Read Model'],
     ['certification','Certification'],['diagnostics','Diagnostics']
   ];

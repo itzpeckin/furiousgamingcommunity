@@ -134,13 +134,13 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 163,
+      ".js": 166,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 24,
+      ".mjs": 25,
       ".png": 1,
-      ".sql": 24,
+      ".sql": 25,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
@@ -163,7 +163,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74802,
+        "bytes": 74868,
         "file": "index.html"
       },
       {
@@ -223,11 +223,11 @@
         "file": "functions/api/leagues/[leagueSlug]/snapshot/read-model.js"
       },
       {
-        "bytes": 16605,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-teams.js"
+        "bytes": 17706,
+        "file": "tools/check-release.mjs"
       }
     ],
-    "total": 513
+    "total": 518
   },
   "frontend": {
     "assets": [
@@ -582,6 +582,11 @@
         "versioned": true
       },
       {
+        "path": "league-engine/identity-preview.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "league-engine/developer-mode.js",
         "type": "script",
         "versioned": true
@@ -673,11 +678,11 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 86,
+    "scriptCount": 87,
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 61,
+    "routeCount": 62,
     "routes": [
       {
         "file": "functions/index.js",
@@ -836,6 +841,14 @@
           "onRequestGet"
         ],
         "route": "/api/leagues/:leagueSlug/companion/free-agent-capture"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/identity-preview.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/identity-preview"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/companion/import-certification.js",
@@ -1162,6 +1175,7 @@
         "league-engine/companion-schedule-mapper.js",
         "league-engine/companion-statistics-engine.js",
         "league-engine/data-explorer.js",
+        "league-engine/identity-preview.js",
         "league-engine/league-snapshot-builder.js",
         "league-engine/live-read-model.js",
         "league-engine/one-click-import.js",
@@ -1173,7 +1187,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 59
+      "occurrences": 60
     },
     "browserStorageCalls": {
       "files": [
@@ -1265,10 +1279,16 @@
       "recordsLedger": true,
       "sha256": "65d76eb495439f6bf8309bcb10e7fc9a5c96a65116df60bb48ce13f83dff182c",
       "version": "0022"
+    },
+    {
+      "file": "migrations/0023_permanent_identity_preview.sql",
+      "recordsLedger": true,
+      "sha256": "75be20c340e78c47509363946055c2b101d9ef903c9f8effdc47531ae1aaf117",
+      "version": "0023"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.0",
+  "release": "7.3.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

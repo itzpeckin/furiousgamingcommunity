@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "7.3.0",
+  "release": "7.3.1",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 22,
+  "currentVersion": 23,
   "requiredTables": [
     "canonical_capture_lifecycle_sessions",
     "canonical_free_agents",
@@ -34,6 +34,9 @@
     "forward_roster_movements",
     "import_performance_certifications",
     "imports",
+    "identity_preview_players",
+    "identity_preview_runs",
+    "identity_preview_teams",
     "league_active_snapshots",
     "league_data_reset_audit",
     "league_domains",
@@ -52,7 +55,12 @@
     "madden_discovery_session_captures",
     "madden_discovery_sessions",
     "oauth_states",
+    "franchise_seasons",
+    "gm_identities",
     "players",
+    "player_identities",
+    "player_season_summaries",
+    "player_source_aliases",
     "schema_migrations",
     "server_import_delegations",
     "sessions",
@@ -60,6 +68,7 @@
     "snapshot_validation_player_ids",
     "snapshots",
     "teams",
+    "team_ownership_periods",
     "tenant_audit_events",
     "transaction_movement_classifications",
     "users"
@@ -76,6 +85,14 @@
     "league_snapshots": ["id", "league_id", "status", "manifest_json", "validation_status", "validation_score", "created_at", "updated_at"],
     "sessions": ["id", "user_id", "session_token_hash", "expires_at", "last_seen_at", "revoked_at"],
     "madden_discovery_sessions": ["id", "league_id", "token_hash", "status", "capture_count", "expires_at", "created_at", "updated_at"],
-    "madden_discovery_reports": ["id", "league_id", "session_id", "status", "route_count", "capture_count", "source_verification_json", "report_hash", "generated_at"]
+    "madden_discovery_reports": ["id", "league_id", "session_id", "status", "route_count", "capture_count", "source_verification_json", "report_hash", "generated_at"],
+    "franchise_seasons": ["id", "league_id", "source_system", "source_franchise_id", "source_season_id", "game_release", "display_name", "status"],
+    "player_identities": ["id", "league_id", "public_id", "display_name"],
+    "player_source_aliases": ["league_id", "source_system", "source_franchise_id", "source_player_id", "player_identity_id", "first_seen_season_id", "last_seen_season_id"],
+    "player_season_summaries": ["league_id", "franchise_season_id", "player_identity_id", "current_team_external_id", "career_totals_json", "season_totals_json"],
+    "gm_identities": ["id", "league_id", "user_id", "public_id", "display_name"],
+    "team_ownership_periods": ["id", "league_id", "gm_identity_id", "team_key", "franchise_season_id", "started_at", "ended_at"],
+    "identity_preview_runs": ["id", "league_id", "franchise_season_id", "status", "free_agent_status", "team_count", "rostered_player_count", "free_agent_count"],
+    "identity_preview_players": ["preview_run_id", "league_id", "player_identity_id", "source_player_id", "team_external_id"]
   }
 }

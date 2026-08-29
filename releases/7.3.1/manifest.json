@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.1",
+  "releaseType": "permanent-identity-private-preview",
+  "status": "staging-validated",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.0",
+    "commit": "5c062e5b91b9b7690c3717ff4fe6bef761999e48",
+    "tree": "pending-local-validation",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pull-request-open-hosted-checks-passed",
+    "commit": "40cbc63132963a9633b85124f4ed70eb60bd90ad",
+    "pullRequest": 11,
+    "hostedChecksPassed": 4,
+    "scope": "The staging-validated candidate is published on codex/franchisehq-7.3.1 with a stacked pull request against codex/franchisehq-7.3.0. Main is unchanged."
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": true,
+    "status": "private-identity-preview-verified",
+    "deploymentId": "c8df85cf-f69c-41ea-b47b-ee899abdf97c",
+    "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
+    "scope": "Migration 23 and runtime commit 40cbc63 are verified in isolated staging. The authenticated report, 32-team/2,044-rostered-player mappings, and private identity preview completed. The temporary membership is inactive, all temporary sessions are revoked, Free Agents remain blocked with a null count, and no snapshot was activated."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-authorized",
+    "url": "https://franchisehq.app/",
+    "scope": "No production deployment, migration, Madden data reset, import, snapshot activation, or membership change is authorized."
+  },
+  "requiredArtifacts": [
+    "config/database-schema-contract.json",
+    "docs/ROADMAP.md",
+    "functions/_lib/permanent-identity.js",
+    "functions/api/leagues/[leagueSlug]/companion/identity-preview.js",
+    "league-engine/identity-preview.js",
+    "migrations/0023_permanent_identity_preview.sql",
+    "releases/7.3.1/release-record.md",
+    "releases/7.3.1/validation-evidence.json",
+    "tests/import/permanent-identity.test.mjs"
+  ]
+}

@@ -293,6 +293,37 @@ if (version === '7.3.0') {
     errors.push('7.3.0 must preserve the no-activation and no-raw-payload boundaries.');
   }
 }
+if (version === '7.3.1') {
+  for (const check of [
+    'permanentSeasonIdentity',
+    'stablePlayerIdentity',
+    'playerSeasonHistory',
+    'gmPersonIdentity',
+    'ownershipPeriodIntegrity',
+    'privateIdentityPreview',
+    'rosteredPlayerOnlyState',
+    'freeAgentBlockedPreserved',
+    'sourceLockNoActivation',
+    'strictMigration'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.1 identity evidence is incomplete: ${check}.`);
+  }
+  if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+    errors.push('7.3.1 candidate work must not claim production authorization or deployment.');
+  }
+  if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
+    errors.push('7.3.1 candidate work must not claim an authorized or completed production migration.');
+  }
+  if (evidence.external?.productionDataReset?.authorized !== false || evidence.external?.productionDataReset?.status !== 'not-run') {
+    errors.push('7.3.1 identity work must not claim an authorized or completed production data reset.');
+  }
+  if (evidence.external?.maddenImportActivation?.authorized !== false || evidence.external?.maddenImportActivation?.status !== 'not-run') {
+    errors.push('7.3.1 identity work must not claim an authorized or completed Madden activation.');
+  }
+  if (evidence.scopeBoundaries?.activeSnapshotChanged !== false || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false) {
+    errors.push('7.3.1 must preserve no-activation and blocked-Free-Agent boundaries.');
+  }
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {
