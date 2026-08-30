@@ -182,12 +182,12 @@
         "file": "platform/validate.js"
       },
       {
-        "bytes": 21293,
-        "file": "functions/_lib/madden-discovery.js"
+        "bytes": 21732,
+        "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 20920,
-        "file": "tools/check-release.mjs"
+        "bytes": 21293,
+        "file": "functions/_lib/madden-discovery.js"
       },
       {
         "bytes": 20354,

@@ -360,8 +360,19 @@ if (version === '7.3.2') {
     if (evidence.external?.productionGameYearTransition?.status !== 'archived-detached-clean-active-plane') {
       errors.push('Deployed 7.3.2 evidence must record the exact game-year archive/detach transition.');
     }
-    if (evidence.external?.candidateImportRehearsal?.status !== 'completed-verified-performance-pending') {
-      errors.push('Deployed 7.3.2 evidence must retain the Production rehearsal and its pending performance result.');
+    const initialRehearsalStatus = evidence.external?.candidateImportRehearsal?.status;
+    if (!['completed-verified-performance-pending','completed-verified-performance-failed'].includes(initialRehearsalStatus)) {
+      errors.push('Deployed 7.3.2 evidence must retain the initial Production rehearsal and its measured performance result.');
+    }
+    if (evidence.status === 'production-cold-performance-validated-pending-owner-acceptance') {
+      const repaired = evidence.external?.repairedColdCandidateRehearsal;
+      const durationMs = Number(repaired?.durationMs || 0);
+      const targetMs = Number(repaired?.targetMs || 60000);
+      if (repaired?.authorized !== true || repaired?.status !== 'completed-verified'
+        || repaired?.performanceTargetMet !== true || durationMs <= 0 || durationMs >= targetMs
+        || evidence.checks?.productionColdPerformance?.passed !== true) {
+        errors.push('Performance-validated 7.3.2 evidence must retain one authorized, completed, sub-target repaired cold rehearsal.');
+      }
     }
   } else {
     if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
