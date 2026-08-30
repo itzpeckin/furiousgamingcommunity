@@ -507,6 +507,77 @@ if (version === '7.3.3') {
     errors.push('7.3.3 implementation must preserve Production, Main, active-snapshot, and blocked-Free-Agent boundaries.');
   }
 }
+if (version === '7.3.4') {
+  for (const check of [
+    'sourceScopedRepeatImport',
+    'exactSourceIdempotency',
+    'weekCoverageCertification',
+    'sameSeasonHistoryCarryForward',
+    'staleCaptureRejected',
+    'activeSnapshotIsolation',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.4 repeat-import evidence is incomplete: ${check}.`);
+  }
+  if (
+    manifest.repositoryPublication?.authorized !== false
+    || manifest.repositoryPublication?.status !== 'not-run'
+    || evidence.external?.githubPublication?.authorized !== false
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.authorized !== false
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+  ) {
+    errors.push('7.3.4 local build authorization must not claim repository publication or hosted checks.');
+  }
+  if (
+    manifest.staging?.authorized !== false
+    || manifest.staging?.deployed !== false
+    || evidence.external?.stagingDeployment?.authorized !== false
+    || evidence.external?.stagingDeployment?.status !== 'not-run'
+  ) {
+    errors.push('7.3.4 follows Production-first policy and must not claim an unrequested staging cycle.');
+  }
+  if (
+    manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || evidence.external?.productionDeployment?.authorized !== false
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+    || evidence.external?.productionCandidateImport?.authorized !== false
+    || evidence.external?.productionCandidateImport?.status !== 'not-run'
+    || evidence.external?.maddenImportActivation?.authorized !== false
+    || evidence.external?.maddenImportActivation?.status !== 'not-run'
+  ) {
+    errors.push('7.3.4 local work must preserve separate Production, real-import, and activation gates.');
+  }
+  if (
+    evidence.checks?.weekCoverageCertification?.gapVisible !== true
+    || evidence.checks?.sameSeasonHistoryCarryForward?.freshExactIdWins !== true
+    || evidence.checks?.staleCaptureRejected?.candidateWorkStarted !== false
+    || evidence.checks?.activeSnapshotIsolation?.activeSnapshotChanged === true
+    || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+  ) {
+    errors.push('7.3.4 must prove source-scoped Week coverage, history precedence, stale-source refusal, snapshot isolation, and blocked-Free-Agent preservation.');
+  }
+  if (
+    evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) {
+    errors.push('7.3.4 implementation must preserve every Production, data, Main, transition, import, activation, and Free Agent boundary.');
+  }
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

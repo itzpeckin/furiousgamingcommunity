@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.2 */
+/* FHQ_BUILD: 7.3.4 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.2';
+  const VERSION = '7.3.4';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -58,6 +58,11 @@
     return `${(Number(ms) / 1000).toFixed(2)}s`;
   }
   function countLabel(value) { return value === null || value === undefined ? 'unknown' : Number(value).toLocaleString(); }
+  function dateLabel(value) {
+    if (!value) return 'Not analyzed';
+    const parsed=new Date(value);
+    return Number.isNaN(parsed.valueOf()) ? String(value) : parsed.toLocaleString();
+  }
 
   async function createDestination() {
     if (busy) return;
@@ -238,6 +243,7 @@
       }),payload=>({
         summary:`Private candidate ${payload.snapshot?.snapshotId || 'built'}`,
         counts:payload.snapshot?.counts||{},
+        warnings:payload.snapshot?.warnings||[],
         candidateSnapshotId:payload.snapshot?.snapshotId
       }),wallStartedAt);
       const snapshotId=built.snapshot?.snapshotId;
@@ -246,6 +252,7 @@
       await runPhase(runId,'validate-candidate',()=>validateCandidate(snapshotId),payload=>({
         summary:'Private candidate validation ready',
         counts:payload.snapshot?.counts||{},
+        warnings:payload.snapshot?.warnings||[],
         candidateSnapshotId:snapshotId
       }),wallStartedAt);
 
@@ -288,28 +295,39 @@
       ? countLabel(resultCounts.freeAgentCount ?? source?.counts?.freeAgentCount) : 'unknown';
     const ready=run?.status==='preview-ready';
     const sub60=ready && Number(run.durationMs)<60000;
+    const coverage=source?.coverage||{};
+    const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
+    const sourceIsNew=source?.selectionStatus==='new-source';
+    const runDisabled=busy||!state?.destination||!source||ready;
+    const runLabel=busy?'Candidate Import Running…'
+      :ready?'Exact Export Already Imported'
+        :run?.status==='failed'?'Retry Candidate Import'
+          :sourceIsNew?'Build New Candidate':'Analyze Captured Export';
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
-      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>Private Candidate Import</h3><p>Analyze the captured export, map it into one reviewed season, and build a validated private preview. This workflow never activates a snapshot.</p></div><span class="pill pill--${ready?'success':run?.status==='failed'?'danger':'neutral'}">${esc(ready?'Preview ready':run?.status||'Not started')}</span></div>
-      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Safety boundary:</strong> Production and Main are unchanged. Data is append-only, no reset runs, and the active snapshot pointer is verified unchanged.</span></div>
+      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>Private Candidate Import</h3><p>Analyze the selected capture, map it into one reviewed season, and build a validated private preview. This workflow never activates a snapshot.</p></div><span class="pill pill--${ready?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(ready?'Preview ready':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
+      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Safety boundary:</strong> The active league view and Git Main remain unchanged. Candidate data is append-only, no reset runs, and the active snapshot pointer is verified before finalization.</span></div>
       ${faStatus==='blocked'?`<div class="league-import-framework-note"><svg><use href="#icon-alert-triangle"></use></svg><span><strong>Free Agents blocked upstream:</strong> this candidate is rostered-player-only. The Free Agent count is unknown, never zero.</span></div>`:''}
       <div class="commissioner-import-summary">
         <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
         <div><small>Season</small><strong>${esc(source?.season?.seasonYear ?? '—')}</strong></div>
+        <div><small>Active / captured week</small><strong>${esc(state?.activeSnapshotWeek ?? '—')} / ${esc(coverage.currentWeek ?? 'unknown')}</strong></div>
+        <div><small>Week continuity</small><strong>${esc(coverage.continuityStatus||'unknown')}</strong></div>
+        <div><small>Capture analyzed</small><strong>${esc(dateLabel(source?.generatedAt))}</strong></div>
         <div><small>Teams</small><strong>${countLabel(resultCounts.teams ?? source?.counts?.teams)}</strong></div>
         <div><small>Rostered players</small><strong>${countLabel(resultCounts.rosteredPlayers ?? resultCounts.players ?? source?.counts?.rosteredPlayers)}</strong></div>
         <div><small>Free Agents</small><strong>${esc(faCount)}</strong></div>
         <div><small>Wall time</small><strong>${durationLabel(run?.durationMs)}</strong></div>
       </div>
       <div class="commissioner-import-progress-block"><div class="commissioner-import-progress-head"><span>${esc(notice||'Candidate workflow')}</span><strong>${Number(run?.progress||0)}%</strong></div><div class="commissioner-import-progress-track"><span style="width:${Number(run?.progress||0)}%"></span></div><ol class="commissioner-import-phase-list">${phaseRows()}</ol></div>
-      ${run?.warnings?.length?`<div class="validation-errors"><strong>Warnings</strong><ul>${run.warnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></div>`:''}
+      ${sourceWarnings.length?`<div class="validation-errors"><strong>Coverage and candidate warnings</strong><ul>${sourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></div>`:''}
       ${errorMessage?`<div class="validation-errors"><strong>Stopped safely</strong><p>${esc(errorMessage)}</p>${run?.retry?.message?`<p>${esc(run.retry.message)}</p>`:''}</div>`:''}
       ${sub60?`<div class="league-import-framework-note"><svg><use href="#icon-check"></use></svg><span><strong>Performance target met:</strong> ${esc(durationLabel(run.durationMs))}, under 60 seconds.</span></div>`:''}
       <div class="league-import-framework-actions">
         <button class="button button--ghost" data-create-candidate-destination ${busy||!source?.season||state?.destination?'disabled':''}>${state?.destination?'Destination Selected':'Create Private Destination'}</button>
-        <button class="button button--primary" data-run-candidate-import ${busy||!state?.destination||ready?'disabled':''}>${busy?'Candidate Import Running…':run?.status==='failed'?'Retry Candidate Import':'Analyze Captured Export'}</button>
+        <button class="button button--primary" data-run-candidate-import ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
         <button class="button button--ghost" data-refresh-candidate-import ${busy?'disabled':''}>Refresh</button>
       </div>
-      <p class="muted">Candidate ID: ${esc(run?.candidateSnapshotId||'—')} · completeness: ${esc(run?.completenessStatus||'not evaluated')} · activation performed: no</p>
+      <p class="muted">Source fingerprint: ${esc(source?.sourceFingerprint?.slice(0,12)||'—')} · Candidate ID: ${esc(run?.candidateSnapshotId||'—')} · previous candidate: ${esc(state?.previousRun?.candidateSnapshotId||'—')} · completeness: ${esc(run?.completenessStatus||'not evaluated')} · activation performed: no</p>
     </section>`;
   }
 

@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.43
+**Revision:** 1.44
 
 **Current production:** 7.3.3 from exact source commit `b373f66`; accepted Madden 27 snapshot `841ce1b5` remains active
 
-**Current work:** Exact 7.3.3 candidate `b373f66` passed the 92/92 consolidated strict local gate and 4/4 hosted checks, then reached Production as Pages deployment `e926a37f`. Additive migration 25 is applied and reconciled; the active snapshot, protected platform counts, Git Main, and blocked/null Free Agent state are unchanged. Owner UI acceptance is pending.
+**Current work:** The owner accepted the visible 7.3.3 Production transition panel and authorized the consolidated 7.3.4 build. The locally validated 7.3.4 review candidate makes repeat imports source-specific, exposes Week 9/current-week coverage and skipped-week gaps, carries eligible same-season game/stat history forward, and keeps the active snapshot unchanged. Publication and Production are not yet authorized.
 
-**Next gate:** The owner validates the 7.3.3 commissioner transition panel at `franchisehq.app`, without executing archive/detach/removal/recovery. Production transition operations, Main, data reset, and snapshot activation/change remain separately authorized and excluded.
+**Next gate:** Review the 7.3.4 local candidate, then separately authorize one branch/PR/hosted-check cycle and one exact Production deployment. The real Week 9 capture/candidate rehearsal and any later activation remain separate decisions. Staging is not used unless the owner explicitly requests it.
 
 ## Product decisions
 
@@ -48,8 +48,8 @@
 | 7.3.0 | Completion candidate | Real Madden 27 source captured; 2,044 rostered players certified as preview-ready; Free Agents honestly blocked upstream and deferred |
 | 7.3.1 | Staging validated | One reviewed 2026 season, 32 teams, and 2,044 rostered-player identities are retained in a private preview; Free Agents remain blocked/unknown and no snapshot is active |
 | 7.3.2 | Released; owner accepted and active | Exact repair `972bea6` completed the cold run in 43.763 seconds; the owner accepted and separately activated the validation-ready 32-team/2,044-player snapshot. Free Agents remain blocked/null. |
-| 7.3.3 | Production deployed; owner acceptance pending | Exact `b373f66` and migration 25 are live; the staged 7,455-row/43-source archive/removal/recovery rehearsal remains the proof, while Production transition rows stay empty and active snapshot `841ce1b5` remains unchanged |
-| 7.3.4 | Planned | Real FGC Madden 27 staging import and recovery certification |
+| 7.3.3 | Released; owner accepted | Exact `b373f66` and migration 25 are live; Production transition rows remain empty and active snapshot `841ce1b5` remains unchanged |
+| 7.3.4 | Local review candidate | Source-scoped repeat imports, exact-export idempotency, visible Week coverage/gaps, and same-season history carry-forward without activation |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
@@ -169,9 +169,12 @@
 
 ## 7.3.4 — FGC Madden 27 Certification
 
-- Rehearse the full process on isolated staging with one actual FGC Madden 27 export.
-- Reconcile every source total, unknown route, duplicate, unassigned player, and Free Agent result before activation is considered.
-- Gate: teams, rosters, Free Agents, standings, schedules, and statistics match the source; rollback is proven; no legacy/demo data appears; production remains separately authorized.
+- Select the candidate run by the newest analyzed report/capture fingerprint, not by the league's previously completed candidate. The same exact export remains idempotent; a new fingerprint can build a new private candidate.
+- Show capture time, source fingerprint, active week, captured week, and schedule/statistics coverage before candidate work starts. Refuse a capture older than the active snapshot.
+- Carry older game/statistic records forward only when the active snapshot belongs to the same Madden game year and franchise season. Fresh exact-ID records win; current/future prior-week rows are not copied.
+- If active Week 7 is followed by a capture that supplies only Week 9, visibly report Week 8 as missing. Never imply that an unavailable week was imported or manufacture its games/statistics.
+- Reconcile every source total, unknown route, duplicate, unassigned player, and Free Agent result before activation is considered. Blocked Free Agents remain unknown/null.
+- Production-first gate: publish and deploy one exact candidate only after separate owner authorization, then let the commissioner run one real new capture-to-private-candidate cycle. The existing active snapshot stays live; activation remains a later explicit authorization. Staging is skipped unless explicitly requested.
 
 ## 7.3.5 — Team, Roster, Player, Statistics, Standings, and Free Agent Experience
 
@@ -312,3 +315,4 @@
 - **Revision 1.41:** Completed the separately authorized 7.3.3 isolated-staging rehearsal. Migration 25, a 7,455-row/43-source immutable archive, staged detach/removal, resumable restoration, an audited two-parent identity dependency repair, and exact boundary-status reconciliation are verified with zero foreign-key violations. Exact implementation commit `061639d` passes 91/91 local tests and 4/4 hosted checks. The active staging pointer remains empty, Free Agents remain blocked/null, temporary access is revoked/inactive, and Production/Main/reset/activation remain unchanged and unauthorized.
 - **Revision 1.42:** Adopted owner-directed Production-first acceptance for future releases; staging now requires separate explicit owner direction. Authorized one cumulative 7.3.3 Production acceptance cycle with additive migration 25 and exact candidate `67255af`, which replaces the stale 7.3.0 shell marker with accurate Production/7.3.3 identification. Transition execution, reset, Main, and active-snapshot changes remain excluded.
 - **Revision 1.43:** Deployed exact 7.3.3 candidate `b373f66` to Production as Pages deployment `e926a37f` after 4/4 hosted checks, applied and reconciled additive migration 25, and immediately restored the Cloudflare Production branch setting to `main`. The active snapshot remains exact `841ce1b5`; protected counts are unchanged; Production transition/archive/recovery/removal rows remain zero; Free Agents remain blocked/null; and Git Main, reset, transition execution, and snapshot activation/change remain untouched. Owner UI acceptance is the next gate.
+- **Revision 1.44:** Recorded owner acceptance of the visible 7.3.3 Production controls and completed the authorized consolidated 7.3.4 local build. The candidate scopes the importer to the newest analyzed export fingerprint, allows a different Week 9 source to proceed despite the prior preview-ready run, reuses identical exports, exposes skipped-week gaps, carries eligible older same-season games/statistics forward with fresh-record precedence, and refuses stale captures. The 94-test local suite passes; Production, staging, Git Main, the active snapshot, real capture/import, transitions, reset, activation, and blocked/null Free Agent semantics remain unchanged.

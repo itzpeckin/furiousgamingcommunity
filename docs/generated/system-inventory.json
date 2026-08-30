@@ -180,16 +180,20 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
+        "bytes": 31970,
+        "file": "tools/check-release.mjs"
+      },
+      {
         "bytes": 31509,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 28528,
-        "file": "tools/check-release.mjs"
-      },
-      {
         "bytes": 27001,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
+      },
+      {
+        "bytes": 24691,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
         "bytes": 22790,
@@ -200,10 +204,6 @@
         "file": "functions/_lib/madden-discovery.js"
       },
       {
-        "bytes": 21049,
-        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
-      },
-      {
         "bytes": 20354,
         "file": "migrations/0019_canonical_import_snapshot_foundation.sql"
       },
@@ -212,16 +212,16 @@
         "file": "league-engine/games.js"
       },
       {
+        "bytes": 19599,
+        "file": "league-engine/one-click-import.js"
+      },
+      {
         "bytes": 19144,
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
         "bytes": 18703,
         "file": "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
-      },
-      {
-        "bytes": 18283,
-        "file": "league-engine/one-click-import.js"
       }
     ],
     "total": 527
@@ -1310,7 +1310,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.3",
+  "release": "7.3.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
