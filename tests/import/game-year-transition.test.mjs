@@ -382,6 +382,42 @@ test('large recovery advances through durable bounded cursors and resumes idempo
   }finally{database.close();}
 });
 
+test('recovery cursor also bounds large archived row payloads by byte size', async () => {
+  const {database,token}=await fixture({activeSnapshot:false});
+  const db=d1(database),archives=bucket(),sources=bucket({'source/capture-1.json':'{"teams":[]}'});
+  const post=body=>onRequestPost(context({db,token,archives,sources,method:'POST',body}));
+  try{
+    const insert=database.prepare(`INSERT INTO league_snapshot_records
+      (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`);
+    const largeValue='x'.repeat(150000);
+    for(let index=0;index<4;index+=1){
+      insert.run('snapshot-1','league-1','statistics',`large-${index}`,JSON.stringify({value:largeValue,index}));
+    }
+    let response=await onRequestGet(context({db,token,archives,sources,query:'?preview=1'}));
+    const initial=await response.json(),confirmations=initial.confirmations,gameYearId=initial.gameYear.id;
+    for(const [action,confirmation] of [
+      ['plan-archive',confirmations.plan],
+      ['archive',confirmations.archive],
+      ['detach',confirmations.detach],
+      ['remove-active-data',confirmations.removeActive]
+    ]){
+      response=await post({action,gameYearId,confirmation});
+      assert.equal(response.status,200);
+    }
+    response=await post({action:'rollback',gameYearId,confirmation:confirmations.rollback});
+    let payload=await response.json();
+    assert.equal(payload.rollback.pending,true);
+    assert.match(payload.rollback.phase,/^restore-copy:/);
+    const recovered=await completeRollback(post,{
+      action:'rollback',gameYearId,confirmation:confirmations.rollback
+    });
+    payload=recovered.payload;
+    assert.equal(payload.rollback.restored,true);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,7);
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{database.close();}
+});
+
 test('archive-copy removal is separately confirmed, verified, and tombstoned before recovery is disabled', async () => {
   const {database,token}=await fixture();
   const db=d1(database),archives=bucket(),sources=bucket({'source/capture-1.json':'{"teams":[]}'});

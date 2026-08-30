@@ -20,7 +20,8 @@ import { requireCommissioner } from '../../../_lib/permissions.js';
 
 const RELEASE = GAME_YEAR_TRANSITION_RELEASE;
 const PAGE_SIZE = 250;
-const RESTORE_ROWS_PER_REQUEST = 180;
+const RESTORE_ROWS_PER_REQUEST = 96;
+const RESTORE_BYTES_PER_REQUEST = 256 * 1024;
 const RESTORE_SOURCES_PER_REQUEST = 8;
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 const text = value => String(value ?? '').trim();
@@ -655,6 +656,7 @@ async function restoreRows(current, bundle, transition) {
   const datasets = bundle.datasets || {};
   let { tableIndex, rowOffset } = restoreRowCursor(transition.phase);
   let remaining = RESTORE_ROWS_PER_REQUEST;
+  let remainingBytes = RESTORE_BYTES_PER_REQUEST;
   let processed = 0;
   for (; tableIndex < RESTORE_ORDER.length; tableIndex += 1) {
     const table = RESTORE_ORDER[tableIndex];
@@ -664,7 +666,15 @@ async function restoreRows(current, bundle, transition) {
       continue;
     }
     const allowed = await tableColumns(current.db,table);
-    const selected = rows.slice(rowOffset,rowOffset + remaining);
+    const selected = [];
+    for (let index=rowOffset;index<rows.length&&selected.length<remaining;index+=1) {
+      const row=rows[index];
+      const byteLength=new TextEncoder().encode(JSON.stringify(row)).byteLength;
+      if(selected.length&&byteLength>remainingBytes)break;
+      selected.push(row);
+      remainingBytes=Math.max(0,remainingBytes-byteLength);
+      if(remainingBytes===0)break;
+    }
     const statements = [];
     for (const row of selected) {
       const columns = Object.keys(row).filter(column=>allowed.has(column)&&SAFE_IDENTIFIER.test(column));
@@ -681,7 +691,7 @@ async function restoreRows(current, bundle, transition) {
     }
     const complete = tableIndex >= RESTORE_ORDER.length;
     const phase = complete ? 'restore-source:0' : `restore-copy:${tableIndex}:${rowOffset}`;
-    if (complete || remaining <= 0) {
+    if (complete || remaining <= 0 || remainingBytes <= 0) {
       await saveRestorePhase(current,transition.id,phase);
       return { complete, phase, rowsProcessed:processed };
     }
