@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.3",
   "releaseType": "safe-game-year-transition-controls",
-  "status": "validated-review-candidate",
+  "status": "staging-validated",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.2",
@@ -20,16 +20,20 @@
   "repositoryPublication": {
     "authorized": true,
     "status": "pull-request-open-hosted-checks-passed",
-    "commit": "1076b49893c0d71cc7fc66adb69a8cee81b06170",
+    "commit": "061639d48b6cf540a853f8612e51ab316d70dc4e",
     "pullRequest": 13,
     "hostedChecksPassed": 4,
     "scope": "Publication is limited to codex/franchisehq-7.3.3 and a stacked pull request. Git Main is excluded."
   },
   "staging": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-run",
-    "scope": "No cloud rehearsal or isolated-staging mutation is included in this implementation authorization."
+    "authorized": true,
+    "deployed": true,
+    "status": "rehearsal-completed-restored",
+    "implementationCommit": "061639d48b6cf540a853f8612e51ab316d70dc4e",
+    "rehearsalCommit": "71d088e54baf2955980afda2d1f93fd6f319dd9d",
+    "previewDeployment": "0bd05506-b52f-4078-8bd4-5df76e3302d6",
+    "migration": 25,
+    "scope": "One authorized isolated-staging rehearsal applied additive migration 25, verified a private archive, detached and removed the staged Madden 27 active plane, restored it from the immutable archive, reconciled boundary statuses, and retained audit evidence. Production is excluded."
   },
   "production": {
     "authorized": false,

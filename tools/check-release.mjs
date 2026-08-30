@@ -428,6 +428,10 @@ if (version === '7.3.3') {
     'activeDataDetachRemoval',
     'recoveryBookmarkRollback',
     'archiveCopyRemoval',
+    'resumableRecovery',
+    'identityMappingDependencies',
+    'boundaryStatusRestoration',
+    'isolatedStagingRehearsal',
     'legacyResetRetired',
     'freeAgentBlockedPreserved',
     'strictMigration'
@@ -443,8 +447,30 @@ if (version === '7.3.3') {
   if (evidence.external?.productionDataRemoval?.authorized !== false || evidence.external?.productionDataRemoval?.status !== 'not-run') {
     errors.push('7.3.3 implementation work must not claim an authorized or completed Production removal.');
   }
-  if (evidence.external?.cloudRehearsal?.authorized !== false || evidence.external?.cloudRehearsal?.status !== 'not-run') {
-    errors.push('7.3.3 implementation work must preserve the separate cloud-rehearsal boundary.');
+  const stagingValidated=manifest.status==='staging-validated';
+  if(stagingValidated){
+    const rehearsal=evidence.external?.cloudRehearsal;
+    if(
+      manifest.staging?.authorized!==true
+      || manifest.staging?.deployed!==true
+      || rehearsal?.authorized!==true
+      || rehearsal?.status!=='completed-restored'
+      || rehearsal?.environment!=='isolated-staging'
+      || Number(rehearsal?.migrationVersion)!==25
+      || Number(rehearsal?.archive?.totalRows)!==7455
+      || Number(rehearsal?.archive?.sourceObjects)!==43
+      || rehearsal?.transitionStatus!=='restored'
+      || rehearsal?.activeSnapshotId!==null
+      || rehearsal?.freeAgentStatus!=='blocked'
+      || rehearsal?.freeAgentCount!==null
+      || Number(rehearsal?.foreignKeyViolations)!==0
+      || rehearsal?.sessionStatus!=='revoked'
+      || rehearsal?.membershipStatus!=='inactive'
+    ){
+      errors.push('7.3.3 staging evidence must prove the authorized isolated archive/remove/recovery rehearsal and cleanup.');
+    }
+  }else if(evidence.external?.cloudRehearsal?.authorized!==false||evidence.external?.cloudRehearsal?.status!=='not-run'){
+    errors.push('7.3.3 implementation work must preserve the separate cloud-rehearsal boundary until staging is validated.');
   }
   if (
     evidence.scopeBoundaries?.activeSnapshotChanged !== false
