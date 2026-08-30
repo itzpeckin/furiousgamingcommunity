@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.2",
+  "validatedOn": "2026-08-30",
+  "status": "validated-production-authorized",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "productionIncidentDiagnosis": {
+      "passed": true,
+      "maddenExportAccepted": true,
+      "firstCompleteBurstRoutes": 43,
+      "firstCompleteBurstSessionsBeforeRepair": 8,
+      "firstReceivedAt": "2026-08-30T21:33:47.826Z",
+      "lastReceivedAt": "2026-08-30T21:33:49.047Z",
+      "teamRoutes": 1,
+      "teamRosterRoutes": 32,
+      "rosteredPlayerRows": 2043,
+      "standingRoutes": 1,
+      "scheduleRoutes": 1,
+      "statisticsRoutes": 7,
+      "freeAgentRoutes": 1,
+      "freeAgentStatus": "blocked",
+      "freeAgentCount": null
+    },
+    "atomicCohortClaim": {
+      "passed": true,
+      "concurrentRequests": 43,
+      "resultingSessionCount": 1,
+      "deterministicGenerationId": true,
+      "compareAndSwapPointer": true
+    },
+    "exactBurstRecovery": {
+      "passed": true,
+      "expectedCaptureCount": 43,
+      "maximumWindowMs": 10000,
+      "platformOwnerRequired": true,
+      "typedConfirmationRequired": true,
+      "readyReportRequiredBeforePointerAdvance": true,
+      "idempotent": true
+    },
+    "activeSnapshotIsolation": {
+      "passed": true,
+      "activeSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+      "activeSnapshotChanged": false,
+      "activationPerformed": false,
+      "resetPerformed": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false,
+      "eligibleScope": "rostered-players-only"
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 26,
+      "newMigration": false,
+      "requiredTables": 79
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 101,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 203,
+      "inventoryFiles": 533,
+      "routes": 65,
+      "requiredTables": 79
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "resetPerformed": false,
+    "transitionOperationExecuted": false,
+    "archiveOperationExecuted": false,
+    "captureExecuted": false,
+    "cohortRecoveryExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false
+  },
+  "external": {
+    "githubPublication": { "authorized": true, "status": "not-run" },
+    "hostedChecks": { "authorized": true, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "not-run",
+      "currentDeployment": "0eec0551-216c-4f32-8aed-e8a7fbcb81ab",
+      "currentRuntimeCommit": "6de7c1018c89bc8fd6868fbde984f7a496e2a69d"
+    },
+    "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 26 },
+    "productionCohortRecovery": {
+      "authorized": true,
+      "status": "not-run",
+      "firstReceivedAt": "2026-08-30T21:33:47.826Z",
+      "lastReceivedAt": "2026-08-30T21:33:49.047Z",
+      "expectedCaptureCount": 43
+    },
+    "productionMaddenExport": { "authorized": false, "status": "not-run" },
+    "productionCandidateImport": { "authorized": false, "status": "not-run" },
+    "maddenImportActivation": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

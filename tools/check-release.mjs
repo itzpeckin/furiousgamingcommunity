@@ -681,6 +681,102 @@ if (version === '7.3.4.1') {
     errors.push('7.3.4.1 evidence must accurately preserve every Production, data, Main, transition, import, activation, and Free Agent boundary.');
   }
 }
+if (version === '7.3.4.2') {
+  const productionDeployed = isPostDeployment;
+  for (const check of [
+    'productionIncidentDiagnosis',
+    'atomicCohortClaim',
+    'exactBurstRecovery',
+    'activeSnapshotIsolation',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.4.2 cohort-remediation evidence is incomplete: ${check}.`);
+  }
+  if (
+    Number(evidence.checks?.productionIncidentDiagnosis?.firstCompleteBurstRoutes) !== 43
+    || Number(evidence.checks?.productionIncidentDiagnosis?.firstCompleteBurstSessionsBeforeRepair) !== 8
+    || Number(evidence.checks?.productionIncidentDiagnosis?.teamRosterRoutes) !== 32
+    || Number(evidence.checks?.productionIncidentDiagnosis?.rosteredPlayerRows) !== 2043
+    || evidence.checks?.atomicCohortClaim?.resultingSessionCount !== 1
+    || evidence.checks?.atomicCohortClaim?.compareAndSwapPointer !== true
+    || evidence.checks?.exactBurstRecovery?.platformOwnerRequired !== true
+    || evidence.checks?.exactBurstRecovery?.typedConfirmationRequired !== true
+    || evidence.checks?.exactBurstRecovery?.readyReportRequiredBeforePointerAdvance !== true
+  ) errors.push('7.3.4.2 must prove the observed incident, atomic claim, and fail-closed exact recovery.');
+  if (productionDeployed) {
+    if (
+      manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'published-hosted-checks-passed-main'
+      || evidence.external?.githubPublication?.status !== 'published-main'
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || Number(evidence.external?.hostedChecks?.passed) < 4
+    ) errors.push('Deployed 7.3.4.2 evidence must record Main publication and passed hosted checks.');
+    if (
+      manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.status !== 'success-pending-owner-acceptance'
+      || evidence.external?.productionDeployment?.authorized !== true
+      || evidence.external?.productionDeployment?.status !== 'success'
+      || evidence.external?.productionCohortRecovery?.authorized !== true
+      || evidence.external?.productionCohortRecovery?.status !== 'completed-verified'
+      || Number(evidence.external?.productionCohortRecovery?.captureCount) !== 43
+      || Number(evidence.external?.productionCohortRecovery?.teamRosterRoutes) !== 32
+      || evidence.external?.productionCohortRecovery?.ready !== true
+      || evidence.external?.productionCohortRecovery?.freeAgentStatus !== 'blocked'
+      || evidence.external?.productionCohortRecovery?.freeAgentCount !== null
+      || evidence.external?.productionCohortRecovery?.activeSnapshotChanged !== false
+    ) errors.push('Deployed 7.3.4.2 evidence must record the exact Production deployment and verified 43-route recovery.');
+  } else {
+    if (
+      manifest.status !== 'validated-production-authorized'
+      || manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'authorized-not-run'
+      || evidence.external?.githubPublication?.authorized !== true
+      || evidence.external?.githubPublication?.status !== 'not-run'
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== false
+      || manifest.production?.status !== 'authorized-not-run'
+      || evidence.external?.productionDeployment?.authorized !== true
+      || evidence.external?.productionDeployment?.status !== 'not-run'
+      || evidence.external?.productionCohortRecovery?.authorized !== true
+      || evidence.external?.productionCohortRecovery?.status !== 'not-run'
+    ) errors.push('Authorized 7.3.4.2 evidence must retain pending publication, deployment, and recovery gates.');
+  }
+  if (
+    manifest.staging?.authorized !== false
+    || manifest.staging?.deployed !== false
+    || evidence.external?.stagingDeployment?.authorized !== false
+    || evidence.external?.stagingDeployment?.status !== 'not-run'
+    || evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-required'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 26
+    || evidence.external?.productionMaddenExport?.authorized !== false
+    || evidence.external?.productionMaddenExport?.status !== 'not-run'
+    || evidence.external?.productionCandidateImport?.authorized !== false
+    || evidence.external?.productionCandidateImport?.status !== 'not-run'
+    || evidence.external?.maddenImportActivation?.authorized !== false
+    || evidence.external?.maddenImportActivation?.status !== 'not-run'
+  ) errors.push('7.3.4.2 must preserve the staging, migration, new-export, candidate-import, and activation boundaries.');
+  if (
+    evidence.scopeBoundaries?.productionChanged !== productionDeployed
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== productionDeployed
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveOperationExecuted !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.cohortRecoveryExecuted !== productionDeployed
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.3.4.2 evidence must preserve every Production remediation boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

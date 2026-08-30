@@ -51,13 +51,13 @@ test('production shell exposes the exact release and environment', async () => {
     readFile(new URL('../../functions/leagues/index.js', import.meta.url), 'utf8'),
     readFile(new URL('../../functions/leagues/[[path]].js', import.meta.url), 'utf8')
   ]);
-  assert.match(index, /franchise-hq-platform-version" content="7\.3\.4\.1"/);
-  assert.match(index, /Production · Current Release 7\.3\.4\.1/);
-  assert.match(index, /app\.js\?v=7\.3\.4\.1/);
-  assert.match(index, /trade-module\.js\?v=7\.3\.4\.1/);
-  assert.match(app, /const VISIBLE_RELEASE = '7\.3\.4\.1'/);
+  assert.match(index, /franchise-hq-platform-version" content="7\.3\.4\.2"/);
+  assert.match(index, /Production · Current Release 7\.3\.4\.2/);
+  assert.match(index, /app\.js\?v=7\.3\.4\.2/);
+  assert.match(index, /trade-module\.js\?v=7\.3\.4\.2/);
+  assert.match(app, /const VISIBLE_RELEASE = '7\.3\.4\.2'/);
   assert.match(app, /hostname==='franchisehq\.app'.*return 'Production'/);
   for (const source of [landing, selector, leagueRoute]) {
-    assert.match(source, /const RELEASE ?= ?["']7\.3\.4\.1["']/);
+    assert.match(source, /const RELEASE ?= ?["']7\.3\.4\.2["']/);
   }
 });

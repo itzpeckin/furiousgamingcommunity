@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.2",
+  "releaseType": "permanent-export-atomic-cohort-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.4.1",
+    "commit": "6de7c1018c89bc8fd6868fbde984f7a496e2a69d",
+    "tree": "d24aa355717eec9a78c0bc23f4c882081812740b",
+    "tag": "v7.0.0",
+    "productionDeployment": "0eec0551-216c-4f32-8aed-e8a7fbcb81ab"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.4.2",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "scope": "The owner authorized one consolidated branch, pull request, hosted-check, Main, and Production cycle for the atomic cohort repair."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Production-first policy applies. No staging cycle is authorized."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.3.4.1",
+    "currentCommit": "6de7c1018c89bc8fd6868fbde984f7a496e2a69d",
+    "currentDeployment": "0eec0551-216c-4f32-8aed-e8a7fbcb81ab",
+    "activeSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+    "scope": "Deploy only the atomic cohort fix and recover the exact previously captured 43-route window. Import, activation, reset, URL rotation, transition, and Free Agent reinterpretation remain excluded."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/madden-discovery-report.js",
+    "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+    "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
+    "releases/7.3.4.2/release-record.md",
+    "releases/7.3.4.2/validation-evidence.json",
+    "tests/import/madden-discovery.test.mjs",
+    "tests/import/permanent-league-export.test.mjs"
+  ]
+}

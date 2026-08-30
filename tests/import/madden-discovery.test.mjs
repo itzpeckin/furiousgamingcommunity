@@ -14,6 +14,7 @@ import {
 } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { hashToken } from '../../functions/_lib/auth.js';
 import { deriveLeagueExportToken } from '../../functions/_lib/permanent-league-export.js';
+import { recoverMaddenDiscoveryCohort } from '../../functions/_lib/madden-discovery-report.js';
 import { onRequestPost as startDiscoverySession } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-session.js';
 import { onRequestPost as generateDiscoveryReport } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js';
 import { onRequest as receiveDiscoveryCapture } from '../../functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js';
@@ -493,6 +494,92 @@ test('one authenticated discovery session captures, deduplicates, reports, and n
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM madden_discovery_reports`).get().count,2);
     assert.equal(r2.objects.size,7,'duplicate payloads are linked into the new cohort without copying raw objects');
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
+  } finally {
+    database.close();
+  }
+});
+
+test('an existing shattered 43-route burst is recovered without importing or activating data', async () => {
+  const database = new DatabaseSync(':memory:');
+  try {
+    database.exec('PRAGMA foreign_keys = ON;');
+    for (const migration of MIGRATIONS) database.exec(await readFile(new URL(migration, import.meta.url),'utf8'));
+    database.prepare(`INSERT INTO leagues
+      (id,name,product_name,slug,public_status,tenant_status,timezone)
+      VALUES (?,?,?,?,?,?,?)`).run(
+        'league-recovery','Furious Gaming Community','FranchiseHQ','recovery-league',
+        'active','enabled','America/Chicago'
+      );
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(
+        'season-recovery','league-recovery','ea-madden-companion','742482','1',
+        'Madden NFL 27','Recovery Season',2026,'active'
+      );
+    database.prepare(`INSERT INTO league_game_years
+      (id,league_id,game_release,edition_year,display_name,status)
+      VALUES (?,?,?,?,?,'active')`).run(
+        'game-year-recovery','league-recovery','Madden NFL 27',27,'Madden NFL 27'
+      );
+    database.prepare(`INSERT INTO madden_discovery_sessions
+      (id,league_id,token_hash,status,expires_at,created_at,updated_at)
+      VALUES (?,?,?,'review_required',?,?,?)`).run(
+        'shattered-source','league-recovery','shattered-source-token',
+        '2099-01-01T00:00:00.000Z','2026-08-30T21:33:47.800Z','2026-08-30T21:33:50.000Z'
+      );
+
+    const captures=liveLikeRosterCaptureSet().filter(item=>!item.routePath.endsWith('/league'));
+    const teamsCapture=captures.find(item=>item.routePath.endsWith('/leagueteams'));
+    Object.assign(teamsCapture.payload,{
+      success:true,gameVersion:'Madden NFL 27',platform:'xbsx',franchiseId:'742482',
+      leagueName:'Furious Gaming Community',season:1,week:9
+    });
+    for (let index=0; index<6; index+=1) captures.push(capture(
+      `xbsx/742482/week/reg/9/extra-${index}`,
+      {playerReceivingStatInfoList:[{rosterId:`player-${index+1}`,teamId:`team-${index+1}`,weekIndex:8}]},
+      3_810+index
+    ));
+    assert.equal(captures.length,43);
+    const binding=d1(database),r2=memoryR2();
+    for (let index=0; index<captures.length; index+=1) {
+      const item=captures[index];
+      const id=`recovery-capture-${index}`;
+      const key=`recovery/${id}.json`;
+      const encoded=new TextEncoder().encode(JSON.stringify(item.payload));
+      await r2.put(key,encoded.buffer);
+      database.prepare(`INSERT INTO companion_route_captures
+        (id,league_id,discovery_session_id,route_path,request_method,content_type,byte_length,
+         payload_hash,r2_object_key,top_level_keys_json,collections_json,request_headers_json,received_at)
+        VALUES (?,?,?,?,'POST','application/json',?,?,?,?,?,?,?)`).run(
+          id,'league-recovery','shattered-source',item.routePath,encoded.byteLength,
+          `recovery-hash-${index}`,key,'[]','[]','{}',item.receivedAt
+        );
+      database.prepare(`INSERT INTO madden_discovery_session_captures
+        (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`).run(
+          'league-recovery','shattered-source',id,item.routePath,item.receivedAt
+        );
+    }
+    const first=captures.map(item=>item.receivedAt).sort()[0];
+    const last=captures.map(item=>item.receivedAt).sort().at(-1);
+    const recovered=await recoverMaddenDiscoveryCohort({
+      db:binding,env:{COMPANION_EXPORTS:r2},leagueId:'league-recovery',
+      leagueName:'Furious Gaming Community',firstReceivedAt:first,lastReceivedAt:last,
+      expectedCaptureCount:43
+    });
+    assert.equal(recovered.summary.captures,43);
+    assert.equal(recovered.summary.teamRosters,32);
+    assert.equal(recovered.readiness.ready,true);
+    assert.equal(recovered.readiness.freeAgentStatus,'blocked');
+    assert.equal(recovered.readiness.freeAgentCount,null);
+    const endpoint=database.prepare(`SELECT * FROM companion_league_export_endpoints
+      WHERE league_id='league-recovery'`).get();
+    assert.equal(endpoint.latest_session_id,recovered.sessionId);
+    assert.equal(endpoint.latest_report_id,recovered.reportId);
+    assert.equal(endpoint.latest_ready_report_id,recovered.reportId);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM madden_discovery_session_captures
+      WHERE session_id=?`).get(recovered.sessionId).count,43);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   } finally {
     database.close();
   }

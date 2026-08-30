@@ -180,7 +180,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 37677,
+        "bytes": 43535,
         "file": "tools/check-release.mjs"
       },
       {
@@ -200,6 +200,10 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
+        "bytes": 26784,
+        "file": "tests/import/madden-discovery.test.mjs"
+      },
+      {
         "bytes": 25471,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
@@ -208,12 +212,12 @@
         "file": "platform/validate.js"
       },
       {
-        "bytes": 21978,
-        "file": "tests/import/madden-discovery.test.mjs"
-      },
-      {
         "bytes": 21293,
         "file": "functions/_lib/madden-discovery.js"
+      },
+      {
+        "bytes": 20470,
+        "file": "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
       },
       {
         "bytes": 20354,
@@ -226,10 +230,6 @@
       {
         "bytes": 20056,
         "file": "league-engine/one-click-import.js"
-      },
-      {
-        "bytes": 18887,
-        "file": "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
       }
     ],
     "total": 533
@@ -1337,7 +1337,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.4.1",
+  "release": "7.3.4.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

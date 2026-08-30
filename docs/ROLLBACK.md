@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.4.2 cohort-remediation impact
+
+The authorized 7.3.4.2 patch changes only automatic permanent-export cohort claiming and an exact, platform-owner-only recovery path. It adds no migration. The observed Production burst from `2026-08-30T21:33:47.826Z` through `2026-08-30T21:33:49.047Z` contains 43 retained routes but was fragmented across eight sessions by concurrent 7.3.4.1 requests.
+
+Recovery creates a new immutable discovery-session link set and structural report over those existing R2 objects; it does not copy or delete raw payloads. The endpoint pointer advances only after the recovered report passes readiness. Original fragmented sessions/reports and the recovery audit row must be retained. Runtime rollback may restore exact 7.3.4.1 commit `6de7c1018c89bc8fd6868fbde984f7a496e2a69d` / Pages deployment `0eec0551-216c-4f32-8aed-e8a7fbcb81ab`, but must not delete or repoint recovery evidence.
+
+Do not import or activate a candidate, reset data, rotate the permanent URL, run a game-year transition, restore D1, or reinterpret the blocked/null Free Agent result as part of this remediation or rollback.
+
 ## 7.3.4.1 Production impact
 
 The local 7.3.4.1 candidate adds additive migration 26 and a permanent Madden Companion export endpoint for each league. The URL credential is derived from a protected server root, league ID, and token version; D1 stores no raw credential. Rotation increments the version and invalidates only the previous URL. The endpoint row and its current version persist across normal imports and game-year archive/removal operations.

@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.46
+**Revision:** 1.47
 
 **Current production:** 7.3.4.1 from exact Main commit `6de7c10` (Pages deployment `0eec0551`); accepted Madden 27 snapshot `841ce1b5` remains active
 
-**Current work:** Production 7.3.4.1 provides one permanent league-specific export URL, automatic export-cohort analysis, Commissioner HQ readiness, explicit credential rotation, and one **Import Latest Export** action. Migration 26 is reconciled at 79 application tables with one active endpoint row; the active snapshot and protected league/account plane are unchanged.
+**Current work:** Production 7.3.4.1 received the commissioner's complete 43-route Madden export but split its concurrent requests across eight automatic sessions. Authorized 7.3.4.2 atomically claims one cohort per endpoint generation and provides a platform-owner-only exact-window recovery for the retained burst. Migration 26, the active snapshot, and the protected league/account plane remain unchanged during implementation.
 
-**Next gate:** The commissioner validates the visible Production workflow, copies the permanent league URL into Madden Companion, and sends the next export. Automatic analysis should mark the latest export ready; **Import Latest Export** then creates a private candidate. A real export, candidate import, and any later snapshot activation remain separate actions. Staging is not used unless the owner explicitly requests it.
+**Next gate:** Publish the authorized 7.3.4.2 patch through hosted checks and exact Main/Production deployment, then recover and analyze only the retained 43-route burst from `21:33:47.826Z` through `21:33:49.047Z`. Candidate import and activation remain separate actions. Staging is not used unless the owner explicitly requests it.
 
 ## Product decisions
 
@@ -51,6 +51,7 @@
 | 7.3.3 | Released; owner accepted | Exact `b373f66` and migration 25 are live; Production transition rows remain empty and active snapshot `841ce1b5` remains unchanged |
 | 7.3.4 | Production | Source-scoped repeat imports, exact-export idempotency, visible Week coverage/gaps, and same-season history carry-forward without activation |
 | 7.3.4.1 | Production; pending owner UI acceptance | Permanent revocable league export URL, automatic cohort analysis, readiness status, and one-click latest candidate import |
+| 7.3.4.2 | Production remediation authorized | Atomic concurrent cohort claim and exact retained-burst recovery without candidate import or activation |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
@@ -329,3 +330,4 @@
 - **Revision 1.44:** Recorded owner acceptance of the visible 7.3.3 Production controls and completed the authorized consolidated 7.3.4 local build. The candidate scopes the importer to the newest analyzed export fingerprint, allows a different Week 9 source to proceed despite the prior preview-ready run, reuses identical exports, exposes skipped-week gaps, carries eligible older same-season games/statistics forward with fresh-record precedence, and refuses stale captures. The 94-test local suite passes; Production, staging, Git Main, the active snapshot, real capture/import, transitions, reset, activation, and blocked/null Free Agent semantics remain unchanged.
 - **Revision 1.45:** Recorded Production 7.3.4 at exact Main commit `431583e` / Pages deployment `fafabfb2` and completed the authorized 7.3.4.1 local workflow redesign. One revocable URL now persists per league; automatic quiet-window cohorts analyze every full or partial export; only eligible reports advance the ready pointer; Commissioner HQ shows freshness/readiness and offers one **Import Latest Export** action. Migration 26 is additive and un-applied. Production, staging, Main, real capture/import, reset, transition, active snapshot `841ce1b5`, and blocked/null Free Agent semantics remain unchanged.
 - **Revision 1.46:** Published 7.3.4.1 through PR #16 with 4/4 candidate checks passing, fast-forwarded exact commit `6de7c10` to Main, reconciled additive Production migration 26, and deployed exact Pages runtime `0eec0551`. One active league endpoint points to the existing eligible report without storing a raw credential. Public and authorization-boundary smoke checks pass; the active snapshot remains `841ce1b5`, protected counts are unchanged, and Free Agents remain blocked/null. No staging, real export/import, reset, transition, archive/removal/recovery operation, credential rotation, or activation ran.
+- **Revision 1.47:** Diagnosed the first permanent-URL Production export. Madden successfully delivered one complete 43-route burst in 1.221 seconds—teams, 32 rosters with 2,043 current roster rows, standings, schedule, seven statistics routes, and the blocked Free Agent response—but concurrent receiver calls raced and split it across eight sessions. Authorized 7.3.4.2 adds a deterministic compare-and-swap cohort claim plus platform-owner-only exact-window recovery. No import, activation, reset, URL rotation, transition, or Free Agent reinterpretation is included.

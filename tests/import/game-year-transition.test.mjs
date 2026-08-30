@@ -513,6 +513,6 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.match(ui,/Start New Franchise Season/);
   assert.match(ui,/Archive \/ Remove Madden Game Year/);
   assert.match(ui,/Free Agents remain blocked\/unknown/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.3\.4\.1/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.3\.4\.2/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });

@@ -17,7 +17,7 @@ import { hashToken } from '../../../../../../_lib/auth.js';
 import { deriveLeagueExportToken } from '../../../../../../_lib/permanent-league-export.js';
 import { generateMaddenDiscoveryReport } from '../../../../../../_lib/madden-discovery-report.js';
 
-const RELEASE = '7.3.4.1';
+const RELEASE = '7.3.4.2';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
 const AUTOMATIC_COHORT_WINDOW_MS = 2 * 60 * 1000;
 const AUTOMATIC_LATE_CAPTURE_WINDOW_MS = 15 * 1000;
@@ -152,7 +152,23 @@ async function permanentEndpointFor(db, leagueId) {
     WHERE league_id=? LIMIT 1`).bind(leagueId).first();
 }
 
-async function automaticSessionFor(db, league, endpoint) {
+async function automaticCohortId(leagueId, endpoint) {
+  const marker = [
+    'permanent-cohort-v2',
+    leagueId,
+    Number(endpoint?.token_version || 1),
+    endpoint?.latest_session_id || 'initial',
+    endpoint?.last_received_at || endpoint?.updated_at || endpoint?.created_at || 'initial'
+  ].join(':');
+  const digest = await sha256Hex(new TextEncoder().encode(marker));
+  return `m27_auto_${digest.slice(0,32)}`;
+}
+
+export async function automaticSessionFor(db, league, suppliedEndpoint) {
+  const endpoint = await permanentEndpointFor(db,league.id) || suppliedEndpoint;
+  if (!endpoint || endpoint.status !== 'active') {
+    throw new Error('The permanent league export endpoint is unavailable.');
+  }
   const previous = endpoint?.latest_session_id
     ? await db.prepare(`SELECT * FROM madden_discovery_sessions
       WHERE league_id=? AND id=? LIMIT 1`).bind(league.id,endpoint.latest_session_id).first()
@@ -171,24 +187,38 @@ async function automaticSessionFor(db, league, endpoint) {
     .bind(league.id).first();
   const season = await db.prepare(`SELECT source_season_id FROM franchise_seasons
     WHERE league_id=? ORDER BY updated_at DESC,created_at DESC LIMIT 1`).bind(league.id).first();
-  const id = `m27_auto_${crypto.randomUUID()}`;
+  // Every concurrent request that observes the same endpoint generation derives
+  // the same candidate ID. INSERT OR IGNORE plus the compare-and-swap pointer
+  // prevents one Madden burst from fragmenting into many sessions.
+  const id = await automaticCohortId(league.id,endpoint);
   const createdAt = new Date().toISOString();
   const expiresAt = new Date(Date.now()+AUTOMATIC_SESSION_DURATION_MS).toISOString();
   const tokenHash = await hashToken(`permanent:${league.id}:${endpoint.token_version}:${id}`);
-  await db.batch([
-    db.prepare(`INSERT INTO madden_discovery_sessions
+  await db.prepare(`INSERT OR IGNORE INTO madden_discovery_sessions
       (id,league_id,token_hash,status,expected_game_release,expected_league_name,expected_season,
        expires_at,created_at,updated_at)
       VALUES (?,?,?,'open',?,?,?,?,?,?)`).bind(
         id,league.id,tokenHash,
         gameYear?.game_release || null,league.name,season?.source_season_id || null,
         expiresAt,createdAt,createdAt
-      ),
-    db.prepare(`UPDATE companion_league_export_endpoints SET
+      ).run();
+  await db.prepare(`UPDATE companion_league_export_endpoints SET
       latest_session_id=?,latest_session_token_version=?,analysis_requested_at=NULL,updated_at=?
-      WHERE league_id=?`).bind(id,endpoint.token_version,createdAt,league.id)
-  ]);
-  return db.prepare(`SELECT * FROM madden_discovery_sessions WHERE id=?`).bind(id).first();
+      WHERE league_id=? AND status='active' AND token_version=?
+        AND latest_session_id IS ?`).bind(
+          id,endpoint.token_version,createdAt,league.id,
+          endpoint.token_version,endpoint.latest_session_id || null
+        ).run();
+  const winner = await permanentEndpointFor(db,league.id);
+  if (Number(winner?.token_version) !== Number(endpoint.token_version)) {
+    throw new Error('The permanent export URL changed while Madden was sending data.');
+  }
+  const winnerId = winner?.latest_session_id;
+  if (!winnerId) throw new Error('The automatic export cohort could not be claimed.');
+  const session = await db.prepare(`SELECT * FROM madden_discovery_sessions
+    WHERE league_id=? AND id=? LIMIT 1`).bind(league.id,winnerId).first();
+  if (!session) throw new Error('The claimed automatic export cohort is unavailable.');
+  return session;
 }
 
 async function afterPermanentCapture(context, db, leagueId, sessionId, receivedAt) {

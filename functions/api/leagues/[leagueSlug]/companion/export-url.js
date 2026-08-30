@@ -5,7 +5,7 @@ import {
   resolveLeague,
   validLeagueSlug
 } from '../../../../_lib/cloud-platform.js';
-import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireCommissioner, requirePlatformOwner } from '../../../../_lib/permissions.js';
 import {
   deriveLeagueExportToken,
   leagueExportUrl,
@@ -13,11 +13,12 @@ import {
 } from '../../../../_lib/permanent-league-export.js';
 import {
   generateMaddenDiscoveryReport,
-  publicMaddenDiscoveryReport
+  publicMaddenDiscoveryReport,
+  recoverMaddenDiscoveryCohort
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.3.4.1';
+const RELEASE = '7.3.4.2';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();
@@ -180,6 +181,55 @@ export async function onRequestPost(context) {
   let body = {};
   try { body=await context.request.json(); } catch {}
   const action = text(body.action).toLowerCase();
+  if (action === 'recover-cohort') {
+    const owner = await requirePlatformOwner(context);
+    if (!owner.authorized) return owner.response;
+    const firstReceivedAt = text(body.firstReceivedAt);
+    const lastReceivedAt = text(body.lastReceivedAt);
+    const expectedCaptureCount = Number(body.expectedCaptureCount || 0);
+    const expectedConfirmation = `RECOVER ${current.slug} ${firstReceivedAt} ${lastReceivedAt} ${expectedCaptureCount}`;
+    if (text(body.confirmation) !== expectedConfirmation || expectedCaptureCount !== 43) {
+      return json({ok:false,error:'Exact cohort recovery confirmation is required.',release:RELEASE},409);
+    }
+    const before = await current.db.prepare(`SELECT snapshot_id FROM league_active_snapshots
+      WHERE league_id=? LIMIT 1`).bind(current.league.id).first();
+    try {
+      const recovery = await recoverMaddenDiscoveryCohort({
+        db:current.db,
+        env:current.env,
+        leagueId:current.league.id,
+        leagueName:current.league.name,
+        firstReceivedAt,
+        lastReceivedAt,
+        expectedCaptureCount,
+        generatedByUserId:owner.session.user.id
+      });
+      const after = await current.db.prepare(`SELECT snapshot_id FROM league_active_snapshots
+        WHERE league_id=? LIMIT 1`).bind(current.league.id).first();
+      if ((before?.snapshot_id || null) !== (after?.snapshot_id || null)) {
+        return json({ok:false,error:'Recovery stopped because the active snapshot changed.',release:RELEASE},409);
+      }
+      await audit(current,'companion.export_cohort.recover',{
+        firstReceivedAt,lastReceivedAt,expectedCaptureCount,
+        recoverySessionId:recovery.sessionId,recoveryReportId:recovery.reportId,
+        activeSnapshotId:after?.snapshot_id || null,
+        activeSnapshotChanged:false,activationPerformed:false,
+        freeAgentStatus:recovery.readiness.freeAgentStatus,
+        freeAgentCount:recovery.readiness.freeAgentCount,
+        freeAgentInterpretedAsZero:false
+      });
+      return json({
+        ...(await publicState(current)),
+        recovered:true,
+        recovery,
+        activeSnapshotId:after?.snapshot_id || null,
+        activeSnapshotChanged:false,
+        activationPerformed:false
+      });
+    } catch (error) {
+      return json({ok:false,error:error?.message || 'The capture cohort could not be recovered.',release:RELEASE},error?.status || 500);
+    }
+  }
   if (action !== 'rotate') return json({ok:false,error:`Unsupported action: ${action || 'none'}.`,release:RELEASE},400);
   const before = await endpointFor(current.db,current.league.id);
   await current.db.prepare(`UPDATE companion_league_export_endpoints SET

@@ -8,6 +8,8 @@ import {
   permanentExportPublicState,
   reportImportReadiness
 } from '../../functions/_lib/permanent-league-export.js';
+import { recoveryCohortSummary } from '../../functions/_lib/madden-discovery-report.js';
+import { automaticSessionFor } from '../../functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js';
 
 function eligibleReport(freeAgentStatus='blocked') {
   const located = recordCount => ({status:'located',recordCount});
@@ -69,7 +71,79 @@ test('an incomplete newest report never replaces the retained ready source', () 
   assert.equal(review.importAvailable,false);
 });
 
-test('runtime wiring preserves immutable sources, snapshot isolation, and explicit rotation', async () => {
+function concurrentCohortDatabase() {
+  const endpoint = {
+    league_id:'league-1',token_version:1,status:'active',latest_session_id:'previous-session',
+    latest_session_token_version:1,last_received_at:'2026-08-30T20:00:00.000Z',
+    updated_at:'2026-08-30T20:00:03.000Z',created_at:'2026-08-30T19:00:00.000Z'
+  };
+  const sessions = new Map([['previous-session',{
+    id:'previous-session',league_id:'league-1',status:'review_required',
+    last_capture_at:'2026-08-30T20:00:00.000Z',created_at:'2026-08-30T20:00:00.000Z'
+  }]]);
+  const prepare = sql => ({bind:(...args)=>({
+    first:async()=>{
+      if (sql.includes('FROM companion_league_export_endpoints')) return {...endpoint};
+      if (sql.includes('FROM madden_discovery_sessions')) return {...(sessions.get(args.at(-1)) || null)};
+      if (sql.includes('FROM league_game_years')) return {game_release:'Madden NFL 27'};
+      if (sql.includes('FROM franchise_seasons')) return {source_season_id:'1'};
+      throw new Error(`Unexpected first query: ${sql}`);
+    },
+    run:async()=>{
+      if (sql.includes('INSERT OR IGNORE INTO madden_discovery_sessions')) {
+        const [id,leagueId,tokenHash,gameRelease,leagueName,season,expiresAt,createdAt,updatedAt]=args;
+        if (!sessions.has(id)) sessions.set(id,{
+          id,league_id:leagueId,token_hash:tokenHash,status:'open',expected_game_release:gameRelease,
+          expected_league_name:leagueName,expected_season:season,expires_at:expiresAt,created_at:createdAt,
+          updated_at:updatedAt,capture_count:0
+        });
+        return {meta:{changes:1}};
+      }
+      if (sql.includes('UPDATE companion_league_export_endpoints SET')) {
+        await Promise.resolve();
+        const [id,tokenVersion,updatedAt,leagueId,expectedVersion,expectedSessionId]=args;
+        const matches = endpoint.league_id === leagueId
+          && endpoint.status === 'active'
+          && Number(endpoint.token_version) === Number(expectedVersion)
+          && (endpoint.latest_session_id || null) === (expectedSessionId || null);
+        if (matches) Object.assign(endpoint,{
+          latest_session_id:id,latest_session_token_version:tokenVersion,
+          analysis_requested_at:null,updated_at:updatedAt
+        });
+        return {meta:{changes:matches ? 1 : 0}};
+      }
+      throw new Error(`Unexpected run query: ${sql}`);
+    }
+  })});
+  return {prepare,endpoint,sessions};
+}
+
+test('43 concurrent Madden routes atomically claim one automatic cohort', async () => {
+  const db=concurrentCohortDatabase();
+  const league={id:'league-1',name:'Furious Gaming Community'};
+  const supplied={...db.endpoint};
+  const sessions=await Promise.all(Array.from({length:43},()=>automaticSessionFor(db,league,supplied)));
+  assert.equal(new Set(sessions.map(session=>session.id)).size,1);
+  assert.equal(db.sessions.size,2);
+  assert.equal(db.endpoint.latest_session_id,sessions[0].id);
+  assert.equal(sessions[0].status,'open');
+});
+
+test('the observed 43-route Production burst satisfies exact recovery structure', () => {
+  const rows=[
+    {id:'teams',route_path:'xbsx/742482/leagueteams'},
+    {id:'free-agents',route_path:'xbsx/742482/freeagents/roster'},
+    {id:'standings',route_path:'xbsx/742482/standings'},
+    {id:'schedule',route_path:'xbsx/742482/week/reg/9/schedules'},
+    ...Array.from({length:7},(_,index)=>({id:`stat-${index}`,route_path:`xbsx/742482/week/reg/9/stat-${index}`})),
+    ...Array.from({length:32},(_,index)=>({id:`roster-${index}`,route_path:`xbsx/742482/team/${index+1}/roster`}))
+  ];
+  assert.deepEqual(recoveryCohortSummary(rows),{
+    captures:43,teams:1,teamRosters:32,freeAgents:1,standings:1,schedule:1,statistics:7,other:0
+  });
+});
+
+test('runtime wiring preserves immutable sources, atomic cohorts, snapshot isolation, and explicit recovery', async () => {
   const [migration,receiver,management,candidate,ui,importer,transition]=await Promise.all([
     readFile(new URL('../../migrations/0026_permanent_league_export_url.sql',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js',import.meta.url),'utf8'),
@@ -87,12 +161,18 @@ test('runtime wiring preserves immutable sources, snapshot isolation, and explic
   assert.match(receiver,/deriveLeagueExportToken/);
   assert.match(receiver,/AUTOMATIC_ANALYSIS_IDLE_MS = 3_000/);
   assert.match(receiver,/afterPermanentCapture/);
+  assert.match(receiver,/automaticCohortId/);
+  assert.match(receiver,/latest_session_id IS \?/);
   assert.match(receiver,/generateMaddenDiscoveryReport/);
   assert.match(receiver,/analysis_requested_at IS NULL/);
   assert.match(receiver,/await hashToken\(`permanent:/);
   assert.doesNotMatch(receiver,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
   assert.match(management,/token_version=token_version\+1/);
   assert.match(management,/companion\.export_url\.rotate/);
+  assert.match(management,/recover-cohort/);
+  assert.match(management,/requirePlatformOwner/);
+  assert.match(management,/expectedCaptureCount !== 43/);
+  assert.doesNotMatch(management,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
   assert.match(candidate,/latest_ready_report_id/);
   assert.doesNotMatch(candidate,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
   assert.match(ui,/Copy League Export URL/);
