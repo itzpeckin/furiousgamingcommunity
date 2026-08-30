@@ -111,7 +111,7 @@ async function fixture({activeSnapshot=true}={}) {
     VALUES (?,?,?,?,?,?,?)`).run('destination-1','league-1','season-1','Madden 27 candidate','active','commissioner-1','game-year-27');
   database.prepare(`INSERT INTO league_snapshots
     (id,league_id,status,season_year,team_count,player_count,game_count,statistic_count,standing_count,warnings_json,manifest_json,validation_status)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run('snapshot-1','league-1','active',2026,1,2,1,1,1,'["Free Agents blocked"]','{"freeAgentStatus":"blocked"}','ready');
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run('snapshot-1','league-1',activeSnapshot?'active':'validated',2026,1,2,1,1,1,'["Free Agents blocked"]','{"freeAgentStatus":"blocked"}','ready');
   const record=database.prepare(`INSERT INTO league_snapshot_records
     (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`);
   record.run('snapshot-1','league-1','teams','tb','{"name":"Buccaneers"}');
@@ -380,7 +380,9 @@ test('rollback preserves an intentionally empty active-snapshot pointer', async 
     assert.equal(payload.rollback.activeSnapshotId,null);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
     assert.equal(database.prepare(`SELECT status FROM league_game_years WHERE id=?`).get(gameYearId).status,'restored');
-    assert.equal(database.prepare(`SELECT snapshot_status FROM game_year_snapshots WHERE game_year_id=?`).get(gameYearId).snapshot_status,'restored');
+    assert.equal(database.prepare(`SELECT status FROM league_snapshots WHERE id='snapshot-1'`).get().status,'validated');
+    assert.equal(database.prepare(`SELECT snapshot_status FROM game_year_snapshots WHERE game_year_id=?`).get(gameYearId).snapshot_status,'candidate');
+    assert.equal(database.prepare(`SELECT status FROM franchise_seasons WHERE id='season-1'`).get().status,'active');
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{database.close();}
 });

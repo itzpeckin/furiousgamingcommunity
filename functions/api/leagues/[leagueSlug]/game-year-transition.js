@@ -221,6 +221,16 @@ async function relationalBundle(current, gameYear) {
   const persistent = await protectedPlaneCounts(current.db, current.league.id);
   const teamAssignments = await all(current.db, `SELECT id membership_id,user_id,role,team_id
     FROM league_memberships WHERE league_id=? AND active=1 AND team_id IS NOT NULL ORDER BY id`, current.league.id);
+  const boundaryState = {
+    franchiseSeasons:await all(current.db,`SELECT season.id,season.status,season.updated_at
+      FROM franchise_seasons season JOIN game_year_franchise_seasons linked
+        ON linked.franchise_season_id=season.id
+      WHERE linked.league_id=? AND linked.game_year_id=? ORDER BY season.id`,current.league.id,gameYear.id),
+    gameYearSnapshots:await all(current.db,`SELECT snapshot_id,snapshot_status,updated_at
+      FROM game_year_snapshots WHERE league_id=? AND game_year_id=? ORDER BY snapshot_id`,current.league.id,gameYear.id),
+    importDestinations:await all(current.db,`SELECT id,status,updated_at
+      FROM companion_import_destinations WHERE league_id=? AND game_year_id=? ORDER BY id`,current.league.id,gameYear.id)
+  };
   return {
     formatVersion:GAME_YEAR_ARCHIVE_FORMAT,
     release:RELEASE,
@@ -229,6 +239,7 @@ async function relationalBundle(current, gameYear) {
     generatedAt:new Date().toISOString(),
     persistentPlatformPlane:persistent,
     teamAssignments,
+    boundaryState,
     datasets,
     tableCounts,
     sourceObjectKeys
@@ -846,6 +857,31 @@ async function rollback(current, gameYear, transition, body) {
       activeSnapshotId:bookmark.active_snapshot_id || null
     };
   }
+  const archivedSnapshots=Array.isArray(bundle.datasets?.league_snapshots)
+    ? bundle.datasets.league_snapshots
+    : [];
+  const candidateSnapshotIds=new Set((bundle.datasets?.companion_candidate_import_runs||[])
+    .map(run=>text(run.candidate_snapshot_id)).filter(Boolean));
+  const boundary=bundle.boundaryState||{};
+  const gameYearSnapshotState=Array.isArray(boundary.gameYearSnapshots)&&boundary.gameYearSnapshots.length
+    ? boundary.gameYearSnapshots
+    : archivedSnapshots.map(snapshot=>({
+        snapshot_id:snapshot.id,
+        snapshot_status:bookmark.active_snapshot_id===snapshot.id
+          ? 'active'
+          : candidateSnapshotIds.has(snapshot.id)?'candidate':'retained',
+        updated_at:snapshot.updated_at
+      }));
+  const franchiseSeasonState=Array.isArray(boundary.franchiseSeasons)&&boundary.franchiseSeasons.length
+    ? boundary.franchiseSeasons
+    : (await all(current.db,`SELECT franchise_season_id id FROM game_year_franchise_seasons
+        WHERE league_id=? AND game_year_id=? ORDER BY franchise_season_id`,current.league.id,gameYear.id))
+      .map(season=>({...season,status:bookmark.active_snapshot_id?'active':'preview'}));
+  const destinationState=Array.isArray(boundary.importDestinations)&&boundary.importDestinations.length
+    ? boundary.importDestinations
+    : (await all(current.db,`SELECT id FROM companion_import_destinations
+        WHERE league_id=? AND game_year_id=? ORDER BY id`,current.league.id,gameYear.id))
+      .map(destination=>({...destination,status:'active'}));
   const assignments = parse(bookmark.team_assignments_json,[]);
   const statements = [
     ...assignments.map(item=>current.db.prepare(`UPDATE league_memberships SET team_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND user_id=?`).bind(item.team_id,item.membership_id,current.league.id,item.user_id)),
@@ -853,11 +889,19 @@ async function rollback(current, gameYear, transition, body) {
       ? current.db.prepare(`INSERT OR REPLACE INTO league_active_snapshots (league_id,snapshot_id,activated_at,activated_by,previous_snapshot_id)
         VALUES (?,?,CURRENT_TIMESTAMP,?,NULL)`).bind(current.league.id,bookmark.active_snapshot_id,current.authorization.session.user.id)
       : current.db.prepare(`DELETE FROM league_active_snapshots WHERE league_id=?`).bind(current.league.id),
-    current.db.prepare(`UPDATE league_snapshots SET status=CASE WHEN id=? THEN 'active' ELSE 'archived' END,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND id IN
-      (SELECT snapshot_id FROM game_year_snapshots WHERE league_id=? AND game_year_id=?)`).bind(bookmark.active_snapshot_id,current.league.id,current.league.id,gameYear.id),
-    current.db.prepare(`UPDATE game_year_snapshots SET snapshot_status=CASE WHEN snapshot_id=? THEN 'active' ELSE 'restored' END,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND game_year_id=?`).bind(bookmark.active_snapshot_id,current.league.id,gameYear.id),
+    ...archivedSnapshots.map(snapshot=>current.db.prepare(`UPDATE league_snapshots
+      SET status=?,archived_at=?,updated_at=? WHERE id=? AND league_id=?`)
+      .bind(snapshot.status,snapshot.archived_at||null,snapshot.updated_at||new Date().toISOString(),snapshot.id,current.league.id)),
+    ...gameYearSnapshotState.map(snapshot=>current.db.prepare(`UPDATE game_year_snapshots
+      SET snapshot_status=?,updated_at=? WHERE league_id=? AND game_year_id=? AND snapshot_id=?`)
+      .bind(snapshot.snapshot_status,snapshot.updated_at||new Date().toISOString(),current.league.id,gameYear.id,snapshot.snapshot_id)),
+    ...franchiseSeasonState.map(season=>current.db.prepare(`UPDATE franchise_seasons
+      SET status=?,updated_at=? WHERE id=? AND league_id=?`)
+      .bind(season.status,season.updated_at||new Date().toISOString(),season.id,current.league.id)),
+    ...destinationState.map(destination=>current.db.prepare(`UPDATE companion_import_destinations
+      SET status=?,updated_at=? WHERE id=? AND league_id=? AND game_year_id=?`)
+      .bind(destination.status,destination.updated_at||new Date().toISOString(),destination.id,current.league.id,gameYear.id)),
     current.db.prepare(`UPDATE league_game_years SET status='restored',removed_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(gameYear.id),
-    current.db.prepare(`UPDATE companion_import_destinations SET status='active',updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND game_year_id=?`).bind(current.league.id,gameYear.id),
     current.db.prepare(`UPDATE game_year_transition_runs SET status='restored',phase='complete',active_snapshot_id_after=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(bookmark.active_snapshot_id,transition.id),
     event(current,transition.id,'game_year_restored',{manifestId:manifest.id,activeSnapshotId:bookmark.active_snapshot_id,teamAssignmentsRestored:assignments.length}),
     await audit(current,'game_year.transition.rollback','league_game_year',gameYear.id,{
