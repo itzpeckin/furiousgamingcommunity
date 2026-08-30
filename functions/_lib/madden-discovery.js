@@ -92,6 +92,10 @@ function routeDataset(routeValue) {
   const route = normalizeMaddenRoute(routeValue);
   if (/(?:^|\/)free[-_]?agents?(?:\/|$)/i.test(route)) return 'free-agents';
   if (/(?:^|\/)team\/[^/]+\/roster(?:\/|$)/i.test(route)) return 'team-rosters';
+  // Madden's weekly team-stat endpoint ends in `/team`; it is not a league
+  // team-directory response and must be classified before the generic team
+  // route matcher.
+  if (/(?:^|\/)week\/[^/]+\/[^/]+\/team(?:\/|$)/i.test(route)) return 'statistics';
   if (/(?:^|\/)(?:leagueteams|teams?|teaminfo)(?:\/|$)/i.test(route)) return 'teams';
   if (/(?:^|\/)(?:players?|playerinfo|rosters?)(?:\/|$)/i.test(route)) return 'players';
   if (/(?:^|\/)standings?(?:\/|$)/i.test(route)) return 'standings';
@@ -168,7 +172,7 @@ function relationshipFields(fields) {
   return relationships;
 }
 
-function markerCandidates(payload) {
+function markerCandidates(payload, routeValue) {
   const found = Object.fromEntries(Object.keys(MARKER_ALIASES).map(key => [key, []]));
   const walk = (value, path = '$', depth = 0) => {
     if (depth > 6 || !value || typeof value !== 'object' || Array.isArray(value)) return;
@@ -186,6 +190,20 @@ function markerCandidates(payload) {
     }
   };
   walk(payload);
+  const route = normalizeMaddenRoute(routeValue);
+  const segments = route.split('/');
+  if (/^(?:xbsx|xbox|ps5|ps4|pc)$/i.test(segments[0] || '') && segments[1]) {
+    const franchiseSegment = segments[1] === 'franchise' ? segments[2] : segments[1];
+    found.platform.push({ value: segments[0], path: '$route.platform' });
+    if (franchiseSegment) {
+      found.sourceFranchiseId.push({ value: franchiseSegment, path: '$route.franchiseId' });
+    }
+  }
+  const weekIndex = segments.indexOf('week');
+  if (weekIndex >= 0 && segments[weekIndex + 1] && segments[weekIndex + 2]) {
+    found.stage.push({ value: segments[weekIndex + 1], path: '$route.stage' });
+    found.week.push({ value: segments[weekIndex + 2], path: '$route.week' });
+  }
   return found;
 }
 
@@ -226,7 +244,7 @@ export function analyzeMaddenCapture(capture) {
     recordCount: rows.length,
     fields,
     relationships: relationshipFields(fields),
-    markers: markerCandidates(payload),
+    markers: markerCandidates(payload, routePath),
     freeAgentEvidence: explicitFreeAgentRoute ? {
       explicitRoute: true,
       status: freeAgentStatus,
@@ -397,7 +415,12 @@ function sourceGate(markers) {
     || markers.gameRelease?.status === 'commissioner-confirmed-only';
   const league = acceptable.has(markers.sourceLeagueId?.status)
     || acceptable.has(markers.sourceFranchiseId?.status);
-  const season = acceptable.has(markers.season?.status);
+  // The permanent league endpoint is already scoped to the reviewed franchise
+  // season. Madden does not repeat that season marker in every weekly payload,
+  // so the durable session expectation is accepted while franchise and week
+  // identifiers still must be observed from the export itself.
+  const season = acceptable.has(markers.season?.status)
+    || markers.season?.status === 'commissioner-confirmed-only';
   const week = acceptable.has(markers.week?.status);
   return { gameRelease, league, season, week, passed: gameRelease && league && season && week };
 }

@@ -46,6 +46,7 @@
     "docs/ROADMAP.md",
     "docs/ROLLBACK.md",
     "functions/_lib/madden-discovery-report.js",
+    "functions/_lib/madden-discovery.js",
     "functions/api/leagues/[leagueSlug]/companion/export-url.js",
     "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
     "releases/7.3.4.2/release-record.md",

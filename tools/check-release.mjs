@@ -687,6 +687,7 @@ if (version === '7.3.4.2') {
     'productionIncidentDiagnosis',
     'atomicCohortClaim',
     'exactBurstRecovery',
+    'productionPayloadReconstruction',
     'activeSnapshotIsolation',
     'freeAgentBlockedPreserved',
     'strictMigration',
@@ -705,6 +706,16 @@ if (version === '7.3.4.2') {
     || evidence.checks?.exactBurstRecovery?.platformOwnerRequired !== true
     || evidence.checks?.exactBurstRecovery?.typedConfirmationRequired !== true
     || evidence.checks?.exactBurstRecovery?.readyReportRequiredBeforePointerAdvance !== true
+    || Number(evidence.checks?.productionPayloadReconstruction?.retainedObjectsRead) !== 43
+    || Number(evidence.checks?.productionPayloadReconstruction?.teamCount) !== 32
+    || Number(evidence.checks?.productionPayloadReconstruction?.rosteredPlayerRows) !== 2043
+    || Number(evidence.checks?.productionPayloadReconstruction?.statisticsRoutes) !== 7
+    || Number(evidence.checks?.productionPayloadReconstruction?.statisticsRows) !== 207
+    || evidence.checks?.productionPayloadReconstruction?.routeDerivedFranchiseAndWeekMarkers !== true
+    || evidence.checks?.productionPayloadReconstruction?.weeklyTeamRouteClassifiedAsStatistics !== true
+    || evidence.checks?.productionPayloadReconstruction?.ready !== true
+    || evidence.checks?.productionPayloadReconstruction?.freeAgentStatus !== 'blocked'
+    || evidence.checks?.productionPayloadReconstruction?.freeAgentCount !== null
   ) errors.push('7.3.4.2 must prove the observed incident, atomic claim, and fail-closed exact recovery.');
   if (productionDeployed) {
     if (

@@ -180,7 +180,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 43535,
+        "bytes": 44463,
         "file": "tools/check-release.mjs"
       },
       {
@@ -196,12 +196,12 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 27001,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
+        "bytes": 27540,
+        "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 26784,
-        "file": "tests/import/madden-discovery.test.mjs"
+        "bytes": 27001,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
         "bytes": 25471,
@@ -212,7 +212,7 @@
         "file": "platform/validate.js"
       },
       {
-        "bytes": 21293,
+        "bytes": 22678,
         "file": "functions/_lib/madden-discovery.js"
       },
       {

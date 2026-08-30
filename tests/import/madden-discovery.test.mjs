@@ -529,13 +529,15 @@ test('an existing shattered 43-route burst is recovered without importing or act
       );
 
     const captures=liveLikeRosterCaptureSet().filter(item=>!item.routePath.endsWith('/league'));
-    const teamsCapture=captures.find(item=>item.routePath.endsWith('/leagueteams'));
-    Object.assign(teamsCapture.payload,{
-      success:true,gameVersion:'Madden NFL 27',platform:'xbsx',franchiseId:'742482',
-      leagueName:'Furious Gaming Community',season:1,week:9
-    });
-    for (let index=0; index<6; index+=1) captures.push(capture(
-      `xbsx/742482/week/reg/9/extra-${index}`,
+    const firstRoster=captures.find(item=>/\/team\/[^/]+\/roster$/.test(item.routePath));
+    firstRoster.payload.rosterInfoList.pop();
+    const scheduleCapture=captures.find(item=>item.routePath.endsWith('/schedules'));
+    scheduleCapture.routePath='xbsx/742482/week/reg/9/schedules';
+    const passingCapture=captures.find(item=>item.routePath.endsWith('/passing'));
+    passingCapture.routePath='xbsx/742482/week/reg/9/passing';
+    const weeklyStatistics=['receiving','defense','punting','rushing','kicking','team'];
+    for (let index=0; index<weeklyStatistics.length; index+=1) captures.push(capture(
+      `xbsx/742482/week/reg/9/${weeklyStatistics[index]}`,
       {playerReceivingStatInfoList:[{rosterId:`player-${index+1}`,teamId:`team-${index+1}`,weekIndex:8}]},
       3_810+index
     ));
@@ -571,6 +573,13 @@ test('an existing shattered 43-route burst is recovered without importing or act
     assert.equal(recovered.readiness.ready,true);
     assert.equal(recovered.readiness.freeAgentStatus,'blocked');
     assert.equal(recovered.readiness.freeAgentCount,null);
+    const report=database.prepare(`SELECT requirement_results_json,source_verification_json
+      FROM madden_discovery_reports WHERE id=?`).get(recovered.reportId);
+    const requirements=JSON.parse(report.requirement_results_json);
+    assert.equal(requirements.teams.recordCount,32);
+    assert.equal(requirements.players.recordCount,2043);
+    assert.equal(requirements.statistics.routes.length,7);
+    assert.equal(JSON.parse(report.source_verification_json).passed,true);
     const endpoint=database.prepare(`SELECT * FROM companion_league_export_endpoints
       WHERE league_id='league-recovery'`).get();
     assert.equal(endpoint.latest_session_id,recovered.sessionId);

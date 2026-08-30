@@ -39,6 +39,26 @@
       "readyReportRequiredBeforePointerAdvance": true,
       "idempotent": true
     },
+    "productionPayloadReconstruction": {
+      "passed": true,
+      "retainedObjectsRead": 43,
+      "totalBytes": 9958627,
+      "routeWindowMs": 1221,
+      "teamCount": 32,
+      "teamRosterRoutes": 32,
+      "rosteredPlayerRows": 2043,
+      "statisticsRoutes": 7,
+      "statisticsRows": 207,
+      "scheduleRows": 15,
+      "standingRows": 32,
+      "routeDerivedFranchiseAndWeekMarkers": true,
+      "weeklyTeamRouteClassifiedAsStatistics": true,
+      "ready": true,
+      "completeness": "rostered-players-only",
+      "freeAgentStatus": "blocked",
+      "freeAgentCount": null,
+      "productionRowsWritten": 0
+    },
     "activeSnapshotIsolation": {
       "passed": true,
       "activeSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
