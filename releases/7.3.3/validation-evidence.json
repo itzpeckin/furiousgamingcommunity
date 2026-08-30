@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.3",
   "validatedOn": "2026-08-30",
-  "status": "staging-validated",
+  "status": "production-authorized-pending-deployment",
   "baselineGate": {
     "passed": true,
     "unregisteredFailures": 0
@@ -148,6 +148,14 @@
       "count": null,
       "interpretedAsZero": false
     },
+    "productionReleaseIndicator": {
+      "passed": true,
+      "release": "7.3.3",
+      "productionHost": "franchisehq.app",
+      "ownerFallbackHost": "franchise-hq.pages.dev",
+      "previewLabel": "Staging",
+      "cacheKeysAdvanced": true
+    },
     "strictMigration": {
       "passed": true,
       "expectedFailure": false,
@@ -155,7 +163,7 @@
     },
     "automatedTests": {
       "passed": true,
-      "passedTests": 91,
+      "passedTests": 92,
       "failedTests": 0,
       "scope": "full-consolidated-release-gate"
     },
@@ -190,21 +198,28 @@
       "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/13",
       "base": "codex/franchisehq-7.3.2",
       "head": "codex/franchisehq-7.3.3",
-      "commit": "061639d48b6cf540a853f8612e51ab316d70dc4e",
+      "commit": "67255affd4240d9b9713acdb4ad5198943927948",
       "gitMainChanged": false
     },
     "hostedChecks": {
-      "status": "passed",
-      "passed": 4,
+      "status": "pending",
+      "passed": 0,
       "failed": 0,
-      "pending": 0,
-      "commit": "061639d48b6cf540a853f8612e51ab316d70dc4e",
+      "pending": 4,
+      "commit": "67255affd4240d9b9713acdb4ad5198943927948",
       "checks": [
         "quality (branch push)",
         "quality (pull request)",
         "Workers Builds: franchise-hq-import-worker",
         "Cloudflare Pages"
       ]
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "not-run",
+      "implementationCommit": "67255affd4240d9b9713acdb4ad5198943927948",
+      "target": "franchisehq.app",
+      "ownerAcceptanceRequired": true
     },
     "cloudRehearsal": {
       "authorized": true,
@@ -263,7 +278,7 @@
       "gitMainChanged": false
     },
     "productionMigrations": {
-      "authorized": false,
+      "authorized": true,
       "status": "not-run",
       "migration": 25
     },

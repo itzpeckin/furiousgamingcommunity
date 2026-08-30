@@ -434,6 +434,7 @@ if (version === '7.3.3') {
     'isolatedStagingRehearsal',
     'legacyResetRetired',
     'freeAgentBlockedPreserved',
+    'productionReleaseIndicator',
     'strictMigration'
   ]) {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.3 game-year transition evidence is incomplete: ${check}.`);

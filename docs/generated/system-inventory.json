@@ -144,7 +144,7 @@
     },
     "largest": [
       {
-        "bytes": 602600,
+        "bytes": 603233,
         "file": "app.js"
       },
       {
@@ -160,7 +160,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74930,
+        "bytes": 74963,
         "file": "index.html"
       },
       {
@@ -184,12 +184,12 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 27001,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
+        "bytes": 28528,
+        "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 26449,
-        "file": "tools/check-release.mjs"
+        "bytes": 27001,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
         "bytes": 22790,

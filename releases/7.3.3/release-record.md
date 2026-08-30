@@ -1,10 +1,10 @@
 # FranchiseHQ 7.3.3 Release Record
 
-**Status:** Isolated-staging validated; PR #13 open with 4/4 hosted checks passing
+**Status:** Production acceptance deployment authorized; 92/92 strict local checks passed; hosted checks pending
 
-**Production authorized:** No
+**Production authorized:** Yes — one cumulative 7.3.3 acceptance deployment plus additive migration 25
 
-**Production changed:** No. Production, its active snapshot, and Git Main remain unchanged. Only the registered isolated-staging D1 and dedicated staging archive bucket were changed.
+**Production changed:** Not yet. Production, its active snapshot, and Git Main remain unchanged while exact candidate `67255affd4240d9b9713acdb4ad5198943927948` completes hosted validation.
 
 ## Scope
 
@@ -22,6 +22,7 @@ Build reusable, commissioner-operated Madden game-year archive/removal and recov
 - Preserved leagues, users, memberships, roles, sessions, settings, rules, audits, stable player identities, frozen player season summaries, GM identities, and ownership history. Edition-specific team assignments are cleared only at detach and restored only by a verified rollback.
 - Retired the legacy broad-reset endpoint with HTTP 410 and routed Commissioner HQ to the scoped 7.3.3 controls.
 - Kept Free Agents as blocked/unknown with a null count throughout preview, manifest, removal, and recovery contracts.
+- Replaced the stale 7.3.0 shell marker with a host-derived environment label and exact 7.3.3 release marker, and advanced the release asset cache keys so Production cannot retain the older commissioner shell after deployment.
 
 ## Known inherited blockers
 
@@ -33,8 +34,9 @@ Build reusable, commissioner-operated Madden game-year archive/removal and recov
 - Migration 25 applies to a clean database, advances the continuous ledger through version 25, creates 78 required tables, and retains clean foreign keys.
 - Automated integration coverage exercises complete local lifecycles: preview, plan, relational/raw archive, checksum verification, detach, active-data removal, resumable rollback restoration, large row/byte payloads, identity-owned mapping dependencies, exact empty-pointer recovery, and separately confirmed archive-copy deletion with retained immutable evidence and rollback refusal.
 - Tests prove that the league/account plane and active membership survive, team assignment clearing is edition-scoped, immutable evidence cannot be rewritten, and blocked Free Agents remain null rather than zero.
-- The consolidated strict gate passes 91/91 automated tests, syntax-checks 198 JavaScript modules, scans 552 text files for secrets, verifies a deterministic 527-file/64-route inventory, and validates all 78 required tables through migration 25.
-- Exact implementation commit `061639d48b6cf540a853f8612e51ab316d70dc4e` is published in stacked PR #13; all four hosted checks passed with zero failures or pending checks.
+- The consolidated strict gate passes 92/92 automated tests, syntax-checks 198 JavaScript modules, scans 552 text files for secrets, verifies a deterministic 527-file/64-route inventory, and validates all 78 required tables through migration 25.
+- Exact acceptance candidate `67255affd4240d9b9713acdb4ad5198943927948` adds the release/environment regression and is queued for hosted checks before Production changes.
+- The game-year implementation remains exact commit `061639d48b6cf540a853f8612e51ab316d70dc4e`; the acceptance candidate adds only accurate runtime identification, cache advancement, its regression, and production-aware evidence gates.
 
 ## Isolated-staging rehearsal
 
@@ -51,7 +53,8 @@ Build reusable, commissioner-operated Madden game-year archive/removal and recov
 ## Deployment status
 
 - Branch `codex/franchisehq-7.3.3` is published and stacked PR #13 targets `codex/franchisehq-7.3.2`, not Main.
-- The separately authorized isolated-staging rehearsal is complete and restored. Production publication, Production migration 25, Production archive/removal/recovery, Main changes, data reset, and snapshot activation remain unauthorized and were not performed.
+- The owner authorized one direct Production acceptance cycle from the exact validated 7.3.3 candidate, including additive migration 25. Candidate validation and hosted checks must pass before publication.
+- No additional staging deployment or rehearsal is included. Production archive/removal/recovery operations, Main changes, data reset, and snapshot activation remain unauthorized.
 
 ## Rollback
 

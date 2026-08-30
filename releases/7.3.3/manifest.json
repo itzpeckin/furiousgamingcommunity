@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.3",
   "releaseType": "safe-game-year-transition-controls",
-  "status": "staging-validated",
+  "status": "validated-production-authorized",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.2",
@@ -19,8 +19,8 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pull-request-open-hosted-checks-passed",
-    "commit": "061639d48b6cf540a853f8612e51ab316d70dc4e",
+    "status": "production-acceptance-candidate-hosted-checks-pending",
+    "commit": "67255affd4240d9b9713acdb4ad5198943927948",
     "pullRequest": 13,
     "hostedChecksPassed": 4,
     "scope": "Publication is limited to codex/franchisehq-7.3.3 and a stacked pull request. Git Main is excluded."
@@ -36,10 +36,12 @@
     "scope": "One authorized isolated-staging rehearsal applied additive migration 25, verified a private archive, detached and removed the staged Madden 27 active plane, restored it from the immutable archive, reconciled boundary statuses, and retained audit evidence. Production is excluded."
   },
   "production": {
-    "authorized": false,
+    "authorized": true,
     "deployed": false,
-    "status": "not-run",
-    "scope": "No Production publication, migration, archive, detach, removal, activation, or rollback is authorized."
+    "status": "authorized-not-run",
+    "implementationCommit": "67255affd4240d9b9713acdb4ad5198943927948",
+    "migration": 25,
+    "scope": "One cumulative Production acceptance deployment and additive migration 25 are owner-authorized. Archive, detach, active-data removal, recovery, archive-copy removal, reset, snapshot activation/change, Git Main changes, and Free Agent reinterpretation remain excluded."
   },
   "requiredArtifacts": [
     "config/database-schema-contract.json",
@@ -50,6 +52,9 @@
     "functions/_lib/game-year-transition.js",
     "functions/api/leagues/[leagueSlug]/game-year-transition.js",
     "functions/api/leagues/[leagueSlug]/reset-data.js",
+    "functions/leagues/[[path]].js",
+    "index.html",
+    "app.js",
     "league-engine/game-year-transition.js",
     "migrations/0025_safe_game_year_transition.sql",
     "releases/7.3.3/release-record.md",
