@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4",
+  "releaseType": "source-scoped-repeat-import-and-week-certification",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.3",
+    "commit": "c5b87dbb46cb42841510538cbcb8bf4272ed772e",
+    "tree": "5be1adb6a45b0eabdd5f45ab7288e88ea3e9e3b9",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.4",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "scope": "The owner authorized the consolidated local 7.3.4 build. Branch publication, a pull request, hosted checks, Production, staging, and Git Main remain separate gates."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Production-first policy applies. No staging cycle is authorized."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.3.3",
+    "currentDeployment": "e926a37f-50b1-4b8c-af83-84364a7d4960",
+    "activeSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+    "scope": "No Production deployment, capture, candidate import, activation, reset, transition, archive/removal/recovery operation, migration, or Git Main change is authorized."
+  },
+  "requiredArtifacts": [
+    "app.js",
+    "config/database-schema-contract.json",
+    "config/environment-contract.json",
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "index.html",
+    "league-engine/one-click-import.js",
+    "releases/7.3.4/release-record.md",
+    "releases/7.3.4/validation-evidence.json",
+    "tests/import/candidate-import.test.mjs"
+  ]
+}

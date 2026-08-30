@@ -9,15 +9,17 @@ import {
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import {
   CANDIDATE_IMPORT_PHASES,
+  candidateCoverageWarnings,
   candidateCompleteness,
   candidateRetryGuidance,
+  candidateSourceCoverage,
   nextCandidatePhase,
   parseCandidateJson,
   publicCandidateRun
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 
-const RELEASE = '7.3.3';
+const RELEASE = '7.3.4';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -45,9 +47,16 @@ async function identitySource(db, leagueId) {
 
 async function latestReport(db, leagueId) {
   return db.prepare(`SELECT id,session_id,status,route_count,capture_count,total_bytes,report_hash,
-      requirement_results_json,free_agent_evidence_json,generated_at
-    FROM madden_discovery_reports WHERE league_id=? ORDER BY generated_at DESC LIMIT 1`)
+      source_markers_json,dataset_inventory_json,requirement_results_json,free_agent_evidence_json,generated_at
+    FROM madden_discovery_reports WHERE league_id=? ORDER BY generated_at DESC,rowid DESC LIMIT 1`)
     .bind(leagueId).first();
+}
+
+async function reportForSession(db, leagueId, sessionId) {
+  return db.prepare(`SELECT id,session_id,status,route_count,capture_count,total_bytes,report_hash,
+      source_markers_json,dataset_inventory_json,requirement_results_json,free_agent_evidence_json,generated_at
+    FROM madden_discovery_reports WHERE league_id=? AND session_id=? LIMIT 1`)
+    .bind(leagueId,sessionId).first();
 }
 
 async function destinationFor(db, leagueId, franchiseSeasonId) {
@@ -64,10 +73,23 @@ async function latestRun(db, leagueId) {
     WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
 }
 
-async function activeSnapshotId(db, leagueId) {
-  const row = await db.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id=?`)
+async function runForSource(db, leagueId, destinationId, fingerprint) {
+  if (!destinationId || !fingerprint) return null;
+  return db.prepare(`SELECT * FROM companion_candidate_import_runs
+    WHERE league_id=? AND destination_id=? AND source_fingerprint=? LIMIT 1`)
+    .bind(leagueId,destinationId,fingerprint).first();
+}
+
+async function activeSnapshot(db, leagueId) {
+  return db.prepare(`SELECT active.snapshot_id,snapshot.week_index,snapshot.created_at
+    FROM league_active_snapshots active
+    JOIN league_snapshots snapshot ON snapshot.id=active.snapshot_id AND snapshot.league_id=active.league_id
+    WHERE active.league_id=?`)
     .bind(leagueId).first();
-  return row?.snapshot_id || null;
+}
+
+async function activeSnapshotId(db, leagueId) {
+  return (await activeSnapshot(db,leagueId))?.snapshot_id || null;
 }
 
 async function captureDigest(db, leagueId, sessionId) {
@@ -109,8 +131,8 @@ function sourceCounts(report, identity) {
     captures:Number(report?.capture_count || 0),
     routes:Number(report?.route_count || 0),
     bytes:Number(report?.total_bytes || 0),
-    teams:Number(identity?.team_count || requirements?.teams?.recordCount || 0),
-    rosteredPlayers:Number(identity?.rostered_player_count || requirements?.players?.recordCount || 0),
+    teams:Number(requirements?.teams?.recordCount || identity?.team_count || 0),
+    rosteredPlayers:Number(requirements?.players?.recordCount || identity?.rostered_player_count || 0),
     standings:Number(requirements?.standings?.recordCount || 0),
     schedule:Number(requirements?.schedule?.recordCount || 0),
     statistics:Number(requirements?.statistics?.recordCount || 0),
@@ -120,11 +142,28 @@ function sourceCounts(report, identity) {
   };
 }
 
-async function publicState(current) {
+async function sourceFingerprint(db, leagueId, report, identity, destination) {
+  if (!report || !identity || !destination) return null;
+  const digest = await captureDigest(db,leagueId,report.session_id);
+  return sha256Hex(new TextEncoder().encode(
+    `${report.report_hash}:${digest}:${identity.preview_run_id}:${destination.id}`
+  ));
+}
+
+async function publicState(current, options = {}) {
   const identity = await identitySource(current.db, current.league.id);
-  const report = await latestReport(current.db, current.league.id);
+  const report = options.discoverySessionId
+    ? await reportForSession(current.db,current.league.id,options.discoverySessionId)
+    : await latestReport(current.db, current.league.id);
   const destination = await destinationFor(current.db, current.league.id, identity?.franchise_season_id);
-  const run = await latestRun(current.db, current.league.id);
+  const active = await activeSnapshot(current.db,current.league.id);
+  const fingerprint = await sourceFingerprint(current.db,current.league.id,report,identity,destination);
+  const run = await runForSource(current.db,current.league.id,destination?.id,fingerprint);
+  const previousRun = run || await latestRun(current.db,current.league.id);
+  const coverage = candidateSourceCoverage({
+    sourceMarkers:parseCandidateJson(report?.source_markers_json,{}),
+    datasetInventory:parseCandidateJson(report?.dataset_inventory_json,[])
+  },active?.week_index);
   return {
     ok:true,
     release:RELEASE,
@@ -135,6 +174,11 @@ async function publicState(current) {
       discoverySessionId:report.session_id,
       reportStatus:report.status,
       reportHash:report.report_hash,
+      sourceFingerprint:fingerprint,
+      generatedAt:report.generated_at,
+      selectionStatus:run ? 'existing-source' : 'new-source',
+      coverage,
+      coverageWarnings:candidateCoverageWarnings(coverage),
       counts:sourceCounts(report, identity),
       season:identity ? {
         id:identity.franchise_season_id,
@@ -146,7 +190,9 @@ async function publicState(current) {
       } : null
     } : null,
     run:publicCandidateRun(run),
-    activeSnapshotId:await activeSnapshotId(current.db, current.league.id),
+    previousRun:run ? null : publicCandidateRun(previousRun),
+    activeSnapshotId:active?.snapshot_id || null,
+    activeSnapshotWeek:active?.week_index === null || active?.week_index === undefined ? null : Number(active.week_index),
     phases:CANDIDATE_IMPORT_PHASES,
     private:true,
     activationPerformed:false,
@@ -222,29 +268,43 @@ async function startRun(current, destination, report, identity, retry) {
   if (run?.status === 'preview-ready' || (run?.status === 'running' && !retry)) {
     return { run, reused:true, warm:run.status === 'preview-ready' };
   }
-  const activeBefore = await activeSnapshotId(current.db,current.league.id);
-  const counts = sourceCounts(report,identity);
+  const active = await activeSnapshot(current.db,current.league.id);
+  const activeBefore = active?.snapshot_id || null;
+  const coverage = candidateSourceCoverage({
+    sourceMarkers:parseCandidateJson(report.source_markers_json,{}),
+    datasetInventory:parseCandidateJson(report.dataset_inventory_json,[])
+  },active?.week_index);
+  if (coverage.continuityStatus === 'stale') return { response:json({
+    ok:false,
+    error:`The analyzed Week ${coverage.currentWeek} capture is older than active Week ${coverage.activeWeek}. Analyze a current export before building a replacement candidate.`,
+    release:RELEASE,
+    sourceCoverage:coverage,
+    activeSnapshotChanged:false
+  },409) };
+  const coverageWarnings = candidateCoverageWarnings(coverage);
+  const counts = { ...sourceCounts(report,identity), sourceWeek:coverage.currentWeek, sourceCoverage:coverage };
   if (run) {
     if (!retry) return { run, reused:true, warm:false };
     await current.db.prepare(`UPDATE companion_candidate_import_runs SET
       status='running',completeness_status='review-required',current_phase='analyze-source',phase_index=0,
-      phase_state_json='{}',source_counts_json=?,result_counts_json='{}',warnings_json='[]',retry_json='{}',
+      phase_state_json='{}',source_counts_json=?,result_counts_json='{}',warnings_json=?,retry_json='{}',
       team_mapping_run_id=NULL,player_mapping_run_id=NULL,schedule_mapping_run_id=NULL,
       statistics_mapping_run_id=NULL,candidate_snapshot_id=NULL,active_snapshot_id_before=?,
       active_snapshot_id_after=NULL,started_at=CURRENT_TIMESTAMP,completed_at=NULL,duration_ms=NULL,
-      updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(JSON.stringify(counts),activeBefore,run.id).run();
+      updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(JSON.stringify(counts),JSON.stringify(coverageWarnings),activeBefore,run.id).run();
   } else {
     const id = `candidate_import_${crypto.randomUUID()}`;
     await current.db.prepare(`INSERT INTO companion_candidate_import_runs
       (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,
        completeness_status,current_phase,phase_index,phase_state_json,source_counts_json,
        result_counts_json,warnings_json,retry_json,active_snapshot_id_before,created_by_user_id,started_at)
-      VALUES (?,?,?,?,?,'running','review-required','analyze-source',0,'{}',?,'{}','[]','{}',?,?,CURRENT_TIMESTAMP)`)
-      .bind(id,current.league.id,destination.id,report.session_id,fingerprint,JSON.stringify(counts),
+      VALUES (?,?,?,?,?,'running','review-required','analyze-source',0,'{}',?,'{}',?,'{}',?,?,CURRENT_TIMESTAMP)`)
+      .bind(id,current.league.id,destination.id,report.session_id,fingerprint,JSON.stringify(counts),JSON.stringify(coverageWarnings),
         activeBefore,current.authorization.session.user.id).run();
     run = await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(id).first();
     await audit(current,'companion.candidate_import.start','companion_candidate_import',id,{
-      discoverySessionId:report.session_id,sourceFingerprint:fingerprint,activationPerformed:false
+      discoverySessionId:report.session_id,sourceFingerprint:fingerprint,sourceCoverage:coverage,
+      activationPerformed:false
     });
   }
   run = await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first();
@@ -305,11 +365,13 @@ async function reportPhase(current, body) {
   return { run:await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first() };
 }
 
-async function finalize(current, body, report) {
+async function finalize(current, body) {
   const runId = text(body.runId);
   const run = runId ? await current.db.prepare(`SELECT * FROM companion_candidate_import_runs
     WHERE id=? AND league_id=?`).bind(runId,current.league.id).first() : null;
   if (!run) return { response:json({ ok:false,error:'Candidate import run not found.',release:RELEASE }, 404) };
+  const report = await reportForSession(current.db,current.league.id,run.discovery_session_id);
+  if (!report) return { response:json({ ok:false,error:'The exact analyzed source report for this candidate is missing.',release:RELEASE }, 409) };
   if (run.current_phase !== 'preview-ready' || !run.candidate_snapshot_id) return { response:json({
     ok:false,error:'Complete and validate every candidate phase before finalizing.',run:publicCandidateRun(run),release:RELEASE
   }, 409) };
@@ -375,18 +437,18 @@ export async function onRequestPost(context) {
     const result = await startRun(current,destination,report,identity,body.retry === true);
     if (result.response) return result.response;
     return json({
-      ...(await publicState(current)),run:publicCandidateRun(result.run),reused:result.reused,warm:result.warm
+      ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run),reused:result.reused,warm:result.warm
     });
   }
   if (action === 'report-phase') {
     const result = await reportPhase(current,body);
     if (result.response) return result.response;
-    return json({ ...(await publicState(current)),run:publicCandidateRun(result.run) });
+    return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run) });
   }
   if (action === 'finalize') {
-    const result = await finalize(current,body,report);
+    const result = await finalize(current,body);
     if (result.response) return result.response;
-    return json({ ...(await publicState(current)),run:publicCandidateRun(result.run) });
+    return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run) });
   }
   return json({ ok:false,error:`Unsupported action: ${action || 'none'}.`,release:RELEASE }, 400);
 }

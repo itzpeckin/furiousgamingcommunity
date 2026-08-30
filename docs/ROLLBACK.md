@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.4 candidate impact
+
+The local 7.3.4 review candidate changes repeat-import source selection and private candidate composition only. It adds no migration and has not been published, deployed, run against a real Week 9 capture, changed Production or Git Main, reset/transitioned data, or activated a snapshot.
+
+Candidate identity remains the exact analyzed report plus capture digest, reviewed identity preview, and destination. An identical export reuses the same candidate; a different fingerprint may create a new append-only candidate. The active pointer is checked before finalization and is never written by the importer.
+
+Same-season history carry-forward copies only older game/statistic records from the exact active snapshot when it is linked to the same Madden game year and franchise season. Fresh exact-ID records win. The candidate manifest records the source snapshot, retained counts/weeks, and any coverage gap. A code rollback simply returns to exact 7.3.3 evidence baseline `c5b87dbb46cb42841510538cbcb8bf4272ed772e`; do not delete candidate rows or change the active snapshot.
+
 ## 7.3.3 Production impact
 
 Production Pages deployment `e926a37f-50b1-4b8c-af83-84364a7d4960` runs exact source commit `b373f661101c33a2ee2bd17433cfe4001f166b3f`. The Cloudflare Pages Production branch setting was restored to `main` immediately after the exact deployment succeeded; Git `main` remains `4045e02980c93491b47910f17fcb2e48fae76c68`.

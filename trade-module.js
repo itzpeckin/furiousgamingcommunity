@@ -872,7 +872,7 @@ async function disableLeagueMember(userId){
 function renderMaddenResetCard(){
  const transition=window.FranchiseHQ?.gameYearTransition||window.FranchiseHQ?.platform?.gameYearTransition||window.FranchiseHQ?.getModuleService?.('platform','gameYearTransition');
  if(transition?.renderPanel)return transition.renderPanel();
- return `<section class="card game-year-transition-card" data-game-year-transition-panel><div class="card-header"><div><span class="eyebrow">Protected edition boundary</span><h3>Game Year & Season Transition</h3><p>The 7.3.3 transition service is still initializing.</p></div><span class="pill pill--neutral">Loading</span></div></section>`;
+ return `<section class="card game-year-transition-card" data-game-year-transition-panel><div class="card-header"><div><span class="eyebrow">Protected edition boundary</span><h3>Game Year & Season Transition</h3><p>The 7.3.4 transition service is still initializing.</p></div><span class="pill pill--neutral">Loading</span></div></section>`;
 }
 window.addEventListener('franchisehq:open-candidate-import',()=>{ui.showLeagueImport=true;renderCommissioner('league-data')});
 

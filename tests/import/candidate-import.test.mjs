@@ -6,9 +6,12 @@ import path from 'node:path';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import {
   CANDIDATE_IMPORT_PHASES,
+  candidateCoverageWarnings,
   candidateCompleteness,
+  candidateHistoryCarryForward,
   candidateProgress,
   candidateRetryGuidance,
+  candidateSourceCoverage,
   nextCandidatePhase
 } from '../../functions/_lib/candidate-import.js';
 
@@ -56,6 +59,54 @@ test('blocked or missing Free Agents remain rostered-player-only, never zero', (
   assert.equal(candidateCompleteness('located'),'complete');
 });
 
+test('Week 9 source coverage is explicit and gaps after the active snapshot are never hidden', () => {
+  const report={
+    sourceMarkers:{week:{expected:'9',observed:['9']}},
+    datasetInventory:[
+      {datasetType:'schedule',routePath:'xbsx/742482/week/reg/9/schedules'},
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/9/passing'},
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/9/defense'}
+    ]
+  };
+  const gap=candidateSourceCoverage(report,7);
+  assert.equal(gap.currentWeek,9);
+  assert.equal(gap.currentWeekStatus,'covered');
+  assert.equal(gap.continuityStatus,'gap-detected');
+  assert.deepEqual(gap.missingWeeks,[8]);
+  assert.deepEqual(candidateCoverageWarnings(gap),[
+    'Week coverage gap after active Week 7: missing Week 8.'
+  ]);
+
+  const continuous=candidateSourceCoverage({
+    ...report,
+    datasetInventory:[
+      {datasetType:'schedule',routePath:'xbsx/742482/week/reg/8/schedules'},
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/8/passing'},
+      ...report.datasetInventory
+    ]
+  },7);
+  assert.equal(continuous.continuityStatus,'continuous');
+  assert.deepEqual(continuous.missingWeeks,[]);
+});
+
+test('a Week 9 candidate carries older active history forward without overriding fresh records', () => {
+  const fresh=[
+    {external_id:'game-week-9',week_index:9,status:'completed'},
+    {external_id:'game-week-7',week_index:7,status:'completed',home_score:31}
+  ];
+  const prior=[
+    {external_id:'game-week-7',data_json:JSON.stringify({external_id:'game-week-7',week_index:7,status:'scheduled'})},
+    {external_id:'game-week-6',data_json:JSON.stringify({external_id:'game-week-6',week_index:6,status:'completed'})},
+    {external_id:'game-week-9-old',data_json:JSON.stringify({external_id:'game-week-9-old',week_index:9,status:'scheduled'})}
+  ];
+  const merged=candidateHistoryCarryForward(fresh,prior,{keyName:'external_id',currentWeek:9});
+  assert.equal(merged.retained,1);
+  assert.deepEqual(merged.retainedWeeks,[6]);
+  assert.equal(merged.records.length,3);
+  assert.equal(merged.records.find(row=>row.external_id==='game-week-7').home_score,31);
+  assert.equal(merged.records.some(row=>row.external_id==='game-week-9-old'),false);
+});
+
 test('one private destination and one idempotent candidate run are enforced per source fingerprint', async () => {
   const db=await database();
   try{
@@ -73,6 +124,8 @@ test('one private destination and one idempotent candidate run are enforced per 
     assert.throws(()=>run.run(
       'candidate-2','league-1','destination-1','capture-1','report:identity:destination','running','commissioner-1'
     ),/UNIQUE constraint failed/i);
+    run.run('candidate-3','league-1','destination-1','capture-1','new-report:identity:destination','running','commissioner-1');
+    assert.equal(db.prepare(`SELECT COUNT(*) count FROM companion_candidate_import_runs`).get().count,2);
     assert.equal(db.prepare(`SELECT season_year FROM franchise_seasons WHERE id='season-2026'`).get().season_year,2026);
     assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
     assert.throws(()=>db.prepare(`DELETE FROM franchise_seasons WHERE id='season-2026'`).run(),/FOREIGN KEY constraint failed/i);
@@ -96,6 +149,10 @@ test('commissioner candidate paths cannot activate, reset, prune, or reinterpret
   assert.match(candidate,/freeAgentCount:\['located','empty-confirmed'\]/);
   assert.match(candidate,/captureDigest/);
   assert.match(candidate,/payload_hash/);
+  assert.match(candidate,/runForSource/);
+  assert.match(candidate,/destination_id=\? AND source_fingerprint=\?/);
+  assert.match(candidate,/selectionStatus:run \? 'existing-source' : 'new-source'/);
+  assert.match(candidate,/reportForSession/);
   assert.match(candidate,/active snapshot changed during candidate import/i);
   assert.doesNotMatch(candidate,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
 
@@ -103,6 +160,9 @@ test('commissioner candidate paths cannot activate, reset, prune, or reinterpret
   assert.match(builder,/candidateImportRunId/);
   assert.match(builder,/exact analyzed discovery session/);
   assert.match(builder,/madden_discovery_session_captures/);
+  assert.match(builder,/historyCarryForward/);
+  assert.match(builder,/candidateCoverageWarnings/);
+  assert.match(builder,/domain IN \('games','statistics'\)/);
   assert.doesNotMatch(builder,/DELETE\s+FROM/i);
   assert.doesNotMatch(builder,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
 
@@ -117,6 +177,9 @@ test('commissioner candidate paths cannot activate, reset, prune, or reinterpret
   }
   assert.match(ui,/Create Private Destination/);
   assert.match(ui,/Analyze Captured Export/);
+  assert.match(ui,/Build New Candidate/);
+  assert.match(ui,/Exact Export Already Imported/);
+  assert.match(ui,/Active \/ captured week/);
   assert.match(ui,/under 60 seconds/);
   assert.match(ui,/Free Agent count is unknown, never zero/);
   assert.match(ui,/discoverySessionId/);
