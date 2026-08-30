@@ -168,7 +168,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 63413,
+        "bytes": 67649,
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
@@ -180,7 +180,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 28253,
+        "bytes": 31241,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {

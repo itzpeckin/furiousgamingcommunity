@@ -156,6 +156,9 @@ function datasetQueries(leagueId, gameYearId) {
   const identityScope = `SELECT preview.id FROM identity_preview_runs preview
     JOIN game_year_franchise_seasons season ON season.franchise_season_id=preview.franchise_season_id
     WHERE preview.league_id=? AND season.game_year_id=?`;
+  const identityMappingScope = column => `SELECT DISTINCT ${column} FROM identity_preview_runs preview
+    JOIN game_year_franchise_seasons season ON season.franchise_season_id=preview.franchise_season_id
+    WHERE preview.league_id=? AND season.game_year_id=? AND ${column} IS NOT NULL`;
   const mappingScope = column => `SELECT DISTINCT ${column} FROM companion_candidate_import_runs run
     JOIN companion_import_destinations destination ON destination.id=run.destination_id
     WHERE run.league_id=? AND destination.game_year_id=? AND ${column} IS NOT NULL`;
@@ -181,10 +184,18 @@ function datasetQueries(leagueId, gameYearId) {
     identity_preview_runs:[`SELECT * FROM identity_preview_runs WHERE league_id=? AND id IN (${identityScope}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
     identity_preview_teams:[`SELECT * FROM identity_preview_teams WHERE league_id=? AND preview_run_id IN (${identityScope}) ORDER BY preview_run_id,team_external_id`, [leagueId, leagueId, gameYearId]],
     identity_preview_players:[`SELECT * FROM identity_preview_players WHERE league_id=? AND preview_run_id IN (${identityScope}) ORDER BY preview_run_id,player_identity_id`, [leagueId, leagueId, gameYearId]],
-    companion_team_mapping_runs:[`SELECT * FROM companion_team_mapping_runs WHERE league_id=? AND id IN (${mappingScope('run.team_mapping_run_id')}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
-    companion_canonical_teams_preview:[`SELECT * FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id IN (${mappingScope('run.team_mapping_run_id')}) ORDER BY mapping_run_id,external_id`, [leagueId, leagueId, gameYearId]],
-    companion_player_mapping_runs:[`SELECT * FROM companion_player_mapping_runs WHERE league_id=? AND id IN (${mappingScope('run.player_mapping_run_id')}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
-    companion_canonical_players_preview:[`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id IN (${mappingScope('run.player_mapping_run_id')}) ORDER BY mapping_run_id,external_id`, [leagueId, leagueId, gameYearId]],
+    companion_team_mapping_runs:[`SELECT * FROM companion_team_mapping_runs WHERE league_id=? AND
+      (id IN (${mappingScope('run.team_mapping_run_id')}) OR id IN (${identityMappingScope('preview.team_mapping_run_id')}))
+      ORDER BY id`, [leagueId, leagueId, gameYearId, leagueId, gameYearId]],
+    companion_canonical_teams_preview:[`SELECT * FROM companion_canonical_teams_preview WHERE league_id=? AND
+      (mapping_run_id IN (${mappingScope('run.team_mapping_run_id')}) OR mapping_run_id IN (${identityMappingScope('preview.team_mapping_run_id')}))
+      ORDER BY mapping_run_id,external_id`, [leagueId, leagueId, gameYearId, leagueId, gameYearId]],
+    companion_player_mapping_runs:[`SELECT * FROM companion_player_mapping_runs WHERE league_id=? AND
+      (id IN (${mappingScope('run.player_mapping_run_id')}) OR id IN (${identityMappingScope('preview.player_mapping_run_id')}))
+      ORDER BY id`, [leagueId, leagueId, gameYearId, leagueId, gameYearId]],
+    companion_canonical_players_preview:[`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND
+      (mapping_run_id IN (${mappingScope('run.player_mapping_run_id')}) OR mapping_run_id IN (${identityMappingScope('preview.player_mapping_run_id')}))
+      ORDER BY mapping_run_id,external_id`, [leagueId, leagueId, gameYearId, leagueId, gameYearId]],
     companion_schedule_mapping_runs:[`SELECT * FROM companion_schedule_mapping_runs WHERE league_id=? AND id IN (${mappingScope('run.schedule_mapping_run_id')}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
     companion_canonical_games_preview:[`SELECT * FROM companion_canonical_games_preview WHERE league_id=? AND mapping_run_id IN (${mappingScope('run.schedule_mapping_run_id')}) ORDER BY mapping_run_id,external_id`, [leagueId, leagueId, gameYearId]],
     companion_statistics_mapping_runs:[`SELECT * FROM companion_statistics_mapping_runs WHERE league_id=? AND id IN (${mappingScope('run.statistics_mapping_run_id')}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
@@ -723,6 +734,80 @@ async function restoreSources(current, manifest, transition) {
   return { complete, phase, sourcesProcessed:selected.length, sourcesTotal:sources.length };
 }
 
+async function ensureIdentityMappingDependencies(current,bundle,transition) {
+  const identityRuns=Array.isArray(bundle.datasets?.identity_preview_runs)
+    ? bundle.datasets.identity_preview_runs
+    : [];
+  const specifications=[
+    {
+      column:'team_mapping_run_id',
+      table:'companion_team_mapping_runs',
+      archived:'companion_team_mapping_runs',
+      countColumn:'team_count',
+      identityCount:'team_count'
+    },
+    {
+      column:'player_mapping_run_id',
+      table:'companion_player_mapping_runs',
+      archived:'companion_player_mapping_runs',
+      countColumn:'player_count',
+      identityCount:'rostered_player_count'
+    }
+  ];
+  const repaired=[];
+  for(const identityRun of identityRuns){
+    for(const specification of specifications){
+      const dependencyId=text(identityRun[specification.column]);
+      if(!dependencyId)continue;
+      const archivedRows=Array.isArray(bundle.datasets?.[specification.archived])
+        ? bundle.datasets[specification.archived]
+        : [];
+      if(archivedRows.some(row=>text(row.id)===dependencyId))continue;
+      if(await current.db.prepare(`SELECT 1 found FROM ${specification.table} WHERE id=? AND league_id=?`)
+        .bind(dependencyId,current.league.id).first())continue;
+      const template=archivedRows[0];
+      if(!template)throw new Error(`Identity recovery dependency is unavailable: ${specification.table}`);
+      const allowed=await tableColumns(current.db,specification.table);
+      const rebuilt={
+        ...template,
+        id:dependencyId,
+        status:'recovered-identity-dependency',
+        [specification.countColumn]:Number(identityRun[specification.identityCount]||0),
+        warning_count:Number(template.warning_count||0)+1,
+        warnings_json:JSON.stringify([{
+          code:'RECOVERED_IDENTITY_MAPPING_DEPENDENCY',
+          archiveScope:'legacy-7.3.3',
+          freeAgentStatus:identityRun.free_agent_status,
+          freeAgentCount:identityRun.free_agent_count,
+          freeAgentInterpretedAsZero:false
+        }]),
+        created_at:identityRun.created_at||template.created_at,
+        updated_at:new Date().toISOString()
+      };
+      const columns=Object.keys(rebuilt).filter(column=>allowed.has(column)&&SAFE_IDENTIFIER.test(column));
+      const result=await current.db.prepare(`INSERT OR IGNORE INTO ${specification.table}
+        (${columns.join(',')}) VALUES (${marks(columns)})`).bind(...columns.map(column=>rebuilt[column])).run();
+      if(Number(result?.meta?.changes||0)>0)repaired.push({table:specification.table,id:dependencyId});
+    }
+  }
+  if(repaired.length){
+    await current.db.batch([
+      event(current,transition.id,'recovery_dependencies_rebuilt',{
+        repaired:repaired.map(item=>item.table),
+        reason:'legacy archive omitted identity-owned mapping parents',
+        freeAgentInterpretedAsZero:false
+      }),
+      await audit(current,'game_year.recovery.dependencies','game_year_transition',transition.id,{
+        repaired:repaired.map(item=>item.table),
+        identityRowsRetained:true,
+        archiveManifestImmutable:true,
+        freeAgentInterpretedAsZero:false
+      })
+    ]);
+  }
+  return repaired;
+}
+
 async function rollback(current, gameYear, transition, body) {
   const confirmations = transitionConfirmations(current.league.slug, gameYear.game_release);
   if (!validateTypedConfirmation(body.confirmation, confirmations.rollback)) {
@@ -737,6 +822,14 @@ async function rollback(current, gameYear, transition, body) {
   if (transition.status !== 'restoring') {
     transition = { ...transition, status:'restoring', phase:'restore-copy:0:0' };
     await saveRestorePhase(current,transition.id,transition.phase);
+  }
+  const rowCursor=restoreRowCursor(transition.phase);
+  if(
+    text(transition.phase).startsWith('restore-source:')
+    || transition.phase==='restore-finalize'
+    || (text(transition.phase).startsWith('restore-copy')&&rowCursor.tableIndex>=13)
+  ){
+    await ensureIdentityMappingDependencies(current,bundle,transition);
   }
   if (!text(transition.phase).startsWith('restore-source:') && transition.phase !== 'restore-finalize') {
     const step = await restoreRows(current,bundle,transition);

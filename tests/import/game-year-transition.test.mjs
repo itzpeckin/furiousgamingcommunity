@@ -252,6 +252,47 @@ test('migration 25 links a version-24 active candidate without replacing protect
   }finally{database.close();}
 });
 
+test('archive scope includes mapping dependencies owned by the identity preview', async () => {
+  const {database,token}=await fixture({activeSnapshot:false});
+  const db=d1(database),archives=bucket(),sources=bucket({'source/capture-1.json':'{"teams":[]}'});
+  try{
+    database.prepare(`INSERT INTO companion_team_mapping_runs
+      (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,team_count)
+      VALUES (?,?,?,?,?,?,?)`).run('identity-team-run','league-1','capture-session-1','capture-1','teams','preview-ready',1);
+    database.prepare(`INSERT INTO companion_player_mapping_runs
+      (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,rostered_count,free_agent_count)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run('identity-player-run','league-1','capture-session-1','capture-1','rosters','rostered-players-only',2,2,0);
+    database.prepare(`INSERT INTO companion_canonical_teams_preview
+      (mapping_run_id,league_id,external_id,display_name,source_record_json)
+      VALUES (?,?,?,?,?)`).run('identity-team-run','league-1','tb','Buccaneers','{}');
+    database.prepare(`INSERT INTO companion_canonical_players_preview
+      (mapping_run_id,league_id,external_id,team_external_id,display_name,source_record_json)
+      VALUES (?,?,?,?,?,?)`).run('identity-player-run','league-1','p1','tb','Player One','{}');
+    database.prepare(`INSERT INTO identity_preview_runs
+      (id,league_id,franchise_season_id,team_mapping_run_id,player_mapping_run_id,status,
+       free_agent_status,team_count,rostered_player_count,free_agent_count,created_by_user_id)
+      VALUES (?,?,?,?,?,'rostered-players-only','blocked',1,2,NULL,?)`)
+      .run('identity-run','league-1','season-1','identity-team-run','identity-player-run','commissioner-1');
+    let response=await onRequestGet(context({db,token,archives,sources,query:'?preview=1'}));
+    const initial=await response.json(),confirmations=initial.confirmations,gameYearId=initial.gameYear.id;
+    for(const [action,confirmation] of [
+      ['plan-archive',confirmations.plan],
+      ['archive',confirmations.archive]
+    ]){
+      response=await onRequestPost(context({db,token,archives,sources,method:'POST',body:{action,gameYearId,confirmation}}));
+      assert.equal(response.status,200);
+    }
+    const relational=[...archives.objects.entries()].find(([key])=>key.endsWith('/relational.json'))?.[1];
+    assert.ok(relational);
+    const bundle=JSON.parse(new TextDecoder().decode(relational));
+    assert.deepEqual(bundle.datasets.companion_team_mapping_runs.map(row=>row.id),['identity-team-run']);
+    assert.deepEqual(bundle.datasets.companion_player_mapping_runs.map(row=>row.id),['identity-player-run']);
+    assert.equal(bundle.datasets.companion_canonical_teams_preview.length,1);
+    assert.equal(bundle.datasets.companion_canonical_players_preview.length,1);
+    assert.equal(bundle.datasets.identity_preview_runs.length,1);
+  }finally{database.close();}
+});
+
 test('commissioner workflow archives, verifies, detaches, removes, and restores without changing the platform plane', async () => {
   const {database,token}=await fixture();
   const db=d1(database),archives=bucket(),sources=bucket({'source/capture-1.json':'{"teams":[]}'});
