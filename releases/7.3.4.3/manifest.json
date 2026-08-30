@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.4.3",
   "releaseType": "recovered-export-exact-session-import-remediation",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.4.2",
@@ -20,10 +20,11 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0,
+    "status": "published-hosted-checks-passed-main",
+    "commit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa",
+    "pullRequest": 19,
+    "hostedChecksPassed": 4,
+    "mainChecksPassed": 7,
     "scope": "The owner authorized one consolidated branch, pull request, hosted-check, exact Main, and Production deployment cycle for the recovered-export Teams mapping remediation."
   },
   "staging": {
@@ -34,11 +35,12 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.3.4.2",
-    "currentCommit": "e95ad2f4a6989433a05f9bf7ea605caa0e83b165",
-    "currentDeployment": "0747aebd-5f6a-4852-b3c4-98aaffb20ad0",
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
+    "currentRelease": "7.3.4.3",
+    "currentCommit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa",
+    "currentDeployment": "3d667ec0-73f8-4188-9e5b-76f154634dfe",
+    "workerBuild": "8fa92466-efe6-438f-8811-3cae1c4f6138",
     "activeSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
     "scope": "Deploy only the exact-session classification and Teams mapping compatibility fix. Do not retry an import, activate a snapshot, reset data, rotate the export URL, run a transition, create a new export, or reinterpret blocked Free Agents."
   },

@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.4.3",
   "validatedOn": "2026-08-30",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-verified",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "productionFailureDiagnosis": {
@@ -80,14 +80,22 @@
       "inventoryFiles": 533,
       "routes": 65,
       "requiredTables": 79
+    },
+    "productionRuntimeSmoke": {
+      "passed": true,
+      "domain": "https://franchisehq.app",
+      "visibleRelease": "7.3.4.3",
+      "runtimeCommit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa",
+      "pagesDeployment": "3d667ec0-73f8-4188-9e5b-76f154634dfe",
+      "candidateImportRetryExecuted": false
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
     "resetPerformed": false,
     "transitionOperationExecuted": false,
     "archiveOperationExecuted": false,
@@ -99,21 +107,37 @@
     "credentialsChanged": false
   },
   "external": {
-    "githubPublication": { "authorized": true, "status": "not-run" },
-    "hostedChecks": { "authorized": true, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "githubPublication": {
+      "authorized": true,
+      "status": "published-main",
+      "pullRequest": 19,
+      "candidateCommit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa",
+      "mainCommit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "passed": 7,
+      "candidatePassed": 4,
+      "failed": 0,
+      "pending": 0
+    },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
     "productionDeployment": {
       "authorized": true,
-      "status": "not-run",
-      "currentDeployment": "0747aebd-5f6a-4852-b3c4-98aaffb20ad0",
-      "currentRuntimeCommit": "e95ad2f4a6989433a05f9bf7ea605caa0e83b165"
+      "status": "success",
+      "currentDeployment": "3d667ec0-73f8-4188-9e5b-76f154634dfe",
+      "deploymentUrl": "https://3d667ec0.franchise-hq.pages.dev",
+      "productionDomain": "https://franchisehq.app",
+      "currentRuntimeCommit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa",
+      "importWorkerBuild": "8fa92466-efe6-438f-8811-3cae1c4f6138"
     },
     "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 26 },
     "productionMaddenExport": { "authorized": false, "status": "not-run" },
     "productionCandidateImportRetry": { "authorized": false, "status": "not-run" },
     "maddenImportActivation": { "authorized": false, "status": "not-run" }
   },
-  "productionChanged": false,
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false
