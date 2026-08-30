@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.4.1",
   "releaseType": "permanent-league-export-and-one-click-latest-import",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.4",
@@ -19,12 +19,12 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0,
-    "scope": "The owner authorized implementation of the permanent export workflow. Publication, a pull request, hosted checks, staging, Production, and Git Main remain separate gates."
+    "authorized": true,
+    "status": "published-hosted-checks-passed-main",
+    "commit": "6de7c1018c89bc8fd6868fbde984f7a496e2a69d",
+    "pullRequest": 16,
+    "hostedChecksPassed": 4,
+    "scope": "The owner authorized publication and Main. Pull request #16 passed all four candidate checks and exact commit 6de7c1018c89bc8fd6868fbde984f7a496e2a69d was fast-forwarded to Main."
   },
   "staging": {
     "authorized": false,
@@ -33,14 +33,14 @@
     "scope": "Production-first policy applies. No staging cycle is authorized."
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "7.3.4",
-    "currentCommit": "431583ea7a472c4ba5292bea1a1775e7f0309b33",
-    "currentDeployment": "fafabfb2-91fe-4759-9cf8-8872365c6777",
+    "authorized": true,
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
+    "currentRelease": "7.3.4.1",
+    "currentCommit": "6de7c1018c89bc8fd6868fbde984f7a496e2a69d",
+    "currentDeployment": "0eec0551-216c-4f32-8aed-e8a7fbcb81ab",
     "activeSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
-    "scope": "No Production deployment, migration 26 application, real export, candidate import, activation, reset, transition, archive/removal/recovery operation, or Git Main change is authorized."
+    "scope": "The owner authorized exact Main/Production publication and additive migration 26. No real export, candidate import, activation, reset, transition, or archive/removal/recovery operation was authorized or run."
   },
   "requiredArtifacts": [
     "config/database-schema-contract.json",

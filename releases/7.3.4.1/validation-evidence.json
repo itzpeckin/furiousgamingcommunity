@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.4.1",
   "validatedOn": "2026-08-30",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "baselineGate": {
     "passed": true,
     "unregisteredFailures": 0
@@ -78,11 +78,11 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
     "resetPerformed": false,
     "transitionOperationExecuted": false,
     "archiveOperationExecuted": false,
@@ -93,26 +93,51 @@
     "credentialsChanged": false
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main", "pullRequest": 16, "commit": "6de7c1018c89bc8fd6868fbde984f7a496e2a69d" },
+    "hostedChecks": { "authorized": true, "status": "passed", "passed": 4, "failed": 0, "pending": 0 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentDeployment": "fafabfb2-91fe-4759-9cf8-8872365c6777",
-      "currentRuntimeCommit": "431583ea7a472c4ba5292bea1a1775e7f0309b33"
+      "authorized": true,
+      "status": "success",
+      "deploymentId": "0eec0551-216c-4f32-8aed-e8a7fbcb81ab",
+      "url": "https://franchisehq.app",
+      "deploymentUrl": "https://0eec0551.franchise-hq.pages.dev",
+      "runtimeCommit": "6de7c1018c89bc8fd6868fbde984f7a496e2a69d",
+      "previousDeployment": "fafabfb2-91fe-4759-9cf8-8872365c6777",
+      "productionBranch": "main",
+      "smokeStatus": "passed"
     },
     "productionMigration": {
-      "authorized": false,
-      "status": "not-run",
-      "candidateMigration": 26,
-      "currentMigration": 25
+      "authorized": true,
+      "status": "applied-verified",
+      "migration": 26,
+      "sha256": "e1a48bd151393f2fee728c723ff1db3afc418a505b9057f1cb8f2c114a2f84d4",
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "preMigrationBookmark": "00000032-00000000-000050d7-f42cc5c918932fe187a765a42a32342b",
+      "postMigrationBookmark": "00000032-00000008-000050d7-3c7fd83fe2a1d18c39cbc80d28444ede",
+      "before": {
+        "ledgerVersion": 25,
+        "tableCount": 78,
+        "protectedCounts": { "leagues": 1, "users": 8, "memberships": 8, "activeTeamAssignments": 6, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1 },
+        "foreignKeyViolations": 0
+      },
+      "after": {
+        "ledgerVersion": 26,
+        "tableCount": 79,
+        "protectedCounts": { "leagues": 1, "users": 8, "memberships": 8, "activeTeamAssignments": 6, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1 },
+        "foreignKeyViolations": 0,
+        "endpointRows": 1,
+        "activeEndpointRows": 1,
+        "latestReadyReportBackfilled": true,
+        "rawTokenStored": false
+      }
     },
     "productionMaddenExport": { "authorized": false, "status": "not-run" },
     "productionCandidateImport": { "authorized": false, "status": "not-run" },
     "maddenImportActivation": { "authorized": false, "status": "not-run" }
   },
-  "productionChanged": false,
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false
