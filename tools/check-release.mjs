@@ -367,7 +367,7 @@ if (version === '7.3.2') {
     if (!['completed-verified-performance-pending','completed-verified-performance-failed'].includes(initialRehearsalStatus)) {
       errors.push('Deployed 7.3.2 evidence must retain the initial Production rehearsal and its measured performance result.');
     }
-    if (['production-cold-performance-validated-pending-owner-acceptance','production-owner-accepted-no-activation'].includes(evidence.status)) {
+    if (['production-cold-performance-validated-pending-owner-acceptance','production-owner-accepted-no-activation','production-owner-accepted-active-snapshot'].includes(evidence.status)) {
       const repaired = evidence.external?.repairedColdCandidateRehearsal;
       const durationMs = Number(repaired?.durationMs || 0);
       const targetMs = Number(repaired?.targetMs || 60000);
@@ -378,13 +378,11 @@ if (version === '7.3.2') {
       }
     }
     if (manifest.status === 'released' && (
-      evidence.status !== 'production-owner-accepted-no-activation'
+      !['production-owner-accepted-no-activation','production-owner-accepted-active-snapshot'].includes(evidence.status)
       || evidence.manualAcceptance?.status !== 'owner-accepted'
       || evidence.manualAcceptance?.ownerAcceptanceRecorded !== true
-      || evidence.external?.maddenImportActivation?.authorized !== false
-      || evidence.external?.maddenImportActivation?.status !== 'not-run'
     )) {
-      errors.push('Released 7.3.2 evidence must record owner acceptance while preserving the separate no-activation boundary.');
+      errors.push('Released 7.3.2 evidence must record owner acceptance and its exact activation boundary.');
     }
   } else {
     if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
@@ -397,11 +395,24 @@ if (version === '7.3.2') {
       errors.push('Unpublished 7.3.2 candidate work must not claim an authorized or completed production data reset.');
     }
   }
-  if (evidence.external?.maddenImportActivation?.authorized !== false || evidence.external?.maddenImportActivation?.status !== 'not-run') {
-    errors.push('7.3.2 candidate work must not claim an authorized or completed Madden activation.');
+  const activation = evidence.external?.maddenImportActivation;
+  const activeRelease = evidence.status === 'production-owner-accepted-active-snapshot';
+  if (activeRelease) {
+    const repairedSnapshotId = evidence.external?.repairedColdCandidateRehearsal?.candidateSnapshotId;
+    if (activation?.authorized !== true || activation?.status !== 'completed-verified'
+      || activation?.snapshotId !== repairedSnapshotId || activation?.activeSnapshotRows !== 1
+      || activation?.validationStatus !== 'ready' || Number(activation?.validationErrors) !== 0
+      || activation?.freeAgentStatus !== 'blocked' || activation?.freeAgentCount !== null
+      || activation?.activationSessionStatus !== 'revoked' || Number(activation?.activeActivationSessions) !== 0
+      || Number(activation?.foreignKeyViolations) !== 0 || evidence.scopeBoundaries?.activeSnapshotChanged !== true) {
+      errors.push('Active 7.3.2 evidence must prove exact accepted-snapshot activation, validation, cleanup, and blocked-Free-Agent preservation.');
+    }
+  } else if (activation?.authorized !== false || activation?.status !== 'not-run'
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false) {
+    errors.push('Non-active 7.3.2 evidence must preserve the separate no-activation boundary.');
   }
-  if (evidence.scopeBoundaries?.activeSnapshotChanged !== false || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false) {
-    errors.push('7.3.2 must preserve no-activation and blocked-Free-Agent boundaries.');
+  if (evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false) {
+    errors.push('7.3.2 must preserve the blocked-Free-Agent boundary.');
   }
 }
 

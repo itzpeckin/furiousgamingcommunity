@@ -178,12 +178,12 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
-        "bytes": 22790,
-        "file": "platform/validate.js"
+        "bytes": 23346,
+        "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 22452,
-        "file": "tools/check-release.mjs"
+        "bytes": 22790,
+        "file": "platform/validate.js"
       },
       {
         "bytes": 21293,

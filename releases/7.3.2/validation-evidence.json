@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.2",
   "validatedOn": "2026-08-30",
-  "status": "production-owner-accepted-no-activation",
+  "status": "production-owner-accepted-active-snapshot",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "commissionerCandidateAuthority": { "passed": true, "platformOwnerAssistanceRequired": false },
@@ -16,7 +16,7 @@
     "productionColdPerformance": { "passed": true, "durationMs": 43763, "targetMs": 60000, "headroomMs": 16237, "previousDurationMs": 74387 },
     "productionColdRemediation": { "passed": true, "implementationDeployed": true, "firstRehearsalFailedSafely": true, "failedPhase": "map-statistics", "cause": "D1 SQL-variable ceiling", "repairDeployed": true, "additionalColdRehearsalAuthorized": true, "additionalColdRehearsalConsumed": true, "additionalColdRehearsalCompleted": true },
     "freeAgentBlockedPreserved": { "passed": true, "status": "blocked", "count": null, "interpretedAsZero": false },
-    "sourceLockNoActivation": { "passed": true, "activeSnapshotChanged": false },
+    "sourceLockNoActivation": { "passed": true, "sourceLockAndCandidatePhasesActivatedNothing": true, "laterOwnerAuthorizedActivation": true },
     "gameYearTransition": { "passed": true, "outgoingGameYear": "Madden NFL 26", "incomingGameYear": "Madden NFL 27", "franchiseSeasonYear": 2026, "persistentPlatformPlanePreserved": true },
     "productionCandidateCorrectness": { "passed": true, "teams": 32, "rosteredPlayers": 2044, "games": 14, "statistics": 510, "standings": 32 },
     "productionSessionCleanup": { "passed": true, "rehearsalSessionsCreated": 4, "rehearsalSessionsRevoked": 4, "activeRehearsalSessions": 0, "membershipChanged": false },
@@ -30,14 +30,15 @@
     "gameYearSeparateFromFranchiseSeason": true,
     "persistentLeagueAndAccountPlanePreserved": true,
     "sessionRefreshRedesignChanged": false,
-    "activeSnapshotChanged": false,
+    "activeSnapshotChanged": true,
     "freeAgentInterpretedAsZero": false,
     "gitMainChanged": false,
     "productionInfrastructureChanged": true,
     "productionDataChanged": true,
     "credentialsChanged": false,
     "temporaryProductionMembershipCreated": false,
-    "temporaryProductionSessionsActive": 0
+    "temporaryProductionSessionsActive": 0,
+    "activeSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663"
   },
   "external": {
     "githubPullRequest": { "authorized": true, "status": "open", "pullRequest": 12, "base": "codex/franchisehq-7.3.1", "head": "codex/franchisehq-7.3.2", "commit": "972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a", "mergeState": "clean", "gitMainChanged": false },
@@ -67,10 +68,10 @@
     "candidateImportRehearsal": { "authorized": true, "status": "completed-verified-performance-failed", "seasonYear": 2026, "destinationId": "import_destination_8bbd1c19-864f-4d57-b53a-49501e370fad", "runId": "candidate_import_0fec6fdd-e27c-4d89-ad0d-dcc7ff054fe0", "candidateSnapshotId": "c7023ac0-e6d8-476c-949b-483092830fdd", "durationMs": 74387, "performanceTargetMet": false, "teamCount": 32, "rosteredPlayerCount": 2044, "gameCount": 14, "statisticCount": 510, "standingCount": 32, "validationStatus": "ready", "validationErrors": 0, "freeAgentStatus": "blocked", "freeAgentCount": null, "activeSnapshotBefore": null, "activeSnapshotAfter": null, "activationPerformed": false, "phaseTimingsMs": { "analyzeSource": 3596, "classifyCaptures": 7783, "mapTeams": 948, "mapPlayers": 4795, "mapSchedule": 896, "mapStatistics": 20995, "buildCandidate": 10546, "validateCandidate": 13370 } },
     "performanceRemediationRehearsal": { "authorized": true, "status": "failed-safe-then-retried", "seasonYear": 2026, "sourceCommit": "7557730694aafaf74ec2498cb9f9d1af1ea9745f", "runId": "candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339", "candidateSnapshotId": null, "durationMs": 20623, "performanceTargetMet": false, "completedThrough": "map-schedule", "failedPhase": "map-statistics", "statisticsMappingRunId": "7363b576-2332-4905-9c6c-2e462d9d1eac", "failedRoute": "xbsx/742482/week/reg/7/defense", "failure": "D1_ERROR: too many SQL variables at offset 375: SQLITE_ERROR", "repairCommit": "972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a", "repairDeployed": true, "repairRehearsed": true, "teamCount": 32, "rosteredPlayerCount": 2044, "gameCount": 14, "freeAgentStatus": "blocked", "freeAgentCount": null, "activeSnapshotBefore": null, "activeSnapshotAfter": null, "activationPerformed": false, "phaseTimingsMs": { "analyzeSource": 1002, "classifyCaptures": 720, "mapTeams": 1129, "mapPlayers": 6291, "mapSchedule": 1129, "mapStatistics": 2669 } },
     "repairedColdCandidateRehearsal": { "authorized": true, "status": "completed-verified", "seasonYear": 2026, "sourceCommit": "972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a", "runId": "candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339", "candidateSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663", "durationMs": 43763, "targetMs": 60000, "performanceTargetMet": true, "headroomMs": 16237, "teamMappingRunId": "c339e31c-e5e1-4e83-a040-997e64f67cd1", "playerMappingRunId": "572f19ca-ced6-4a28-9203-e31dc4f70978", "scheduleMappingRunId": "1d5cab38-8b27-4961-acfe-a7a0ff64160f", "statisticsMappingRunId": "cd5a3426-1b88-4b4d-b49e-f70a56b49b89", "teamCount": 32, "rosteredPlayerCount": 2044, "gameCount": 14, "statisticCount": 510, "standingCount": 32, "validationStatus": "ready", "validationScore": 99.2, "validationErrors": 0, "validationWarnings": 1, "freeAgentStatus": "blocked", "freeAgentCount": null, "activeSnapshotBefore": null, "activeSnapshotAfter": null, "activationPerformed": false, "statisticsRequests": 8, "validationRequests": 3, "phaseTimingsMs": { "analyzeSource": 1003, "classifyCaptures": 640, "mapTeams": 1028, "mapPlayers": 5146, "mapSchedule": 1013, "mapStatistics": 13285, "buildCandidate": 5144, "validateCandidate": 5977 } },
-    "temporaryProductionAccess": { "authorized": true, "status": "revoked", "membershipCreated": false, "membershipChanged": false, "rehearsalSessionsCreated": 4, "rehearsalSessionsRevoked": 4, "activeRehearsalSessions": 0, "auditRowsRetained": 3 },
+    "temporaryProductionAccess": { "authorized": true, "status": "revoked", "membershipCreated": false, "membershipChanged": false, "rehearsalSessionsCreated": 4, "rehearsalSessionsRevoked": 4, "activationSessionsCreated": 1, "activationSessionsRevoked": 1, "activeRehearsalSessions": 0, "activeActivationSessions": 0, "auditRowsRetained": 3 },
     "productionSmoke": { "status": "passed", "homepageHttpStatus": 200, "platformReady": true, "databaseSchemaVersion": 24, "discordLoginHttpStatus": 302, "guestCandidateHttpStatus": 401 },
     "productionDataReset": { "authorized": true, "status": "fulfilled-by-archive-and-detach", "inPlaceDestructiveSqlRun": false },
-    "maddenImportActivation": { "authorized": false, "status": "not-run" }
+    "maddenImportActivation": { "authorized": true, "status": "completed-verified", "snapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663", "previousSnapshotId": null, "activeSnapshotRows": 1, "activatedAt": "2026-08-30 14:09:48", "activatedBy": "owner-tb", "validationStatus": "ready", "validationErrors": 0, "teamCount": 32, "rosteredPlayerCount": 2044, "gameCount": 14, "statisticCount": 510, "standingCount": 32, "freeAgentStatus": "blocked", "freeAgentCount": null, "foreignKeyViolations": 0, "activationSessionStatus": "revoked", "activeActivationSessions": 0, "lifecycleEvent": "activated", "forwardDetectionStatus": "pending-separate-stage", "resetPerformed": false, "gitMainChanged": false }
   },
   "manualAcceptance": {
     "status": "owner-accepted",
@@ -81,7 +82,7 @@
     "acceptedCandidateRunId": "candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339",
     "acceptedCandidateSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
     "performanceAccepted": true,
-    "nextGate": "snapshot activation requires a separate explicit authorization; otherwise proceed to the separately authorized 7.3.3 implementation gate"
+    "nextGate": "forward-transaction detection remains a separate pending stage; 7.3.3 implementation and any rollback remain separately authorized"
   },
   "productionChanged": true,
   "dataChanged": true,

@@ -1,10 +1,10 @@
 # FranchiseHQ 7.3.2 Release Record
 
-**Status:** Released and owner-accepted; private candidate retained without activation
+**Status:** Released, owner-accepted, and active in Production
 
-**Production authorized:** Yes, for the accepted 7.3.2 deployment, performance remediation commits `7557730694aafaf74ec2498cb9f9d1af1ea9745f` and `972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a`, the first consolidated remediation rehearsal, one additional cold repair rehearsal, and final owner acceptance of the repaired private candidate
+**Production authorized:** Yes, for the accepted 7.3.2 deployment, performance remediation commits `7557730694aafaf74ec2498cb9f9d1af1ea9745f` and `972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a`, the first consolidated remediation rehearsal, one additional cold repair rehearsal, final owner acceptance, and separate activation of the exact repaired snapshot
 
-**Production changed:** Yes. Git Main and the active-snapshot pointer are unchanged.
+**Production changed:** Yes. The active-snapshot pointer now targets the accepted snapshot; Git Main is unchanged.
 
 ## Scope
 
@@ -24,11 +24,12 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - Repaired the discovered limit in commit `972bea6` by retaining the 200-record work chunk while batching complete player-identity lookups into safe 75-value D1 reads. The strict gate and hosted checks passed, and the exact repair is deployed to both Pages/Functions and the import Worker.
 - Used the newly authorized cold repair rehearsal exactly once. Reused run `candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339` reached `preview-ready` in 43.763 seconds, 16.237 seconds inside the sub-60 target, and retained validated private snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` without activating it.
 - Recorded owner acceptance of that exact repaired private candidate. Acceptance does not authorize or perform snapshot activation, reset data, merge Main, or create another Production run.
+- After a separate explicit authorization, activated only snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663`. The activation session was revoked immediately; no reset, Main change, membership change, candidate rerun, or credential change occurred.
 
 ## Known inherited blockers
 
 - Madden's explicit Free Agent route remains blocked upstream. The candidate is `rostered-players-only`; Free Agent count is unknown/null and is never interpreted as zero.
-- The first Production cold rehearsal completed in 74.387 seconds, above the sub-60 target. The first remediation rehearsal later stopped safely at statistics mapping after exposing D1's SQL-variable ceiling. Exact repair `972bea6` then completed the separately authorized cold rerun in 43.763 seconds and the owner accepted that result. Snapshot activation remains separately authorized.
+- The first Production cold rehearsal completed in 74.387 seconds, above the sub-60 target. The first remediation rehearsal later stopped safely at statistics mapping after exposing D1's SQL-variable ceiling. Exact repair `972bea6` then completed the separately authorized cold rerun in 43.763 seconds; the owner accepted and separately activated that exact result.
 - The Production Cloudflare configuration still lacks a dedicated `LEAGUE_CONFIG` KV binding and an explicit `PLATFORM_OWNER_ACCOUNT_ID` variable. Existing commissioner candidate routes work, but these inherited contract gaps remain visible.
 - The first direct Pages upload (`1bee7993`) omitted Functions and was discarded. Complete deployment `ebcf42ec` superseded it and passed Functions/auth smoke checks.
 - The direct acceptance upload temporarily changed the Git-build output directory to a local absolute path. Evidence commit `237bb3d` therefore failed its first automatic Preview in seven seconds with `build output directory is outside of the repository`. The project setting was restored to the repository root, isolated Preview `9bdb6209` verified the corrected configuration, and retry `791c66a6` restored PR #12 to 4/4 passing checks.
@@ -40,7 +41,7 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - Production `/api/platform/status` reports configured/ready with D1, R2, KV, secret, schema 24, and `commissioner_candidate_import`. The canonical Discord login endpoint returns an HTTP 302 rather than a broken file URL; the guest candidate endpoint returns HTTP 401.
 - The authenticated Production candidate contains 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. Validation is `ready` with zero errors and foreign-key verification returns zero violations.
 - Free Agents remain `blocked` with a null count. Completeness is `rostered-players-only`.
-- The active snapshot ID was null before and after. `league_active_snapshots` remains empty; activation was never called.
+- The active snapshot ID was null throughout every source-lock, candidate, and acceptance phase. The later separately authorized activation created exactly one pointer to snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663`.
 - Every Production rehearsal session is revoked, no rehearsal session remains active, no membership role was changed, and team assignments remain zero.
 - The initial Production cold duration was 74.387 seconds. Exact repair `972bea6` subsequently completed the separately authorized cold rerun in 43.763 seconds, meeting the sub-60 target with 16.237 seconds of headroom while retaining the initial failed performance result as evidence.
 - The remediation rehearsal run `candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339` completed analyze source in 1.002 seconds, classification in 0.720 seconds, teams in 1.129 seconds, players in 6.291 seconds, and schedule in 1.129 seconds. Statistics mapping failed after 2.669 seconds in mapping run `7363b576-2332-4905-9c6c-2e462d9d1eac` with `D1_ERROR: too many SQL variables`; candidate and validation phases did not run.
@@ -49,6 +50,7 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - The additional repaired cold rehearsal completed all nine candidate phases in 43.763 seconds. Phase timings were: analyze 1.003s, classify 0.640s, teams 1.028s, players 5.146s, schedule 1.013s, statistics 13.285s, candidate build 5.144s, and validation 5.977s.
 - Repaired candidate `841ce1b5-a4a6-4246-a53a-01cd1f189663` is private and validation-ready at score 99.2 with zero errors: 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. Its one warning is the inherited rostered-player-only completeness warning caused by the blocked upstream Free Agent route.
 - Post-rerun verification returned zero active snapshots, eight users, eight memberships, zero team assignments, six membership-audit rows, 109 total sessions, zero active rehearsal sessions, and zero foreign-key violations. The new session is revoked; Free Agents are still `blocked` with a JSON null count.
+- Post-activation verification returned one active snapshot row for the exact accepted snapshot, status `active`, validation `ready` with zero errors, the same 32/2,044/14/510/32 counts, Free Agents `blocked` with a null count, zero active activation sessions, and zero foreign-key violations. The lifecycle event is `activated` by `owner-tb`; forward-transaction detection remains `pending-separate-stage` and was not run under this authorization.
 
 ## Deployment status
 
@@ -61,8 +63,8 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - Detached Madden 26 D1: `franchise-hq-db` / `d21fb8c2-1b26-4766-9249-73af5d8b6678`.
 - Production candidate destination `import_destination_8bbd1c19-864f-4d57-b53a-49501e370fad`, run `candidate_import_0fec6fdd-e27c-4d89-ad0d-dcc7ff054fe0`, and validated private snapshot `c7023ac0-e6d8-476c-949b-483092830fdd` are retained for owner review.
 - Remediation run `candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339` was reset through its explicit retry path and is now `preview-ready`; its earlier failed statistics run `7363b576-2332-4905-9c6c-2e462d9d1eac` remains retained as diagnostic evidence. The repaired run pins team mapping `c339e31c-e5e1-4e83-a040-997e64f67cd1`, player mapping `572f19ca-ced6-4a28-9203-e31dc4f70978`, schedule mapping `1d5cab38-8b27-4961-acfe-a7a0ff64160f`, and statistics mapping `cd5a3426-1b88-4b4d-b49e-f70a56b49b89`.
-- The repaired private candidate snapshot is `841ce1b5-a4a6-4246-a53a-01cd1f189663`. It is validation-ready but not active; two append-only candidate snapshots are retained for review and `league_active_snapshots` remains empty.
-- No snapshot was activated, no Git Main change was made, and no credentials were changed.
+- The repaired snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` is validation-ready and active. The earlier validated candidate `c7023ac0-e6d8-476c-949b-483092830fdd` remains retained and inactive.
+- One exact snapshot was activated. No Git Main change, reset, membership change, additional candidate run, or credential change was made.
 
 ## Rollback
 
@@ -70,4 +72,4 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - The clean Madden 27 D1 and additive schema remain forward-compatible during a code rollback. Do not drop migrations 21–24.
 - The detached Madden 26 D1 and verified private archive remain the recovery sources. The 1,295 deleted raw R2 objects are not recoverable from the former raw-source bucket.
 - Candidate, identity, session-audit, and game-year-transition audit rows are retained. Their removal requires a new exact-target authorization.
-- Snapshot rollback is not applicable because the active-snapshot table is empty.
+- Snapshot rollback is now a separate authorization decision. The activated row records no previous snapshot, so no automatic prior active pointer exists to restore.
