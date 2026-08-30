@@ -438,16 +438,40 @@ if (version === '7.3.3') {
   ]) {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.3 game-year transition evidence is incomplete: ${check}.`);
   }
-  if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
-    errors.push('7.3.3 implementation work must not claim Production authorization or deployment.');
-  }
-  if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
-    errors.push('7.3.3 implementation work must not claim an authorized or completed Production migration.');
+  const productionAuthorized=manifest.status==='validated-production-authorized';
+  const productionDeployed=isPostDeployment;
+  if(productionDeployed){
+    if(manifest.production?.authorized!==true||manifest.production?.deployed!==true||manifest.production?.status!=='success-pending-owner-acceptance'){
+      errors.push('Deployed 7.3.3 evidence must record the owner-authorized Production acceptance publication.');
+    }
+    if(evidence.external?.productionDeployment?.authorized!==true||evidence.external?.productionDeployment?.status!=='success'){
+      errors.push('Deployed 7.3.3 evidence must record the successful authorized Production deployment.');
+    }
+    if(evidence.external?.productionMigrations?.authorized!==true||evidence.external?.productionMigrations?.status!=='applied-verified'||Number(evidence.external?.productionMigrations?.migration)!==25){
+      errors.push('Deployed 7.3.3 evidence must record additive Production migration 25 as applied and verified.');
+    }
+  }else if(productionAuthorized){
+    if(manifest.production?.authorized!==true||manifest.production?.deployed!==false||manifest.production?.status!=='authorized-not-run'){
+      errors.push('Authorized 7.3.3 evidence must record Production publication authorization without claiming deployment.');
+    }
+    if(evidence.external?.productionDeployment?.authorized!==true||evidence.external?.productionDeployment?.status!=='not-run'){
+      errors.push('Authorized 7.3.3 evidence must retain a pending Production deployment.');
+    }
+    if(evidence.external?.productionMigrations?.authorized!==true||evidence.external?.productionMigrations?.status!=='not-run'||Number(evidence.external?.productionMigrations?.migration)!==25){
+      errors.push('Authorized 7.3.3 evidence must retain pending additive Production migration 25.');
+    }
+  }else{
+    if(manifest.production?.authorized!==false||manifest.production?.deployed!==false){
+      errors.push('Unpublished 7.3.3 work must not claim Production authorization or deployment.');
+    }
+    if(evidence.external?.productionMigrations?.authorized!==false||evidence.external?.productionMigrations?.status!=='not-run'){
+      errors.push('Unpublished 7.3.3 work must not claim an authorized or completed Production migration.');
+    }
   }
   if (evidence.external?.productionDataRemoval?.authorized !== false || evidence.external?.productionDataRemoval?.status !== 'not-run') {
     errors.push('7.3.3 implementation work must not claim an authorized or completed Production removal.');
   }
-  const stagingValidated=manifest.status==='staging-validated';
+  const stagingValidated=['staging-validated','validated-production-authorized','production-deployed-pending-owner-acceptance','released'].includes(manifest.status);
   if(stagingValidated){
     const rehearsal=evidence.external?.cloudRehearsal;
     if(
@@ -474,7 +498,8 @@ if (version === '7.3.3') {
   }
   if (
     evidence.scopeBoundaries?.activeSnapshotChanged !== false
-    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || (!productionDeployed && evidence.scopeBoundaries?.productionDataChanged !== false)
+    || (productionDeployed && evidence.scopeBoundaries?.productionDataChanged !== true)
     || evidence.scopeBoundaries?.gitMainChanged !== false
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   ) {

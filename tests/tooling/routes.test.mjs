@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { functionRoutePath, requestHandlers } from '../../tools/lib/routes.mjs';
 
@@ -36,4 +37,23 @@ test('extracts named Pages request handlers', () => {
     export const onRequestPost = async () => {};
   `;
   assert.deepEqual(requestHandlers(source), ['onRequestGet', 'onRequestPost']);
+});
+
+test('production shell exposes the exact release and environment', async () => {
+  const [index, app, landing, selector, leagueRoute] = await Promise.all([
+    readFile(new URL('../../index.html', import.meta.url), 'utf8'),
+    readFile(new URL('../../app.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../functions/index.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../functions/leagues/index.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../functions/leagues/[[path]].js', import.meta.url), 'utf8')
+  ]);
+  assert.match(index, /franchise-hq-platform-version" content="7\.3\.3"/);
+  assert.match(index, /Production · Current Release 7\.3\.3/);
+  assert.match(index, /app\.js\?v=7\.3\.3/);
+  assert.match(index, /trade-module\.js\?v=7\.3\.3/);
+  assert.match(app, /const VISIBLE_RELEASE = '7\.3\.3'/);
+  assert.match(app, /hostname==='franchisehq\.app'.*return 'Production'/);
+  for (const source of [landing, selector, leagueRoute]) {
+    assert.match(source, /const RELEASE ?= ?["']7\.3\.3["']/);
+  }
 });
