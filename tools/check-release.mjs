@@ -24,6 +24,8 @@ const isPostDeployment = new Set([
   'production-deployed-pending-owner-acceptance',
   'released'
 ]).has(manifest.status);
+const isAuthorizedGameYearTransition = version === '7.3.2'
+  && evidence.scopeBoundaries?.gameYearTransition === true;
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
 if (manifest.version !== version || evidence.version !== version) errors.push('Package, manifest, and evidence versions must match.');
@@ -44,8 +46,14 @@ if (isAtLeast(7, 1)) {
 if (!isPostDeployment && (evidence.productionChanged !== false || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
   errors.push(`${version} evidence must accurately preserve unchanged production, data, and credentials during candidate work.`);
 }
-if (isPostDeployment && (evidence.productionChanged !== true || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
-  errors.push(`${version} post-deployment evidence must record the production publication without claiming league-data or credential changes.`);
+if (isPostDeployment && (
+  evidence.productionChanged !== true
+  || evidence.credentialsChanged !== false
+  || (isAuthorizedGameYearTransition
+    ? (evidence.dataChanged !== true || evidence.productionDataChanged !== true)
+    : evidence.dataChanged !== false)
+)) {
+  errors.push(`${version} post-deployment evidence must accurately record the authorized production, data, and credential scope.`);
 }
 if (version === '7.0.1') {
   for (const check of [
@@ -322,6 +330,89 @@ if (version === '7.3.1') {
   }
   if (evidence.scopeBoundaries?.activeSnapshotChanged !== false || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false) {
     errors.push('7.3.1 must preserve no-activation and blocked-Free-Agent boundaries.');
+  }
+}
+if (version === '7.3.2') {
+  for (const check of [
+    'commissionerCandidateAuthority',
+    'privateSeasonDestination',
+    'idempotentSourceFingerprint',
+    'exactMappingRunPins',
+    'appendOnlyCandidateBuild',
+    'candidateValidation',
+    'measuredPhaseProgress',
+    'freeAgentBlockedPreserved',
+    'sourceLockNoActivation',
+    'strictMigration'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.2 candidate-import evidence is incomplete: ${check}.`);
+  }
+  if (isPostDeployment) {
+    const expectedProductionStatus = manifest.status === 'released'
+      ? 'success-owner-accepted'
+      : 'success-pending-owner-acceptance';
+    if (manifest.production?.authorized !== true || manifest.production?.deployed !== true || manifest.production?.status !== expectedProductionStatus) {
+      errors.push('Deployed 7.3.2 evidence must record the owner-authorized Production acceptance publication.');
+    }
+    if (evidence.external?.productionDeployment?.authorized !== true || evidence.external?.productionDeployment?.status !== 'success') {
+      errors.push('Deployed 7.3.2 evidence must record the successful authorized Pages deployment.');
+    }
+    if (evidence.external?.productionMigrations?.authorized !== true || evidence.external?.productionMigrations?.status !== 'applied-verified') {
+      errors.push('Deployed 7.3.2 evidence must record migrations 21–24 as applied and verified.');
+    }
+    if (evidence.external?.productionGameYearTransition?.status !== 'archived-detached-clean-active-plane') {
+      errors.push('Deployed 7.3.2 evidence must record the exact game-year archive/detach transition.');
+    }
+    const initialRehearsalStatus = evidence.external?.candidateImportRehearsal?.status;
+    if (!['completed-verified-performance-pending','completed-verified-performance-failed'].includes(initialRehearsalStatus)) {
+      errors.push('Deployed 7.3.2 evidence must retain the initial Production rehearsal and its measured performance result.');
+    }
+    if (['production-cold-performance-validated-pending-owner-acceptance','production-owner-accepted-no-activation','production-owner-accepted-active-snapshot'].includes(evidence.status)) {
+      const repaired = evidence.external?.repairedColdCandidateRehearsal;
+      const durationMs = Number(repaired?.durationMs || 0);
+      const targetMs = Number(repaired?.targetMs || 60000);
+      if (repaired?.authorized !== true || repaired?.status !== 'completed-verified'
+        || repaired?.performanceTargetMet !== true || durationMs <= 0 || durationMs >= targetMs
+        || evidence.checks?.productionColdPerformance?.passed !== true) {
+        errors.push('Performance-validated 7.3.2 evidence must retain one authorized, completed, sub-target repaired cold rehearsal.');
+      }
+    }
+    if (manifest.status === 'released' && (
+      !['production-owner-accepted-no-activation','production-owner-accepted-active-snapshot'].includes(evidence.status)
+      || evidence.manualAcceptance?.status !== 'owner-accepted'
+      || evidence.manualAcceptance?.ownerAcceptanceRecorded !== true
+    )) {
+      errors.push('Released 7.3.2 evidence must record owner acceptance and its exact activation boundary.');
+    }
+  } else {
+    if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+      errors.push('Unpublished 7.3.2 candidate work must not claim production authorization or deployment.');
+    }
+    if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
+      errors.push('Unpublished 7.3.2 candidate work must not claim an authorized or completed production migration.');
+    }
+    if (evidence.external?.productionDataReset?.authorized !== false || evidence.external?.productionDataReset?.status !== 'not-run') {
+      errors.push('Unpublished 7.3.2 candidate work must not claim an authorized or completed production data reset.');
+    }
+  }
+  const activation = evidence.external?.maddenImportActivation;
+  const activeRelease = evidence.status === 'production-owner-accepted-active-snapshot';
+  if (activeRelease) {
+    const repairedSnapshotId = evidence.external?.repairedColdCandidateRehearsal?.candidateSnapshotId;
+    if (activation?.authorized !== true || activation?.status !== 'completed-verified'
+      || activation?.snapshotId !== repairedSnapshotId || activation?.activeSnapshotRows !== 1
+      || activation?.validationStatus !== 'ready' || Number(activation?.validationErrors) !== 0
+      || activation?.freeAgentStatus !== 'blocked' || activation?.freeAgentCount !== null
+      || activation?.activationSessionStatus !== 'revoked' || Number(activation?.activeActivationSessions) !== 0
+      || Number(activation?.foreignKeyViolations) !== 0 || evidence.scopeBoundaries?.activeSnapshotChanged !== true) {
+      errors.push('Active 7.3.2 evidence must prove exact accepted-snapshot activation, validation, cleanup, and blocked-Free-Agent preservation.');
+    }
+  } else if (activation?.authorized !== false || activation?.status !== 'not-run'
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false) {
+    errors.push('Non-active 7.3.2 evidence must preserve the separate no-activation boundary.');
+  }
+  if (evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false) {
+    errors.push('7.3.2 must preserve the blocked-Free-Agent boundary.');
   }
 }
 

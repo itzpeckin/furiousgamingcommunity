@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.2",
+  "releaseType": "commissioner-private-candidate-import",
+  "status": "released",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.1",
+    "commit": "483c4b81ba55509c9ce9542827f307d6192585e1",
+    "tree": "35b62f41e9cd6f37d8485a3f57d61adf9d9ba92d",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.2",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pull-request-open-hosted-checks-passed",
+    "commit": "972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a",
+    "pullRequest": 12,
+    "hostedChecksPassed": 4,
+    "scope": "PR #12 remains open from codex/franchisehq-7.3.2 to codex/franchisehq-7.3.1. Git Main is unchanged."
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": true,
+    "status": "private-candidate-import-verified",
+    "deploymentId": "6d7f2591-944b-4060-b1e6-b1c9c562a521",
+    "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
+    "scope": "The exact importer completed the authenticated 2026 isolated candidate in 23.456 seconds with validation ready and no activation."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": true,
+    "status": "success-owner-accepted",
+    "url": "https://franchisehq.app/",
+    "deploymentId": "61165506-9d06-4f95-9760-58f73389d37c",
+    "commit": "972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a",
+    "scope": "The owner accepted and separately authorized activation of the exact repaired 7.3.2 snapshot after its 43.763-second cold Production rehearsal. Active snapshot 841ce1b5 contains 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings with validation ready. Free Agents remain blocked/null; no reset or Main change was authorized."
+  },
+  "requiredArtifacts": [
+    "config/database-schema-contract.json",
+    "config/d1-database-targets.json",
+    "docs/DATABASE-OPERATIONS.md",
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+    "league-engine/one-click-import.js",
+    "migrations/0024_commissioner_candidate_import.sql",
+    "releases/7.3.2/release-record.md",
+    "releases/7.3.2/validation-evidence.json",
+    "tests/import/candidate-import.test.mjs",
+    "workers/franchise-import-worker/src/index.js"
+  ]
+}

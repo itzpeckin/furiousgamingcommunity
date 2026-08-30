@@ -114,13 +114,8 @@
     ],
     "PLATFORM_OWNER_ACCOUNT_ID": [
       "functions/_lib/permissions.js",
-      "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
       "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
       "functions/api/leagues/[leagueSlug]/companion/import-certification.js",
-      "functions/api/leagues/[leagueSlug]/companion/import-job.js",
-      "functions/api/leagues/[leagueSlug]/companion/import-orchestrator.js",
-      "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
-      "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
       "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js",
       "functions/api/leagues/[leagueSlug]/companion/snapshot-verification.js",
       "functions/api/leagues/[leagueSlug]/companion/statistics-capture-diagnostics.js",
@@ -134,13 +129,13 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 166,
+      ".js": 168,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 25,
+      ".mjs": 26,
       ".png": 1,
-      ".sql": 25,
+      ".sql": 26,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
@@ -163,7 +158,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74868,
+        "bytes": 74860,
         "file": "index.html"
       },
       {
@@ -171,20 +166,20 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 37245,
-        "file": "league-engine/one-click-import.js"
-      },
-      {
-        "bytes": 34765,
+        "bytes": 35151,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 34437,
+        "bytes": 35061,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 25681,
+        "bytes": 27001,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
+      },
+      {
+        "bytes": 23346,
+        "file": "tools/check-release.mjs"
       },
       {
         "bytes": 22790,
@@ -207,8 +202,16 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
+        "bytes": 19065,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
+      },
+      {
         "bytes": 18703,
         "file": "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
+      },
+      {
+        "bytes": 18283,
+        "file": "league-engine/one-click-import.js"
       },
       {
         "bytes": 18207,
@@ -217,17 +220,9 @@
       {
         "bytes": 18095,
         "file": "league-engine/rosters.js"
-      },
-      {
-        "bytes": 17885,
-        "file": "functions/api/leagues/[leagueSlug]/snapshot/read-model.js"
-      },
-      {
-        "bytes": 17706,
-        "file": "tools/check-release.mjs"
       }
     ],
-    "total": 518
+    "total": 522
   },
   "frontend": {
     "assets": [
@@ -682,7 +677,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 62,
+    "routeCount": 63,
     "routes": [
       {
         "file": "functions/index.js",
@@ -763,6 +758,14 @@
           "onRequestPost"
         ],
         "route": "/api/leagues/:leagueSlug/companion/build-snapshot"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/candidate-import"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/companion/change-check.js",
@@ -1178,7 +1181,6 @@
         "league-engine/identity-preview.js",
         "league-engine/league-snapshot-builder.js",
         "league-engine/live-read-model.js",
-        "league-engine/one-click-import.js",
         "league-engine/platform-owner-identity.js",
         "league-engine/platform-workspace.js",
         "league-engine/snapshot-lifecycle.js",
@@ -1187,7 +1189,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 60
+      "occurrences": 59
     },
     "browserStorageCalls": {
       "files": [
@@ -1204,14 +1206,13 @@
         "league-engine/import-history.js",
         "league-engine/league-tenant.js",
         "league-engine/live-read-model.js",
-        "league-engine/one-click-import.js",
         "league-engine/platform-workspace.js",
         "league-engine/snapshot-manager.js",
         "platform/contract.js",
         "platform/store.js",
         "trade-module.js"
       ],
-      "occurrences": 70
+      "occurrences": 67
     },
     "hardCodedFgc": {
       "files": [
@@ -1227,26 +1228,20 @@
     "ownerTb": {
       "files": [
         "FHQ-6126-index.html",
-        "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
         "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
         "functions/api/leagues/[leagueSlug]/companion/import-certification.js",
-        "functions/api/leagues/[leagueSlug]/companion/import-job.js",
-        "functions/api/leagues/[leagueSlug]/companion/import-orchestrator.js",
-        "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
-        "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
         "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js",
         "functions/api/leagues/[leagueSlug]/companion/snapshot-verification.js",
         "functions/api/leagues/[leagueSlug]/companion/statistics-capture-diagnostics.js",
         "functions/api/leagues/[leagueSlug]/companion/statistics-capture-inspector.js",
         "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
         "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js",
-        "import-orchestrator.js",
         "index.html",
         "league-engine/platform-owner-identity.js",
         "league-engine/platform-workspace.js",
         "trade-module.js"
       ],
-      "occurrences": 19
+      "occurrences": 13
     }
   },
   "migrations": [
@@ -1285,10 +1280,16 @@
       "recordsLedger": true,
       "sha256": "75be20c340e78c47509363946055c2b101d9ef903c9f8effdc47531ae1aaf117",
       "version": "0023"
+    },
+    {
+      "file": "migrations/0024_commissioner_candidate_import.sql",
+      "recordsLedger": true,
+      "sha256": "41085d1448fb307329ee0d5c4a7a6faf1331cc20c6085cf7faf7a7465ea27838",
+      "version": "0024"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.1",
+  "release": "7.3.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -1,805 +1,331 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
+/* FHQ_BUILD: 7.3.2 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.10.6.5.4h-p3d';
-  const STAGES = [
-    ['discover','Discover Latest Companion Captures'],
-    ['storage-preflight','Prepare Import Storage'],
-    ['map-teams','Map Teams'],
-    ['reconstruct-player-lifecycle','Reconstruct Player Lifecycle'],
-    ['map-players','Map Players'],
-    ['map-schedule','Map Schedule'],
-    ['map-statistics','Map Statistics'],
-    ['build-snapshot','Build Snapshot'],
-    ['validate-snapshot','Validate Snapshot'],
-    ['activate-snapshot','Activate Snapshot'],
-    ['detect-transactions','Detect Roster Movements'],
-    ['classify-transactions','Classify Transactions'],
-    ['reconcile-transactions','Reconcile Transactions'],
-    ['verify-active-snapshot','Verify Live Snapshot'],
-    ['publish-transactions','Publish Transactions & Free Agents']
+  const VERSION = '7.3.2';
+  const PHASES = [
+    ['analyze-source', 'Analyze Captured Export'],
+    ['classify-captures', 'Classify Captures'],
+    ['map-teams', 'Map 32 Teams'],
+    ['map-players', 'Map Rostered Players'],
+    ['map-schedule', 'Map Schedule'],
+    ['map-statistics', 'Map Statistics'],
+    ['build-candidate', 'Build Private Candidate'],
+    ['validate-candidate', 'Validate Candidate'],
+    ['preview-ready', 'Private Preview Ready']
   ];
 
+  let state = null;
   let busy = false;
-  let run = null;
-  let stageState = {};
-  let lastError = null;
-  let progress = '';
-  let snapshotId = null;
-  let importStartedAt = null;
-  let importCompletedAt = null;
-  let stageTimings = {};
-  let currentStageStartedAt = {};
-  let lastCertification = null;
-  let deltaPlan = null;
-  let notificationDismissTimer = null;
-  let serverDurationSeconds = null;
+  let errorMessage = '';
+  let notice = '';
 
-  const IMPORT_PROGRESS_STYLE_ID='fhq-import-progress-style-v654hp2';
-  if(!document.getElementById(IMPORT_PROGRESS_STYLE_ID)){
-    const style=document.createElement('style');
-    style.id=IMPORT_PROGRESS_STYLE_ID;
-    style.textContent=`
-      .commissioner-import-progress-block{margin:18px 0;padding:16px;border:1px solid var(--border,#d9dee7);border-radius:12px}
-      .commissioner-import-progress-head,.commissioner-import-progress-foot{display:flex;justify-content:space-between;gap:16px;align-items:center}
-      .commissioner-import-progress-head span{font-weight:800;font-size:16px}
-      .commissioner-import-progress-track{height:14px;border-radius:999px;overflow:hidden;background:rgba(127,127,127,.18);margin:10px 0}
-      .commissioner-import-progress-track>span{display:block;height:100%;width:0;background:currentColor;border-radius:inherit;transition:width .3s ease}
-      .commissioner-import-progress-foot{font-size:12px;opacity:.78}
-      .franchise-import-notification__copy{display:grid;gap:4px;min-width:220px}
-      .franchise-import-progress-mini{height:5px;border-radius:999px;overflow:hidden;background:rgba(127,127,127,.2)}
-      .franchise-import-progress-mini i{display:block;height:100%;background:currentColor;border-radius:inherit;transition:width .3s ease}
-      .franchise-import-notification__copy em{font-style:normal;font-size:11px;font-weight:800;opacity:.72}
-    `;
-    document.head.appendChild(style);
-  }
-
-  const nowMs = () => (window.performance?.now?.() ?? Date.now());
-  const isoNow = () => new Date().toISOString();
-
-  function serverTimestampMs(value){
-    if(!value)return NaN;
-    const raw=String(value).trim();
-    // D1 CURRENT_TIMESTAMP is returned as "YYYY-MM-DD HH:MM:SS" with no timezone.
-    // SQLite stores that value in UTC, but browsers parse a timezone-less string as local time.
-    // Normalize it to explicit UTC before calculating elapsed time.
-    const normalized=/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(raw)
-      ? raw.replace(' ','T')+'Z'
-      : raw;
-    return Date.parse(normalized);
-  }
-
-  function timingStart(stage) {
-    currentStageStartedAt[stage] = {ms:nowMs(), at:isoNow()};
-    stageTimings[stage] = {
-      ...(stageTimings[stage] || {}),
-      stage,
-      startedAt: currentStageStartedAt[stage].at,
-      completedAt: null,
-      durationMs: null,
-      durationSeconds: null,
-      state:'running'
-    };
-  }
-
-  function timingFinish(stage,state='complete') {
-    const start=currentStageStartedAt[stage];
-    if(!start)return;
-    const duration=Math.max(0,Math.round(nowMs()-start.ms));
-    stageTimings[stage]={
-      ...(stageTimings[stage]||{}),
-      completedAt:isoNow(),
-      durationMs:duration,
-      durationSeconds:Number((duration/1000).toFixed(2)),
-      state
-    };
-    delete currentStageStartedAt[stage];
-  }
-
-  function timingSummary() {
-    const rows=STAGES.map(([id])=>stageTimings[id]).filter(Boolean);
-    const totalMs=rows.reduce((sum,row)=>sum+Number(row.durationMs||0),0);
-    const wallMs=importStartedAt
-      ? Math.max(0,Math.round((importCompletedAt?.ms ?? nowMs())-importStartedAt.ms))
-      : 0;
-    return {
-      release:VERSION,
-      startedAt:importStartedAt?.at||null,
-      completedAt:importCompletedAt?.at||null,
-      totalStageDurationMs:totalMs,
-      totalStageDurationSeconds:Number((totalMs/1000).toFixed(2)),
-      wallClockDurationMs:wallMs,
-      wallClockDurationSeconds:Number((wallMs/1000).toFixed(2)),
-      stages:rows
-    };
-  }
-
-  const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
-  const account = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
+  const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
+  }[character]));
   const slug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || null;
   const base = () => `/api/leagues/${encodeURIComponent(slug())}/companion/`;
-  const headers = () => ({accept:'application/json','content-type':'application/json','x-franchisehq-platform-owner-account-id':String(account()?.id||'')});
+  const now = () => window.performance?.now?.() ?? Date.now();
 
-  async function api(url, method='GET', body) {
-    const response = await fetch(url, {
+  async function api(endpoint, method='GET', body) {
+    const response = await fetch(`${base()}${endpoint}`, {
       method,
-      headers: headers(),
-      credentials: 'same-origin',
-      cache: 'no-store',
-      body: body === undefined ? undefined : JSON.stringify(body)
+      credentials:'same-origin',
+      cache:'no-store',
+      headers:{accept:'application/json','content-type':'application/json'},
+      body:body === undefined ? undefined : JSON.stringify(body)
     });
     const payload = await response.json().catch(() => ({ok:false,error:`HTTP ${response.status}`}));
     if (!response.ok || payload.ok === false) {
-      const error = new Error(payload.detail || payload.error || `Import request failed (${response.status}).`);
-      error.payload = payload;
-      throw error;
+      const failure = new Error(payload.detail || payload.error || `Candidate import request failed (${response.status}).`);
+      failure.payload = payload;
+      throw failure;
     }
     return payload;
   }
 
-  const orchestrator = (method='GET', body) => api(`${base()}import-orchestrator`, method, body);
-  const forwardDetection = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/forward-detection`, method, body);
-  const transactionClassification = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/classification`, method, body);
-  const canonicalTransactions = (method='POST', body) => api(`/api/leagues/${encodeURIComponent(slug())}/transactions/canonical`, method, body);
-  const importCertification = (method='GET', body) => api(`${base()}import-certification`, method, body);
-  const changeCheck = () => api(`${base()}change-check`,'GET');
-  const importJob = (method='GET', body, id='') => api(`${base()}import-job${id?`?id=${encodeURIComponent(id)}`:''}`,method,body);
-  const JOB_KEY = () => `franchisehq:import-job:${slug()}`;
-  const workflowDone = status => ['complete','completed','failed','errored','error','terminated','cancelled','canceled'].includes(String(status||'').toLowerCase());
-
-  function applyServerRun(serverRun){
-    if(!serverRun)return;
-    run=serverRun;
-    const states=serverRun.stageState||serverRun.stage_state||serverRun.stages||{};
-    const current=serverRun.currentStage||serverRun.current_stage||null;
-
-    // The orchestrator begins after discovery and storage preflight.
-    stageState.discover={state:'complete',detail:'Latest Companion export discovered',at:serverRun.createdAt||new Date().toISOString()};
-    stageState['storage-preflight']={state:'complete',detail:'Import storage prepared',at:serverRun.createdAt||new Date().toISOString()};
-
-    for(const [id] of STAGES){
-      const row=states?.[id];
-      if(row){
-        stageState[id]={state:row.ok===false?'failed':'complete',detail:row.summary||'Complete',at:row.at||new Date().toISOString()};
-      }else if(current===id){
-        stageState[id]={state:'running',detail:'Running on Franchise HQ servers…',at:new Date().toISOString()};
-      }
-    }
-
-    // Lifecycle is auxiliary work immediately before map-players.
-    if(states?.['map-players']){
-      stageState['reconstruct-player-lifecycle']={
-        state:'complete',
-        detail:'Player lifecycle synchronized',
-        at:states['map-players'].at||new Date().toISOString()
-      };
-    }else if(current==='map-players'){
-      stageState['reconstruct-player-lifecycle']={
-        state:'running',
-        detail:'Synchronizing roster lifecycle and Free Agents…',
-        at:new Date().toISOString()
-      };
-    }
-
-    if(['complete','completed'].includes(String(serverRun.status||'').toLowerCase())){
-      stageState['publish-transactions']={
-        state:'complete',
-        detail:'Transactions and Free Agents published',
-        at:serverRun.completedAt||serverRun.updatedAt||new Date().toISOString()
-      };
-      const startMs=serverTimestampMs(serverRun.createdAt);
-      const endMs=serverTimestampMs(serverRun.completedAt||serverRun.updatedAt);
-      if(Number.isFinite(startMs)&&Number.isFinite(endMs)&&endMs>=startMs){
-        serverDurationSeconds=Number(((endMs-startMs)/1000).toFixed(2));
-      }
-    }
-  }
-
-  async function monitorServerJob(id,{silent=false}={}){
-    if(!id)return null;
-    busy=true;
-    if(!silent){
-      progress='Import started on Franchise HQ servers · you may lock your phone or close this page';
-      rerender(); renderImportNotification();
-    }
-    let guard=0;
-    while(guard<7200){
-      const status=await importJob('GET',undefined,id);
-      const ws=status?.workflowStatus||{};
-      const serverRun=status?.orchestrator?.run||null;
-      applyServerRun(serverRun);
-      const state=String(status?.workflowState||ws.status||'running').toLowerCase();
-      const output=status?.workflowOutput||ws?.output||null;
-      if(output?.snapshotId)snapshotId=output.snapshotId;
-      if(serverRun?.snapshotId||serverRun?.snapshot_id)snapshotId=serverRun.snapshotId||serverRun.snapshot_id;
-
-      const orchestratorDone=['complete','completed'].includes(String(serverRun?.status||'').toLowerCase());
-      const successfulWorkflow=state==='complete'||state==='completed';
-
-      if(workflowDone(state)||orchestratorDone){
-        localStorage.removeItem(JOB_KEY());
-        busy=false;
-
-        if(successfulWorkflow||orchestratorDone){
-          if(Number.isFinite(Number(output?.durationMs))){
-            serverDurationSeconds=Number((Number(output.durationMs)/1000).toFixed(2));
-          }
-          STAGES.forEach(([stage])=>{
-            if(stageState[stage]?.state!=='failed'){
-              stageState[stage]={...(stageState[stage]||{}),state:'complete',detail:stageState[stage]?.detail||'Complete'};
-            }
-          });
-          progress=output?.noNewExport
-            ? 'No new Madden Companion export detected · nothing to import'
-            : 'Import complete · server-side job finished successfully';
-          lastError=null;
-          try{await HQ?.liveSnapshotBoot?.boot?.({force:true});}catch(_){}
-          try{window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:{snapshotId,serverSide:true,workflowId:id}}));}catch(_){}
-        }else{
-          lastError=new Error(ws?.error?.message||ws?.error||`Server-side import ${state}.`);
-          progress='Import stopped safely on the server.';
-        }
-
-        rerender();
-        renderImportNotification();
-        return status;
-      }
-      const current=serverRun?.currentStage||serverRun?.current_stage;
-      const completed=completedStageCount();
-      const pct=progressPercent();
-      progress=current
-        ? `${stageLabel(current)} · ${completed}/${STAGES.length} tasks · ${pct}%`
-        : `Import running on Franchise HQ servers · ${pct}%`;
-      rerender(); renderImportNotification();
-      await new Promise(resolve=>setTimeout(resolve,500));
-      guard++;
-    }
-    throw new Error('Import status monitoring exceeded the local display window. The server-side import may still be running.');
-  }
-
-  async function reconnectServerJob(){
-    const id=localStorage.getItem(JOB_KEY());
-    if(!id||busy)return;
-    try{await monitorServerJob(id,{silent:true});}
-    catch(error){
-      if(/Authentication required|Commissioner account is required/i.test(String(error?.message||''))){
-        setTimeout(reconnectServerJob,1000);
-        return;
-      }
-      console.warn('[Server Import Monitor]',error);
-    }
-  }
-
-  function setStage(id, state, detail='') {
-    const previous=stageState[id]?.state;
-    if(state==='running' && previous!=='running')timingStart(id);
-    if((state==='complete'||state==='failed') && previous==='running')timingFinish(id,state);
-    stageState[id] = {state, detail, at:new Date().toISOString()};
+  async function refresh() {
+    state = await api('candidate-import');
     rerender();
-    renderImportNotification();
+    return state;
   }
 
-  function stageIcon(id) {
-    const state = stageState[id]?.state || 'pending';
-    return state === 'complete' ? '✓' : state === 'running' ? '→' : state === 'failed' ? '!' : '○';
+  function currentRun() { return state?.run || null; }
+  function counts() { return currentRun()?.resultCounts || currentRun()?.sourceCounts || state?.source?.counts || {}; }
+  function durationLabel(ms) {
+    if (ms === null || ms === undefined) return '—';
+    return `${(Number(ms) / 1000).toFixed(2)}s`;
+  }
+  function countLabel(value) { return value === null || value === undefined ? 'unknown' : Number(value).toLocaleString(); }
+
+  async function createDestination() {
+    if (busy) return;
+    busy = true;
+    errorMessage = '';
+    notice = 'Creating one private destination for the reviewed season…';
+    rerender();
+    try {
+      state = await api('candidate-import','POST',{action:'create-destination'});
+      notice = state.created ? 'Private season destination created.' : 'Existing private season destination selected.';
+    } catch (error) {
+      errorMessage = error.message;
+      notice = '';
+    } finally {
+      busy = false;
+      rerender();
+    }
   }
 
-  function stageClass(id) {
-    const state = stageState[id]?.state || 'pending';
-    return state === 'complete' ? 'success' : state === 'failed' ? 'danger' : state === 'running' ? 'warning' : 'neutral';
+  async function reportPhase(runId, phase, startedAt, result, extra={}) {
+    state = await api('candidate-import','POST',{
+      action:'report-phase',
+      runId,
+      phase,
+      ok:true,
+      durationMs:Math.max(0,Math.round(now()-startedAt)),
+      totalDurationMs:extra.totalDurationMs,
+      summary:extra.summary || 'Complete',
+      counts:extra.counts || {},
+      warnings:extra.warnings || [],
+      teamMappingRunId:extra.teamMappingRunId,
+      playerMappingRunId:extra.playerMappingRunId,
+      scheduleMappingRunId:extra.scheduleMappingRunId,
+      statisticsMappingRunId:extra.statisticsMappingRunId,
+      candidateSnapshotId:extra.candidateSnapshotId
+    });
+    return result;
   }
 
-  function stageLabel(id) {
-    return STAGES.find(([stage])=>stage===id)?.[1] || id;
+  async function runPhase(runId, phase, work, summarize, wallStartedAt) {
+    notice = `${PHASES.find(row=>row[0]===phase)?.[1] || phase}…`;
+    rerender();
+    const startedAt = now();
+    try {
+      const result = await work();
+      const summary = summarize(result) || {};
+      await reportPhase(runId, phase, startedAt, result, {
+        ...summary,
+        totalDurationMs:Math.max(0,Math.round(now()-wallStartedAt))
+      });
+      return result;
+    } catch (error) {
+      await api('candidate-import','POST',{
+        action:'report-phase',runId,phase,ok:false,
+        durationMs:Math.max(0,Math.round(now()-startedAt)),
+        totalDurationMs:Math.max(0,Math.round(now()-wallStartedAt)),
+        summary:error.message,error:{message:error.message}
+      }).catch(()=>{});
+      throw error;
+    }
   }
 
-  function activeStage() {
-    return STAGES.find(([id])=>stageState[id]?.state==='running')?.[0] || null;
+  async function mapStatistics(discoverySessionId) {
+    let result = await api('map-statistics','POST',{action:'start',discoverySessionId});
+    const runId = result?.mappingRun?.id;
+    if (!runId) throw new Error('Statistics mapper did not return its exact run ID.');
+    let guard = 0;
+    while (!result.complete && guard < 5000) {
+      const progress = result.progress || {};
+      notice = `Map Statistics · ${Number(progress.done||0).toLocaleString()}/${Number(progress.total||0).toLocaleString()} routes`;
+      rerender();
+      result = await api('map-statistics','POST',{action:'next',runId});
+      guard += 1;
+    }
+    if (!result.complete) throw new Error('Statistics mapping exceeded the 5,000-batch safety limit.');
+    const final = await api('map-statistics');
+    const failed = Number(final?.progress?.failed ?? final?.delta?.failedRoutes ?? 0);
+    if (failed) throw new Error(`${failed} statistics route(s) failed; candidate build stopped safely.`);
+    return {...final, mappingRun:{...(final.mappingRun||{}),id:runId}};
   }
 
-  function completedStageCount(){
-    return STAGES.filter(([id])=>stageState[id]?.state==='complete').length;
+  async function validateCandidate(snapshotId) {
+    let result = await api('snapshot-lifecycle','POST',{action:'validate-start',snapshotId});
+    let guard = 0;
+    while (!result.complete && guard < 500) {
+      const job = result.validationJob || {};
+      notice = `Validate Candidate · ${Number(job.processedCount||0).toLocaleString()}/${Number(job.totalCount||0).toLocaleString()} records`;
+      rerender();
+      result = await api('snapshot-lifecycle','POST',{action:'validate-next',snapshotId,limit:250});
+      guard += 1;
+    }
+    if (!result.complete) throw new Error('Candidate validation exceeded the 500-batch safety limit.');
+    const snapshot = (result.snapshots || []).find(item=>item.snapshotId===snapshotId);
+    const report = result.report || snapshot?.validationReport || {};
+    if (String(snapshot?.validationStatus || report.status || '').toLowerCase() !== 'ready' || Number(report.errorCount || snapshot?.errorCount || 0)) {
+      throw new Error(`Candidate validation failed: ${(report.errors || []).slice(0,5).join(' | ') || 'not ready'}`);
+    }
+    return {...result,snapshot};
   }
 
-  function progressPercent(){
-    if(!busy&&importCompletedAt&&!lastError)return 100;
-    return Math.max(0,Math.min(100,Math.round((completedStageCount()/STAGES.length)*100)));
-  }
-
-  function ensureImportNotification() {
-    let node=document.querySelector('[data-franchise-import-notification]');
-    if(node)return node;
-    node=document.createElement('div');
-    node.setAttribute('data-franchise-import-notification','');
-    node.className='franchise-import-notification';
-    node.setAttribute('aria-live','polite');
-    document.body.appendChild(node);
-    return node;
-  }
-
-  function renderImportNotification() {
-    const node=ensureImportNotification();
-    const current=activeStage();
-    if(!busy && !lastError && !importCompletedAt){
-      node.className='franchise-import-notification';
-      node.innerHTML='';
+  async function runImport({retry=false}={}) {
+    if (busy) return;
+    if (!state?.destination) {
+      errorMessage = 'Create the private season destination before running the candidate import.';
+      rerender();
       return;
     }
-    let title='Importing Franchise';
-    let detail=current?stageLabel(current):(progress||'Preparing import…');
-    let state='running';
-    if(lastError){
-      title='Import Stopped';
-      detail=lastError.message||'The import could not be completed.';
-      state='error';
-    }else if(!busy&&importCompletedAt){
-      title='Franchise Updated';
-      const completedSeconds=Math.max(0,Number(serverDurationSeconds!=null?serverDurationSeconds:timingSummary().wallClockDurationSeconds)||0);
-      detail=`Import complete · ${completedSeconds}s`;
-      state='success';
-    }
-    const pct=state==='success'?100:progressPercent();
-    node.className=`franchise-import-notification is-visible is-${state}`;
-    node.innerHTML=`<span class="franchise-import-notification__indicator" aria-hidden="true"></span><span class="franchise-import-notification__copy"><strong>${esc(title)}</strong><small>${esc(detail)}</small><span class="franchise-import-progress-mini"><i style="width:${pct}%"></i></span><em>${pct}%</em></span>${state!=='running'?'<button type="button" class="franchise-import-notification__close" aria-label="Dismiss import notification">×</button>':''}`;
-
-    node.querySelector('.franchise-import-notification__close')?.addEventListener('click',()=>{
-      if(notificationDismissTimer)clearTimeout(notificationDismissTimer);
-      node.className='franchise-import-notification';
-      node.innerHTML='';
-    });
-
-    if(notificationDismissTimer)clearTimeout(notificationDismissTimer);
-    notificationDismissTimer=null;
-    if(state==='success'){
-      notificationDismissTimer=setTimeout(()=>{
-        node.className='franchise-import-notification';
-        node.innerHTML='';
-      },5000);
-    }
-  }
-
-  async function report(stage, ok, extra={}) {
-    if (!run?.id) return null;
-    const payload = await orchestrator('POST', {action:'report', runId:run.id, stage, ok, ...extra});
-    run = payload.run || run;
-    return payload;
-  }
-
-  async function skipReportedStage(stage,summary){
-    setStage(stage,'running','Reusing unchanged LIVE data…');
-    setStage(stage,'complete',summary);
-    await report(stage,true,{summary,reused:true});
-    return {ok:true,reused:true,summary};
-  }
-
-  async function runSimpleStage(stage, endpoint, summaryFn) {
-    setStage(stage,'running','Working…');
+    busy = true;
+    errorMessage = '';
+    notice = 'Starting commissioner candidate import…';
+    rerender();
+    const wallStartedAt = now();
+    let runId = null;
     try {
-      const payload = await api(`${base()}${endpoint}`,'POST',{});
-      const summary = summaryFn ? summaryFn(payload) : null;
-      setStage(stage,'complete',summary || 'Complete');
-      await report(stage,true,{summary});
-      return payload;
-    } catch (error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
-  async function runStatistics() {
-    const stage='map-statistics';
-    setStage(stage,'running','Starting chunked statistics map…');
-    try {
-      let payload = await api(`${base()}map-statistics`,'POST',{action:'start'});
-      const statsRunId = payload.mappingRun?.id;
-      if (!statsRunId) throw new Error('Statistics mapper did not return a run ID.');
-      let guard=0;
-      while (!payload.complete && guard < 5000) {
-        const p=payload.progress||{};
-        const next=p.next||{};
-        const routeText=p.total?`${Math.min((p.done||0)+1,p.total)}/${p.total}`:'processing';
-        const recText=next.recordTotal?` · ${next.recordOffset||0}/${next.recordTotal} records`:'';
-        const cat=next.category?` · ${next.category}`:'';
-        const week=next.weekIndex!=null?` · week ${next.weekIndex}`:'';
-        progress=`Statistics ${routeText}${cat}${week}${recText}`;
-        stageState[stage]={state:'running',detail:progress};
-        rerender();
-        payload = await api(`${base()}map-statistics`,'POST',{action:'next',runId:statsRunId});
-        guard++;
-      }
-      if (guard >= 5000) throw new Error('Statistics mapping stopped after 5000 chunks.');
-      const final = await api(`${base()}map-statistics`,'GET');
-      const failedRoutes=Number(final.progress?.failed ?? final.delta?.failedRoutes ?? 0);
-      if(failedRoutes>0){
-        const names=(final.failedRoutes||[]).map(row=>row.routePath).filter(Boolean);
-        throw Object.assign(new Error(`${failedRoutes} statistics route(s) failed mapping${names.length?`: ${names.join(', ')}`:''}. Snapshot build has been blocked to prevent stale/partial weekly statistics from going LIVE.`),{payload:final});
-      }
-      const count=final.mappingRun?.recordCount ?? payload.mappingRun?.recordCount ?? 0;
-      const delta=final.delta||payload.delta||payload.deltaPlan||{};
-      const skipped=Number(delta.skippedRoutes||0);
-      const changed=Number(delta.processedRoutes??delta.changedOrNewRoutes??0);
-      const summary=`${count} new/changed statistics records mapped · ${skipped} route(s) skipped${changed?` · ${changed} route(s) processed`:''}`;
-      setStage(stage,'complete',summary);
-      await report(stage,true,{summary,statisticsMappingRunId:statsRunId});
-      return final;
-    } catch (error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
-  async function buildSnapshot() {
-    const stage='build-snapshot';
-    setStage(stage,'running','Building immutable snapshot…');
-    try {
-      const payload=await api(`${base()}build-snapshot`,'POST',{});
-      snapshotId=payload.snapshot?.snapshotId || payload.snapshotId || null;
-      if (!snapshotId) throw new Error('Snapshot Builder completed without returning a Snapshot ID.');
-      const counts=payload.snapshot?.counts||{};
-      const summary=`${snapshotId} · ${counts.teams??'?'} teams · ${counts.players??'?'} players · ${counts.games??'?'} games · ${counts.statistics??'?'} stats`;
-      setStage(stage,'complete',summary);
-      await report(stage,true,{summary,snapshotId});
-      return payload;
-    } catch(error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
-  async function lifecycle(stage, action) {
-    setStage(stage,'running',`${action==='validate'?'Starting batched validation':'Activating'} snapshot…`);
-    try {
-      if (!snapshotId) throw new Error('No new Snapshot ID is available.');
-
-      let payload;
-      if (action==='validate') {
-        payload=await api(`${base()}snapshot-lifecycle`,'POST',{action:'validate-start',snapshotId});
-        let guard=0;
-        while (!payload.complete && guard < 500) {
-          const job=payload.validationJob||{};
-          const phase=job.phase||'validation';
-          const offset=Number(job.phaseOffset||0);
-          const total=Number(job.phaseTotal||0);
-          progress=`Snapshot validation · ${phase} ${total?`${Math.min(offset,total)}/${total}`:'processing'}`;
-          stageState[stage]={state:'running',detail:progress};
-          rerender();
-          payload=await api(`${base()}snapshot-lifecycle`,'POST',{action:'validate-next',snapshotId,limit:250});
-          guard++;
-        }
-        if (guard>=500) throw new Error('Snapshot validation stopped after 500 batches.');
-      } else {
-        payload=await api(`${base()}snapshot-lifecycle`,'POST',{action,snapshotId});
-      }
-
-      const record=(payload.snapshots||[]).find(s=>String(s.snapshotId)===String(snapshotId));
-      if (action==='validate' && record?.validationStatus && record.validationStatus!=='ready') {
-        throw Object.assign(new Error(`Snapshot validation returned ${record.validationStatus}.`),{payload:record.validationReport||payload.report||record});
-      }
-      if (action==='activate' && payload.activeSnapshotId && String(payload.activeSnapshotId)!==String(snapshotId)) {
-        throw new Error('Snapshot activation did not move the live pointer to the new snapshot.');
-      }
-      const summary=action==='validate'?`Validation ready${record?.validationScore!=null?` · ${record.validationScore}%`:''}`:`LIVE · ${snapshotId}`;
-      setStage(stage,'complete',summary);
-      await report(stage,true,{summary,snapshotId});
-      return payload;
-    } catch(error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
-  async function detectTransactions() {
-    const stage='detect-transactions';
-    setStage(stage,'running','Starting batched roster comparison…');
-    try {
-      let payload=await forwardDetection('POST',{action:'start'});
-      let job=payload.job||{};
-      if (payload.complete) {
-        const summary=job.status==='baseline'
-          ? `Baseline established · ${job.currentTotal||0} players`
-          : `${job.movementCount||0} movement(s) detected`;
-        setStage(stage,'complete',summary);
-        await report(stage,true,{summary,snapshotId});
-        return payload;
-      }
-      let guard=0;
-      while (!payload.complete && guard < 20) {
-        job=payload.job||job||{};
-        const total=(job.currentTotal||0)+(job.exitTotal||0);
-        const compared=job.comparedCount||0;
-        progress=`Roster comparison ${compared}/${total||'?'} · ${job.movementCount||0} movement(s)`;
-        stageState[stage]={state:'running',detail:progress};
-        rerender();
-        payload=await forwardDetection('POST',{action:'next',limit:750});
-        guard++;
-      }
-      if (guard>=20) throw new Error('Forward transaction detection stopped after 20 accelerated batches.');
-      job=payload.job||{};
-      const summary=`${job.movementCount||0} movement(s) · ${job.teamChanges||0} team change(s) · ${job.rosterEntries||0} entries · ${job.rosterExits||0} exits`;
-      setStage(stage,'complete',summary);
-      await report(stage,true,{summary,snapshotId});
-      return payload;
-    } catch(error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
-  async function classifyTransactions() {
-    const stage='classify-transactions';
-    setStage(stage,'running','Classifying roster movement evidence…');
-    try {
-      const payload=await transactionClassification('POST',{action:'classify'});
-      const s=payload.summary||{};
-      const summary=payload.baseline
-        ? 'Baseline · no classification required'
-        : `${payload.classifiedCount||0} classified · ${s.teamChanges||0} team change(s) · ${s.rosterEntries||0} entries · ${s.rosterExits||0} exits`;
-      setStage(stage,'complete',summary);
-      await report(stage,true,{summary,snapshotId});
-      return payload;
-    } catch(error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
-  async function reconcileTransactions() {
-    const stage='reconcile-transactions';
-    setStage(stage,'running','Reconciling lifecycle evidence into the canonical transaction ledger…');
-    try {
-      // Capture-history finalization already merges Release / Signing / Team Change /
-      // roster-status evidence into the canonical ledger. Re-running it here is
-      // idempotent and places reconciliation in the exact orchestrator stage order.
-      const payload=await canonicalTransactions('POST',{action:'capture-lifecycle-finalize'});
-      const summary=`${Number(payload?.eventCount||0)} lifecycle event(s) · ${Number(payload?.signings||0)} signing(s) · ${Number(payload?.releases||0)} release(s) · ${Number(payload?.teamChanges||0)} team change(s)`;
-      setStage(stage,'complete',summary);
-      await report(stage,true,{summary,snapshotId});
-      return payload;
-    } catch(error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
-  async function verify() {
-    const stage='verify-active-snapshot';
-    setStage(stage,'running','Verifying active snapshot…');
-    try {
-      const payload=await api(`${base()}snapshot-verification`,'GET');
-      const active=payload.snapshot?.id || payload.snapshot?.snapshotId || payload.activeSnapshotId || null;
-      if (active && snapshotId && String(active)!==String(snapshotId)) throw new Error(`Verification returned a different active snapshot (${active}).`);
-      const status=payload.integrity?.status || 'verified';
-      const score=payload.integrity?.score;
-      if (String(status).toLowerCase()==='fail') throw Object.assign(new Error('Active snapshot verification failed.'),{payload});
-      const summary=`${status}${score!=null?` · ${score}%`:''}`;
-      setStage(stage,'complete',summary);
-      await report(stage,true,{summary,snapshotId});
-      try { await HQ?.liveSnapshotBoot?.boot?.({force:true}); } catch (_) {}
-      return payload;
-    } catch(error) {
-      setStage(stage,'failed',error.message);
-      await report(stage,false,{error:{message:error.message,detail:error.payload||null}}).catch(()=>{});
-      throw error;
-    }
-  }
-
-  async function reconstructPlayerLifecycle(){
-    const stage='reconstruct-player-lifecycle';
-    setStage(stage,'running','Reconstructing roster history before Player Mapping…');
-    try{
-      const plan=await canonicalTransactions('POST',{action:'capture-lifecycle-plan'});
-      const pending=(plan.sessions||[]).filter(row=>!row.processed);
-      let processed=0;
-      for(const session of pending){
-        progress=`Lifecycle history ${processed+1}/${pending.length} · ${session.sessionId}`;
-        stageState[stage]={state:'running',detail:progress};
-        rerender();
-        await canonicalTransactions('POST',{action:'capture-lifecycle-session',sessionId:session.sessionId});
-        processed++;
-      }
-      const finalized=await canonicalTransactions('POST',{action:'capture-lifecycle-finalize'});
-      const freeAgents=Number(finalized?.freeAgents?.currentFreeAgents||0);
-      const events=Number(finalized?.eventCount||0);
-      const summary=`${events} lifecycle event(s) · ${freeAgents} preserved Free Agent(s) · ${processed} new roster session(s) processed`;
-      setStage(stage,'complete',summary);
-      return {...finalized,processedSessions:processed};
-    }catch(error){
-      setStage(stage,'failed',error.message);
-      throw error;
-    }
-  }
-
-  async function publishTransactions(){
-    const stage='publish-transactions';
-    setStage(stage,'running','Confirming canonical transaction ledger and Free Agent state…');
-    try{
-      const lifecycle=await canonicalTransactions('POST',{action:'capture-lifecycle-finalize'});
-      const payload=await canonicalTransactions('GET');
-      const freeAgents=Number(lifecycle?.freeAgents?.currentFreeAgents||0);
-      const events=Number(lifecycle?.eventCount||0);
-      const transactions=Number(payload?.transactions?.length ?? payload?.canonical?.transactions?.length ?? payload?.count ?? 0);
-      const summary=`${transactions} canonical transaction(s) · ${events} lifecycle event(s) · ${freeAgents} Free Agent(s)`;
-      setStage(stage,'complete',summary);
-      try{
-        if(typeof window.FranchiseHQ?.playerLiveSync?.refresh==='function')await window.FranchiseHQ.playerLiveSync.refresh();
-      }catch(_){}
-      return {canonical:payload,lifecycle};
-    }catch(error){
-      setStage(stage,'failed',error.message);
-      throw error;
-    }
-  }
-
-  async function certifyCompletedImport() {
-    if(lastError||!snapshotId)return null;
-    const timing=timingSummary();
-    let playerSync=null;
-    try {
-      const service=window.FranchiseHQ?.playerLiveSync;
-      if(service?.refresh)playerSync=await service.refresh();
-      else if(service?.status)playerSync=service.status();
-    } catch(error) {
-      console.warn('[Import Certification] Player service synchronization check could not run.',error);
-    }
-
-    const payload=await importCertification('POST',{
-      snapshotId,
-      runId:run?.id||null,
-      timing,
-      playerSync
-    });
-    lastCertification=payload.certification||null;
-    window.__FHQ_IMPORT_CERTIFICATION__=lastCertification;
-    console.info('[Import Performance Certification]',lastCertification);
-    return lastCertification;
-  }
-
-  async function runImport() {
-    if(busy)return;
-    busy=true; lastError=null; progress='Starting server-side import…'; snapshotId=null; stageState={}; lastCertification=null; deltaPlan=null; serverDurationSeconds=null;
-    stageTimings={}; currentStageStartedAt={};
-    importStartedAt={ms:nowMs(),at:isoNow()}; importCompletedAt=null;
-    rerender(); renderImportNotification();
-    try{
-      const started=await importJob('POST',{});
-      if(started?.completed&&started?.noNewExport){
-        snapshotId=started.snapshotId||null;
-        serverDurationSeconds=0;
-        STAGES.forEach(([stage])=>stageState[stage]={state:'complete',detail:'No new Companion export · current LIVE snapshot reused'});
-        busy=false;
-        progress='No new Madden Companion export detected · nothing to import';
-        importCompletedAt={ms:nowMs(),at:isoNow()};
-        rerender();renderImportNotification();
+      state = await api('candidate-import','POST',{action:'start',retry});
+      runId = state?.run?.id;
+      if (!runId) throw new Error('Candidate importer did not return a durable run ID.');
+      if (state.warm && state.run?.status === 'preview-ready') {
+        notice = `Existing private preview reused in ${durationLabel(now()-wallStartedAt)}.`;
         return;
       }
-      const id=started?.id;
-      if(!id)throw new Error('Server-side importer did not return a Workflow ID.');
-      localStorage.setItem(JOB_KEY(),id);
-      progress=started?.reusedExisting
-        ? 'This Companion export is already being processed · connected to the existing server job'
-        : 'Import accepted by Franchise HQ servers · you may lock your phone now';
-      rerender(); renderImportNotification();
-      await monitorServerJob(id);
-    }catch(error){
-      lastError=error;
-      busy=false;
-      progress='Import could not be started or monitored.';
-      console.error('[Server-Side Import]',error.payload||error);
-      rerender(); renderImportNotification();
-    }finally{
-      importCompletedAt={ms:nowMs(),at:isoNow()};
+
+      const analyzed = await runPhase(runId,'analyze-source',
+        ()=>api('discovery-report','POST',{sessionId:state.source?.discoverySessionId}),
+        payload=>({
+          summary:`${Number(payload.report?.captureCount||0)} captures analyzed`,
+          counts:{captures:Number(payload.report?.captureCount||0),routes:Number(payload.report?.routeCount||0)}
+        }),wallStartedAt);
+
+      await runPhase(runId,'classify-captures',()=>api('classify','POST',{}),payload=>({
+        summary:`${Number(payload.inspectedRouteCount||0)} captures classified`,
+        counts:{classifiedCaptures:Number(payload.inspectedRouteCount||0)}
+      }),wallStartedAt);
+
+      const discoverySessionId=state.source?.discoverySessionId;
+      const teams = await runPhase(runId,'map-teams',()=>api('map-teams','POST',{discoverySessionId}),payload=>({
+        summary:`${Number(payload.mappingRun?.teamCount ?? payload.teams?.length ?? 0)} teams mapped`,
+        counts:{teams:Number(payload.mappingRun?.teamCount ?? payload.teams?.length ?? 0)},
+        teamMappingRunId:payload.mappingRun?.id
+      }),wallStartedAt);
+
+      const players = await runPhase(runId,'map-players',()=>api('map-players','POST',{compact:true,discoverySessionId}),payload=>{
+        const count=Number(payload.mappingRun?.playerCount ?? payload.playerCount ?? 0);
+        const freeAgentStatus=payload.mappingCompleteness === 'complete' ? 'located' : (analyzed.report?.freeAgentEvidence?.status || 'missing');
+        const warnings=[...(payload.mappingRun?.warnings||[])];
+        if (freeAgentStatus === 'blocked') warnings.push('Madden Free Agents are blocked upstream; count remains unknown.');
+        return {
+          summary:`${count} rostered players mapped`,
+          counts:{players:count,rosteredPlayers:Number(payload.mappingRun?.rosteredCount ?? count),freeAgentStatus,
+            freeAgentCount:['located','empty-confirmed'].includes(freeAgentStatus)?Number(payload.mappingRun?.freeAgentCount||0):null},
+          warnings,
+          playerMappingRunId:payload.mappingRun?.id
+        };
+      },wallStartedAt);
+
+      const schedule = await runPhase(runId,'map-schedule',()=>api('map-schedule','POST',{discoverySessionId}),payload=>({
+        summary:`${Number(payload.mappingRun?.gameCount ?? payload.games?.length ?? 0)} games mapped`,
+        counts:{games:Number(payload.mappingRun?.gameCount ?? payload.games?.length ?? 0)},
+        warnings:payload.mappingRun?.warnings||[],
+        scheduleMappingRunId:payload.mappingRun?.id
+      }),wallStartedAt);
+
+      const statistics = await runPhase(runId,'map-statistics',()=>mapStatistics(discoverySessionId),payload=>({
+        summary:`${Number(payload.mappingRun?.recordCount||0)} statistics mapped`,
+        counts:{statistics:Number(payload.mappingRun?.recordCount||0)},
+        warnings:payload.mappingRun?.warnings||[],
+        statisticsMappingRunId:payload.mappingRun?.id
+      }),wallStartedAt);
+
+      const mappingRunIds={
+        teamMappingRunId:teams.mappingRun?.id,
+        playerMappingRunId:players.mappingRun?.id,
+        scheduleMappingRunId:schedule.mappingRun?.id,
+        statisticsMappingRunId:statistics.mappingRun?.id
+      };
+      const built = await runPhase(runId,'build-candidate',()=>api('build-snapshot','POST',{
+        candidateImportRunId:runId,...mappingRunIds
+      }),payload=>({
+        summary:`Private candidate ${payload.snapshot?.snapshotId || 'built'}`,
+        counts:payload.snapshot?.counts||{},
+        candidateSnapshotId:payload.snapshot?.snapshotId
+      }),wallStartedAt);
+      const snapshotId=built.snapshot?.snapshotId;
+      if (!snapshotId) throw new Error('Candidate builder did not return a snapshot ID.');
+
+      await runPhase(runId,'validate-candidate',()=>validateCandidate(snapshotId),payload=>({
+        summary:'Private candidate validation ready',
+        counts:payload.snapshot?.counts||{},
+        candidateSnapshotId:snapshotId
+      }),wallStartedAt);
+
+      const finalDuration=Math.max(0,Math.round(now()-wallStartedAt));
+      state = await api('candidate-import','POST',{action:'finalize',runId,durationMs:finalDuration});
+      notice = finalDuration < 60000
+        ? `Private candidate ready in ${durationLabel(finalDuration)}.`
+        : `Private candidate ready in ${durationLabel(finalDuration)}; review the sub-60-second performance target.`;
+      window.dispatchEvent(new CustomEvent('franchisehq:candidate-import-ready',{detail:{
+        runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:finalDuration,activationPerformed:false
+      }}));
+    } catch (error) {
+      errorMessage = error.message;
+      notice = 'Candidate import stopped safely. The active snapshot was not changed.';
+    } finally {
+      busy = false;
+      await refresh().catch(()=>rerender());
     }
   }
 
+  function phaseRows() {
+    const run=currentRun();
+    const phaseState=run?.phaseState||{};
+    return PHASES.map(([id,label])=>{
+      const item=phaseState[id];
+      const active=run?.status==='running'&&run?.currentPhase===id;
+      const complete=id==='preview-ready'?run?.status==='preview-ready':item?.status==='complete';
+      const failed=item?.status==='failed';
+      const icon=complete?'✓':failed?'!':active?'→':'○';
+      return `<li class="${complete?'is-complete':failed?'is-failed':active?'is-active':''}"><span>${icon}</span><div><strong>${esc(label)}</strong><small>${esc(item?.summary || (active?'In progress':'Pending'))}${item?.durationMs!=null?` · ${esc(durationLabel(item.durationMs))}`:''}</small></div></li>`;
+    }).join('');
+  }
 
   function renderPanel() {
-    const completed=completedStageCount();
-    const current=activeStage();
-    const pct=progressPercent();
-    const status=lastError?'Stopped':busy?(current?stageLabel(current):'Importing…'):importCompletedAt?'Complete':'Ready';
-    const lastSeconds=importCompletedAt
-      ? Math.max(0,Number(serverDurationSeconds!=null?serverDurationSeconds:timingSummary().wallClockDurationSeconds)||0)
-      : null;
-
+    const run=currentRun();
+    const source=state?.source;
+    const resultCounts=counts();
+    const faStatus=resultCounts.freeAgentStatus || source?.counts?.freeAgentStatus || 'missing';
+    const faCount=['located','empty-confirmed'].includes(faStatus)
+      ? countLabel(resultCounts.freeAgentCount ?? source?.counts?.freeAgentCount) : 'unknown';
+    const ready=run?.status==='preview-ready';
+    const sub60=ready && Number(run.durationMs)<60000;
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
-      <div class="card-header">
-        <div><span class="eyebrow">Madden Companion</span><h2>Import Franchise</h2><p>Import the latest Madden Companion data into Franchise HQ. Your current LIVE league remains active until the new import passes validation.</p></div>
-        <span class="pill pill--${lastError?'danger':busy?'warning':importCompletedAt?'success':'accent'}">${esc(status)}</span>
+      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>Private Candidate Import</h3><p>Analyze the captured export, map it into one reviewed season, and build a validated private preview. This workflow never activates a snapshot.</p></div><span class="pill pill--${ready?'success':run?.status==='failed'?'danger':'neutral'}">${esc(ready?'Preview ready':run?.status||'Not started')}</span></div>
+      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Safety boundary:</strong> Production and Main are unchanged. Data is append-only, no reset runs, and the active snapshot pointer is verified unchanged.</span></div>
+      ${faStatus==='blocked'?`<div class="league-import-framework-note"><svg><use href="#icon-alert-triangle"></use></svg><span><strong>Free Agents blocked upstream:</strong> this candidate is rostered-player-only. The Free Agent count is unknown, never zero.</span></div>`:''}
+      <div class="commissioner-import-summary">
+        <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
+        <div><small>Season</small><strong>${esc(source?.season?.seasonYear ?? '—')}</strong></div>
+        <div><small>Teams</small><strong>${countLabel(resultCounts.teams ?? source?.counts?.teams)}</strong></div>
+        <div><small>Rostered players</small><strong>${countLabel(resultCounts.rosteredPlayers ?? resultCounts.players ?? source?.counts?.rosteredPlayers)}</strong></div>
+        <div><small>Free Agents</small><strong>${esc(faCount)}</strong></div>
+        <div><small>Wall time</small><strong>${durationLabel(run?.durationMs)}</strong></div>
       </div>
-
-      <div class="commissioner-import-progress-block">
-        <div class="commissioner-import-progress-head">
-          <strong>${lastError?'Import stopped':busy?(current?stageLabel(current):'Starting import…'):importCompletedAt?'Franchise updated':'Ready to import'}</strong>
-          <span>${pct}%</span>
-        </div>
-        <div class="commissioner-import-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
-          <span style="width:${pct}%"></span>
-        </div>
-        <div class="commissioner-import-progress-foot">
-          <small>${completed} of ${STAGES.length} tasks complete</small>
-          ${busy?`<small>${esc(progress||'Working on Franchise HQ servers…')}</small>`:''}
-        </div>
+      <div class="commissioner-import-progress-block"><div class="commissioner-import-progress-head"><span>${esc(notice||'Candidate workflow')}</span><strong>${Number(run?.progress||0)}%</strong></div><div class="commissioner-import-progress-track"><span style="width:${Number(run?.progress||0)}%"></span></div><ol class="commissioner-import-phase-list">${phaseRows()}</ol></div>
+      ${run?.warnings?.length?`<div class="validation-errors"><strong>Warnings</strong><ul>${run.warnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></div>`:''}
+      ${errorMessage?`<div class="validation-errors"><strong>Stopped safely</strong><p>${esc(errorMessage)}</p>${run?.retry?.message?`<p>${esc(run.retry.message)}</p>`:''}</div>`:''}
+      ${sub60?`<div class="league-import-framework-note"><svg><use href="#icon-check"></use></svg><span><strong>Performance target met:</strong> ${esc(durationLabel(run.durationMs))}, under 60 seconds.</span></div>`:''}
+      <div class="league-import-framework-actions">
+        <button class="button button--ghost" data-create-candidate-destination ${busy||!source?.season||state?.destination?'disabled':''}>${state?.destination?'Destination Selected':'Create Private Destination'}</button>
+        <button class="button button--primary" data-run-candidate-import ${busy||!state?.destination||ready?'disabled':''}>${busy?'Candidate Import Running…':run?.status==='failed'?'Retry Candidate Import':'Analyze Captured Export'}</button>
+        <button class="button button--ghost" data-refresh-candidate-import ${busy?'disabled':''}>Refresh</button>
       </div>
-
-      <div class="commissioner-live-import-summary">
-        <span><small>Release</small><strong>${esc(VERSION)}</strong></span>
-        <span><small>Status</small><strong>${busy?`${completed}/${STAGES.length} complete`:status}</strong></span>
-        ${lastSeconds!=null?`<span><small>Last Run</small><strong>${esc(lastSeconds)}s</strong></span>`:''}
-      </div>
-
-      <div class="commissioner-import-actions">
-        <button class="button button--primary" data-run-one-click-import ${busy?'disabled':''}><svg><use href="#icon-refresh"></use></svg>${busy?'Import Running…':'Import Latest Madden Data'}</button>
-      </div>
-
-      ${lastError?`<div class="validation-errors"><p><strong>${esc(lastError.message)}</strong></p>${lastError.payload?`<pre style="white-space:pre-wrap;max-height:220px;overflow:auto">${esc(JSON.stringify(lastError.payload,null,2))}</pre>`:''}</div>`:''}
-      <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>The import runs on Franchise HQ servers. You may lock your phone or leave this page after the server accepts the job.</span></div>
+      <p class="muted">Candidate ID: ${esc(run?.candidateSnapshotId||'—')} · completeness: ${esc(run?.completenessStatus||'not evaluated')} · activation performed: no</p>
     </section>`;
   }
 
   function rerender() {
-    document.querySelectorAll('[data-one-click-import-panel]').forEach(node=>node.outerHTML=renderPanel());
+    document.querySelectorAll('[data-one-click-import-panel]').forEach(node=>{ node.outerHTML=renderPanel(); });
   }
 
-  document.addEventListener('click',event=>{
-    const button=event.target.closest('[data-run-one-click-import]');
-    if(!button)return;
-    event.preventDefault();
-    runImport();
+  document.addEventListener('click', event=>{
+    if (event.target.closest('[data-create-candidate-destination]')) createDestination();
+    if (event.target.closest('[data-run-candidate-import]')) runImport({retry:['failed','running'].includes(currentRun()?.status)});
+    if (event.target.closest('[data-refresh-candidate-import]')) refresh().catch(error=>{errorMessage=error.message;rerender();});
   });
 
-  function diagnostics(){return Object.freeze({
-    service:'oneClickImport',
-    version:VERSION,
-    busy,
-    runId:run?.id||null,
-    snapshotId,
-    stageState:{...stageState},
-    deltaPlan:deltaPlan?{
-      changedRouteCount:Number(deltaPlan.changedRouteCount||0),
-      changedByClass:deltaPlan.changedByClass||{},
-      rosterChanged:Boolean(deltaPlan.rosterChanged),
-      canReusePlayers:Boolean(deltaPlan.canReusePlayers),
-      reusablePlayerPreviewCount:Number(deltaPlan.reusablePlayerPreviewCount||0)
-    }:null,
-    lastError:lastError?.message||null
-  });}
+  const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,activationPerformed:false,activeSnapshotChanged:false});
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
-  HQ.defineModuleService('platform','oneClickImport',{runImport,renderPanel,diagnostics,renderImportNotification},{replace:true,alias:'oneClickImport'});
-
-  window.FranchiseHQ=window.FranchiseHQ||{};
-  window.FranchiseHQ.importCertification={
-    release:VERSION,
-    last:()=>lastCertification||window.__FHQ_IMPORT_CERTIFICATION__||null,
-    refresh:async()=>{
-      const payload=await importCertification('GET');
-      lastCertification=payload.certification||null;
-      window.__FHQ_IMPORT_CERTIFICATION__=lastCertification;
-      return lastCertification;
-    }
-  };
-
-  window.FranchiseHQ.importTiming={
-    release:VERSION,
-    current:()=>timingSummary(),
-    last:()=>window.__FHQ_IMPORT_TIMING__||null,
-    reset:()=>{
-      stageTimings={};
-      currentStageStartedAt={};
-      importStartedAt=null;
-      importCompletedAt=null;
-      window.__FHQ_IMPORT_TIMING__=null;
-      return true;
-    }
-  };
-
-  setTimeout(()=>reconnectServerJob(),250);
+  HQ.defineModuleService('platform','oneClickImport',{runImport,createDestination,refresh,renderPanel,diagnostics},{replace:true,alias:'oneClickImport'});
+  HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','private-candidate','sub-60-second-target','no-snapshot-activation']});
+  setTimeout(()=>refresh().catch(()=>{}),0);
 })();

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "7.3.1",
+  "release": "7.3.2",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 23,
+  "currentVersion": 24,
   "requiredTables": [
     "canonical_capture_lifecycle_sessions",
     "canonical_free_agents",
@@ -18,11 +18,13 @@
     "companion_canonical_players_preview",
     "companion_canonical_statistics_preview",
     "companion_canonical_teams_preview",
+    "companion_candidate_import_runs",
     "companion_dataset_inspections",
     "companion_export_events",
     "companion_export_fingerprints",
     "companion_exports",
     "companion_import_orchestrator_runs",
+    "companion_import_destinations",
     "companion_player_mapping_runs",
     "companion_route_captures",
     "companion_schedule_mapping_runs",
@@ -93,6 +95,8 @@
     "gm_identities": ["id", "league_id", "user_id", "public_id", "display_name"],
     "team_ownership_periods": ["id", "league_id", "gm_identity_id", "team_key", "franchise_season_id", "started_at", "ended_at"],
     "identity_preview_runs": ["id", "league_id", "franchise_season_id", "status", "free_agent_status", "team_count", "rostered_player_count", "free_agent_count"],
-    "identity_preview_players": ["preview_run_id", "league_id", "player_identity_id", "source_player_id", "team_external_id"]
+    "identity_preview_players": ["preview_run_id", "league_id", "player_identity_id", "source_player_id", "team_external_id"],
+    "companion_import_destinations": ["id", "league_id", "franchise_season_id", "label", "status", "created_by_user_id"],
+    "companion_candidate_import_runs": ["id", "league_id", "destination_id", "discovery_session_id", "source_fingerprint", "status", "completeness_status", "current_phase", "phase_index", "source_counts_json", "result_counts_json", "candidate_snapshot_id", "active_snapshot_id_before", "active_snapshot_id_after", "duration_ms"]
   }
 }

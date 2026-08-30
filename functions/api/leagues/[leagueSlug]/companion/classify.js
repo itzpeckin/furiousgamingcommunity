@@ -9,6 +9,7 @@ import {
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
 const RELEASE = '5.9.3.1';
+const INSPECTION_CONCURRENCY = 8;
 
 const RULES = [
   { type: 'teams', label: 'Teams', route: /(?:^|\/)(?:teams?|teaminfo)(?:\/|$)/i, fields: ['teamid','displayname','cityname','abbr','teamname'] },
@@ -73,7 +74,21 @@ function parseRawObject(object, contentType) {
   });
 }
 
-async function latestCaptures(db, leagueId) {
+async function latestCaptures(db, leagueId, requestedSessionId = '') {
+  if (requestedSessionId) {
+    const linked = await db.prepare(`SELECT c.id, link.session_id AS discovery_session_id,
+        c.route_path, c.request_method, c.content_type, c.byte_length, c.r2_object_key, c.received_at
+      FROM madden_discovery_session_captures link
+      JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
+      WHERE link.league_id=? AND link.session_id=?
+      ORDER BY link.observed_at ASC`).bind(leagueId, requestedSessionId).all();
+    if ((linked.results || []).length) return { sessionId:requestedSessionId, captures:linked.results || [] };
+    const legacy = await db.prepare(`SELECT id, discovery_session_id, route_path, request_method, content_type,
+        byte_length, r2_object_key, received_at
+      FROM companion_route_captures WHERE league_id=? AND discovery_session_id=?
+      ORDER BY received_at ASC`).bind(leagueId, requestedSessionId).all();
+    return { sessionId:requestedSessionId, captures:legacy.results || [] };
+  }
   const session = await db.prepare(`SELECT discovery_session_id, MAX(received_at) AS latest_received
     FROM companion_route_captures WHERE league_id = ? GROUP BY discovery_session_id
     ORDER BY latest_received DESC LIMIT 1`).bind(leagueId).first();
@@ -176,10 +191,25 @@ export async function onRequestPost(context) {
     return json({ ok: false, error: 'Your Commissioner membership does not match this league.' }, 403);
   }
   try {
-    const latest = await latestCaptures(db, league.id);
+    let body = {};
+    try { body = await context.request.json(); } catch {}
+    const latest = await latestCaptures(db, league.id, String(body.discoverySessionId || '').trim());
     if (!latest.captures.length) return json({ ok: false, error: 'No captured Madden routes are available to inspect.' }, 404);
+    const retained = await reportForSession(db, league.id, latest.sessionId);
+    const retainedByCapture = new Map(retained.map(item => [String(item.captureId || ''), item]));
     const datasets = [];
-    for (const row of latest.captures) datasets.push(await inspectCapture(context, league, row));
+    const missing = [];
+    for (const row of latest.captures) {
+      const existing = retainedByCapture.get(String(row.id));
+      if (existing) datasets.push(existing);
+      else missing.push(row);
+    }
+    for (let offset = 0; offset < missing.length; offset += INSPECTION_CONCURRENCY) {
+      const inspected = await Promise.all(missing.slice(offset, offset + INSPECTION_CONCURRENCY)
+        .map(row => inspectCapture(context, league, row)));
+      datasets.push(...inspected);
+    }
+    datasets.sort((a, b) => String(a.routePath || '').localeCompare(String(b.routePath || '')));
     return json({
       ok: true,
       release: RELEASE,
@@ -188,6 +218,8 @@ export async function onRequestPost(context) {
       discoverySessionId: latest.sessionId,
       capturedRouteCount: latest.captures.length,
       inspectedRouteCount: datasets.length,
+      reusedInspectionCount: datasets.length - missing.length,
+      inspectedNowCount: missing.length,
       classificationSummary: summarize(datasets),
       datasets,
       rawPayloadReturned: false,

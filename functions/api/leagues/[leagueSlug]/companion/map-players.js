@@ -94,11 +94,19 @@ function latestByRoute(rows){
   }
   return [...selected.values()];
 }
-async function rosterCaptureSet(db,leagueId){
+async function rosterCaptureSet(db,leagueId,discoverySessionId){
   // Madden Companion roster requests are not guaranteed to share one discoverySessionId.
   // Current roster authority is therefore the freshest capture for each team within
   // one bounded export-time cohort, not one arbitrary session ID.
-  const result=await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
+  const result=discoverySessionId
+    ? await db.prepare(`SELECT c.id capture_id,link.session_id discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
+      COALESCE(i.dataset_type,'unknown') dataset_type,COALESCE(i.record_count,0) record_count
+    FROM madden_discovery_session_captures link
+    JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
+    LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id
+    WHERE link.league_id=? AND link.session_id=? AND c.route_path LIKE '%/team/%/roster'
+    ORDER BY link.observed_at DESC LIMIT 512`).bind(leagueId,discoverySessionId).all()
+    : await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at,
       COALESCE(i.dataset_type,'unknown') dataset_type,COALESCE(i.record_count,0) record_count
     FROM companion_route_captures c
     LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id
@@ -114,7 +122,7 @@ async function rosterCaptureSet(db,leagueId){
   const latestMs=Math.max(...all.map(row=>Date.parse(row.received_at)||0));
   const cohortWindowMs=20*60*1000;
   const cutoffMs=latestMs-cohortWindowMs;
-  const recent=all.filter(row=>{
+  const recent=discoverySessionId?all:all.filter(row=>{
     const ms=Date.parse(row.received_at)||0;
     return ms>=cutoffMs&&ms<=latestMs;
   });
@@ -129,7 +137,7 @@ async function rosterCaptureSet(db,leagueId){
 
   return{
     captures,
-    sessionId:`aggregate-${latestMs}`,
+    sessionId:discoverySessionId||`aggregate-${latestMs}`,
     availableRoutes:captures.map(r=>r.route_path),
     sessionDiagnostics:[...new Set(captures.map(r=>String(r.discovery_session_id||'')).filter(Boolean))],
     strategy:'fresh-route-cohort',
@@ -172,8 +180,14 @@ export function captureBelongsToRosterCohort(capture,source){
   const windowMs=Number(source?.cohort?.windowMs||20*60*1000);
   return receivedMs>=latestMs-windowMs&&receivedMs<=latestMs+windowMs;
 }
-async function latestFreeAgentCapture(db,env,leagueId,source){
-  const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,received_at,byte_length
+async function latestFreeAgentCapture(db,env,leagueId,source,discoverySessionId){
+  const result=discoverySessionId
+    ? await db.prepare(`SELECT c.id capture_id,link.session_id discovery_session_id,c.route_path,c.r2_object_key,c.received_at,c.byte_length
+    FROM madden_discovery_session_captures link
+    JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
+    WHERE link.league_id=? AND link.session_id=? AND LOWER(c.route_path) LIKE '%/freeagents/roster%'
+    ORDER BY link.observed_at DESC LIMIT 20`).bind(leagueId,discoverySessionId).all()
+    : await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,received_at,byte_length
     FROM companion_route_captures
     WHERE league_id=? AND LOWER(route_path) LIKE '%/freeagents/roster%'
     ORDER BY received_at DESC LIMIT 20`).bind(leagueId).all();
@@ -258,7 +272,8 @@ export async function onRequestPost(context){
   const league=await resolveLeague(context.env,slug);if(!league)return json({ok:false,error:'League not found.'},404);
   if(auth.session.membership?.leagueId!==league.id)return json({ok:false,error:'Commissioner membership does not match this league.'},403);
   try{
-    const source=await rosterCaptureSet(db,league.id);
+    const discoverySessionId=String(requestBody.discoverySessionId||'').trim();
+    const source=await rosterCaptureSet(db,league.id,discoverySessionId);
     if(!source.captures.length)return json({ok:false,error:'No team roster payloads have been captured yet.',detail:'Run the Madden Companion export with Rosters selected, then classify the latest export.',availableRoutes:source.availableRoutes},404);
     if(source.captures.length<32){
       return json({
@@ -317,7 +332,7 @@ export async function onRequestPost(context){
     // Madden exposes Free Agents as a separate league-level roster. Only the
     // newest response from this roster cohort is authoritative; never blend an
     // older successful Free Agent response into a fresh team-roster export.
-    const freeAgentSource=await latestFreeAgentCapture(db,context.env,league.id,source);
+    const freeAgentSource=await latestFreeAgentCapture(db,context.env,league.id,source,discoverySessionId);
     if(freeAgentSource.assessment.accepted){
       diagnostics.push({
         routePath:freeAgentSource.capture.route_path,

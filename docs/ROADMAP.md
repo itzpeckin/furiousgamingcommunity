@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** August 29, 2026
+**Updated:** August 30, 2026
 
-**Revision:** 1.31
+**Revision:** 1.39
 
-**Current production:** 7.1.0 database foundation, delivered through PR #8
+**Current production:** 7.3.2 from exact source commit `972bea6`; accepted Madden 27 snapshot `841ce1b5` is active
 
-**Current work:** 7.3.1 isolated-staging validation complete for permanent season/player/GM identity and the private rostered-player mapping preview
+**Current work:** 7.3.2 is owner-accepted and active against the clean Madden 27 Production data plane. Exact snapshot `841ce1b5` contains 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings with validation ready and zero errors. Its one-time forward-transaction baseline is complete across all 2,044 rostered players with zero movements and zero classifications. Free Agents remain blocked/unknown, no temporary baseline access was created, and Git Main is unchanged.
 
-**Next gate:** Review the 7.3.1 isolated-staging evidence and separately authorize 7.3.2 implementation. Production, Main, data reset, import, and snapshot activation remain separately authorized and excluded.
+**Next gate:** Authorize the 7.3.3 implementation cycle for reusable game-year archive/removal controls. Main, Production publication, any reset/removal rehearsal, snapshot activation, and any rollback remain separately authorized and excluded.
 
 ## Product decisions
 
@@ -21,6 +21,7 @@
 - Server data is authoritative for shared league features. Browser storage is limited to temporary UI preferences.
 - Every release must work at phone and desktop widths. Mobile is an acceptance requirement, not a later port.
 - Madden sources feed one canonical snapshot model. Companion, approved direct-EA access, and CSV/Excel must not create separate downstream products.
+- A Madden **game year** (Madden 27, Madden 28, and so on) is independent from a franchise season year. Leagues, accounts, memberships, roles, settings, rules, and audit history persist across game years; Madden-derived data is partitioned by game year so a commissioner can archive it and remove it from the active application at the next edition transition.
 - Free Agents are a required first-class dataset. A source must provide and reconcile them or explicitly prove their absence.
 - Production publication, database migration, Discord configuration, membership edits, FGC reset, import, and snapshot activation are separate authorization decisions.
 - Every validated release updates this roadmap with requested additions, unexpected work, defects, deferrals, evidence, and the next exact gate.
@@ -35,7 +36,7 @@
 - The real FGC capture received 43 requests (10.17 MB) in 0.448 seconds. It contained 32 teams, all 32 team rosters, 2,044 unique rostered players, standings, 14 current-week games, and 510 statistics rows.
 - All 2,044 captured team-roster players have a valid team assignment and `isFreeAgent: false`; 2,031 are active and 13 are inactive. No duplicate roster identifiers or unassigned players were found.
 - Madden's explicit `xbsx/742482/freeagents/roster` response failed upstream with an empty `rosterInfoList`. This is recorded as **blocked**, not as proof of zero Free Agents. It does not block safe rostered-player preview work, but FranchiseHQ cannot claim a complete player pool until a successful or explicitly empty Free Agent response is received.
-- No FGC Madden reset has occurred. Reset and activation require preview, recovery evidence, staging rehearsal, and explicit owner approval.
+- The owner authorized the Madden 26-to-27 Production transition. Madden 26 is no longer attached to the live application: its D1 database is retained as a detached relational archive, a private 38-table/76,712-row archive was verified, and 1,295 obsolete raw R2 objects were permanently deleted. The clean Madden 27 Production database preserves the league and account plane while clearing all eight legacy team assignments. Accepted Madden 27 snapshot `841ce1b5` is now active.
 
 ## Release tracker
 
@@ -46,8 +47,8 @@
 | 7.2.0 | Staging validated | Tenant-ready core with FGC as the only enabled league; migration 21 and isolated Preview resources verified without production changes |
 | 7.3.0 | Completion candidate | Real Madden 27 source captured; 2,044 rostered players certified as preview-ready; Free Agents honestly blocked upstream and deferred |
 | 7.3.1 | Staging validated | One reviewed 2026 season, 32 teams, and 2,044 rostered-player identities are retained in a private preview; Free Agents remain blocked/unknown and no snapshot is active |
-| 7.3.2 | Planned | Certified sub-60-second Madden 27 import engine |
-| 7.3.3 | Planned | Recoverable Madden reset, season archive, and transition controls |
+| 7.3.2 | Released; owner accepted and active | Exact repair `972bea6` completed the cold run in 43.763 seconds; the owner accepted and separately activated the validation-ready 32-team/2,044-player snapshot. Free Agents remain blocked/null. |
+| 7.3.3 | Planned | Game-year archive, active-data removal, and edition-transition controls that persist leagues and accounts |
 | 7.3.4 | Planned | Real FGC Madden 27 staging import and recovery certification |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
@@ -137,13 +138,27 @@
 - Commissioners review the candidate before any activation; the workspace must distinguish complete, rostered-player-only, explicitly empty, stale, and failed datasets without silently falling back to legacy/demo data.
 - Measure source download, each mapping phase, validation, activation, record counts, bytes, cold runs, and warm runs.
 - Gate: an authorized FGC commissioner can complete the real click-to-preview workflow without platform-owner assistance; repeated realistic imports finish under 60 seconds, FranchiseHQ processing targets under 45 seconds, and any failure leaves the last complete snapshot active.
+- Authorized implementation adds migration 24, one private destination per reviewed season, durable/idempotent source-fingerprint runs, exact mapper-run pinning, append-only candidate snapshots, and commissioner validation.
+- The browser and server Worker share the same non-activating boundary: both stop at `preview-ready`, report per-phase and wall-clock duration, and never call reset or activation.
+- The 2026 reviewed season is the staging destination. Madden Free Agents remain `blocked` with a null/unknown count, so the candidate is explicitly `rostered-players-only`.
+- Publication, hosted checks, Preview deployment, Production acceptance deployment, the Madden 26-to-27 data-plane transition, migrations 21–24, and one Production candidate rehearsal were explicitly authorized. Main and snapshot activation were not.
+- Live staging result: exact runtime commit `a17801a` on Preview deployment `6d7f2591` completed the authenticated 2026 candidate in 23.456 seconds. The validated private snapshot contains 32 teams, 2,044 rostered players, 14 games, 510 statistics rows, and 32 standings rows.
+- Candidate completeness remains `rostered-players-only`; blocked Madden Free Agents are null/unknown. The active snapshot pointer was null before and after, the temporary session is revoked, the retained membership is inactive, and foreign keys are clean.
+- Live Production acceptance result: exact source commit `4f5e81b` is deployed with Functions and the 7.3.2 Worker. The authenticated 2026 candidate retained 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings; validation is `ready`, Free Agents are blocked/null, and the active pointer stayed null. The 74.387-second cold duration did not meet the sub-60 Production target and is recorded as an open acceptance failure rather than rounded away or replaced by the warm idempotent result.
+- Production performance remediation first deployed commit `7557730`, reusing the exact immutable report and capture classifications, bounding R2 work, increasing D1 write batches, and reducing validation round trips. Its one authorized cold rehearsal created run `candidate_import_ee1356d9`, completed source/classification/team/player/schedule phases, then stopped safely at statistics mapping after D1 rejected an oversized player-identity lookup. No candidate snapshot was built, the active pointer remained null, and Free Agents stayed blocked/null.
+- Exact repair commit `972bea6` preserves the 200-record statistics work chunk while splitting player identity reads into complete 75-value D1 batches. It passed the 77-test strict gate and 4/4 hosted checks, then reached Production as Pages deployment `61165506` and Worker version `a772c7e7` at 100%.
+- The separately authorized repaired cold rehearsal used the existing retry path exactly once and completed in 43.763 seconds. It produced validation-ready private snapshot `841ce1b5` with 32 teams, 2,044 rostered players, 14 games, 510 statistics, 32 standings, zero validation errors, and no activation. The short-lived session was revoked, the active pointer stayed null, and Free Agents remained blocked/null.
+- After owner acceptance, a separate explicit activation authorization moved the single Production pointer to exact snapshot `841ce1b5`. Post-activation checks preserved the validated counts, blocked/null Free Agent state, clean foreign keys, eight users, eight memberships, zero team assignments, and six membership-audit rows; the activation session is revoked and forward-transaction detection remains a separate pending stage.
 
 ## 7.3.3 — Safe Reset and Season Transition
 
-- Provide separate Replace Current Import, Start New Season, and Full Madden Reset operations rather than one destructive button.
-- Preview exact affected counts, preserve accounts/memberships/roles/rules/settings/history, record a recovery bookmark and audit event, and require typed confirmation.
+- Make game year a first-class boundary separate from franchise season year. A league can advance many franchise seasons within Madden 27 without triggering an edition transition.
+- Provide separate Replace Current Import, Start New Franchise Season, and Archive/Remove Madden Game Year operations rather than one destructive button.
+- At a Madden 27-to-28 transition, archive all Madden 27 league data under an immutable game-year manifest, verify its counts/checksums, detach it from the active data plane, and allow the commissioner to remove the archived copy under an explicit second confirmation.
+- Preserve users, leagues, memberships, roles, sessions, settings, rules, and audits across every game-year transition. Clear edition-specific team assignments for reviewed remapping rather than carrying them into the next game by inference.
+- Preview exact affected counts, record a recovery bookmark and durable audit event, and require typed confirmation scoped to one league and game year.
 - At season close, freeze player season totals and GM/postseason summaries while allowing old gamelogs and live operational records to be removed.
-- Gate: staging completes backup → reset → import → validate → activate → rollback; failures never expose partial data.
+- Gate: an isolated rehearsal completes inventory → archive → verify → detach/remove active data → import next game year → validate → optional activation → rollback. Failures never expose partial data or erase the persistent league/account plane.
 
 ## 7.3.4 — FGC Madden 27 Certification
 
@@ -278,3 +293,11 @@
 - **Revision 1.27:** Reconciled the real FGC capture: 43 requests, 10.17 MB, 0.448-second source delivery, 32 teams/rosters, 2,044 unique assigned rostered players, standings, 14 current-week games, and 510 statistics rows. Added privacy-safe roster assignment certification, prevented stale Free Agent payload blending, accepted successful explicit zero-player responses, and kept the failed Free Agent route as a visible upstream blocker that does not discard the rostered-player dataset. 7.3.1 now begins with stable identity and a private 2,044-player roster preview; production remains unchanged.
 - **Revision 1.28:** Made the commissioner-operated importer an explicit 7.3.2 deliverable: authorized commissioners create the destination, monitor sub-60-second phases, review counts/warnings/completeness, and reach a private candidate preview without platform-owner assistance. Activation, reset, and season transition remain separately protected by the 7.3.3–7.3.4 gates.
 - **Revision 1.31:** Completed the authorized 7.3.1 isolated-staging acceptance against Preview deployment `c8df85cf`: analyzed 43 captures, mapped 32 teams and 2,044 rostered players, created the owner-reviewed 2026 private identity preview, retained audit/identity rows, revoked every temporary session, deactivated the simulated membership, preserved blocked Free Agents as unknown/null, and confirmed zero active snapshots and zero foreign-key violations. Production, Main, reset, import, and activation remain unchanged and unauthorized.
+- **Revision 1.32:** Authorized 7.3.2 from exact commit `483c4b81`: a commissioner-only private candidate importer with one reviewed 2026 destination, durable idempotency, measured progress, exact mapping pins, append-only build, validation, and a hard stop at preview-ready. Authorized one consolidated branch/PR/check cycle and isolated-staging rehearsal while keeping Production, Main, resets, and activation excluded.
+- **Revision 1.33:** Completed 7.3.2 isolated-staging acceptance against exact Preview runtime `a17801a`: migration 24 verified with protected counts unchanged, PR #12 passed 4/4 hosted checks, and the real 2026 candidate reached validation-ready in 23.456 seconds with 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. Blocked Free Agents remain unknown/null; the session is revoked, membership inactive, active snapshots zero, and Production/Main/reset/activation untouched.
+- **Revision 1.34:** Completed the authorized Madden 26-to-27 Production transition and 7.3.2 acceptance deployment without moving Main or activating a snapshot. The clean Madden 27 plane retained the platform identities, the private candidate validated with 32 teams and 2,044 rostered players, and its 74.387-second cold result left Production performance acceptance open.
+- **Revision 1.35:** Deployed the authorized 7.3.2 cold-path optimizations and used exactly one Production rehearsal. That run stopped safely at statistics mapping on D1's SQL-variable ceiling before candidate build. Repair `972bea6` now batches complete player lookups under the ceiling and is active in Pages deployment `61165506` and Worker version `a772c7e7`; 4/4 hosted checks pass, temporary sessions are revoked, users/memberships/team assignments are unchanged, foreign keys are clean, Free Agents remain blocked/null, and the active snapshot remains null. A new cold rehearsal requires separate authorization.
+- **Revision 1.36:** Used the separately authorized repaired cold rehearsal exactly once against active commit `972bea6`. Run `candidate_import_ee1356d9` reached a private validation-ready preview in 43.763 seconds with 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. The session is revoked, foreign keys are clean, Main and the active snapshot pointer are unchanged, and Free Agents remain blocked with a null count. The next gate is owner acceptance; activation remains separately authorized.
+- **Revision 1.37:** Recorded owner acceptance of the exact repaired 7.3.2 private candidate. This closes the release acceptance gate without activating the snapshot, changing Main, resetting data, creating another rehearsal, or changing the blocked/null Free Agent state. Snapshot activation and 7.3.3 implementation remain separate future authorizations.
+- **Revision 1.38:** Used the separate snapshot-activation authorization exactly once for accepted snapshot `841ce1b5`. Production now has one active pointer with 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings; validation remains ready with zero errors, Free Agents remain blocked/null, the activation session is revoked, foreign keys are clean, and Main/reset/memberships/credentials are unchanged. Forward-transaction detection remains a separate pending stage.
+- **Revision 1.39:** Used the one-time Production forward-transaction authorization for exact active snapshot `841ce1b5`. One completed baseline job compared all 2,044 rostered players and one tenant audit row recorded the result; movements and classifications remain zero, the active pointer and counts are unchanged, Free Agents remain blocked/null rather than zero, foreign keys are clean, no temporary access was created, and Main/reset/activation remain unchanged.

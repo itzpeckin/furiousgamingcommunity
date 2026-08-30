@@ -1,108 +1,61 @@
 /* FHQ_BUILD: 5.9.10.6.5.4h-p5d */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='5.9.10.6.5.4h-p5d',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
-const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
-async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
+const RELEASE='7.3.2';
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 async function latest(db,table,leagueId,status=true){const where=status?" AND status='pending-preview'":'';return db.prepare(`SELECT * FROM ${table} WHERE league_id=?${where} ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();}
 async function rows(db,sql,...args){const r=await db.prepare(sql).bind(...args).all();return r.results||[];}
-async function standings(context,leagueId){const c=await database(context.env).prepare(`SELECT id,route_path,r2_object_key,received_at FROM companion_route_captures WHERE league_id=? AND route_path LIKE '%/standings' ORDER BY received_at DESC LIMIT 1`).bind(leagueId).first();if(!c)return{capture:null,records:[]};const obj=await context.env.COMPANION_EXPORTS.get(c.r2_object_key);if(!obj)return{capture:c,records:[]};const data=JSON.parse(new TextDecoder().decode(await obj.arrayBuffer()));const arrays=[];const walk=(v,p='$',d=0)=>{if(d>6||v==null)return;if(Array.isArray(v)){arrays.push({path:p,values:v});return}if(typeof v==='object')for(const[k,x]of Object.entries(v))walk(x,`${p}.${k}`,d+1)};walk(data);arrays.sort((a,b)=>b.values.length-a.values.length);return{capture:c,records:(arrays[0]?.values||[]).filter(x=>x&&typeof x==='object')};}
+async function standings(context,leagueId,discoverySessionId){const c=await database(context.env).prepare(`SELECT c.id,c.route_path,c.r2_object_key,c.received_at FROM madden_discovery_session_captures link JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id WHERE link.league_id=? AND link.session_id=? AND c.route_path LIKE '%/standings' ORDER BY link.observed_at DESC LIMIT 1`).bind(leagueId,discoverySessionId).first();if(!c)return{capture:null,records:[]};const obj=await context.env.COMPANION_EXPORTS.get(c.r2_object_key);if(!obj)return{capture:c,records:[]};const data=JSON.parse(new TextDecoder().decode(await obj.arrayBuffer()));const arrays=[];const walk=(v,p='$',d=0)=>{if(d>6||v==null)return;if(Array.isArray(v)){arrays.push({path:p,values:v});return}if(typeof v==='object')for(const[k,x]of Object.entries(v))walk(x,`${p}.${k}`,d+1)};walk(data);arrays.sort((a,b)=>b.values.length-a.values.length);return{capture:c,records:(arrays[0]?.values||[]).filter(x=>x&&typeof x==='object')};}
 function publicSnapshot(s){if(!s)return null;return{snapshotId:s.id,status:s.status,seasonYear:s.season_year,weekIndex:s.week_index,counts:{teams:s.team_count,players:s.player_count,games:s.game_count,statistics:s.statistic_count,standings:s.standing_count},warningCount:s.warning_count,warnings:parse(s.warnings_json)||[],manifest:parse(s.manifest_json)||{},createdAt:s.created_at,activatedAt:s.activated_at||null};}
 async function getLatest(db,leagueId){return publicSnapshot(await db.prepare(`SELECT * FROM league_snapshots WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first());}
 
-async function tableExists(db,name){
-  const row=await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).bind(name).first();
-  return Boolean(row);
+async function selectedRun(db,table,leagueId,requestedId){
+  return requestedId
+    ? db.prepare(`SELECT * FROM ${table} WHERE league_id=? AND id=? AND status='pending-preview' LIMIT 1`).bind(leagueId,requestedId).first()
+    : latest(db,table,leagueId);
 }
-async function storageCount(db,table,leagueId){
-  try{return Number((await db.prepare(`SELECT COUNT(*) count FROM ${table} WHERE league_id=?`).bind(leagueId).first())?.count||0)}
-  catch{return 0}
-}
-async function pruneSnapshotStorage(db,leagueId){
-  const activeRow=await db.prepare(`SELECT snapshot_id,previous_snapshot_id FROM league_active_snapshots WHERE league_id=?`).bind(leagueId).first();
-  const activeId=activeRow?.snapshot_id?String(activeRow.snapshot_id):null;
-
-  // Forward detection only needs the snapshot that is LIVE when the next snapshot is activated.
-  // Older test snapshots have already served their comparison purpose and are the largest D1 consumer.
-  let deletedRecords=0,deletedSnapshots=0,deletedEvents=0,deletedValidationJobs=0;
-
-  if(activeId){
-    const count=await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE league_id=? AND snapshot_id<>?`).bind(leagueId,activeId).first();
-    deletedRecords=Number(count?.count||0);
-    await db.prepare(`DELETE FROM league_snapshot_records WHERE league_id=? AND snapshot_id<>?`).bind(leagueId,activeId).run();
-
-    if(await tableExists(db,'snapshot_validation_jobs')){
-      const countJobs=await db.prepare(`SELECT COUNT(*) count FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id<>?`).bind(leagueId,activeId).first();
-      deletedValidationJobs=Number(countJobs?.count||0);
-      await db.prepare(`DELETE FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id<>?`).bind(leagueId,activeId).run();
-    }
-
-    const eventCount=await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_lifecycle_events WHERE league_id=? AND snapshot_id<>?`).bind(leagueId,activeId).first();
-    deletedEvents=Number(eventCount?.count||0);
-    await db.prepare(`DELETE FROM league_snapshot_lifecycle_events WHERE league_id=? AND snapshot_id<>?`).bind(leagueId,activeId).run();
-
-    const snapCount=await db.prepare(`SELECT COUNT(*) count FROM league_snapshots WHERE league_id=? AND id<>?`).bind(leagueId,activeId).first();
-    deletedSnapshots=Number(snapCount?.count||0);
-    await db.prepare(`DELETE FROM league_snapshots WHERE league_id=? AND id<>?`).bind(leagueId,activeId).run();
-
-    // The prior pointer may now refer to a deliberately pruned test snapshot.
-    await db.prepare(`UPDATE league_active_snapshots SET previous_snapshot_id=NULL WHERE league_id=?`).bind(leagueId).run();
-  }
-
-  return{activeSnapshotId:activeId,deletedRecords,deletedSnapshots,deletedEvents,deletedValidationJobs};
-}
-async function pruneMapperPreviewStorage(db,leagueId,runIds){
-  const result={teams:0,players:0,games:0,statistics:0};
-  const specs=[
-    ['teams','companion_canonical_teams_preview',runIds.team],
-    ['players','companion_canonical_players_preview',runIds.player],
-    ['games','companion_canonical_games_preview',runIds.schedule],
-    ['statistics','companion_canonical_statistics_preview',runIds.statistics]
-  ];
-  for(const [label,table,runId] of specs){
-    if(!runId||!(await tableExists(db,table)))continue;
-    try{
-      const before=await db.prepare(`SELECT COUNT(*) count FROM ${table} WHERE league_id=? AND mapping_run_id<>?`).bind(leagueId,runId).first();
-      result[label]=Number(before?.count||0);
-      await db.prepare(`DELETE FROM ${table} WHERE league_id=? AND mapping_run_id<>?`).bind(leagueId,runId).run();
-    }catch{}
-  }
-  return result;
-}
-export async function onRequestGet(context){const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);const auth=await requirePlatformOwner(context);if(!auth.authorized)return auth.response;const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.'},404);const snapshot=await getLatest(db,league.id);return json({ok:true,release:RELEASE,snapshotAvailable:Boolean(snapshot),snapshot,activeSnapshotChanged:false,activationPerformed:false});}
-export async function onRequestPost(context){const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);const auth=await requirePlatformOwner(context);if(!auth.authorized)return auth.response;const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.'},404);
+export async function onRequestGet(context){const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);const auth=await requireCommissioner(context);if(!auth.authorized)return auth.response;const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.'},404);const snapshot=await getLatest(db,league.id);return json({ok:true,release:RELEASE,snapshotAvailable:Boolean(snapshot),snapshot,activeSnapshotChanged:false,activationPerformed:false});}
+export async function onRequestPost(context){const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);const auth=await requireCommissioner(context);if(!auth.authorized)return auth.response;const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.'},404);
 let body={};try{body=await context.request.json()}catch{}
 try{
- const requestedPlayerRunId=String(body?.playerMappingRunId||'').trim();
- const teamRun=await latest(db,'companion_team_mapping_runs',league.id);
- const playerRun=requestedPlayerRunId
-   ? await db.prepare(`SELECT * FROM companion_player_mapping_runs WHERE league_id=? AND id=? AND status='pending-preview' LIMIT 1`).bind(league.id,requestedPlayerRunId).first()
-   : await latest(db,'companion_player_mapping_runs',league.id);
- const scheduleRun=await latest(db,'companion_schedule_mapping_runs',league.id);
- const statisticsRun=await latest(db,'companion_statistics_mapping_runs',league.id);
- if(requestedPlayerRunId&&!playerRun){
-   return json({ok:false,error:'Pinned player mapping run is unavailable.',playerMappingRunId:requestedPlayerRunId,release:RELEASE},409);
- }
- const missing=[];if(!teamRun)missing.push('teams');if(!playerRun)missing.push('players');if(!scheduleRun)missing.push('schedule');if(!statisticsRun)missing.push('statistics');if(missing.length)return json({ok:false,error:`Map required domains before building a snapshot: ${missing.join(', ')}.`},422);
-
- // 5.9.10.6.2g: reclaim D1 space before duplicating the newest canonical previews into an immutable snapshot.
- // Keep the current LIVE snapshot because Forward Detection must compare it to the snapshot being built.
- const retention={
-   snapshots:await pruneSnapshotStorage(db,league.id),
-   previews:await pruneMapperPreviewStorage(db,league.id,{
-     team:teamRun.id,
-     player:playerRun.id,
-     schedule:scheduleRun.id,
-     statistics:statisticsRun.id
-   })
+ const candidateRunId=String(body?.candidateImportRunId||'').trim();
+ const candidateRun=candidateRunId?await db.prepare(`SELECT r.*,s.season_year destination_season_year
+   FROM companion_candidate_import_runs r
+   JOIN companion_import_destinations d ON d.id=r.destination_id AND d.league_id=r.league_id
+   JOIN franchise_seasons s ON s.id=d.franchise_season_id AND s.league_id=d.league_id
+   WHERE r.id=? AND r.league_id=? AND r.status='running' AND r.current_phase='build-candidate' LIMIT 1`)
+   .bind(candidateRunId,league.id).first():null;
+ if(!candidateRun)return json({ok:false,error:'A running commissioner candidate import at build-candidate is required.',release:RELEASE},409);
+ const requested={
+   team:String(body?.teamMappingRunId||'').trim(),
+   player:String(body?.playerMappingRunId||'').trim(),
+   schedule:String(body?.scheduleMappingRunId||'').trim(),
+   statistics:String(body?.statisticsMappingRunId||'').trim()
  };
+ const [teamRun,playerRun,scheduleRun,statisticsRun]=await Promise.all([
+   selectedRun(db,'companion_team_mapping_runs',league.id,requested.team),
+   selectedRun(db,'companion_player_mapping_runs',league.id,requested.player),
+   selectedRun(db,'companion_schedule_mapping_runs',league.id,requested.schedule),
+   selectedRun(db,'companion_statistics_mapping_runs',league.id,requested.statistics)
+ ]);
+ const missing=[];if(!teamRun)missing.push('teams');if(!playerRun)missing.push('players');if(!scheduleRun)missing.push('schedule');if(!statisticsRun)missing.push('statistics');if(missing.length)return json({ok:false,error:`Map required domains before building a snapshot: ${missing.join(', ')}.`},422);
+ const pinned={team:candidateRun.team_mapping_run_id,player:candidateRun.player_mapping_run_id,schedule:candidateRun.schedule_mapping_run_id,statistics:candidateRun.statistics_mapping_run_id};
+ const mismatch=Object.entries(pinned).filter(([key,value])=>value&&String(value)!==String(requested[key]||''));
+ if(mismatch.length)return json({ok:false,error:`Candidate mapping run mismatch: ${mismatch.map(([key])=>key).join(', ')}.`,release:RELEASE},409);
+ const sourceMismatch=[teamRun,playerRun,scheduleRun,statisticsRun].filter(run=>String(run.discovery_session_id||'')!==String(candidateRun.discovery_session_id));
+ if(sourceMismatch.length)return json({ok:false,error:'Candidate mapping runs must all come from the exact analyzed discovery session.',release:RELEASE},409);
 
- const teams=await rows(db,`SELECT * FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id=?`,league.id,teamRun.id);
- const players=await rows(db,`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=?`,league.id,playerRun.id);
- const games=await rows(db,`SELECT * FROM companion_canonical_games_preview WHERE league_id=? AND mapping_run_id=?`,league.id,scheduleRun.id);
- const statistics=await rows(db,`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=?`,league.id,statisticsRun.id);
- const standingSource=await standings(context,league.id),standingRows=standingSource.records;
+ // 7.3.2 candidate builds are append-only. No snapshot, mapper preview, audit,
+ // identity, or active-pointer row is pruned during commissioner review.
+ const retention={mode:'non-destructive',deletedSnapshots:0,deletedPreviewRows:0};
+
+ const [teams,players,games,statistics,standingSource]=await Promise.all([
+   rows(db,`SELECT * FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id=?`,league.id,teamRun.id),
+   rows(db,`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=?`,league.id,playerRun.id),
+   rows(db,`SELECT * FROM companion_canonical_games_preview WHERE league_id=? AND mapping_run_id=?`,league.id,scheduleRun.id),
+   rows(db,`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=?`,league.id,statisticsRun.id),
+   standings(context,league.id,candidateRun.discovery_session_id)
+ ]),standingRows=standingSource.records;
  const warnings=[];
  if(teams.length!==32)warnings.push(`Expected 32 teams; found ${teams.length}.`);
  if(!players.length)warnings.push('No players were available.');
@@ -114,11 +67,11 @@ try{
  if(Number(statisticsRun.warning_count||0))warnings.push(`Statistics mapper reported ${statisticsRun.warning_count} warning(s).`);
  const seasonCandidates=[...games.map(x=>x.season_year),...statistics.map(x=>x.season_year),...standingRows.map(x=>x.calendarYear)].map(Number).filter(Number.isFinite);
  const weekCandidates=[...games.map(x=>x.week_index),...statistics.map(x=>x.week_index),...standingRows.map(x=>x.weekIndex)].map(Number).filter(Number.isFinite);
- const manifest={release:RELEASE,leagueId:league.id,storageRetention:retention,sources:{teamMappingRunId:teamRun.id,playerMappingRunId:playerRun.id,scheduleMappingRunId:scheduleRun.id,statisticsMappingRunId:statisticsRun.id,standingsCaptureId:standingSource.capture?.id||null,standingsRoute:standingSource.capture?.route_path||null},pinnedPlayerMappingRunId:requestedPlayerRunId||null,builtAt:new Date().toISOString(),immutable:true,activationPerformed:false};
+ const manifest={release:RELEASE,leagueId:league.id,candidateImportRunId:candidateRun.id,storageRetention:retention,sources:{teamMappingRunId:teamRun.id,playerMappingRunId:playerRun.id,scheduleMappingRunId:scheduleRun.id,statisticsMappingRunId:statisticsRun.id,standingsCaptureId:standingSource.capture?.id||null,standingsRoute:standingSource.capture?.route_path||null},pinnedMappingRuns:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},builtAt:new Date().toISOString(),immutable:true,privateCandidate:true,activationPerformed:false,activeSnapshotChanged:false};
  const snapshotId=crypto.randomUUID();
- await db.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warning_count,warnings_json,manifest_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(snapshotId,league.id,'pending-validation',seasonCandidates.length?Math.max(...seasonCandidates):null,weekCandidates.length?Math.max(...weekCandidates):null,teams.length,players.length,games.length,statistics.length,standingRows.length,warnings.length,JSON.stringify(warnings),JSON.stringify(manifest)).run();
+ await db.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warning_count,warnings_json,manifest_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(snapshotId,league.id,'pending-validation',Number(candidateRun.destination_season_year)|| (seasonCandidates.length?Math.max(...seasonCandidates):null),weekCandidates.length?Math.max(...weekCandidates):null,teams.length,players.length,games.length,statistics.length,standingRows.length,warnings.length,JSON.stringify(warnings),JSON.stringify(manifest)).run();
  const inserts=[];const add=(domain,items,idFn)=>items.forEach((item,i)=>inserts.push(db.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`).bind(snapshotId,league.id,domain,String(idFn(item,i)),JSON.stringify(item))));
  add('teams',teams,(x,i)=>x.external_id||i);add('players',players,(x,i)=>x.external_id||i);add('games',games,(x,i)=>x.external_id||i);add('statistics',statistics,(x,i)=>x.external_key||i);add('standings',standingRows,(x,i)=>x.teamId||x.teamName||i);
- for(let i=0;i<inserts.length;i+=75)await db.batch(inserts.slice(i,i+75));
- const snapshot=await getLatest(db,league.id);return json({ok:true,release:RELEASE,snapshotAvailable:true,snapshot,storageRetention:retention,playerMappingRunId:playerRun.id,pinnedPlayerMappingRunId:requestedPlayerRunId||null,playerCount:players.length,activeSnapshotChanged:false,activationPerformed:false});
+ for(let i=0;i<inserts.length;i+=150)await db.batch(inserts.slice(i,i+150));
+ const snapshot=publicSnapshot(await db.prepare(`SELECT * FROM league_snapshots WHERE id=? AND league_id=?`).bind(snapshotId,league.id).first());return json({ok:true,release:RELEASE,snapshotAvailable:true,snapshot,storageRetention:retention,mappingRunIds:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},playerCount:players.length,privateCandidate:true,activeSnapshotChanged:false,activationPerformed:false});
 }catch(error){return json({ok:false,error:'Pending snapshot build failed.',detail:error?.message||String(error),release:RELEASE},500)}}

@@ -17,6 +17,10 @@ test('maps Pages Function file names to stable route patterns', () => {
     functionRoutePath('functions/api/leagues/[leagueSlug]/companion/identity-preview.js'),
     '/api/leagues/:leagueSlug/companion/identity-preview'
   );
+  assert.equal(
+    functionRoutePath('functions/api/leagues/[leagueSlug]/companion/candidate-import.js'),
+    '/api/leagues/:leagueSlug/companion/candidate-import'
+  );
   assert.equal(functionRoutePath('functions/leagues/[[path]].js'), '/leagues/*path');
   assert.equal(functionRoutePath('functions/_lib/auth.js'), null);
   assert.equal(functionRoutePath('functions/api/example/_common.js'), null);

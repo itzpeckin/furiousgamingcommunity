@@ -26,6 +26,13 @@ This runbook governs FranchiseHQ database changes beginning with 7.1.0. It is wr
 - Identical route payloads can be associated with a new discovery session without duplicating the same R2 object.
 - The migration does not reset, import, activate, archive, or publish Madden data and does not modify an active snapshot pointer.
 
+## What 7.3.1 and 7.3.2 add
+
+- `migrations/0023_permanent_identity_preview.sql` adds permanent season/player identity and the private identity preview.
+- `migrations/0024_commissioner_candidate_import.sql` adds one private destination per reviewed franchise season and durable candidate-import runs.
+- Candidate creation and validation are append-only and do not write `league_active_snapshots`.
+- Game year is an operational partition independent from franchise season year. Persistent league/account state crosses editions; Madden-derived source, mapping, identity, snapshot, and transaction state belongs to a game year.
+
 ## Authorization boundary
 
 Building and testing a migration does not authorize applying it to Cloudflare. Staging application and production application are separate decisions. A production migration requires a new, explicit owner authorization after the local candidate and recovery plan are reviewed.
@@ -78,7 +85,7 @@ Set a short-lived `CLOUDFLARE_API_TOKEN` with D1 Read for a plan or D1 Write for
 ```sh
 npm run db:plan -- --target staging
 npm run db:plan -- --target production
-npm run db:apply -- --target production --confirm-target production:franchise-hq-db:d21fb8c2-1b26-4766-9249-73af5d8b6678
+npm run db:apply -- --target production --confirm-target production:franchise-hq-db-madden27:b2529150-28af-42ca-a07b-69506764ccb6
 ```
 
 The production confirmation is intentionally exact. The command validates Cloudflare metadata against `config/d1-database-targets.json`, records migration hashes and before/after evidence, and stops deployment when any preservation check fails. Recovery is never automatic because a Time Travel restore overwrites the database and requires separate owner approval.
@@ -98,6 +105,8 @@ PRAGMA foreign_key_check;
 ```
 
 After 7.3.1, the ledger must contain every version from 1 through 23 and the foreign-key check must return no rows. Migration 21 adds four application tables for tenant aliases, domains, features, and audit events. Migration 22 adds exactly three discovery tables. Migration 23 adds permanent identity and private preview tables without changing existing league, user, membership, snapshot, import, team, player, or capture rows.
+
+After 7.3.2, the active ledger must contain every version from 1 through 24 and the foreign-key check must return no rows. Migration 24 adds `companion_import_destinations` and `companion_candidate_import_runs`; neither table authorizes or performs snapshot activation.
 
 ## Stop conditions
 
@@ -150,3 +159,15 @@ When production authorization is eventually granted, add these values to the 7.1
 - Migration result: 0018, 0019, and 0020 applied in order with no failed statement.
 - Rollback decision: not required. The additive schema and all preservation checks passed.
 - Application result: PR #8 is the single deployment candidate; its merge publishes 7.1.0 after all hosted checks pass.
+
+### 7.3.2 Madden 26-to-27 production transition — August 29, 2026
+
+- Owner authorization: one cumulative Production acceptance deployment from exact commit `4f5e81b4cc924e72bc9b8499ae12164bfd12620c`, followed by explicit authorization to archive/remove Madden 26 from the active application while preserving the platform plane.
+- Former active D1: `franchise-hq-db` / `d21fb8c2-1b26-4766-9249-73af5d8b6678`; retained and detached as a Madden 26 relational archive.
+- New active D1: `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`.
+- A private game-year archive under `game-year/madden-26/league/franchise-hq-primary/2026-08-29` verified 38 manifests, 76,712 durable rows, 331 data parts, and 166,195,617 bytes.
+- The prior private raw-source bucket was emptied permanently: 1,295 objects / 241,070,631 bytes. Two obsolete Companion KV discovery pointers were removed.
+- The active Madden 27 database received migrations 18–24 in order. Platform copy preserved one league, eight users, 104 sessions, eight memberships, and six membership-audit rows while clearing all eight legacy team assignments. Rules/settings had no rows to copy.
+- The certified Madden 27 source copied 43 captures / 10,150,363 bytes and the reviewed 2026 identities for 32 teams and 2,044 rostered players. Free Agents remain `blocked` with a null count.
+- The candidate rehearsal produced one validation-ready private snapshot and left `league_active_snapshots` empty. Foreign-key verification returned zero rows and the short-lived acceptance session was revoked.
+- The old D1 rows were not deleted in place. They are inaccessible to the active runtime and remain the recovery archive until a separately reviewed archive-retention/deletion control exists.

@@ -7,8 +7,16 @@
       "databaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816"
     },
     "production": {
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6"
+    }
+  },
+  "detachedArchives": {
+    "madden26Production": {
       "databaseName": "franchise-hq-db",
-      "databaseId": "d21fb8c2-1b26-4766-9249-73af5d8b6678"
+      "databaseId": "d21fb8c2-1b26-4766-9249-73af5d8b6678",
+      "detachedOn": "2026-08-29",
+      "activeRuntimeBinding": false
     }
   }
 }

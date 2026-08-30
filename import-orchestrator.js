@@ -1,9 +1,8 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='5.9.7.1',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
-const STAGES=['map-teams','map-players','map-schedule','map-statistics','build-snapshot','validate-snapshot','activate-snapshot','verify-active-snapshot'];
-const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
+const RELEASE='7.3.2';
+const STAGES=['map-teams','map-players','map-schedule','map-statistics','build-candidate','validate-candidate','preview-ready'];
 const parse=(v,f={})=>{try{return JSON.parse(v||'')}catch{return f}};
 const text=v=>v==null?null:(String(v).trim()||null);
 let orchestratorSchemaReady=false;
@@ -27,8 +26,7 @@ async function ensureOrchestratorSchema(db){
   await db.prepare(`CREATE INDEX IF NOT EXISTS idx_import_orchestrator_league_created ON companion_import_orchestrator_runs (league_id, created_at DESC)`).run();
   orchestratorSchemaReady=true;
 }
-async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth}
-async function state(context){const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return{response:json({ok:false,error:'Invalid league slug.'},400)};const auth=await requirePlatformOwner(context);if(!auth.authorized)return{response:auth.response};const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return{response:json({ok:false,error:'Not found.'},404)};await ensureOrchestratorSchema(db);return{db,league,slug}}
+async function state(context){const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return{response:json({ok:false,error:'Invalid league slug.'},400)};const auth=await requireCommissioner(context);if(!auth.authorized)return{response:auth.response};const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return{response:json({ok:false,error:'Not found.'},404)};await ensureOrchestratorSchema(db);return{db,league,slug}}
 function publicRun(run){if(!run)return null;return{id:run.id,status:run.status,currentStage:run.current_stage,stageIndex:Number(run.stage_index||0),stages:STAGES,stageState:parse(run.stage_state_json,{}),statisticsMappingRunId:run.statistics_mapping_run_id||null,snapshotId:run.snapshot_id||null,error:parse(run.error_json,null),createdAt:run.created_at,updatedAt:run.updated_at,completedAt:run.completed_at||null}}
 function instruction(slug,run){
   if(!run||run.status!=='running')return null;
@@ -38,10 +36,9 @@ function instruction(slug,run){
     case'map-players':return{method:'POST',url:`${base}map-players`,body:{}};
     case'map-schedule':return{method:'POST',url:`${base}map-schedule`,body:{}};
     case'map-statistics':return{mode:'incremental',method:'POST',url:`${base}map-statistics`,startBody:{action:'start'},nextBody:{action:'next',runId:'<statisticsMappingRunId>'},repeatUntil:'complete=true'};
-    case'build-snapshot':return{method:'POST',url:`${base}build-snapshot`,body:{}};
-    case'validate-snapshot':return{method:'POST',url:`${base}snapshot-lifecycle`,body:{action:'validate',snapshotId:run.snapshot_id||'<snapshotId>'}};
-    case'activate-snapshot':return{method:'POST',url:`${base}snapshot-lifecycle`,body:{action:'activate',snapshotId:run.snapshot_id||'<snapshotId>'}};
-    case'verify-active-snapshot':return{method:'GET',url:`${base}snapshot-verification`};
+    case'build-candidate':return{method:'POST',url:`${base}build-snapshot`,body:{}};
+    case'validate-candidate':return{method:'POST',url:`${base}snapshot-lifecycle`,body:{action:'validate-start',snapshotId:run.snapshot_id||'<snapshotId>'}};
+    case'preview-ready':return{method:'POST',url:`${base}candidate-import`,body:{action:'finalize',runId:run.id}};
     default:return null;
   }
 }

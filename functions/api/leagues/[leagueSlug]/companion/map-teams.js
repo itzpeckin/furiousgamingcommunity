@@ -167,8 +167,16 @@ function routeIsForbidden(routePath) {
   return /\/(?:passing|rushing|receiving|kicking|punting|defense|schedules|standings)$/.test(String(routePath || '').toLowerCase().replace(/\/+$/, ''));
 }
 
-async function latestTeamCapture(db, leagueId) {
-  const result = await db.prepare(`SELECT i.capture_id, i.discovery_session_id, i.route_path,
+async function latestTeamCapture(db, leagueId, discoverySessionId) {
+  const result = discoverySessionId
+    ? await db.prepare(`SELECT i.capture_id, link.session_id discovery_session_id, i.route_path,
+      i.confidence_score, c.r2_object_key, c.content_type, c.received_at
+    FROM madden_discovery_session_captures link
+    JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
+    JOIN companion_dataset_inspections i ON i.capture_id=c.id AND i.league_id=c.league_id
+    WHERE link.league_id=? AND link.session_id=? AND i.dataset_type='teams'
+    ORDER BY i.inspected_at DESC,c.received_at DESC`).bind(leagueId,discoverySessionId).all()
+    : await db.prepare(`SELECT i.capture_id, i.discovery_session_id, i.route_path,
       i.confidence_score, c.r2_object_key, c.content_type, c.received_at
     FROM companion_dataset_inspections i
     JOIN companion_route_captures c ON c.id = i.capture_id
@@ -282,7 +290,9 @@ export async function onRequestPost(context) {
   if (authorization.session.membership?.leagueId !== league.id) return json({ ok: false, error: 'Commissioner membership does not match this league.' }, 403);
 
   try {
-    const capture = await latestTeamCapture(db, league.id);
+    let body={};try{body=await context.request.json()}catch{}
+    const discoverySessionId=String(body.discoverySessionId||'').trim();
+    const capture = await latestTeamCapture(db, league.id, discoverySessionId);
     if (!capture) return json({ ok: false, error: 'No classified Teams dataset is available. Run v5.9.3.1 classification first.' }, 404);
     const payload = await parseObject(context.env, capture);
     const collection = chooseTeamCollection(payload);

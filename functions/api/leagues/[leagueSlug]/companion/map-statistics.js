@@ -3,10 +3,11 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
-const RELEASE='5.9.10.6.5.4h-p3d';
-const RECORD_CHUNK_SIZE=40;
+const RELEASE='7.3.2';
+const RECORD_CHUNK_SIZE=200;
+const D1_LOOKUP_CHUNK_SIZE=75;
+const ROUTE_INSPECTION_CONCURRENCY=4;
 const MAX_STORED_WARNINGS_PER_BATCH=25;
-const DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const WEEKLY_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/(defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
 // Madden can emit empty /week/reg/0/* routes as lifecycle placeholders.
 // Week 0 is not a playable regular-season statistics week and must never block snapshot activation.
@@ -29,17 +30,8 @@ const META=new Set([
 const text=v=>v==null?null:(String(v).trim()||null);
 const int=v=>Number.isFinite(Number.parseInt(v,10))?Number.parseInt(v,10):null;
 const safeParse=(value,fallback)=>{try{return JSON.parse(value??'')}catch{return fallback}};
-const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function ensureStatisticsSchema(db){
   return requireDatabaseSchema(db);
-}
-
-async function requirePlatformOwner(context){
-  const auth=await requireCommissioner(context);
-  if(!auth.authorized)return auth;
-  const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();
-  if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};
-  return auth;
 }
 
 function own(o,k){return o&&Object.prototype.hasOwnProperty.call(o,k)}
@@ -93,8 +85,15 @@ function captureParseStatus(row){
   const headers=safeParse(row?.request_headers_json,{});
   return text(headers?.parseStatus);
 }
-async function capturedRouteCandidates(db,leagueId){
-  const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,payload_hash,
+async function capturedRouteCandidates(db,leagueId,discoverySessionId){
+  const result=discoverySessionId
+    ? await db.prepare(`SELECT c.id capture_id,link.session_id discovery_session_id,c.route_path,c.r2_object_key,c.payload_hash,
+      c.byte_length,c.collections_json,c.request_headers_json,c.received_at
+    FROM madden_discovery_session_captures link
+    JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
+    WHERE link.league_id=? AND link.session_id=? AND c.route_path LIKE '%/week/%'
+    ORDER BY link.observed_at DESC`).bind(leagueId,discoverySessionId).all()
+    : await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,payload_hash,
       byte_length,collections_json,request_headers_json,received_at
     FROM companion_route_captures
     WHERE league_id=? AND route_path LIKE '%/week/%'
@@ -143,19 +142,18 @@ async function inspectCaptureShape(env,capture,meta){
   }
 }
 
-async function capturedRoutes(db,env,leagueId){
-  const grouped=await capturedRouteCandidates(db,leagueId);
+async function capturedRoutes(db,env,leagueId,discoverySessionId){
+  const grouped=await capturedRouteCandidates(db,leagueId,discoverySessionId);
   const selected=[];
 
-  for(const [routePath,rows] of grouped.entries()){
+  const inspectRoute=async([routePath,rows])=>{
     const meta=routeMeta(routePath);
-    if(!meta)continue;
-
+    if(!meta)return null;
     let chosen=null;
     const audit=[];
-    // Only inspect a bounded number of recent candidates; this keeps weekly imports fast.
+    // Candidate inspection remains ordered within a route while independent
+    // routes use bounded R2 concurrency.
     const candidates=rows.filter(obviousCaptureCandidate).slice(0,12);
-
     for(const candidate of candidates){
       const shape=await inspectCaptureShape(env,candidate,meta);
       audit.push({
@@ -171,23 +169,19 @@ async function capturedRoutes(db,env,leagueId){
         break;
       }
     }
-
     if(!chosen){
-      const fallback=rows[0];
-      selected.push({
-        ...fallback,
-        captureUsable:false,
-        candidateAudit:audit,
+      return{
+        ...rows[0],captureUsable:false,candidateAudit:audit,
         selectionError:`No usable statistics capture found for ${routePath}.`
-      });
-    }else{
-      selected.push({
-        ...chosen,
-        captureUsable:true,
-        candidateAudit:audit,
-        selectionError:null
-      });
+      };
     }
+    return{...chosen,captureUsable:true,candidateAudit:audit,selectionError:null};
+  };
+
+  const entries=[...grouped.entries()];
+  for(let offset=0;offset<entries.length;offset+=ROUTE_INSPECTION_CONCURRENCY){
+    const batch=await Promise.all(entries.slice(offset,offset+ROUTE_INSPECTION_CONCURRENCY).map(inspectRoute));
+    selected.push(...batch.filter(Boolean));
   }
 
   return selected.sort((a,b)=>a.route_path.localeCompare(b.route_path));
@@ -254,11 +248,19 @@ async function activeManifestByRoute(db,leagueId,snapshotId){
 async function playerIndexForRecords(db,leagueId,records){
   const run=await db.prepare(`SELECT id FROM companion_player_mapping_runs WHERE league_id=? AND status='pending-preview' ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
   const byId=new Map(),byName=new Map();if(!run)return{byId,byName};
-  const ids=[...new Set((records||[]).map(record=>text(first(record,IDS))).filter(Boolean))].slice(0,100);
-  const names=[...new Set((records||[]).map(record=>{const f=text(first(record,FIRST)),l=text(first(record,LAST));return (text(first(record,NAME))||[f,l].filter(Boolean).join(' ')||'').trim().toLowerCase()}).filter(Boolean))].slice(0,100);
+  const ids=[...new Set((records||[]).map(record=>text(first(record,IDS))).filter(Boolean))];
+  const names=[...new Set((records||[]).map(record=>{const f=text(first(record,FIRST)),l=text(first(record,LAST));return (text(first(record,NAME))||[f,l].filter(Boolean).join(' ')||'').trim().toLowerCase()}).filter(Boolean))];
+  const lookups=[];
+  for(let offset=0;offset<ids.length;offset+=D1_LOOKUP_CHUNK_SIZE){
+    const chunk=ids.slice(offset,offset+D1_LOOKUP_CHUNK_SIZE),marks=chunk.map(()=>'?').join(',');
+    lookups.push(db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND external_id IN (${marks})`).bind(leagueId,run.id,...chunk));
+  }
+  for(let offset=0;offset<names.length;offset+=D1_LOOKUP_CHUNK_SIZE){
+    const chunk=names.slice(offset,offset+D1_LOOKUP_CHUNK_SIZE),marks=chunk.map(()=>'?').join(',');
+    lookups.push(db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND lower(COALESCE(display_name, trim(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')))) IN (${marks})`).bind(leagueId,run.id,...chunk));
+  }
   const rows=[];
-  if(ids.length){const marks=ids.map(()=>'?').join(',');const result=await db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND external_id IN (${marks})`).bind(leagueId,run.id,...ids).all();rows.push(...(result.results||[]))}
-  if(names.length){const marks=names.map(()=>'?').join(',');const result=await db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND lower(COALESCE(display_name, trim(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')))) IN (${marks})`).bind(leagueId,run.id,...names).all();rows.push(...(result.results||[]))}
+  for(const result of lookups.length?await db.batch(lookups):[])rows.push(...(result.results||[]));
   for(const p of rows){byId.set(String(p.external_id),p);const n=String(p.display_name||`${p.first_name||''} ${p.last_name||''}`).trim().toLowerCase();if(n&&!byName.has(n))byName.set(n,p)}
   return{byId,byName};
 }
@@ -289,8 +291,8 @@ async function latestRun(db,leagueId,includeRows=false){
   const result=await db.prepare(`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=? ORDER BY category,stage,week_index,player_name,team_external_id,external_key LIMIT 500`).bind(leagueId,run.id).all();
   return{...pub,statistics:(result.results||[]).map(row=>({externalKey:row.external_key,category:row.category,seasonYear:row.season_year,stage:row.stage,weekIndex:row.week_index,playerExternalId:row.player_external_id,teamExternalId:row.team_external_id,playerName:row.player_name,position:row.position,metrics:safeParse(row.metrics_json,{}),sourceRoutePath:row.source_route_path}))};
 }
-async function startRun(db,env,leagueId){
-  const routes=await capturedRoutes(db,env,leagueId);
+async function startRun(db,env,leagueId,discoverySessionId){
+  const routes=await capturedRoutes(db,env,leagueId,discoverySessionId);
   if(!routes.length)throw Object.assign(new Error('No weekly statistics datasets were captured.'),{status:422});
 
   const bootstrap=await bootstrapActiveStatisticsManifest(db,leagueId);
@@ -318,7 +320,7 @@ async function startRun(db,env,leagueId){
     (id,league_id,discovery_session_id,status,route_count,record_count,resolved_player_count,
      unresolved_player_count,category_summary_json,warning_count,warnings_json)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind(runId,leagueId,routes[0]?.discovery_session_id||'aggregated-stat-routes',
+    .bind(runId,leagueId,discoverySessionId||routes[0]?.discovery_session_id||'aggregated-stat-routes',
       pending?'processing':'pending-preview',routes.length,0,0,0,'{}',0,'[]').run();
 
   const sql=`INSERT INTO companion_statistics_mapping_batches
@@ -461,7 +463,7 @@ async function processNext(db,env,leagueId,runId){
 
 async function authorizedContext(context){
   const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return{response:json({ok:false,error:'Invalid league slug.'},400)};
-  const auth=await requirePlatformOwner(context);if(!auth.authorized)return{response:auth.response};
+  const auth=await requireCommissioner(context);if(!auth.authorized)return{response:auth.response};
   const db=database(context.env),league=await resolveLeague(context.env,slug);if(!db||!league||auth.session.membership?.leagueId!==league.id)return{response:json({ok:false,error:'Not found.'},404)};
   await ensureStatisticsSchema(db);
   return{db,league};
@@ -482,7 +484,7 @@ export async function onRequestPost(context){
   try{
     const body=await readBody(context.request),action=String(body.action||'start').toLowerCase();
     if(action==='start'){
-      const started=await startRun(state.db,context.env,state.league.id);
+      const started=await startRun(state.db,context.env,state.league.id,text(body.discoverySessionId));
       const run=await state.db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=?`).bind(started.runId).first();
       const pub=await runPublic(state.db,run);
       return json({ok:true,release:RELEASE,action:'start',...pub,
