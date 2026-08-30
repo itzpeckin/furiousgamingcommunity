@@ -9497,12 +9497,22 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
 
-  // v5.9.8c — authoritative visible release marker.
+  // 7.3.3 — authoritative visible release and environment marker.
+  const VISIBLE_RELEASE = '7.3.3';
+  function visibleEnvironment() {
+    const hostname=String(window.location.hostname||'').toLowerCase();
+    if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';
+    if(hostname.endsWith('.franchise-hq.pages.dev'))return 'Staging';
+    if(hostname==='localhost'||hostname==='127.0.0.1'||hostname==='::1')return 'Local';
+    return 'Unknown Environment';
+  }
   function syncVisibleReleaseMarker() {
+    const environment=visibleEnvironment();
     document.querySelectorAll('.version-label,[data-current-release]').forEach(node => {
-      node.textContent = 'Current Release - 7.3.0';
+      node.textContent = `${environment} · Current Release ${VISIBLE_RELEASE}`;
     });
-    document.documentElement.dataset.franchiseHqRelease = '7.3.0';
+    document.documentElement.dataset.franchiseHqRelease = VISIBLE_RELEASE;
+    document.documentElement.dataset.franchiseHqEnvironment = environment.toLowerCase().replaceAll(' ','-');
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncVisibleReleaseMarker, { once:true });
@@ -10308,4 +10318,3 @@ document.addEventListener('click',event=>{
 
 
 /* 5.9.11.0 — experimental released-player locator removed during stabilization */
-

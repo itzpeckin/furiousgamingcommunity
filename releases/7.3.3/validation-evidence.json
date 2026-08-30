@@ -1,0 +1,358 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.3",
+  "validatedOn": "2026-08-30",
+  "status": "production-deployed-pending-owner-acceptance",
+  "baselineGate": {
+    "passed": true,
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "gameYearBoundary": {
+      "passed": true,
+      "separateFromFranchiseSeason": true,
+      "migrationVersion": 25
+    },
+    "separateOperationControls": {
+      "passed": true,
+      "operations": [
+        "replace-current-import",
+        "start-franchise-season",
+        "archive-remove-game-year"
+      ]
+    },
+    "immutableArchiveManifest": {
+      "passed": true,
+      "manifestUpdateBlocked": true,
+      "manifestDeleteBlocked": true,
+      "appendOnlyEvents": true
+    },
+    "archiveChecksumVerification": {
+      "passed": true,
+      "relationalReadBack": true,
+      "sourceObjectReadBack": true,
+      "rawBytesHashedDirectly": true,
+      "rootDigestDeterministic": true,
+      "rootDigestReverifiedBeforeRecovery": true,
+      "relationalSha256": "6c76706630cf1a28ac642d93e281992d0081ffdb870f26633b10923b53e4b34a",
+      "rootSha256": "44f81301b8cf8efb238ffc6141b132d627e2079124b86b588ba6907522d79b63"
+    },
+    "typedLeagueGameYearConfirmation": {
+      "passed": true,
+      "leagueScoped": true,
+      "gameReleaseScoped": true,
+      "separateArchiveDetachRemovalConfirmations": true
+    },
+    "protectedPlatformPlane": {
+      "passed": true,
+      "preserved": [
+        "leagues",
+        "users",
+        "memberships",
+        "roles",
+        "sessions",
+        "settings",
+        "rules",
+        "audits",
+        "player identities",
+        "player season summaries",
+        "GM identities",
+        "ownership history"
+      ],
+      "finalUsers": 1,
+      "finalMemberships": 1,
+      "activeTemporarySessions": 0,
+      "activeTemporaryMemberships": 0
+    },
+    "teamAssignmentRemapBoundary": {
+      "passed": true,
+      "clearedAtDetach": true,
+      "membershipDisabled": false,
+      "restoredByVerifiedRollback": true,
+      "stagingAssignmentsBefore": 0,
+      "stagingAssignmentsAfter": 0
+    },
+    "franchiseSeasonClosure": {
+      "passed": true,
+      "frozenPlayerSummaries": true,
+      "frozenOwnershipPeriods": true,
+      "sameGameYearAllowed": true
+    },
+    "activeDataDetachRemoval": {
+      "passed": true,
+      "archiveRequired": true,
+      "checksumVerificationRequired": true,
+      "partialExposurePrevented": true,
+      "sourceDeletionReadBackVerified": true,
+      "isolatedStagingExecuted": true
+    },
+    "recoveryBookmarkRollback": {
+      "passed": true,
+      "activeSnapshotPointerRestored": true,
+      "intentionallyEmptyPointerPreserved": true,
+      "activeSnapshotId": null,
+      "teamAssignmentsRestored": true,
+      "sourceObjectsRestored": true,
+      "identityPreviewPlayersRestored": 2044
+    },
+    "archiveCopyRemoval": {
+      "passed": true,
+      "separateConfirmation": true,
+      "objectDeletionVerifiedLocally": true,
+      "immutableRowsRetained": true,
+      "tombstoneRetained": true,
+      "rollbackRefusedAfterRemoval": true,
+      "isolatedStagingExecuted": false
+    },
+    "resumableRecovery": {
+      "passed": true,
+      "durableRowCursor": true,
+      "rowAndByteBounded": true,
+      "sourceObjectBatches": true,
+      "idempotentResume": true,
+      "largePayloadRegression": true
+    },
+    "identityMappingDependencies": {
+      "passed": true,
+      "futureArchivesIncludeIdentityOwnedParents": true,
+      "legacyArchiveCompatibilityRepairAudited": true,
+      "stagingParentsRebuilt": 2,
+      "identityRowsRetained": true
+    },
+    "boundaryStatusRestoration": {
+      "passed": true,
+      "futureArchivesRecordBoundaryState": true,
+      "leagueSnapshotStatus": "validated",
+      "gameYearSnapshotStatus": "candidate",
+      "franchiseSeasonStatus": "preview",
+      "statusReconciliationAudited": true
+    },
+    "isolatedStagingRehearsal": {
+      "passed": true,
+      "migrationVersion": 25,
+      "archiveVerified": true,
+      "activeDataRemoved": true,
+      "recoveryCompleted": true,
+      "transitionStatus": "restored",
+      "foreignKeyViolations": 0
+    },
+    "legacyResetRetired": {
+      "passed": true,
+      "httpStatus": 410,
+      "broadResetWrites": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "productionReleaseIndicator": {
+      "passed": true,
+      "release": "7.3.3",
+      "productionHost": "franchisehq.app",
+      "ownerFallbackHost": "franchise-hq.pages.dev",
+      "previewLabel": "Staging",
+      "cacheKeysAdvanced": true,
+      "liveHeaderVerified": true,
+      "liveAssetVerified": true
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 92,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 198,
+      "secretScanFiles": 552,
+      "inventoryFiles": 527,
+      "routes": 64,
+      "requiredTables": 78
+    }
+  },
+  "scopeBoundaries": {
+    "implementationAddsDestructiveCapability": true,
+    "destructiveOperationExecuted": true,
+    "destructiveOperationEnvironment": "isolated-staging",
+    "gameYearSeparateFromFranchiseSeason": true,
+    "persistentLeagueAndAccountPlanePreserved": true,
+    "activeSnapshotChanged": false,
+    "productionDataChanged": true,
+    "stagingDataChanged": true,
+    "gitMainChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "sessionRefreshRedesignChanged": false,
+    "credentialsChanged": false
+  },
+  "external": {
+    "githubPullRequest": {
+      "authorized": true,
+      "status": "open",
+      "pullRequest": 13,
+      "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/13",
+      "base": "codex/franchisehq-7.3.2",
+      "head": "codex/franchisehq-7.3.3",
+      "commit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
+      "gitMainChanged": false
+    },
+    "hostedChecks": {
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "pending": 0,
+      "commit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
+      "checks": [
+        "quality (branch push)",
+        "quality (pull request)",
+        "Workers Builds: franchise-hq-import-worker",
+        "Cloudflare Pages"
+      ]
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "success",
+      "implementationCommit": "67255affd4240d9b9713acdb4ad5198943927948",
+      "sourceCommit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
+      "deploymentId": "e926a37f-50b1-4b8c-af83-84364a7d4960",
+      "target": "franchisehq.app",
+      "url": "https://franchisehq.app",
+      "functionsIncluded": true,
+      "supersededDeploymentId": "61165506-9d06-4f95-9760-58f73389d37c",
+      "temporaryProductionBranch": "codex/franchisehq-7.3.3",
+      "productionBranchRestoredTo": "main",
+      "gitMainChanged": false,
+      "ownerAcceptanceRequired": true
+    },
+    "cloudRehearsal": {
+      "authorized": true,
+      "status": "completed-restored",
+      "environment": "isolated-staging",
+      "database": "franchise-hq-staging-db",
+      "migrationVersion": 25,
+      "preflightBookmarkFingerprint": "1c27a351dd3ae3525fa9c0072d86a9ed1a96311f68b92888ef467bba784b24c8",
+      "finalBookmarkFingerprint": "f497d8ce10009666a245d7cd91f3728f4427d5c207b23344423a289c878c2f53",
+      "previewDeployment": "0bd05506-b52f-4078-8bd4-5df76e3302d6",
+      "runtimeCommit": "71d088e54baf2955980afda2d1f93fd6f319dd9d",
+      "finalImplementationCommit": "061639d48b6cf540a853f8612e51ab316d70dc4e",
+      "transitionId": "game_year_transition_2a19db91-c087-4156-acfb-da0fbf624b06",
+      "manifestId": "game_year_manifest_4b4b86a3-36a9-4ec9-9d03-b6ad25459b93",
+      "recoveryBookmarkId": "game_year_bookmark_5d7577cb-f2fb-49fb-aa25-77d279e2e197",
+      "transitionStatus": "restored",
+      "archive": {
+        "totalRows": 7455,
+        "totalObjects": 44,
+        "sourceObjects": 43,
+        "totalBytes": 33758815,
+        "relationalSha256": "6c76706630cf1a28ac642d93e281992d0081ffdb870f26633b10923b53e4b34a",
+        "rootSha256": "44f81301b8cf8efb238ffc6141b132d627e2079124b86b588ba6907522d79b63",
+        "archiveCopyRetained": true
+      },
+      "finalCounts": {
+        "routeCaptures": 43,
+        "candidateRuns": 1,
+        "leagueSnapshots": 1,
+        "identityPreviewTeams": 32,
+        "identityPreviewPlayers": 2044,
+        "playerIdentities": 2044
+      },
+      "compatibilityRepair": {
+        "reason": "The first immutable archive scope omitted two identity-owned mapping parent rows; route-capture cascade removal exposed the gap.",
+        "mappingParentsRebuilt": 2,
+        "identityRowsRetained": true,
+        "auditEventRetained": true
+      },
+      "boundaryStatusReconciliation": {
+        "leagueSnapshot": "validated",
+        "gameYearSnapshot": "candidate",
+        "franchiseSeason": "preview",
+        "auditEventRetained": true
+      },
+      "activeSnapshotId": null,
+      "activeSnapshotRows": 0,
+      "freeAgentStatus": "blocked",
+      "freeAgentCount": null,
+      "freeAgentInterpretedAsZero": false,
+      "foreignKeyViolations": 0,
+      "sessionStatus": "revoked",
+      "membershipStatus": "inactive",
+      "resetPerformed": false,
+      "productionChanged": false,
+      "gitMainChanged": false
+    },
+    "productionMigrations": {
+      "authorized": true,
+      "status": "applied-verified",
+      "migration": 25,
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "preMigrationBookmarkFingerprint": "0ceaf7c2b4e68568e4187bb16b4f62dfd446b990b40ce4672546133289d719db",
+      "postMigrationBookmarkFingerprint": "c9e6a53d26d89a8c6ff5f230c4ab62b39fd2bd377bbed287b6c83220c9abf041",
+      "ledgerBefore": 24,
+      "ledgerAfter": 25,
+      "migrationRows": 25,
+      "requiredTableCount": 78,
+      "databaseTableCountIncludingLedger": 79,
+      "foreignKeyViolations": 0,
+      "protectedCountsBefore": {
+        "leagues": 1,
+        "users": 8,
+        "memberships": 8,
+        "activeTeamAssignments": 6,
+        "teams": 0,
+        "players": 0,
+        "snapshots": 0,
+        "activeSnapshots": 1
+      },
+      "protectedCountsAfter": {
+        "leagues": 1,
+        "users": 8,
+        "memberships": 8,
+        "activeTeamAssignments": 6,
+        "teams": 0,
+        "players": 0,
+        "snapshots": 0,
+        "activeSnapshots": 1
+      }
+    },
+    "productionReconciliation": {
+      "status": "verified",
+      "activeSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+      "activeSnapshotChanged": false,
+      "gameRelease": "Madden NFL 27",
+      "gameYearStatus": "active",
+      "candidateSnapshotId": "c7023ac0-e6d8-476c-949b-483092830fdd",
+      "identityPreviewStatus": "rostered-players-only",
+      "identityTeams": 32,
+      "identityRosteredPlayers": 2044,
+      "freeAgentStatus": "blocked",
+      "freeAgentCount": null,
+      "freeAgentInterpretedAsZero": false,
+      "transitionRuns": 0,
+      "archiveManifests": 0,
+      "recoveryBookmarks": 0,
+      "archiveRemovals": 0,
+      "foreignKeyViolations": 0
+    },
+    "productionDataRemoval": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "maddenImportActivation": {
+      "authorized": false,
+      "status": "not-run"
+    }
+  },
+  "productionChanged": true,
+  "dataChanged": false,
+  "stagingDataChanged": true,
+  "productionDataChanged": true,
+  "credentialsChanged": false
+}

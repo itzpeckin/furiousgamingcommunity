@@ -6508,3 +6508,26 @@ table td{
 @media(max-width:620px){
   .football-formation--special{grid-template-columns:repeat(2,minmax(0,1fr));padding-left:8px;padding-right:8px}
 }
+
+/* FranchiseHQ 7.3.3 — commissioner game-year transition controls */
+.game-year-transition-stack{display:grid;gap:18px}
+.game-year-transition-card{overflow:hidden}
+.game-year-operation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+.game-year-operation-grid>section{display:grid;align-content:start;gap:10px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+.game-year-operation-grid h4{margin:0;font-size:1.05rem}
+.game-year-operation-grid p{margin:0;color:var(--muted)}
+.game-year-season-fields{display:grid;gap:8px}
+.game-year-season-fields input{width:100%;min-width:0}
+.game-year-transition-card--danger{border-color:color-mix(in srgb,var(--warning,#f6b73c) 42%,var(--line))}
+.game-year-count-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
+.game-year-count-grid>div{display:grid;gap:4px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.game-year-count-grid small{color:var(--muted)}
+.game-year-count-grid strong{font-size:1.25rem;font-variant-numeric:tabular-nums}
+.game-year-transition-actions{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin-top:16px}
+.game-year-transition-actions .field{flex:1 1 420px;margin:0}
+@media(max-width:760px){
+  .game-year-operation-grid{grid-template-columns:1fr}
+  .game-year-count-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .game-year-transition-actions>.button{width:100%}
+}
+@media(max-width:480px){.game-year-count-grid{grid-template-columns:1fr}}

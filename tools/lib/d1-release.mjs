@@ -125,7 +125,8 @@ export async function loadCanonicalMigrations() {
       21: 'tenant_ready_core',
       22: 'madden_27_discovery_foundation',
       23: 'permanent_identity_preview',
-      24: 'commissioner_candidate_import'
+      24: 'commissioner_candidate_import',
+      25: 'safe_game_year_transition'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);

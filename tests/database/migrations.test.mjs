@@ -119,7 +119,7 @@ test('the production-like legacy upgrade preserves identities and relationships'
     assert.equal(database.prepare(
       `SELECT user_id FROM sessions WHERE id='session-upgrade-test'`
     ).get().user_id, 'user-upgrade-test');
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 24);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 25);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {
     database.close();
@@ -224,7 +224,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 24', async () => {
+test('runtime schema verification fails closed before version 25', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -235,13 +235,13 @@ test('runtime schema verification fails closed before version 24', async () => {
     () => requireDatabaseSchema(outdated),
     error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 17
   );
-  observedVersion = 24;
-  assert.equal((await requireDatabaseSchema(outdated)).version, 24);
+  observedVersion = 25;
+  assert.equal((await requireDatabaseSchema(outdated)).version, 25);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 24, name: 'commissioner_candidate_import' }) };
+      return { first: async () => ({ version: 25, name: 'safe_game_year_transition' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 24);
+  assert.equal((await requireDatabaseSchema(current)).version, 25);
 });

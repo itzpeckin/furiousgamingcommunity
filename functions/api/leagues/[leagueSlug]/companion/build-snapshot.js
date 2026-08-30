@@ -1,7 +1,7 @@
 /* FHQ_BUILD: 5.9.10.6.5.4h-p5d */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-const RELEASE='7.3.2';
+const RELEASE='7.3.3';
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 async function latest(db,table,leagueId,status=true){const where=status?" AND status='pending-preview'":'';return db.prepare(`SELECT * FROM ${table} WHERE league_id=?${where} ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();}
 async function rows(db,sql,...args){const r=await db.prepare(sql).bind(...args).all();return r.results||[];}
@@ -19,13 +19,14 @@ export async function onRequestPost(context){const slug=normalizeLeagueSlug(cont
 let body={};try{body=await context.request.json()}catch{}
 try{
  const candidateRunId=String(body?.candidateImportRunId||'').trim();
- const candidateRun=candidateRunId?await db.prepare(`SELECT r.*,s.season_year destination_season_year
+ const candidateRun=candidateRunId?await db.prepare(`SELECT r.*,s.season_year destination_season_year,d.game_year_id
    FROM companion_candidate_import_runs r
    JOIN companion_import_destinations d ON d.id=r.destination_id AND d.league_id=r.league_id
    JOIN franchise_seasons s ON s.id=d.franchise_season_id AND s.league_id=d.league_id
    WHERE r.id=? AND r.league_id=? AND r.status='running' AND r.current_phase='build-candidate' LIMIT 1`)
    .bind(candidateRunId,league.id).first():null;
  if(!candidateRun)return json({ok:false,error:'A running commissioner candidate import at build-candidate is required.',release:RELEASE},409);
+ if(!candidateRun.game_year_id)return json({ok:false,error:'The candidate destination is not attached to a Madden game year.',release:RELEASE},409);
  const requested={
    team:String(body?.teamMappingRunId||'').trim(),
    player:String(body?.playerMappingRunId||'').trim(),
@@ -69,7 +70,10 @@ try{
  const weekCandidates=[...games.map(x=>x.week_index),...statistics.map(x=>x.week_index),...standingRows.map(x=>x.weekIndex)].map(Number).filter(Number.isFinite);
  const manifest={release:RELEASE,leagueId:league.id,candidateImportRunId:candidateRun.id,storageRetention:retention,sources:{teamMappingRunId:teamRun.id,playerMappingRunId:playerRun.id,scheduleMappingRunId:scheduleRun.id,statisticsMappingRunId:statisticsRun.id,standingsCaptureId:standingSource.capture?.id||null,standingsRoute:standingSource.capture?.route_path||null},pinnedMappingRuns:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},builtAt:new Date().toISOString(),immutable:true,privateCandidate:true,activationPerformed:false,activeSnapshotChanged:false};
  const snapshotId=crypto.randomUUID();
- await db.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warning_count,warnings_json,manifest_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(snapshotId,league.id,'pending-validation',Number(candidateRun.destination_season_year)|| (seasonCandidates.length?Math.max(...seasonCandidates):null),weekCandidates.length?Math.max(...weekCandidates):null,teams.length,players.length,games.length,statistics.length,standingRows.length,warnings.length,JSON.stringify(warnings),JSON.stringify(manifest)).run();
+ await db.batch([
+  db.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warning_count,warnings_json,manifest_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(snapshotId,league.id,'pending-validation',Number(candidateRun.destination_season_year)|| (seasonCandidates.length?Math.max(...seasonCandidates):null),weekCandidates.length?Math.max(...weekCandidates):null,teams.length,players.length,games.length,statistics.length,standingRows.length,warnings.length,JSON.stringify(warnings),JSON.stringify(manifest)),
+  db.prepare(`INSERT INTO game_year_snapshots (game_year_id,league_id,snapshot_id,snapshot_status) VALUES (?,?,?,'candidate')`).bind(candidateRun.game_year_id,league.id,snapshotId)
+ ]);
  const inserts=[];const add=(domain,items,idFn)=>items.forEach((item,i)=>inserts.push(db.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`).bind(snapshotId,league.id,domain,String(idFn(item,i)),JSON.stringify(item))));
  add('teams',teams,(x,i)=>x.external_id||i);add('players',players,(x,i)=>x.external_id||i);add('games',games,(x,i)=>x.external_id||i);add('statistics',statistics,(x,i)=>x.external_key||i);add('standings',standingRows,(x,i)=>x.teamId||x.teamName||i);
  for(let i=0;i<inserts.length;i+=150)await db.batch(inserts.slice(i,i+150));

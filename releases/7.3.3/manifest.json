@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.3",
+  "releaseType": "safe-game-year-transition-controls",
+  "status": "production-deployed-pending-owner-acceptance",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.2",
+    "commit": "b6082b2cb91dc70f9a30d2325f4067ffef045b1a",
+    "tree": "fdb5e69935213eb04577e7668ec472695f48781b",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.3",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "production-acceptance-candidate-hosted-checks-passed",
+    "commit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
+    "pullRequest": 13,
+    "hostedChecksPassed": 4,
+    "scope": "Publication is limited to codex/franchisehq-7.3.3 and a stacked pull request. Git Main is excluded."
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": true,
+    "status": "rehearsal-completed-restored",
+    "implementationCommit": "061639d48b6cf540a853f8612e51ab316d70dc4e",
+    "rehearsalCommit": "71d088e54baf2955980afda2d1f93fd6f319dd9d",
+    "previewDeployment": "0bd05506-b52f-4078-8bd4-5df76e3302d6",
+    "migration": 25,
+    "scope": "One authorized isolated-staging rehearsal applied additive migration 25, verified a private archive, detached and removed the staged Madden 27 active plane, restored it from the immutable archive, reconciled boundary statuses, and retained audit evidence. Production is excluded."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
+    "implementationCommit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
+    "deployment": "e926a37f-50b1-4b8c-af83-84364a7d4960",
+    "migration": 25,
+    "scope": "The owner-authorized exact candidate and additive migration 25 are deployed to Production pending owner acceptance. Archive, detach, active-data removal, recovery, archive-copy removal, reset, snapshot activation/change, Git Main changes, and Free Agent reinterpretation remain excluded."
+  },
+  "requiredArtifacts": [
+    "config/database-schema-contract.json",
+    "config/environment-contract.json",
+    "docs/DATABASE-OPERATIONS.md",
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/game-year-transition.js",
+    "functions/api/leagues/[leagueSlug]/game-year-transition.js",
+    "functions/api/leagues/[leagueSlug]/reset-data.js",
+    "functions/leagues/[[path]].js",
+    "index.html",
+    "app.js",
+    "league-engine/game-year-transition.js",
+    "migrations/0025_safe_game_year_transition.sql",
+    "releases/7.3.3/release-record.md",
+    "releases/7.3.3/validation-evidence.json",
+    "tests/import/game-year-transition.test.mjs"
+  ]
+}

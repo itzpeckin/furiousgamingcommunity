@@ -1,5 +1,17 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.3 Production impact
+
+Production Pages deployment `e926a37f-50b1-4b8c-af83-84364a7d4960` runs exact source commit `b373f661101c33a2ee2bd17433cfe4001f166b3f`. The Cloudflare Pages Production branch setting was restored to `main` immediately after the exact deployment succeeded; Git `main` remains `4045e02980c93491b47910f17fcb2e48fae76c68`.
+
+Additive migration 25 is applied to `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`. The ledger is continuous through 25, foreign keys are clean, and protected counts plus exact active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` are unchanged. Production transition runs, archive manifests, recovery bookmarks, and archive removals are all zero; no archive, detach, active-data removal, recovery, reset, or activation was run.
+
+A code rollback retains the additive game-year tables and links. Do not reverse migration 25 by dropping tables or clearing `game_year_id`. Before any future data transition, recovery depends on a read-back-verified immutable archive manifest plus its recovery bookmark. Detach and active-data removal are refused until verification succeeds, and rollback restores only the exact scoped rows, source objects, prior active pointer, and team assignments recorded by that bookmark.
+
+For a runtime-only rollback, restore prior Pages deployment `61165506-9d06-4f95-9760-58f73389d37c` while deliberately retaining the current Madden 27 database binding and migration 25. Do not reconnect the detached Madden 26 database, move Git Main, clear game-year links, reset data, or change the active snapshot as part of a code rollback.
+
+Archive-object deletion is a distinct irreversible operation with its own typed league-and-edition confirmation. It retains manifest and tombstone rows but eliminates application-level restore from those objects. Never use it as a code rollback. Blocked or missing Free Agents remain null/unknown throughout archive and recovery.
+
 ## 7.3.2 Production acceptance impact
 
 Production Pages deployment `ebcf42ec-5a7c-4efa-8e88-891f6c06fcaa` and Worker version `3b883a17-04bf-4c46-8b2d-e5ab5b98658e` run exact source commit `4f5e81b4cc924e72bc9b8499ae12164bfd12620c`. Git `main` remains `4045e02980c93491b47910f17fcb2e48fae76c68`; PR #12 remains open.
@@ -36,11 +48,11 @@ The current production rollback target is:
 3. For an unhealthy Cloudflare build, restore the last known-good deployment while the Git rollback is reviewed.
 4. Run production smoke checks and record the restored deployment identity.
 
-The 7.1/7.2 application can operate with the additive 7.3 discovery schema, so normal code rollback retains migrations 21 and 22 rather than trying to reverse tables.
+The 7.1/7.2 application can operate with the additive 7.3 discovery schema, so normal code rollback retains migrations 21 through 25 rather than trying to reverse tables.
 
 ## Database recovery
 
-Follow `docs/DATABASE-OPERATIONS.md`. Before migrations 21 or 22, record the D1 Time Travel bookmark, ledger, table/row counts, tenant identities, memberships, rules, settings, active snapshot pointer, validation-player rows, and foreign-key result.
+Follow `docs/DATABASE-OPERATIONS.md`. Before migrations 21 through 25, record the D1 Time Travel bookmark, ledger, table/row counts, tenant identities, memberships, rules, settings, active snapshot pointer, validation-player rows, and foreign-key result.
 
 Never replay `migrations/legacy/` and never improvise rollback by dropping tenant tables. If reconciliation fails, stop application publication. A Time Travel restore overwrites the database and requires separate owner authorization.
 

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "FranchiseHQ",
-  "release": "7.3.2",
+  "release": "7.3.3",
   "configurationAuthority": "Cloudflare dashboard export until a reviewed Wrangler configuration is adopted",
   "deploymentPolicy": {
     "productionBranch": "main",
@@ -15,6 +15,7 @@
       { "name": "DB", "kind": "d1", "logicalResource": "primaryDatabase", "required": true },
       { "name": "FRANCHISE_HQ_DB", "kind": "d1", "logicalResource": "primaryDatabase", "required": true },
       { "name": "COMPANION_EXPORTS", "kind": "r2", "logicalResource": "companionExports", "required": true },
+      { "name": "GAME_YEAR_ARCHIVES", "kind": "r2", "logicalResource": "gameYearArchives", "required": true },
       { "name": "COMPANION_EXPORT_META", "kind": "kv", "logicalResource": "companionMetadata", "required": true },
       { "name": "LEAGUE_CONFIG", "kind": "kv", "logicalResource": "leagueConfiguration", "required": true },
       { "name": "FRANCHISE_IMPORT_WORKER", "kind": "service", "logicalResource": "importWorker", "required": false },
@@ -58,6 +59,7 @@
         "DB": "local:primary-database",
         "FRANCHISE_HQ_DB": "local:primary-database",
         "COMPANION_EXPORTS": "local:companion-exports",
+        "GAME_YEAR_ARCHIVES": "local:game-year-archives",
         "COMPANION_EXPORT_META": "local:companion-metadata",
         "LEAGUE_CONFIG": "local:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "local:import-worker",
@@ -65,7 +67,7 @@
       },
       "variables": {
         "APP_ENV": "local",
-        "APP_VERSION": "7.3.2",
+        "APP_VERSION": "7.3.3",
         "DISCORD_CLIENT_ID": "local-discord-application",
         "DISCORD_REDIRECT_URI": "http://localhost:8788/api/auth/discord/callback",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
@@ -86,6 +88,7 @@
         "DB": "cloudflare:staging:primary-database",
         "FRANCHISE_HQ_DB": "cloudflare:staging:primary-database",
         "COMPANION_EXPORTS": "cloudflare:staging:companion-exports",
+        "GAME_YEAR_ARCHIVES": "cloudflare:staging:game-year-archives",
         "COMPANION_EXPORT_META": "cloudflare:staging:companion-metadata",
         "LEAGUE_CONFIG": "cloudflare:staging:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "cloudflare:staging:import-worker",
@@ -93,7 +96,7 @@
       },
       "variables": {
         "APP_ENV": "staging",
-        "APP_VERSION": "7.3.2",
+        "APP_VERSION": "7.3.3",
         "DISCORD_CLIENT_ID": "staging-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-staging",
         "DISCORD_REDIRECT_URI_PUBLIC": "set-in-cloudflare-staging-public",
@@ -114,6 +117,7 @@
         "DB": "cloudflare:production:primary-database",
         "FRANCHISE_HQ_DB": "cloudflare:production:primary-database",
         "COMPANION_EXPORTS": "cloudflare:production:companion-exports",
+        "GAME_YEAR_ARCHIVES": "cloudflare:production:game-year-archives",
         "COMPANION_EXPORT_META": "cloudflare:production:companion-metadata",
         "LEAGUE_CONFIG": "cloudflare:production:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "cloudflare:production:import-worker",
@@ -121,7 +125,7 @@
       },
       "variables": {
         "APP_ENV": "production",
-        "APP_VERSION": "7.3.2",
+        "APP_VERSION": "7.3.3",
         "DISCORD_CLIENT_ID": "production-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-production",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",

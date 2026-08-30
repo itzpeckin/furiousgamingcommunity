@@ -823,10 +823,6 @@ function renderLeagueTenantPanel(){
 const FRANCHISEHQ_PUBLIC_ORIGIN='https://franchisehq.app';
 let commissionerMembersCache=null;
 let commissionerMembersPromise=null;
-let commissionerResetPreview=null;
-let commissionerResetBusy=false;
-let commissionerResetConfirmation='';
-const commissionerResetPreserve=new Set();
 function commissionerLeagueSlug(){return window.FranchiseHQ?.leagueTenant?.current?.()?.slug||decodeURIComponent(location.pathname.match(/\/leagues\/([^/?#]+)/i)?.[1]||'')}
 function commissionerMemberRoleLabel(role){return role==='commissioner'?'Commissioner':role==='trade_committee'?'Trade Committee':role==='team_owner'?'Team Owner':role==='pending'?'Pending':'Member'}
 function commissionerTeamShape(team={}){const id=String(team.teamKey||team.id||team.abbreviation||team.abbr||'').toLowerCase();return{...team,id,teamKey:id,liveTeamId:String(team.externalId||team.liveTeamId||team.id||''),abbr:String(team.abbreviation||team.abbr||id).toUpperCase(),fullName:team.displayName||team.fullName||team.name||id.toUpperCase(),city:team.cityName||team.city||'',name:team.nickname||team.name||'',conference:team.conferenceName||team.conference||'',division:team.divisionName||team.division||'',logo:team.logoUrl||team.logo||null,primary:team.primaryColor||team.primary||'#27364f',secondary:team.secondaryColor||team.secondary||'#8fa4c4',owner:team.ownerName||team.owner||'Unassigned',ownerRole:team.ownerRole||null}}
@@ -873,42 +869,12 @@ async function disableLeagueMember(userId){
  const slug=commissionerLeagueSlug();try{const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/memberships`,{method:'DELETE',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({userId})});const data=await response.json();if(!response.ok)throw new Error(data?.error||`Request failed (${response.status})`);document.body.style.overflow='';showToast('Access revoked','The member can no longer enter this league. Their audit history is preserved.');await loadCommissionerMembers();await refreshCanonicalOwnership();renderCommissioner('teams')}catch(error){showToast('Access not revoked',error.message||String(error))}
 }
 
-async function loadCommissionerResetPreview(){
- if(commissionerResetBusy)return;
- commissionerResetBusy=true;renderCommissioner('league-data');
- try{
-  if(!commissionerMembersCache)await loadCommissionerMembers();
-  const slug=commissionerLeagueSlug(),response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/reset-data`,{credentials:'same-origin',headers:{accept:'application/json'}}),data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data?.error||`Request failed (${response.status})`);
-  commissionerResetPreview=data;
-  if(!commissionerResetPreserve.size)commissionerMembershipRows().filter(member=>member.status==='active').forEach(member=>commissionerResetPreserve.add(String(member.userId)));
- }catch(error){showToast('Reset preview unavailable',error.message||String(error))}
- finally{commissionerResetBusy=false;renderCommissioner('league-data')}
-}
 function renderMaddenResetCard(){
- if(!commissionerResetPreview)return `<section class="card commissioner-reset-card"><div class="card-header"><div><span class="eyebrow">Protected maintenance</span><h3>Prepare for Madden 27</h3><p>Review an auditable cleanup of old Madden snapshots, imports, statistics, and test data. Accounts, league rules, and selected memberships are preserved.</p></div><button class="button button--ghost" data-load-madden-reset ${commissionerResetBusy?'disabled':''}>${commissionerResetBusy?'Reviewing…':'Review Reset'}</button></div></section>`;
- const members=commissionerMembershipRows(),total=Object.values(commissionerResetPreview.counts||{}).reduce((sum,value)=>sum+Number(value||0),0),slug=commissionerResetPreview.confirmation||commissionerLeagueSlug();
- return `<section class="card commissioner-reset-card"><div class="card-header"><div><span class="eyebrow">Protected maintenance</span><h3>Prepare for Madden 27</h3><p>This removes ${total.toLocaleString()} stored Madden/test records and disables every league member who is not selected below.</p></div><span class="pill pill--warning">Not reversible</span></div><div class="validation-errors"><p>FranchiseHQ tenant settings, rules, Discord accounts, sessions, and the selected memberships remain intact.</p></div><div class="commissioner-member-list">${members.map(member=>{const id=String(member.userId),checked=commissionerResetPreserve.has(id),self=id===String(window.FranchiseHQ?.auth?.getCurrentUser?.()?.id||'');return `<label><span><strong>${escapeHtml(commissionerDiscordName(member))}</strong><small>${escapeHtml(commissionerMemberRoleLabel(member.role))} · ${escapeHtml(commissionerMemberTeamName(member.teamId))} · ${escapeHtml(member.status)}</small></span><input type="checkbox" data-reset-preserve-member="${escapeHtml(id)}" ${checked?'checked':''} ${self?'disabled':''}></label>`}).join('')}</div><label class="field"><span>Type ${escapeHtml(slug)} to confirm</span><input data-reset-confirmation value="${escapeHtml(commissionerResetConfirmation)}" autocomplete="off"></label><div class="heading-actions"><button class="button button--ghost" data-load-madden-reset>Refresh Preview</button><button class="button button--danger" data-execute-madden-reset ${commissionerResetConfirmation===slug&&!commissionerResetBusy?'':'disabled'}>${commissionerResetBusy?'Resetting…':'Reset Madden/Test Data'}</button></div></section>`
+ const transition=window.FranchiseHQ?.gameYearTransition||window.FranchiseHQ?.platform?.gameYearTransition||window.FranchiseHQ?.getModuleService?.('platform','gameYearTransition');
+ if(transition?.renderPanel)return transition.renderPanel();
+ return `<section class="card game-year-transition-card" data-game-year-transition-panel><div class="card-header"><div><span class="eyebrow">Protected edition boundary</span><h3>Game Year & Season Transition</h3><p>The 7.3.3 transition service is still initializing.</p></div><span class="pill pill--neutral">Loading</span></div></section>`;
 }
-async function executeMaddenReset(){
- const slug=commissionerLeagueSlug();if(commissionerResetConfirmation!==slug||commissionerResetBusy)return;
- if(!confirm('This will permanently remove the old Madden and test data for this league. Continue?'))return;
- commissionerResetBusy=true;renderCommissioner('league-data');
- try{const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/reset-data`,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({confirmation:slug,preserveUserIds:[...commissionerResetPreserve]})}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||`Request failed (${response.status})`);showToast('Madden data reset complete','Selected accounts and FranchiseHQ settings were preserved.');setTimeout(()=>location.reload(),500)}catch(error){commissionerResetBusy=false;showToast('Madden data not reset',error.message||String(error));renderCommissioner('league-data')}
-}
-document.addEventListener('click',event=>{
- if(event.target.closest('[data-load-madden-reset]')){event.preventDefault();loadCommissionerResetPreview();return}
- if(event.target.closest('[data-execute-madden-reset]')){event.preventDefault();executeMaddenReset()}
-});
-document.addEventListener('change',event=>{
- const input=event.target.closest('[data-reset-preserve-member]');if(!input)return;
- if(input.checked)commissionerResetPreserve.add(String(input.dataset.resetPreserveMember));else commissionerResetPreserve.delete(String(input.dataset.resetPreserveMember));
-});
-document.addEventListener('input',event=>{
- if(!event.target.matches('[data-reset-confirmation]'))return;
- commissionerResetConfirmation=event.target.value;
- const button=document.querySelector('[data-execute-madden-reset]');if(button)button.disabled=commissionerResetConfirmation!==(commissionerResetPreview?.confirmation||commissionerLeagueSlug())||commissionerResetBusy;
-});
+window.addEventListener('franchisehq:open-candidate-import',()=>{ui.showLeagueImport=true;renderCommissioner('league-data')});
 
 
 const RULE_STARTER=[

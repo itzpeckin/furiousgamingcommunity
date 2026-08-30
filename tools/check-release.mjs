@@ -415,6 +415,98 @@ if (version === '7.3.2') {
     errors.push('7.3.2 must preserve the blocked-Free-Agent boundary.');
   }
 }
+if (version === '7.3.3') {
+  for (const check of [
+    'gameYearBoundary',
+    'separateOperationControls',
+    'immutableArchiveManifest',
+    'archiveChecksumVerification',
+    'typedLeagueGameYearConfirmation',
+    'protectedPlatformPlane',
+    'teamAssignmentRemapBoundary',
+    'franchiseSeasonClosure',
+    'activeDataDetachRemoval',
+    'recoveryBookmarkRollback',
+    'archiveCopyRemoval',
+    'resumableRecovery',
+    'identityMappingDependencies',
+    'boundaryStatusRestoration',
+    'isolatedStagingRehearsal',
+    'legacyResetRetired',
+    'freeAgentBlockedPreserved',
+    'productionReleaseIndicator',
+    'strictMigration'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.3 game-year transition evidence is incomplete: ${check}.`);
+  }
+  const productionAuthorized=manifest.status==='validated-production-authorized';
+  const productionDeployed=isPostDeployment;
+  if(productionDeployed){
+    if(manifest.production?.authorized!==true||manifest.production?.deployed!==true||manifest.production?.status!=='success-pending-owner-acceptance'){
+      errors.push('Deployed 7.3.3 evidence must record the owner-authorized Production acceptance publication.');
+    }
+    if(evidence.external?.productionDeployment?.authorized!==true||evidence.external?.productionDeployment?.status!=='success'){
+      errors.push('Deployed 7.3.3 evidence must record the successful authorized Production deployment.');
+    }
+    if(evidence.external?.productionMigrations?.authorized!==true||evidence.external?.productionMigrations?.status!=='applied-verified'||Number(evidence.external?.productionMigrations?.migration)!==25){
+      errors.push('Deployed 7.3.3 evidence must record additive Production migration 25 as applied and verified.');
+    }
+  }else if(productionAuthorized){
+    if(manifest.production?.authorized!==true||manifest.production?.deployed!==false||manifest.production?.status!=='authorized-not-run'){
+      errors.push('Authorized 7.3.3 evidence must record Production publication authorization without claiming deployment.');
+    }
+    if(evidence.external?.productionDeployment?.authorized!==true||evidence.external?.productionDeployment?.status!=='not-run'){
+      errors.push('Authorized 7.3.3 evidence must retain a pending Production deployment.');
+    }
+    if(evidence.external?.productionMigrations?.authorized!==true||evidence.external?.productionMigrations?.status!=='not-run'||Number(evidence.external?.productionMigrations?.migration)!==25){
+      errors.push('Authorized 7.3.3 evidence must retain pending additive Production migration 25.');
+    }
+  }else{
+    if(manifest.production?.authorized!==false||manifest.production?.deployed!==false){
+      errors.push('Unpublished 7.3.3 work must not claim Production authorization or deployment.');
+    }
+    if(evidence.external?.productionMigrations?.authorized!==false||evidence.external?.productionMigrations?.status!=='not-run'){
+      errors.push('Unpublished 7.3.3 work must not claim an authorized or completed Production migration.');
+    }
+  }
+  if (evidence.external?.productionDataRemoval?.authorized !== false || evidence.external?.productionDataRemoval?.status !== 'not-run') {
+    errors.push('7.3.3 implementation work must not claim an authorized or completed Production removal.');
+  }
+  const stagingValidated=['staging-validated','validated-production-authorized','production-deployed-pending-owner-acceptance','released'].includes(manifest.status);
+  if(stagingValidated){
+    const rehearsal=evidence.external?.cloudRehearsal;
+    if(
+      manifest.staging?.authorized!==true
+      || manifest.staging?.deployed!==true
+      || rehearsal?.authorized!==true
+      || rehearsal?.status!=='completed-restored'
+      || rehearsal?.environment!=='isolated-staging'
+      || Number(rehearsal?.migrationVersion)!==25
+      || Number(rehearsal?.archive?.totalRows)!==7455
+      || Number(rehearsal?.archive?.sourceObjects)!==43
+      || rehearsal?.transitionStatus!=='restored'
+      || rehearsal?.activeSnapshotId!==null
+      || rehearsal?.freeAgentStatus!=='blocked'
+      || rehearsal?.freeAgentCount!==null
+      || Number(rehearsal?.foreignKeyViolations)!==0
+      || rehearsal?.sessionStatus!=='revoked'
+      || rehearsal?.membershipStatus!=='inactive'
+    ){
+      errors.push('7.3.3 staging evidence must prove the authorized isolated archive/remove/recovery rehearsal and cleanup.');
+    }
+  }else if(evidence.external?.cloudRehearsal?.authorized!==false||evidence.external?.cloudRehearsal?.status!=='not-run'){
+    errors.push('7.3.3 implementation work must preserve the separate cloud-rehearsal boundary until staging is validated.');
+  }
+  if (
+    evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || (!productionDeployed && evidence.scopeBoundaries?.productionDataChanged !== false)
+    || (productionDeployed && evidence.scopeBoundaries?.productionDataChanged !== true)
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) {
+    errors.push('7.3.3 implementation must preserve Production, Main, active-snapshot, and blocked-Free-Agent boundaries.');
+  }
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

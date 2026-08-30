@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.39
+**Revision:** 1.43
 
-**Current production:** 7.3.2 from exact source commit `972bea6`; accepted Madden 27 snapshot `841ce1b5` is active
+**Current production:** 7.3.3 from exact source commit `b373f66`; accepted Madden 27 snapshot `841ce1b5` remains active
 
-**Current work:** 7.3.2 is owner-accepted and active against the clean Madden 27 Production data plane. Exact snapshot `841ce1b5` contains 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings with validation ready and zero errors. Its one-time forward-transaction baseline is complete across all 2,044 rostered players with zero movements and zero classifications. Free Agents remain blocked/unknown, no temporary baseline access was created, and Git Main is unchanged.
+**Current work:** Exact 7.3.3 candidate `b373f66` passed the 92/92 consolidated strict local gate and 4/4 hosted checks, then reached Production as Pages deployment `e926a37f`. Additive migration 25 is applied and reconciled; the active snapshot, protected platform counts, Git Main, and blocked/null Free Agent state are unchanged. Owner UI acceptance is pending.
 
-**Next gate:** Authorize the 7.3.3 implementation cycle for reusable game-year archive/removal controls. Main, Production publication, any reset/removal rehearsal, snapshot activation, and any rollback remain separately authorized and excluded.
+**Next gate:** The owner validates the 7.3.3 commissioner transition panel at `franchisehq.app`, without executing archive/detach/removal/recovery. Production transition operations, Main, data reset, and snapshot activation/change remain separately authorized and excluded.
 
 ## Product decisions
 
@@ -48,7 +48,7 @@
 | 7.3.0 | Completion candidate | Real Madden 27 source captured; 2,044 rostered players certified as preview-ready; Free Agents honestly blocked upstream and deferred |
 | 7.3.1 | Staging validated | One reviewed 2026 season, 32 teams, and 2,044 rostered-player identities are retained in a private preview; Free Agents remain blocked/unknown and no snapshot is active |
 | 7.3.2 | Released; owner accepted and active | Exact repair `972bea6` completed the cold run in 43.763 seconds; the owner accepted and separately activated the validation-ready 32-team/2,044-player snapshot. Free Agents remain blocked/null. |
-| 7.3.3 | Planned | Game-year archive, active-data removal, and edition-transition controls that persist leagues and accounts |
+| 7.3.3 | Production deployed; owner acceptance pending | Exact `b373f66` and migration 25 are live; the staged 7,455-row/43-source archive/removal/recovery rehearsal remains the proof, while Production transition rows stay empty and active snapshot `841ce1b5` remains unchanged |
 | 7.3.4 | Planned | Real FGC Madden 27 staging import and recovery certification |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
@@ -159,6 +159,13 @@
 - Preview exact affected counts, record a recovery bookmark and durable audit event, and require typed confirmation scoped to one league and game year.
 - At season close, freeze player season totals and GM/postseason summaries while allowing old gamelogs and live operational records to be removed.
 - Gate: an isolated rehearsal completes inventory → archive → verify → detach/remove active data → import next game year → validate → optional activation → rollback. Failures never expose partial data or erase the persistent league/account plane.
+- Implementation adds migration 25, first-class Madden game years, separate commissioner operation cards, immutable archive manifests/parts/events, raw-source and relational checksums, exact typed confirmations, recovery bookmarks, franchise-season closures, scoped active-data removal, resumable row/byte-bounded recovery, and exact boundary-state restoration. The legacy broad-reset endpoint is retired.
+- Live isolated-staging result: migration 25 is applied only to `franchise-hq-staging-db`. One private immutable archive verified 7,455 scoped rows and 43 source objects (44 objects / 33,758,815 bytes), then the workflow detached and removed the staged Madden 27 active plane and restored it from the same archive. The archive copy remains retained.
+- The cloud rehearsal exposed and closed three gaps: recovery now persists bounded cursors across requests; archive scope now includes identity-owned mapping parents; and rollback restores exact franchise-season, game-year snapshot, league-snapshot, and destination statuses. The first immutable archive required an audited two-parent compatibility repair, after which all 32 identity teams and 2,044 identity players were restored.
+- Final staging state is intentionally non-active: the league snapshot is `validated`, its game-year link is `candidate`, the franchise season is `preview`, and active snapshot rows remain zero. Users/memberships remain 1/1, temporary access is inactive/revoked, foreign keys are clean, and Free Agents remain blocked/null rather than zero.
+- Exact game-year implementation commit `061639d` passed 91/91 local tests and 4/4 hosted checks in PR #13. At that validation checkpoint, Production, Main, Production migration 25, Production archive/removal/recovery, data reset, and snapshot activation remained unchanged and unauthorized.
+- The owner subsequently authorized one cumulative direct Production acceptance cycle. Exact acceptance candidate `b373f66` corrects the stale shell label to show its host-derived environment and release 7.3.3, passed 4/4 hosted checks, and is live as Pages deployment `e926a37f` with additive migration 25 applied.
+- Production reconciliation retained one league, eight users, eight memberships, six active team assignments, exact active snapshot `841ce1b5`, 32 identity teams, and 2,044 rostered-player identities. Free Agents remain blocked/null, foreign keys are clean, and all Production transition/archive/recovery/removal row counts remain zero. Git Main remains unchanged.
 
 ## 7.3.4 — FGC Madden 27 Certification
 
@@ -276,7 +283,7 @@
 3. Implement related work together; do not publish partial patch chains.
 4. Add regressions for each defect and contract tests for each new authority.
 5. Run one consolidated strict gate and update this roadmap with discoveries.
-6. Review the candidate, then request separate staging and production authorizations when applicable.
+6. Review the candidate, then request Production authorization. Staging is not used unless the owner explicitly requests it for that release.
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
@@ -301,3 +308,7 @@
 - **Revision 1.37:** Recorded owner acceptance of the exact repaired 7.3.2 private candidate. This closes the release acceptance gate without activating the snapshot, changing Main, resetting data, creating another rehearsal, or changing the blocked/null Free Agent state. Snapshot activation and 7.3.3 implementation remain separate future authorizations.
 - **Revision 1.38:** Used the separate snapshot-activation authorization exactly once for accepted snapshot `841ce1b5`. Production now has one active pointer with 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings; validation remains ready with zero errors, Free Agents remain blocked/null, the activation session is revoked, foreign keys are clean, and Main/reset/memberships/credentials are unchanged. Forward-transaction detection remains a separate pending stage.
 - **Revision 1.39:** Used the one-time Production forward-transaction authorization for exact active snapshot `841ce1b5`. One completed baseline job compared all 2,044 rostered players and one tenant audit row recorded the result; movements and classifications remain zero, the active pointer and counts are unchanged, Free Agents remain blocked/null rather than zero, foreign keys are clean, no temporary access was created, and Main/reset/activation remain unchanged.
+- **Revision 1.40:** Completed the authorized 7.3.3 implementation from exact evidence commit `b6082b2`. Exact implementation commit `1076b498` is published in stacked PR #13 with 4/4 hosted checks passing. Migration 25 and local rehearsals cover separate import/season/game-year controls, immutable archive verification, detach/removal, archive-copy tombstoning, and recovery while preserving the league/account plane and blocked/null Free Agent semantics. Production, Main, cloud data, the active snapshot, and all live data remain unchanged; one isolated cloud rehearsal is the next separate gate.
+- **Revision 1.41:** Completed the separately authorized 7.3.3 isolated-staging rehearsal. Migration 25, a 7,455-row/43-source immutable archive, staged detach/removal, resumable restoration, an audited two-parent identity dependency repair, and exact boundary-status reconciliation are verified with zero foreign-key violations. Exact implementation commit `061639d` passes 91/91 local tests and 4/4 hosted checks. The active staging pointer remains empty, Free Agents remain blocked/null, temporary access is revoked/inactive, and Production/Main/reset/activation remain unchanged and unauthorized.
+- **Revision 1.42:** Adopted owner-directed Production-first acceptance for future releases; staging now requires separate explicit owner direction. Authorized one cumulative 7.3.3 Production acceptance cycle with additive migration 25 and exact candidate `67255af`, which replaces the stale 7.3.0 shell marker with accurate Production/7.3.3 identification. Transition execution, reset, Main, and active-snapshot changes remain excluded.
+- **Revision 1.43:** Deployed exact 7.3.3 candidate `b373f66` to Production as Pages deployment `e926a37f` after 4/4 hosted checks, applied and reconciled additive migration 25, and immediately restored the Cloudflare Production branch setting to `main`. The active snapshot remains exact `841ce1b5`; protected counts are unchanged; Production transition/archive/recovery/removal rows remain zero; Free Agents remain blocked/null; and Git Main, reset, transition execution, and snapshot activation/change remain untouched. Owner UI acceptance is the next gate.
