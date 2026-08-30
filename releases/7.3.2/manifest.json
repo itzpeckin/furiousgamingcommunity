@@ -20,7 +20,7 @@
   "repositoryPublication": {
     "authorized": true,
     "status": "pull-request-open-hosted-checks-passed",
-    "commit": "4f5e81b4cc924e72bc9b8499ae12164bfd12620c",
+    "commit": "972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a",
     "pullRequest": 12,
     "hostedChecksPassed": 4,
     "scope": "PR #12 remains open from codex/franchisehq-7.3.2 to codex/franchisehq-7.3.1. Git Main is unchanged."
@@ -38,9 +38,9 @@
     "deployed": true,
     "status": "success-pending-owner-acceptance",
     "url": "https://franchisehq.app/",
-    "deploymentId": "ebcf42ec-5a7c-4efa-8e88-891f6c06fcaa",
-    "commit": "4f5e81b4cc924e72bc9b8499ae12164bfd12620c",
-    "scope": "The private candidate is correct and validation-ready with no active snapshot. Production cold-path performance is not yet accepted because the first cold rehearsal took 74.387 seconds."
+    "deploymentId": "61165506-9d06-4f95-9760-58f73389d37c",
+    "commit": "972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a",
+    "scope": "The retained private candidate is correct and validation-ready with no active snapshot. The one remediation rehearsal stopped safely on D1's SQL-variable ceiling; the deployed repair bounds complete identity lookups, and one newly authorized cold rehearsal is required for performance acceptance."
   },
   "requiredArtifacts": [
     "config/database-schema-contract.json",
@@ -51,6 +51,7 @@
     "functions/_lib/candidate-import.js",
     "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
     "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
     "league-engine/one-click-import.js",
     "migrations/0024_commissioner_candidate_import.sql",
     "releases/7.3.2/release-record.md",
