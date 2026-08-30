@@ -19,6 +19,8 @@ const checks = [
     'tests/database/migrations.test.mjs',
     'tests/import/madden-discovery.test.mjs',
     'tests/import/permanent-identity.test.mjs',
+    'tests/import/candidate-import.test.mjs',
+    'tests/import/game-year-transition.test.mjs',
     'tests/security/containment.test.mjs',
     'tests/security/session.test.mjs',
     'tests/security/onboarding.test.mjs',

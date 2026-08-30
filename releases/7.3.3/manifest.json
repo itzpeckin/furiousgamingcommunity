@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.3",
+  "releaseType": "safe-game-year-transition-controls",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.2",
+    "commit": "b6082b2cb91dc70f9a30d2325f4067ffef045b1a",
+    "tree": "fdb5e69935213eb04577e7668ec472695f48781b",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.3",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending-candidate-commit",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "scope": "Publication is limited to codex/franchisehq-7.3.3 and a stacked pull request. Git Main is excluded."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "No cloud rehearsal or isolated-staging mutation is included in this implementation authorization."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "No Production publication, migration, archive, detach, removal, activation, or rollback is authorized."
+  },
+  "requiredArtifacts": [
+    "config/database-schema-contract.json",
+    "config/environment-contract.json",
+    "docs/DATABASE-OPERATIONS.md",
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/game-year-transition.js",
+    "functions/api/leagues/[leagueSlug]/game-year-transition.js",
+    "functions/api/leagues/[leagueSlug]/reset-data.js",
+    "league-engine/game-year-transition.js",
+    "migrations/0025_safe_game_year_transition.sql",
+    "releases/7.3.3/release-record.md",
+    "releases/7.3.3/validation-evidence.json",
+    "tests/import/game-year-transition.test.mjs"
+  ]
+}

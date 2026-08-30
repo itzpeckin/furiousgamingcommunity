@@ -11,7 +11,7 @@ import {
   resolveTeam
 } from '../../functions/_lib/league-teams.js';
 import { hashToken } from '../../functions/_lib/auth.js';
-import { onRequestPost as resetLeagueData } from '../../functions/api/leagues/[leagueSlug]/reset-data.js';
+import { onRequestPost as retiredLeagueReset } from '../../functions/api/leagues/[leagueSlug]/reset-data.js';
 import { normalizeTeam } from '../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js';
 
 function d1(database) {
@@ -121,7 +121,7 @@ test('the database prevents two active memberships from owning the same canonica
   database.close();
 });
 
-test('commissioner reset atomically clears Madden data and preserves only selected active members', async () => {
+test('the legacy broad reset is retired without changing Madden data or memberships', async () => {
   const database = new DatabaseSync(':memory:');
   database.exec(`
     PRAGMA foreign_keys=ON;
@@ -199,7 +199,7 @@ test('commissioner reset atomically clears Madden data and preserves only select
   database.prepare('INSERT INTO league_snapshot_records VALUES (?,?,?,?,?)').run('snapshot-1','league-1','teams','tb','{}');
   database.prepare('INSERT INTO league_active_snapshots VALUES (?,?)').run('league-1','snapshot-1');
 
-  const response = await resetLeagueData({
+  const response = await retiredLeagueReset({
     request:new Request('https://franchisehq.app/api/leagues/fgc/reset-data', {
       method:'POST',
       headers:{ 'content-type':'application/json', cookie:`franchise_hq_session=${token}` },
@@ -208,31 +208,31 @@ test('commissioner reset atomically clears Madden data and preserves only select
     params:{ leagueSlug:'fgc' },
     env:{ DB:d1(database) }
   });
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 410);
   const payload = await response.json();
-  assert.deepEqual(new Set(payload.preservedUserIds), new Set(['justin','gas']));
-  assert.equal(payload.deletedCounts.league_snapshots, 1);
-  assert.equal(payload.deletedCounts.league_snapshot_records, 1);
-  assert.equal(payload.deletedCounts.disabledMemberships, 1);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM league_snapshots').get().count, 0);
+  assert.equal(payload.code, 'LEGACY_RESET_RETIRED');
+  assert.equal(payload.resetPerformed, false);
+  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM league_snapshots').get().count, 1);
   assert.equal(database.prepare('SELECT active FROM league_memberships WHERE user_id=?').get('justin').active, 1);
   assert.equal(database.prepare('SELECT active FROM league_memberships WHERE user_id=?').get('gas').active, 1);
-  assert.equal(database.prepare('SELECT active FROM league_memberships WHERE user_id=?').get('saluki').active, 0);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM league_data_reset_audit').get().count, 1);
+  assert.equal(database.prepare('SELECT active FROM league_memberships WHERE user_id=?').get('saluki').active, 1);
+  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM league_data_reset_audit').get().count, 0);
   database.close();
 });
 
 test('ownership and reset source guards keep authority on the server', async () => {
-  const [appSource, tradeSource, resetSource] = await Promise.all([
+  const [appSource, tradeSource, resetSource,transitionSource] = await Promise.all([
     readFile(new URL('../../app.js', import.meta.url), 'utf8'),
     readFile(new URL('../../trade-module.js', import.meta.url), 'utf8'),
-    readFile(new URL('../../functions/api/leagues/[leagueSlug]/reset-data.js', import.meta.url), 'utf8')
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/reset-data.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/game-year-transition.js', import.meta.url), 'utf8')
   ]);
   assert.doesNotMatch(appSource, /source\?\.ownerName|source\?\.userName|source\.ownerName|source\.userName/);
   assert.match(tradeSource, /function reviewerRoleForAccount\(account\).*account\.role==='commissioner'/);
   assert.doesNotMatch(tradeSource, /function reviewerRoleForAccount\(account\).*ownershipState/);
   assert.match(resetSource, /requireCommissioner\(context\)/);
-  assert.match(resetSource, /body\.confirmation !== state\.league\.slug/);
-  assert.match(resetSource, /new Set\(\[state\.auth\.session\.user\.id, \.\.\.requested\]\)/);
-  assert.match(resetSource, /await context\.env\.DB\.batch\(statements\)/);
+  assert.match(resetSource, /LEGACY_RESET_RETIRED/);
+  assert.doesNotMatch(resetSource, /DELETE FROM|UPDATE league_memberships/);
+  assert.match(transitionSource, /transitionConfirmations/);
+  assert.match(transitionSource, /platformPlanePreserved:true/);
 });

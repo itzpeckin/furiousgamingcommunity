@@ -2,7 +2,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
-const RELEASE='7.3.2',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+const RELEASE='7.3.3',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -605,9 +605,17 @@ export async function onRequestPost(context){const c=await contextData(context);
  }
  if(snapshot.validation_status!=='ready'||Number(snapshot.validation_error_count||0)>0)return json({ok:false,error:'Snapshot must pass validation before activation.',validationStatus:snapshot.validation_status||'not-run'},422);
  const current=await active(c.db,c.league.id);if(current?.snapshot_id===snapshot.id)return json({ok:true,release:RELEASE,action,alreadyActive:true,...await listSnapshots(c.db,c.league.id)});
+ const targetGameYear=await c.db.prepare(`SELECT gy.* FROM game_year_snapshots linked JOIN league_game_years gy ON gy.id=linked.game_year_id AND gy.league_id=linked.league_id WHERE linked.league_id=? AND linked.snapshot_id=?`).bind(c.league.id,snapshot.id).first();
+ if(!targetGameYear)return json({ok:false,error:'Snapshot is not attached to a Madden game year.',release:RELEASE},409);
+ if(current?.snapshot_id){
+   const currentGameYear=await c.db.prepare(`SELECT game_year_id FROM game_year_snapshots WHERE league_id=? AND snapshot_id=?`).bind(c.league.id,current.snapshot_id).first();
+   if(currentGameYear?.game_year_id&&currentGameYear.game_year_id!==targetGameYear.id)return json({ok:false,error:'Archive and detach the active Madden game year before activating a different edition.',release:RELEASE},409);
+ }
  if(current?.snapshot_id){await c.db.prepare(`UPDATE league_snapshots SET status='archived',archived_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(current.snapshot_id).run();}
  await c.db.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id,activated_at,activated_by,previous_snapshot_id) VALUES (?,?,CURRENT_TIMESTAMP,?,?) ON CONFLICT(league_id) DO UPDATE SET snapshot_id=excluded.snapshot_id,activated_at=CURRENT_TIMESTAMP,activated_by=excluded.activated_by,previous_snapshot_id=league_active_snapshots.snapshot_id`).bind(c.league.id,snapshot.id,actor,current?.snapshot_id||null).run();
  await c.db.prepare(`UPDATE league_snapshots SET status='active',activated_at=CURRENT_TIMESTAMP,archived_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(snapshot.id).run();
+ await c.db.prepare(`UPDATE game_year_snapshots SET snapshot_status=CASE WHEN snapshot_id=? THEN 'active' WHEN snapshot_status='active' THEN 'archived' ELSE snapshot_status END,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND game_year_id=?`).bind(snapshot.id,c.league.id,targetGameYear.id).run();
+ await c.db.prepare(`UPDATE league_game_years SET status='active',archived_at=NULL,removed_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=?`).bind(targetGameYear.id,c.league.id).run();
  const forwardDetection=action==='activate'
    ?{status:'pending-separate-stage',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id,note:'5.9.10.6.2e runs forward transaction detection in bounded requests after activation.'}
    :{status:'skipped',reason:'rollback-activation',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id};

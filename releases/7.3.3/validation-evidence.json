@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.3",
+  "validatedOn": "2026-08-30",
+  "status": "local-review-candidate",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "gameYearBoundary": { "passed": true, "separateFromFranchiseSeason": true, "migrationVersion": 25 },
+    "separateOperationControls": { "passed": true, "operations": ["replace-current-import", "start-franchise-season", "archive-remove-game-year"] },
+    "immutableArchiveManifest": { "passed": true, "manifestUpdateBlocked": true, "manifestDeleteBlocked": true, "appendOnlyEvents": true },
+    "archiveChecksumVerification": { "passed": true, "relationalReadBack": true, "sourceObjectReadBack": true, "rawBytesHashedDirectly": true, "rootDigestDeterministic": true, "rootDigestReverifiedBeforeRemovalOrRecovery": true },
+    "typedLeagueGameYearConfirmation": { "passed": true, "leagueScoped": true, "gameReleaseScoped": true, "separateArchiveDetachRemovalConfirmations": true },
+    "protectedPlatformPlane": { "passed": true, "preserved": ["leagues", "users", "memberships", "roles", "sessions", "settings", "rules", "audits", "player identities", "player season summaries", "GM identities", "ownership history"] },
+    "teamAssignmentRemapBoundary": { "passed": true, "clearedAtDetach": true, "membershipDisabled": false, "restoredByVerifiedRollback": true },
+    "franchiseSeasonClosure": { "passed": true, "frozenPlayerSummaries": true, "frozenOwnershipPeriods": true, "sameGameYearAllowed": true },
+    "activeDataDetachRemoval": { "passed": true, "archiveRequired": true, "checksumVerificationRequired": true, "partialExposurePrevented": true, "sourceDeletionReadBackVerified": true },
+    "recoveryBookmarkRollback": { "passed": true, "activeSnapshotRestored": true, "teamAssignmentsRestored": true, "sourceObjectsRestored": true },
+    "archiveCopyRemoval": { "passed": true, "separateConfirmation": true, "objectDeletionVerified": true, "immutableRowsRetained": true, "tombstoneRetained": true, "rollbackRefusedAfterRemoval": true },
+    "legacyResetRetired": { "passed": true, "httpStatus": 410, "broadResetWrites": false },
+    "freeAgentBlockedPreserved": { "passed": true, "status": "blocked", "count": null, "interpretedAsZero": false },
+    "strictMigration": { "passed": true, "expectedFailure": false, "blockingIssues": 0 },
+    "automatedTests": { "passed": true, "passedTests": 87, "failedTests": 0, "scope": "full-consolidated-release-gate" },
+    "strictRepositoryGate": { "passed": true, "javascriptModules": 198, "secretScanFiles": 552, "inventoryFiles": 527, "routes": 64, "requiredTables": 78 }
+  },
+  "scopeBoundaries": {
+    "implementationAddsDestructiveCapability": true,
+    "destructiveOperationExecuted": false,
+    "gameYearSeparateFromFranchiseSeason": true,
+    "persistentLeagueAndAccountPlanePreserved": true,
+    "activeSnapshotChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "sessionRefreshRedesignChanged": false,
+    "credentialsChanged": false
+  },
+  "external": {
+    "githubPullRequest": { "authorized": true, "status": "pending", "pullRequest": null, "base": "codex/franchisehq-7.3.2", "head": "codex/franchisehq-7.3.3", "commit": null, "gitMainChanged": false },
+    "hostedChecks": { "status": "pending", "passed": 0, "failed": 0, "commit": null },
+    "cloudRehearsal": { "authorized": false, "status": "not-run" },
+    "productionMigrations": { "authorized": false, "status": "not-run", "migration": 25 },
+    "productionDataRemoval": { "authorized": false, "status": "not-run" },
+    "maddenImportActivation": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

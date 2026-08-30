@@ -15,8 +15,9 @@ import {
   parseCandidateJson,
   publicCandidateRun
 } from '../../../../_lib/candidate-import.js';
+import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 
-const RELEASE = '7.3.2';
+const RELEASE = '7.3.3';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -51,8 +52,10 @@ async function latestReport(db, leagueId) {
 
 async function destinationFor(db, leagueId, franchiseSeasonId) {
   if (!franchiseSeasonId) return null;
-  return db.prepare(`SELECT * FROM companion_import_destinations
-    WHERE league_id=? AND franchise_season_id=? AND status='active' LIMIT 1`)
+  return db.prepare(`SELECT destination.*,game_year.status game_year_status,game_year.game_release
+    FROM companion_import_destinations destination
+    LEFT JOIN league_game_years game_year ON game_year.id=destination.game_year_id
+    WHERE destination.league_id=? AND destination.franchise_season_id=? AND destination.status='active' LIMIT 1`)
     .bind(leagueId, franchiseSeasonId).first();
 }
 
@@ -90,6 +93,8 @@ function publicDestination(row) {
   return {
     id:row.id,
     franchiseSeasonId:row.franchise_season_id,
+    gameYearId:row.game_year_id || null,
+    gameRelease:row.game_release || null,
     label:row.label,
     status:row.status,
     createdAt:row.created_at,
@@ -166,15 +171,38 @@ async function createDestination(current, identity) {
   let destination = await destinationFor(current.db,current.league.id,identity.franchise_season_id);
   let created = false;
   if (!destination) {
+    const release = normalizeGameRelease(identity.game_release);
+    if (!release.ok) return { response:json({ok:false,error:release.error,release:RELEASE},409) };
+    let gameYear = await current.db.prepare(`SELECT * FROM league_game_years
+      WHERE league_id=? AND game_release=?`).bind(current.league.id,release.gameRelease).first();
+    if (!gameYear) {
+      const gameYearId = `game_year_${crypto.randomUUID()}`;
+      await current.db.batch([
+        current.db.prepare(`INSERT INTO league_game_years
+          (id,league_id,game_release,edition_year,display_name,status)
+          VALUES (?,?,?,?,?,'preparing')`).bind(gameYearId,current.league.id,release.gameRelease,release.editionYear,release.gameRelease),
+        current.db.prepare(`INSERT INTO game_year_franchise_seasons
+          (game_year_id,league_id,franchise_season_id) VALUES (?,?,?)`)
+          .bind(gameYearId,current.league.id,identity.franchise_season_id)
+      ]);
+      gameYear = await current.db.prepare(`SELECT * FROM league_game_years WHERE id=?`).bind(gameYearId).first();
+    } else {
+      await current.db.prepare(`INSERT OR IGNORE INTO game_year_franchise_seasons
+        (game_year_id,league_id,franchise_season_id) VALUES (?,?,?)`)
+        .bind(gameYear.id,current.league.id,identity.franchise_season_id).run();
+    }
+    if (!['preparing','active','restored'].includes(String(gameYear?.status||''))) {
+      return { response:json({ok:false,error:'This Madden game year is archived. Start a new edition transition before importing into it.',release:RELEASE},409) };
+    }
     const id = `import_destination_${crypto.randomUUID()}`;
     await current.db.prepare(`INSERT INTO companion_import_destinations
-      (id,league_id,franchise_season_id,label,status,created_by_user_id)
-      VALUES (?,?,?,?,?,?)`).bind(id,current.league.id,identity.franchise_season_id,
-        `${identity.display_name} private candidate`,'active',current.authorization.session.user.id).run();
+      (id,league_id,franchise_season_id,label,status,created_by_user_id,game_year_id)
+      VALUES (?,?,?,?,?,?,?)`).bind(id,current.league.id,identity.franchise_season_id,
+        `${identity.display_name} private candidate`,'active',current.authorization.session.user.id,gameYear.id).run();
     destination = await destinationFor(current.db,current.league.id,identity.franchise_season_id);
     created = true;
     await audit(current,'companion.candidate_destination.create','companion_import_destination',id,{
-      franchiseSeasonId:identity.franchise_season_id,activationPerformed:false
+      franchiseSeasonId:identity.franchise_season_id,gameYearId:gameYear.id,activationPerformed:false
     });
   }
   return { destination, created };

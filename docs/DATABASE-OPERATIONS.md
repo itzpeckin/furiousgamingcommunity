@@ -33,6 +33,15 @@ This runbook governs FranchiseHQ database changes beginning with 7.1.0. It is wr
 - Candidate creation and validation are append-only and do not write `league_active_snapshots`.
 - Game year is an operational partition independent from franchise season year. Persistent league/account state crosses editions; Madden-derived source, mapping, identity, snapshot, and transaction state belongs to a game year.
 
+## What 7.3.3 adds
+
+- `migrations/0025_safe_game_year_transition.sql` advances the required schema to version 25 and makes the Madden game year a first-class partition above one or more franchise seasons.
+- The migration is additive: it links existing seasons, candidate destinations, and snapshots to a game year without changing the active snapshot pointer or removing active data.
+- A commissioner must use separate, exact league-and-edition confirmations to plan an archive, write and read-back-verify it, detach active data, remove active data, remove retained archive objects, or restore a verified archive.
+- `GAME_YEAR_ARCHIVES` is a private R2 binding dedicated to verified relational and source-object archives. Provisioning or binding it, applying migration 25, and exercising any transition are separate cloud authorizations.
+- Archive manifests, archive parts, recovery bookmarks, and transition events are immutable. Archive-object removal retains the manifest and an explicit tombstone.
+- Free Agents remain `blocked` or `missing` with a null count unless source evidence proves `located` or `empty-confirmed`; an unavailable route is never converted to zero.
+
 ## Authorization boundary
 
 Building and testing a migration does not authorize applying it to Cloudflare. Staging application and production application are separate decisions. A production migration requires a new, explicit owner authorization after the local candidate and recovery plan are reviewed.
@@ -60,13 +69,13 @@ npm run check:strict
 
 The gate must prove:
 
-- a clean database reaches ledger version 23;
+- a clean database reaches ledger version 25;
 - a production-like legacy database upgrades without changing league, user, membership, team assignment, or snapshot identity;
 - all required tables and core columns exist;
 - `PRAGMA foreign_key_check` returns no rows;
 - a file backup restores to the same rows and relationships;
 - no request handler contains table or index creation SQL;
-- tenant migration preservation, two-tenant isolation, hashed discovery-session storage, and source-lock privacy tests pass.
+- tenant migration preservation, two-tenant isolation, hashed discovery-session storage, source-lock privacy, version-24 game-year backfill, and the complete local archive/detach/removal/recovery lifecycle pass.
 
 Apply only unapplied migrations to an isolated staging database:
 
@@ -108,6 +117,8 @@ After 7.3.1, the ledger must contain every version from 1 through 23 and the for
 
 After 7.3.2, the active ledger must contain every version from 1 through 24 and the foreign-key check must return no rows. Migration 24 adds `companion_import_destinations` and `companion_candidate_import_runs`; neither table authorizes or performs snapshot activation.
 
+After 7.3.3, the ledger must contain every version from 1 through 25 and the foreign-key check must return no rows. Migration 25 adds game-year links and immutable archive/recovery evidence. Applying it does not itself archive, detach, remove, restore, or activate anything. Before any later transition operation, record the exact game year, active snapshot, protected counts, typed confirmation, private R2 target, and verified archive digest.
+
 ## Stop conditions
 
 Stop immediately and do not deploy the application when any of these occurs:
@@ -115,11 +126,14 @@ Stop immediately and do not deploy the application when any of these occurs:
 - the target database identity is uncertain;
 - a Time Travel bookmark was not recorded;
 - a migration is applied out of order or only partly succeeds;
-- ledger versions 1 through 23 are not continuous;
+- ledger versions 1 through 25 are not continuous;
 - league, user, membership, team assignment, or snapshot counts unexpectedly change;
 - any foreign-key check row appears;
 - an expected production table or column is missing;
-- the staging application reports `DATABASE_MIGRATION_REQUIRED` after version 23 is recorded.
+- the application reports `DATABASE_MIGRATION_REQUIRED` after version 25 is recorded;
+- `GAME_YEAR_ARCHIVES` is missing, public, or points to an unreviewed bucket;
+- a transition attempts detach or removal before the archive read-back digest is verified;
+- blocked or missing Free Agents are presented as a zero count.
 
 ## Recovery and rollback
 

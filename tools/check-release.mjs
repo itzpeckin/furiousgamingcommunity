@@ -415,6 +415,46 @@ if (version === '7.3.2') {
     errors.push('7.3.2 must preserve the blocked-Free-Agent boundary.');
   }
 }
+if (version === '7.3.3') {
+  for (const check of [
+    'gameYearBoundary',
+    'separateOperationControls',
+    'immutableArchiveManifest',
+    'archiveChecksumVerification',
+    'typedLeagueGameYearConfirmation',
+    'protectedPlatformPlane',
+    'teamAssignmentRemapBoundary',
+    'franchiseSeasonClosure',
+    'activeDataDetachRemoval',
+    'recoveryBookmarkRollback',
+    'archiveCopyRemoval',
+    'legacyResetRetired',
+    'freeAgentBlockedPreserved',
+    'strictMigration'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.3 game-year transition evidence is incomplete: ${check}.`);
+  }
+  if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
+    errors.push('7.3.3 implementation work must not claim Production authorization or deployment.');
+  }
+  if (evidence.external?.productionMigrations?.authorized !== false || evidence.external?.productionMigrations?.status !== 'not-run') {
+    errors.push('7.3.3 implementation work must not claim an authorized or completed Production migration.');
+  }
+  if (evidence.external?.productionDataRemoval?.authorized !== false || evidence.external?.productionDataRemoval?.status !== 'not-run') {
+    errors.push('7.3.3 implementation work must not claim an authorized or completed Production removal.');
+  }
+  if (evidence.external?.cloudRehearsal?.authorized !== false || evidence.external?.cloudRehearsal?.status !== 'not-run') {
+    errors.push('7.3.3 implementation work must preserve the separate cloud-rehearsal boundary.');
+  }
+  if (
+    evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) {
+    errors.push('7.3.3 implementation must preserve Production, Main, active-snapshot, and blocked-Free-Agent boundaries.');
+  }
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

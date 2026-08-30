@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.3 candidate impact
+
+The 7.3.3 review candidate adds migration 25 and commissioner-operated game-year transition controls. This implementation cycle does not apply the migration to a cloud database, write an archive, detach or remove data, change the active snapshot, deploy Production, or change Git Main.
+
+A code rollback retains the additive game-year tables and links. Do not reverse migration 25 by dropping tables or clearing `game_year_id`. Before any future data transition, recovery depends on a read-back-verified immutable archive manifest plus its recovery bookmark. Detach and active-data removal are refused until verification succeeds, and rollback restores only the exact scoped rows, source objects, prior active pointer, and team assignments recorded by that bookmark.
+
+Archive-object deletion is a distinct irreversible operation with its own typed league-and-edition confirmation. It retains manifest and tombstone rows but eliminates application-level restore from those objects. Never use it as a code rollback. Blocked or missing Free Agents remain null/unknown throughout archive and recovery.
+
 ## 7.3.2 Production acceptance impact
 
 Production Pages deployment `ebcf42ec-5a7c-4efa-8e88-891f6c06fcaa` and Worker version `3b883a17-04bf-4c46-8b2d-e5ab5b98658e` run exact source commit `4f5e81b4cc924e72bc9b8499ae12164bfd12620c`. Git `main` remains `4045e02980c93491b47910f17fcb2e48fae76c68`; PR #12 remains open.
@@ -36,11 +44,11 @@ The current production rollback target is:
 3. For an unhealthy Cloudflare build, restore the last known-good deployment while the Git rollback is reviewed.
 4. Run production smoke checks and record the restored deployment identity.
 
-The 7.1/7.2 application can operate with the additive 7.3 discovery schema, so normal code rollback retains migrations 21 and 22 rather than trying to reverse tables.
+The 7.1/7.2 application can operate with the additive 7.3 discovery schema, so normal code rollback retains migrations 21 through 25 rather than trying to reverse tables.
 
 ## Database recovery
 
-Follow `docs/DATABASE-OPERATIONS.md`. Before migrations 21 or 22, record the D1 Time Travel bookmark, ledger, table/row counts, tenant identities, memberships, rules, settings, active snapshot pointer, validation-player rows, and foreign-key result.
+Follow `docs/DATABASE-OPERATIONS.md`. Before migrations 21 through 25, record the D1 Time Travel bookmark, ledger, table/row counts, tenant identities, memberships, rules, settings, active snapshot pointer, validation-player rows, and foreign-key result.
 
 Never replay `migrations/legacy/` and never improvise rollback by dropping tenant tables. If reconciliation fails, stop application publication. A Time Travel restore overwrites the database and requires separate owner authorization.
 
