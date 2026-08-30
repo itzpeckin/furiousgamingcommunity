@@ -1,8 +1,8 @@
 # FranchiseHQ 7.3.4.1 Release Record
 
-**Status:** Consolidated local implementation and validation complete; publication and Production are not authorized
+**Status:** Production deployed from exact Main commit; pending owner UI acceptance
 
-**Production changed:** No. Production remains on exact 7.3.4 commit `431583ea7a472c4ba5292bea1a1775e7f0309b33` / Pages deployment `fafabfb2-91fe-4759-9cf8-8872365c6777`, with active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` unchanged.
+**Production changed:** Yes, within the authorized release boundary. Exact commit `6de7c1018c89bc8fd6868fbde984f7a496e2a69d` is on Main and Production Pages deployment `0eec0551-216c-4f32-8aed-e8a7fbcb81ab`; additive migration 26 is applied. Active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` is unchanged.
 
 ## Scope
 
@@ -36,12 +36,16 @@ Replace weekly commissioner capture-session setup with one permanent, league-spe
 
 ## Deployment status
 
-- Local branch `codex/franchisehq-7.3.4.1` contains the validated review candidate based on exact Production/Main commit `431583e`.
-- Branch publication, pull request creation, hosted checks, staging, Production deployment, and migration 26 application are not authorized and have not run.
-- No real Madden export or candidate import ran. No data was reset, archived, removed, recovered, or activated, and the active snapshot was not changed.
+- Pull request #16 published exact candidate `6de7c1018c89bc8fd6868fbde984f7a496e2a69d`; all four candidate hosted checks passed, and Main fast-forwarded to that exact commit.
+- Additive migration 26 applied to exact Production D1 database `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`. The ledger advanced from 25 to 26, the application-table count advanced from 78 to 79, protected counts remained exact, and the foreign-key check returned zero violations.
+- One active endpoint row was created for the existing league at token version 1. It backfilled the existing eligible report as both latest and latest-ready without storing a raw URL credential.
+- Cloudflare Pages Production deployment `0eec0551-216c-4f32-8aed-e8a7fbcb81ab` succeeded from branch `main` / source `6de7c10`; Main quality, build, Worker deploy, and Pages checks all passed.
+- Public app, league route, health endpoint, and exact deployment smoke checks returned HTTP 200. Commissioner-only URL and candidate-import routes returned HTTP 401 without a session, confirming the authorization boundary.
+- No staging cycle, real Madden export, candidate import, reset, transition, archive/removal/recovery operation, credential rotation, or activation ran. Active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` is unchanged, and Free Agents remain blocked/unknown with a null count.
 
 ## Rollback
 
-- Before publication, return to exact Production/Main baseline `431583ea7a472c4ba5292bea1a1775e7f0309b33`.
-- After any future authorized migration 26 application, retain the additive endpoint table and every capture/report/audit row; do not drop the table or rotate/delete URLs as a code rollback.
-- A runtime-only rollback restores Pages deployment `fafabfb2-91fe-4759-9cf8-8872365c6777` while preserving active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` and blocked/null Free Agent semantics.
+- Retain migration 26, its endpoint row, and every capture/report/audit row during any runtime rollback; do not drop the table or rotate/delete URLs as a code rollback.
+- A runtime-only rollback restores exact 7.3.4 Pages deployment `fafabfb2-91fe-4759-9cf8-8872365c6777` / commit `431583ea7a472c4ba5292bea1a1775e7f0309b33` while deliberately retaining migration 26.
+- Production D1 recovery bookmarks are `00000032-00000000-000050d7-f42cc5c918932fe187a765a42a32342b` before and `00000032-00000008-000050d7-3c7fd83fe2a1d18c39cbc80d28444ede` after migration. Time Travel is destructive and remains separately owner-authorized.
+- Preserve active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` and blocked/null Free Agent semantics through rollback.

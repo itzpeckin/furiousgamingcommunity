@@ -579,6 +579,7 @@ if (version === '7.3.4') {
   }
 }
 if (version === '7.3.4.1') {
+  const productionDeployed = isPostDeployment;
   for (const check of [
     'permanentLeagueExportUrl',
     'explicitRevocation',
@@ -593,16 +594,24 @@ if (version === '7.3.4.1') {
   ]) {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.4.1 permanent-export evidence is incomplete: ${check}.`);
   }
-  if (
+  if (productionDeployed) {
+    if (
+      manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'published-hosted-checks-passed-main'
+      || evidence.external?.githubPublication?.authorized !== true
+      || evidence.external?.githubPublication?.status !== 'published-main'
+      || evidence.external?.hostedChecks?.authorized !== true
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || Number(evidence.external?.hostedChecks?.passed) < 4
+    ) errors.push('Deployed 7.3.4.1 evidence must record Main publication and passed hosted checks.');
+  } else if (
     manifest.repositoryPublication?.authorized !== false
     || manifest.repositoryPublication?.status !== 'not-run'
     || evidence.external?.githubPublication?.authorized !== false
     || evidence.external?.githubPublication?.status !== 'not-run'
     || evidence.external?.hostedChecks?.authorized !== false
     || evidence.external?.hostedChecks?.status !== 'not-run'
-  ) {
-    errors.push('7.3.4.1 local implementation must not claim repository publication or hosted checks.');
-  }
+  ) errors.push('7.3.4.1 local implementation must not claim repository publication or hosted checks.');
   if (
     manifest.staging?.authorized !== false
     || manifest.staging?.deployed !== false
@@ -611,21 +620,35 @@ if (version === '7.3.4.1') {
   ) {
     errors.push('7.3.4.1 follows Production-first policy and must not claim an unrequested staging cycle.');
   }
-  if (
+  if (productionDeployed) {
+    if (
+      manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.status !== 'success-pending-owner-acceptance'
+      || evidence.external?.productionDeployment?.authorized !== true
+      || evidence.external?.productionDeployment?.status !== 'success'
+      || evidence.external?.productionMigration?.authorized !== true
+      || evidence.external?.productionMigration?.status !== 'applied-verified'
+      || Number(evidence.external?.productionMigration?.migration) !== 26
+      || Number(evidence.external?.productionMigration?.after?.foreignKeyViolations) !== 0
+    ) errors.push('Deployed 7.3.4.1 evidence must record the exact Production deployment and reconciled migration 26.');
+  } else if (
     manifest.production?.authorized !== false
     || manifest.production?.deployed !== false
     || evidence.external?.productionDeployment?.authorized !== false
     || evidence.external?.productionDeployment?.status !== 'not-run'
     || evidence.external?.productionMigration?.authorized !== false
     || evidence.external?.productionMigration?.status !== 'not-run'
-    || evidence.external?.productionMaddenExport?.authorized !== false
+  ) errors.push('Unpublished 7.3.4.1 work must not claim Production deployment or migration.');
+  if (
+    evidence.external?.productionMaddenExport?.authorized !== false
     || evidence.external?.productionMaddenExport?.status !== 'not-run'
     || evidence.external?.productionCandidateImport?.authorized !== false
     || evidence.external?.productionCandidateImport?.status !== 'not-run'
     || evidence.external?.maddenImportActivation?.authorized !== false
     || evidence.external?.maddenImportActivation?.status !== 'not-run'
   ) {
-    errors.push('7.3.4.1 must preserve separate Production migration, export, candidate-import, and activation gates.');
+    errors.push('7.3.4.1 must preserve separate real-export, candidate-import, and activation gates.');
   }
   if (
     evidence.checks?.permanentLeagueExportUrl?.onePerLeague !== true
@@ -642,11 +665,11 @@ if (version === '7.3.4.1') {
     errors.push('7.3.4.1 must prove stable/rotatable credentials, automatic analysis, ready-source isolation, one-action import, snapshot isolation, and blocked Free Agents.');
   }
   if (
-    evidence.scopeBoundaries?.productionChanged !== false
+    evidence.scopeBoundaries?.productionChanged !== productionDeployed
     || evidence.scopeBoundaries?.productionDataChanged !== false
     || evidence.scopeBoundaries?.stagingChanged !== false
     || evidence.scopeBoundaries?.activeSnapshotChanged !== false
-    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== productionDeployed
     || evidence.scopeBoundaries?.resetPerformed !== false
     || evidence.scopeBoundaries?.transitionOperationExecuted !== false
     || evidence.scopeBoundaries?.archiveOperationExecuted !== false
@@ -655,7 +678,7 @@ if (version === '7.3.4.1') {
     || evidence.scopeBoundaries?.activationPerformed !== false
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   ) {
-    errors.push('7.3.4.1 local work must preserve every Production, data, Main, transition, import, activation, and Free Agent boundary.');
+    errors.push('7.3.4.1 evidence must accurately preserve every Production, data, Main, transition, import, activation, and Free Agent boundary.');
   }
 }
 

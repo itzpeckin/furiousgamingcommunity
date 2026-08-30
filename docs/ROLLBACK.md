@@ -1,12 +1,14 @@
 # FranchiseHQ Rollback and Recovery
 
-## 7.3.4.1 candidate impact
+## 7.3.4.1 Production impact
 
 The local 7.3.4.1 candidate adds additive migration 26 and a permanent Madden Companion export endpoint for each league. The URL credential is derived from a protected server root, league ID, and token version; D1 stores no raw credential. Rotation increments the version and invalidates only the previous URL. The endpoint row and its current version persist across normal imports and game-year archive/removal operations.
 
 Raw captures and structural reports remain immutable. Each request burst is linked to an automatic discovery cohort and analyzed after a quiet window. `latest_report_id` may show an incomplete or failed newest export, but `latest_ready_report_id` advances only for an eligible source. A rollback must retain all capture, report, candidate, identity, and audit rows and must not repoint or activate a snapshot.
 
-Migration 26 is additive and has not been applied outside local validation. Before a future authorized application, take the target-locked D1 bookmark and preservation inventory. After application, runtime rollback may restore exact Production 7.3.4 commit `431583ea7a472c4ba5292bea1a1775e7f0309b33` / Pages deployment `fafabfb2-91fe-4759-9cf8-8872365c6777` while retaining the endpoint table. Do not drop migration 26, delete endpoint/capture rows, rotate credentials, reset data, run a transition, or change active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` as an improvised rollback. Blocked Free Agents remain unknown/null.
+Production Pages deployment `0eec0551-216c-4f32-8aed-e8a7fbcb81ab` runs exact Main commit `6de7c1018c89bc8fd6868fbde984f7a496e2a69d`. Migration 26 is applied to `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`; the pre/post bookmarks are `00000032-00000000-000050d7-f42cc5c918932fe187a765a42a32342b` and `00000032-00000008-000050d7-3c7fd83fe2a1d18c39cbc80d28444ede`.
+
+Runtime rollback may restore exact Production 7.3.4 commit `431583ea7a472c4ba5292bea1a1775e7f0309b33` / Pages deployment `fafabfb2-91fe-4759-9cf8-8872365c6777` while retaining the additive endpoint table and token version. Do not drop migration 26, delete endpoint/capture rows, rotate credentials, reset data, run a transition, or change active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` as an improvised rollback. Time Travel recovery overwrites Production and requires separate owner authorization. Blocked Free Agents remain unknown/null.
 
 ## 7.3.4 candidate impact
 

@@ -180,12 +180,12 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 36470,
-        "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
+        "bytes": 37677,
+        "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 36110,
-        "file": "tools/check-release.mjs"
+        "bytes": 36470,
+        "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
         "bytes": 35061,
