@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.2",
   "releaseType": "commissioner-private-candidate-import",
-  "status": "production-deployed-pending-owner-acceptance",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.1",
@@ -36,11 +36,11 @@
   "production": {
     "authorized": true,
     "deployed": true,
-    "status": "success-pending-owner-acceptance",
+    "status": "success-owner-accepted",
     "url": "https://franchisehq.app/",
     "deploymentId": "61165506-9d06-4f95-9760-58f73389d37c",
     "commit": "972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a",
-    "scope": "Exact repair 972bea6 completed the separately authorized cold Production candidate rehearsal in 43.763 seconds with 32 teams, 2,044 rostered players, 14 games, 510 statistics, 32 standings, validation ready, and no active snapshot. Owner acceptance and snapshot activation remain separate; activation is not authorized."
+    "scope": "The owner accepted the exact repaired 7.3.2 private candidate after its 43.763-second cold Production rehearsal. It contains 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings with validation ready. Snapshot activation remains separate and is not authorized."
   },
   "requiredArtifacts": [
     "config/database-schema-contract.json",

@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.36
+**Revision:** 1.37
 
 **Current production:** 7.3.2 performance repair from exact source commit `972bea6`; no Madden snapshot is active
 
-**Current work:** 7.3.2 is deployed against a clean Madden 27 Production data plane. Exact repair `972bea6` completed the separately authorized cold candidate rehearsal in 43.763 seconds with a validation-ready private preview: 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. Free Agents remain blocked/unknown, the temporary session is revoked, and no snapshot is active.
+**Current work:** 7.3.2 is owner-accepted against the clean Madden 27 Production data plane. Exact repair `972bea6` completed the cold candidate rehearsal in 43.763 seconds with a validation-ready private preview: 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. Free Agents remain blocked/unknown, all temporary sessions are revoked, and no snapshot is active.
 
-**Next gate:** Record owner acceptance of the repaired 7.3.2 private candidate. Snapshot activation remains a separate explicit authorization and is not implied by acceptance. Build 7.3.3 game-year archive/removal controls before the next Madden edition; Main remains separately authorized and excluded.
+**Next gate:** Snapshot activation requires a separate explicit authorization and is not implied by 7.3.2 acceptance. Otherwise, authorize the 7.3.3 implementation cycle for reusable game-year archive/removal controls before the next Madden edition. Main remains separately authorized and excluded.
 
 ## Product decisions
 
@@ -47,7 +47,7 @@
 | 7.2.0 | Staging validated | Tenant-ready core with FGC as the only enabled league; migration 21 and isolated Preview resources verified without production changes |
 | 7.3.0 | Completion candidate | Real Madden 27 source captured; 2,044 rostered players certified as preview-ready; Free Agents honestly blocked upstream and deferred |
 | 7.3.1 | Staging validated | One reviewed 2026 season, 32 teams, and 2,044 rostered-player identities are retained in a private preview; Free Agents remain blocked/unknown and no snapshot is active |
-| 7.3.2 | Production performance validated; owner acceptance pending | Exact repair `972bea6` completed the separately authorized cold run in 43.763 seconds with a private validation-ready 32-team/2,044-player candidate. Free Agents remain blocked/null and no snapshot is active. |
+| 7.3.2 | Released; owner accepted | Exact repair `972bea6` completed the cold run in 43.763 seconds and the owner accepted the private validation-ready 32-team/2,044-player candidate. Free Agents remain blocked/null and no snapshot is active. |
 | 7.3.3 | Planned | Game-year archive, active-data removal, and edition-transition controls that persist leagues and accounts |
 | 7.3.4 | Planned | Real FGC Madden 27 staging import and recovery certification |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
@@ -297,3 +297,4 @@
 - **Revision 1.34:** Completed the authorized Madden 26-to-27 Production transition and 7.3.2 acceptance deployment without moving Main or activating a snapshot. The clean Madden 27 plane retained the platform identities, the private candidate validated with 32 teams and 2,044 rostered players, and its 74.387-second cold result left Production performance acceptance open.
 - **Revision 1.35:** Deployed the authorized 7.3.2 cold-path optimizations and used exactly one Production rehearsal. That run stopped safely at statistics mapping on D1's SQL-variable ceiling before candidate build. Repair `972bea6` now batches complete player lookups under the ceiling and is active in Pages deployment `61165506` and Worker version `a772c7e7`; 4/4 hosted checks pass, temporary sessions are revoked, users/memberships/team assignments are unchanged, foreign keys are clean, Free Agents remain blocked/null, and the active snapshot remains null. A new cold rehearsal requires separate authorization.
 - **Revision 1.36:** Used the separately authorized repaired cold rehearsal exactly once against active commit `972bea6`. Run `candidate_import_ee1356d9` reached a private validation-ready preview in 43.763 seconds with 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. The session is revoked, foreign keys are clean, Main and the active snapshot pointer are unchanged, and Free Agents remain blocked with a null count. The next gate is owner acceptance; activation remains separately authorized.
+- **Revision 1.37:** Recorded owner acceptance of the exact repaired 7.3.2 private candidate. This closes the release acceptance gate without activating the snapshot, changing Main, resetting data, creating another rehearsal, or changing the blocked/null Free Agent state. Snapshot activation and 7.3.3 implementation remain separate future authorizations.

@@ -182,7 +182,7 @@
         "file": "platform/validate.js"
       },
       {
-        "bytes": 21732,
+        "bytes": 22452,
         "file": "tools/check-release.mjs"
       },
       {

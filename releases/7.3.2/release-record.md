@@ -1,8 +1,8 @@
 # FranchiseHQ 7.3.2 Release Record
 
-**Status:** Production cold-performance target met; owner acceptance pending
+**Status:** Released and owner-accepted; private candidate retained without activation
 
-**Production authorized:** Yes, for the accepted 7.3.2 deployment, performance remediation commits `7557730694aafaf74ec2498cb9f9d1af1ea9745f` and `972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a`, the first consolidated remediation rehearsal, and one additional cold repair rehearsal
+**Production authorized:** Yes, for the accepted 7.3.2 deployment, performance remediation commits `7557730694aafaf74ec2498cb9f9d1af1ea9745f` and `972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a`, the first consolidated remediation rehearsal, one additional cold repair rehearsal, and final owner acceptance of the repaired private candidate
 
 **Production changed:** Yes. Git Main and the active-snapshot pointer are unchanged.
 
@@ -23,11 +23,12 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - Used the one authorized remediation rehearsal. It stopped before candidate build when statistics route `xbsx/742482/week/reg/7/defense` hit D1's SQL-variable ceiling; the failed run and its start audit remain retained, no snapshot was created or activated, and all temporary sessions were revoked.
 - Repaired the discovered limit in commit `972bea6` by retaining the 200-record work chunk while batching complete player-identity lookups into safe 75-value D1 reads. The strict gate and hosted checks passed, and the exact repair is deployed to both Pages/Functions and the import Worker.
 - Used the newly authorized cold repair rehearsal exactly once. Reused run `candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339` reached `preview-ready` in 43.763 seconds, 16.237 seconds inside the sub-60 target, and retained validated private snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` without activating it.
+- Recorded owner acceptance of that exact repaired private candidate. Acceptance does not authorize or perform snapshot activation, reset data, merge Main, or create another Production run.
 
 ## Known inherited blockers
 
 - Madden's explicit Free Agent route remains blocked upstream. The candidate is `rostered-players-only`; Free Agent count is unknown/null and is never interpreted as zero.
-- The first Production cold rehearsal completed in 74.387 seconds, above the sub-60 target. The first remediation rehearsal later stopped safely at statistics mapping after exposing D1's SQL-variable ceiling. Exact repair `972bea6` then completed the separately authorized cold rerun in 43.763 seconds, meeting the Production target; final owner acceptance remains separate from snapshot activation.
+- The first Production cold rehearsal completed in 74.387 seconds, above the sub-60 target. The first remediation rehearsal later stopped safely at statistics mapping after exposing D1's SQL-variable ceiling. Exact repair `972bea6` then completed the separately authorized cold rerun in 43.763 seconds and the owner accepted that result. Snapshot activation remains separately authorized.
 - The Production Cloudflare configuration still lacks a dedicated `LEAGUE_CONFIG` KV binding and an explicit `PLATFORM_OWNER_ACCOUNT_ID` variable. Existing commissioner candidate routes work, but these inherited contract gaps remain visible.
 - The first direct Pages upload (`1bee7993`) omitted Functions and was discarded. Complete deployment `ebcf42ec` superseded it and passed Functions/auth smoke checks.
 - The direct acceptance upload temporarily changed the Git-build output directory to a local absolute path. Evidence commit `237bb3d` therefore failed its first automatic Preview in seven seconds with `build output directory is outside of the repository`. The project setting was restored to the repository root, isolated Preview `9bdb6209` verified the corrected configuration, and retry `791c66a6` restored PR #12 to 4/4 passing checks.

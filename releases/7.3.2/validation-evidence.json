@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.2",
   "validatedOn": "2026-08-30",
-  "status": "production-cold-performance-validated-pending-owner-acceptance",
+  "status": "production-owner-accepted-no-activation",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "commissionerCandidateAuthority": { "passed": true, "platformOwnerAssistanceRequired": false },
@@ -73,12 +73,15 @@
     "maddenImportActivation": { "authorized": false, "status": "not-run" }
   },
   "manualAcceptance": {
-    "status": "pending-owner-acceptance",
+    "status": "owner-accepted",
     "ownerConfirmedSeasonYear": 2026,
     "correctnessVerified": true,
-    "ownerAcceptanceRecorded": false,
+    "ownerAcceptanceRecorded": true,
+    "acceptedOn": "2026-08-30",
+    "acceptedCandidateRunId": "candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339",
+    "acceptedCandidateSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
     "performanceAccepted": true,
-    "nextGate": "record owner acceptance of the repaired private candidate; snapshot activation remains separately authorized"
+    "nextGate": "snapshot activation requires a separate explicit authorization; otherwise proceed to the separately authorized 7.3.3 implementation gate"
   },
   "productionChanged": true,
   "dataChanged": true,

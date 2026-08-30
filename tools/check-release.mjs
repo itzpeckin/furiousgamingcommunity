@@ -348,7 +348,10 @@ if (version === '7.3.2') {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.2 candidate-import evidence is incomplete: ${check}.`);
   }
   if (isPostDeployment) {
-    if (manifest.production?.authorized !== true || manifest.production?.deployed !== true || manifest.production?.status !== 'success-pending-owner-acceptance') {
+    const expectedProductionStatus = manifest.status === 'released'
+      ? 'success-owner-accepted'
+      : 'success-pending-owner-acceptance';
+    if (manifest.production?.authorized !== true || manifest.production?.deployed !== true || manifest.production?.status !== expectedProductionStatus) {
       errors.push('Deployed 7.3.2 evidence must record the owner-authorized Production acceptance publication.');
     }
     if (evidence.external?.productionDeployment?.authorized !== true || evidence.external?.productionDeployment?.status !== 'success') {
@@ -364,7 +367,7 @@ if (version === '7.3.2') {
     if (!['completed-verified-performance-pending','completed-verified-performance-failed'].includes(initialRehearsalStatus)) {
       errors.push('Deployed 7.3.2 evidence must retain the initial Production rehearsal and its measured performance result.');
     }
-    if (evidence.status === 'production-cold-performance-validated-pending-owner-acceptance') {
+    if (['production-cold-performance-validated-pending-owner-acceptance','production-owner-accepted-no-activation'].includes(evidence.status)) {
       const repaired = evidence.external?.repairedColdCandidateRehearsal;
       const durationMs = Number(repaired?.durationMs || 0);
       const targetMs = Number(repaired?.targetMs || 60000);
@@ -373,6 +376,15 @@ if (version === '7.3.2') {
         || evidence.checks?.productionColdPerformance?.passed !== true) {
         errors.push('Performance-validated 7.3.2 evidence must retain one authorized, completed, sub-target repaired cold rehearsal.');
       }
+    }
+    if (manifest.status === 'released' && (
+      evidence.status !== 'production-owner-accepted-no-activation'
+      || evidence.manualAcceptance?.status !== 'owner-accepted'
+      || evidence.manualAcceptance?.ownerAcceptanceRecorded !== true
+      || evidence.external?.maddenImportActivation?.authorized !== false
+      || evidence.external?.maddenImportActivation?.status !== 'not-run'
+    )) {
+      errors.push('Released 7.3.2 evidence must record owner acceptance while preserving the separate no-activation boundary.');
     }
   } else {
     if (manifest.production?.authorized !== false || manifest.production?.deployed !== false) {
