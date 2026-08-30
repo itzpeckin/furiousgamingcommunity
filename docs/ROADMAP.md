@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.38
+**Revision:** 1.39
 
 **Current production:** 7.3.2 from exact source commit `972bea6`; accepted Madden 27 snapshot `841ce1b5` is active
 
-**Current work:** 7.3.2 is owner-accepted and active against the clean Madden 27 Production data plane. Exact snapshot `841ce1b5` contains 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings with validation ready and zero errors. Free Agents remain blocked/unknown, all temporary sessions are revoked, and Git Main is unchanged.
+**Current work:** 7.3.2 is owner-accepted and active against the clean Madden 27 Production data plane. Exact snapshot `841ce1b5` contains 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings with validation ready and zero errors. Its one-time forward-transaction baseline is complete across all 2,044 rostered players with zero movements and zero classifications. Free Agents remain blocked/unknown, no temporary baseline access was created, and Git Main is unchanged.
 
-**Next gate:** Run forward-transaction detection only under a separate explicit authorization, or authorize the 7.3.3 implementation cycle for reusable game-year archive/removal controls. Main and any rollback remain separately authorized and excluded.
+**Next gate:** Authorize the 7.3.3 implementation cycle for reusable game-year archive/removal controls. Main, Production publication, any reset/removal rehearsal, snapshot activation, and any rollback remain separately authorized and excluded.
 
 ## Product decisions
 
@@ -300,3 +300,4 @@
 - **Revision 1.36:** Used the separately authorized repaired cold rehearsal exactly once against active commit `972bea6`. Run `candidate_import_ee1356d9` reached a private validation-ready preview in 43.763 seconds with 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. The session is revoked, foreign keys are clean, Main and the active snapshot pointer are unchanged, and Free Agents remain blocked with a null count. The next gate is owner acceptance; activation remains separately authorized.
 - **Revision 1.37:** Recorded owner acceptance of the exact repaired 7.3.2 private candidate. This closes the release acceptance gate without activating the snapshot, changing Main, resetting data, creating another rehearsal, or changing the blocked/null Free Agent state. Snapshot activation and 7.3.3 implementation remain separate future authorizations.
 - **Revision 1.38:** Used the separate snapshot-activation authorization exactly once for accepted snapshot `841ce1b5`. Production now has one active pointer with 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings; validation remains ready with zero errors, Free Agents remain blocked/null, the activation session is revoked, foreign keys are clean, and Main/reset/memberships/credentials are unchanged. Forward-transaction detection remains a separate pending stage.
+- **Revision 1.39:** Used the one-time Production forward-transaction authorization for exact active snapshot `841ce1b5`. One completed baseline job compared all 2,044 rostered players and one tenant audit row recorded the result; movements and classifications remain zero, the active pointer and counts are unchanged, Free Agents remain blocked/null rather than zero, foreign keys are clean, no temporary access was created, and Main/reset/activation remain unchanged.

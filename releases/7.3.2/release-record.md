@@ -1,10 +1,10 @@
 # FranchiseHQ 7.3.2 Release Record
 
-**Status:** Released, owner-accepted, and active in Production
+**Status:** Released, owner-accepted, active in Production, and forward-transaction baseline established
 
-**Production authorized:** Yes, for the accepted 7.3.2 deployment, performance remediation commits `7557730694aafaf74ec2498cb9f9d1af1ea9745f` and `972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a`, the first consolidated remediation rehearsal, one additional cold repair rehearsal, final owner acceptance, and separate activation of the exact repaired snapshot
+**Production authorized:** Yes, for the accepted 7.3.2 deployment, performance remediation commits `7557730694aafaf74ec2498cb9f9d1af1ea9745f` and `972bea60d8e5a9fee1c6a043e8e9f6d3d26b354a`, the first consolidated remediation rehearsal, one additional cold repair rehearsal, final owner acceptance, separate activation of the exact repaired snapshot, and the separately authorized one-time forward-transaction baseline
 
-**Production changed:** Yes. The active-snapshot pointer now targets the accepted snapshot; Git Main is unchanged.
+**Production changed:** Yes. The active-snapshot pointer targets the accepted snapshot, and one forward baseline plus one tenant audit row are retained; Git Main is unchanged.
 
 ## Scope
 
@@ -25,6 +25,7 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - Used the newly authorized cold repair rehearsal exactly once. Reused run `candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339` reached `preview-ready` in 43.763 seconds, 16.237 seconds inside the sub-60 target, and retained validated private snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` without activating it.
 - Recorded owner acceptance of that exact repaired private candidate. Acceptance does not authorize or perform snapshot activation, reset data, merge Main, or create another Production run.
 - After a separate explicit authorization, activated only snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663`. The activation session was revoked immediately; no reset, Main change, membership change, candidate rerun, or credential change occurred.
+- After a separate explicit authorization, established the one-time forward-transaction baseline for that exact active snapshot. The completed job compared all 2,044 rostered players with no previous snapshot and produced zero movements, team changes, roster entries, roster exits, status changes, or classifications. One tenant audit row records the exact result and blocked/null Free Agent boundary. No session or membership was created.
 
 ## Known inherited blockers
 
@@ -50,7 +51,8 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - The additional repaired cold rehearsal completed all nine candidate phases in 43.763 seconds. Phase timings were: analyze 1.003s, classify 0.640s, teams 1.028s, players 5.146s, schedule 1.013s, statistics 13.285s, candidate build 5.144s, and validation 5.977s.
 - Repaired candidate `841ce1b5-a4a6-4246-a53a-01cd1f189663` is private and validation-ready at score 99.2 with zero errors: 32 teams, 2,044 rostered players, 14 games, 510 statistics, and 32 standings. Its one warning is the inherited rostered-player-only completeness warning caused by the blocked upstream Free Agent route.
 - Post-rerun verification returned zero active snapshots, eight users, eight memberships, zero team assignments, six membership-audit rows, 109 total sessions, zero active rehearsal sessions, and zero foreign-key violations. The new session is revoked; Free Agents are still `blocked` with a JSON null count.
-- Post-activation verification returned one active snapshot row for the exact accepted snapshot, status `active`, validation `ready` with zero errors, the same 32/2,044/14/510/32 counts, Free Agents `blocked` with a null count, zero active activation sessions, and zero foreign-key violations. The lifecycle event is `activated` by `owner-tb`; forward-transaction detection remains `pending-separate-stage` and was not run under this authorization.
+- Post-activation verification returned one active snapshot row for the exact accepted snapshot, status `active`, validation `ready` with zero errors, the same 32/2,044/14/510/32 counts, Free Agents `blocked` with a null count, zero active activation sessions, and zero foreign-key violations. The lifecycle event is `activated` by `owner-tb`.
+- Post-baseline verification returned completed job `forward_baseline_841ce1b5_a4a6_4246_a53a_01cd1f189663` with `previous_snapshot_id` null, 2,044 current/comparison rows, and every movement/classification count at zero. Audit row `tenant_audit_forward_baseline_841ce1b5_a4a6_4246_a53a_01cd1f189663` records Free Agents as blocked with a JSON null count and `freeAgentInterpretedAsZero: false`. The active pointer and 32/2,044/14/510/32 counts are unchanged, and foreign-key verification remains clean.
 
 ## Deployment status
 
@@ -65,11 +67,12 @@ Deploy the commissioner-operated Madden 27 candidate importer to Production, tra
 - Remediation run `candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339` was reset through its explicit retry path and is now `preview-ready`; its earlier failed statistics run `7363b576-2332-4905-9c6c-2e462d9d1eac` remains retained as diagnostic evidence. The repaired run pins team mapping `c339e31c-e5e1-4e83-a040-997e64f67cd1`, player mapping `572f19ca-ced6-4a28-9203-e31dc4f70978`, schedule mapping `1d5cab38-8b27-4961-acfe-a7a0ff64160f`, and statistics mapping `cd5a3426-1b88-4b4d-b49e-f70a56b49b89`.
 - The repaired snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` is validation-ready and active. The earlier validated candidate `c7023ac0-e6d8-476c-949b-483092830fdd` remains retained and inactive.
 - One exact snapshot was activated. No Git Main change, reset, membership change, additional candidate run, or credential change was made.
+- One forward-detection baseline job and one tenant audit row are retained for the active snapshot. No movement or classification rows were created, and no temporary access was required.
 
 ## Rollback
 
 - Functional code rollback target is the slower but validated Pages deployment `ebcf42ec-5a7c-4efa-8e88-891f6c06fcaa`; deployment `6ea23d00` must not be used because it contains the D1 lookup-limit defect. The D1 binding must be reviewed explicitly before rollback, and reconnecting the detached Madden 26 database is prohibited.
 - The clean Madden 27 D1 and additive schema remain forward-compatible during a code rollback. Do not drop migrations 21–24.
 - The detached Madden 26 D1 and verified private archive remain the recovery sources. The 1,295 deleted raw R2 objects are not recoverable from the former raw-source bucket.
-- Candidate, identity, session-audit, and game-year-transition audit rows are retained. Their removal requires a new exact-target authorization.
+- Candidate, identity, session-audit, game-year-transition, and forward-baseline audit rows are retained. Their removal requires a new exact-target authorization.
 - Snapshot rollback is now a separate authorization decision. The activated row records no previous snapshot, so no automatic prior active pointer exists to restore.

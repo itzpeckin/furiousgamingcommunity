@@ -19,6 +19,7 @@
     "sourceLockNoActivation": { "passed": true, "sourceLockAndCandidatePhasesActivatedNothing": true, "laterOwnerAuthorizedActivation": true },
     "gameYearTransition": { "passed": true, "outgoingGameYear": "Madden NFL 26", "incomingGameYear": "Madden NFL 27", "franchiseSeasonYear": 2026, "persistentPlatformPlanePreserved": true },
     "productionCandidateCorrectness": { "passed": true, "teams": 32, "rosteredPlayers": 2044, "games": 14, "statistics": 510, "standings": 32 },
+    "forwardTransactionBaseline": { "passed": true, "snapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663", "previousSnapshotId": null, "comparedPlayers": 2044, "movements": 0, "classifications": 0, "auditRows": 1 },
     "productionSessionCleanup": { "passed": true, "rehearsalSessionsCreated": 4, "rehearsalSessionsRevoked": 4, "activeRehearsalSessions": 0, "membershipChanged": false },
     "productionForeignKeyIntegrity": { "passed": true, "violations": 0 },
     "strictMigration": { "passed": true, "expectedFailure": false, "blockingIssues": 0 },
@@ -31,6 +32,8 @@
     "persistentLeagueAndAccountPlanePreserved": true,
     "sessionRefreshRedesignChanged": false,
     "activeSnapshotChanged": true,
+    "forwardTransactionBaselineChanged": true,
+    "movementClassificationChanged": false,
     "freeAgentInterpretedAsZero": false,
     "gitMainChanged": false,
     "productionInfrastructureChanged": true,
@@ -71,7 +74,8 @@
     "temporaryProductionAccess": { "authorized": true, "status": "revoked", "membershipCreated": false, "membershipChanged": false, "rehearsalSessionsCreated": 4, "rehearsalSessionsRevoked": 4, "activationSessionsCreated": 1, "activationSessionsRevoked": 1, "activeRehearsalSessions": 0, "activeActivationSessions": 0, "auditRowsRetained": 3 },
     "productionSmoke": { "status": "passed", "homepageHttpStatus": 200, "platformReady": true, "databaseSchemaVersion": 24, "discordLoginHttpStatus": 302, "guestCandidateHttpStatus": 401 },
     "productionDataReset": { "authorized": true, "status": "fulfilled-by-archive-and-detach", "inPlaceDestructiveSqlRun": false },
-    "maddenImportActivation": { "authorized": true, "status": "completed-verified", "snapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663", "previousSnapshotId": null, "activeSnapshotRows": 1, "activatedAt": "2026-08-30 14:09:48", "activatedBy": "owner-tb", "validationStatus": "ready", "validationErrors": 0, "teamCount": 32, "rosteredPlayerCount": 2044, "gameCount": 14, "statisticCount": 510, "standingCount": 32, "freeAgentStatus": "blocked", "freeAgentCount": null, "foreignKeyViolations": 0, "activationSessionStatus": "revoked", "activeActivationSessions": 0, "lifecycleEvent": "activated", "forwardDetectionStatus": "pending-separate-stage", "resetPerformed": false, "gitMainChanged": false }
+    "maddenImportActivation": { "authorized": true, "status": "completed-verified", "snapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663", "previousSnapshotId": null, "activeSnapshotRows": 1, "activatedAt": "2026-08-30 14:09:48", "activatedBy": "owner-tb", "validationStatus": "ready", "validationErrors": 0, "teamCount": 32, "rosteredPlayerCount": 2044, "gameCount": 14, "statisticCount": 510, "standingCount": 32, "freeAgentStatus": "blocked", "freeAgentCount": null, "foreignKeyViolations": 0, "activationSessionStatus": "revoked", "activeActivationSessions": 0, "lifecycleEvent": "activated", "forwardDetectionStatus": "baseline-complete", "resetPerformed": false, "gitMainChanged": false },
+    "forwardTransactionBaseline": { "authorized": true, "status": "completed-verified", "completedAt": "2026-08-30 15:30:43", "snapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663", "previousSnapshotId": null, "jobId": "forward_baseline_841ce1b5_a4a6_4246_a53a_01cd1f189663", "jobStatus": "baseline", "phase": "complete", "currentPlayers": 2044, "comparedPlayers": 2044, "movements": 0, "teamChanges": 0, "rosterEntries": 0, "rosterExits": 0, "statusChanges": 0, "classifications": 0, "auditRowId": "tenant_audit_forward_baseline_841ce1b5_a4a6_4246_a53a_01cd1f189663", "auditRows": 1, "freeAgentStatus": "blocked", "freeAgentCount": null, "freeAgentInterpretedAsZero": false, "activeSnapshotChanged": false, "resetPerformed": false, "temporarySessionCreated": false, "membershipChanged": false, "foreignKeyViolations": 0, "gitMainChanged": false }
   },
   "manualAcceptance": {
     "status": "owner-accepted",
@@ -82,7 +86,7 @@
     "acceptedCandidateRunId": "candidate_import_ee1356d9-c6a9-4faa-b2c1-548761069339",
     "acceptedCandidateSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
     "performanceAccepted": true,
-    "nextGate": "forward-transaction detection remains a separate pending stage; 7.3.3 implementation and any rollback remain separately authorized"
+    "nextGate": "7.3.3 implementation is the next gate; Main, Production publication, reset/removal rehearsal, activation, and rollback remain separately authorized"
   },
   "productionChanged": true,
   "dataChanged": true,
