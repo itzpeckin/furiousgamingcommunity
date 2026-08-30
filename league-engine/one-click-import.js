@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.4.2 */
+/* FHQ_BUILD: 7.3.4.3 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.4.2';
+  const VERSION = '7.3.4.3';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -186,19 +186,21 @@
         return;
       }
 
+      const discoverySessionId=state.source?.discoverySessionId;
+      if (!discoverySessionId) throw new Error('The selected ready export does not have an exact capture session.');
+
       const analyzed = await runPhase(runId,'analyze-source',
-        ()=>api('discovery-report','POST',{sessionId:state.source?.discoverySessionId,reuseExisting:true}),
+        ()=>api('discovery-report','POST',{sessionId:discoverySessionId,reuseExisting:true}),
         payload=>({
           summary:`${Number(payload.report?.captureCount||0)} captures analyzed`,
           counts:{captures:Number(payload.report?.captureCount||0),routes:Number(payload.report?.routeCount||0)}
         }),wallStartedAt);
 
-      await runPhase(runId,'classify-captures',()=>api('classify','POST',{}),payload=>({
+      await runPhase(runId,'classify-captures',()=>api('classify','POST',{discoverySessionId}),payload=>({
         summary:`${Number(payload.inspectedRouteCount||0)} captures classified`,
         counts:{classifiedCaptures:Number(payload.inspectedRouteCount||0)}
       }),wallStartedAt);
 
-      const discoverySessionId=state.source?.discoverySessionId;
       const teams = await runPhase(runId,'map-teams',()=>api('map-teams','POST',{discoverySessionId}),payload=>({
         summary:`${Number(payload.mappingRun?.teamCount ?? payload.teams?.length ?? 0)} teams mapped`,
         counts:{teams:Number(payload.mappingRun?.teamCount ?? payload.teams?.length ?? 0)},

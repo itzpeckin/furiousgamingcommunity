@@ -180,7 +180,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 44463,
+        "bytes": 50392,
         "file": "tools/check-release.mjs"
       },
       {
@@ -196,7 +196,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 27540,
+        "bytes": 31133,
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
@@ -228,7 +228,7 @@
         "file": "league-engine/games.js"
       },
       {
-        "bytes": 20056,
+        "bytes": 20178,
         "file": "league-engine/one-click-import.js"
       }
     ],
@@ -1337,7 +1337,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.4.2",
+  "release": "7.3.4.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

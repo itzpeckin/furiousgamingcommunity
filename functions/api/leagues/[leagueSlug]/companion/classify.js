@@ -8,16 +8,15 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '5.9.3.1';
+const RELEASE = '7.3.4.3';
 const INSPECTION_CONCURRENCY = 8;
 
 const RULES = [
-  { type: 'teams', label: 'Teams', route: /(?:^|\/)(?:teams?|teaminfo)(?:\/|$)/i, fields: ['teamid','displayname','cityname','abbr','teamname'] },
+  { type: 'teams', label: 'Teams', route: /(?:^|\/)(?:leagueteams|teams|teaminfo)(?:\/|$)/i, fields: ['teamid','displayname','cityname','abbr','abbrname','teamname'] },
   { type: 'players-rosters', label: 'Players / Rosters', route: /(?:^|\/)(?:rosters?|players?|playerinfo)(?:\/|$)/i, fields: ['playerid','firstname','lastname','position','overallrating','teamid'] },
   { type: 'standings', label: 'Standings', route: /(?:^|\/)standings?(?:\/|$)/i, fields: ['wins','losses','ties','rank','winpct','teamid'] },
   { type: 'schedule-games', label: 'Schedule / Games', route: /(?:^|\/)(?:schedule|games?)(?:\/|$)/i, fields: ['home','away','homescore','awayscore','week','season'] },
-  { type: 'weekly-offense', label: 'Weekly Offense Statistics', route: /(?:^|\/)week\/[^/]+\/\d+\/(?:offense|offensive)(?:\/|$)/i, fields: ['passingyards','rushingyards','receivingyards','touchdowns'] },
-  { type: 'weekly-defense', label: 'Weekly Defense Statistics', route: /(?:^|\/)week\/[^/]+\/\d+\/(?:defense|defensive)(?:\/|$)/i, fields: ['tackles','sacks','interceptions','forcedfumbles'] },
+  { type: 'statistics', label: 'Weekly Statistics', route: /(?:^|\/)week\/[^/]+\/[^/]+\/(?:passing|rushing|receiving|defense|defensive|kicking|punting|offense|offensive|team)(?:\/|$)/i, fields: ['yards','touchdowns','attempts','completions','tackles','sacks','interceptions','forcedfumbles'] },
   { type: 'statistics', label: 'Statistics', route: /(?:^|\/)(?:stats?|statistics)(?:\/|$)/i, fields: ['yards','touchdowns','attempts','completions'] },
   { type: 'league-info', label: 'League Information', route: /(?:^|\/)(?:league|franchise|settings|info)(?:\/|$)/i, fields: ['season','week','leagueid','leaguename','salarycap'] },
   { type: 'draft-picks', label: 'Draft Picks', route: /(?:^|\/)(?:draftpicks?|picks?)(?:\/|$)/i, fields: ['round','pick','originalteamid','currentteamid'] },
@@ -138,8 +137,10 @@ async function inspectCapture(context, league, row) {
 
 async function reportForSession(db, leagueId, sessionId) {
   if (!sessionId) return [];
-  const rows = await db.prepare(`SELECT schema_json FROM companion_dataset_inspections
-    WHERE league_id = ? AND discovery_session_id = ? ORDER BY route_path ASC`)
+  const rows = await db.prepare(`SELECT i.schema_json
+    FROM madden_discovery_session_captures link
+    JOIN companion_dataset_inspections i ON i.capture_id=link.capture_id AND i.league_id=link.league_id
+    WHERE link.league_id=? AND link.session_id=? ORDER BY link.route_path ASC`)
     .bind(leagueId, sessionId).all();
   return (rows.results || []).map(row => {
     try { return JSON.parse(row.schema_json); } catch (_) { return null; }

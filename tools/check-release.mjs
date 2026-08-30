@@ -788,6 +788,100 @@ if (version === '7.3.4.2') {
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   ) errors.push('7.3.4.2 evidence must preserve every Production remediation boundary.');
 }
+if (version === '7.3.4.3') {
+  const productionDeployed = isPostDeployment;
+  for (const check of [
+    'productionFailureDiagnosis',
+    'exactSessionPropagation',
+    'sharedTeamsRouteAuthority',
+    'recoveredCohortEndToEnd',
+    'weekCoverageWarningPreserved',
+    'activeSnapshotIsolation',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.4.3 exact-session remediation evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.productionFailureDiagnosis?.selectedReadySessionId !== 'm27_recovered_8bf2666ce3393492ed580dac'
+    || Number(evidence.checks?.productionFailureDiagnosis?.selectedReadyRoutes) !== 43
+    || Number(evidence.checks?.productionFailureDiagnosis?.originalFragmentedSessions) !== 8
+    || evidence.checks?.productionFailureDiagnosis?.candidateBuildReached !== false
+    || evidence.checks?.productionFailureDiagnosis?.activationReached !== false
+    || evidence.checks?.exactSessionPropagation?.classificationUsesSelectedSession !== true
+    || evidence.checks?.exactSessionPropagation?.emptyClassificationRequestRemoved !== true
+    || evidence.checks?.sharedTeamsRouteAuthority?.sourceRoute !== 'xbsx/742482/leagueteams'
+    || Number(evidence.checks?.sharedTeamsRouteAuthority?.mappedTeams) !== 32
+    || evidence.checks?.sharedTeamsRouteAuthority?.legacyInspectionRequired !== false
+    || evidence.checks?.sharedTeamsRouteAuthority?.weeklyTeamRouteClassifiedAsStatistics !== true
+    || Number(evidence.checks?.recoveredCohortEndToEnd?.recoveredRoutes) !== 43
+    || Number(evidence.checks?.recoveredCohortEndToEnd?.classifiedRoutes) !== 43
+    || Number(evidence.checks?.recoveredCohortEndToEnd?.classifiedStatisticsRoutes) !== 7
+    || Number(evidence.checks?.weekCoverageWarningPreserved?.activeWeek) !== 7
+    || Number(evidence.checks?.weekCoverageWarningPreserved?.capturedWeek) !== 9
+    || JSON.stringify(evidence.checks?.weekCoverageWarningPreserved?.missingWeeks) !== '[8]'
+    || evidence.checks?.weekCoverageWarningPreserved?.silentlyFilled !== false
+    || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+  ) errors.push('7.3.4.3 must prove exact-session propagation, shared 32-team authority, the retained Week 8 warning, and blocked/null Free Agents.');
+  if (productionDeployed) {
+    if (
+      manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'published-hosted-checks-passed-main'
+      || evidence.external?.githubPublication?.status !== 'published-main'
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || Number(evidence.external?.hostedChecks?.passed) < 4
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.status !== 'success-pending-owner-acceptance'
+      || evidence.external?.productionDeployment?.authorized !== true
+      || evidence.external?.productionDeployment?.status !== 'success'
+    ) errors.push('Deployed 7.3.4.3 evidence must record exact Main publication, hosted checks, and Production deployment.');
+  } else if (
+    manifest.status !== 'validated-production-authorized'
+    || manifest.repositoryPublication?.authorized !== true
+    || manifest.repositoryPublication?.status !== 'authorized-not-run'
+    || evidence.external?.githubPublication?.authorized !== true
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || manifest.production?.authorized !== true
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'authorized-not-run'
+    || evidence.external?.productionDeployment?.authorized !== true
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+  ) errors.push('Authorized 7.3.4.3 evidence must retain pending publication and deployment gates.');
+  if (
+    manifest.staging?.authorized !== false
+    || manifest.staging?.deployed !== false
+    || evidence.external?.stagingDeployment?.authorized !== false
+    || evidence.external?.stagingDeployment?.status !== 'not-run'
+    || evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-required'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 26
+    || evidence.external?.productionMaddenExport?.authorized !== false
+    || evidence.external?.productionMaddenExport?.status !== 'not-run'
+    || evidence.external?.productionCandidateImportRetry?.authorized !== false
+    || evidence.external?.productionCandidateImportRetry?.status !== 'not-run'
+    || evidence.external?.maddenImportActivation?.authorized !== false
+    || evidence.external?.maddenImportActivation?.status !== 'not-run'
+  ) errors.push('7.3.4.3 must preserve the staging, migration, new-export, import-retry, and activation boundaries.');
+  if (
+    evidence.scopeBoundaries?.productionChanged !== productionDeployed
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== productionDeployed
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveOperationExecuted !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.3.4.3 evidence must preserve every Production remediation boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

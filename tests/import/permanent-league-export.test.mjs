@@ -180,5 +180,7 @@ test('runtime wiring preserves immutable sources, atomic cohorts, snapshot isola
   assert.match(ui,/Rotate Export URL/);
   assert.match(ui,/Free Agents remain blocked\/unknown/);
   assert.match(importer,/reuseExisting:true/);
+  assert.match(importer,/api\('classify','POST',\{discoverySessionId\}\)/);
+  assert.doesNotMatch(importer,/api\('classify','POST',\{\}\)/);
   assert.match(transition,/companion_league_export_endpoints/);
 });

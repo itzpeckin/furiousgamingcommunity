@@ -7,8 +7,9 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { enrichTeamBranding, findTeamBranding } from '../../../../_lib/team-branding.js';
+import { classifyMaddenRoute } from '../../../../_lib/madden-discovery.js';
 
-const RELEASE = '5.9.3.2b';
+const RELEASE = '7.3.4.3';
 
 const ALIASES = Object.freeze({
   id: ['teamId', 'teamID', 'id', 'team_id', 'clubId', 'franchiseId'],
@@ -169,21 +170,24 @@ function routeIsForbidden(routePath) {
 
 async function latestTeamCapture(db, leagueId, discoverySessionId) {
   const result = discoverySessionId
-    ? await db.prepare(`SELECT i.capture_id, link.session_id discovery_session_id, i.route_path,
-      i.confidence_score, c.r2_object_key, c.content_type, c.received_at
+    ? await db.prepare(`SELECT c.id capture_id, link.session_id discovery_session_id, c.route_path,
+      COALESCE(i.confidence_score,0) confidence_score,COALESCE(i.dataset_type,'unknown') dataset_type,
+      c.r2_object_key, c.content_type, c.received_at
     FROM madden_discovery_session_captures link
     JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
-    JOIN companion_dataset_inspections i ON i.capture_id=c.id AND i.league_id=c.league_id
-    WHERE link.league_id=? AND link.session_id=? AND i.dataset_type='teams'
-    ORDER BY i.inspected_at DESC,c.received_at DESC`).bind(leagueId,discoverySessionId).all()
-    : await db.prepare(`SELECT i.capture_id, i.discovery_session_id, i.route_path,
-      i.confidence_score, c.r2_object_key, c.content_type, c.received_at
-    FROM companion_dataset_inspections i
-    JOIN companion_route_captures c ON c.id = i.capture_id
-    WHERE i.league_id = ? AND i.dataset_type = 'teams'
-    ORDER BY i.inspected_at DESC, c.received_at DESC`).bind(leagueId).all();
+    LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id AND i.league_id=c.league_id
+    WHERE link.league_id=? AND link.session_id=?
+    ORDER BY link.observed_at DESC,c.received_at DESC`).bind(leagueId,discoverySessionId).all()
+    : await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,
+      COALESCE(i.confidence_score,0) confidence_score,COALESCE(i.dataset_type,'unknown') dataset_type,
+      c.r2_object_key,c.content_type,c.received_at
+    FROM companion_route_captures c
+    LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id AND i.league_id=c.league_id
+    WHERE c.league_id=?
+    ORDER BY c.received_at DESC`).bind(leagueId).all();
   const candidates = (result.results || [])
-    .filter(row => !routeIsForbidden(row.route_path) && routePriority(row.route_path) < 99)
+    .filter(row => classifyMaddenRoute(row.route_path) === 'teams'
+      && !routeIsForbidden(row.route_path) && routePriority(row.route_path) < 99)
     .sort((a, b) => routePriority(a.route_path) - routePriority(b.route_path)
       || Number(b.confidence_score || 0) - Number(a.confidence_score || 0)
       || String(b.received_at || '').localeCompare(String(a.received_at || '')));
@@ -293,7 +297,7 @@ export async function onRequestPost(context) {
     let body={};try{body=await context.request.json()}catch{}
     const discoverySessionId=String(body.discoverySessionId||'').trim();
     const capture = await latestTeamCapture(db, league.id, discoverySessionId);
-    if (!capture) return json({ ok: false, error: 'No classified Teams dataset is available. Run v5.9.3.1 classification first.' }, 404);
+    if (!capture) return json({ ok: false, error: 'The selected analyzed export does not contain a recognized Teams dataset.' }, 404);
     const payload = await parseObject(context.env, capture);
     const collection = chooseTeamCollection(payload);
     if (!collection || collection.score < 10) return json({ ok: false, error: 'A team-like record collection could not be identified in the classified payload.' }, 422);

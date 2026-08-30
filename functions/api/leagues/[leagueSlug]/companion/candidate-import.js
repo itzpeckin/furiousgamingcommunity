@@ -19,7 +19,7 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 
-const RELEASE = '7.3.4.2';
+const RELEASE = '7.3.4.3';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {

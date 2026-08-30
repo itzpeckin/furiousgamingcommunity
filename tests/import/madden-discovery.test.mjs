@@ -17,6 +17,8 @@ import { deriveLeagueExportToken } from '../../functions/_lib/permanent-league-e
 import { recoverMaddenDiscoveryCohort } from '../../functions/_lib/madden-discovery-report.js';
 import { onRequestPost as startDiscoverySession } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-session.js';
 import { onRequestPost as generateDiscoveryReport } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js';
+import { onRequestPost as classifyDiscoveryCaptures } from '../../functions/api/leagues/[leagueSlug]/companion/classify.js';
+import { onRequestPost as mapDiscoveryTeams } from '../../functions/api/leagues/[leagueSlug]/companion/map-teams.js';
 import { onRequest as receiveDiscoveryCapture } from '../../functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js';
 
 const MIGRATIONS = [
@@ -527,6 +529,17 @@ test('an existing shattered 43-route burst is recovered without importing or act
         'shattered-source','league-recovery','shattered-source-token',
         '2099-01-01T00:00:00.000Z','2026-08-30T21:33:47.800Z','2026-08-30T21:33:50.000Z'
       );
+    const fragmentedSessions=['shattered-source'];
+    for(let index=1;index<8;index+=1){
+      const sessionId=`shattered-source-${index+1}`;
+      fragmentedSessions.push(sessionId);
+      database.prepare(`INSERT INTO madden_discovery_sessions
+        (id,league_id,token_hash,status,expires_at,created_at,updated_at)
+        VALUES (?,?,?,'review_required',?,?,?)`).run(
+          sessionId,'league-recovery',`${sessionId}-token`,
+          '2099-01-01T00:00:00.000Z','2026-08-30T21:33:47.800Z','2026-08-30T21:33:50.000Z'
+        );
+    }
 
     const captures=liveLikeRosterCaptureSet().filter(item=>!item.routePath.endsWith('/league'));
     const firstRoster=captures.find(item=>/\/team\/[^/]+\/roster$/.test(item.routePath));
@@ -547,18 +560,19 @@ test('an existing shattered 43-route burst is recovered without importing or act
       const item=captures[index];
       const id=`recovery-capture-${index}`;
       const key=`recovery/${id}.json`;
+      const fragmentedSessionId=fragmentedSessions[index%fragmentedSessions.length];
       const encoded=new TextEncoder().encode(JSON.stringify(item.payload));
       await r2.put(key,encoded.buffer);
       database.prepare(`INSERT INTO companion_route_captures
         (id,league_id,discovery_session_id,route_path,request_method,content_type,byte_length,
          payload_hash,r2_object_key,top_level_keys_json,collections_json,request_headers_json,received_at)
         VALUES (?,?,?,?,'POST','application/json',?,?,?,?,?,?,?)`).run(
-          id,'league-recovery','shattered-source',item.routePath,encoded.byteLength,
+          id,'league-recovery',fragmentedSessionId,item.routePath,encoded.byteLength,
           `recovery-hash-${index}`,key,'[]','[]','{}',item.receivedAt
         );
       database.prepare(`INSERT INTO madden_discovery_session_captures
         (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`).run(
-          'league-recovery','shattered-source',id,item.routePath,item.receivedAt
+          'league-recovery',fragmentedSessionId,id,item.routePath,item.receivedAt
         );
     }
     const first=captures.map(item=>item.receivedAt).sort()[0];
@@ -587,6 +601,55 @@ test('an existing shattered 43-route burst is recovered without importing or act
     assert.equal(endpoint.latest_ready_report_id,recovered.reportId);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM madden_discovery_session_captures
       WHERE session_id=?`).get(recovered.sessionId).count,43);
+
+    database.prepare(`INSERT INTO users
+      (id,discord_user_id,discord_username,display_name) VALUES (?,?,?,?)`).run(
+        'recovery-commissioner','recovery-discord','recovery-commissioner','Recovery Commissioner'
+      );
+    database.prepare(`INSERT INTO league_memberships
+      (id,league_id,user_id,role,active) VALUES (?,?,?,'commissioner',1)`).run(
+        'recovery-membership','league-recovery','recovery-commissioner'
+      );
+    database.prepare(`INSERT INTO sessions
+      (id,user_id,session_token_hash,expires_at) VALUES (?,?,?,?)`).run(
+        'recovery-auth-session','recovery-commissioner','unused-recovery-session-hash','2099-01-01T00:00:00.000Z'
+      );
+    const importToken='exact-recovered-import-token';
+    database.prepare(`INSERT INTO server_import_delegations
+      (token_hash,session_id,league_id,expires_at) VALUES (?,?,?,?)`).run(
+        await hashToken(importToken),'recovery-auth-session','league-recovery','2099-01-01T00:00:00.000Z'
+      );
+    const endpointContext=(path,body)=>({
+      request:new Request(`https://franchisehq.test/api/leagues/recovery-league/companion/${path}`,{
+        method:'POST',headers:{'content-type':'application/json','x-franchisehq-import-token':importToken},
+        body:JSON.stringify(body)
+      }),
+      env:{DB:binding,COMPANION_EXPORTS:r2},params:{leagueSlug:'recovery-league'}
+    });
+
+    const legacyClassificationResponse=await classifyDiscoveryCaptures(endpointContext('classify',{}));
+    assert.equal(legacyClassificationResponse.status,200);
+    const legacyClassification=await legacyClassificationResponse.json();
+    assert.ok(legacyClassification.inspectedRouteCount<43,
+      'an unspecified classifier request sees only one original fragmented session');
+
+    const fallbackTeamResponse=await mapDiscoveryTeams(endpointContext('map-teams',{
+      discoverySessionId:recovered.sessionId
+    }));
+    assert.equal(fallbackTeamResponse.status,200);
+    const fallbackTeams=await fallbackTeamResponse.json();
+    assert.equal(fallbackTeams.mappingRun.teamCount,32);
+    assert.equal(fallbackTeams.mappingRun.discoverySessionId,recovered.sessionId);
+    assert.equal(fallbackTeams.mappingRun.sourceRoutePath,'xbsx/742482/leagueteams');
+
+    const exactClassificationResponse=await classifyDiscoveryCaptures(endpointContext('classify',{
+      discoverySessionId:recovered.sessionId
+    }));
+    assert.equal(exactClassificationResponse.status,200);
+    const exactClassification=await exactClassificationResponse.json();
+    assert.equal(exactClassification.inspectedRouteCount,43);
+    assert.equal(exactClassification.classificationSummary.teams,1);
+    assert.equal(exactClassification.classificationSummary.statistics,7);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   } finally {

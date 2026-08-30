@@ -18,7 +18,7 @@ import {
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.3.4.2';
+const RELEASE = '7.3.4.3';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();

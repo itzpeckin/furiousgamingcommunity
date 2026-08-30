@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.4.3 exact-session import remediation impact
+
+The authorized 7.3.4.3 patch changes browser-side candidate orchestration, legacy dataset classification, and Teams capture selection only. It adds no migration and does not run the candidate importer. The exact latest-ready source remains recovered session `m27_recovered_8bf2666ce3393492ed580dac` / report `m27_report_8bf2666c-e339-3492-ed58-0dac09b696c9`; active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` remains unchanged.
+
+Until deployment, exact Production remains 7.3.4.2 commit `e95ad2f4a6989433a05f9bf7ea605caa0e83b165` / Pages `0747aebd-5f6a-4852-b3c4-98aaffb20ad0`. After deployment, runtime rollback may restore that exact deployment while retaining the recovered session/report, raw captures, legacy inspections, audit rows, endpoint pointer/token version, failed import-run evidence, and active snapshot.
+
+Do not use rollback to retry or activate the candidate, hide the missing Week 8 warning, reset data, rotate the export URL, run a game-year transition, restore D1, create another Madden export, or reinterpret blocked/null Free Agents.
+
 ## 7.3.4.2 cohort-remediation impact
 
 The authorized 7.3.4.2 patch changes only automatic permanent-export cohort claiming and an exact, platform-owner-only recovery path. It adds no migration. The observed Production burst from `2026-08-30T21:33:47.826Z` through `2026-08-30T21:33:49.047Z` contains 43 retained routes but was fragmented across eight sessions by concurrent 7.3.4.1 requests.

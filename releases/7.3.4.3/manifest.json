@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.3",
+  "releaseType": "recovered-export-exact-session-import-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.4.2",
+    "commit": "e95ad2f4a6989433a05f9bf7ea605caa0e83b165",
+    "tree": "de1fb297e9dcebdfd5969aa8796f8f1b15f70939",
+    "tag": "v7.0.0",
+    "productionDeployment": "0747aebd-5f6a-4852-b3c4-98aaffb20ad0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.4.3",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "scope": "The owner authorized one consolidated branch, pull request, hosted-check, exact Main, and Production deployment cycle for the recovered-export Teams mapping remediation."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Production-first policy applies. No staging cycle is authorized."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.3.4.2",
+    "currentCommit": "e95ad2f4a6989433a05f9bf7ea605caa0e83b165",
+    "currentDeployment": "0747aebd-5f6a-4852-b3c4-98aaffb20ad0",
+    "activeSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+    "scope": "Deploy only the exact-session classification and Teams mapping compatibility fix. Do not retry an import, activate a snapshot, reset data, rotate the export URL, run a transition, create a new export, or reinterpret blocked Free Agents."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/api/leagues/[leagueSlug]/companion/classify.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-teams.js",
+    "league-engine/one-click-import.js",
+    "releases/7.3.4.3/release-record.md",
+    "releases/7.3.4.3/validation-evidence.json",
+    "tests/import/madden-discovery.test.mjs",
+    "tests/import/permanent-league-export.test.mjs"
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.3",
+  "validatedOn": "2026-08-30",
+  "status": "validated-production-authorized",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "productionFailureDiagnosis": {
+      "passed": true,
+      "selectedReadySessionId": "m27_recovered_8bf2666ce3393492ed580dac",
+      "selectedReadyRoutes": 43,
+      "originalFragmentedSessions": 8,
+      "browserClassificationSessionIdPreviouslyOmitted": true,
+      "candidateBuildReached": false,
+      "activationReached": false
+    },
+    "exactSessionPropagation": {
+      "passed": true,
+      "analysisUsesSelectedSession": true,
+      "classificationUsesSelectedSession": true,
+      "teamsMappingUsesSelectedSession": true,
+      "emptyClassificationRequestRemoved": true
+    },
+    "sharedTeamsRouteAuthority": {
+      "passed": true,
+      "sourceRoute": "xbsx/742482/leagueteams",
+      "mappedTeams": 32,
+      "legacyInspectionRequired": false,
+      "weeklyTeamRouteClassifiedAsStatistics": true
+    },
+    "recoveredCohortEndToEnd": {
+      "passed": true,
+      "fragmentedSessions": 8,
+      "recoveredRoutes": 43,
+      "classifiedRoutes": 43,
+      "classifiedTeamsRoutes": 1,
+      "classifiedStatisticsRoutes": 7,
+      "mappedTeams": 32,
+      "activeSnapshotChanged": false
+    },
+    "weekCoverageWarningPreserved": {
+      "passed": true,
+      "activeWeek": 7,
+      "capturedWeek": 9,
+      "missingWeeks": [8],
+      "silentlyFilled": false
+    },
+    "activeSnapshotIsolation": {
+      "passed": true,
+      "activeSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+      "activeSnapshotChanged": false,
+      "activationPerformed": false,
+      "resetPerformed": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false,
+      "eligibleScope": "rostered-players-only"
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 26,
+      "newMigration": false,
+      "requiredTables": 79
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 101,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 203,
+      "inventoryFiles": 533,
+      "routes": 65,
+      "requiredTables": 79
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "resetPerformed": false,
+    "transitionOperationExecuted": false,
+    "archiveOperationExecuted": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false
+  },
+  "external": {
+    "githubPublication": { "authorized": true, "status": "not-run" },
+    "hostedChecks": { "authorized": true, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "not-run",
+      "currentDeployment": "0747aebd-5f6a-4852-b3c4-98aaffb20ad0",
+      "currentRuntimeCommit": "e95ad2f4a6989433a05f9bf7ea605caa0e83b165"
+    },
+    "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 26 },
+    "productionMaddenExport": { "authorized": false, "status": "not-run" },
+    "productionCandidateImportRetry": { "authorized": false, "status": "not-run" },
+    "maddenImportActivation": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

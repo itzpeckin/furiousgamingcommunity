@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.49
+**Revision:** 1.50
 
 **Current production:** 7.3.4.2 from exact Main commit `e95ad2f` (Pages deployment `0747aebd`); the recovered 43-route Week 9 source is latest-ready and accepted Madden 27 snapshot `841ce1b5` remains active
 
-**Current work:** The 7.3.4.2 Production cohort remediation is complete and pending owner UI acceptance. Future concurrent Madden routes atomically claim one cohort. The exact retained Week 9 burst is selected as latest-ready with 32 teams, 2,043 rostered players, 15 schedule rows, 207 statistics rows, and 32 standings rows. Free Agents remain blocked/null, and no import or activation ran.
+**Current work:** The owner authorized 7.3.4.3 after the first import attempt stopped safely at Teams mapping. The browser classified an arbitrary original fragment because it omitted the recovered session ID, while mapping correctly targeted the recovered 43-route session. The local repair carries the exact selected session through classification and lets Teams mapping use the same shared route evidence as the ready report. Production, Main, the active snapshot, and the recovered latest-ready source remain unchanged.
 
-**Next gate:** Owner confirms Commissioner HQ shows **Ready to import**, 43 routes, 32 teams, 2,043 rostered players, captured Week 9, and Free Agents unknown. Running **Import Latest Export** remains a separate commissioner action and was not performed by this release.
+**Next gate:** Publish the exact 7.3.4.3 candidate through hosted checks, Main, and Production. After deployment, the owner may retry the same existing export without a new Madden export or URL rotation. The missing Week 8 warning remains visible; import retry and activation remain separate actions.
 
 ## Product decisions
 
@@ -52,6 +52,7 @@
 | 7.3.4 | Production | Source-scoped repeat imports, exact-export idempotency, visible Week coverage/gaps, and same-season history carry-forward without activation |
 | 7.3.4.1 | Production; pending owner UI acceptance | Permanent revocable league export URL, automatic cohort analysis, readiness status, and one-click latest candidate import |
 | 7.3.4.2 | Production; pending owner UI acceptance | Atomic concurrent cohort claim, exact real-payload parsing, and verified retained-burst recovery without candidate import or activation |
+| 7.3.4.3 | Production remediation authorized; locally validated | Exact recovered-session classification and shared Teams route authority; retry uses the existing export and preserves the Week 8 gap warning |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
@@ -333,3 +334,4 @@
 - **Revision 1.47:** Diagnosed the first permanent-URL Production export. Madden successfully delivered one complete 43-route burst in 1.221 seconds—teams, 32 rosters with 2,043 current roster rows, standings, schedule, seven statistics routes, and the blocked Free Agent response—but concurrent receiver calls raced and split it across eight sessions. Authorized 7.3.4.2 adds a deterministic compare-and-swap cohort claim plus platform-owner-only exact-window recovery. No import, activation, reset, URL rotation, transition, or Free Agent reinterpretation is included.
 - **Revision 1.48:** Published initial 7.3.4.2 candidate `90559f0` through PR #17 with 4/4 candidate checks and all Main deployment checks passing; Production Pages deployment `b0706bba` succeeded. Before recovery, a read-only reconstruction of all 43 retained R2 objects stopped safely on two parser gaps: Madden's weekly `/team` route was counted as league teams, and route-level franchise/week evidence was ignored. The corrected parser now proves 32 teams, 32 rosters/2,043 players, 15 schedule rows, seven statistics routes/207 rows, 32 standings rows, and blocked/null Free Agents as rostered-player-only ready. No recovery row, import, activation, reset, transition, credential rotation, or snapshot change has occurred yet.
 - **Revision 1.49:** Corrective PR #18 passed 4/4 candidate checks and all Main checks; exact commit `e95ad2f` deployed as Production Pages `0747aebd`. The exact 43-route window was recovered into session `m27_recovered_8bf2666ce3393492ed580dac` and report `m27_report_8bf2666c-e339-3492-ed58-0dac09b696c9`; Commissioner HQ now shows Week 9, 43 routes, 32 teams, 2,043 rostered players, and **Ready to import**. One oversized administrative statement was atomically rejected with zero writes before the bounded successful application. Migration 26/79 tables, protected counts, token version 1, active snapshot `841ce1b5`, candidate/transition run counts, and zero foreign-key violations are unchanged. Free Agents remain blocked/null. No import, activation, reset, transition, archive, URL rotation, or new Madden export ran.
+- **Revision 1.50:** The first commissioner import attempt stopped safely before candidate construction because browser-side classification omitted the exact recovered session ID and inspected only one original fragment; Teams mapping then found no compatible inspection in the selected 43-route session. Authorized 7.3.4.3 passes the exact session through classification, uses shared route authority for `/leagueteams`, classifies weekly `/team` as Statistics, and adds a realistic eight-fragment/43-route/32-team regression. The active snapshot remains `841ce1b5`; Week 8 remains visibly missing between active Week 7 and captured Week 9; Free Agents remain blocked/null. Production/Main publication, import retry, activation, reset, transition, URL rotation, and new export have not run.
