@@ -132,6 +132,9 @@ test('commissioner candidate paths cannot activate, reset, prune, or reinterpret
   assert.match(classifier,/madden_discovery_session_captures/);
   assert.match(worker,/classify'\),'POST',\{discoverySessionId:context\.discoverySessionId\}/);
   assert.match(statistics,/RECORD_CHUNK_SIZE=200/);
+  assert.match(statistics,/D1_LOOKUP_CHUNK_SIZE=75/);
+  assert.match(statistics,/await db\.batch\(lookups\)/);
+  assert.doesNotMatch(statistics,/\.slice\(0,100\)/);
   assert.match(statistics,/ROUTE_INSPECTION_CONCURRENCY=4/);
   assert.match(lifecycle,/Math\.min\(4,Number\(body\.batches\)/);
   assert.match(worker,/limit:500,batches:4/);

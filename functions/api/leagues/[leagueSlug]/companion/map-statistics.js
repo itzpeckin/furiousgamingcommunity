@@ -5,6 +5,7 @@ import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
 const RELEASE='7.3.2';
 const RECORD_CHUNK_SIZE=200;
+const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;
 const MAX_STORED_WARNINGS_PER_BATCH=25;
 const WEEKLY_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/(defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
@@ -247,11 +248,19 @@ async function activeManifestByRoute(db,leagueId,snapshotId){
 async function playerIndexForRecords(db,leagueId,records){
   const run=await db.prepare(`SELECT id FROM companion_player_mapping_runs WHERE league_id=? AND status='pending-preview' ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
   const byId=new Map(),byName=new Map();if(!run)return{byId,byName};
-  const ids=[...new Set((records||[]).map(record=>text(first(record,IDS))).filter(Boolean))].slice(0,100);
-  const names=[...new Set((records||[]).map(record=>{const f=text(first(record,FIRST)),l=text(first(record,LAST));return (text(first(record,NAME))||[f,l].filter(Boolean).join(' ')||'').trim().toLowerCase()}).filter(Boolean))].slice(0,100);
+  const ids=[...new Set((records||[]).map(record=>text(first(record,IDS))).filter(Boolean))];
+  const names=[...new Set((records||[]).map(record=>{const f=text(first(record,FIRST)),l=text(first(record,LAST));return (text(first(record,NAME))||[f,l].filter(Boolean).join(' ')||'').trim().toLowerCase()}).filter(Boolean))];
+  const lookups=[];
+  for(let offset=0;offset<ids.length;offset+=D1_LOOKUP_CHUNK_SIZE){
+    const chunk=ids.slice(offset,offset+D1_LOOKUP_CHUNK_SIZE),marks=chunk.map(()=>'?').join(',');
+    lookups.push(db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND external_id IN (${marks})`).bind(leagueId,run.id,...chunk));
+  }
+  for(let offset=0;offset<names.length;offset+=D1_LOOKUP_CHUNK_SIZE){
+    const chunk=names.slice(offset,offset+D1_LOOKUP_CHUNK_SIZE),marks=chunk.map(()=>'?').join(',');
+    lookups.push(db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND lower(COALESCE(display_name, trim(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')))) IN (${marks})`).bind(leagueId,run.id,...chunk));
+  }
   const rows=[];
-  if(ids.length){const marks=ids.map(()=>'?').join(',');const result=await db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND external_id IN (${marks})`).bind(leagueId,run.id,...ids).all();rows.push(...(result.results||[]))}
-  if(names.length){const marks=names.map(()=>'?').join(',');const result=await db.prepare(`SELECT external_id,team_external_id,display_name,first_name,last_name,position FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? AND lower(COALESCE(display_name, trim(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')))) IN (${marks})`).bind(leagueId,run.id,...names).all();rows.push(...(result.results||[]))}
+  for(const result of lookups.length?await db.batch(lookups):[])rows.push(...(result.results||[]));
   for(const p of rows){byId.set(String(p.external_id),p);const n=String(p.display_name||`${p.first_name||''} ${p.last_name||''}`).trim().toLowerCase();if(n&&!byName.has(n))byName.set(n,p)}
   return{byId,byName};
 }

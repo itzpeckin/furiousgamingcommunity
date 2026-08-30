@@ -170,7 +170,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 34790,
+        "bytes": 35061,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
