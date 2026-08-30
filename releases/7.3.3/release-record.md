@@ -1,10 +1,10 @@
 # FranchiseHQ 7.3.3 Release Record
 
-**Status:** Production acceptance deployment authorized; 92/92 strict local checks passed; hosted checks pending
+**Status:** Production deployed; owner acceptance pending; 92/92 strict local checks and 4/4 hosted checks passed
 
 **Production authorized:** Yes — one cumulative 7.3.3 acceptance deployment plus additive migration 25
 
-**Production changed:** Not yet. Production, its active snapshot, and Git Main remain unchanged while exact candidate `67255affd4240d9b9713acdb4ad5198943927948` completes hosted validation.
+**Production changed:** Yes — exact candidate `b373f661101c33a2ee2bd17433cfe4001f166b3f` and additive migration 25 are deployed. The active snapshot, protected platform counts, Git Main, and blocked/null Free Agent state remain unchanged.
 
 ## Scope
 
@@ -35,8 +35,16 @@ Build reusable, commissioner-operated Madden game-year archive/removal and recov
 - Automated integration coverage exercises complete local lifecycles: preview, plan, relational/raw archive, checksum verification, detach, active-data removal, resumable rollback restoration, large row/byte payloads, identity-owned mapping dependencies, exact empty-pointer recovery, and separately confirmed archive-copy deletion with retained immutable evidence and rollback refusal.
 - Tests prove that the league/account plane and active membership survive, team assignment clearing is edition-scoped, immutable evidence cannot be rewritten, and blocked Free Agents remain null rather than zero.
 - The consolidated strict gate passes 92/92 automated tests, syntax-checks 198 JavaScript modules, scans 552 text files for secrets, verifies a deterministic 527-file/64-route inventory, and validates all 78 required tables through migration 25.
-- Exact acceptance candidate `67255affd4240d9b9713acdb4ad5198943927948` adds the release/environment regression and is queued for hosted checks before Production changes.
+- Exact acceptance candidate `b373f661101c33a2ee2bd17433cfe4001f166b3f` adds the release/environment regression, passed all four hosted checks, and is the exact source of successful Production Pages deployment `e926a37f-50b1-4b8c-af83-84364a7d4960`.
 - The game-year implementation remains exact commit `061639d48b6cf540a853f8612e51ab316d70dc4e`; the acceptance candidate adds only accurate runtime identification, cache advancement, its regression, and production-aware evidence gates.
+
+## Production migration and reconciliation
+
+- Applied additive migration 25 to `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`, advancing the continuous migration ledger from 24 to 25. Production now has 78 required application tables plus the migration-ledger table, with zero foreign-key violations.
+- Before/after protected counts are identical: one league, eight users, eight memberships, six active team assignments, zero legacy `teams`/`players`/`snapshots` rows, and one active-snapshot pointer.
+- The active snapshot remains exact `841ce1b5-a4a6-4246-a53a-01cd1f189663`. The Madden NFL 27 game year is active and links that active snapshot plus retained candidate `c7023ac0-e6d8-476c-949b-483092830fdd`.
+- The private identity preview still contains 32 teams and 2,044 rostered players. Free Agents remain `blocked` with a null count and are not interpreted as zero.
+- No Production transition was executed: transition runs, archive manifests, recovery bookmarks, and archive-removal rows all remain zero. No reset, detach, archive/removal, recovery, import activation, or active-snapshot change occurred.
 
 ## Isolated-staging rehearsal
 
@@ -53,11 +61,12 @@ Build reusable, commissioner-operated Madden game-year archive/removal and recov
 ## Deployment status
 
 - Branch `codex/franchisehq-7.3.3` is published and stacked PR #13 targets `codex/franchisehq-7.3.2`, not Main.
-- The owner authorized one direct Production acceptance cycle from the exact validated 7.3.3 candidate, including additive migration 25. Candidate validation and hosted checks must pass before publication.
-- No additional staging deployment or rehearsal is included. Production archive/removal/recovery operations, Main changes, data reset, and snapshot activation remain unauthorized.
+- Cloudflare Pages Production deployment `e926a37f-50b1-4b8c-af83-84364a7d4960` succeeded from exact commit `b373f661101c33a2ee2bd17433cfe4001f166b3f`; `franchisehq.app` serves the `7.3.3` response header and matching runtime asset.
+- The Cloudflare Pages Production branch was temporarily changed from `main` to `codex/franchisehq-7.3.3` only for that exact retry deployment and was immediately restored to `main`. Git Main remains unchanged.
+- No additional staging deployment or rehearsal was performed. Production archive/removal/recovery operations, Main changes, data reset, and snapshot activation remain unauthorized and were not run.
 
 ## Rollback
 
-- Before publication, discard the 7.3.3 branch and return to exact evidence commit `b6082b2cb91dc70f9a30d2325f4067ffef045b1a`.
-- After any future authorized migration, migration 25 remains additive and must not be dropped. Runtime rollback must preserve its manifest, bookmark, lifecycle, and tombstone evidence.
+- For a runtime-only rollback, restore prior Pages deployment `61165506-9d06-4f95-9760-58f73389d37c` while keeping Git Main unchanged and reviewing bindings deliberately.
+- Migration 25 remains additive and must not be dropped. Runtime rollback must preserve its game-year, manifest, bookmark, lifecycle, and tombstone schema.
 - Any future data rollback uses a checksum-verified private archive and its immutable recovery bookmark; it does not infer a prior snapshot, team assignment, or Free Agent count.

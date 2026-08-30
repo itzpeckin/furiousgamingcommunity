@@ -1,10 +1,14 @@
 # FranchiseHQ Rollback and Recovery
 
-## 7.3.3 candidate impact
+## 7.3.3 Production impact
 
-The 7.3.3 review candidate adds migration 25 and commissioner-operated game-year transition controls. This implementation cycle does not apply the migration to a cloud database, write an archive, detach or remove data, change the active snapshot, deploy Production, or change Git Main.
+Production Pages deployment `e926a37f-50b1-4b8c-af83-84364a7d4960` runs exact source commit `b373f661101c33a2ee2bd17433cfe4001f166b3f`. The Cloudflare Pages Production branch setting was restored to `main` immediately after the exact deployment succeeded; Git `main` remains `4045e02980c93491b47910f17fcb2e48fae76c68`.
+
+Additive migration 25 is applied to `franchise-hq-db-madden27` / `b2529150-28af-42ca-a07b-69506764ccb6`. The ledger is continuous through 25, foreign keys are clean, and protected counts plus exact active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` are unchanged. Production transition runs, archive manifests, recovery bookmarks, and archive removals are all zero; no archive, detach, active-data removal, recovery, reset, or activation was run.
 
 A code rollback retains the additive game-year tables and links. Do not reverse migration 25 by dropping tables or clearing `game_year_id`. Before any future data transition, recovery depends on a read-back-verified immutable archive manifest plus its recovery bookmark. Detach and active-data removal are refused until verification succeeds, and rollback restores only the exact scoped rows, source objects, prior active pointer, and team assignments recorded by that bookmark.
+
+For a runtime-only rollback, restore prior Pages deployment `61165506-9d06-4f95-9760-58f73389d37c` while deliberately retaining the current Madden 27 database binding and migration 25. Do not reconnect the detached Madden 26 database, move Git Main, clear game-year links, reset data, or change the active snapshot as part of a code rollback.
 
 Archive-object deletion is a distinct irreversible operation with its own typed league-and-edition confirmation. It retains manifest and tombstone rows but eliminates application-level restore from those objects. Never use it as a code rollback. Blocked or missing Free Agents remain null/unknown throughout archive and recovery.
 

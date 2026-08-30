@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.41
+**Revision:** 1.43
 
-**Current production:** 7.3.2 from exact source commit `972bea6`; accepted Madden 27 snapshot `841ce1b5` is active
+**Current production:** 7.3.3 from exact source commit `b373f66`; accepted Madden 27 snapshot `841ce1b5` remains active
 
-**Current work:** 7.3.3 is authorized for one direct Production acceptance cycle. Exact acceptance implementation `67255af` adds accurate Production/7.3.3 runtime identification to the staging-proven game-year controls from `061639d` and passes the 92/92 consolidated strict local gate; hosted checks, additive Production migration 25, and exact-candidate publication are pending. Production remains on 7.3.2 with exact active snapshot `841ce1b5`; Git Main is unchanged.
+**Current work:** Exact 7.3.3 candidate `b373f66` passed the 92/92 consolidated strict local gate and 4/4 hosted checks, then reached Production as Pages deployment `e926a37f`. Additive migration 25 is applied and reconciled; the active snapshot, protected platform counts, Git Main, and blocked/null Free Agent state are unchanged. Owner UI acceptance is pending.
 
-**Next gate:** Validate and publish exact 7.3.3 candidate `67255af` directly to Production, then complete owner acceptance at `franchisehq.app`. Production transition operations, Main, data reset, archive/removal/recovery execution, and snapshot activation/change remain separately authorized and excluded.
+**Next gate:** The owner validates the 7.3.3 commissioner transition panel at `franchisehq.app`, without executing archive/detach/removal/recovery. Production transition operations, Main, data reset, and snapshot activation/change remain separately authorized and excluded.
 
 ## Product decisions
 
@@ -48,7 +48,7 @@
 | 7.3.0 | Completion candidate | Real Madden 27 source captured; 2,044 rostered players certified as preview-ready; Free Agents honestly blocked upstream and deferred |
 | 7.3.1 | Staging validated | One reviewed 2026 season, 32 teams, and 2,044 rostered-player identities are retained in a private preview; Free Agents remain blocked/unknown and no snapshot is active |
 | 7.3.2 | Released; owner accepted and active | Exact repair `972bea6` completed the cold run in 43.763 seconds; the owner accepted and separately activated the validation-ready 32-team/2,044-player snapshot. Free Agents remain blocked/null. |
-| 7.3.3 | Production acceptance authorized; local gate passed; hosted checks pending | Migration 25 plus a verified 7,455-row/43-source archive, active-data removal, resumable recovery, exact boundary-status restoration, retained league/account/identity data, and an accurate Production release marker |
+| 7.3.3 | Production deployed; owner acceptance pending | Exact `b373f66` and migration 25 are live; the staged 7,455-row/43-source archive/removal/recovery rehearsal remains the proof, while Production transition rows stay empty and active snapshot `841ce1b5` remains unchanged |
 | 7.3.4 | Planned | Real FGC Madden 27 staging import and recovery certification |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
@@ -164,7 +164,8 @@
 - The cloud rehearsal exposed and closed three gaps: recovery now persists bounded cursors across requests; archive scope now includes identity-owned mapping parents; and rollback restores exact franchise-season, game-year snapshot, league-snapshot, and destination statuses. The first immutable archive required an audited two-parent compatibility repair, after which all 32 identity teams and 2,044 identity players were restored.
 - Final staging state is intentionally non-active: the league snapshot is `validated`, its game-year link is `candidate`, the franchise season is `preview`, and active snapshot rows remain zero. Users/memberships remain 1/1, temporary access is inactive/revoked, foreign keys are clean, and Free Agents remain blocked/null rather than zero.
 - Exact game-year implementation commit `061639d` passed 91/91 local tests and 4/4 hosted checks in PR #13. At that validation checkpoint, Production, Main, Production migration 25, Production archive/removal/recovery, data reset, and snapshot activation remained unchanged and unauthorized.
-- The owner subsequently authorized one cumulative direct Production acceptance cycle. Exact acceptance candidate `67255af` corrects the stale shell label to show its host-derived environment and release 7.3.3, with additive migration 25 included; transition execution, data reset, Main, and snapshot changes remain excluded.
+- The owner subsequently authorized one cumulative direct Production acceptance cycle. Exact acceptance candidate `b373f66` corrects the stale shell label to show its host-derived environment and release 7.3.3, passed 4/4 hosted checks, and is live as Pages deployment `e926a37f` with additive migration 25 applied.
+- Production reconciliation retained one league, eight users, eight memberships, six active team assignments, exact active snapshot `841ce1b5`, 32 identity teams, and 2,044 rostered-player identities. Free Agents remain blocked/null, foreign keys are clean, and all Production transition/archive/recovery/removal row counts remain zero. Git Main remains unchanged.
 
 ## 7.3.4 — FGC Madden 27 Certification
 
@@ -310,3 +311,4 @@
 - **Revision 1.40:** Completed the authorized 7.3.3 implementation from exact evidence commit `b6082b2`. Exact implementation commit `1076b498` is published in stacked PR #13 with 4/4 hosted checks passing. Migration 25 and local rehearsals cover separate import/season/game-year controls, immutable archive verification, detach/removal, archive-copy tombstoning, and recovery while preserving the league/account plane and blocked/null Free Agent semantics. Production, Main, cloud data, the active snapshot, and all live data remain unchanged; one isolated cloud rehearsal is the next separate gate.
 - **Revision 1.41:** Completed the separately authorized 7.3.3 isolated-staging rehearsal. Migration 25, a 7,455-row/43-source immutable archive, staged detach/removal, resumable restoration, an audited two-parent identity dependency repair, and exact boundary-status reconciliation are verified with zero foreign-key violations. Exact implementation commit `061639d` passes 91/91 local tests and 4/4 hosted checks. The active staging pointer remains empty, Free Agents remain blocked/null, temporary access is revoked/inactive, and Production/Main/reset/activation remain unchanged and unauthorized.
 - **Revision 1.42:** Adopted owner-directed Production-first acceptance for future releases; staging now requires separate explicit owner direction. Authorized one cumulative 7.3.3 Production acceptance cycle with additive migration 25 and exact candidate `67255af`, which replaces the stale 7.3.0 shell marker with accurate Production/7.3.3 identification. Transition execution, reset, Main, and active-snapshot changes remain excluded.
+- **Revision 1.43:** Deployed exact 7.3.3 candidate `b373f66` to Production as Pages deployment `e926a37f` after 4/4 hosted checks, applied and reconciled additive migration 25, and immediately restored the Cloudflare Production branch setting to `main`. The active snapshot remains exact `841ce1b5`; protected counts are unchanged; Production transition/archive/recovery/removal rows remain zero; Free Agents remain blocked/null; and Git Main, reset, transition execution, and snapshot activation/change remain untouched. Owner UI acceptance is the next gate.

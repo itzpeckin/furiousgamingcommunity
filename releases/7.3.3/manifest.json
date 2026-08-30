@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.3",
   "releaseType": "safe-game-year-transition-controls",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.2",
@@ -19,8 +19,8 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "production-acceptance-candidate-hosted-checks-pending",
-    "commit": "67255affd4240d9b9713acdb4ad5198943927948",
+    "status": "production-acceptance-candidate-hosted-checks-passed",
+    "commit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
     "pullRequest": 13,
     "hostedChecksPassed": 4,
     "scope": "Publication is limited to codex/franchisehq-7.3.3 and a stacked pull request. Git Main is excluded."
@@ -37,11 +37,12 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "implementationCommit": "67255affd4240d9b9713acdb4ad5198943927948",
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
+    "implementationCommit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
+    "deployment": "e926a37f-50b1-4b8c-af83-84364a7d4960",
     "migration": 25,
-    "scope": "One cumulative Production acceptance deployment and additive migration 25 are owner-authorized. Archive, detach, active-data removal, recovery, archive-copy removal, reset, snapshot activation/change, Git Main changes, and Free Agent reinterpretation remain excluded."
+    "scope": "The owner-authorized exact candidate and additive migration 25 are deployed to Production pending owner acceptance. Archive, detach, active-data removal, recovery, archive-copy removal, reset, snapshot activation/change, Git Main changes, and Free Agent reinterpretation remain excluded."
   },
   "requiredArtifacts": [
     "config/database-schema-contract.json",

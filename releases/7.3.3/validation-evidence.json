@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.3",
   "validatedOn": "2026-08-30",
-  "status": "production-authorized-pending-deployment",
+  "status": "production-deployed-pending-owner-acceptance",
   "baselineGate": {
     "passed": true,
     "unregisteredFailures": 0
@@ -154,7 +154,9 @@
       "productionHost": "franchisehq.app",
       "ownerFallbackHost": "franchise-hq.pages.dev",
       "previewLabel": "Staging",
-      "cacheKeysAdvanced": true
+      "cacheKeysAdvanced": true,
+      "liveHeaderVerified": true,
+      "liveAssetVerified": true
     },
     "strictMigration": {
       "passed": true,
@@ -183,7 +185,7 @@
     "gameYearSeparateFromFranchiseSeason": true,
     "persistentLeagueAndAccountPlanePreserved": true,
     "activeSnapshotChanged": false,
-    "productionDataChanged": false,
+    "productionDataChanged": true,
     "stagingDataChanged": true,
     "gitMainChanged": false,
     "freeAgentInterpretedAsZero": false,
@@ -198,15 +200,15 @@
       "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/13",
       "base": "codex/franchisehq-7.3.2",
       "head": "codex/franchisehq-7.3.3",
-      "commit": "67255affd4240d9b9713acdb4ad5198943927948",
+      "commit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
       "gitMainChanged": false
     },
     "hostedChecks": {
-      "status": "pending",
-      "passed": 0,
+      "status": "passed",
+      "passed": 4,
       "failed": 0,
-      "pending": 4,
-      "commit": "67255affd4240d9b9713acdb4ad5198943927948",
+      "pending": 0,
+      "commit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
       "checks": [
         "quality (branch push)",
         "quality (pull request)",
@@ -216,9 +218,17 @@
     },
     "productionDeployment": {
       "authorized": true,
-      "status": "not-run",
+      "status": "success",
       "implementationCommit": "67255affd4240d9b9713acdb4ad5198943927948",
+      "sourceCommit": "b373f661101c33a2ee2bd17433cfe4001f166b3f",
+      "deploymentId": "e926a37f-50b1-4b8c-af83-84364a7d4960",
       "target": "franchisehq.app",
+      "url": "https://franchisehq.app",
+      "functionsIncluded": true,
+      "supersededDeploymentId": "61165506-9d06-4f95-9760-58f73389d37c",
+      "temporaryProductionBranch": "codex/franchisehq-7.3.3",
+      "productionBranchRestoredTo": "main",
+      "gitMainChanged": false,
       "ownerAcceptanceRequired": true
     },
     "cloudRehearsal": {
@@ -279,8 +289,57 @@
     },
     "productionMigrations": {
       "authorized": true,
-      "status": "not-run",
-      "migration": 25
+      "status": "applied-verified",
+      "migration": 25,
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "preMigrationBookmarkFingerprint": "0ceaf7c2b4e68568e4187bb16b4f62dfd446b990b40ce4672546133289d719db",
+      "postMigrationBookmarkFingerprint": "c9e6a53d26d89a8c6ff5f230c4ab62b39fd2bd377bbed287b6c83220c9abf041",
+      "ledgerBefore": 24,
+      "ledgerAfter": 25,
+      "migrationRows": 25,
+      "requiredTableCount": 78,
+      "databaseTableCountIncludingLedger": 79,
+      "foreignKeyViolations": 0,
+      "protectedCountsBefore": {
+        "leagues": 1,
+        "users": 8,
+        "memberships": 8,
+        "activeTeamAssignments": 6,
+        "teams": 0,
+        "players": 0,
+        "snapshots": 0,
+        "activeSnapshots": 1
+      },
+      "protectedCountsAfter": {
+        "leagues": 1,
+        "users": 8,
+        "memberships": 8,
+        "activeTeamAssignments": 6,
+        "teams": 0,
+        "players": 0,
+        "snapshots": 0,
+        "activeSnapshots": 1
+      }
+    },
+    "productionReconciliation": {
+      "status": "verified",
+      "activeSnapshotId": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+      "activeSnapshotChanged": false,
+      "gameRelease": "Madden NFL 27",
+      "gameYearStatus": "active",
+      "candidateSnapshotId": "c7023ac0-e6d8-476c-949b-483092830fdd",
+      "identityPreviewStatus": "rostered-players-only",
+      "identityTeams": 32,
+      "identityRosteredPlayers": 2044,
+      "freeAgentStatus": "blocked",
+      "freeAgentCount": null,
+      "freeAgentInterpretedAsZero": false,
+      "transitionRuns": 0,
+      "archiveManifests": 0,
+      "recoveryBookmarks": 0,
+      "archiveRemovals": 0,
+      "foreignKeyViolations": 0
     },
     "productionDataRemoval": {
       "authorized": false,
@@ -291,9 +350,9 @@
       "status": "not-run"
     }
   },
-  "productionChanged": false,
+  "productionChanged": true,
   "dataChanged": false,
   "stagingDataChanged": true,
-  "productionDataChanged": false,
+  "productionDataChanged": true,
   "credentialsChanged": false
 }
