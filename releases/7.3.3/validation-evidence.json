@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.3",
   "validatedOn": "2026-08-30",
-  "status": "local-review-candidate",
+  "status": "published-review-candidate",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "gameYearBoundary": { "passed": true, "separateFromFranchiseSeason": true, "migrationVersion": 25 },
@@ -36,8 +36,8 @@
     "credentialsChanged": false
   },
   "external": {
-    "githubPullRequest": { "authorized": true, "status": "pending", "pullRequest": null, "base": "codex/franchisehq-7.3.2", "head": "codex/franchisehq-7.3.3", "commit": null, "gitMainChanged": false },
-    "hostedChecks": { "status": "pending", "passed": 0, "failed": 0, "commit": null },
+    "githubPullRequest": { "authorized": true, "status": "open", "pullRequest": 13, "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/13", "base": "codex/franchisehq-7.3.2", "head": "codex/franchisehq-7.3.3", "commit": "1076b49893c0d71cc7fc66adb69a8cee81b06170", "gitMainChanged": false },
+    "hostedChecks": { "status": "passed", "passed": 4, "failed": 0, "pending": 0, "commit": "1076b49893c0d71cc7fc66adb69a8cee81b06170", "checks": ["quality (branch push)", "quality (pull request)", "Workers Builds: franchise-hq-import-worker", "Cloudflare Pages"] },
     "cloudRehearsal": { "authorized": false, "status": "not-run" },
     "productionMigrations": { "authorized": false, "status": "not-run", "migration": 25 },
     "productionDataRemoval": { "authorized": false, "status": "not-run" },

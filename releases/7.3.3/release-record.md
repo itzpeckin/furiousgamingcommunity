@@ -1,6 +1,6 @@
 # FranchiseHQ 7.3.3 Release Record
 
-**Status:** Locally validated review candidate
+**Status:** Published review candidate; PR #13 open with 4/4 hosted checks passing
 
 **Production authorized:** No
 
@@ -31,10 +31,11 @@ Build reusable, commissioner-operated Madden game-year archive/removal and recov
 - Automated integration coverage exercises both complete local lifecycles: preview, plan, relational/raw archive, checksum verification, detach, active-data removal, and rollback restoration; plus separately confirmed archive-copy deletion with retained immutable evidence and rollback refusal.
 - Tests prove that the league/account plane and active membership survive, team assignment clearing is edition-scoped, immutable evidence cannot be rewritten, and blocked Free Agents remain null rather than zero.
 - The consolidated strict gate passes 87/87 automated tests, syntax-checks 198 JavaScript modules, scans 552 text files for secrets, verifies a deterministic 527-file/64-route inventory, and validates all 78 required tables through migration 25.
+- Exact implementation commit `1076b49893c0d71cc7fc66adb69a8cee81b06170` is published in stacked PR #13; all four hosted checks passed with zero failures or pending checks.
 
 ## Deployment status
 
-- Branch publication and a stacked pull request are authorized.
+- Branch `codex/franchisehq-7.3.3` is published and stacked PR #13 targets `codex/franchisehq-7.3.2`, not Main.
 - Production, Main, migration 25 application, cloud rehearsal, data removal, snapshot activation, and rollback are not authorized and were not performed.
 
 ## Rollback

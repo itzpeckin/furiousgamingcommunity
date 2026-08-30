@@ -19,10 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending-candidate-commit",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0,
+    "status": "pull-request-open-hosted-checks-passed",
+    "commit": "1076b49893c0d71cc7fc66adb69a8cee81b06170",
+    "pullRequest": 13,
+    "hostedChecksPassed": 4,
     "scope": "Publication is limited to codex/franchisehq-7.3.3 and a stacked pull request. Git Main is excluded."
   },
   "staging": {
