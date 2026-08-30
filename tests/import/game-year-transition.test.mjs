@@ -145,6 +145,19 @@ function context({db,token,archives,sources,method='GET',body,query=''}) {
   };
 }
 
+async function completeRollback(post, body, maxAttempts=100) {
+  let payload=null;
+  for(let attempt=1;attempt<=maxAttempts;attempt+=1){
+    const response=await post(body);
+    assert.equal(response.status,200,'rollback batch should complete or remain safely resumable');
+    payload=await response.json();
+    if(payload.rollback?.restored)return {payload,attempts:attempt};
+    assert.equal(payload.rollback?.pending,true);
+    assert.equal(payload.transition?.status,'restoring');
+  }
+  assert.fail(`rollback did not complete within ${maxAttempts} bounded requests`);
+}
+
 test('game-year helpers preserve edition and blocked-Free-Agent semantics', async () => {
   assert.deepEqual(normalizeGameRelease('Madden NFL 27'),{ok:true,gameRelease:'Madden NFL 27',editionYear:27});
   assert.equal(normalizeGameRelease('2026').ok,false);
@@ -289,11 +302,11 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_memberships`).get().count,1);
     assert.equal(sources.objects.has('source/capture-1.json'),false);
 
-    response=await onRequestPost(context({db,token,archives,sources,method:'POST',body:{
+    const recovered=await completeRollback(body=>onRequestPost(context({db,token,archives,sources,method:'POST',body})),{
       action:'rollback',gameYearId:'game-year-27',confirmation:confirmations.rollback
-    }}));
-    assert.equal(response.status,200);
-    payload=await response.json();
+    });
+    payload=recovered.payload;
+    assert.ok(recovered.attempts>=3);
     assert.equal(payload.rollback.restored,true);
     assert.equal(database.prepare(`SELECT snapshot_id FROM league_active_snapshots`).get().snapshot_id,'snapshot-1');
     assert.equal(database.prepare(`SELECT team_id FROM league_memberships WHERE id='membership-1'`).get().team_id,'tb');
@@ -315,17 +328,56 @@ test('rollback preserves an intentionally empty active-snapshot pointer', async 
       ['plan-archive',confirmations.plan],
       ['archive',confirmations.archive],
       ['detach',confirmations.detach],
-      ['remove-active-data',confirmations.removeActive],
-      ['rollback',confirmations.rollback]
+      ['remove-active-data',confirmations.removeActive]
     ]){
       response=await post({action,gameYearId,confirmation});
       assert.equal(response.status,200,`${action} should preserve an empty active pointer`);
     }
-    const payload=await response.json();
+    const {payload}=await completeRollback(post,{
+      action:'rollback',gameYearId,confirmation:confirmations.rollback
+    });
     assert.equal(payload.rollback.activeSnapshotId,null);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
     assert.equal(database.prepare(`SELECT status FROM league_game_years WHERE id=?`).get(gameYearId).status,'restored');
     assert.equal(database.prepare(`SELECT snapshot_status FROM game_year_snapshots WHERE game_year_id=?`).get(gameYearId).snapshot_status,'restored');
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{database.close();}
+});
+
+test('large recovery advances through durable bounded cursors and resumes idempotently', async () => {
+  const {database,token}=await fixture({activeSnapshot:false});
+  const db=d1(database),archives=bucket(),sources=bucket({'source/capture-1.json':'{"teams":[]}'});
+  const post=body=>onRequestPost(context({db,token,archives,sources,method:'POST',body}));
+  try{
+    const insert=database.prepare(`INSERT INTO league_snapshot_records
+      (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`);
+    for(let index=0;index<400;index+=1){
+      insert.run('snapshot-1','league-1','players',`bulk-${index}`,JSON.stringify({player:index}));
+    }
+    let response=await onRequestGet(context({db,token,archives,sources,query:'?preview=1'}));
+    const initial=await response.json(),confirmations=initial.confirmations,gameYearId=initial.gameYear.id;
+    for(const [action,confirmation] of [
+      ['plan-archive',confirmations.plan],
+      ['archive',confirmations.archive],
+      ['detach',confirmations.detach],
+      ['remove-active-data',confirmations.removeActive]
+    ]){
+      response=await post({action,gameYearId,confirmation});
+      assert.equal(response.status,200);
+    }
+    response=await post({action:'rollback',gameYearId,confirmation:confirmations.rollback});
+    assert.equal(response.status,200);
+    let payload=await response.json();
+    assert.equal(payload.rollback.pending,true);
+    assert.match(payload.rollback.phase,/^restore-copy:/);
+    assert.equal(database.prepare(`SELECT status FROM game_year_transition_runs`).get().status,'restoring');
+    const recovered=await completeRollback(post,{
+      action:'rollback',gameYearId,confirmation:confirmations.rollback
+    });
+    payload=recovered.payload;
+    assert.equal(payload.rollback.restored,true);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,403);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{database.close();}
 });

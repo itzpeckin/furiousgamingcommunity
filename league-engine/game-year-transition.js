@@ -55,12 +55,18 @@
     notice = 'Applying the protected operation…';
     rerender();
     try {
-      state = await request('POST',{
-        action,
-        gameYearId:state.gameYear.id,
-        confirmation,
-        ...extra
-      });
+      do {
+        state = await request('POST',{
+          action,
+          gameYearId:state.gameYear.id,
+          confirmation,
+          ...extra
+        });
+        if (action === 'rollback' && state?.rollback?.pending) {
+          notice = `Recovery in progress · ${state.rollback.phase}`;
+          rerender();
+        }
+      } while (action === 'rollback' && state?.rollback?.pending);
       confirmation = '';
       notice = 'Operation completed and audit evidence was retained.';
     } catch (error) {
@@ -138,7 +144,7 @@
     const action=transitionAction();
     const expected=action?.expected||currentExpected();
     const freeAgents=state.freeAgents||{status:'missing',count:null};
-    const canRollback=['archive-verified','detached','active-data-removed'].includes(transition?.status);
+    const canRollback=['archive-verified','detached','active-data-removed','restoring'].includes(transition?.status);
     const activeSeason=state.franchiseSeasons?.find(season=>['active','preview'].includes(season.status))||state.franchiseSeasons?.[0];
     return `<section class="game-year-transition-stack" data-game-year-transition-panel>
       <article class="card game-year-transition-card">

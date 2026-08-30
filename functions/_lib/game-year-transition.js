@@ -139,7 +139,7 @@ export function canTransition(status, action) {
     detach:new Set(['archive-verified']),
     removeActive:new Set(['detached']),
     removeArchive:new Set(['active-data-removed']),
-    rollback:new Set(['archive-verified', 'detached', 'active-data-removed'])
+    rollback:new Set(['archive-verified', 'detached', 'active-data-removed', 'restoring'])
   };
   return allowed[action]?.has(String(status || '')) === true;
 }

@@ -20,6 +20,8 @@ import { requireCommissioner } from '../../../_lib/permissions.js';
 
 const RELEASE = GAME_YEAR_TRANSITION_RELEASE;
 const PAGE_SIZE = 250;
+const RESTORE_ROWS_PER_REQUEST = 180;
+const RESTORE_SOURCES_PER_REQUEST = 8;
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 const text = value => String(value ?? '').trim();
 const parse = (value, fallback = null) => { try { return JSON.parse(value || 'null') ?? fallback; } catch { return fallback; } };
@@ -631,20 +633,84 @@ async function tableColumns(db, table) {
   return new Set(resultRows(result).map(column=>column.name));
 }
 
-async function restoreRows(current, bundle) {
+function restoreRowCursor(phase) {
+  const match = text(phase).match(/^restore-copy:(\d+):(\d+)$/);
+  return match
+    ? { tableIndex:Number(match[1]), rowOffset:Number(match[2]) }
+    : { tableIndex:0, rowOffset:0 };
+}
+
+function restoreSourceCursor(phase) {
+  const match = text(phase).match(/^restore-source:(\d+)$/);
+  return match ? Number(match[1]) : 0;
+}
+
+async function saveRestorePhase(current, transitionId, phase) {
+  await current.db.prepare(`UPDATE game_year_transition_runs
+    SET status='restoring',phase=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .bind(phase,transitionId).run();
+}
+
+async function restoreRows(current, bundle, transition) {
   const datasets = bundle.datasets || {};
-  for (const table of RESTORE_ORDER) {
+  let { tableIndex, rowOffset } = restoreRowCursor(transition.phase);
+  let remaining = RESTORE_ROWS_PER_REQUEST;
+  let processed = 0;
+  for (; tableIndex < RESTORE_ORDER.length; tableIndex += 1) {
+    const table = RESTORE_ORDER[tableIndex];
     const rows = Array.isArray(datasets[table]) ? datasets[table] : [];
-    if (!rows.length) continue;
+    if (!rows.length || rowOffset >= rows.length) {
+      rowOffset = 0;
+      continue;
+    }
     const allowed = await tableColumns(current.db,table);
+    const selected = rows.slice(rowOffset,rowOffset + remaining);
     const statements = [];
-    for (const row of rows) {
+    for (const row of selected) {
       const columns = Object.keys(row).filter(column=>allowed.has(column)&&SAFE_IDENTIFIER.test(column));
       if (!columns.length) continue;
       statements.push(current.db.prepare(`INSERT OR IGNORE INTO ${table} (${columns.join(',')}) VALUES (${marks(columns)})`).bind(...columns.map(column=>row[column])));
     }
     for (let index=0;index<statements.length;index+=60) await current.db.batch(statements.slice(index,index+60));
+    processed += selected.length;
+    remaining -= selected.length;
+    rowOffset += selected.length;
+    if (rowOffset >= rows.length) {
+      tableIndex += 1;
+      rowOffset = 0;
+    }
+    const complete = tableIndex >= RESTORE_ORDER.length;
+    const phase = complete ? 'restore-source:0' : `restore-copy:${tableIndex}:${rowOffset}`;
+    if (complete || remaining <= 0) {
+      await saveRestorePhase(current,transition.id,phase);
+      return { complete, phase, rowsProcessed:processed };
+    }
+    tableIndex -= 1;
   }
+  await saveRestorePhase(current,transition.id,'restore-source:0');
+  return { complete:true, phase:'restore-source:0', rowsProcessed:processed };
+}
+
+async function restoreSources(current, manifest, transition) {
+  const sources = parse(manifest.source_objects_json,[]);
+  const start = restoreSourceCursor(transition.phase);
+  const selected = sources.slice(start,start + RESTORE_SOURCES_PER_REQUEST);
+  for (const source of selected) {
+    const archived = await current.context.env.GAME_YEAR_ARCHIVES.get(source.archiveKey);
+    if (!archived) throw new Error(`Archived source object not found: ${source.archiveKey}`);
+    const bytes = new Uint8Array(await archived.arrayBuffer());
+    if (await archiveDigest(bytes)!==source.sha256) throw new Error(`Archived source checksum mismatch: ${source.archiveKey}`);
+    await current.context.env.COMPANION_EXPORTS.put(source.sourceKey,bytes);
+    const restored = await current.context.env.COMPANION_EXPORTS.get(source.sourceKey);
+    if (!restored || await archiveDigest(new Uint8Array(await restored.arrayBuffer()))!==source.sha256) {
+      throw new Error(`Restored source checksum mismatch: ${source.sourceKey}`);
+    }
+  }
+  const next = start + selected.length;
+  const complete = next >= sources.length;
+  const phase = complete ? 'restore-finalize' : `restore-source:${next}`;
+  await saveRestorePhase(current,transition.id,phase);
+  return { complete, phase, sourcesProcessed:selected.length, sourcesTotal:sources.length };
 }
 
 async function rollback(current, gameYear, transition, body) {
@@ -658,14 +724,24 @@ async function rollback(current, gameYear, transition, body) {
   if(!bookmark)throw new Error('Immutable recovery bookmark not found.');
   const sources=parse(manifest.source_objects_json,[]);
   if(sources.length&&!current.context.env.COMPANION_EXPORTS?.put)throw new Error('Source-object recovery is unavailable; rollback was refused.');
-  await current.db.prepare(`UPDATE game_year_transition_runs SET status='restoring',phase='restore-copy',updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(transition.id).run();
-  await restoreRows(current,bundle);
-  for (const source of sources) {
-    const archived = await current.context.env.GAME_YEAR_ARCHIVES.get(source.archiveKey);
-    if (!archived) throw new Error(`Archived source object not found: ${source.archiveKey}`);
-    const bytes = new Uint8Array(await archived.arrayBuffer());
-    if (await archiveDigest(bytes)!==source.sha256) throw new Error(`Archived source checksum mismatch: ${source.archiveKey}`);
-    await current.context.env.COMPANION_EXPORTS?.put?.(source.sourceKey,bytes);
+  if (transition.status !== 'restoring') {
+    transition = { ...transition, status:'restoring', phase:'restore-copy:0:0' };
+    await saveRestorePhase(current,transition.id,transition.phase);
+  }
+  if (!text(transition.phase).startsWith('restore-source:') && transition.phase !== 'restore-finalize') {
+    const step = await restoreRows(current,bundle,transition);
+    return {
+      restored:false,pending:true,phase:step.phase,
+      rowsProcessed:step.rowsProcessed,activeSnapshotId:bookmark.active_snapshot_id || null
+    };
+  }
+  if (text(transition.phase).startsWith('restore-source:')) {
+    const step = await restoreSources(current,manifest,transition);
+    return {
+      restored:false,pending:true,phase:step.phase,
+      sourcesProcessed:step.sourcesProcessed,sourcesTotal:step.sourcesTotal,
+      activeSnapshotId:bookmark.active_snapshot_id || null
+    };
   }
   const assignments = parse(bookmark.team_assignments_json,[]);
   const statements = [
@@ -774,7 +850,7 @@ export async function onRequestPost(context) {
       const result=await removeArchive(current,gameYear,transition,body);if(result.response)return result.response;return json({...await publicState(current),archiveRemoval:result});
     }
     if(action==='rollback'){
-      const result=await rollback(current,gameYear,transition,body);if(result.response)return result.response;return json({...await publicState(current),activeSnapshotChanged:true,rollback:result});
+      const result=await rollback(current,gameYear,transition,body);if(result.response)return result.response;return json({...await publicState(current),activeSnapshotChanged:Boolean(result.restored&&result.activeSnapshotId),rollback:result});
     }
     return json({ok:false,error:`Unsupported action: ${action||'none'}.`,release:RELEASE},400);
   }catch(error){
