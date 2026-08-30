@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.4 */
+/* FHQ_BUILD: 7.3.4.1 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.4';
+  const VERSION = '7.3.4.1';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -80,6 +80,7 @@
       busy = false;
       rerender();
     }
+    return state;
   }
 
   async function reportPhase(runId, phase, startedAt, result, extra={}) {
@@ -186,7 +187,7 @@
       }
 
       const analyzed = await runPhase(runId,'analyze-source',
-        ()=>api('discovery-report','POST',{sessionId:state.source?.discoverySessionId}),
+        ()=>api('discovery-report','POST',{sessionId:state.source?.discoverySessionId,reuseExisting:true}),
         payload=>({
           summary:`${Number(payload.report?.captureCount||0)} captures analyzed`,
           counts:{captures:Number(payload.report?.captureCount||0),routes:Number(payload.report?.routeCount||0)}
@@ -271,6 +272,15 @@
       busy = false;
       await refresh().catch(()=>rerender());
     }
+    return state;
+  }
+
+  async function importLatestExport() {
+    await refresh();
+    if (!state?.source) throw new Error('No analyzed league export is ready to import.');
+    if (!state.destination) await createDestination();
+    if (!state?.destination) throw new Error('The private season destination is unavailable.');
+    return runImport({retry:['failed','running'].includes(currentRun()?.status)});
   }
 
   function phaseRows() {
@@ -302,10 +312,10 @@
     const runLabel=busy?'Candidate Import Running…'
       :ready?'Exact Export Already Imported'
         :run?.status==='failed'?'Retry Candidate Import'
-          :sourceIsNew?'Build New Candidate':'Analyze Captured Export';
+          :sourceIsNew?'Import Latest Export':'Analyze Captured Export';
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
       <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>Private Candidate Import</h3><p>Analyze the selected capture, map it into one reviewed season, and build a validated private preview. This workflow never activates a snapshot.</p></div><span class="pill pill--${ready?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(ready?'Preview ready':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
-      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Safety boundary:</strong> The active league view and Git Main remain unchanged. Candidate data is append-only, no reset runs, and the active snapshot pointer is verified before finalization.</span></div>
+      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Safety boundary:</strong> The active league view remains unchanged. Candidate data is append-only, no reset runs, and the active snapshot pointer is verified before finalization.</span></div>
       ${faStatus==='blocked'?`<div class="league-import-framework-note"><svg><use href="#icon-alert-triangle"></use></svg><span><strong>Free Agents blocked upstream:</strong> this candidate is rostered-player-only. The Free Agent count is unknown, never zero.</span></div>`:''}
       <div class="commissioner-import-summary">
         <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
@@ -343,7 +353,7 @@
 
   const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,activationPerformed:false,activeSnapshotChanged:false});
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
-  HQ.defineModuleService('platform','oneClickImport',{runImport,createDestination,refresh,renderPanel,diagnostics},{replace:true,alias:'oneClickImport'});
+  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,renderPanel,diagnostics},{replace:true,alias:'oneClickImport'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','private-candidate','sub-60-second-target','no-snapshot-activation']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

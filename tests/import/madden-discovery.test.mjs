@@ -13,6 +13,7 @@ import {
   captureBelongsToRosterCohort
 } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { hashToken } from '../../functions/_lib/auth.js';
+import { deriveLeagueExportToken } from '../../functions/_lib/permanent-league-export.js';
 import { onRequestPost as startDiscoverySession } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-session.js';
 import { onRequestPost as generateDiscoveryReport } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js';
 import { onRequest as receiveDiscoveryCapture } from '../../functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js';
@@ -22,7 +23,11 @@ const MIGRATIONS = [
   '../../migrations/0019_canonical_import_snapshot_foundation.sql',
   '../../migrations/0020_canonical_transaction_runtime_foundation.sql',
   '../../migrations/0021_tenant_ready_core.sql',
-  '../../migrations/0022_madden_27_discovery_foundation.sql'
+  '../../migrations/0022_madden_27_discovery_foundation.sql',
+  '../../migrations/0023_permanent_identity_preview.sql',
+  '../../migrations/0024_commissioner_candidate_import.sql',
+  '../../migrations/0025_safe_game_year_transition.sql',
+  '../../migrations/0026_permanent_league_export_url.sql'
 ];
 
 function d1(database) {
@@ -369,12 +374,14 @@ test('one authenticated discovery session captures, deduplicates, reports, and n
     const binding = d1(database);
     const r2 = memoryR2();
     const kv = memoryKv();
+    const credentialRoot = ['test','permanent','export','root'].join('-');
     const env = {
       DB: binding,
       FRANCHISE_HQ_DB: binding,
       COMPANION_EXPORTS: r2,
       COMPANION_EXPORT_META: kv,
       LEAGUE_CONFIG: memoryKv(),
+      COMPANION_EXPORT_TOKEN: credentialRoot,
       APP_ENV: 'production',
       OWNER_FALLBACK_DISCORD_ID: '100000000000000001'
     };
@@ -443,6 +450,48 @@ test('one authenticated discovery session captures, deduplicates, reports, and n
     assert.equal(generated.report.activationPerformed, false);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM madden_discovery_reports`).get().count, 1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count, 0);
+
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(
+        'season-test','league-test','ea-madden-companion','fr-1','1','Madden NFL 27','Test Season',2026,'active'
+      );
+    database.prepare(`INSERT INTO league_game_years
+      (id,league_id,game_release,edition_year,display_name,status)
+      VALUES (?,?,?,?,?,'active')`).run(
+        'game-year-test','league-test','Madden NFL 27',27,'Madden NFL 27'
+      );
+    database.prepare(`UPDATE companion_league_export_endpoints SET
+      latest_session_id=NULL,latest_report_id=NULL,latest_ready_report_id=NULL,
+      last_received_at=NULL,last_analyzed_at=NULL,analysis_requested_at=NULL
+      WHERE league_id='league-test'`).run();
+    const permanentToken = await deriveLeagueExportToken(
+      env.COMPANION_EXPORT_TOKEN,'league-test',1
+    );
+    const pendingAnalysis=[];
+    for (const item of completeCaptureSet()) {
+      const response = await receiveDiscoveryCapture({
+        env,
+        params:{leagueSlug:'test-league',token:permanentToken,datasetPath:item.routePath},
+        request:new Request(`https://franchisehq.app/api/leagues/test-league/companion/export/${permanentToken}/${item.routePath}`,{
+          method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(item.payload)
+        }),
+        waitUntil(promise){ pendingAnalysis.push(promise); }
+      });
+      assert.equal(response.status,200);
+      assert.equal((await response.json()).mode,'permanent-league-export');
+    }
+    await Promise.all(pendingAnalysis);
+    const endpoint=database.prepare(`SELECT * FROM companion_league_export_endpoints
+      WHERE league_id='league-test'`).get();
+    const automaticSession=database.prepare(`SELECT * FROM madden_discovery_sessions
+      WHERE id=?`).get(endpoint.latest_session_id);
+    assert.match(automaticSession.id,/^m27_auto_/);
+    assert.equal(automaticSession.capture_count,7);
+    assert.ok(endpoint.latest_report_id);
+    assert.equal(endpoint.latest_ready_report_id,endpoint.latest_report_id);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM madden_discovery_reports`).get().count,2);
+    assert.equal(r2.objects.size,7,'duplicate payloads are linked into the new cohort without copying raw objects');
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {
     database.close();

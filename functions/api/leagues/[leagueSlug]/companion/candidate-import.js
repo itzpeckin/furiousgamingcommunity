@@ -19,7 +19,7 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 
-const RELEASE = '7.3.4';
+const RELEASE = '7.3.4.1';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -46,6 +46,16 @@ async function identitySource(db, leagueId) {
 }
 
 async function latestReport(db, leagueId) {
+  const endpoint = await db.prepare(`SELECT latest_ready_report_id
+    FROM companion_league_export_endpoints WHERE league_id=? LIMIT 1`).bind(leagueId).first();
+  if (endpoint && !endpoint.latest_ready_report_id) return null;
+  const selected = endpoint ? await db.prepare(`SELECT report.id,report.session_id,report.status,report.route_count,
+      report.capture_count,report.total_bytes,report.report_hash,report.source_markers_json,
+      report.dataset_inventory_json,report.requirement_results_json,report.free_agent_evidence_json,report.generated_at
+    FROM madden_discovery_reports report
+    WHERE report.league_id=? AND report.id=? LIMIT 1`).bind(leagueId,endpoint.latest_ready_report_id).first() : null;
+  if (selected) return selected;
+  if (endpoint) return null;
   return db.prepare(`SELECT id,session_id,status,route_count,capture_count,total_bytes,report_hash,
       source_markers_json,dataset_inventory_json,requirement_results_json,free_agent_evidence_json,generated_at
     FROM madden_discovery_reports WHERE league_id=? ORDER BY generated_at DESC,rowid DESC LIMIT 1`)

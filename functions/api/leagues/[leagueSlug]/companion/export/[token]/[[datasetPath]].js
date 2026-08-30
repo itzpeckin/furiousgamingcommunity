@@ -14,9 +14,16 @@ import {
   summarizePayloadShape
 } from '../../../../../../_lib/cloud-platform.js';
 import { hashToken } from '../../../../../../_lib/auth.js';
+import { deriveLeagueExportToken } from '../../../../../../_lib/permanent-league-export.js';
+import { generateMaddenDiscoveryReport } from '../../../../../../_lib/madden-discovery-report.js';
 
-const RELEASE = '7.3.0';
+const RELEASE = '7.3.4.1';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
+const AUTOMATIC_COHORT_WINDOW_MS = 2 * 60 * 1000;
+const AUTOMATIC_LATE_CAPTURE_WINDOW_MS = 15 * 1000;
+const AUTOMATIC_SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
+const AUTOMATIC_ANALYSIS_IDLE_MS = 3_000;
+const AUTOMATIC_ANALYSIS_MAX_WAIT_MS = 24_000;
 
 function slugOf(context) {
   return String(context.params?.leagueSlug || '').trim().toLowerCase();
@@ -140,6 +147,89 @@ async function discoverySessionFor(db, leagueId, token) {
     LIMIT 1`).bind(leagueId, tokenHash).first();
 }
 
+async function permanentEndpointFor(db, leagueId) {
+  return db.prepare(`SELECT * FROM companion_league_export_endpoints
+    WHERE league_id=? LIMIT 1`).bind(leagueId).first();
+}
+
+async function automaticSessionFor(db, league, endpoint) {
+  const previous = endpoint?.latest_session_id
+    ? await db.prepare(`SELECT * FROM madden_discovery_sessions
+      WHERE league_id=? AND id=? LIMIT 1`).bind(league.id,endpoint.latest_session_id).first()
+    : null;
+  const previousActivity = Date.parse(previous?.last_capture_at || previous?.created_at || '') || 0;
+  const reuseWindow = previous?.status === 'open'
+    ? AUTOMATIC_COHORT_WINDOW_MS
+    : AUTOMATIC_LATE_CAPTURE_WINDOW_MS;
+  if (previous && Number(endpoint.latest_session_token_version) === Number(endpoint.token_version)
+    && !['expired','cancelled'].includes(previous.status)
+    && Date.now()-previousActivity <= reuseWindow) return previous;
+
+  const gameYear = await db.prepare(`SELECT game_release FROM league_game_years
+    WHERE league_id=? AND status IN ('active','restored','preparing')
+    ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'restored' THEN 1 ELSE 2 END,updated_at DESC LIMIT 1`)
+    .bind(league.id).first();
+  const season = await db.prepare(`SELECT source_season_id FROM franchise_seasons
+    WHERE league_id=? ORDER BY updated_at DESC,created_at DESC LIMIT 1`).bind(league.id).first();
+  const id = `m27_auto_${crypto.randomUUID()}`;
+  const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now()+AUTOMATIC_SESSION_DURATION_MS).toISOString();
+  const tokenHash = await hashToken(`permanent:${league.id}:${endpoint.token_version}:${id}`);
+  await db.batch([
+    db.prepare(`INSERT INTO madden_discovery_sessions
+      (id,league_id,token_hash,status,expected_game_release,expected_league_name,expected_season,
+       expires_at,created_at,updated_at)
+      VALUES (?,?,?,'open',?,?,?,?,?,?)`).bind(
+        id,league.id,tokenHash,
+        gameYear?.game_release || null,league.name,season?.source_season_id || null,
+        expiresAt,createdAt,createdAt
+      ),
+    db.prepare(`UPDATE companion_league_export_endpoints SET
+      latest_session_id=?,latest_session_token_version=?,analysis_requested_at=NULL,updated_at=?
+      WHERE league_id=?`).bind(id,endpoint.token_version,createdAt,league.id)
+  ]);
+  return db.prepare(`SELECT * FROM madden_discovery_sessions WHERE id=?`).bind(id).first();
+}
+
+async function afterPermanentCapture(context, db, leagueId, sessionId, receivedAt) {
+  await db.prepare(`UPDATE companion_league_export_endpoints SET
+    latest_session_id=?,last_received_at=?,updated_at=? WHERE league_id=?`).bind(
+      sessionId,receivedAt,receivedAt,leagueId
+    ).run();
+  const claim = await db.prepare(`UPDATE companion_league_export_endpoints
+    SET analysis_requested_at=?,updated_at=?
+    WHERE league_id=? AND (
+      analysis_requested_at IS NULL
+      OR datetime(analysis_requested_at)<=datetime(?,'-30 seconds')
+    )`).bind(receivedAt,receivedAt,leagueId,receivedAt).run();
+  if (!Number(claim?.meta?.changes || 0)) return;
+  const analyze = (async()=>{
+    try {
+      const deadline = Date.now()+AUTOMATIC_ANALYSIS_MAX_WAIT_MS;
+      while (Date.now()<deadline) {
+        const session = await db.prepare(`SELECT last_capture_at FROM madden_discovery_sessions
+          WHERE league_id=? AND id=? LIMIT 1`).bind(leagueId,sessionId).first();
+        const idleMs = Date.now()-(Date.parse(session?.last_capture_at || '') || Date.now());
+        if (idleMs >= AUTOMATIC_ANALYSIS_IDLE_MS) break;
+        await new Promise(resolve=>setTimeout(resolve,Math.min(
+          AUTOMATIC_ANALYSIS_IDLE_MS-idleMs,
+          Math.max(1,deadline-Date.now())
+        )));
+      }
+      await generateMaddenDiscoveryReport({
+        db,env:context.env,leagueId,sessionId,reuseExisting:true
+      });
+    } catch (error) {
+      console.error('Automatic Madden export analysis failed',error?.message || error);
+    } finally {
+      await db.prepare(`UPDATE companion_league_export_endpoints SET analysis_requested_at=NULL
+        WHERE league_id=? AND latest_session_id=?`).bind(leagueId,sessionId).run().catch(()=>{});
+    }
+  })();
+  if (typeof context.waitUntil === 'function') context.waitUntil(analyze);
+  else await analyze;
+}
+
 async function linkSessionCapture(db, leagueId, discoverySessionId, captureId, routePath, observedAt) {
   if (!discoverySessionId) return;
   await db.batch([
@@ -203,22 +293,33 @@ export async function onRequest(context) {
     }
 
     const suppliedToken = tokenOf(context);
-    const discoverySession = await discoverySessionFor(db, league.id, suppliedToken);
+    let discoverySession = await discoverySessionFor(db, league.id, suppliedToken);
+    const permanentEndpoint = await permanentEndpointFor(db,league.id);
+    const permanentSigningSecret = context.env.COMPANION_EXPORT_TOKEN || context.env.SESSION_SIGNING_SECRET;
+    const permanentToken = permanentEndpoint?.status === 'active' && permanentSigningSecret
+      ? await deriveLeagueExportToken(permanentSigningSecret,league.id,permanentEndpoint.token_version)
+      : null;
+    const permanentAuthorized = Boolean(permanentToken && safeEqual(suppliedToken,permanentToken));
     const expected = await configuredExportToken(context.env, league);
-    const legacyAuthorized = Boolean(expected && safeEqual(suppliedToken, expected));
-    if (!discoverySession && !legacyAuthorized) {
+    const legacyAuthorized = Boolean(!permanentEndpoint && expected && safeEqual(suppliedToken, expected));
+    if (!discoverySession && !legacyAuthorized && !permanentAuthorized) {
       return json({ ok: false, error: 'Unauthorized export request.', release: RELEASE }, 401);
+    }
+
+    if (permanentAuthorized && method !== 'GET') {
+      discoverySession = await automaticSessionFor(db,league,permanentEndpoint);
     }
 
     if (method === 'GET') {
       return json({
         ok: true,
         ready: true,
-        mode: 'route-discovery',
+        mode: permanentAuthorized ? 'permanent-league-export' : 'route-discovery',
         leagueSlug: slug,
         routePath,
         discoverySessionId: discoverySession?.id || null,
-        expiresAt: discoverySession?.expires_at || null,
+        expiresAt: permanentAuthorized ? null : discoverySession?.expires_at || null,
+        reusable:permanentAuthorized,
         release: RELEASE
       });
     }
@@ -259,10 +360,14 @@ export async function onRequest(context) {
       if (discoverySession) {
         await linkSessionCapture(db, league.id, discoverySession.id, duplicate.id, routePath, receivedAt);
       }
+      if (permanentAuthorized && discoverySession) {
+        await afterPermanentCapture(context,db,league.id,discoverySession.id,receivedAt);
+      }
       return json({
         ok: true,
         accepted: false,
         duplicate: true,
+        mode:permanentAuthorized ? 'permanent-league-export' : 'route-discovery',
         captureId: duplicate.id,
         discoverySessionId,
         routePath,
@@ -338,6 +443,10 @@ export async function onRequest(context) {
       }, 500);
     }
 
+    if (permanentAuthorized && discoverySession) {
+      await afterPermanentCapture(context,db,league.id,discoverySession.id,receivedAt);
+    }
+
     const pointer = {
       captureId,
       discoverySessionId,
@@ -363,6 +472,7 @@ export async function onRequest(context) {
     } catch (error) {
       // The payload is safely retained in R2 and D1. Report partial success instead of crashing Madden.
       return successResponse({
+        mode:permanentAuthorized ? 'permanent-league-export' : 'route-discovery',
         partial: true,
         warning: 'Capture was stored in R2 and D1, but the KV latest pointer could not be updated.',
         captureId,
@@ -382,6 +492,7 @@ export async function onRequest(context) {
     }
 
     return successResponse({
+      mode:permanentAuthorized ? 'permanent-league-export' : 'route-discovery',
       captureId,
       discoverySessionId,
       leagueSlug: slug,

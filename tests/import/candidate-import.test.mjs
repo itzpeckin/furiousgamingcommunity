@@ -133,7 +133,7 @@ test('one private destination and one idempotent candidate run are enforced per 
 });
 
 test('commissioner candidate paths cannot activate, reset, prune, or reinterpret Free Agents', async () => {
-  const [candidate,builder,lifecycle,ui,worker,job,report,classifier,statistics]=await Promise.all([
+  const [candidate,builder,lifecycle,ui,worker,job,report,reportHelper,classifier,statistics]=await Promise.all([
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js',import.meta.url),'utf8'),
@@ -141,6 +141,7 @@ test('commissioner candidate paths cannot activate, reset, prune, or reinterpret
     readFile(new URL('../../workers/franchise-import-worker/src/index.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/import-job.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js',import.meta.url),'utf8'),
+    readFile(new URL('../../functions/_lib/madden-discovery-report.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/classify.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js',import.meta.url),'utf8')
   ]);
@@ -177,7 +178,7 @@ test('commissioner candidate paths cannot activate, reset, prune, or reinterpret
   }
   assert.match(ui,/Create Private Destination/);
   assert.match(ui,/Analyze Captured Export/);
-  assert.match(ui,/Build New Candidate/);
+  assert.match(ui,/Import Latest Export/);
   assert.match(ui,/Exact Export Already Imported/);
   assert.match(ui,/Active \/ captured week/);
   assert.match(ui,/under 60 seconds/);
@@ -189,7 +190,8 @@ test('commissioner candidate paths cannot activate, reset, prune, or reinterpret
   // Production cold-path remediation reuses only exact immutable source-lock
   // evidence, bounds R2 concurrency, and reduces D1/HTTP round trips.
   assert.match(report,/body\.reuseExisting === true/);
-  assert.match(report,/reportGeneratedAt >= newestObservedAt/);
+  assert.match(reportHelper,/retained\.generated_at/);
+  assert.match(reportHelper,/newestObservedAt/);
   assert.match(classifier,/INSPECTION_CONCURRENCY = 8/);
   assert.match(classifier,/reusedInspectionCount/);
   assert.match(classifier,/madden_discovery_session_captures/);

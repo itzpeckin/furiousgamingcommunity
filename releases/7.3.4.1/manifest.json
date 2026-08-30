@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.1",
+  "releaseType": "permanent-league-export-and-one-click-latest-import",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.4",
+    "commit": "431583ea7a472c4ba5292bea1a1775e7f0309b33",
+    "tree": "b8a3c56ae3e48d15433961b54a36a87fa286877d",
+    "tag": "v7.0.0",
+    "productionDeployment": "fafabfb2-91fe-4759-9cf8-8872365c6777"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.4.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "scope": "The owner authorized implementation of the permanent export workflow. Publication, a pull request, hosted checks, staging, Production, and Git Main remain separate gates."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Production-first policy applies. No staging cycle is authorized."
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.3.4",
+    "currentCommit": "431583ea7a472c4ba5292bea1a1775e7f0309b33",
+    "currentDeployment": "fafabfb2-91fe-4759-9cf8-8872365c6777",
+    "activeSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+    "scope": "No Production deployment, migration 26 application, real export, candidate import, activation, reset, transition, archive/removal/recovery operation, or Git Main change is authorized."
+  },
+  "requiredArtifacts": [
+    "config/database-schema-contract.json",
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/madden-discovery-report.js",
+    "functions/_lib/permanent-league-export.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+    "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
+    "league-engine/one-click-import.js",
+    "league-engine/permanent-export-url.js",
+    "migrations/0026_permanent_league_export_url.sql",
+    "releases/7.3.4.1/release-record.md",
+    "releases/7.3.4.1/validation-evidence.json",
+    "tests/import/permanent-league-export.test.mjs"
+  ]
+}

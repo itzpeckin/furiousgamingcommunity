@@ -119,7 +119,15 @@ test('the production-like legacy upgrade preserves identities and relationships'
     assert.equal(database.prepare(
       `SELECT user_id FROM sessions WHERE id='session-upgrade-test'`
     ).get().user_id, 'user-upgrade-test');
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 25);
+    assert.deepEqual({...database.prepare(`SELECT league_id,token_version,status
+      FROM companion_league_export_endpoints WHERE league_id='league-upgrade-test'`).get()}, {
+      league_id:'league-upgrade-test',token_version:1,status:'active'
+    });
+    database.prepare(`INSERT INTO leagues (id,name,product_name,slug)
+      VALUES (?,?,?,?)`).run('league-future-test','Future League','FranchiseHQ','future-league');
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints
+      WHERE league_id='league-future-test'`).get().count,1);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 26);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {
     database.close();
@@ -224,7 +232,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 25', async () => {
+test('runtime schema verification fails closed before version 26', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -235,13 +243,13 @@ test('runtime schema verification fails closed before version 25', async () => {
     () => requireDatabaseSchema(outdated),
     error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 17
   );
-  observedVersion = 25;
-  assert.equal((await requireDatabaseSchema(outdated)).version, 25);
+  observedVersion = 26;
+  assert.equal((await requireDatabaseSchema(outdated)).version, 26);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 25, name: 'safe_game_year_transition' }) };
+      return { first: async () => ({ version: 26, name: 'permanent_league_export_url' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 25);
+  assert.equal((await requireDatabaseSchema(current)).version, 26);
 });

@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.4.1 candidate impact
+
+The local 7.3.4.1 candidate adds additive migration 26 and a permanent Madden Companion export endpoint for each league. The URL credential is derived from a protected server root, league ID, and token version; D1 stores no raw credential. Rotation increments the version and invalidates only the previous URL. The endpoint row and its current version persist across normal imports and game-year archive/removal operations.
+
+Raw captures and structural reports remain immutable. Each request burst is linked to an automatic discovery cohort and analyzed after a quiet window. `latest_report_id` may show an incomplete or failed newest export, but `latest_ready_report_id` advances only for an eligible source. A rollback must retain all capture, report, candidate, identity, and audit rows and must not repoint or activate a snapshot.
+
+Migration 26 is additive and has not been applied outside local validation. Before a future authorized application, take the target-locked D1 bookmark and preservation inventory. After application, runtime rollback may restore exact Production 7.3.4 commit `431583ea7a472c4ba5292bea1a1775e7f0309b33` / Pages deployment `fafabfb2-91fe-4759-9cf8-8872365c6777` while retaining the endpoint table. Do not drop migration 26, delete endpoint/capture rows, rotate credentials, reset data, run a transition, or change active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` as an improvised rollback. Blocked Free Agents remain unknown/null.
+
 ## 7.3.4 candidate impact
 
 The local 7.3.4 review candidate changes repeat-import source selection and private candidate composition only. It adds no migration and has not been published, deployed, run against a real Week 9 capture, changed Production or Git Main, reset/transitioned data, or activated a snapshot.
@@ -56,11 +64,11 @@ The current production rollback target is:
 3. For an unhealthy Cloudflare build, restore the last known-good deployment while the Git rollback is reviewed.
 4. Run production smoke checks and record the restored deployment identity.
 
-The 7.1/7.2 application can operate with the additive 7.3 discovery schema, so normal code rollback retains migrations 21 through 25 rather than trying to reverse tables.
+The 7.1/7.2 application can operate with the additive 7.3 discovery schema, so normal code rollback retains migrations 21 through 26 rather than trying to reverse tables.
 
 ## Database recovery
 
-Follow `docs/DATABASE-OPERATIONS.md`. Before migrations 21 through 25, record the D1 Time Travel bookmark, ledger, table/row counts, tenant identities, memberships, rules, settings, active snapshot pointer, validation-player rows, and foreign-key result.
+Follow `docs/DATABASE-OPERATIONS.md`. Before migrations 21 through 26, record the D1 Time Travel bookmark, ledger, table/row counts, tenant identities, memberships, rules, settings, active snapshot pointer, validation-player rows, and foreign-key result.
 
 Never replay `migrations/legacy/` and never improvise rollback by dropping tenant tables. If reconciliation fails, stop application publication. A Time Travel restore overwrites the database and requires separate owner authorization.
 

@@ -12,13 +12,15 @@
   },
   "environmentBindings": {
     "APP_ENV": [
-      "functions/_lib/permissions.js"
+      "functions/_lib/permissions.js",
+      "functions/api/leagues/[leagueSlug]/companion/export-url.js"
     ],
     "ASSETS": [
       "functions/leagues/[[path]].js"
     ],
     "COMPANION_EXPORTS": [
       "functions/_lib/cloud-platform.js",
+      "functions/_lib/madden-discovery-report.js",
       "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
       "functions/api/leagues/[leagueSlug]/companion/classify.js",
       "functions/api/leagues/[leagueSlug]/companion/data-explorer.js",
@@ -47,7 +49,9 @@
       "functions/api/leagues/[leagueSlug]/companion/test.js"
     ],
     "COMPANION_EXPORT_TOKEN": [
-      "functions/_lib/cloud-platform.js"
+      "functions/_lib/cloud-platform.js",
+      "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+      "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
     ],
     "DB": [
       "functions/_lib/auth.js",
@@ -124,6 +128,10 @@
       "functions/api/leagues/[leagueSlug]/companion/statistics-capture-inspector.js",
       "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
       "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
+    ],
+    "SESSION_SIGNING_SECRET": [
+      "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+      "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
     ]
   },
   "files": {
@@ -131,20 +139,20 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 171,
+      ".js": 175,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 27,
+      ".mjs": 28,
       ".png": 1,
-      ".sql": 27,
+      ".sql": 28,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 603233,
+        "bytes": 603237,
         "file": "app.js"
       },
       {
@@ -152,7 +160,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 366992,
+        "bytes": 367608,
         "file": "trade-module.js"
       },
       {
@@ -160,7 +168,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 74963,
+        "bytes": 75059,
         "file": "index.html"
       },
       {
@@ -172,19 +180,19 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 36468,
+        "bytes": 36470,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
+      },
+      {
+        "bytes": 36110,
+        "file": "tools/check-release.mjs"
       },
       {
         "bytes": 35061,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 31970,
-        "file": "tools/check-release.mjs"
-      },
-      {
-        "bytes": 31509,
+        "bytes": 31552,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
@@ -192,12 +200,16 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
-        "bytes": 24691,
+        "bytes": 25471,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
         "bytes": 22790,
         "file": "platform/validate.js"
+      },
+      {
+        "bytes": 21978,
+        "file": "tests/import/madden-discovery.test.mjs"
       },
       {
         "bytes": 21293,
@@ -212,19 +224,15 @@
         "file": "league-engine/games.js"
       },
       {
-        "bytes": 19599,
+        "bytes": 20056,
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 19144,
-        "file": "tests/import/madden-discovery.test.mjs"
-      },
-      {
-        "bytes": 18703,
-        "file": "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
+        "bytes": 18887,
+        "file": "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
       }
     ],
-    "total": 527
+    "total": 533
   },
   "frontend": {
     "assets": [
@@ -574,6 +582,11 @@
         "versioned": true
       },
       {
+        "path": "league-engine/permanent-export-url.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "league-engine/game-year-transition.js",
         "type": "script",
         "versioned": true
@@ -680,11 +693,11 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 88,
+    "scriptCount": 89,
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 64,
+    "routeCount": 65,
     "routes": [
       {
         "file": "functions/index.js",
@@ -827,6 +840,14 @@
           "onRequestPost"
         ],
         "route": "/api/leagues/:leagueSlug/companion/export"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/export-url"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
@@ -1307,10 +1328,16 @@
       "recordsLedger": true,
       "sha256": "25bdcc9103b8a029bfaa2db88f3351b95d9bf6f95480be4c2bec4e409d910b4a",
       "version": "0025"
+    },
+    {
+      "file": "migrations/0026_permanent_league_export_url.sql",
+      "recordsLedger": true,
+      "sha256": "e1a48bd151393f2fee728c723ff1db3afc418a505b9057f1cb8f2c114a2f84d4",
+      "version": "0026"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.4",
+  "release": "7.3.4.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

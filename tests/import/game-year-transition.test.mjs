@@ -65,7 +65,7 @@ function bucket(initial={}) {
   };
 }
 
-async function createDatabase(maxVersion=25) {
+async function createDatabase(maxVersion=26) {
   const database=new DatabaseSync(':memory:');
   database.exec('PRAGMA foreign_keys=ON');
   const files=(await walkFiles())
@@ -508,10 +508,11 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.match(endpoint,/archive-verified/);
   assert.match(endpoint,/freeAgentInterpretedAsZero:false/);
   assert.match(endpoint,/platformPlanePreserved:true/);
-  assert.match(ui,/Replace Current Import/);
+  assert.match(ui,/Latest League Export/);
+  assert.match(ui,/View Import Details/);
   assert.match(ui,/Start New Franchise Season/);
   assert.match(ui,/Archive \/ Remove Madden Game Year/);
   assert.match(ui,/Free Agents remain blocked\/unknown/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.3\.4/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.3\.4\.1/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });

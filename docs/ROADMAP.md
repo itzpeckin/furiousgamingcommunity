@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.44
+**Revision:** 1.45
 
-**Current production:** 7.3.3 from exact source commit `b373f66`; accepted Madden 27 snapshot `841ce1b5` remains active
+**Current production:** 7.3.4 from exact source commit `431583e` (Pages deployment `fafabfb2`); accepted Madden 27 snapshot `841ce1b5` remains active
 
-**Current work:** The owner accepted the visible 7.3.3 Production transition panel and authorized the consolidated 7.3.4 build. The locally validated 7.3.4 review candidate makes repeat imports source-specific, exposes Week 9/current-week coverage and skipped-week gaps, carries eligible same-season game/stat history forward, and keeps the active snapshot unchanged. Publication and Production are not yet authorized.
+**Current work:** Production 7.3.4 provides source-scoped repeat candidates. The authorized 7.3.4.1 completion patch is locally implemented and strictly validated: one permanent league-specific export URL, automatic export-cohort analysis, Commissioner HQ readiness, explicit credential rotation, and one **Import Latest Export** action. Additive migration 26 and the code remain local; Production data and the active snapshot are unchanged.
 
-**Next gate:** Review the 7.3.4 local candidate, then separately authorize one branch/PR/hosted-check cycle and one exact Production deployment. The real Week 9 capture/candidate rehearsal and any later activation remain separate decisions. Staging is not used unless the owner explicitly requests it.
+**Next gate:** Review the consolidated 7.3.4.1 candidate, then separately authorize publication/hosted checks and one exact Production deployment with additive migration 26. A real Madden export, candidate import, and any later snapshot activation remain separate decisions. Staging is not used unless the owner explicitly requests it.
 
 ## Product decisions
 
@@ -29,7 +29,7 @@
 
 ## Current facts and accepted limitations
 
-- 7.1.0 is production and established a reproducible database, continuous migration ledger, preservation checks, and target-locked migration command.
+- 7.1.0 established a reproducible database, continuous migration ledger, preservation checks, and target-locked migration command.
 - Refreshing Commissioner HQ or Trade Center can return a user to Account or require another login, especially on mobile. The owner accepted this as a temporary UX defect.
 - Commissioner settings can remain browser-local and disagree between commissioners. The shared schema exists; 7.4.2 moves the feature to server authority.
 - EA has restored Madden NFL 27 Companion data flow. After 7.2, discovery and a safe FGC teams/rosters/players activation are the immediate priority.
@@ -49,7 +49,8 @@
 | 7.3.1 | Staging validated | One reviewed 2026 season, 32 teams, and 2,044 rostered-player identities are retained in a private preview; Free Agents remain blocked/unknown and no snapshot is active |
 | 7.3.2 | Released; owner accepted and active | Exact repair `972bea6` completed the cold run in 43.763 seconds; the owner accepted and separately activated the validation-ready 32-team/2,044-player snapshot. Free Agents remain blocked/null. |
 | 7.3.3 | Released; owner accepted | Exact `b373f66` and migration 25 are live; Production transition rows remain empty and active snapshot `841ce1b5` remains unchanged |
-| 7.3.4 | Local review candidate | Source-scoped repeat imports, exact-export idempotency, visible Week coverage/gaps, and same-season history carry-forward without activation |
+| 7.3.4 | Production | Source-scoped repeat imports, exact-export idempotency, visible Week coverage/gaps, and same-season history carry-forward without activation |
+| 7.3.4.1 | Local review candidate | Permanent revocable league export URL, automatic cohort analysis, readiness status, and one-click latest candidate import |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
@@ -176,6 +177,16 @@
 - Reconcile every source total, unknown route, duplicate, unassigned player, and Free Agent result before activation is considered. Blocked Free Agents remain unknown/null.
 - Production-first gate: publish and deploy one exact candidate only after separate owner authorization, then let the commissioner run one real new capture-to-private-candidate cycle. The existing active snapshot stays live; activation remains a later explicit authorization. Staging is skipped unless explicitly requested.
 
+## 7.3.4.1 — Permanent League Export Connection
+
+- Create exactly one reusable Madden Companion export URL per league. Its credential is deterministically derived from a protected server root and a stored league token version; the credential itself is never stored in D1.
+- Make rotation an explicit commissioner action that increments the token version and immediately invalidates the prior URL while preserving captures, reports, candidates, and the active snapshot.
+- Automatically group each Madden request burst into a durable discovery cohort, retain duplicate payload links without duplicating raw R2 data, and analyze the cohort after a three-second quiet window. An interrupted cohort is still analyzed and shown as review-required.
+- Advance `latest_ready_report_id` only when source identity, 32-team roster coverage, schedule, standings, statistics, and rostered-player assignment evidence pass. A failed or partial newest export remains visible but cannot displace the prior ready report.
+- Treat Madden's blocked Free Agent response as rostered-player-only readiness with a null/unknown count. Never convert the upstream failure into an empty Free Agent pool.
+- Expose the permanent connection and latest received/analyzed time, captured week, route count, counts, warnings, and private-candidate status in Commissioner HQ. The normal weekly workflow is: export to the same URL, wait for Ready, and select **Import Latest Export** once.
+- The one-click action creates or reuses the private season destination and runs the existing non-activating candidate pipeline. Migration 26 is additive; no reset, game-year transition, Main change, real capture/import, Production deployment, or snapshot activation is included in the local implementation authorization.
+
 ## 7.3.5 — Team, Roster, Player, Statistics, Standings, and Free Agent Experience
 
 - Serve team pages, roster groups, player profiles, Free Agent browsing, standings, and statistics from one active Madden 27 snapshot.
@@ -199,7 +210,7 @@
 
 ## 7.3.8 — Incremental Madden Updates
 
-- Intake later Companion exports without a destructive full reset.
+- Build on the permanent 7.3.4.1 Companion intake to reconcile later ready candidates without a destructive full reset.
 - Compare snapshots, report freshness/warnings, and activate teams, rosters, transactions, schedule, standings, and statistics atomically as supported.
 - Gate: duplicate exports are idempotent, successful updates are coherent, and failure/rollback retains the previous complete experience.
 
@@ -316,3 +327,4 @@
 - **Revision 1.42:** Adopted owner-directed Production-first acceptance for future releases; staging now requires separate explicit owner direction. Authorized one cumulative 7.3.3 Production acceptance cycle with additive migration 25 and exact candidate `67255af`, which replaces the stale 7.3.0 shell marker with accurate Production/7.3.3 identification. Transition execution, reset, Main, and active-snapshot changes remain excluded.
 - **Revision 1.43:** Deployed exact 7.3.3 candidate `b373f66` to Production as Pages deployment `e926a37f` after 4/4 hosted checks, applied and reconciled additive migration 25, and immediately restored the Cloudflare Production branch setting to `main`. The active snapshot remains exact `841ce1b5`; protected counts are unchanged; Production transition/archive/recovery/removal rows remain zero; Free Agents remain blocked/null; and Git Main, reset, transition execution, and snapshot activation/change remain untouched. Owner UI acceptance is the next gate.
 - **Revision 1.44:** Recorded owner acceptance of the visible 7.3.3 Production controls and completed the authorized consolidated 7.3.4 local build. The candidate scopes the importer to the newest analyzed export fingerprint, allows a different Week 9 source to proceed despite the prior preview-ready run, reuses identical exports, exposes skipped-week gaps, carries eligible older same-season games/statistics forward with fresh-record precedence, and refuses stale captures. The 94-test local suite passes; Production, staging, Git Main, the active snapshot, real capture/import, transitions, reset, activation, and blocked/null Free Agent semantics remain unchanged.
+- **Revision 1.45:** Recorded Production 7.3.4 at exact Main commit `431583e` / Pages deployment `fafabfb2` and completed the authorized 7.3.4.1 local workflow redesign. One revocable URL now persists per league; automatic quiet-window cohorts analyze every full or partial export; only eligible reports advance the ready pointer; Commissioner HQ shows freshness/readiness and offers one **Import Latest Export** action. Migration 26 is additive and un-applied. Production, staging, Main, real capture/import, reset, transition, active snapshot `841ce1b5`, and blocked/null Free Agent semantics remain unchanged.
