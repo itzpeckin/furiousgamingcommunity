@@ -76,7 +76,7 @@ async function createDatabase(maxVersion=25) {
   return database;
 }
 
-async function fixture() {
+async function fixture({activeSnapshot=true}={}) {
   const database=await createDatabase();
   database.prepare(`INSERT INTO leagues
     (id,name,product_name,slug,public_status,tenant_status,timezone)
@@ -117,15 +117,15 @@ async function fixture() {
   record.run('snapshot-1','league-1','teams','tb','{"name":"Buccaneers"}');
   record.run('snapshot-1','league-1','players','p1','{"team_external_id":"tb"}');
   record.run('snapshot-1','league-1','players','p2','{"team_external_id":"tb"}');
-  database.prepare(`INSERT INTO league_active_snapshots
+  if(activeSnapshot)database.prepare(`INSERT INTO league_active_snapshots
     (league_id,snapshot_id,activated_by) VALUES (?,?,?)`).run('league-1','snapshot-1','commissioner-1');
   database.prepare(`INSERT INTO game_year_snapshots
-    (game_year_id,league_id,snapshot_id,snapshot_status) VALUES (?,?,?,'active')`).run('game-year-27','league-1','snapshot-1');
+    (game_year_id,league_id,snapshot_id,snapshot_status) VALUES (?,?,?,?)`).run('game-year-27','league-1','snapshot-1',activeSnapshot?'active':'candidate');
   database.prepare(`INSERT INTO companion_candidate_import_runs
     (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,completeness_status,current_phase,
      result_counts_json,candidate_snapshot_id,active_snapshot_id_after,created_by_user_id,completed_at)
     VALUES (?,?,?,?,?,'preview-ready','rostered-players-only','preview-ready',?,?,?,?,CURRENT_TIMESTAMP)`)
-    .run('candidate-1','league-1','destination-1','capture-session-1','fingerprint-1','{"players":2,"freeAgentStatus":"blocked","freeAgentCount":null}','snapshot-1','snapshot-1','commissioner-1');
+    .run('candidate-1','league-1','destination-1','capture-session-1','fingerprint-1','{"players":2,"freeAgentStatus":"blocked","freeAgentCount":null}','snapshot-1',activeSnapshot?'snapshot-1':null,'commissioner-1');
   database.prepare(`INSERT INTO canonical_roster_snapshots
     (league_id,snapshot_id,player_count) VALUES (?,?,?)`).run('league-1','snapshot-1',2);
   database.prepare(`INSERT INTO canonical_roster_snapshot_players
@@ -299,6 +299,33 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     assert.equal(database.prepare(`SELECT team_id FROM league_memberships WHERE id='membership-1'`).get().team_id,'tb');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,3);
     assert.equal(sources.objects.has('source/capture-1.json'),true);
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{database.close();}
+});
+
+test('rollback preserves an intentionally empty active-snapshot pointer', async () => {
+  const {database,token}=await fixture({activeSnapshot:false});
+  const db=d1(database),archives=bucket(),sources=bucket({'source/capture-1.json':'{"teams":[]}'});
+  const post=body=>onRequestPost(context({db,token,archives,sources,method:'POST',body}));
+  try{
+    let response=await onRequestGet(context({db,token,archives,sources,query:'?preview=1'}));
+    const initial=await response.json(),confirmations=initial.confirmations,gameYearId=initial.gameYear.id;
+    assert.equal(initial.gameYear.activeSnapshotId,null);
+    for(const [action,confirmation] of [
+      ['plan-archive',confirmations.plan],
+      ['archive',confirmations.archive],
+      ['detach',confirmations.detach],
+      ['remove-active-data',confirmations.removeActive],
+      ['rollback',confirmations.rollback]
+    ]){
+      response=await post({action,gameYearId,confirmation});
+      assert.equal(response.status,200,`${action} should preserve an empty active pointer`);
+    }
+    const payload=await response.json();
+    assert.equal(payload.rollback.activeSnapshotId,null);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
+    assert.equal(database.prepare(`SELECT status FROM league_game_years WHERE id=?`).get(gameYearId).status,'restored');
+    assert.equal(database.prepare(`SELECT snapshot_status FROM game_year_snapshots WHERE game_year_id=?`).get(gameYearId).snapshot_status,'restored');
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{database.close();}
 });

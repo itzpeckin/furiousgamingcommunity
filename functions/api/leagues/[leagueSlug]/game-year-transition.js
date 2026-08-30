@@ -670,8 +670,10 @@ async function rollback(current, gameYear, transition, body) {
   const assignments = parse(bookmark.team_assignments_json,[]);
   const statements = [
     ...assignments.map(item=>current.db.prepare(`UPDATE league_memberships SET team_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND user_id=?`).bind(item.team_id,item.membership_id,current.league.id,item.user_id)),
-    current.db.prepare(`INSERT OR REPLACE INTO league_active_snapshots (league_id,snapshot_id,activated_at,activated_by,previous_snapshot_id)
-      VALUES (?,?,CURRENT_TIMESTAMP,?,NULL)`).bind(current.league.id,bookmark.active_snapshot_id,current.authorization.session.user.id),
+    bookmark.active_snapshot_id
+      ? current.db.prepare(`INSERT OR REPLACE INTO league_active_snapshots (league_id,snapshot_id,activated_at,activated_by,previous_snapshot_id)
+        VALUES (?,?,CURRENT_TIMESTAMP,?,NULL)`).bind(current.league.id,bookmark.active_snapshot_id,current.authorization.session.user.id)
+      : current.db.prepare(`DELETE FROM league_active_snapshots WHERE league_id=?`).bind(current.league.id),
     current.db.prepare(`UPDATE league_snapshots SET status=CASE WHEN id=? THEN 'active' ELSE 'archived' END,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND id IN
       (SELECT snapshot_id FROM game_year_snapshots WHERE league_id=? AND game_year_id=?)`).bind(bookmark.active_snapshot_id,current.league.id,current.league.id,gameYear.id),
     current.db.prepare(`UPDATE game_year_snapshots SET snapshot_status=CASE WHEN snapshot_id=? THEN 'active' ELSE 'restored' END,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND game_year_id=?`).bind(bookmark.active_snapshot_id,current.league.id,gameYear.id),
@@ -685,7 +687,7 @@ async function rollback(current, gameYear, transition, body) {
     })
   ];
   await current.db.batch(statements);
-  return { restored:true, activeSnapshotId:bookmark.active_snapshot_id, teamAssignmentsRestored:assignments.length };
+  return { restored:true, activeSnapshotId:bookmark.active_snapshot_id || null, teamAssignmentsRestored:assignments.length };
 }
 
 async function replaceCurrentImport(current, gameYear, body) {
