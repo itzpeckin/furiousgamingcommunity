@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.4.4",
   "releaseType": "one-action-live-import-and-season-archive",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.4.3",
@@ -21,11 +21,11 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0,
-    "mainChecksPassed": 0,
+    "status": "published-hosted-checks-passed-main",
+    "commit": "5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8",
+    "pullRequest": 20,
+    "hostedChecksPassed": 4,
+    "mainChecksPassed": 7,
     "scope": "Build and validate one exact candidate, publish its pull request, pass hosted checks, move that exact candidate to Main, and deploy Production in one consolidated authorized cycle."
   },
   "staging": {
@@ -36,12 +36,14 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.3.4.3",
-    "currentCommit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa",
-    "currentDeployment": "3d667ec0-73f8-4188-9e5b-76f154634dfe",
-    "activeSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
+    "currentRelease": "7.3.4.4",
+    "currentCommit": "5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8",
+    "currentDeployment": "51e55575-0032-41af-b5d3-a69c67f54d2e",
+    "workerBuild": "44d2c02b-f6e1-433f-9e28-339fa6d0f382",
+    "workerVersion": "1e01f1a9",
+    "activeSnapshot": "8b47ec76-7369-495e-913f-edc0310b49e1",
     "scope": "Deploy the one-action workflow and then activate only the currently validated Week 9 candidate. Do not delete history, reset league data, rotate the export URL, run Archive Season, run a Madden game-year transition, or reinterpret blocked Free Agents."
   },
   "requiredArtifacts": [
