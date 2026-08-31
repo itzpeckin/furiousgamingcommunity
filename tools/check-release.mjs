@@ -24,8 +24,11 @@ const isPostDeployment = new Set([
   'production-deployed-pending-owner-acceptance',
   'released'
 ]).has(manifest.status);
-const isAuthorizedGameYearTransition = version === '7.3.2'
-  && evidence.scopeBoundaries?.gameYearTransition === true;
+const isAuthorizedProductionDataChange = (
+  version === '7.3.2' && evidence.scopeBoundaries?.gameYearTransition === true
+) || (
+  version === '7.3.4.4' && evidence.scopeBoundaries?.activationPerformed === true
+);
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
 if (manifest.version !== version || evidence.version !== version) errors.push('Package, manifest, and evidence versions must match.');
@@ -49,7 +52,7 @@ if (!isPostDeployment && (evidence.productionChanged !== false || evidence.dataC
 if (isPostDeployment && (
   evidence.productionChanged !== true
   || evidence.credentialsChanged !== false
-  || (isAuthorizedGameYearTransition
+  || (isAuthorizedProductionDataChange
     ? (evidence.dataChanged !== true || evidence.productionDataChanged !== true)
     : evidence.dataChanged !== false)
 )) {
@@ -881,6 +884,111 @@ if (version === '7.3.4.3') {
     || evidence.scopeBoundaries?.exportUrlRotated !== false
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   ) errors.push('7.3.4.3 evidence must preserve every Production remediation boundary.');
+}
+if (version === '7.3.4.4') {
+  const productionDeployed = isPostDeployment;
+  for (const check of [
+    'oneActionLiveImport',
+    'atomicActivation',
+    'oneActionArchiveSeason',
+    'week9CandidateReadiness',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.4.4 one-action workflow evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.oneActionLiveImport?.destinationAutomaticallyCreatedOrReused !== true
+    || evidence.checks?.oneActionLiveImport?.validationRequiredBeforeActivation !== true
+    || evidence.checks?.oneActionLiveImport?.activationIncludedInImportAction !== true
+    || evidence.checks?.oneActionLiveImport?.separateRoutineActivationButton !== false
+    || evidence.checks?.atomicActivation?.expectedPriorPointerGuarded !== true
+    || evidence.checks?.atomicActivation?.activePointerAndStatusesOneBatch !== true
+    || evidence.checks?.atomicActivation?.idempotentFinalize !== true
+    || evidence.checks?.atomicActivation?.failurePreservesPriorSnapshot !== true
+    || evidence.checks?.oneActionArchiveSeason?.historyBooksFrozen !== true
+    || evidence.checks?.oneActionArchiveSeason?.nextFranchiseSeasonPrepared !== true
+    || evidence.checks?.oneActionArchiveSeason?.latestExportSelectionCleared !== true
+    || evidence.checks?.oneActionArchiveSeason?.newWeekOneExportRequired !== true
+    || evidence.checks?.oneActionArchiveSeason?.historyPermanentlyDeleted !== false
+    || evidence.checks?.oneActionArchiveSeason?.activeSnapshotChanged !== false
+    || evidence.checks?.oneActionArchiveSeason?.exportUrlRotated !== false
+  ) errors.push('7.3.4.4 must prove the exact one-action live-import and archive-season contracts.');
+  if (
+    evidence.checks?.week9CandidateReadiness?.sourceSessionId !== 'm27_recovered_8bf2666ce3393492ed580dac'
+    || evidence.checks?.week9CandidateReadiness?.sourceReportId !== 'm27_report_8bf2666c-e339-3492-ed58-0dac09b696c9'
+    || Number(evidence.checks?.week9CandidateReadiness?.capturedWeek) !== 9
+    || Number(evidence.checks?.week9CandidateReadiness?.routes) !== 43
+    || Number(evidence.checks?.week9CandidateReadiness?.teams) !== 32
+    || Number(evidence.checks?.week9CandidateReadiness?.rosteredPlayers) !== 2043
+    || JSON.stringify(evidence.checks?.week9CandidateReadiness?.missingWeeks) !== '[8]'
+    || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+  ) errors.push('7.3.4.4 must retain exact Week 9 source evidence, the Week 8 gap, and blocked/null Free Agents.');
+  if (productionDeployed) {
+    if (
+      manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'published-hosted-checks-passed-main'
+      || evidence.external?.githubPublication?.status !== 'published-main'
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || Number(evidence.external?.hostedChecks?.passed) < 4
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.status !== 'success-pending-owner-acceptance'
+      || evidence.external?.productionDeployment?.status !== 'success'
+      || evidence.external?.productionWeek9Activation?.status !== 'completed-verified'
+      || evidence.checks?.week9CandidateReadiness?.activationPerformed !== true
+      || !evidence.checks?.week9CandidateReadiness?.candidateSnapshotId
+      || evidence.checks?.week9CandidateReadiness?.candidateSnapshotId !== evidence.external?.productionWeek9Activation?.activeSnapshot
+    ) errors.push('Deployed 7.3.4.4 evidence must record exact Main publication, Production deployment, and verified Week 9 activation.');
+  } else if (
+    manifest.status !== 'validated-production-authorized'
+    || manifest.repositoryPublication?.authorized !== true
+    || manifest.repositoryPublication?.status !== 'authorized-not-run'
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+    || manifest.production?.authorized !== true
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'authorized-not-run'
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+    || evidence.external?.productionWeek9Activation?.authorized !== true
+    || evidence.external?.productionWeek9Activation?.status !== 'not-run'
+    || evidence.checks?.week9CandidateReadiness?.activationPerformed !== false
+  ) errors.push('Authorized 7.3.4.4 evidence must retain pending publication, deployment, and Week 9 activation gates.');
+  if (
+    manifest.staging?.authorized !== false
+    || manifest.staging?.deployed !== false
+    || evidence.external?.stagingDeployment?.status !== 'not-run'
+    || evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-required'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 26
+    || evidence.external?.productionMaddenExport?.authorized !== false
+    || evidence.external?.productionMaddenExport?.status !== 'not-run'
+    || evidence.external?.archiveSeason?.authorized !== false
+    || evidence.external?.archiveSeason?.status !== 'not-run'
+    || evidence.external?.gameYearTransition?.authorized !== false
+    || evidence.external?.gameYearTransition?.status !== 'not-run'
+  ) errors.push('7.3.4.4 must preserve staging, migration, new-export, archive-season, and game-year transition boundaries.');
+  if (
+    evidence.scopeBoundaries?.productionChanged !== productionDeployed
+    || evidence.scopeBoundaries?.productionDataChanged !== productionDeployed
+    || evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== productionDeployed
+    || evidence.scopeBoundaries?.gitMainChanged !== productionDeployed
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.archiveGameYearExecuted !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== productionDeployed
+    || evidence.scopeBoundaries?.activationPerformed !== productionDeployed
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.3.4.4 evidence must preserve every authorized Production boundary.');
 }
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));

@@ -4,7 +4,7 @@ import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '.
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
-const RELEASE='7.3.2';
+const RELEASE='7.3.4.4';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -66,6 +66,8 @@ async function latestImportRun(db,leagueId){
   const row=await db.prepare(`SELECT * FROM companion_candidate_import_runs
     WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first().catch(()=>null);
   if(!row)return null;
+  const activationPerformed=Boolean(row.candidate_snapshot_id&&row.active_snapshot_id_after
+    &&String(row.candidate_snapshot_id)===String(row.active_snapshot_id_after));
   return{
     id:row.id,
     status:row.status,
@@ -81,9 +83,10 @@ async function latestImportRun(db,leagueId){
     warnings:parseJson(row.warnings_json,[]),
     retry:parseJson(row.retry_json,{}),
     durationMs:row.duration_ms===null?null:Number(row.duration_ms),
-    private:true,
-    activationPerformed:false,
-    activeSnapshotChanged:false,
+    private:!activationPerformed,
+    activationPerformed,
+    activeSnapshotChanged:activationPerformed
+      &&String(row.active_snapshot_id_before||'')!==String(row.active_snapshot_id_after||''),
     createdAt:row.created_at,
     updatedAt:row.updated_at,
     completedAt:row.completed_at||null
@@ -148,8 +151,8 @@ export async function onRequestGet(context){
     workflowState:workerStatus?.workflowState||'unknown',
     workflowOutput:workerStatus?.workflowOutput||null,
     candidate:{run},
-    private:true,
-    activationPerformed:false,
-    activeSnapshotChanged:false
+    private:!run?.activationPerformed,
+    activationPerformed:Boolean(run?.activationPerformed),
+    activeSnapshotChanged:Boolean(run?.activeSnapshotChanged)
   });
 }

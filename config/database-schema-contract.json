@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "7.3.4.3",
+  "release": "7.3.4.4",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,

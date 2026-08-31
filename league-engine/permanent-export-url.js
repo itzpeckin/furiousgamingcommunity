@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.4.3 */
+/* FHQ_BUILD: 7.3.4.4 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.3.4.3';
+  const VERSION = '7.3.4.4';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -115,7 +115,7 @@
     const latest = state?.latestExport || {};
     const counts = latest.counts || {};
     const status = latest.status || 'loading';
-    const importDone = latest.importStatus === 'preview-ready';
+    const importDone = latest.importLive === true || latest.importStatus === 'live';
     const importDisabled = busy || status !== 'ready' || importDone;
     const tone = status === 'ready' ? 'success' : status === 'review-required' ? 'warning' : status === 'revoked' ? 'danger' : 'neutral';
     if (!pollTimer) {
@@ -136,13 +136,13 @@
         <div><small>Teams</small><strong>${count(counts.teams)}</strong></div>
         <div><small>Rostered players</small><strong>${count(counts.rosteredPlayers)}</strong></div>
         <div><small>Free Agents</small><strong>${['located','empty-confirmed'].includes(counts.freeAgentStatus) ? count(counts.freeAgentCount) : 'unknown'}</strong></div>
-        <div><small>Import status</small><strong>${esc(importDone ? 'Private preview ready' : latest.importStatus || 'Not started')}</strong></div>
+        <div><small>Import status</small><strong>${esc(importDone ? 'Live' : latest.importStatus === 'preview-ready' ? 'Validated · ready to publish' : latest.importStatus || 'Not started')}</strong></div>
       </div>
       ${(latest.warnings || []).length ? `<div class="validation-errors"><strong>Latest export not selected</strong><ul>${latest.warnings.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></div>` : ''}
       ${errorMessage ? `<div class="validation-errors"><strong>Action stopped safely</strong><p>${esc(errorMessage)}</p></div>` : ''}
       <div class="league-import-framework-actions">
         <button class="button button--secondary" data-copy-permanent-export-url ${busy || !endpointState.exportUrl ? 'disabled' : ''}>${copied ? 'URL Copied' : 'Copy League Export URL'}</button>
-        <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''}>${busy ? 'Working…' : importDone ? 'Latest Export Imported' : 'Import Latest Export'}</button>
+        <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''}>${busy ? 'Working…' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
         <button class="button button--ghost" data-refresh-permanent-export ${busy ? 'disabled' : ''}>Refresh</button>
       </div>
       <details class="commissioner-export-advanced"><summary>Export URL security</summary><p>Rotate only if the URL is exposed or league access changes. The newest ready export and active snapshot are preserved.</p><button class="button ${rotateArmed ? 'button--danger' : 'button--ghost'}" data-rotate-permanent-export ${busy ? 'disabled' : ''}>${rotateArmed ? 'Confirm Rotation — Revoke Previous URL' : 'Rotate Export URL'}</button>${rotateArmed ? '<button class="button button--ghost" data-cancel-export-rotation>Cancel</button>' : ''}</details>
@@ -162,7 +162,7 @@
     if (event.target.closest('[data-cancel-export-rotation]')) { rotateArmed=false;rerender(); }
   });
 
-  const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,permanent:true,revocable:true,activationPerformed:false});
+  const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,permanent:true,revocable:true,activationPerformed:Boolean(state?.latestExport?.importLive)});
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before permanent-export-url.js.');
   HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,renderPanel,diagnostics},{replace:true,alias:'leagueExportUrl'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'permanent-league-export-url',service:'leagueExportUrl',script:'league-engine/permanent-export-url.js',version:VERSION,dependencies:['auth','leagueTenant','oneClickImport'],capabilities:['permanent-url','explicit-rotation','automatic-analysis','latest-export-readiness','one-click-import']});

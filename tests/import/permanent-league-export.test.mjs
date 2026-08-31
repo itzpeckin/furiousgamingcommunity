@@ -71,6 +71,27 @@ test('an incomplete newest report never replaces the retained ready source', () 
   assert.equal(review.importAvailable,false);
 });
 
+test('a validated preview remains importable until its exact snapshot is live', () => {
+  const validated=permanentExportPublicState({
+    endpoint:{status:'active'},latestSession:{capture_count:43},
+    latestReport:{id:'ready'},readyReport:{id:'ready'},
+    candidateRun:{status:'preview-ready',candidate_snapshot_id:'week-9',active_snapshot_id_after:'week-7'}
+  });
+  assert.equal(validated.status,'ready');
+  assert.equal(validated.importAvailable,true);
+  assert.equal(validated.importLive,false);
+  assert.equal(validated.importStatus,'preview-ready');
+
+  const live=permanentExportPublicState({
+    endpoint:{status:'active'},latestSession:{capture_count:43},
+    latestReport:{id:'ready'},readyReport:{id:'ready'},
+    candidateRun:{status:'preview-ready',candidate_snapshot_id:'week-9',active_snapshot_id_after:'week-9'}
+  });
+  assert.equal(live.importAvailable,false);
+  assert.equal(live.importLive,true);
+  assert.equal(live.importStatus,'live');
+});
+
 function concurrentCohortDatabase() {
   const endpoint = {
     league_id:'league-1',token_version:1,status:'active',latest_session_id:'previous-session',
@@ -174,9 +195,12 @@ test('runtime wiring preserves immutable sources, atomic cohorts, snapshot isola
   assert.match(management,/expectedCaptureCount !== 43/);
   assert.doesNotMatch(management,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
   assert.match(candidate,/latest_ready_report_id/);
-  assert.doesNotMatch(candidate,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
+  assert.match(candidate,/INSERT INTO league_active_snapshots/);
+  assert.match(candidate,/companion\.live_import\.activate/);
+  assert.doesNotMatch(candidate,/DELETE\s+FROM/i);
   assert.match(ui,/Copy League Export URL/);
   assert.match(ui,/Import Latest Export/);
+  assert.match(ui,/Latest Export Live/);
   assert.match(ui,/Rotate Export URL/);
   assert.match(ui,/Free Agents remain blocked\/unknown/);
   assert.match(importer,/reuseExisting:true/);

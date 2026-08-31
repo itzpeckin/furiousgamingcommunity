@@ -1,5 +1,15 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.4.4 one-action workflow impact
+
+The authorized 7.3.4.4 candidate changes routine commissioner workflow without adding a migration. **Import Latest Export** now creates or reuses the current franchise-season destination, completes validation, and compare-and-swaps the active pointer to that exact candidate in one request. The active snapshot, snapshot/game-year/season statuses, lifecycle event, and tenant audit are written in one D1 batch guarded by the expected prior pointer. If validation fails or another writer changes the pointer, the prior live snapshot remains authoritative.
+
+**Archive Season** is a separate one-action same-edition boundary. It freezes player-season summaries and ownership periods into the immutable closure evidence, closes the completed franchise season, prepares the next franchise-season row, archives only the old import destination, and clears only the endpoint's latest-source selection. It retains every snapshot, record, capture, report, closure, lifecycle event, audit row, and the permanent URL token version. It does not run during deployment or Week 9 activation.
+
+Before the authorized Week 9 activation, the rollback target remains exact 7.3.4.3 Main commit `0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa`, Pages deployment `3d667ec0-73f8-4188-9e5b-76f154634dfe`, and import Worker build `8fa92466-efe6-438f-8811-3cae1c4f6138`. After activation, runtime rollback must retain the newly active Week 9 pointer and all lifecycle/audit evidence; restoring Week 7 is a separately reviewed snapshot rollback, never an implied code rollback.
+
+Do not use rollback to delete history, reset league data, rotate the export URL, run Archive Season, run a Madden game-year transition, restore D1, manufacture Week 8, or reinterpret blocked/null Free Agents as zero.
+
 ## 7.3.4.3 exact-session import remediation impact
 
 Production Pages deployment `3d667ec0-73f8-4188-9e5b-76f154634dfe` and import Worker build `8fa92466-efe6-438f-8811-3cae1c4f6138` run exact Main commit `0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa`. The 7.3.4.3 patch changes browser-side candidate orchestration, legacy dataset classification, and Teams capture selection only. It adds no migration and did not run the candidate importer. The exact latest-ready source remains recovered session `m27_recovered_8bf2666ce3393492ed580dac` / report `m27_report_8bf2666c-e339-3492-ed58-0dac09b696c9`; active snapshot `841ce1b5-a4a6-4246-a53a-01cd1f189663` remains unchanged.

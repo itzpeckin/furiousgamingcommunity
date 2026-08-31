@@ -106,7 +106,7 @@ async function currentSeason(db, leagueId, gameYearId) {
   return db.prepare(`SELECT season.* FROM franchise_seasons season
     JOIN game_year_franchise_seasons linked ON linked.franchise_season_id=season.id
     WHERE linked.league_id=? AND linked.game_year_id=? AND season.status IN ('active','preview')
-    ORDER BY season.created_at DESC LIMIT 1`).bind(leagueId, gameYearId).first();
+    ORDER BY season.created_at DESC,season.rowid DESC LIMIT 1`).bind(leagueId, gameYearId).first();
 }
 
 async function latestTransition(db, leagueId, gameYearId) {
@@ -285,7 +285,7 @@ async function publicState(current, includePreview = false) {
   const transition = gameYear ? await latestTransition(current.db, current.league.id, gameYear.id) : null;
   const seasons = gameYear ? await all(current.db, `SELECT season.* FROM franchise_seasons season
     JOIN game_year_franchise_seasons linked ON linked.franchise_season_id=season.id
-    WHERE linked.league_id=? AND linked.game_year_id=? ORDER BY season.created_at DESC`, current.league.id, gameYear.id) : [];
+    WHERE linked.league_id=? AND linked.game_year_id=? ORDER BY season.created_at DESC,season.rowid DESC`, current.league.id, gameYear.id) : [];
   const freeAgents = gameYear ? await freeAgentEvidence(current.db, current.league.id, gameYear.id) : normalizeFreeAgentEvidence();
   return {
     ok:true,
@@ -927,13 +927,36 @@ async function replaceCurrentImport(current, gameYear, body) {
   return { completed:true, nextPath:'#commissioner/league-data', openImporter:true };
 }
 
-async function startFranchiseSeason(current, gameYear, body) {
-  const confirmations=transitionConfirmations(current.league.slug,gameYear.game_release);
-  if(!validateTypedConfirmation(body.confirmation,confirmations.startSeason))return{response:json({ok:false,error:`Type ${confirmations.startSeason} exactly.`,release:RELEASE},400)};
-  const sourceSeasonId=text(body.sourceSeasonId),displayName=text(body.displayName),seasonYear=Number(body.seasonYear);
-  if(!sourceSeasonId||!displayName||!Number.isInteger(seasonYear)||seasonYear<2000||seasonYear>2200)return{response:json({ok:false,error:'Source season ID, display name, and reviewed season year are required.',release:RELEASE},400)};
+function nextFranchiseSeason(previous,current) {
+  const seasonYear=Number(previous?.season_year)+1;
+  if(!Number.isInteger(seasonYear)||seasonYear<2000||seasonYear>2200)return null;
+  const priorSource=text(previous?.source_season_id);
+  const numeric=priorSource.match(/^(.*?)(\d+)$/);
+  const sourceSeasonId=numeric
+    ? `${numeric[1]}${Number(numeric[2])+1}`
+    : `${priorSource||'season'}-${seasonYear}`;
+  return{
+    sourceSeasonId,
+    seasonYear,
+    displayName:`${current.league.name} · ${previous.game_release} · ${seasonYear}`
+  };
+}
+
+async function archiveFranchiseSeason(current, gameYear) {
   const previous=await currentSeason(current.db,current.league.id,gameYear.id);
-  if(!previous)return{response:json({ok:false,error:'No current franchise season is available to close.',release:RELEASE},409)};
+  if(!previous)return{response:json({ok:false,error:'No current franchise season is available to archive.',release:RELEASE},409)};
+  const active=await current.db.prepare(`SELECT snapshot.id,snapshot.season_year
+    FROM league_active_snapshots pointer JOIN league_snapshots snapshot
+      ON snapshot.id=pointer.snapshot_id AND snapshot.league_id=pointer.league_id
+    WHERE pointer.league_id=?`).bind(current.league.id).first();
+  if(previous.status==='preview'&&Number(active?.season_year)!==Number(previous.season_year)){
+    return{completed:true,alreadyPrepared:true,franchiseSeasonId:previous.id,seasonYear:Number(previous.season_year)};
+  }
+  if(!active||Number(active.season_year)!==Number(previous.season_year)){
+    return{response:json({ok:false,error:'The live snapshot does not match the franchise season selected for archive.',release:RELEASE},409)};
+  }
+  const next=nextFranchiseSeason(previous,current);
+  if(!next)return{response:json({ok:false,error:'The next franchise season identity could not be derived safely.',release:RELEASE},409)};
   const summaries=await all(current.db,`SELECT player_identity_id,career_totals_json,season_totals_json FROM player_season_summaries WHERE league_id=? AND franchise_season_id=? ORDER BY player_identity_id`,current.league.id,previous.id);
   const periods=await all(current.db,`SELECT id,gm_identity_id,team_key,started_at,ended_at FROM team_ownership_periods WHERE league_id=? AND franchise_season_id=? ORDER BY id`,current.league.id,previous.id);
   const frozenSha=await archiveDigest({summaries,periods});
@@ -943,19 +966,29 @@ async function startFranchiseSeason(current, gameYear, body) {
     current.db.prepare(`UPDATE team_ownership_periods SET ended_at=COALESCE(ended_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND franchise_season_id=?`).bind(current.league.id,previous.id),
     current.db.prepare(`INSERT INTO franchise_season_closures
       (id,league_id,game_year_id,franchise_season_id,player_summary_count,ownership_period_count,frozen_totals_sha256,postseason_summary_json,closed_by_user_id)
-      VALUES (?,?,?,?,?,?,?,?,?)`).bind(closureId,current.league.id,gameYear.id,previous.id,summaries.length,periods.length,frozenSha,JSON.stringify(body.postseasonSummary||{}),current.authorization.session.user.id),
+      VALUES (?,?,?,?,?,?,?,?,?)`).bind(closureId,current.league.id,gameYear.id,previous.id,summaries.length,periods.length,frozenSha,JSON.stringify({}),current.authorization.session.user.id),
     current.db.prepare(`INSERT INTO franchise_seasons
       (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
-      VALUES (?,?,?,?,?,?,?,?, 'preview')`).bind(newSeasonId,current.league.id,previous.source_system,previous.source_franchise_id,sourceSeasonId,gameYear.game_release,displayName,seasonYear),
+      VALUES (?,?,?,?,?,?,?,?, 'preview')`).bind(newSeasonId,current.league.id,previous.source_system,previous.source_franchise_id,next.sourceSeasonId,gameYear.game_release,next.displayName,next.seasonYear),
     current.db.prepare(`INSERT INTO game_year_franchise_seasons (game_year_id,league_id,franchise_season_id) VALUES (?,?,?)`).bind(gameYear.id,current.league.id,newSeasonId),
+    current.db.prepare(`UPDATE companion_import_destinations SET status='archived',updated_at=CURRENT_TIMESTAMP
+      WHERE league_id=? AND franchise_season_id=?`).bind(current.league.id,previous.id),
+    current.db.prepare(`UPDATE companion_league_export_endpoints SET latest_session_id=NULL,
+      latest_session_token_version=NULL,latest_report_id=NULL,latest_ready_report_id=NULL,
+      analysis_requested_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE league_id=?`).bind(current.league.id),
     current.db.prepare(`INSERT INTO game_year_transition_runs
       (id,league_id,operation,outgoing_game_year_id,incoming_game_year_id,status,phase,confirmation_scope,created_by_user_id,completed_at)
-      VALUES (?,?,?,?,?,'completed','season-created',?,?,CURRENT_TIMESTAMP)`).bind(transitionId,current.league.id,GAME_YEAR_OPERATIONS.startFranchiseSeason,gameYear.id,gameYear.id,confirmations.startSeason,current.authorization.session.user.id),
+      VALUES (?,?,?,?,?,'completed','season-prepared',?,?,CURRENT_TIMESTAMP)`).bind(transitionId,current.league.id,GAME_YEAR_OPERATIONS.startFranchiseSeason,gameYear.id,gameYear.id,'one-click-archive-season',current.authorization.session.user.id),
     event(current,transitionId,'franchise_season_closed',{franchiseSeasonId:previous.id,closureId,playerSummaryCount:summaries.length,ownershipPeriodCount:periods.length,frozenTotalsSha256:frozenSha}),
-    event(current,transitionId,'franchise_season_started',{franchiseSeasonId:newSeasonId,sourceSeasonId,seasonYear}),
-    await audit(current,'game_year.operation.start_franchise_season','franchise_season',newSeasonId,{transitionId,previousSeasonId:previous.id,closureId,gameYearId:gameYear.id,seasonYear,activeSnapshotChanged:false})
+    event(current,transitionId,'franchise_season_prepared',{franchiseSeasonId:newSeasonId,sourceSeasonId:next.sourceSeasonId,seasonYear:next.seasonYear,latestExportSelectionCleared:true}),
+    await audit(current,'franchise_season.archive_and_prepare','franchise_season',previous.id,{
+      transitionId,previousSeasonId:previous.id,nextSeasonId:newSeasonId,closureId,gameYearId:gameYear.id,
+      seasonYear:previous.season_year,nextSeasonYear:next.seasonYear,activeSnapshotChanged:false,
+      historyPermanentlyDeleted:false,exportUrlRotated:false,freeAgentInterpretedAsZero:false
+    })
   ]);
-  return{completed:true,franchiseSeasonId:newSeasonId,closureId,frozenTotalsSha256:frozenSha};
+  return{completed:true,archivedSeasonId:previous.id,franchiseSeasonId:newSeasonId,
+    seasonYear:next.seasonYear,closureId,frozenTotalsSha256:frozenSha,historyPermanentlyDeleted:false};
 }
 
 export async function onRequestGet(context) {
@@ -976,8 +1009,8 @@ export async function onRequestPost(context) {
     if(action==='replace-current-import'){
       const result=await replaceCurrentImport(current,gameYear,body);if(result.response)return result.response;return json({...await publicState(current),result});
     }
-    if(action==='start-franchise-season'){
-      const result=await startFranchiseSeason(current,gameYear,body);if(result.response)return result.response;return json({...await publicState(current),result});
+    if(action==='archive-franchise-season'||action==='start-franchise-season'){
+      const result=await archiveFranchiseSeason(current,gameYear);if(result.response)return result.response;return json({...await publicState(current),result});
     }
     if(action==='plan-archive'){
       const result=await planArchive(current,gameYear,body);if(result.response)return result.response;return json({...await publicState(current),planned:true,reused:result.reused});

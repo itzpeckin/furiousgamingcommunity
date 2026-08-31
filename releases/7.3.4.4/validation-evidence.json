@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.4",
+  "validatedOn": "2026-08-30",
+  "status": "locally-validated-production-authorized",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "oneActionLiveImport": {
+      "passed": true,
+      "commissionerOperated": true,
+      "destinationAutomaticallyCreatedOrReused": true,
+      "validationRequiredBeforeActivation": true,
+      "activationIncludedInImportAction": true,
+      "separateRoutineActivationButton": false
+    },
+    "atomicActivation": {
+      "passed": true,
+      "expectedPriorPointerGuarded": true,
+      "activePointerAndStatusesOneBatch": true,
+      "idempotentFinalize": true,
+      "failurePreservesPriorSnapshot": true,
+      "auditAndLifecycleRowsCreated": true
+    },
+    "oneActionArchiveSeason": {
+      "passed": true,
+      "historyBooksFrozen": true,
+      "nextFranchiseSeasonPrepared": true,
+      "latestExportSelectionCleared": true,
+      "newWeekOneExportRequired": true,
+      "historyPermanentlyDeleted": false,
+      "activeSnapshotChanged": false,
+      "exportUrlRotated": false
+    },
+    "week9CandidateReadiness": {
+      "passed": true,
+      "sourceSessionId": "m27_recovered_8bf2666ce3393492ed580dac",
+      "sourceReportId": "m27_report_8bf2666c-e339-3492-ed58-0dac09b696c9",
+      "capturedWeek": 9,
+      "routes": 43,
+      "teams": 32,
+      "rosteredPlayers": 2043,
+      "missingWeeks": [8],
+      "status": "validation-ready",
+      "activationPerformed": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false,
+      "eligibleScope": "rostered-players-only"
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 26,
+      "newMigration": false,
+      "requiredTables": 79
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 104,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 203,
+      "inventoryFiles": 533,
+      "routes": 65,
+      "requiredTables": 79
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "resetPerformed": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "archiveGameYearExecuted": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "historyPermanentlyDeleted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false
+  },
+  "external": {
+    "githubPublication": { "authorized": true, "status": "not-run", "pullRequest": null, "candidateCommit": null, "mainCommit": null },
+    "hostedChecks": { "authorized": true, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": { "authorized": true, "status": "not-run", "currentDeployment": "3d667ec0-73f8-4188-9e5b-76f154634dfe", "currentRuntimeCommit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa" },
+    "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 26 },
+    "productionMaddenExport": { "authorized": false, "status": "not-run" },
+    "productionWeek9Activation": { "authorized": true, "status": "not-run", "priorSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663" },
+    "archiveSeason": { "authorized": false, "status": "not-run" },
+    "gameYearTransition": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

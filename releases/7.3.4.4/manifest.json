@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.4",
+  "releaseType": "one-action-live-import-and-season-archive",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.4.3",
+    "commit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa",
+    "tree": "58726b251e776f7ba89a4c2b2167b8f9bdf328d9",
+    "tag": "v7.0.0",
+    "productionDeployment": "3d667ec0-73f8-4188-9e5b-76f154634dfe",
+    "workerBuild": "8fa92466-efe6-438f-8811-3cae1c4f6138"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.4.4",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Build and validate one exact candidate, publish its pull request, pass hosted checks, move that exact candidate to Main, and deploy Production in one consolidated authorized cycle."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Production-first policy applies. No staging cycle is authorized."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.3.4.3",
+    "currentCommit": "0a5dc06b90fbf2fe718482106c5c7a037f2d6dfa",
+    "currentDeployment": "3d667ec0-73f8-4188-9e5b-76f154634dfe",
+    "activeSnapshot": "841ce1b5-a4a6-4246-a53a-01cd1f189663",
+    "scope": "Deploy the one-action workflow and then activate only the currently validated Week 9 candidate. Do not delete history, reset league data, rotate the export URL, run Archive Season, run a Madden game-year transition, or reinterpret blocked Free Agents."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/game-year-transition.js",
+    "league-engine/one-click-import.js",
+    "league-engine/game-year-transition.js",
+    "releases/7.3.4.4/release-record.md",
+    "releases/7.3.4.4/validation-evidence.json",
+    "tests/import/candidate-import.test.mjs",
+    "tests/import/game-year-transition.test.mjs"
+  ]
+}

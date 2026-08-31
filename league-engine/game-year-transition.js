@@ -1,15 +1,14 @@
-/* FHQ_BUILD: 7.3.3 */
+/* FHQ_BUILD: 7.3.4.4 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.3';
+  const VERSION = '7.3.4.4';
   let state = null;
   let busy = false;
   let errorMessage = '';
   let notice = '';
   let confirmation = '';
-  let seasonDraft = { sourceSeasonId:'', displayName:'', seasonYear:'', confirmation:'' };
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
@@ -94,14 +93,13 @@
     finally { busy = false; rerender(); }
   }
 
-  async function startSeason() {
-    await runAction('start-franchise-season',{
-      confirmation:seasonDraft.confirmation,
-      sourceSeasonId:seasonDraft.sourceSeasonId,
-      displayName:seasonDraft.displayName,
-      seasonYear:Number(seasonDraft.seasonYear)
-    });
-    if (!errorMessage) seasonDraft={sourceSeasonId:'',displayName:'',seasonYear:'',confirmation:''};
+  async function archiveSeason() {
+    await runAction('archive-franchise-season');
+    if(!errorMessage){
+      notice='Season archived in History Books. The next franchise season is ready for its Week 1 export.';
+      window.dispatchEvent(new CustomEvent('franchisehq:franchise-season-archived',{detail:state?.result||{}}));
+      rerender();
+    }
   }
 
   function count(value) { return Number(value || 0).toLocaleString(); }
@@ -150,8 +148,8 @@
       <article class="card game-year-transition-card">
         <div class="card-header"><div><span class="eyebrow">v${VERSION} · Madden edition boundary</span><h3>${esc(gameYear.displayName)}</h3><p>A Madden game year can contain several franchise seasons. League accounts, memberships, roles, sessions, settings, rules, audits, stable player identities, and GM history persist across every operation.</p></div><span class="pill pill--${statusTone(gameYear.status)}">${esc(gameYear.status)}</span></div>
         <div class="game-year-operation-grid">
-          <section><span class="eyebrow">Same edition</span><h4>Latest League Export</h4><p>The permanent league URL receives each ${esc(gameYear.gameRelease)} export. Import the newest eligible revision from League Data; the active snapshot stays live until separately reviewed and activated.</p><button class="button button--ghost" data-game-year-replace ${busy?'disabled':''}>View Import Details</button></section>
-          <section><span class="eyebrow">Same edition</span><h4>Start New Franchise Season</h4><p>Freeze ${esc(activeSeason?.displayName||'the current season')} totals and ownership history, then create another season inside ${esc(gameYear.gameRelease)}.</p><div class="game-year-season-fields"><input data-game-year-season-id placeholder="Reviewed source season ID" value="${esc(seasonDraft.sourceSeasonId)}"><input data-game-year-season-name placeholder="Display name" value="${esc(seasonDraft.displayName)}"><input data-game-year-season-year type="number" min="2000" max="2200" placeholder="Season year" value="${esc(seasonDraft.seasonYear)}"><input data-game-year-season-confirmation autocomplete="off" placeholder="${esc(state.confirmations.startSeason)}" value="${esc(seasonDraft.confirmation)}"></div><button class="button button--ghost" data-game-year-start-season ${busy||!seasonDraft.sourceSeasonId||!seasonDraft.displayName||!seasonDraft.seasonYear||seasonDraft.confirmation!==state.confirmations.startSeason?'disabled':''}>Freeze & Start Season</button></section>
+          <section><span class="eyebrow">Same edition</span><h4>Latest League Export</h4><p>The permanent league URL receives each ${esc(gameYear.gameRelease)} export. One Import action validates and publishes the newest eligible revision live.</p><button class="button button--ghost" data-game-year-replace ${busy?'disabled':''}>Open Import</button></section>
+          <section><span class="eyebrow">Same edition</span><h4>Archive Season</h4><p>One click freezes ${esc(activeSeason?.displayName||'the completed season')} into History Books and prepares the next franchise season. Then run the Week 1 export and select Import once.</p><button class="button button--primary" data-game-year-archive-season ${busy?'disabled':''}>${busy?'Working…':'Archive Season'}</button></section>
         </div>
       </article>
       <article class="card game-year-transition-card game-year-transition-card--danger">
@@ -177,14 +175,6 @@
 
   document.addEventListener('input',event=>{
     if(event.target.matches('[data-game-year-confirmation]'))confirmation=event.target.value;
-    if(event.target.matches('[data-game-year-season-id]'))seasonDraft.sourceSeasonId=event.target.value;
-    if(event.target.matches('[data-game-year-season-name]'))seasonDraft.displayName=event.target.value;
-    if(event.target.matches('[data-game-year-season-year]'))seasonDraft.seasonYear=event.target.value;
-    if(event.target.matches('[data-game-year-season-confirmation]'))seasonDraft.confirmation=event.target.value;
-    if(event.target.matches('[data-game-year-season-id],[data-game-year-season-name],[data-game-year-season-year],[data-game-year-season-confirmation]')){
-      const button=document.querySelector('[data-game-year-start-season]');
-      if(button)button.disabled=busy||!seasonDraft.sourceSeasonId||!seasonDraft.displayName||!seasonDraft.seasonYear||seasonDraft.confirmation!==state?.confirmations?.startSeason;
-    }
     if(event.target.matches('[data-game-year-confirmation]')){
       const button=document.querySelector('[data-game-year-action]');if(button)button.disabled=busy||confirmation!==currentExpected();
     }
@@ -192,7 +182,7 @@
   document.addEventListener('click',event=>{
     if(event.target.closest('[data-game-year-preview]')){event.preventDefault();refresh(true).catch(error=>{errorMessage=error.message;rerender();});return;}
     if(event.target.closest('[data-game-year-replace]')){event.preventDefault();replaceCurrentImport();return;}
-    if(event.target.closest('[data-game-year-start-season]')){event.preventDefault();startSeason();return;}
+    if(event.target.closest('[data-game-year-archive-season]')){event.preventDefault();archiveSeason();return;}
     const action=event.target.closest('[data-game-year-action]');
     if(action){event.preventDefault();if(confirm(`Continue with ${action.textContent.trim()}?`))runAction(action.dataset.gameYearAction);return;}
     if(event.target.closest('[data-game-year-rollback]')){
@@ -205,6 +195,6 @@
 
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before game-year-transition.js.');
   HQ.defineModuleService('platform','gameYearTransition',{refresh,renderPanel,diagnostics:()=>({release:VERSION,busy,state,error:errorMessage})},{replace:true,alias:'gameYearTransition'});
-  HQ.manifest?.register?.({scope:'module',module:'platform',id:'game-year-transition',service:'gameYearTransition',script:'league-engine/game-year-transition.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['game-year-boundary','franchise-season-close','immutable-archive','typed-confirmation','recovery-bookmark','no-free-agent-zero-default']});
+  HQ.manifest?.register?.({scope:'module',module:'platform',id:'game-year-transition',service:'gameYearTransition',script:'league-engine/game-year-transition.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['game-year-boundary','one-click-franchise-season-archive','immutable-history','recovery-bookmark','no-free-agent-zero-default']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

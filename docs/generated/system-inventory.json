@@ -176,11 +176,11 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 70350,
+        "bytes": 72106,
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 50392,
+        "bytes": 57322,
         "file": "tools/check-release.mjs"
       },
       {
@@ -188,12 +188,16 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
+        "bytes": 35252,
+        "file": "tests/import/game-year-transition.test.mjs"
+      },
+      {
         "bytes": 35061,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 31552,
-        "file": "tests/import/game-year-transition.test.mjs"
+        "bytes": 32035,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
         "bytes": 31133,
@@ -202,10 +206,6 @@
       {
         "bytes": 27001,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
-      },
-      {
-        "bytes": 25471,
-        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
         "bytes": 22790,
@@ -228,7 +228,7 @@
         "file": "league-engine/games.js"
       },
       {
-        "bytes": 20178,
+        "bytes": 20125,
         "file": "league-engine/one-click-import.js"
       }
     ],
@@ -1337,7 +1337,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.4.3",
+  "release": "7.3.4.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

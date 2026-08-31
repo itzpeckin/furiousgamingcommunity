@@ -172,6 +172,57 @@ test('game-year helpers preserve edition and blocked-Free-Agent semantics', asyn
   assert.equal(await rootArchiveDigest([first,second]),await rootArchiveDigest([second,first]));
 });
 
+test('one Archive Season action freezes History Books and prepares the next season without deletion', async () => {
+  const {database,token}=await fixture();
+  const db=d1(database),archives=bucket(),sources=bucket();
+  try{
+    database.prepare(`UPDATE companion_league_export_endpoints SET
+      latest_session_id='capture-session-1',latest_session_token_version=1 WHERE league_id='league-1'`).run();
+    const before={
+      users:database.prepare(`SELECT COUNT(*) count FROM users`).get().count,
+      memberships:database.prepare(`SELECT COUNT(*) count FROM league_memberships`).get().count,
+      snapshots:database.prepare(`SELECT COUNT(*) count FROM league_snapshots`).get().count,
+      active:database.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id='league-1'`).get().snapshot_id,
+      tokenVersion:database.prepare(`SELECT token_version FROM companion_league_export_endpoints WHERE league_id='league-1'`).get().token_version
+    };
+    let response=await onRequestPost(context({db,token,archives,sources,method:'POST',body:{
+      action:'archive-franchise-season',gameYearId:'game-year-27'
+    }}));
+    let payload=await response.json();
+    assert.equal(response.status,200,JSON.stringify(payload));
+    assert.equal(payload.result.completed,true);
+    assert.equal(payload.result.historyPermanentlyDeleted,false);
+    assert.equal(database.prepare(`SELECT status FROM franchise_seasons WHERE id='season-1'`).get().status,'closed');
+    const prepared=database.prepare(`SELECT id,source_season_id,season_year,status FROM franchise_seasons
+      WHERE league_id='league-1' AND id<>'season-1'`).get();
+    assert.deepEqual({sourceSeasonId:prepared.source_season_id,seasonYear:prepared.season_year,status:prepared.status},
+      {sourceSeasonId:'2',seasonYear:2027,status:'preview'});
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM franchise_season_closures`).get().count,1);
+    assert.equal(database.prepare(`SELECT status FROM companion_import_destinations WHERE id='destination-1'`).get().status,'archived');
+    const endpoint=database.prepare(`SELECT token_version,latest_session_id,latest_ready_report_id
+      FROM companion_league_export_endpoints WHERE league_id='league-1'`).get();
+    assert.equal(endpoint.token_version,before.tokenVersion);
+    assert.equal(endpoint.latest_session_id,null);
+    assert.equal(endpoint.latest_ready_report_id,null);
+    assert.deepEqual({
+      users:database.prepare(`SELECT COUNT(*) count FROM users`).get().count,
+      memberships:database.prepare(`SELECT COUNT(*) count FROM league_memberships`).get().count,
+      snapshots:database.prepare(`SELECT COUNT(*) count FROM league_snapshots`).get().count,
+      active:database.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id='league-1'`).get().snapshot_id
+    },{users:before.users,memberships:before.memberships,snapshots:before.snapshots,active:before.active});
+    assert.equal(database.prepare(`SELECT action FROM tenant_audit_events
+      WHERE action='franchise_season.archive_and_prepare'`).get().action,'franchise_season.archive_and_prepare');
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
+
+    response=await onRequestPost(context({db,token,archives,sources,method:'POST',body:{
+      action:'archive-franchise-season',gameYearId:'game-year-27'
+    }}));
+    payload=await response.json();
+    assert.equal(payload.result.alreadyPrepared,true);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM franchise_season_closures`).get().count,1);
+  }finally{database.close();}
+});
+
 test('migration 25 makes game year first-class and immutable archive rows cannot be rewritten', async () => {
   const db=await createDatabase();
   try{
@@ -509,10 +560,12 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.match(endpoint,/freeAgentInterpretedAsZero:false/);
   assert.match(endpoint,/platformPlanePreserved:true/);
   assert.match(ui,/Latest League Export/);
-  assert.match(ui,/View Import Details/);
-  assert.match(ui,/Start New Franchise Season/);
+  assert.match(ui,/Open Import/);
+  assert.match(ui,/Archive Season/);
+  assert.match(ui,/data-game-year-archive-season/);
+  assert.doesNotMatch(ui,/data-game-year-season-confirmation/);
   assert.match(ui,/Archive \/ Remove Madden Game Year/);
   assert.match(ui,/Free Agents remain blocked\/unknown/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.3\.4\.3/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.3\.4\.4/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });

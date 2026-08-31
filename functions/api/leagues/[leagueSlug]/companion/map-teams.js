@@ -9,7 +9,7 @@ import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { enrichTeamBranding, findTeamBranding } from '../../../../_lib/team-branding.js';
 import { classifyMaddenRoute } from '../../../../_lib/madden-discovery.js';
 
-const RELEASE = '7.3.4.3';
+const RELEASE = '7.3.4.4';
 
 const ALIASES = Object.freeze({
   id: ['teamId', 'teamID', 'id', 'team_id', 'clubId', 'franchiseId'],

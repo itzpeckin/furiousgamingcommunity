@@ -19,7 +19,7 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 
-const RELEASE = '7.3.4.3';
+const RELEASE = '7.3.4.4';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -39,10 +39,15 @@ async function identitySource(db, leagueId) {
   return db.prepare(`SELECT r.id preview_run_id,r.status preview_status,r.free_agent_status,
       r.team_count,r.rostered_player_count,r.free_agent_count,r.created_at preview_created_at,
       s.id franchise_season_id,s.display_name,s.game_release,s.source_franchise_id,
-      s.source_season_id,s.season_year
-    FROM identity_preview_runs r
-    JOIN franchise_seasons s ON s.id=r.franchise_season_id AND s.league_id=r.league_id
-    WHERE r.league_id=? ORDER BY r.created_at DESC LIMIT 1`).bind(leagueId).first();
+      s.source_season_id,s.season_year,s.created_at season_created_at
+    FROM franchise_seasons s
+    LEFT JOIN identity_preview_runs r ON r.id=(
+      SELECT preview.id FROM identity_preview_runs preview
+      WHERE preview.league_id=s.league_id AND preview.franchise_season_id=s.id
+      ORDER BY preview.created_at DESC LIMIT 1
+    )
+    WHERE s.league_id=? AND s.status IN ('active','preview')
+    ORDER BY s.created_at DESC,s.rowid DESC LIMIT 1`).bind(leagueId).first();
 }
 
 async function latestReport(db, leagueId) {
@@ -130,7 +135,8 @@ function publicDestination(row) {
     label:row.label,
     status:row.status,
     createdAt:row.created_at,
-    private:true
+    private:false,
+    publishesLive:true
   };
 }
 
@@ -156,7 +162,7 @@ async function sourceFingerprint(db, leagueId, report, identity, destination) {
   if (!report || !identity || !destination) return null;
   const digest = await captureDigest(db,leagueId,report.session_id);
   return sha256Hex(new TextEncoder().encode(
-    `${report.report_hash}:${digest}:${identity.preview_run_id}:${destination.id}`
+    `${report.report_hash}:${digest}:${identity.preview_run_id || identity.franchise_season_id}:${destination.id}`
   ));
 }
 
@@ -204,9 +210,9 @@ async function publicState(current, options = {}) {
     activeSnapshotId:active?.snapshot_id || null,
     activeSnapshotWeek:active?.week_index === null || active?.week_index === undefined ? null : Number(active.week_index),
     phases:CANDIDATE_IMPORT_PHASES,
-    private:true,
-    activationPerformed:false,
-    activeSnapshotChanged:false
+    private:!publicCandidateRun(run)?.activationPerformed,
+    activationPerformed:Boolean(publicCandidateRun(run)?.activationPerformed),
+    activeSnapshotChanged:Boolean(publicCandidateRun(run)?.activeSnapshotChanged)
   };
 }
 
@@ -222,7 +228,7 @@ async function audit(current, action, resourceType, resourceId, detail = {}) {
 
 async function createDestination(current, identity) {
   if (!identity) return { response:json({
-    ok:false,error:'Generate the reviewed private identity preview before creating an import destination.',release:RELEASE
+    ok:false,error:'A prepared franchise season is required before creating an import destination.',release:RELEASE
   }, 409) };
   let destination = await destinationFor(current.db,current.league.id,identity.franchise_season_id);
   let created = false;
@@ -254,7 +260,7 @@ async function createDestination(current, identity) {
     await current.db.prepare(`INSERT INTO companion_import_destinations
       (id,league_id,franchise_season_id,label,status,created_by_user_id,game_year_id)
       VALUES (?,?,?,?,?,?,?)`).bind(id,current.league.id,identity.franchise_season_id,
-        `${identity.display_name} private candidate`,'active',current.authorization.session.user.id,gameYear.id).run();
+        `${identity.display_name} live imports`,'active',current.authorization.session.user.id,gameYear.id).run();
     destination = await destinationFor(current.db,current.league.id,identity.franchise_season_id);
     created = true;
     await audit(current,'companion.candidate_destination.create','companion_import_destination',id,{
@@ -266,11 +272,19 @@ async function createDestination(current, identity) {
 
 async function startRun(current, destination, report, identity, retry) {
   if (!destination || !report || !identity) return { response:json({
-    ok:false,error:'A reviewed identity destination and analyzed capture are required.',release:RELEASE
+    ok:false,error:'A prepared franchise season and analyzed capture are required.',release:RELEASE
   }, 409) };
+  if (!identity.preview_run_id && Date.parse(String(report.generated_at||'')) < Date.parse(String(identity.season_created_at||''))) {
+    return { response:json({
+      ok:false,
+      error:'The next franchise season is ready. Run its new Madden export before importing Week 1.',
+      release:RELEASE,
+      activeSnapshotChanged:false
+    },409) };
+  }
   const digest = await captureDigest(current.db,current.league.id,report.session_id);
   const fingerprint = await sha256Hex(new TextEncoder().encode(
-    `${report.report_hash}:${digest}:${identity.preview_run_id}:${destination.id}`
+    `${report.report_hash}:${digest}:${identity.preview_run_id || identity.franchise_season_id}:${destination.id}`
   ));
   let run = await current.db.prepare(`SELECT * FROM companion_candidate_import_runs
     WHERE league_id=? AND destination_id=? AND source_fingerprint=? LIMIT 1`)
@@ -391,8 +405,29 @@ async function finalize(current, body) {
     return { response:json({ ok:false,error:'Candidate snapshot validation is not ready.',release:RELEASE }, 422) };
   }
   const activeAfter = await activeSnapshotId(current.db,current.league.id);
-  if ((activeAfter || null) !== (run.active_snapshot_id_before || null) || activeAfter === snapshot.id) {
+  if (activeAfter === snapshot.id) {
+    await current.db.prepare(`UPDATE companion_candidate_import_runs SET
+      status='preview-ready',active_snapshot_id_after=?,completed_at=COALESCE(completed_at,CURRENT_TIMESTAMP),
+      updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=?`)
+      .bind(snapshot.id,run.id,current.league.id).run();
+    return { run:await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first() };
+  }
+  if ((activeAfter || null) !== (run.active_snapshot_id_before || null)) {
     return { response:json({ ok:false,error:'The active snapshot changed during candidate import; finalization refused.',release:RELEASE }, 409) };
+  }
+  const targetGameYear=await current.db.prepare(`SELECT gy.* FROM game_year_snapshots linked
+    JOIN league_game_years gy ON gy.id=linked.game_year_id AND gy.league_id=linked.league_id
+    WHERE linked.league_id=? AND linked.snapshot_id=?`).bind(current.league.id,snapshot.id).first();
+  if(!targetGameYear)return{response:json({ok:false,error:'Candidate snapshot is not attached to a Madden game year.',release:RELEASE},409)};
+  const destination=await current.db.prepare(`SELECT * FROM companion_import_destinations
+    WHERE id=? AND league_id=?`).bind(run.destination_id,current.league.id).first();
+  if(!destination)return{response:json({ok:false,error:'Candidate import destination is missing.',release:RELEASE},409)};
+  if(activeAfter){
+    const activeGameYear=await current.db.prepare(`SELECT game_year_id FROM game_year_snapshots
+      WHERE league_id=? AND snapshot_id=?`).bind(current.league.id,activeAfter).first();
+    if(activeGameYear?.game_year_id&&activeGameYear.game_year_id!==targetGameYear.id){
+      return{response:json({ok:false,error:'Archive the active Madden game year before importing a different edition.',release:RELEASE},409)};
+    }
   }
   const freeAgentEvidence = parseCandidateJson(report?.free_agent_evidence_json, {});
   const completeness = candidateCompleteness(freeAgentEvidence.status);
@@ -412,13 +447,69 @@ async function finalize(current, body) {
       ? Number(freeAgentEvidence.recordCount || 0) : null
   };
   const durationMs = Math.max(0,Number(body.durationMs || 0));
-  await current.db.prepare(`UPDATE companion_candidate_import_runs SET
-    status='preview-ready',completeness_status=?,result_counts_json=?,warnings_json=?,retry_json='{}',
-    active_snapshot_id_after=?,duration_ms=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-    .bind(completeness,JSON.stringify(counts),JSON.stringify([...new Set(warnings)]),activeAfter,durationMs,run.id).run();
-  await audit(current,'companion.candidate_import.preview_ready','companion_candidate_import',run.id,{
-    candidateSnapshotId:snapshot.id,completeness,durationMs,activationPerformed:false,activeSnapshotChanged:false
-  });
+  const actor=current.authorization.session.user.id;
+  const expectedActive=run.active_snapshot_id_before || '';
+  const lifecycleId=crypto.randomUUID();
+  const auditId=`tenant_audit_${crypto.randomUUID()}`;
+  const uniqueWarnings=[...new Set(warnings)];
+  const activationGuard=`EXISTS (SELECT 1 FROM league_active_snapshots active
+    WHERE active.league_id=? AND active.snapshot_id=?)`;
+  const statements=[
+    current.db.prepare(`INSERT INTO league_active_snapshots
+      (league_id,snapshot_id,activated_at,activated_by,previous_snapshot_id)
+      SELECT ?,?,CURRENT_TIMESTAMP,?,?
+      WHERE COALESCE((SELECT snapshot_id FROM league_active_snapshots WHERE league_id=?),'')=?
+      ON CONFLICT(league_id) DO UPDATE SET
+        snapshot_id=excluded.snapshot_id,activated_at=CURRENT_TIMESTAMP,
+        activated_by=excluded.activated_by,previous_snapshot_id=excluded.previous_snapshot_id
+      WHERE COALESCE(league_active_snapshots.snapshot_id,'')=?`)
+      .bind(current.league.id,snapshot.id,actor,run.active_snapshot_id_before||null,current.league.id,expectedActive,expectedActive),
+    ...(run.active_snapshot_id_before?[current.db.prepare(`UPDATE league_snapshots SET
+      status='archived',archived_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE id=? AND league_id=? AND ${activationGuard}`)
+      .bind(run.active_snapshot_id_before,current.league.id,current.league.id,snapshot.id)]:[]),
+    current.db.prepare(`UPDATE league_snapshots SET status='active',activated_at=CURRENT_TIMESTAMP,
+      archived_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND ${activationGuard}`)
+      .bind(snapshot.id,current.league.id,current.league.id,snapshot.id),
+    current.db.prepare(`UPDATE game_year_snapshots SET
+      snapshot_status=CASE WHEN snapshot_id=? THEN 'active' WHEN snapshot_status='active' THEN 'archived' ELSE snapshot_status END,
+      updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND game_year_id=? AND ${activationGuard}`)
+      .bind(snapshot.id,current.league.id,targetGameYear.id,current.league.id,snapshot.id),
+    current.db.prepare(`UPDATE league_game_years SET status='active',archived_at=NULL,removed_at=NULL,
+      updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND ${activationGuard}`)
+      .bind(targetGameYear.id,current.league.id,current.league.id,snapshot.id),
+    current.db.prepare(`UPDATE franchise_seasons SET status=CASE WHEN status='preview' THEN 'active' ELSE status END,
+      updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND ${activationGuard}`)
+      .bind(destination.franchise_season_id,current.league.id,current.league.id,snapshot.id),
+    current.db.prepare(`UPDATE companion_candidate_import_runs SET
+      status='preview-ready',completeness_status=?,result_counts_json=?,warnings_json=?,retry_json='{}',
+      active_snapshot_id_after=?,duration_ms=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE id=? AND league_id=? AND ${activationGuard}`)
+      .bind(completeness,JSON.stringify(counts),JSON.stringify(uniqueWarnings),snapshot.id,durationMs,run.id,current.league.id,current.league.id,snapshot.id),
+    current.db.prepare(`INSERT INTO league_snapshot_lifecycle_events
+      (id,league_id,snapshot_id,event_type,actor_id,detail_json)
+      SELECT ?,?,?,?,?,? WHERE ${activationGuard}`)
+      .bind(lifecycleId,current.league.id,snapshot.id,'import-activated',actor,JSON.stringify({
+        candidateRunId:run.id,previousSnapshotId:run.active_snapshot_id_before||null,
+        completeness,forwardDetection:{status:'pending-separate-stage'},
+        freeAgentStatus:counts.freeAgentStatus,freeAgentCount:counts.freeAgentCount
+      }),current.league.id,snapshot.id),
+    current.db.prepare(`INSERT INTO tenant_audit_events
+      (id,league_id,actor_user_id,request_id,action_id,action,resource_type,resource_id,outcome,detail_json)
+      SELECT ?,?,?,?,?,?,?,?,?,? WHERE ${activationGuard}`)
+      .bind(auditId,current.league.id,actor,`request_${crypto.randomUUID()}`,`action_${crypto.randomUUID()}`,
+        'companion.live_import.activate','companion_candidate_import',run.id,'success',JSON.stringify({
+          candidateSnapshotId:snapshot.id,previousSnapshotId:run.active_snapshot_id_before||null,
+          completeness,durationMs,activationPerformed:true,activeSnapshotChanged:true,
+          freeAgentStatus:counts.freeAgentStatus,freeAgentCount:counts.freeAgentCount,
+          freeAgentInterpretedAsZero:false
+        }),current.league.id,snapshot.id)
+  ];
+  await current.db.batch(statements);
+  const activated=await activeSnapshotId(current.db,current.league.id);
+  if(activated!==snapshot.id){
+    return { response:json({ok:false,error:'The active snapshot changed during live import; activation was refused.',release:RELEASE},409) };
+  }
   return { run:await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first() };
 }
 

@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.4.3 */
+/* FHQ_BUILD: 7.3.4.4 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.4.3';
+  const VERSION = '7.3.4.4';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -11,9 +11,9 @@
     ['map-players', 'Map Rostered Players'],
     ['map-schedule', 'Map Schedule'],
     ['map-statistics', 'Map Statistics'],
-    ['build-candidate', 'Build Private Candidate'],
-    ['validate-candidate', 'Validate Candidate'],
-    ['preview-ready', 'Private Preview Ready']
+    ['build-candidate', 'Build Import Snapshot'],
+    ['validate-candidate', 'Validate Import'],
+    ['preview-ready', 'Make Import Live']
   ];
 
   let state = null;
@@ -68,11 +68,11 @@
     if (busy) return;
     busy = true;
     errorMessage = '';
-    notice = 'Creating one private destination for the reviewed season…';
+    notice = 'Preparing the franchise-season import destination…';
     rerender();
     try {
       state = await api('candidate-import','POST',{action:'create-destination'});
-      notice = state.created ? 'Private season destination created.' : 'Existing private season destination selected.';
+      notice = state.created ? 'Franchise-season import destination prepared.' : 'Existing franchise-season destination selected.';
     } catch (error) {
       errorMessage = error.message;
       notice = '';
@@ -166,23 +166,24 @@
 
   async function runImport({retry=false}={}) {
     if (busy) return;
-    if (!state?.destination) {
-      errorMessage = 'Create the private season destination before running the candidate import.';
-      rerender();
-      return;
-    }
     busy = true;
     errorMessage = '';
-    notice = 'Starting commissioner candidate import…';
+    notice = 'Starting live league import…';
     rerender();
     const wallStartedAt = now();
     let runId = null;
     try {
+      if (!state?.destination) {
+        state = await api('candidate-import','POST',{action:'create-destination'});
+        if (!state?.destination) throw new Error('The franchise-season import destination is unavailable.');
+      }
       state = await api('candidate-import','POST',{action:'start',retry});
       runId = state?.run?.id;
       if (!runId) throw new Error('Candidate importer did not return a durable run ID.');
       if (state.warm && state.run?.status === 'preview-ready') {
-        notice = `Existing private preview reused in ${durationLabel(now()-wallStartedAt)}.`;
+        const finalDuration=Math.max(0,Math.round(now()-wallStartedAt));
+        state=await api('candidate-import','POST',{action:'finalize',runId,durationMs:finalDuration});
+        notice = `Validated import is live in ${durationLabel(finalDuration)}.`;
         return;
       }
 
@@ -244,7 +245,7 @@
       const built = await runPhase(runId,'build-candidate',()=>api('build-snapshot','POST',{
         candidateImportRunId:runId,...mappingRunIds
       }),payload=>({
-        summary:`Private candidate ${payload.snapshot?.snapshotId || 'built'}`,
+        summary:`Import snapshot ${payload.snapshot?.snapshotId || 'built'}`,
         counts:payload.snapshot?.counts||{},
         warnings:payload.snapshot?.warnings||[],
         candidateSnapshotId:payload.snapshot?.snapshotId
@@ -253,7 +254,7 @@
       if (!snapshotId) throw new Error('Candidate builder did not return a snapshot ID.');
 
       await runPhase(runId,'validate-candidate',()=>validateCandidate(snapshotId),payload=>({
-        summary:'Private candidate validation ready',
+        summary:'Import validation ready',
         counts:payload.snapshot?.counts||{},
         warnings:payload.snapshot?.warnings||[],
         candidateSnapshotId:snapshotId
@@ -262,14 +263,14 @@
       const finalDuration=Math.max(0,Math.round(now()-wallStartedAt));
       state = await api('candidate-import','POST',{action:'finalize',runId,durationMs:finalDuration});
       notice = finalDuration < 60000
-        ? `Private candidate ready in ${durationLabel(finalDuration)}.`
-        : `Private candidate ready in ${durationLabel(finalDuration)}; review the sub-60-second performance target.`;
-      window.dispatchEvent(new CustomEvent('franchisehq:candidate-import-ready',{detail:{
-        runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:finalDuration,activationPerformed:false
+        ? `Import live in ${durationLabel(finalDuration)}.`
+        : `Import live in ${durationLabel(finalDuration)}; review the sub-60-second performance target.`;
+      window.dispatchEvent(new CustomEvent('franchisehq:league-import-live',{detail:{
+        runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:finalDuration,activationPerformed:true
       }}));
     } catch (error) {
       errorMessage = error.message;
-      notice = 'Candidate import stopped safely. The active snapshot was not changed.';
+      notice = 'Import stopped safely. The previous live snapshot was preserved.';
     } finally {
       busy = false;
       await refresh().catch(()=>rerender());
@@ -281,7 +282,7 @@
     await refresh();
     if (!state?.source) throw new Error('No analyzed league export is ready to import.');
     if (!state.destination) await createDestination();
-    if (!state?.destination) throw new Error('The private season destination is unavailable.');
+    if (!state?.destination) throw new Error('The franchise-season import destination is unavailable.');
     return runImport({retry:['failed','running'].includes(currentRun()?.status)});
   }
 
@@ -306,18 +307,19 @@
     const faCount=['located','empty-confirmed'].includes(faStatus)
       ? countLabel(resultCounts.freeAgentCount ?? source?.counts?.freeAgentCount) : 'unknown';
     const ready=run?.status==='preview-ready';
-    const sub60=ready && Number(run.durationMs)<60000;
+    const live=Boolean(run?.activationPerformed);
+    const sub60=live && Number(run.durationMs)<60000;
     const coverage=source?.coverage||{};
     const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
     const sourceIsNew=source?.selectionStatus==='new-source';
-    const runDisabled=busy||!state?.destination||!source||ready;
-    const runLabel=busy?'Candidate Import Running…'
-      :ready?'Exact Export Already Imported'
+    const runDisabled=busy||!source||live;
+    const runLabel=busy?'Import Running…'
+      :live?'Latest Export Live'
         :run?.status==='failed'?'Retry Candidate Import'
-          :sourceIsNew?'Import Latest Export':'Analyze Captured Export';
+          :'Import Latest Export';
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
-      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>Private Candidate Import</h3><p>Analyze the selected capture, map it into one reviewed season, and build a validated private preview. This workflow never activates a snapshot.</p></div><span class="pill pill--${ready?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(ready?'Preview ready':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
-      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Safety boundary:</strong> The active league view remains unchanged. Candidate data is append-only, no reset runs, and the active snapshot pointer is verified before finalization.</span></div>
+      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>One-Click Live Import</h3><p>Analyze, map, validate, and atomically publish the newest eligible export with one action.</p></div><span class="pill pill--${live?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(live?'Live':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
+      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
       ${faStatus==='blocked'?`<div class="league-import-framework-note"><svg><use href="#icon-alert-triangle"></use></svg><span><strong>Free Agents blocked upstream:</strong> this candidate is rostered-player-only. The Free Agent count is unknown, never zero.</span></div>`:''}
       <div class="commissioner-import-summary">
         <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
@@ -335,11 +337,10 @@
       ${errorMessage?`<div class="validation-errors"><strong>Stopped safely</strong><p>${esc(errorMessage)}</p>${run?.retry?.message?`<p>${esc(run.retry.message)}</p>`:''}</div>`:''}
       ${sub60?`<div class="league-import-framework-note"><svg><use href="#icon-check"></use></svg><span><strong>Performance target met:</strong> ${esc(durationLabel(run.durationMs))}, under 60 seconds.</span></div>`:''}
       <div class="league-import-framework-actions">
-        <button class="button button--ghost" data-create-candidate-destination ${busy||!source?.season||state?.destination?'disabled':''}>${state?.destination?'Destination Selected':'Create Private Destination'}</button>
         <button class="button button--primary" data-run-candidate-import ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
         <button class="button button--ghost" data-refresh-candidate-import ${busy?'disabled':''}>Refresh</button>
       </div>
-      <p class="muted">Source fingerprint: ${esc(source?.sourceFingerprint?.slice(0,12)||'—')} · Candidate ID: ${esc(run?.candidateSnapshotId||'—')} · previous candidate: ${esc(state?.previousRun?.candidateSnapshotId||'—')} · completeness: ${esc(run?.completenessStatus||'not evaluated')} · activation performed: no</p>
+      <p class="muted">Source fingerprint: ${esc(source?.sourceFingerprint?.slice(0,12)||'—')} · snapshot: ${esc(run?.candidateSnapshotId||'—')} · previous snapshot: ${esc(run?.activeSnapshotIdBefore||'—')} · completeness: ${esc(run?.completenessStatus||'not evaluated')} · live: ${live?'yes':'no'}</p>
     </section>`;
   }
 
@@ -353,9 +354,9 @@
     if (event.target.closest('[data-refresh-candidate-import]')) refresh().catch(error=>{errorMessage=error.message;rerender();});
   });
 
-  const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,activationPerformed:false,activeSnapshotChanged:false});
+  const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,activationPerformed:Boolean(currentRun()?.activationPerformed),activeSnapshotChanged:Boolean(currentRun()?.activeSnapshotChanged)});
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
   HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,renderPanel,diagnostics},{replace:true,alias:'oneClickImport'});
-  HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','private-candidate','sub-60-second-target','no-snapshot-activation']});
+  HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','one-click-live-import','atomic-snapshot-activation','sub-60-second-target','blocked-free-agents-unknown']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

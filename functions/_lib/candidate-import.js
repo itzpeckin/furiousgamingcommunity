@@ -154,6 +154,11 @@ export function candidateHistoryCarryForward(freshRecords = [], priorRows = [], 
 
 export function publicCandidateRun(row) {
   if (!row) return null;
+  const activationPerformed=Boolean(
+    row.candidate_snapshot_id
+    && row.active_snapshot_id_after
+    && String(row.candidate_snapshot_id)===String(row.active_snapshot_id_after)
+  );
   return {
     id: row.id,
     destinationId: row.destination_id,
@@ -184,8 +189,9 @@ export function publicCandidateRun(row) {
     startedAt: row.started_at || null,
     completedAt: row.completed_at || null,
     updatedAt: row.updated_at,
-    private: true,
-    activationPerformed: false,
-    activeSnapshotChanged: false
+    private: !activationPerformed,
+    activationPerformed,
+    activeSnapshotChanged: activationPerformed
+      && String(row.active_snapshot_id_before || '')!==String(row.active_snapshot_id_after || '')
   };
 }

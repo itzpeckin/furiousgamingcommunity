@@ -18,7 +18,7 @@ import {
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.3.4.3';
+const RELEASE = '7.3.4.4';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();
@@ -58,7 +58,8 @@ async function sessionFor(db, leagueId, sessionId) {
 
 async function candidateFor(db, leagueId, discoverySessionId) {
   if (!discoverySessionId) return null;
-  return db.prepare(`SELECT id,status,candidate_snapshot_id,duration_ms,completed_at
+  return db.prepare(`SELECT id,status,candidate_snapshot_id,active_snapshot_id_before,
+      active_snapshot_id_after,duration_ms,completed_at
     FROM companion_candidate_import_runs WHERE league_id=? AND discovery_session_id=?
     ORDER BY created_at DESC,rowid DESC LIMIT 1`).bind(leagueId,discoverySessionId).first();
 }
@@ -154,8 +155,8 @@ async function publicState(current) {
         : []
     },
     selectedReportId:readyReport?.id || null,
-    activeSnapshotChanged:false,
-    activationPerformed:false
+    activeSnapshotChanged:Boolean(summary.importLive),
+    activationPerformed:Boolean(summary.importLive)
   };
 }
 

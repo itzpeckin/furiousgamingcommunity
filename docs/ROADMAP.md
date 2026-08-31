@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.51
+**Revision:** 1.52
 
 **Current production:** 7.3.4.3 from exact Main commit `0a5dc06` (Pages deployment `3d667ec0`); the recovered 43-route Week 9 source is latest-ready and accepted Madden 27 snapshot `841ce1b5` remains active
 
-**Current work:** 7.3.4.3 is deployed from exact Main after PR #19, four candidate checks, seven Main/deployment checks, and successful Pages and import Worker deployments. The repair carries the exact selected recovered session through classification and lets Teams mapping use the same shared route evidence as the ready report. No import retry or Production data operation ran, so the active snapshot and recovered latest-ready source remain unchanged.
+**Current work:** 7.3.4.4 is authorized as one consolidated Production cycle. The candidate makes **Import Latest Export** validate and atomically publish the exact snapshot in one action, makes **Archive Season** freeze History Books and prepare the next franchise season in one action, and removes routine preview-acceptance and activation buttons. No migration is required. Publication, deployment, and the single authorized Week 9 activation remain pending local and hosted validation.
 
-**Next gate:** The owner may retry the same existing export without a new Madden export or URL rotation and inspect the private candidate. The missing Week 8 warning remains visible; import retry and activation remain separate actions.
+**Next gate:** Pass the consolidated local gate, publish one exact candidate through hosted checks, deploy that candidate from Main, reconcile the existing validation-ready Week 9 source, and invoke **Import Latest Export** once. Failure must preserve active Week 7; success must move the pointer atomically to exact Week 9 while retaining the Week 8 warning and blocked/null Free Agent state.
 
 ## Product decisions
 
@@ -23,7 +23,8 @@
 - Madden sources feed one canonical snapshot model. Companion, approved direct-EA access, and CSV/Excel must not create separate downstream products.
 - A Madden **game year** (Madden 27, Madden 28, and so on) is independent from a franchise season year. Leagues, accounts, memberships, roles, settings, rules, and audit history persist across game years; Madden-derived data is partitioned by game year so a commissioner can archive it and remove it from the active application at the next edition transition.
 - Free Agents are a required first-class dataset. A source must provide and reconcile them or explicitly prove their absence.
-- Production publication, database migration, Discord configuration, membership edits, FGC reset, import, and snapshot activation are separate authorization decisions.
+- Production publication, database migration, Discord configuration, membership edits, broad resets, and destructive Madden game-year transitions remain separately authorized operations. For routine same-season updates, selecting **Import Latest Export** is the commissioner's explicit authorization to validate and atomically publish that exact eligible snapshot; there is no second activation action.
+- **Archive Season** is the commissioner's single same-edition season-close action: it freezes the completed franchise season into History Books, prepares the next franchise-season identity, and clears only the latest-export selection so a new Week 1 export is required. It does not delete history, rotate the permanent export URL, change Madden game year, or move the active snapshot.
 - Every validated release updates this roadmap with requested additions, unexpected work, defects, deferrals, evidence, and the next exact gate.
 - The refresh/login inconvenience is accepted temporarily. Session redesign remains frozen until 7.5.0 unless evidence shows an authorization or data-exposure vulnerability.
 
@@ -53,6 +54,7 @@
 | 7.3.4.1 | Production; pending owner UI acceptance | Permanent revocable league export URL, automatic cohort analysis, readiness status, and one-click latest candidate import |
 | 7.3.4.2 | Production; pending owner UI acceptance | Atomic concurrent cohort claim, exact real-payload parsing, and verified retained-burst recovery without candidate import or activation |
 | 7.3.4.3 | Production; pending owner import-retry acceptance | Exact recovered-session classification and shared Teams route authority; retry uses the existing export and preserves the Week 8 gap warning |
+| 7.3.4.4 | Production authorized; validation in progress | One-action atomic live import, one-action same-edition season archive/preparation, and exact Week 9 candidate activation |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
@@ -156,7 +158,7 @@
 ## 7.3.3 — Safe Reset and Season Transition
 
 - Make game year a first-class boundary separate from franchise season year. A league can advance many franchise seasons within Madden 27 without triggering an edition transition.
-- Provide separate Replace Current Import, Start New Franchise Season, and Archive/Remove Madden Game Year operations rather than one destructive button.
+- Provide two simple same-edition actions—**Import Latest Export** and **Archive Season**—while keeping irreversible Archive/Remove Madden Game Year operations behind their separate protected workflow.
 - At a Madden 27-to-28 transition, archive all Madden 27 league data under an immutable game-year manifest, verify its counts/checksums, detach it from the active data plane, and allow the commissioner to remove the archived copy under an explicit second confirmation.
 - Preserve users, leagues, memberships, roles, sessions, settings, rules, and audits across every game-year transition. Clear edition-specific team assignments for reviewed remapping rather than carrying them into the next game by inference.
 - Preview exact affected counts, record a recovery bookmark and durable audit event, and require typed confirmation scoped to one league and game year.
@@ -172,12 +174,12 @@
 
 ## 7.3.4 — FGC Madden 27 Certification
 
-- Select the candidate run by the newest analyzed report/capture fingerprint, not by the league's previously completed candidate. The same exact export remains idempotent; a new fingerprint can build a new private candidate.
+- Select the import run by the newest analyzed report/capture fingerprint, not by the league's previously completed run. The same exact export remains idempotent; a new fingerprint can build a new isolated snapshot for validation and atomic publication.
 - Show capture time, source fingerprint, active week, captured week, and schedule/statistics coverage before candidate work starts. Refuse a capture older than the active snapshot.
 - Carry older game/statistic records forward only when the active snapshot belongs to the same Madden game year and franchise season. Fresh exact-ID records win; current/future prior-week rows are not copied.
 - If active Week 7 is followed by a capture that supplies only Week 9, visibly report Week 8 as missing. Never imply that an unavailable week was imported or manufacture its games/statistics.
-- Reconcile every source total, unknown route, duplicate, unassigned player, and Free Agent result before activation is considered. Blocked Free Agents remain unknown/null.
-- Production-first gate: publish and deploy one exact candidate only after separate owner authorization, then let the commissioner run one real new capture-to-private-candidate cycle. The existing active snapshot stays live; activation remains a later explicit authorization. Staging is skipped unless explicitly requested.
+- Reconcile every source total, unknown route, duplicate, unassigned player, and Free Agent result before the atomic live pointer can move. Blocked Free Agents remain unknown/null.
+- Production-first gate: publish and deploy one exact candidate only after owner authorization, then let the commissioner run one real ready-export-to-live cycle. The previous snapshot stays live throughout validation and on every failure. Staging is skipped unless explicitly requested.
 
 ## 7.3.4.1 — Permanent League Export Connection
 
@@ -186,8 +188,8 @@
 - Automatically group each Madden request burst into a durable discovery cohort, retain duplicate payload links without duplicating raw R2 data, and analyze the cohort after a three-second quiet window. An interrupted cohort is still analyzed and shown as review-required.
 - Advance `latest_ready_report_id` only when source identity, 32-team roster coverage, schedule, standings, statistics, and rostered-player assignment evidence pass. A failed or partial newest export remains visible but cannot displace the prior ready report.
 - Treat Madden's blocked Free Agent response as rostered-player-only readiness with a null/unknown count. Never convert the upstream failure into an empty Free Agent pool.
-- Expose the permanent connection and latest received/analyzed time, captured week, route count, counts, warnings, and private-candidate status in Commissioner HQ. The normal weekly workflow is: export to the same URL, wait for Ready, and select **Import Latest Export** once.
-- The one-click action creates or reuses the private season destination and runs the existing non-activating candidate pipeline. Migration 26 is additive; no reset, game-year transition, Main change, real capture/import, Production deployment, or snapshot activation is included in the local implementation authorization.
+- Expose the permanent connection and latest received/analyzed time, captured week, route count, counts, warnings, and live-import status in Commissioner HQ. The normal weekly workflow is: export to the same URL, wait for Ready, and select **Import Latest Export** once.
+- The one-click action creates or reuses the season destination, maps and validates the immutable source, and atomically publishes the exact validated snapshot. Any failure retains the prior live pointer. Migration 26 remains additive; import never resets league data, rotates the URL, or converts blocked Free Agents to zero.
 
 ## 7.3.5 — Team, Roster, Player, Statistics, Standings, and Free Agent Experience
 
@@ -210,10 +212,10 @@
 - Track regular-season and playoff records, teams managed, playoff appearances, conference championships, Super Bowl appearances, and Super Bowl championships across teams.
 - Gate: Justin resolves to Buccaneers and Gas to Packers after reviewed assignment; no duplicate owner/cross-tenant inference is possible; career totals reconcile to season records.
 
-## 7.3.8 — Incremental Madden Updates
+## 7.3.8 — Incremental Madden Freshness and Change Detail
 
-- Build on the permanent 7.3.4.1 Companion intake to reconcile later ready candidates without a destructive full reset.
-- Compare snapshots, report freshness/warnings, and activate teams, rosters, transactions, schedule, standings, and statistics atomically as supported.
+- Build on the permanent intake and 7.3.4.4 atomic live-import contract to expose field-level changes and freshness without a destructive full reset.
+- Compare snapshots and report roster, transaction, schedule, standings, statistics, and source-freshness changes while retaining the one-action atomic publication path.
 - Gate: duplicate exports are idempotent, successful updates are coherent, and failure/rollback retains the previous complete experience.
 
 ## 7.3.9 — Additional Madden Source Adapters
@@ -336,3 +338,4 @@
 - **Revision 1.49:** Corrective PR #18 passed 4/4 candidate checks and all Main checks; exact commit `e95ad2f` deployed as Production Pages `0747aebd`. The exact 43-route window was recovered into session `m27_recovered_8bf2666ce3393492ed580dac` and report `m27_report_8bf2666c-e339-3492-ed58-0dac09b696c9`; Commissioner HQ now shows Week 9, 43 routes, 32 teams, 2,043 rostered players, and **Ready to import**. One oversized administrative statement was atomically rejected with zero writes before the bounded successful application. Migration 26/79 tables, protected counts, token version 1, active snapshot `841ce1b5`, candidate/transition run counts, and zero foreign-key violations are unchanged. Free Agents remain blocked/null. No import, activation, reset, transition, archive, URL rotation, or new Madden export ran.
 - **Revision 1.50:** The first commissioner import attempt stopped safely before candidate construction because browser-side classification omitted the exact recovered session ID and inspected only one original fragment; Teams mapping then found no compatible inspection in the selected 43-route session. Authorized 7.3.4.3 passes the exact session through classification, uses shared route authority for `/leagueteams`, classifies weekly `/team` as Statistics, and adds a realistic eight-fragment/43-route/32-team regression. The active snapshot remains `841ce1b5`; Week 8 remains visibly missing between active Week 7 and captured Week 9; Free Agents remain blocked/null. Production/Main publication, import retry, activation, reset, transition, URL rotation, and new export have not run.
 - **Revision 1.51:** Published 7.3.4.3 through PR #19 with 4/4 candidate checks and 7/7 Main/deployment checks, fast-forwarded exact commit `0a5dc06` to Main, and deployed exact Production Pages runtime `3d667ec0` plus import Worker build `8fa92466`. The live domain reports 7.3.4.3. No migration or Production data operation ran: the recovered 43-route source and active snapshot `841ce1b5` remain unchanged, Week 8 remains visibly missing, and Free Agents remain blocked/null. The owner may now retry the same export; import and activation remain separate actions.
+- **Revision 1.52:** Authorized the consolidated 7.3.4.4 Production one-action remediation. The implementation makes a commissioner import click create/reuse its destination, map, validate, compare-and-swap the active pointer, and audit the exact snapshot atomically; removes routine activation UI; and makes one **Archive Season** click freeze the completed same-edition season, prepare the next identity, archive its old import destination, and clear only the selected latest export so Week 1 must be newly exported. Tests prove idempotent activation and archive behavior, prior-pointer preservation on failure, retained History Books, unchanged export token, and blocked/null Free Agents. Publication, Main, Production deployment, and the exact existing Week 9 activation are authorized but have not yet run.

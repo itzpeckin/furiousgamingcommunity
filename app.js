@@ -9497,8 +9497,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
 
-  // 7.3.4.3 — authoritative visible release and environment marker.
-  const VISIBLE_RELEASE = '7.3.4.3';
+  // 7.3.4.4 — authoritative visible release and environment marker.
+  const VISIBLE_RELEASE = '7.3.4.4';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

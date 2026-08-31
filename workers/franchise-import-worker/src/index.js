@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 7.3.2 */
+/* FHQ_BUILD: 7.3.4.4 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='7.3.2';
+const RELEASE='7.3.4.4';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -111,7 +111,7 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
     };
     if(!context.slug||!context.origin||!context.token)throw new Error('Candidate workflow payload is incomplete.');
 
-    await step.do('create-private-destination',()=>call(
+    await step.do('prepare-season-destination',()=>call(
       context,companion(context.slug,'candidate-import'),'POST',{action:'create-destination'}
     ));
     const started=await step.do('start-candidate-import',()=>call(
@@ -120,11 +120,17 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
     context.runId=started?.run?.id||null;
     context.discoverySessionId=started?.source?.discoverySessionId||null;
     if(!context.runId)throw new Error('Candidate importer did not return a durable run ID.');
-    if(started.warm&&started.run?.status==='preview-ready')return{
-      ok:true,release:RELEASE,reusedExisting:true,run:started.run,
-      candidateSnapshotId:started.run.candidateSnapshotId,durationMs:Date.now()-context.wallStartedAt,
-      private:true,activationPerformed:false,activeSnapshotChanged:false
-    };
+    if(started.warm&&started.run?.status==='preview-ready'){
+      const durationMs=Date.now()-context.wallStartedAt;
+      const finalized=await step.do('publish-existing-validated-import',()=>call(
+        context,companion(context.slug,'candidate-import'),'POST',{action:'finalize',runId:context.runId,durationMs}
+      ));
+      return{
+        ok:true,release:RELEASE,reusedExisting:true,run:finalized.run,
+        candidateSnapshotId:started.run.candidateSnapshotId,durationMs,
+        private:false,activationPerformed:true,activeSnapshotChanged:Boolean(finalized.run?.activeSnapshotChanged)
+      };
+    }
 
     const analyzed=await phase(context,step,'analyze-source',()=>call(
       context,companion(context.slug,'discovery-report'),'POST',{
@@ -191,23 +197,24 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
         candidateImportRunId:context.runId,...mappingRunIds
       }
     ),payload=>({
-      summary:`Private candidate ${payload.snapshot?.snapshotId||'built'}`,
+      summary:`Import snapshot ${payload.snapshot?.snapshotId||'built'}`,
       counts:payload.snapshot?.counts||{},candidateSnapshotId:payload.snapshot?.snapshotId
     }));
     const snapshotId=built.snapshot?.snapshotId;
     if(!snapshotId)throw new Error('Candidate builder did not return a snapshot ID.');
 
     await phase(context,step,'validate-candidate',()=>validateCandidate(context,step,snapshotId),payload=>({
-      summary:'Private candidate validation ready',counts:payload.snapshot?.counts||{},candidateSnapshotId:snapshotId
+      summary:'Import validation ready',counts:payload.snapshot?.counts||{},candidateSnapshotId:snapshotId
     }));
 
     const durationMs=Date.now()-context.wallStartedAt;
-    const finalized=await step.do('finalize-preview-ready',()=>call(
+    const finalized=await step.do('validate-and-publish-live',()=>call(
       context,companion(context.slug,'candidate-import'),'POST',{action:'finalize',runId:context.runId,durationMs}
     ));
     return{
       ok:true,release:RELEASE,run:finalized.run,candidateSnapshotId:snapshotId,durationMs,
-      performanceTargetMet:durationMs<60000,private:true,activationPerformed:false,activeSnapshotChanged:false
+      performanceTargetMet:durationMs<60000,private:false,activationPerformed:true,
+      activeSnapshotChanged:Boolean(finalized.run?.activeSnapshotChanged)
     };
   }
 }

@@ -68,12 +68,18 @@ export function permanentExportPublicState({ endpoint, latestSession, latestRepo
     : !latestSession ? 'awaiting-export'
       : !latestReport ? captureCount ? 'receiving' : 'awaiting-export'
         : latestReportId === readyReportId ? 'ready' : 'review-required';
+  const importLive=Boolean(
+    candidateRun?.candidate_snapshot_id
+    && candidateRun?.active_snapshot_id_after
+    && String(candidateRun.candidate_snapshot_id)===String(candidateRun.active_snapshot_id_after)
+  );
   return {
     status,
     captureCount,
     latestReportId,
     readyReportId,
-    importAvailable:status === 'ready' && candidateRun?.status !== 'preview-ready',
-    importStatus:candidateRun?.status || 'not-started'
+    importAvailable:status === 'ready' && !importLive,
+    importStatus:importLive ? 'live' : candidateRun?.status || 'not-started',
+    importLive
   };
 }
