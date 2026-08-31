@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.4.7 week-label normalization impact
+
+The authorized 7.3.4.7 runtime adds no migration and performs no league-data operation. It retains the approved schedule route in the member read model and makes the already-normalized one-based game week authoritative in the browser. Madden's raw zero-based week remains a compatibility fallback only when a canonical week and authoritative route are unavailable.
+
+The active Week 9 snapshot remains `b00edb25-ac65-40d4-9969-431f94dd1e3e`, with Preseason Weeks 1–3 and Regular Season Weeks 1–9 already stored correctly. Runtime rollback restores exact 7.3.4.6 Main commit `4c9d75a8ec09caa2bc50ae888fd6b2af255f58b3`, Pages deployment `dca6eb7d-9e6d-4678-ab7c-a5194429373c`, and import Worker version `e7d81630-5d93-4726-a0c2-f71e8c12e96a` while retaining that snapshot and all capture/import/audit evidence.
+
+Do not re-export, re-import, rebuild or change the active snapshot, reset data, rotate the permanent export URL, run Archive Season, run a game-year transition, or reinterpret blocked/null Free Agents as zero as part of deployment or rollback.
+
 ## 7.3.4.6 route-authority and retained multi-period impact
 
 The authorized 7.3.4.6 runtime adds no migration. It makes the capture route authoritative for schedule stage/week and allows one historical candidate to pin and compose every data-bearing retained period through the selected older source. For the authorized FGC retry, that retained scope is Preseason Weeks 1–3 plus Regular Season Weeks 1–8. Madden's all-zero Preseason Week 4 placeholder is excluded; no new Madden export or export-URL rotation is required.

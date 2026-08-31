@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.7",
+  "releaseType": "canonical-week-label-normalization",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.4.6",
+    "commit": "4c9d75a8ec09caa2bc50ae888fd6b2af255f58b3",
+    "tree": "e6dff78fb36b48080744502af378211e0395e884",
+    "tag": "v7.0.0",
+    "productionDeployment": "dca6eb7d-9e6d-4678-ab7c-a5194429373c",
+    "workerVersion": "e7d81630-5d93-4726-a0c2-f71e8c12e96a"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.4.7",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Publish one exact candidate, pass hosted checks, fast-forward that exact candidate to Main, and deploy Production in one consolidated authorized cycle."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Production-first policy applies. No staging data cycle is authorized."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.3.4.6",
+    "currentCommit": "4c9d75a8ec09caa2bc50ae888fd6b2af255f58b3",
+    "currentDeployment": "dca6eb7d-9e6d-4678-ab7c-a5194429373c",
+    "workerVersion": "e7d81630-5d93-4726-a0c2-f71e8c12e96a",
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+    "scope": "Deploy the canonical week-label and route-provenance runtime only. Do not execute an export/import, move the active pointer, reset data, rotate the export URL, archive a season, run a transition, or reinterpret blocked Free Agents."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "app.js",
+    "league-engine/week-context.js",
+    "functions/api/leagues/[leagueSlug]/snapshot/read-model.js",
+    "releases/7.3.4.7/release-record.md",
+    "releases/7.3.4.7/validation-evidence.json",
+    "tests/import/week-label-normalization.test.mjs"
+  ]
+}

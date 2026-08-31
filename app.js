@@ -2270,27 +2270,9 @@
   };
 
   function stageWeekContext(source={},fallbackWeek=0,fallbackStage='reg') {
-    const route=String(source.routePath||source.route_path||source.sourceRoutePath||source.source_route_path||'');
-    const routeMatch=route.match(/\/week\/(pre|reg|post|playoffs?)\/(\d+)/i);
-    if(routeMatch){
-      const token=routeMatch[1].toLowerCase();
-      const phase=token==='pre'?'preseason':token==='reg'?'regular':'playoffs';
-      const week=Number(routeMatch[2]);
-      const round=phase==='playoffs'?({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[week]||`Playoff Week ${week}`):null;
-      return {phase,week,round,label:phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'};
-    }
-    const stageIndex=Number(source.stageIndex);
-    const rawWeek=Number(source.weekIndex);
-    const stageText=String(source.stage||source.stageName||fallbackStage||'reg').toLowerCase();
-    const phase=Number.isFinite(stageIndex)
-      ? (stageIndex===0?'preseason':stageIndex===1?'regular':'playoffs')
-      : (stageText.includes('pre')?'preseason':stageText.includes('post')||stageText.includes('playoff')?'playoffs':'regular');
-    let week=Number.isFinite(rawWeek)?rawWeek+1:Number(fallbackWeek||0);
-    if(!Number.isFinite(rawWeek) && week<1) week=1;
-    const round=phase==='playoffs'
-      ? ({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[week]||`Playoff Week ${week}`)
-      : null;
-    return {phase,week:Math.max(1,week||1),round,label:phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'};
+    const resolver=window.FranchiseHQ?.canonicalWeekContext?.resolve;
+    if(typeof resolver!=='function')throw new Error('Canonical week context is unavailable.');
+    return resolver(source,fallbackWeek,fallbackStage);
   }
 
   function canonicalScheduleLabel(game={}) {
@@ -9501,8 +9483,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
 
-  // 7.3.4.6 — authoritative visible release and environment marker.
-  const VISIBLE_RELEASE = '7.3.4.6';
+  // 7.3.4.7 — authoritative visible release and environment marker.
+  const VISIBLE_RELEASE = '7.3.4.7';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

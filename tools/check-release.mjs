@@ -1200,6 +1200,103 @@ if (version === '7.3.4.6') {
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   ) errors.push('7.3.4.6 evidence must preserve every authorized Production remediation boundary.');
 }
+if (version === '7.3.4.7') {
+  const productionDeployed = isPostDeployment;
+  for (const check of [
+    'weekLabelNormalization',
+    'routeProvenance',
+    'activeSnapshotBaseline',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.4.7 remediation evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.weekLabelNormalization?.canonicalOneBasedWeekPreferred !== true
+    || evidence.checks?.weekLabelNormalization?.doubleIncrementRemoved !== true
+    || evidence.checks?.weekLabelNormalization?.legacyZeroBasedFallbackPreserved !== true
+    || JSON.stringify(evidence.checks?.weekLabelNormalization?.preseasonWeeksDisplay) !== '[1,2,3]'
+    || JSON.stringify(evidence.checks?.weekLabelNormalization?.regularSeasonWeeksDisplay) !== '[1,2,3,4,5,6,7,8,9]'
+    || evidence.checks?.routeProvenance?.authoritativeRoutePreferred !== true
+    || evidence.checks?.routeProvenance?.approvedRouteRetainedInReadModel !== true
+    || evidence.checks?.routeProvenance?.rawSourceRecordReturned !== false
+    || evidence.checks?.routeProvenance?.privateSourceFieldsReturned !== false
+  ) errors.push('7.3.4.7 must prove canonical one-based display, route precedence, legacy fallback, and contained route provenance.');
+  if (
+    evidence.checks?.activeSnapshotBaseline?.snapshotId !== 'b00edb25-ac65-40d4-9969-431f94dd1e3e'
+    || evidence.checks?.activeSnapshotBaseline?.previousSnapshotId !== '518236e4-1cac-41f5-b8c8-757b7150dcd8'
+    || Number(evidence.checks?.activeSnapshotBaseline?.week) !== 9
+    || Number(evidence.checks?.activeSnapshotBaseline?.teams) !== 32
+    || Number(evidence.checks?.activeSnapshotBaseline?.rosteredPlayers) !== 2042
+    || Number(evidence.checks?.activeSnapshotBaseline?.games) !== 184
+    || Number(evidence.checks?.activeSnapshotBaseline?.statistics) !== 6966
+    || Number(evidence.checks?.activeSnapshotBaseline?.standings) !== 32
+    || evidence.checks?.activeSnapshotBaseline?.validationStatus !== 'ready'
+    || Number(evidence.checks?.activeSnapshotBaseline?.validationErrors) !== 0
+    || JSON.stringify(evidence.checks?.activeSnapshotBaseline?.preseasonWeeks) !== '[1,2,3]'
+    || JSON.stringify(evidence.checks?.activeSnapshotBaseline?.regularSeasonWeeks) !== '[1,2,3,4,5,6,7,8,9]'
+    || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+  ) errors.push('7.3.4.7 must retain the exact Week 9 snapshot baseline and blocked/null Free Agent evidence.');
+  if (productionDeployed) {
+    if (
+      manifest.status !== 'released'
+      || manifest.repositoryPublication?.status !== 'published-hosted-checks-passed-main'
+      || evidence.external?.githubPublication?.status !== 'published-main'
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || Number(evidence.external?.hostedChecks?.candidatePassed) < 4
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.status !== 'success-owner-authorized'
+      || evidence.external?.productionDeployment?.status !== 'success'
+  ) errors.push('Released 7.3.4.7 evidence must record exact publication, hosted checks, and the owner-authorized Production deployment.');
+  } else if (
+    manifest.status !== 'validated-production-authorized'
+    || manifest.repositoryPublication?.authorized !== true
+    || manifest.repositoryPublication?.status !== 'authorized-not-run'
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+    || manifest.production?.authorized !== true
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'authorized-not-run'
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+  ) errors.push('Authorized 7.3.4.7 evidence must retain pending publication and deployment gates.');
+  if (
+    manifest.staging?.authorized !== false
+    || manifest.staging?.deployed !== false
+    || evidence.external?.stagingDeployment?.status !== 'not-run'
+    || evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-required'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 26
+    || evidence.external?.productionMaddenExport?.authorized !== false
+    || evidence.external?.productionMaddenExport?.status !== 'not-run'
+    || evidence.external?.productionMaddenExport?.anotherExportRequired !== false
+    || evidence.external?.productionCandidateImport?.authorized !== false
+    || evidence.external?.productionCandidateImport?.status !== 'not-run'
+    || evidence.external?.archiveSeason?.status !== 'not-run'
+    || evidence.external?.gameYearTransition?.status !== 'not-run'
+  ) errors.push('7.3.4.7 must preserve staging, migration, export/import, archive-season, and transition boundaries.');
+  if (
+    evidence.scopeBoundaries?.productionChanged !== productionDeployed
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== productionDeployed
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.archiveGameYearExecuted !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.3.4.7 evidence must preserve every authorized Production display-remediation boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

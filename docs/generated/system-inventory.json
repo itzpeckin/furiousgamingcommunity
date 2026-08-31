@@ -139,11 +139,11 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 175,
+      ".js": 176,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 28,
+      ".mjs": 29,
       ".png": 1,
       ".sql": 28,
       ".txt": 1,
@@ -152,7 +152,7 @@
     },
     "largest": [
       {
-        "bytes": 603376,
+        "bytes": 602077,
         "file": "app.js"
       },
       {
@@ -168,7 +168,11 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 75059,
+        "bytes": 77089,
+        "file": "tools/check-release.mjs"
+      },
+      {
+        "bytes": 75123,
         "file": "index.html"
       },
       {
@@ -178,10 +182,6 @@
       {
         "bytes": 72106,
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
-      },
-      {
-        "bytes": 70900,
-        "file": "tools/check-release.mjs"
       },
       {
         "bytes": 38439,
@@ -232,7 +232,7 @@
         "file": "migrations/0019_canonical_import_snapshot_foundation.sql"
       }
     ],
-    "total": 533
+    "total": 535
   },
   "frontend": {
     "assets": [
@@ -577,6 +577,11 @@
         "versioned": true
       },
       {
+        "path": "league-engine/week-context.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "league-engine/one-click-import.js",
         "type": "script",
         "versioned": true
@@ -693,7 +698,7 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 89,
+    "scriptCount": 90,
     "stylesheetCount": 2
   },
   "functions": {
@@ -1337,7 +1342,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.4.6",
+  "release": "7.3.4.7",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -2,7 +2,7 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireActiveMembership } from '../../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../../_lib/league-teams.js';
 
-const RELEASE = '7.3.0';
+const RELEASE = '7.3.4.7';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -159,10 +159,12 @@ export function normalizeGame(raw = {}) {
   const awayScore = numeric(raw.away_score ?? raw.awayScore);
   const status = text(raw.status ?? raw.game_status ?? raw.gameStatus);
   const scheduledAt = text(raw.scheduled_at ?? raw.scheduledAt);
+  const routePath = text(raw.source_route_path ?? raw.sourceRoutePath ?? raw.route_path ?? raw.routePath);
   const approved = {
     gameId:id, seasonYear:season, stage, stageName:stage,
     stageIndex:numeric(raw.stageIndex), weekIndex:week,
     homeTeamId, awayTeamId, homeScore, awayScore, status, scheduledAt,
+    routePath,
     stadiumName:text(raw.stadiumName ?? raw.stadium),
     network:text(raw.network ?? raw.broadcastNetwork),
     roundName:text(raw.roundName ?? raw.playoffRound)

@@ -22,6 +22,7 @@ const checks = [
     'tests/import/candidate-import.test.mjs',
     'tests/import/permanent-league-export.test.mjs',
     'tests/import/game-year-transition.test.mjs',
+    'tests/import/week-label-normalization.test.mjs',
     'tests/security/containment.test.mjs',
     'tests/security/session.test.mjs',
     'tests/security/onboarding.test.mjs',
