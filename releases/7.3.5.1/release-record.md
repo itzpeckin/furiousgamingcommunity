@@ -12,6 +12,7 @@ Correct three display-integrity defects found during 7.3.5 Production acceptance
 
 - The roster-to-player-card adapter now preserves all 55 allowlisted Madden rating fields while retaining normalized core aliases.
 - Trade Center's live bridge now converts salary and cap-hit dollars to millions exactly once and uses a new cache namespace so stale mis-scaled browser data cannot survive deployment.
+- Production acceptance also exercised the canonical player-card Trade Calculator bridge; it now applies the same conversion and uses a fresh `app.js` asset token so the correction cannot be hidden by the four-hour browser cache.
 - The league context and live-week header now hydrate from the active snapshot instead of static Season 4/Week 8 mock labels.
 - Regression tests lock all three adapter contracts and the release cache boundary.
 

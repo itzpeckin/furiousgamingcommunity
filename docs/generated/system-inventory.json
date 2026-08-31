@@ -151,7 +151,7 @@
     },
     "largest": [
       {
-        "bytes": 612007,
+        "bytes": 612035,
         "file": "app.js"
       },
       {
@@ -167,11 +167,11 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 89156,
+        "bytes": 89343,
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 75179,
+        "bytes": 75180,
         "file": "index.html"
       },
       {

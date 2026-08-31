@@ -1419,6 +1419,8 @@ if (version === '7.3.5.1') {
     || evidence.checks?.displayIntegrityAdapters?.tradeCenterInputUnit !== 'millions'
     || evidence.checks?.displayIntegrityAdapters?.contractConvertedExactlyOnce !== true
     || evidence.checks?.displayIntegrityAdapters?.tradeCacheInvalidated !== true
+    || evidence.checks?.displayIntegrityAdapters?.canonicalPlayerTradeBridgeConverted !== true
+    || evidence.checks?.displayIntegrityAdapters?.applicationAssetCacheInvalidated !== true
   ) errors.push('7.3.5.1 must prove complete player-card ratings and exactly-once Trade Center contract conversion.');
   if (
     evidence.checks?.activeSnapshotShell?.leagueContextFromActiveSnapshot !== true

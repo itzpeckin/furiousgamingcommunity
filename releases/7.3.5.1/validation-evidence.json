@@ -14,7 +14,9 @@
       "tradeCenterInputUnit": "millions",
       "canonicalContractInputUnit": "dollars",
       "contractConvertedExactlyOnce": true,
-      "tradeCacheInvalidated": true
+      "tradeCacheInvalidated": true,
+      "canonicalPlayerTradeBridgeConverted": true,
+      "applicationAssetCacheInvalidated": true
     },
     "activeSnapshotShell": {
       "passed": true,

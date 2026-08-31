@@ -105,6 +105,8 @@ test('Production player-card and Trade Center adapters preserve ratings and cont
   assert.match(appSource, /function tradeCalculatorMillions\(value\)/);
   assert.match(appSource, /salary:tradeCalculatorMillions\(view\.salary\)/);
   assert.match(appSource, /capHit:tradeCalculatorMillions\(view\.capHit\)/);
+  assert.match(appSource, /salary:tradeCalculatorMillions\(player\.salary\)/);
+  assert.match(appSource, /capHit:tradeCalculatorMillions\(player\.capHit\)/);
   assert.match(appSource, /franchisehq:trade-live-cache:v2/);
 });
 
