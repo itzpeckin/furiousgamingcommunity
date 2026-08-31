@@ -6,13 +6,13 @@
 
 **Updated:** August 31, 2026
 
-**Revision:** 1.61
+**Revision:** 1.62
 
-**Current production:** 7.3.5 from exact Main commit `1d9cbc2`, Pages deployment `484acd14`, and import Worker version `2b745b42`; Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer
+**Current production:** 7.3.5.1 from exact Main commit `b84af9d`, Pages deployment `eb95fd00`, and unchanged import Worker version `d29befdd`; Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer
 
-**Current work:** 7.3.5.1 is authorized for one consolidated build, validation, pull-request, Main, and Production cycle from exact Main commit `1d9cbc2`. It preserves all 55 approved Madden ratings through the final player-card adapter, converts canonical contract dollars once at the Trade Center millions boundary, and hydrates the global season/week shell from the active snapshot.
+**Current work:** 7.3.6 is authorized for one consolidated build, validation, pull-request, Main, and Production cycle from exact accepted Main commit `b84af9d`. It promotes stable team slugs and permanent opaque player identities into authenticated league-scoped URLs, preserves current hash navigation as a compatibility layer, and cross-links the existing roster, statistics, transaction, Trade Block, proposal, and team surfaces.
 
-**Next gate:** Complete the consolidated 7.3.5.1 strict gate, publish one exact candidate, require hosted checks, fast-forward that exact commit to Main, deploy Production, and perform read-only desktop/phone acceptance. No Madden export/import, snapshot change, reset, archive, transition, export-URL rotation, migration, credential change, or database write is authorized.
+**Next gate:** Complete the consolidated 7.3.6 strict gate, publish one exact candidate, require hosted checks, fast-forward that exact commit to Main, deploy Production, and perform read-only same-URL desktop/phone acceptance for one team and one player. No Madden export/import, snapshot change, reset, archive, transition, export-URL rotation, migration, credential change, or database write is authorized.
 
 ## Product decisions
 
@@ -59,8 +59,8 @@
 | 7.3.4.6 | Released; owner accepted and active | Route-authoritative schedule-week normalization and one-candidate composition of all data-bearing retained preseason/regular-season periods |
 | 7.3.4.7 | Released; owner accepted | Canonical one-based week display and retained route provenance without a Madden data operation |
 | 7.3.5 | Released | Active-snapshot team, roster, player, statistics, standings, and honest Free Agent experience |
-| 7.3.5.1 | Production authorized | Ratings-adapter preservation, Trade Center contract-unit correction, and active-snapshot global shell context |
-| 7.3.6 | Planned | Stable shareable team and player URLs |
+| 7.3.5.1 | Released; owner accepted | Ratings-adapter preservation, Trade Center contract-unit correction, and active-snapshot global shell context |
+| 7.3.6 | Production authorized | Stable authenticated team/player URLs backed by permanent identities and safe public lookup contracts |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
 | 7.3.8 | Planned | Incremental Madden updates and freshness reporting |
 | 7.3.9 | Research gate | Approved direct-EA and CSV/Excel adapters |
@@ -226,6 +226,10 @@
 - Link players from rosters, Free Agents, statistics, transactions, Trade Block, and proposals; link teams throughout the platform.
 - Preserve valid links through trades, releases, season transitions, and display-name changes while exposing only safe social metadata.
 - Gate: two users opening one URL see the same active identity and raw database row IDs are not the public contract.
+- Authorized implementation reuses the permanent `plr_…` identities created in 7.3.1 and canonical team keys already used for ownership. It adds no migration and creates no replacement identity rows.
+- Direct document requests, browser refresh, Discord return paths, back/forward navigation, and legacy hash routes converge on the same canonical league URL. A permanent player identity not present on the active roster remains a valid non-classifying page rather than being labeled a Free Agent.
+- Authenticated team/player lookup endpoints expose the stable public contract and safe display metadata only; source/database join keys, internal identity row IDs, credentials, and raw export records are not returned.
+- Production acceptance is code-only and read-only. It must prove that the same copied URL resolves identically after refresh and in a second authenticated tab, while active Week 9 and blocked/null Free Agent evidence remain unchanged.
 
 ## 7.3.7 — Ownership, My Team, GM History, and Trophy Cases
 

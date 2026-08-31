@@ -1489,6 +1489,72 @@ if (version === '7.3.5.1') {
     || evidence.scopeBoundaries?.credentialsChanged !== false
   ) errors.push('7.3.5.1 evidence must preserve every authorized code-only remediation boundary.');
 }
+if (version === '7.3.6') {
+  for (const check of [
+    'stablePublicIdentityRoutes',
+    'platformLinkCoverage',
+    'routeCompatibility',
+    'freeAgentBlockedPreserved',
+    'activeSnapshotBaseline',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.6 stable-route evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.stablePublicIdentityRoutes?.leagueScopedTeamPaths !== true
+    || evidence.checks?.stablePublicIdentityRoutes?.leagueScopedPlayerPaths !== true
+    || evidence.checks?.stablePublicIdentityRoutes?.opaquePermanentPlayerIds !== true
+    || evidence.checks?.stablePublicIdentityRoutes?.canonicalTeamSlugs !== true
+    || evidence.checks?.stablePublicIdentityRoutes?.rawDatabaseIdsArePublicContract !== false
+    || evidence.checks?.stablePublicIdentityRoutes?.safeSocialMetadataOnly !== true
+    || evidence.checks?.stablePublicIdentityRoutes?.releasedPlayerLinkRemainsValid !== true
+    || evidence.checks?.stablePublicIdentityRoutes?.releasedPlayerClassifiedAsFreeAgent !== false
+  ) errors.push('7.3.6 must expose stable safe team/player identity paths without raw database IDs or Free Agent inference.');
+  for (const surface of ['rosters','freeAgents','statistics','transactions','tradeBlock','proposals','teamsThroughoutPlatform']) {
+    if (evidence.checks?.platformLinkCoverage?.[surface] !== true) errors.push(`7.3.6 link coverage is missing ${surface}.`);
+  }
+  if (
+    evidence.checks?.routeCompatibility?.legacyHashNavigationRetained !== true
+    || evidence.checks?.routeCompatibility?.historyBackForward !== true
+    || evidence.checks?.routeCompatibility?.hardRefreshDeepPath !== true
+    || evidence.checks?.routeCompatibility?.discordReturnToDeepPath !== true
+    || evidence.checks?.routeCompatibility?.sameUrlSameIdentityContract !== true
+  ) errors.push('7.3.6 must preserve hash compatibility and exact deep-path refresh/back/auth behavior.');
+  if (
+    evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+    || evidence.checks?.activeSnapshotBaseline?.snapshotId !== 'b00edb25-ac65-40d4-9969-431f94dd1e3e'
+    || evidence.checks?.activeSnapshotBaseline?.changedDuringCandidateWork !== false
+  ) errors.push('7.3.6 must retain the exact active Week 9 and blocked/null Free Agent baseline.');
+  if (
+    manifest.status !== 'validated-production-authorized'
+    || manifest.repositoryPublication?.authorized !== true
+    || manifest.repositoryPublication?.status !== 'authorized-not-run'
+    || manifest.production?.authorized !== true
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'authorized-not-run'
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+  ) errors.push('7.3.6 must retain the authorized-but-not-yet-run publication and Production gates.');
+  if (
+    manifest.staging?.authorized !== false
+    || evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-required'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 26
+    || evidence.external?.productionMaddenExport?.status !== 'not-run'
+    || evidence.external?.productionCandidateImport?.status !== 'not-run'
+    || evidence.external?.archiveSeason?.status !== 'not-run'
+    || evidence.external?.gameYearTransition?.status !== 'not-run'
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.scopeBoundaries?.identityRowsCreated !== 0
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.3.6 must preserve every code-only and data-plane authorization boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

@@ -1,6 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../../_lib/league-teams.js';
+import { normalizePublicPlayerId, normalizePublicTeamSlug } from '../../../../_lib/public-identity-routes.js';
 import {
   freeAgentStateFromMappingRun,
   resolveSnapshotPlayerMappingRun,
@@ -10,7 +11,7 @@ import {
   sourceSupportedContract
 } from '../../../../_lib/live-data-experience.js';
 
-const RELEASE = '7.3.5.1';
+const RELEASE = '7.3.6';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -94,9 +95,10 @@ function applyAuthoritativeOwners(records, canonicalTeams, assignments) {
   });
 }
 
-export function normalizePlayer(raw = {}) {
+export function normalizePlayer(raw = {}, publicIdValue = null) {
   raw = sourceRecord(raw);
   const id = String(raw.external_id ?? raw.player_id ?? raw.playerId ?? '');
+  const publicId = normalizePublicPlayerId(publicIdValue ?? raw.public_id ?? raw.publicId);
   const teamId = String(raw.team_external_id ?? raw.team_id ?? raw.teamId ?? raw.teamID ?? raw.rosterTeamId ?? raw.roster_team_id ?? raw.currentTeamId ?? '');
   const firstName = text(raw.first_name ?? raw.firstName);
   const lastName = text(raw.last_name ?? raw.lastName);
@@ -126,7 +128,7 @@ export function normalizePlayer(raw = {}) {
     portraitId:text(raw.portrait_id ?? raw.portraitId), abilityCount:abilities.length, contract
   };
   return {
-    id, teamId, firstName, lastName, displayName, position, overall,
+    id, publicId, teamId, firstName, lastName, displayName, position, overall,
     age:approved.age, devTrait, jerseyNumber:approved.jerseyNumber,
     archetype:approved.archetype, yearsPro:approved.yearsPro,
     heightInches:approved.heightInches, weightLbs:approved.weightLbs,
@@ -280,9 +282,30 @@ async function domainRows(db, leagueId, snapshotId, domain, cursor = null, limit
       LIMIT ?
     `, leagueId, snapshotId, domain, safeLimit);
   }
+  let publicPlayerIds = null;
+  if (domain === 'players' && result.length) {
+    const identityRows = await rows(db, `
+      SELECT aliases.source_player_id, identities.public_id, aliases.updated_at
+      FROM player_source_aliases aliases
+      JOIN player_identities identities
+        ON identities.id=aliases.player_identity_id AND identities.league_id=aliases.league_id
+      WHERE aliases.league_id=?
+      ORDER BY aliases.updated_at DESC
+    `, leagueId);
+    publicPlayerIds = new Map();
+    for (const identity of identityRows) {
+      const sourcePlayerId = String(identity.source_player_id || '');
+      const publicId = normalizePublicPlayerId(identity.public_id);
+      if (sourcePlayerId && publicId && !publicPlayerIds.has(sourcePlayerId)) {
+        publicPlayerIds.set(sourcePlayerId, publicId);
+      }
+    }
+  }
   const records = result.map(row => {
     const raw = parse(row.data_json) || {};
-    return domain === 'statistics' && compact ? normalizeStatisticCompact(raw) : normalize(domain, raw);
+    if (domain === 'statistics' && compact) return normalizeStatisticCompact(raw);
+    if (domain === 'players') return normalizePlayer(raw, publicPlayerIds?.get(String(row.external_id)) || null);
+    return normalize(domain, raw);
   });
   const nextCursor = result.length === safeLimit ? String(result[result.length - 1]?.external_id || '') : null;
   return {records, nextCursor, complete: !nextCursor, pageSize: safeLimit};
@@ -373,6 +396,10 @@ export async function onRequestGet(context) {
       const canonicalTeams = await activeLeagueTeams(db, league.id);
       const assignments = await activeTeamAssignments(db, league.id, canonicalTeams);
       page.records = applyAuthoritativeOwners(page.records, canonicalTeams, assignments);
+      page.records = page.records.map(team => ({
+        ...team,
+        slug:normalizePublicTeamSlug(team.teamKey)
+      }));
     }
     return json({...base,domain,...page});
   }
@@ -384,6 +411,7 @@ export async function onRequestGet(context) {
       const canonicalTeams = await activeLeagueTeams(db, league.id);
       const assignments = await activeTeamAssignments(db, league.id, canonicalTeams);
       record = applyAuthoritativeOwners([record], canonicalTeams, assignments)[0];
+      record = {...record,slug:normalizePublicTeamSlug(record.teamKey)};
     }
     return json({...base,sample:{domain:sample,record}});
   }

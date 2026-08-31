@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.6",
+  "releaseType": "stable-team-player-urls",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.5.1",
+    "commit": "b84af9d9ffa5adb6cf440e733e83210cea83b3d9",
+    "tree": "529c23ed23f79b4d49190883d28217d1cb74892f",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.6",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Publish one exact candidate, create its pull request, require hosted checks, then fast-forward the accepted exact commit to Main."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.3.5.1",
+    "currentCommit": "b84af9d9ffa5adb6cf440e733e83210cea83b3d9",
+    "currentPagesDeployment": "eb95fd00-bdd6-4565-ae21-65da03b4bd0e",
+    "currentWorkerBuild": "2c7bc863-539d-45bf-a1a4-24edcf1c31b6",
+    "currentWorkerVersion": "d29befdd",
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+    "scope": "Deploy the exact Main commit and perform read-only canonical URL acceptance. No Production data operation is authorized."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/public-identity-routes.js",
+    "functions/api/leagues/[leagueSlug]/snapshot/read-model.js",
+    "functions/api/leagues/[leagueSlug]/players/[publicPlayerId].js",
+    "functions/api/leagues/[leagueSlug]/teams/[teamSlug].js",
+    "functions/leagues/[[path]].js",
+    "platform/navigation.js",
+    "league-engine/live-read-model.js",
+    "app.js",
+    "tests/security/public-identity-routes.test.mjs",
+    "releases/7.3.6/release-record.md",
+    "releases/7.3.6/validation-evidence.json"
+  ]
+}

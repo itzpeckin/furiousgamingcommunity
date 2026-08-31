@@ -95,7 +95,7 @@ test('browser and endpoint source contracts bind Free Agents and paging to the a
   assert.equal(endpoint.includes('companion_route_captures'),false);
   assert.ok(readModel.includes('freeAgents'));
   assert.ok(readModel.includes('integrity'));
-  assert.ok(styles.includes('FranchiseHQ 7.3.5.1 — authoritative live-data experience'));
+  assert.ok(styles.includes('FranchiseHQ 7.3.6 — authoritative live-data experience'));
   assert.ok(styles.includes("wrapper.dataset.verticalScroll='page'")||app.includes("wrapper.dataset.verticalScroll='page'"));
 });
 

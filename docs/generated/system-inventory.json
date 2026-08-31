@@ -138,11 +138,11 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 177,
+      ".js": 180,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 30,
+      ".mjs": 31,
       ".png": 1,
       ".sql": 28,
       ".txt": 1,
@@ -151,11 +151,11 @@
     },
     "largest": [
       {
-        "bytes": 612035,
+        "bytes": 618395,
         "file": "app.js"
       },
       {
-        "bytes": 391370,
+        "bytes": 391483,
         "file": "styles.css"
       },
       {
@@ -167,11 +167,11 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 89343,
+        "bytes": 93389,
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 75180,
+        "bytes": 75150,
         "file": "index.html"
       },
       {
@@ -195,7 +195,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 35252,
+        "bytes": 35249,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
@@ -231,7 +231,7 @@
         "file": "migrations/0019_canonical_import_snapshot_foundation.sql"
       }
     ],
-    "total": 537
+    "total": 541
   },
   "frontend": {
     "assets": [
@@ -701,7 +701,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 65,
+    "routeCount": 67,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1116,6 +1116,13 @@
         "route": "/api/leagues/:leagueSlug/memberships"
       },
       {
+        "file": "functions/api/leagues/[leagueSlug]/players/[publicPlayerId].js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/players/:publicPlayerId"
+      },
+      {
         "file": "functions/api/leagues/[leagueSlug]/players/free-agents.js",
         "handlers": [
           "onRequestGet"
@@ -1144,6 +1151,13 @@
           "onRequestGet"
         ],
         "route": "/api/leagues/:leagueSlug/snapshot/read-model"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/teams/[teamSlug].js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/teams/:teamSlug"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js",
@@ -1229,7 +1243,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 59
+      "occurrences": 56
     },
     "browserStorageCalls": {
       "files": [
@@ -1341,7 +1355,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.5.1",
+  "release": "7.3.6",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

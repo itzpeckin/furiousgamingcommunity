@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.6 stable team/player URL impact
+
+The authorized 7.3.6 runtime adds no migration and performs no league-data operation. It reads existing permanent player identities and canonical team keys to expose authenticated league paths at `/leagues/{leagueSlug}/players/{publicPlayerId}` and `/leagues/{leagueSlug}/teams/{teamSlug}`. Current hash navigation remains a compatibility layer, and unauthenticated document recovery returns to the exact deep path after Discord authentication.
+
+Runtime rollback restores exact accepted 7.3.5.1 Main commit `b84af9d9ffa5adb6cf440e733e83210cea83b3d9`, Pages deployment `eb95fd00-bdd6-4565-ae21-65da03b4bd0e`, and the unchanged import Worker build `2c7bc863-539d-45bf-a1a4-24edcf1c31b6` / version `d29befdd`. Retain permanent player identities/source aliases, active Week 9 snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`, previous snapshot `518236e4-1cac-41f5-b8c8-757b7150dcd8`, every data/audit row, and the permanent league export URL.
+
+Do not use deployment or rollback to create/delete identities, export/import Madden data, move the active pointer, reset data, run Archive Season, run a game-year transition, rotate the permanent export URL, delete history, change credentials, or reinterpret Madden's blocked Free Agent route as zero.
+
 ## 7.3.5.1 display-integrity remediation impact
 
 The authorized 7.3.5.1 runtime adds no migration and performs no league-data operation. It preserves the complete allowlisted ratings object through the final player-card adapter, converts canonical salary/cap-hit dollars once at the Trade Center's millions boundary, invalidates the old mis-scaled browser cache, and replaces static Season 4/Week 8 mock shell labels with active-snapshot season/week context.

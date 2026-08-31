@@ -236,6 +236,76 @@
   function percent(value) { return `${Number(value).toFixed(1)}%`; }
   function routeBase(route) { return route.split('/')[0] || 'home'; }
 
+  const PUBLIC_PLAYER_ID_PATTERN=/^plr_[a-f0-9]{32}$/;
+
+  function leagueBasePath(locationValue=window.location) {
+    const match=String(locationValue.pathname||'').match(/^\/leagues\/([^/]+)/i);
+    return match?`/leagues/${encodeURIComponent(decodeURIComponent(match[1]))}`:'';
+  }
+
+  function routeFromPublicLocation(locationValue=window.location) {
+    const match=String(locationValue.pathname||'').match(/^\/leagues\/[^/]+\/(teams|players)\/([^/]+)\/?$/i);
+    if(!match)return null;
+    try{return `${match[1].toLowerCase()}/${decodeURIComponent(match[2])}`}
+    catch{return null}
+  }
+
+  function currentAppRoute() {
+    return window.FranchiseHQ?.navigation?.currentRoute?.()
+      || routeFromPublicLocation(window.location)
+      || String(window.location.hash||'').replace(/^#\/?/,'')
+      || 'home';
+  }
+
+  function safeTeamSlug(value='') {
+    const slug=String(value||'').trim().toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-|-$/g,'');
+    return /^[a-z0-9][a-z0-9._-]{0,31}$/.test(slug)?slug:null;
+  }
+
+  function teamForPublicRoute(value='') {
+    const wanted=String(value||'').toLowerCase();
+    const collection=liveTeamDirectory?.teams||teams;
+    return collection.find(team=>[team.id,team.slug,team.teamKey,team.abbr,team.abbreviation]
+      .some(candidate=>String(candidate||'').toLowerCase()===wanted))||null;
+  }
+
+  function playerForPublicRoute(value='') {
+    const wanted=String(value||'').toLowerCase();
+    const collection=liveTeamDirectory?.players||players;
+    return collection.find(player=>[player.id,player.publicId]
+      .some(candidate=>String(candidate||'').toLowerCase()===wanted))||null;
+  }
+
+  function publicUrlForRoute(route='home') {
+    const basePath=leagueBasePath();
+    if(!basePath)return null;
+    const normalized=String(route||'home').replace(/^#\/?/,'').replace(/^\/+|\/+$/g,'')||'home';
+    const [base,id]=normalized.split('/');
+    if(base==='teams'&&id){
+      const team=teamForPublicRoute(id);
+      const teamSlug=safeTeamSlug(team?.slug||team?.teamKey||team?.abbr||(safeTeamSlug(id)&&id));
+      if(teamSlug)return `${basePath}/teams/${encodeURIComponent(teamSlug)}`;
+      return `${basePath}#${normalized}`;
+    }
+    if(base==='players'&&id){
+      const player=playerForPublicRoute(id);
+      const publicId=String(player?.publicId||id).toLowerCase();
+      if(PUBLIC_PLAYER_ID_PATTERN.test(publicId))return `${basePath}/players/${encodeURIComponent(publicId)}`;
+      return `${basePath}#${normalized}`;
+    }
+    return `${basePath}#${normalized}`;
+  }
+
+  function replaceCurrentPublicUrl(route) {
+    const url=publicUrlForRoute(route);
+    if(!url)return false;
+    const current=`${location.pathname}${location.search}${location.hash}`;
+    if(current!==url)history.replaceState({franchiseHqRoute:route},'',url);
+    return true;
+  }
+
+  let publicPlayerReturnRoute=null;
+
   const GOTW_STORAGE_KEY = 'franchisehq:home.gotw.v1';
   function readGotwSelections() {
     try { return JSON.parse(localStorage.getItem(GOTW_STORAGE_KEY) || '{}') || {}; }
@@ -946,7 +1016,7 @@
           try{localStorage.setItem(criticalCacheKey,JSON.stringify({savedAt:Date.now(),payload:fresh}));}catch{}
           const oldSnapshot=String(cachedCritical?.payload?.[1]?.id||'');
           const newSnapshot=String(fresh?.[1]?.id||'');
-          if(newSnapshot&&newSnapshot!==oldSnapshot&&routeBase(location.hash.slice(1))==='home'){
+          if(newSnapshot&&newSnapshot!==oldSnapshot&&routeBase(currentAppRoute())==='home'){
             window.__FHQ_HOME_DEEP_CACHE__=null;
             renderLeagueHomeLive();
           }
@@ -962,7 +1032,7 @@
       const statRows=sameDeepSnapshot&&Array.isArray(deepCache.statistics)?deepCache.statistics:[];
       const playerRows=sameDeepSnapshot&&Array.isArray(deepCache.players)?deepCache.players:[];
       pageContent.removeAttribute('aria-busy');
-      if(routeBase(location.hash.slice(1))!=='home')return;
+      if(routeBase(currentAppRoute())!=='home')return;
       if(stateValue!=='live'||!snapshot){renderLiveState('No live franchise connected','Activate a validated snapshot to populate League Home.');return;}
 
       const liveTeams=teamRows.map(liveTeamShape),teamMap=new Map(liveTeams.map(team=>[String(team.id),team]));
@@ -1124,7 +1194,7 @@
                 statistics:Array.isArray(statistics)?statistics:[],
                 players:Array.isArray(players)?players:[]
               };
-              if(routeBase(location.hash.slice(1))==='home')renderLeagueHomeLive();
+              if(routeBase(currentAppRoute())==='home')renderLeagueHomeLive();
             })
             .catch(error=>{
               console.warn('[Home Secondary Data]',error);
@@ -1140,7 +1210,7 @@
       }
     }catch(error){
       console.error('[Home Live Integration]',error);
-      if(routeBase(location.hash.slice(1))==='home')renderLiveState('Live data unavailable',error.message||'The active snapshot could not be loaded.','warning');
+      if(routeBase(currentAppRoute())==='home')renderLiveState('Live data unavailable',error.message||'The active snapshot could not be loaded.','warning');
     }
   }
   function renderLeagueHome() {
@@ -1393,6 +1463,7 @@
       source
     };
     shaped.teamKey=team.teamKey||source.teamKey||String(shaped.abbr||'').toLowerCase();
+    shaped.slug=safeTeamSlug(team.slug||shaped.teamKey);
     shaped.owner=liveTeamOwnerName(team);
     shaped.ownerRole=team.ownerRole||source.ownerRole||null;
     shaped.ownerAccountId=null;
@@ -2728,6 +2799,7 @@
     Object.assign(ratings,corePlayerRatings(source,ratings));
     return {
       id:String(player.id||source.playerId||source.external_id||''),
+      publicId:PUBLIC_PLAYER_ID_PATTERN.test(String(player.publicId||'').toLowerCase())?String(player.publicId).toLowerCase():null,
       name:player.displayName||source.displayName||source.fullName||[player.firstName||source.firstName,player.lastName||source.lastName].filter(Boolean).join(' ')||'Unknown Player',
       firstName:player.firstName||source.firstName||'',
       lastName:player.lastName||source.lastName||'',
@@ -2788,7 +2860,10 @@
         freeAgentState={status:'unavailable',count:null,reason:'The active snapshot Free Agent rows do not reconcile to its pinned player-mapping source.',interpretedAsZero:false,authority:'active-snapshot'};
       }
       liveRosterPlayers.clear();
-      playersLive.forEach(player=>{if(player.id)liveRosterPlayers.set(String(player.id),player)});
+      playersLive.forEach(player=>{
+        if(player.id)liveRosterPlayers.set(String(player.id),player);
+        if(player.publicId)liveRosterPlayers.set(String(player.publicId),player);
+      });
       const playersByTeam=new Map();
       playersLive.forEach(player=>{
         const key=String(player.teamId||'');
@@ -2803,11 +2878,17 @@
         snapshot:snapshotValue,
         currentContext,
         teams:teamsLive,
-        teamMap:new Map(teamsLive.map(team=>[String(team.id),team])),
+        teamMap:new Map(teamsLive.flatMap(team=>[
+          [String(team.id),team],
+          ...(team.slug?[[String(team.slug),team]]:[])
+        ])),
         standingMap,
         players:playersLive,
         rosteredPlayers:playersLive.length,
-        playerMap:new Map(playersLive.map(player=>[String(player.id),player])),
+        playerMap:new Map(playersLive.flatMap(player=>[
+          [String(player.id),player],
+          ...(player.publicId?[[String(player.publicId),player]]:[])
+        ])),
         playersByTeam,
         games:normalizedGames,
         freeAgents:freeAgentState,
@@ -2855,7 +2936,7 @@
       const [stateValue,snapshot,teamRows,standingRows,summary]=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSummary()
       ]);
-      if(routeBase(location.hash.slice(1))!=='teams'||location.hash.split('/')[1])return;
+      if(routeBase(currentAppRoute())!=='teams'||currentAppRoute().split('/')[1])return;
       if(stateValue!=='live'||!snapshot){
         pageContent.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h2>No live team directory</h2><p>Activate a validated snapshot to populate Teams.</p></div></article>`;
         return;
@@ -2864,7 +2945,10 @@
       const teamsLive=(teamRows||[]).map(team=>liveTeamUiShape(team,standingMap.get(String(team.id))));
       liveTeamDirectory=liveTeamDirectory||{};
       liveTeamDirectory.teams=teamsLive;
-      liveTeamDirectory.teamMap=new Map(teamsLive.map(team=>[String(team.id),team]));
+      liveTeamDirectory.teamMap=new Map(teamsLive.flatMap(team=>[
+        [String(team.id),team],
+        ...(team.slug?[[String(team.slug),team]]:[])
+      ]));
       liveTeamDirectory.standings=standingRows||[];
       liveTeamDirectory.standingMap=standingMap;
       const statusHost=document.querySelector('[data-live-teams-status]');
@@ -2872,7 +2956,7 @@
       refreshTeamGrid();
     }catch(error){
       console.error('[Teams Live Integration]',error);
-      if(routeBase(location.hash.slice(1))==='teams'){
+      if(routeBase(currentAppRoute())==='teams'){
         const grid=document.querySelector('[data-team-grid]');
         if(grid)grid.innerHTML=`<article class="card roadmap-state" style="grid-column:1/-1"><div class="roadmap-state__inner"><h2>Live teams unavailable</h2><p>${escapeHtml(error.message||'The active snapshot could not be read.')}</p></div></article>`;
       }
@@ -2927,11 +3011,7 @@
         }
         const teamId=card.dataset.teamId;
         state.teamTab='roster';
-        history.pushState(null,'',`#teams/${teamId}`);
-        if(mainContent?.scrollTo) mainContent.scrollTo({top:0,left:0,behavior:'instant'});
-        window.scrollTo({top:0,left:0,behavior:'instant'});
-        pageContent.innerHTML='<section class="empty-state"><strong>Loading team…</strong><p>Opening the active franchise roster.</p></section>';
-        renderTeamDetail(teamId);
+        setRoute(`teams/${teamId}`,{source:'team-card'});
       };
       card.onclick=open;
       card.onkeydown=event=>{
@@ -3126,9 +3206,9 @@
   }
 
   function activeTeamIdForTeamPage() {
-    const route=String(location.hash.slice(1)||'');
+    const route=String(currentAppRoute()||'');
     const [base,id]=route.split('/');
-    if(base==='teams' && id) return String(id);
+    if(base==='teams' && id) return String(teamForPublicRoute(id)?.id||id);
     if(base==='my-team'){
       const account=window.FGC_TRADE?.getCurrentAccount?.();
       return String(liveOwnedTeamId?.()||account?.teamId||'');
@@ -4315,6 +4395,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const modal=document.querySelector('[data-value-card-modal]');
     const content=document.querySelector('[data-value-card-content]');
     if(!modal||!content)return false;
+    if(player.publicId)modal.dataset.publicPlayerId=player.publicId;
     const logo=renderTeamMark(team,'canonical-player-team-logo');
     const watermarkLogo=team.logo
       ? `<img class="canonical-player-watermark-image" src="${escapeHtml(team.logo)}" alt="" aria-hidden="true" loading="lazy">`
@@ -4330,7 +4411,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         <div class="canonical-player-hero__watermark canonical-player-hero__watermark--logo">${watermarkLogo}</div>
         <div class="canonical-player-hero__image">${renderCanonicalPlayerImage(player)}</div>
         <div class="canonical-player-hero__identity">
-          <div class="canonical-player-teamline">${logo}<div><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><span>#${escapeHtml(player.number||'—')} &nbsp;•&nbsp; ${escapeHtml(player.position||'—')}</span></div></div>
+          <button type="button" class="canonical-player-teamline" data-team-id="${escapeHtml(team.id||'')}">${logo}<span><strong>${escapeHtml(team.fullName||team.abbr||'Team')}</strong><span>#${escapeHtml(player.number||'—')} &nbsp;•&nbsp; ${escapeHtml(player.position||'—')}</span></span></button>
           <div class="canonical-player-nameblock"><h2>${escapeHtml(player.name||'Player')}</h2><p>${escapeHtml(player.height||'—')} &nbsp;•&nbsp; ${escapeHtml(player.weight||'—')} lbs &nbsp;•&nbsp; ${escapeHtml(player.college||'—')}</p></div>
           <div class="canonical-player-bio-strip"><div><span>Age</span><strong>${escapeHtml(bio.age)}</strong></div><div><span>Exp</span><strong>${escapeHtml(bio.exp==='—'?'—':`${bio.exp} Year${Number(bio.exp)===1?'':'s'}`)}</strong></div><div><span>College</span><strong>${escapeHtml(player.college||'—')}</strong></div></div>
         </div>
@@ -4394,6 +4475,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     };
 
     const open=()=>{
+      const publicPlayer=playerForPublicRoute(playerId);
+      const publicId=String(publicPlayer?.publicId||'').toLowerCase();
+      const currentRoute=currentAppRoute();
+      if(PUBLIC_PLAYER_ID_PATTERN.test(publicId)&&currentRoute!==`players/${publicId}`){
+        publicPlayerReturnRoute=currentRoute;
+        setRoute(`players/${publicId}`,{source:'player-link'});
+        return true;
+      }
       try{
         if(openCanonicalLivePlayerCard(playerId)){
           restorePlayerScroll();
@@ -4455,9 +4544,10 @@ function canonicalPlayerDashboardStats(playerId='') {
         pageContent.innerHTML='<section class="empty-state"><strong>Live team data unavailable</strong><p>The active snapshot did not return a team directory.</p></section>';
         return;
       }
-      const team=directory.teamMap.get(String(teamId));
+      const team=teamForPublicRoute(teamId);
       if(!team){setRoute('teams');return;}
-      const players=directory.playersByTeam.get(String(teamId))||[];
+      replaceCurrentPublicUrl(`teams/${team.id}`);
+      const players=directory.playersByTeam.get(String(team.id))||[];
       const rosterModel=liveRosterModel(team,players);
       const roster=players.map(rosterPlayerView);
       const leaders=[...roster].sort((a,b)=>(Number(b.overall)||0)-(Number(a.overall)||0)).slice(0,5);
@@ -6151,7 +6241,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function refreshActiveCapTab() {
-    const teamId=String(location.hash.split('/')[1]||'');
+    const teamId=activeTeamIdForTeamPage();
     const team=liveTeamDirectory?.teamMap?.get(teamId);
     const players=liveTeamDirectory?.playersByTeam?.get(teamId)||[];
     const target=pageContent?.querySelector?.('[data-team-tab-content]');
@@ -6269,14 +6359,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     refresh:async()=>{
       window.FranchiseHQ?.transactionUiLoader?.clear?.();
       const payload=await loadCanonicalTransactionsForUi(true);
-      if(routeBase(location.hash.slice(1))==='transactions')renderLeagueTransactionTable(payload);
+      if(routeBase(currentAppRoute())==='transactions')renderLeagueTransactionTable(payload);
       return {ok:true,transactions:payload?.transactions?.length||0};
     },
     status:()=>({
       release:'6.3.2',
       cached:Boolean(canonicalTransactionUiCache?.payload),
       count:canonicalTransactionUiCache?.payload?.transactions?.length||0,
-      route:routeBase(location.hash.slice(1))
+      route:routeBase(currentAppRoute())
     })
   };
 
@@ -6541,7 +6631,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   async function renderPlayers() {
-    pageContent.innerHTML='<section class="empty-state"><strong>Loading live players…</strong><p>Reading the active franchise snapshot.</p></section>';await loadLiveTeamDirectory(false);if(routeBase(location.hash.slice(1))!=='players')return;
+    pageContent.innerHTML='<section class="empty-state"><strong>Loading live players…</strong><p>Reading the active franchise snapshot.</p></section>';await loadLiveTeamDirectory(false);if(routeBase(currentAppRoute())!=='players')return;
     const sourceTeams=liveTeamDirectory?.teams||[],sourcePlayers=liveTeamDirectory?.players||[],positions=sortPositionFilterValues(sourcePlayers.map(player=>player.position));
     const freeAgentStatus=liveTeamDirectory?.freeAgents?.status||'unavailable';
     const freeAgentLabel=['ready','empty-confirmed'].includes(freeAgentStatus)?'Free Agents':`Free Agents — ${freeAgentStatus==='blocked'?'blocked / unknown':'unavailable'}`;
@@ -6557,16 +6647,40 @@ function canonicalPlayerDashboardStats(playerId='') {
     const pagination=document.querySelector('[data-player-pagination]');if(pagination){const first=filtered.length?start+1:0,last=Math.min(start+pageSize,filtered.length);pagination.innerHTML=`<span>Showing ${first.toLocaleString()}–${last.toLocaleString()} of ${filtered.length.toLocaleString()} matched · ${(liveTeamDirectory?.players?.length||0).toLocaleString()} active snapshot players</span><div><button type="button" class="button button--ghost" data-player-page="${state.playerPage-1}" ${state.playerPage<=1?'disabled':''}>Previous</button><strong>Page ${state.playerPage} of ${totalPages}</strong><button type="button" class="button button--ghost" data-player-page="${state.playerPage+1}" ${state.playerPage>=totalPages?'disabled':''}>Next</button></div>`;}
   }
 
+  async function renderInactivePublicPlayer(publicId) {
+    const leagueSlug=location.pathname.match(/^\/leagues\/([^/]+)/i)?.[1]||'';
+    if(!leagueSlug||!PUBLIC_PLAYER_ID_PATTERN.test(String(publicId||'')))return false;
+    try{
+      const response=await fetch(`/api/leagues/${encodeURIComponent(decodeURIComponent(leagueSlug))}/players/${encodeURIComponent(publicId)}`,{
+        credentials:'same-origin',cache:'no-store'
+      });
+      const payload=await response.json().catch(()=>null);
+      if(!response.ok||!payload?.player)return false;
+      pageContent.innerHTML=`
+        <div class="page-heading"><div><button class="text-button" data-route="players"><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>Player database</button></div></div>
+        <section class="card roadmap-state"><div class="roadmap-state__inner">
+          <span class="eyebrow">Permanent player identity</span>
+          <h1>${escapeHtml(payload.player.displayName||'Player')}</h1>
+          <p>This identity link is valid, but the player is not present on the active roster snapshot. FranchiseHQ will preserve this URL through releases and team changes without classifying the player as a Free Agent.</p>
+          <span class="pill pill--neutral">Not on active roster</span>
+        </div></section>`;
+      return true;
+    }catch{return false}
+  }
+
   async function renderPlayerProfile(playerId) {
     if(!liveTeamDirectory){
       pageContent.innerHTML='<section class="empty-state"><strong>Loading live player…</strong><p>Reading the active franchise snapshot.</p></section>';
       await loadLiveTeamDirectory(false);
     }
     if(liveTeamDirectory?.snapshot){
-      const livePlayer=liveRosterPlayers.get(String(playerId));
+      const livePlayer=playerForPublicRoute(playerId);
       await renderPlayers();
-      if(livePlayer) openCanonicalLivePlayerCard(playerId);
-      else showToast('Player unavailable','That player is not present in the active Madden snapshot.');
+      if(livePlayer){
+        replaceCurrentPublicUrl(`players/${livePlayer.publicId||playerId}`);
+        openCanonicalLivePlayerCard(livePlayer.id);
+      }
+      else if(!(await renderInactivePublicPlayer(playerId)))showToast('Player unavailable','That player identity is not available in this league.');
       return;
     }
     const player = playerById(playerId);
@@ -6632,7 +6746,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     try{
       const [stateValue,snapshot,teamRows,standingRows,summary]=await Promise.all([service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSummary()]);
       pageContent.removeAttribute('aria-busy');
-      if(routeBase(location.hash.slice(1))!=='standings')return;
+      if(routeBase(currentAppRoute())!=='standings')return;
       if(stateValue!=='live'||!snapshot){renderLiveState('No live standings available','Activate a validated snapshot to populate Standings.');return;}
       const liveTeams=teamRows.map(liveTeamShape),teamMap=new Map(liveTeams.map(t=>[String(t.id),t]));
       const rows=standingRows.map(r=>liveStandingShape(r,teamMap));
@@ -6649,7 +6763,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const tabs=[['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture']];
       const context=publicSeasonContext(snapshot,[]);
       pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')}</span><h1>Standings</h1></div><div class="heading-actions"><div class="segmented-tabs standings-primary-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${activeView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div>${renderLiveDataStatus({snapshot,rosteredPlayers:Number(summary?.rosteredPlayers??summary?.domains?.players??0),integrity:summary?.integrity})}<div data-standings-content>${content}</div>`;
-    }catch(error){console.error('[Standings Live Integration]',error);if(routeBase(location.hash.slice(1))==='standings')renderLiveState('Live standings unavailable',error.message||'The active snapshot could not be loaded.','warning');}
+    }catch(error){console.error('[Standings Live Integration]',error);if(routeBase(currentAppRoute())==='standings')renderLiveState('Live standings unavailable',error.message||'The active snapshot could not be loaded.','warning');}
   }
   function renderStandings() {
     const service=liveReadModel();
@@ -7497,7 +7611,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
     try{
       const payload=await loadCanonicalTransactionsForUi(false);
-      if(routeBase(location.hash.slice(1))!=='transactions')return;
+      if(routeBase(currentAppRoute())!=='transactions')return;
       renderLeagueTransactionTable(payload);
     }catch(error){
       console.error('[League Transactions]',error);
@@ -8110,14 +8224,21 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function setRoute(route, options={}) {
-    if(routeBase(location.hash.slice(1))==='schedule'&&routeBase(route)!=='schedule'&&!confidenceUnsavedPrompt())return false;
+    if(routeBase(currentAppRoute())==='schedule'&&routeBase(route)!=='schedule'&&!confidenceUnsavedPrompt())return false;
     if(routeBase(route)!=='schedule')confidenceDirtyWeeks.clear();
     const navigation=window.FranchiseHQ?.navigation;
     if (navigation?.go) return navigation.go(route,{source:options.source||'legacy-app',replace:options.replace===true});
     const normalized=String(route||'home').replace(/^#\/?/,'').replace(/^\//,'')||'home';
-    const hash=`#${normalized}`;
-    if (location.hash===hash) renderRoute(normalized);
-    else location.hash=normalized;
+    const publicUrl=publicUrlForRoute(normalized);
+    if(publicUrl){
+      if(options.replace===true)history.replaceState({franchiseHqRoute:normalized},'',publicUrl);
+      else history.pushState({franchiseHqRoute:normalized},'',publicUrl);
+      renderRoute(normalized);
+    }else{
+      const hash=`#${normalized}`;
+      if (location.hash===hash) renderRoute(normalized);
+      else location.hash=normalized;
+    }
     return normalized;
   }
 
@@ -8129,7 +8250,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     commissionerAuthRecoveryInFlight=true;
     Promise.resolve(auth.refresh()).finally(()=>{
       commissionerAuthRecoveryInFlight=false;
-      if(routeBase(location.hash.slice(1))==='commissioner') renderRoute(location.hash.slice(1)||'commissioner');
+      if(routeBase(currentAppRoute())==='commissioner') renderRoute(currentAppRoute()||'commissioner');
     });
     return true;
   }
@@ -8162,7 +8283,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       link.setAttribute('aria-hidden',String(!access));
     });
 
-    if (!access && routeBase(location.hash.slice(1))==='commissioner') {
+    if (!access && routeBase(currentAppRoute())==='commissioner') {
       // A hard refresh can briefly expose an anonymous snapshot before the
       // persisted server session is restored. Recover auth in place rather
       // than navigating away from Commissioner HQ.
@@ -8200,7 +8321,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   function mountCommissionerFranchiseImporter(){
     return false;
-    const route=location.hash.slice(1)||'home';
+    const route=currentAppRoute()||'home';
     if(!route.startsWith('commissioner')||route.startsWith('commissioner/platform-workspace'))return false;
     const panel=document.querySelector('.commissioner-tab-panel');
     if(!panel)return false;
@@ -8220,7 +8341,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   const commissionerImportObserver=new MutationObserver(()=>{
-    if((location.hash.slice(1)||'').startsWith('commissioner')){
+    if((currentAppRoute()||'').startsWith('commissioner')){
       scheduleCommissionerImporterMount();
       setTimeout(()=>mountPerformanceCertificationCard(),60);
     }
@@ -8303,7 +8424,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     // Async live renderers verify the active hash before committing their DOM.
     // Update the URL without firing hashchange so the certification measures the
     // real page instead of leaving the renderer thinking Commissioner HQ is active.
-    history.replaceState(null,'',`#${item.route}`);
+    history.replaceState({franchiseHqRoute:item.route},'',publicUrlForRoute(item.route)||`#${item.route}`);
     renderRoute(item.route);
     const readiness=await waitForPerformanceRoute(item.route);
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
@@ -8321,7 +8442,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   async function runPerformanceCertification(){
     if(performanceCertificationRunning)return performanceCertificationResult;
     performanceCertificationRunning=true;
-    const returnRoute=location.hash.slice(1)||'commissioner';
+    const returnRoute=currentAppRoute()||'commissioner';
     const routes=performanceCertificationRoutes();
     const startedAt=new Date().toISOString();
     const cold=[];
@@ -8354,7 +8475,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       return performanceCertificationResult;
     }finally{
       performanceCertificationRunning=false;
-      history.replaceState(null,'',`#${returnRoute}`);
+      history.replaceState({franchiseHqRoute:returnRoute},'',publicUrlForRoute(returnRoute)||`#${returnRoute}`);
       if(returnRoute.startsWith('commissioner')){
         renderRoute('commissioner');
         setTimeout(()=>mountPerformanceCertificationCard(),60);
@@ -8392,7 +8513,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   function mountPerformanceCertificationCard(){
     return false;
-    const route=location.hash.slice(1)||'home';
+    const route=currentAppRoute()||'home';
     if(!route.startsWith('commissioner')||route.includes('platform-workspace'))return false;
     if(document.querySelector('[data-performance-certification-card]'))return true;
     const panel=document.querySelector('.commissioner-tab-panel');
@@ -8425,9 +8546,16 @@ function canonicalPlayerDashboardStats(playerId='') {
     print:()=>console.log(JSON.stringify(lastPerformanceCertification(),null,2))
   };
 
-  function renderRoute(routeInput=location.hash.slice(1)||'home') {
+  function renderRoute(routeInput=currentAppRoute()||'home') {
     const route=routeInput||'home';
     const [base,id]=route.split('/');
+    const publicPlayerModal=document.querySelector('[data-value-card-modal][data-public-player-id]');
+    if(publicPlayerModal&&!(base==='players'&&id===publicPlayerModal.dataset.publicPlayerId)){
+      publicPlayerModal.classList.remove('is-open');
+      publicPlayerModal.setAttribute('aria-hidden','true');
+      delete publicPlayerModal.dataset.publicPlayerId;
+      document.body.style.overflow='';
+    }
     closeSidebar();
     document.querySelectorAll('.nav-item[data-route]').forEach(item=>item.classList.toggle('is-active',item.dataset.route===base));
     pageContent.innerHTML='';
@@ -8516,7 +8644,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
 
   function suppressPlatformWorkspaceImporter(){
-    if(!(location.hash.slice(1)||'').startsWith('commissioner/platform-workspace'))return;
+    if(!(currentAppRoute()||'').startsWith('commissioner/platform-workspace'))return;
     document.querySelectorAll('[data-one-click-import-panel]').forEach(node=>node.remove());
   }
 
@@ -8678,13 +8806,19 @@ function canonicalPlayerDashboardStats(playerId='') {
     const teamId=teamCard.dataset.teamId;
     state.teamTab='roster';
     const route=`teams/${teamId}`;
-    history.pushState(null,'',`#${route}`);
-    renderTeamDetail(teamId);
+    setRoute(route,{source:'team-card-keyboard'});
   }, true);
 
   document.addEventListener('click', event => {
     const closeDetailTarget=event.target.closest('[data-close-detail]');
     if (closeDetailTarget) { event.preventDefault(); event.stopPropagation(); closeDetail(); return; }
+
+    const closePlayerTarget=event.target.closest('[data-close-value-card]');
+    if(closePlayerTarget&&routeBase(currentAppRoute())==='players'&&currentAppRoute().split('/')[1]){
+      const returnRoute=publicPlayerReturnRoute||'players';
+      publicPlayerReturnRoute=null;
+      setTimeout(()=>setRoute(returnRoute,{source:'player-card-close',replace:true}),0);
+    }
 
     const gameCenterTab=event.target.closest('[data-game-center-tab]');
     if (gameCenterTab) {
@@ -8732,7 +8866,15 @@ function canonicalPlayerDashboardStats(playerId='') {
     const openPlayerCard=event.target.closest('[data-open-player-card]');
     if (openPlayerCard) {
       event.preventDefault();
-      window.FGC_TRADE?.openValueCard?.(openPlayerCard.dataset.openPlayerCard);
+      openRosterPlayerDetail(openPlayerCard.dataset.openPlayerCard);
+      return;
+    }
+
+    const tradePlayerCard=event.target.closest('[data-open-value-card]');
+    if(tradePlayerCard&&playerForPublicRoute(tradePlayerCard.dataset.openValueCard)){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openRosterPlayerDetail(tradePlayerCard.dataset.openValueCard);
       return;
     }
 
@@ -8816,7 +8958,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const windowScroll=window.scrollY;
       const mainScroll=mainContent?.scrollTop || 0;
       state.teamSchedulePhase=teamSchedulePhase.dataset.teamSchedulePhase;
-      renderRoute(location.hash.slice(1));
+      renderRoute(currentAppRoute());
       requestAnimationFrame(() => {
         window.scrollTo({top:windowScroll,left:0,behavior:'instant'});
         if (mainContent) mainContent.scrollTop=mainScroll;
@@ -8853,9 +8995,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const route=routeTarget.dataset.route;
       if(/^teams\//.test(route)){
         state.teamTab='roster';
-        const hash=`#${route}`;
-        if(location.hash===hash) renderRoute(route);
-        else location.hash=hash;
+        setRoute(route,{source:'data-route'});
       } else setRoute(route);
       return;
     }
@@ -8865,17 +9005,22 @@ function canonicalPlayerDashboardStats(playerId='') {
     const nestedInteractive=interactiveTarget && interactiveTarget!==teamTarget;
     if (teamTarget && !nestedInteractive) {
       event.preventDefault();
+      const playerModal=teamTarget.closest('[data-value-card-modal]');
+      if(playerModal){
+        playerModal.classList.remove('is-open');
+        playerModal.setAttribute('aria-hidden','true');
+        document.body.style.overflow='';
+        publicPlayerReturnRoute=null;
+      }
       const route=`teams/${teamTarget.dataset.teamId}`;
-      const hash=`#${route}`;
-      if(location.hash===hash) renderRoute(route);
-      else location.hash=hash;
+      setRoute(route,{source:'team-link'});
       return;
     }
 
     const playerTarget=event.target.closest('[data-player-id]');
     if (playerTarget) {
       event.preventDefault();
-      window.FGC_TRADE?.openValueCard?.(playerTarget.dataset.playerId);
+      openRosterPlayerDetail(playerTarget.dataset.playerId);
       return;
     }
 
@@ -8890,7 +9035,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const route=commandRoute.dataset.commandRoute;
       closeCommand();
       if (route.startsWith('players/')) {
-        window.FGC_TRADE?.openValueCard?.(route.split('/')[1]);
+        openRosterPlayerDetail(route.split('/')[1]);
       } else {
         setRoute(route);
       }
@@ -8955,7 +9100,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         scrollTeamTabsToTop();
       } else {
         // Safe fallback if the directory was cleared unexpectedly.
-        renderRoute(location.hash.slice(1));
+        renderRoute(currentAppRoute());
       }
       return;
     }
@@ -8995,7 +9140,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     if(statsSort){const key=statsSort.dataset.statsSort;if(state.statsSortKey===key)state.statsSortDirection=state.statsSortDirection==='desc'?'asc':'desc';else{state.statsSortKey=key;state.statsSortDirection='desc';}renderStats();return;}
 
     const useDevelopmentDevice=event.target.closest('[data-use-development-device]');
-    if(useDevelopmentDevice){const service=window.FranchiseHQ?.leagueData;if(service?.setMode){service.setMode('demo');if(service.status?.().isEmpty)service.seedDemoFromLegacy?.();showToast('Development Data enabled','This browser will now use Development Data.');renderRoute(location.hash.slice(1)||'home');}return;}
+    if(useDevelopmentDevice){const service=window.FranchiseHQ?.leagueData;if(service?.setMode){service.setMode('demo');if(service.status?.().isEmpty)service.seedDemoFromLegacy?.();showToast('Development Data enabled','This browser will now use Development Data.');renderRoute(currentAppRoute()||'home');}return;}
 
     const scheduleSection=event.target.closest('[data-schedule-section]');
     if(scheduleSection){state.scheduleSection=scheduleSection.dataset.scheduleSection;renderSchedule();return;}
@@ -9079,7 +9224,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     else { state.rosterSortKey=key; state.rosterSortDirection=key==='player'||key==='position'||key==='development'||key==='status'?'asc':'desc'; }
     const scrollHost=mainContent||document.scrollingElement;
     const savedTop=scrollHost?.scrollTop??window.scrollY;
-    const teamId=String(location.hash.split('/')[1]||'');
+    const teamId=activeTeamIdForTeamPage();
     const team=liveTeamDirectory?.teamMap?.get(teamId);
     const players=liveTeamDirectory?.playersByTeam?.get(teamId)||[];
     const target=pageContent.querySelector('[data-team-tab-content]');
@@ -9144,8 +9289,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const teamId=teamCard.dataset.teamId;
     state.teamTab='roster';
     const route=`teams/${teamId}`;
-    history.pushState(null,'',`#${route}`);
-    renderTeamDetail(teamId);
+    setRoute(route,{source:'team-card-keyboard'});
   }, true);
 
   document.addEventListener('keydown', event => {
@@ -9153,9 +9297,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     if(!teamCard || !['Enter',' '].includes(event.key)) return;
     event.preventDefault();
     const route=`teams/${teamCard.dataset.teamId}`;
-    const hash=`#${route}`;
-    if(location.hash===hash) renderRoute(route);
-    else location.hash=hash;
+    setRoute(route,{source:'team-card-keyboard'});
   });
 
   document.addEventListener('input', event => {
@@ -9173,15 +9315,15 @@ function canonicalPlayerDashboardStats(playerId='') {
     if (event.target.matches('[data-team-division]')) { state.teamDivision=event.target.value; refreshTeamGrid(); }
     if (event.target.matches('[data-roster-group]')) {
       state.rosterGroup=event.target.value;
-      if(!refreshActiveRosterTab()) renderRoute(location.hash.slice(1));
+      if(!refreshActiveRosterTab()) renderRoute(currentAppRoute());
     }
     if (event.target.matches('[data-roster-position]')) {
       state.rosterPosition=event.target.value==='All'?'All':canonicalFilterPosition(event.target.value);
-      if(!refreshActiveRosterTab()) renderRoute(location.hash.slice(1));
+      if(!refreshActiveRosterTab()) renderRoute(currentAppRoute());
     }
     if (event.target.matches('[data-roster-dev]')) {
       state.rosterDev=event.target.value;
-      if(!refreshActiveRosterTab()) renderRoute(location.hash.slice(1));
+      if(!refreshActiveRosterTab()) renderRoute(currentAppRoute());
     }
     if (event.target.matches('[data-player-position]')) { state.playerPosition=event.target.value; state.playerPage=1; refreshPlayerTable(); }
     if (event.target.matches('[data-player-team]')) { state.playerTeam=event.target.value; state.playerPage=1; refreshPlayerTable(); }
@@ -9213,21 +9355,21 @@ function canonicalPlayerDashboardStats(playerId='') {
   window.addEventListener('franchisehq:auth-changed', event=>{
     if(event.detail?.status!=='ready') return;
     syncCommissionerAccess();
-    const activeBase=routeBase(location.hash.slice(1));
+    const activeBase=routeBase(currentAppRoute());
     if (['commissioner','trade-center','trade-block'].includes(activeBase)) {
-      const currentProtectedRoute=location.hash.slice(1)||activeBase;
+      const currentProtectedRoute=currentAppRoute()||activeBase;
       renderRoute(currentProtectedRoute);
     }
   });
 
   window.addEventListener('franchisehq:trade-ready', ()=>{
-    if (routeBase(location.hash.slice(1))==='my-team') renderRoute('my-team');
+    if (routeBase(currentAppRoute())==='my-team') renderRoute('my-team');
   });
 
   window.addEventListener('franchisehq:gotw-changed', event=>{
     const currentWeek=currentHomeWeek();
     if(Number(event.detail?.week)===Number(currentWeek?.week)) state.featuredGameId=event.detail?.gameId||null;
-    if(routeBase(location.hash.slice(1))==='home') renderLeagueHome();
+    if(routeBase(currentAppRoute())==='home') renderLeagueHome();
   });
 
   window.FranchiseHQ?.sidebar?.init?.({ sidebar, overlay: mobileOverlay });
@@ -9466,9 +9608,9 @@ function canonicalPlayerDashboardStats(playerId='') {
       }));
 
       if(rerender){
-        const base=(location.hash.slice(1)||'').split('/')[0];
+        const base=(currentAppRoute()||'').split('/')[0];
         if(['trade-center','trade-block','commissioner'].includes(base)){
-          renderRoute(location.hash.slice(1));
+          renderRoute(currentAppRoute());
         }
       }
       return true;
@@ -9484,15 +9626,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   function navigateSpecialRoute(route='') {
     const normalized=String(route||'').replace(/^#\/?/,'').replace(/^\//,'');
     if(!['trade-center','trade-block','commissioner','commissioner/platform-workspace'].includes(normalized)) return false;
-
-    const hash=`#${normalized}`;
-    if(location.hash!==hash){
-      history.pushState(null,'',hash);
-    }
-
-    // Render synchronously. This avoids relying on a hashchange/navigation bridge
-    // which is the exact layer currently swallowing these routes.
-    renderRoute(normalized);
+    setRoute(normalized,{source:'special-route'});
 
     // Keep sidebar selection in sync without requiring a second navigation event.
     document.querySelectorAll('[data-route]').forEach(node=>{
@@ -9525,6 +9659,11 @@ function canonicalPlayerDashboardStats(playerId='') {
     getTeam: teamById
   });
 
+  window.FranchiseHQ?.navigation?.configureLocationAdapter?.({
+    routeFromLocation:routeFromPublicLocation,
+    urlForRoute:publicUrlForRoute
+  });
+
   window.FranchiseHQ?.appRouter?.configure?.({
     renderer: renderRoute,
     titleResolver: resolveRouteTitle,
@@ -9540,23 +9679,23 @@ function canonicalPlayerDashboardStats(playerId='') {
     if(nextRole && nextRole!==state.role) applyRole(nextRole,false);
   });
   applyRole(window.FranchiseHQ?.simulation?.getRole?.() || state.role,false);
-  window.FranchiseHQ?.appRouter?.render?.(location.hash.slice(1)||'home',{source:'startup'}) || renderRoute();
+  window.FranchiseHQ?.appRouter?.render?.(currentAppRoute()||'home',{source:'startup'}) || renderRoute();
 
   // v5.9.10.1k — Trade data is hydrated synchronously from the last validated
   // LIVE cache before UI startup. Refresh Cloudflare data immediately in the
   // background instead of waiting until after the first paint.
   syncTradeCenterLiveBridge({rerender:false}).then(updated=>{
     if(updated){
-      const base=(location.hash.slice(1)||'').split('/')[0];
-      if(['trade-center','trade-block'].includes(base)) renderRoute(location.hash.slice(1));
+      const base=(currentAppRoute()||'').split('/')[0];
+      if(['trade-center','trade-block'].includes(base)) renderRoute(currentAppRoute());
     }
   });
   document.addEventListener('franchisehq:league-data-state-changed',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
   window.addEventListener('franchisehq:live-snapshot-booted',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
   window.addEventListener('franchisehq:one-click-import-complete',async()=>{
-    const route=location.hash.slice(1)||'home';
+    const route=currentAppRoute()||'home';
     await syncTradeCenterLiveBridge({rerender:false,forceLive:true});
-    if((location.hash.slice(1)||'home')===route)renderRoute(route);
+    if((currentAppRoute()||'home')===route)renderRoute(route);
   });
 
   window.addEventListener('franchisehq:live-snapshot-booted',event=>{
@@ -9567,8 +9706,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
 
-  // 7.3.5.1 — authoritative visible release and environment marker.
-  const VISIBLE_RELEASE = '7.3.5.1';
+  // 7.3.6 — stable team and player URLs and environment marker.
+  const VISIBLE_RELEASE = '7.3.6';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';
@@ -10280,12 +10419,12 @@ function canonicalPlayerDashboardStats(playerId='') {
     try{await window.FranchiseHQ?.transactionUiLoader?.load?.(true)}
     catch(error){console.warn('[Transactions Post Import Refresh]',error)}
 
-    const activeRoute=String(location.hash.slice(1)||'').replace(/^\/?/,'');
+    const activeRoute=String(currentAppRoute()||'').replace(/^\/?/,'');
     const base=activeRoute.split('/')[0]||'home';
     if(base==='transactions'){
       renderLeagueTransactions();
     }else if(base==='teams'&&state.teamTab==='trade-history'){
-      const teamId=String(location.hash.split('/')[1]||'');
+      const teamId=activeTeamIdForTeamPage();
       const team=liveTeamDirectory?.teamMap?.get(teamId);
       if(team)refreshTeamTransactionHistory(team,pageContent.querySelector('[data-team-tab-content]'));
     }

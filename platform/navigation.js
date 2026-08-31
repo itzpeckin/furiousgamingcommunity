@@ -9,6 +9,7 @@
   const routes = new Map();
   let started = false;
   let lastRoute = null;
+  let locationAdapter = null;
 
   const DEFAULT_ROUTES = [
     ['home', { label: 'League Home' }],
@@ -50,7 +51,14 @@
   }
 
   function currentRoute() {
+    const adapted = locationAdapter?.routeFromLocation?.(window.location);
+    if (adapted) return normalizeRoute(adapted);
     return normalizeRoute(window.location.hash);
+  }
+
+  function configureLocationAdapter(adapter = null) {
+    locationAdapter = adapter && typeof adapter === 'object' ? adapter : null;
+    return locationAdapter;
   }
 
   function registerRoute(name, definition = {}) {
@@ -124,12 +132,18 @@
       });
     }
 
+    const adaptedUrl = locationAdapter?.urlForRoute?.(target, window.location) || null;
     const hash = `#${target}`;
-    if (window.location.hash === hash) {
+    if (currentRoute() === target && (!adaptedUrl || adaptedUrl === `${window.location.pathname}${window.location.search}${window.location.hash}`)) {
       render(target, { source: options.source || 'platform' });
+    } else if (adaptedUrl) {
+      const state = {franchiseHqRoute:target};
+      if (options.replace === true) window.history.replaceState(state, '', adaptedUrl);
+      else window.history.pushState(state, '', adaptedUrl);
+      handleLocationChange({ source: options.source || 'platform', replaced: options.replace === true });
     } else if (options.replace === true) {
       window.history.replaceState(null, '', hash);
-      handleHashChange({ source: options.source || 'platform', replaced: true });
+      handleLocationChange({ source: options.source || 'platform', replaced: true });
     } else {
       window.location.hash = target;
     }
@@ -155,7 +169,7 @@
     window.history.forward();
   }
 
-  function handleHashChange(event = {}) {
+  function handleLocationChange(event = {}) {
     const current = currentRoute();
     const previous = lastRoute;
     lastRoute = current;
@@ -179,7 +193,8 @@
     if (started) return currentRoute();
     started = true;
     lastRoute = currentRoute();
-    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
 
     if (options.renderInitial !== false) {
       render(lastRoute, { source: 'startup' });
@@ -195,7 +210,8 @@
 
   function stop() {
     if (!started) return;
-    window.removeEventListener('hashchange', handleHashChange);
+    window.removeEventListener('hashchange', handleLocationChange);
+    window.removeEventListener('popstate', handleLocationChange);
     started = false;
   }
 
@@ -205,6 +221,7 @@
     normalizeRoute,
     splitRoute,
     currentRoute,
+    configureLocationAdapter,
     registerRoute,
     getRoute,
     listRoutes,
