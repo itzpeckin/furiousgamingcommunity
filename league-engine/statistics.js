@@ -13,7 +13,9 @@
   const appTeams=()=>global.FGC_APP?.teams||[];
   const teamMap=()=>new Map(appTeams().map(t=>[String(t.id),t]));
   const playerMap=()=>new Map(appPlayers().map(p=>[String(p.id),p]));
-  const defensePositions=new Set(['LE','RE','DE','DT','NT','LOLB','MLB','ROLB','LB','EDGE','CB','FS','SS','S']);
+  const positionAliases={REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'};
+  const normalizePosition=value=>{const position=text(value).toUpperCase().replace(/[_ -]+/g,'');return positionAliases[position]||position};
+  const defensePositions=new Set(['REDGE','LEDGE','EDGE','DE','DT','NT','SAM','MIKE','WILL','LB','CB','FS','SS','S']);
   const categoryPositions={passing:['QB'],rushing:['QB','RB','FB'],receiving:['RB','FB','WR','TE'],defense:[...defensePositions],kicking:['K'],punting:['P']};
   const categorySort={passing:'passingYards',rushing:'rushingYards',receiving:'receivingYards',defense:'tackles',kicking:'points',punting:'average'};
 
@@ -77,7 +79,7 @@
     const teams=teamMap();
     normalizedCache=rawPlayers().map(p=>{
       const stats=normalizeStats(p);const team=teams.get(String(p.teamId));
-      return {id:p.id,name:p.name,position:String(p.position||'').toUpperCase(),teamId:p.teamId,teamName:team?.fullName||team?.name||'',teamAbbr:team?.abbr||'',overall:num(p.overall),stats,rawStats:clone(p.stats||{}),gameLog:clone(p.stats?.gameLog||p.stats?.weekly||p.raw?.stats?.gameLog||[])};
+      return {id:p.id,name:p.name,position:normalizePosition(p.position),teamId:p.teamId,teamName:team?.fullName||team?.name||'',teamAbbr:team?.abbr||'',overall:num(p.overall),stats,rawStats:clone(p.stats||{}),gameLog:clone(p.stats?.gameLog||p.stats?.weekly||p.raw?.stats?.gameLog||[])};
     });
     return normalizedCache;
   }

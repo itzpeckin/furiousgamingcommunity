@@ -9,7 +9,7 @@
   const VERSION = '5.5.0';
   const POSITION_GROUPS = Object.freeze({
     offense: Object.freeze(['QB','RB','FB','WR','TE','LT','LG','C','RG','RT','OL']),
-    defense: Object.freeze(['LE','RE','DE','DT','NT','LOLB','MLB','ROLB','LB','EDGE','CB','FS','SS','S']),
+    defense: Object.freeze(['LE','RE','DE','REDGE','LEDGE','EDGE','DT','NT','LOLB','MLB','ROLB','SAM','MIKE','WILL','LB','CB','FS','SS','S']),
     specialTeams: Object.freeze(['K','P','LS','KR','PR'])
   });
   const STATUS_ORDER = Object.freeze(['active','injured-reserve','practice-squad','free-agent','unassigned','other']);
@@ -25,6 +25,11 @@
   const array = (value) => Array.isArray(value) ? value : [];
   const text = (value) => String(value ?? '').trim();
   const upper = (value) => text(value).toUpperCase();
+  const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
+  const normalizePosition = value => {
+    const position=upper(value).replace(/[_ -]+/g,'');
+    return POSITION_ALIASES[position]||position;
+  };
   const key = (value) => text(value).toLowerCase();
   const numberOrNull = (value) => value === '' || value == null || Number.isNaN(Number(value)) ? null : Number(value);
 
@@ -48,7 +53,7 @@
   }
 
   function positionGroup(position) {
-    const pos = upper(position);
+    const pos = normalizePosition(position);
     if (POSITION_GROUPS.offense.includes(pos)) return 'offense';
     if (POSITION_GROUPS.defense.includes(pos)) return 'defense';
     if (POSITION_GROUPS.specialTeams.includes(pos)) return 'specialTeams';
@@ -111,7 +116,7 @@
       const contract = playerId ? contracts.get(playerId) || null : null;
       const injury = playerId ? injuries.get(playerId) || null : null;
       const roster = assignmentList[0]?.roster || null;
-      const position = upper(raw.position || raw.pos || raw.positionAbbr);
+      const position = normalizePosition(raw.position || raw.pos || raw.positionAbbr);
       if (!position) issues.push({ type: 'missing-position', severity: 'warning', playerId, message: `Player ${playerId || index + 1} has no position.` });
       if (position && positionGroup(position) === 'other') issues.push({ type: 'unsupported-position', severity: 'warning', playerId, position, message: `Player ${playerId} uses unsupported position ${position}.` });
 
@@ -223,7 +228,7 @@
 
   function getPlayersByPosition(teamId, position) {
     const id = text(teamId);
-    const pos = upper(position);
+    const pos = normalizePosition(position);
     const model = normalizeModel();
     return sorted((model.byTeam.get(id) || []).filter((player) => player.position === pos));
   }
@@ -238,7 +243,7 @@
     const filters = typeof query === 'object' && query !== null ? query : { query };
     const term = key(filters.query ?? filters.name ?? '');
     const teamId = text(filters.teamId);
-    const position = upper(filters.position);
+    const position = normalizePosition(filters.position);
     const status = key(filters.rosterStatus || filters.status);
     const results = model.players.filter((player) => {
       if (term && ![player.name, player.id, player.teamId, player.position].some((value) => key(value).includes(term))) return false;

@@ -1,8 +1,8 @@
 # FranchiseHQ 7.3.7 Release Record
 
-**Status:** Validated local review candidate
+**Status:** Released; owner accepted with 7.3.7.1 edge-alias follow-up
 
-**Production changed:** No. Production remains on accepted 7.3.6 commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a`, migration 26, Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162`, and active snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`.
+**Production changed:** Yes, within the authorized application and additive-migration scope. Exact commit `3f3bcdddceae2e5a684980cc303083f4ba6639cb`, migration 27, and Pages deployment `5dba5ab4-4591-4f2c-a517-4c4ca7fefc78` are live; active snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e` is unchanged.
 
 ## Scope
 
@@ -29,16 +29,16 @@ Deliver 7.3.7 ownership reconciliation, My Team GM history, and trophy cases usi
 - The full baseline gate covers syntax, repository contracts, assets, secret scanning, environment separation, migration continuity, release evidence, inventory, authorization, tenant boundaries, session behavior, imports, game-year transitions, permanent identities, and live-data behavior.
 - Focused 7.3.7 tests prove ownership attribution without Madden owner names, week/season cutoff behavior, instant-card and return-route contracts, phone table layout, Game Logs scrolling, logo targeting, and requested defensive roles/stat columns.
 - Fresh and production-shaped databases reach migration 27 with 80 required tables and zero foreign-key violations. Runtime schema checks fail closed below version 27.
-- Local candidate work created no Production identity, ownership, audit, import, candidate, activation, archive, reset, transition, export, or credential row. A future authorized migration 27 will create only the GM identities and opening ownership periods derived from existing active reviewed memberships.
+- Authorized Production migration 27 created 17 GM identities and 17 opening ownership periods from existing active reviewed memberships. It changed no membership assignment, import, candidate, activation, archive, reset, transition, export, or credential row.
+- Owner acceptance later found that raw Madden `REDG`/`LEDG` labels did not reach every presentation mapping. That contained display/API normalization is assigned to 7.3.7.1 without rewriting the active snapshot.
 
 ## Deployment status
 
-- The exact candidate has not yet been published, merged to Main, migrated, or deployed.
-- Migration 27 must be applied before the 7.3.7 runtime because membership assignment handlers intentionally require the new ownership-period columns.
-- Production application publication and migration remain separate recorded gates. No staging run is required by this local candidate.
+- PR #28 published the exact candidate and passed 4/4 hosted checks; the exact Main commit passed 5/5 Main/deployment checks.
+- Migration 27 was applied and verified before the runtime. The resulting 80-table database has zero foreign-key violations.
+- Exact runtime `3f3bcdd` is accepted on Production Pages deployment `5dba5ab4`. No staging run, Madden import/export, snapshot activation, reset, Archive Season, transition, or export-URL rotation occurred.
 
 ## Rollback
 
-- Before publication, discard only the unmerged candidate; Production remains unchanged.
-- After a future accepted deployment, runtime rollback restores accepted 7.3.6 commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a` and Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162` while retaining additive migration 27 and every GM identity, ownership period, season summary, audit, membership, and snapshot row.
+- Runtime rollback restores accepted 7.3.6 commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a` and Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162` while retaining additive migration 27 and every GM identity, ownership period, season summary, audit, membership, and snapshot row.
 - Never drop migration 27, rewrite ownership history, move the active snapshot, reset/import data, run Archive Season, rotate the export URL, or reinterpret blocked Free Agents as zero as part of runtime rollback.

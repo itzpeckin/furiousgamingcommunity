@@ -165,7 +165,7 @@
     ['LE',2],['RE',2],['DT',3],['LOLB',2],['MLB',3],['ROLB',2],['CB',5],['FS',2],['SS',2],['K',1],['P',1]
   ];
   const offensePositions = ['QB','HB','RB','FB','WR','TE','LT','LG','C','RG','RT'];
-  const defensePositions = ['LE','RE','REDGE','LEDGE','DT','LOLB','MLB','ROLB','SAM','MIKE','WILL','CB','FS','SS'];
+  const defensePositions = ['LE','RE','REDG','LEDG','REDGE','LEDGE','EDGE','DT','LOLB','MLB','ROLB','SAM','MIKE','WILL','CB','FS','SS'];
   const specialPositions = ['K','P'];
   const colleges = ['Oklahoma','Ohio State','Alabama','Georgia','Texas','LSU','Michigan','Oregon','Clemson','Penn State','Florida State','USC','Notre Dame','Tennessee','Washington','Miami'];
 
@@ -907,7 +907,7 @@
     return {
       id:playerId,teamId,
       name:player.displayName||source.displayName||source.fullName||[player.firstName||source.firstName,player.lastName||source.lastName].filter(Boolean).join(' ')||'Unknown Player',
-      position:String(player.position||source.position||source.positionName||source.pos||'').toUpperCase(),
+      position:canonicalFilterPosition(player.position||source.position||source.positionName||source.pos||''),
       overall:Number(player.overall||source.overallRating||source.playerBestOvr||source.overall||0),
       dev:player.devTrait||source.devTrait||source.developmentTrait||source.dev||'Normal',
       stats:totals
@@ -2254,7 +2254,7 @@
   }
   function playerStatLabel(category){return ({passing:'Passing',rushing:'Rushing',receiving:'Receiving',defense:'Defense',kicking:'Kicking',punting:'Punting'})[category]||category;}
   function playerStatCategoryOrderForPosition(position='',available=PLAYER_STAT_CATEGORIES){
-    const pos=String(position||'').toUpperCase();let preferred;
+    const pos=canonicalFilterPosition(position);let preferred;
     if(pos==='QB')preferred=['passing','rushing']; else if(['RB','FB'].includes(pos))preferred=['rushing','receiving']; else if(['WR','TE'].includes(pos))preferred=['receiving','rushing']; else if(pos==='K')preferred=['kicking']; else if(pos==='P')preferred=['punting']; else preferred=['defense'];
     return [...preferred,...PLAYER_STAT_CATEGORIES].filter((c,i,a)=>a.indexOf(c)===i&&available.includes(c));
   }
@@ -2588,7 +2588,7 @@
 
   // v5.9.9.2 — shared, uppercase football position filter standard.
   const POSITION_FILTER_ORDER=['QB','HB','FB','WR','TE','LT','LG','C','RG','RT','REDGE','DT','LEDGE','SAM','MIKE','WILL','CB','FS','SS','K','P','LS'];
-  const POSITION_FILTER_ALIASES={RB:'HB',RDE:'REDGE',RE:'REDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'};
+  const POSITION_FILTER_ALIASES={RB:'HB',REDG:'REDGE',REDGE:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LEDGE:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'};
   function canonicalFilterPosition(position=''){
     const value=String(position||'').trim().toUpperCase().replace(/[_ -]+/g,'');
     return POSITION_FILTER_ALIASES[value]||value;
@@ -2804,14 +2804,14 @@
       firstName:player.firstName||source.firstName||'',
       lastName:player.lastName||source.lastName||'',
       teamId:String(player.teamId||source.teamId||source.team_id||source.rosterTeamId||''),
-      position:String(player.position||source.position||source.positionName||source.pos||'').toUpperCase(),
+      position:canonicalFilterPosition(player.position||source.position||source.positionName||source.pos||''),
       overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall','overall_rating','playerOverall','ovr']),
       age:Number(player.age??source.age??0)||null,
       yearsPro:Number(source.yearsPro||source.experience||0)||null,
       developmentTrait:normalizeLiveDevelopment(player.devTrait??source.devTrait??source.developmentTrait??source.dev),
       injuryStatus:source.injuryStatus||source.injury||'Healthy',
       depthOrder:Number(source.depthOrder??source.depthChartOrder??source.depth_chart_order??source.depth??source.depthPositionOrder??source.positionOrder??99),
-      depthPosition:String(source.depthPosition??source.depthChartPosition??source.depth_chart_position??source.depthSlot??source.depthChartSlot??source.positionDepth??source.position??player.position??'').toUpperCase(),
+      depthPosition:canonicalFilterPosition(source.depthPosition??source.depthChartPosition??source.depth_chart_position??source.depthSlot??source.depthChartSlot??source.positionDepth??source.position??player.position??''),
       rosterStatus:String(source.rosterStatus||source.status||'active').toLowerCase(),
       contract,
       ratings,
@@ -3028,17 +3028,20 @@
     const raw = player?.raw || {};
     const contract = canonicalContract(player);
     const resolvedTeamId = String(player?.teamId ?? raw.teamId ?? raw.team_id ?? raw.teamExternalId ?? raw.team_external_id ?? '');
+    const position = canonicalFilterPosition(player?.position ?? raw.position ?? raw.positionAbbr ?? raw.pos ?? '');
+    const depthPosition = canonicalFilterPosition(player?.depthPosition ?? raw.depthPosition ?? raw.depthChartPosition ?? raw.depth_chart_position ?? raw.depthSlot ?? raw.depthChartSlot ?? position);
     return {
       ...player,
       contract,
       teamId: resolvedTeamId,
+      position,
       dev: normalizeLiveDevelopment(player?.developmentTrait ?? raw.dev ?? raw.developmentTrait),
       injury: player?.injuryStatus || raw.injury || 'Healthy',
       years: Number(contract.yearsRemaining ?? 0) || 0,
       salary: Number(contract.totalSalary ?? 0) || 0,
       capHit: Number(contract.capHit ?? 0) || 0,
       depth: player?.depthOrder ?? raw.depthOrder ?? raw.depthChartOrder ?? raw.depth_chart_order ?? raw.depth ?? null,
-      depthPosition: String(player?.depthPosition ?? raw.depthPosition ?? raw.depthChartPosition ?? raw.depth_chart_position ?? raw.depthSlot ?? raw.depthChartSlot ?? player?.position ?? raw.position ?? '').toUpperCase(),
+      depthPosition,
       college: raw.college || raw.school || '—',
       imageUrl: raw.imageUrl || raw.playerImageUrl || raw.headshotUrl || raw.headshot || raw.photoUrl || raw.photo || raw.portraitUrl || raw.portrait || player?.imageUrl || player?.headshotUrl || null,
       imageAssetId: raw.imageAssetId || raw.portraitId || raw.headshotId || null,
@@ -3269,7 +3272,7 @@
       TE:['TE'], LT:['LT'], LG:['LG'], C:['C'], RG:['RG'], RT:['RT'],
       CB1:['CB1','LCB'], CB2:['CB2','RCB'], SCB:['SCB','SLOTCB'], CB:['CB'],
       FS:['FS'], SS:['SS'], S:['S'],
-      LEDGE:['LEDGE','LE','LEDT'], REDGE:['REDGE','RE','REDT'], DT:['DT','DT1','DT2'],
+      LEDGE:['LEDGE','LEDG','LE','LEDT'], REDGE:['REDGE','REDG','RE','REDT'], DT:['DT','DT1','DT2'],
       SAM:['SAM','LOLB'], MIKE:['MIKE','MLB'], WILL:['WILL','ROLB'],
       K:['K'], P:['P']
     };
@@ -3321,7 +3324,7 @@
       stackMarkup('WR1',wr1,'wr1'), stackMarkup('LT',prefer('LT',position('LT')),'lt'), stackMarkup('LG',prefer('LG',position('LG')),'lg'), stackMarkup('C',prefer('C',position('C')),'c'), stackMarkup('RG',prefer('RG',position('RG')),'rg'), stackMarkup('RT',prefer('RT',position('RT')),'rt'), stackMarkup('TE',prefer('TE',position('TE')),'te'), stackMarkup('WR2',wr2,'wr2'), stackMarkup('SLOT',slotWr,'slot'), stackMarkup('QB',prefer('QB',position('QB')),'qb'), stackMarkup('HB',prefer('HB',position('HB','RB')),'rb'), stackMarkup('FB',prefer('FB',position('FB')),'fb')
     ].join('');
     const defense = [
-      stackMarkup('FS',prefer('FS',position('FS')),'fs'), stackMarkup('SS',prefer('SS',position('SS')),'ss'), stackMarkup('SAM',prefer('SAM',position('SAM','LOLB')),'lolb'), stackMarkup('MIKE',prefer('MIKE',position('MIKE','MLB')),'mlb'), stackMarkup('WILL',prefer('WILL',position('WILL','ROLB')),'rolb'), stackMarkup('CB1',cb1,'cb1'), stackMarkup('SCB',slotCb,'scb'), stackMarkup('REDGE',prefer('REDGE',position('REDGE','RE')),'redge'), stackMarkup('DT1',dt1,'dt1'), stackMarkup('DT2',dt2,'dt2'), stackMarkup('LEDGE',prefer('LEDGE',position('LEDGE','LE')),'ledge'), stackMarkup('CB2',cb2,'cb2')
+      stackMarkup('FS',prefer('FS',position('FS')),'fs'), stackMarkup('SS',prefer('SS',position('SS')),'ss'), stackMarkup('SAM',prefer('SAM',position('SAM','LOLB')),'lolb'), stackMarkup('MIKE',prefer('MIKE',position('MIKE','MLB')),'mlb'), stackMarkup('WILL',prefer('WILL',position('WILL','ROLB')),'rolb'), stackMarkup('CB1',cb1,'cb1'), stackMarkup('SCB',slotCb,'scb'), stackMarkup('REDGE',prefer('REDGE',position('REDGE','REDG','RE')),'redge'), stackMarkup('DT1',dt1,'dt1'), stackMarkup('DT2',dt2,'dt2'), stackMarkup('LEDGE',prefer('LEDGE',position('LEDGE','LEDG','LE')),'ledge'), stackMarkup('CB2',cb2,'cb2')
     ].join('');
     const special = [stackMarkup('K',prefer('K',position('K')),'k'),stackMarkup('P',prefer('P',position('P')),'p')].join('');
     const explicitCount=players.filter(player=>{const slot=slotName(player); return slot && slot!==String(player.position||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}).length;
@@ -4225,7 +4228,7 @@
   };
 
   function playerDetailsGameLogColumns(position=''){
-    const pos=String(position||'').toUpperCase();
+    const pos=canonicalFilterPosition(position);
     if(PLAYER_DETAILS_GAMELOG_COLUMNS[pos])return PLAYER_DETAILS_GAMELOG_COLUMNS[pos];
     if(['LE','RE','LEDGE','REDGE','EDGE','DT','DL','LOLB','ROLB','MLB','LB','SAM','MIKE','WILL','CB','FS','SS','DB'].includes(pos))return PLAYER_DETAILS_GAMELOG_COLUMNS.DEFENSE;
     return [];
@@ -6768,13 +6771,22 @@ function canonicalPlayerDashboardStats(playerId='') {
     return window.FranchiseHQ?.modules?.league?.standings || window.FranchiseHQ?.leagueStandings || null;
   }
 
+  function ownershipCareerService() {
+    return window.FranchiseHQ?.modules?.league?.ownershipCareer || window.FranchiseHQ?.ownershipCareer || null;
+  }
+
 
   async function renderStandingsLive() {
     const service=liveReadModel();
     if(!service){renderStandingsLegacy();return;}
     pageContent.setAttribute('aria-busy','true');
     try{
-      const [stateValue,snapshot,teamRows,standingRows,summary]=await Promise.all([service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSummary()]);
+      const requestedView=state.standingsView==='confidence'?'division':state.standingsView;
+      const ownership=ownershipCareerService();
+      const historyPromise=requestedView==='history'&&ownership?.requestLeague
+        ? ownership.requestLeague()
+        : Promise.resolve(null);
+      const [stateValue,snapshot,teamRows,standingRows,summary,leagueHistory]=await Promise.all([service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSummary(),historyPromise]);
       pageContent.removeAttribute('aria-busy');
       if(routeBase(currentAppRoute())!=='standings')return;
       if(stateValue!=='live'||!snapshot){renderLiveState('No live standings available','Activate a validated snapshot to populate Standings.');return;}
@@ -6785,12 +6797,14 @@ function canonicalPlayerDashboardStats(playerId='') {
       const table=(group,seeded=false)=>`<div class="table-wrap"><table class="standings-service-table"><thead><tr>${seeded?'<th>Rank</th>':''}<th>Team</th><th>W</th><th>L</th><th>T</th><th>PCT</th><th>DIV</th><th>CONF</th><th>PF</th><th>PA</th><th>DIFF</th><th>STRK</th></tr></thead><tbody>${group.map((row,index)=>{const team=teamMap.get(row.teamId)||{};return `<tr class="clickable-row" data-route="teams/${escapeHtml(row.teamId)}">${seeded?`<td><span class="seed">${row.leagueRank||index+1}</span></td>`:''}<td><div class="table-team">${renderTeamMark(team)}<div><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml([row.conference,row.division].filter(Boolean).join(' '))}</small></div></div></td><td><strong>${row.wins}</strong></td><td>${row.losses}</td><td>${row.ties}</td><td>${Number(row.winPct).toFixed(3).replace(/^0/,'')}</td><td>${escapeHtml(row.divisionRecord)}</td><td>${escapeHtml(row.conferenceRecord)}</td><td>${row.pointsFor}</td><td>${row.pointsAgainst}</td><td class="${row.pointDifferential>=0?'streak--win':'streak--loss'}">${row.pointDifferential>=0?'+':''}${row.pointDifferential}</td><td><span class="streak ${String(row.streak).startsWith('W')?'streak--win':String(row.streak).startsWith('L')?'streak--loss':''}">${escapeHtml(row.streak)}</span></td></tr>`}).join('')}</tbody></table></div>`;
       const confGroups=Object.fromEntries(['AFC','NFC'].map(conf=>[conf,ranked.filter(r=>String(r.conference).toUpperCase()===conf).map((r,i)=>({...r,leagueRank:i+1}))]));
       const divisionGroups={};ranked.forEach(row=>{const key=[row.conference,row.division].filter(Boolean).join(' ')||'League';(divisionGroups[key]||(divisionGroups[key]=[])).push(row)});Object.values(divisionGroups).forEach(group=>group.sort(sortRows));
-      const activeView=state.standingsView==='confidence'?'division':state.standingsView;
-      const content=activeView==='league'?`<article class="card">${table(ranked,true)}</article>`:
+      const activeView=requestedView;
+      const content=activeView==='history'
+        ? (ownership?.renderLeague?.(leagueHistory)||'<article class="card gm-career-empty"><h3>League History unavailable</h3><p>The ownership history service has not loaded.</p></article>')
+        : activeView==='league'?`<article class="card">${table(ranked,true)}</article>`:
         activeView==='conference'?`<div class="content-grid content-grid--equal">${['AFC','NFC'].map(conf=>`<article class="card"><div class="card-header"><div><span class="eyebrow">Conference rankings</span><h3>${conf}</h3></div></div>${table(confGroups[conf]||[],true)}</article>`).join('')}</div>`:
         activeView==='playoffs'?`<div class="playoff-grid">${['AFC','NFC'].map(conf=>{const picture=buildConferencePicture(conf,rows);return `<article class="card"><div class="card-header"><div><h3>${conf} Playoff Picture</h3></div><span class="pill pill--accent">Top 7</span></div><div class="playoff-bracket">${picture.seeds.map(row=>{const team=teamMap.get(String(row.teamId))||{};return `<div class="playoff-seed"><span class="seed">${row.playoffSeed}</span>${renderTeamMark(team)}<div><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml(row.qualification)}</small></div><strong>${escapeHtml(row.record)}</strong></div>`}).join('')}</div></article>`}).join('')}</div>`:
         `<div class="division-grid">${Object.entries(divisionGroups).map(([name,group])=>`<article class="card division-card"><div class="card-header"><div><span class="eyebrow">${escapeHtml(name.split(' ')[0]||'League')}</span><h3>${escapeHtml(name.split(' ').slice(1).join(' ')||name)}</h3></div></div>${table(group,false)}</article>`).join('')}</div>`;
-      const tabs=[['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture']];
+      const tabs=[['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture'],['history','League History']];
       const context=publicSeasonContext(snapshot,[]);
       pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')}</span><h1>Standings</h1></div><div class="heading-actions"><div class="segmented-tabs standings-primary-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${activeView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div>${renderLiveDataStatus({snapshot,rosteredPlayers:Number(summary?.rosteredPlayers??summary?.domains?.players??0),integrity:summary?.integrity})}<div data-standings-content>${content}</div>`;
     }catch(error){console.error('[Standings Live Integration]',error);if(routeBase(currentAppRoute())==='standings')renderLiveState('Live standings unavailable',error.message||'The active snapshot could not be loaded.','warning');}
@@ -9750,7 +9764,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.3.7';
+  const VISIBLE_RELEASE = '7.3.7.1';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

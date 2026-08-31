@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.7.1",
+  "validatedOn": "2026-08-31",
+  "status": "validated-review-candidate",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "edgePositionNormalization": {
+      "passed": true,
+      "rawSourcePositions": ["REDG", "LEDG"],
+      "canonicalPositions": ["REDGE", "LEDGE"],
+      "playerCards": true,
+      "playerDirectory": true,
+      "statistics": true,
+      "teamRosters": true,
+      "depthCharts": true,
+      "stablePlayerApi": true,
+      "futureImports": true,
+      "detailsGameLogMapped": true,
+      "defensiveColumns": ["TKL", "TFL", "SACK", "INT", "FF", "FR", "TD"]
+    },
+    "leagueHistory": {
+      "passed": true,
+      "location": "standings",
+      "membershipAuthorityOnly": true,
+      "maddenOwnerNamesUsed": false,
+      "crossTenantInference": false,
+      "careerRecord": true,
+      "playoffRecord": true,
+      "playoffAppearances": true,
+      "superBowlAppearances": true,
+      "superBowlWins": true,
+      "teamsManaged": true,
+      "currentTeams": true,
+      "desktopValidated": true,
+      "phoneValidated": true,
+      "phoneHorizontalScroll": true,
+      "browserViewports": ["desktop", "390x844"]
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false,
+      "authority": "active-snapshot-player-mapping-lineage"
+    },
+    "activeSnapshotBaseline": {
+      "passed": true,
+      "snapshotId": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+      "previousSnapshotId": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+      "week": 9,
+      "teams": 32,
+      "rosteredPlayers": 2042,
+      "games": 184,
+      "statistics": 6966,
+      "standings": 32,
+      "changedDuringCandidateWork": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 27,
+      "newMigration": false,
+      "requiredTables": 80,
+      "productionAlreadyApplied": true
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 131,
+      "failedTests": 0,
+      "focusedGmAndRemediationTests": 4,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 216,
+      "inventoryFiles": 547,
+      "routes": 68,
+      "requiredTables": 80
+    },
+    "productionHttpsAcceptance": {
+      "passed": false,
+      "status": "not-run",
+      "reason": "Production publication is not authorized by this local candidate record."
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "resetPerformed": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "archiveGameYearExecuted": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "historyPermanentlyDeleted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "identityRowsCreated": 0,
+    "ownershipRowsCreated": 0,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": { "authorized": false, "status": "not-run" },
+    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "not-run",
+      "currentRuntimeCommit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb",
+      "pagesDeployment": "5dba5ab4-4591-4f2c-a517-4c4ca7fefc78",
+      "workerSourceChanged": false,
+      "databaseRowsWrittenByCandidateWork": 0
+    },
+    "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 27, "candidateMigration": 27 },
+    "productionMaddenExport": { "authorized": false, "status": "not-run", "anotherExportRequired": false },
+    "productionCandidateImport": { "authorized": false, "status": "not-run" },
+    "archiveSeason": { "authorized": false, "status": "not-run" },
+    "gameYearTransition": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

@@ -1,10 +1,18 @@
 # FranchiseHQ Rollback and Recovery
 
-## 7.3.7 ownership history and player-experience candidate impact
+## 7.3.7.1 edge-position and League History candidate impact
 
-The validated 7.3.7 candidate adds additive migration 27, season/week-scoped ownership periods, frozen GM season summaries, membership-authoritative career/trophy-case reads, and consolidated player-card/mobile experience repairs. It has not been published, applied to Production, or used to create/reconcile ownership rows. Production remains on exact accepted 7.3.6 commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a`, migration 26, and Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162`.
+The validated 7.3.7.1 candidate is code-only. It canonicalizes Madden's raw `REDG`/`LEDG` source labels to `REDGE`/`LEDGE` across shared player, statistics, roster, depth-chart, stable-API, and future-import paths. It also adds a tenant-scoped, membership-authoritative **League History** table within Standings. It adds no migration and writes no ownership, identity, membership, audit, import, snapshot, archive, transition, or other database row.
 
-After any future accepted publication, apply migration 27 before the 7.3.7 runtime. A runtime rollback restores the accepted 7.3.6 application while deliberately retaining migration 27 and every GM identity, team ownership period, GM season summary, membership, role, user, session, setting, rule, audit, import, and snapshot row. Do not drop the additive columns/table or rewrite ownership chronology.
+Production remains on exact accepted 7.3.7 commit `3f3bcdddceae2e5a684980cc303083f4ba6639cb`, migration 27, and Pages deployment `5dba5ab4-4591-4f2c-a517-4c4ca7fefc78`. A future runtime rollback from 7.3.7.1 restores that exact application while retaining migration 27, all 17 GM identities, all 17 opening ownership periods, frozen summaries, memberships, roles, users, sessions, settings, rules, audits, imports, and snapshots.
+
+Deployment or rollback does not authorize ownership reconciliation, a Madden export/import, active snapshot change, reset, Archive Season, game-year transition, permanent deletion, export-URL rotation, credential change, or interpretation of blocked Free Agents as zero.
+
+## 7.3.7 ownership history and player-experience Production impact
+
+Exact 7.3.7 commit `3f3bcdddceae2e5a684980cc303083f4ba6639cb` is live as accepted Pages deployment `5dba5ab4-4591-4f2c-a517-4c4ca7fefc78`. Additive migration 27 introduced season/week-scoped ownership periods and frozen GM season summaries. Production initialization created 17 GM identities and 17 opening ownership periods from existing active reviewed membership assignments; foreign keys remained clean and no membership assignment was changed.
+
+A 7.3.7 runtime rollback restores exact accepted 7.3.6 commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a` and Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162` while deliberately retaining migration 27 and every GM identity, team ownership period, GM season summary, membership, role, user, session, setting, rule, audit, import, and snapshot row. Do not drop the additive columns/table or rewrite ownership chronology.
 
 Deployment or rollback does not authorize reviewed membership reconciliation, a Madden export/import, active snapshot change, reset, Archive Season, game-year transition, permanent deletion, export-URL rotation, credential change, or interpretation of blocked Free Agents as zero.
 

@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.7",
   "validatedOn": "2026-08-31",
-  "status": "validated-review-candidate",
+  "status": "released",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "playerCardExperience": {
@@ -88,7 +88,7 @@
       "migrationVersion": 27,
       "newMigration": true,
       "requiredTables": 80,
-      "productionApplied": false
+      "productionApplied": true
     },
     "automatedTests": {
       "passed": true,
@@ -105,17 +105,17 @@
       "requiredTables": 80
     },
     "productionHttpsAcceptance": {
-      "passed": false,
-      "status": "not-run",
-      "reason": "Production runtime and migration are not authorized by this local implementation record."
+      "passed": true,
+      "status": "accepted-with-edge-alias-follow-up",
+      "reason": "Core 7.3.7 Production acceptance passed. Raw Madden REDG/LEDG aliases were subsequently identified for the 7.3.7.1 display follow-up."
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "productionDataChanged": false,
+    "productionChanged": true,
+    "productionDataChanged": true,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
     "resetPerformed": false,
     "transitionOperationExecuted": false,
     "archiveSeasonExecuted": false,
@@ -128,23 +128,23 @@
     "freeAgentInterpretedAsZero": false,
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
-    "identityRowsCreated": 0,
-    "ownershipRowsCreated": 0,
-    "databaseRowsWritten": 0
+    "identityRowsCreated": 17,
+    "ownershipRowsCreated": 17,
+    "databaseRowsWritten": 163
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "commit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb", "pullRequest": 28 },
+    "hostedChecks": { "authorized": true, "status": "passed", "passed": 4, "failed": 0, "pending": 0, "mainChecksPassed": 5 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "productionDeployment": { "authorized": false, "status": "not-run", "currentRuntimeCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a", "pagesDeployment": "3138d4d2-d1f7-498e-a15d-89bdb6bdd162", "workerSourceChanged": false, "activeWorkerVersion": "d29befdd", "databaseRowsWrittenByCandidateWork": 0 },
-    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 26, "candidateMigration": 27 },
+    "productionDeployment": { "authorized": true, "status": "accepted-with-edge-alias-follow-up", "currentRuntimeCommit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb", "pagesDeployment": "5dba5ab4-4591-4f2c-a517-4c4ca7fefc78", "workerSourceChanged": false, "activeWorkerVersion": "d29befdd", "databaseRowsWrittenByCandidateWork": 163 },
+    "productionMigration": { "authorized": true, "status": "applied-and-verified", "currentMigration": 27, "candidateMigration": 27, "foreignKeyViolations": 0 },
     "productionMaddenExport": { "authorized": false, "status": "not-run", "anotherExportRequired": false },
     "productionCandidateImport": { "authorized": false, "status": "not-run" },
     "archiveSeason": { "authorized": false, "status": "not-run" },
     "gameYearTransition": { "authorized": false, "status": "not-run" }
   },
-  "productionChanged": false,
-  "dataChanged": false,
-  "productionDataChanged": false,
+  "productionChanged": true,
+  "dataChanged": true,
+  "productionDataChanged": true,
   "credentialsChanged": false
 }

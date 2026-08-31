@@ -40,8 +40,8 @@
   };
   const normalizePosition = (value) => {
     const raw = text(value).toUpperCase();
-    const aliases = {HALFBACK:'HB',RUNNINGBACK:'RB',LEFTEND:'LE',RIGHTEND:'RE',DEFENSIVETACKLE:'DT',MIDDLELINEBACKER:'MLB',FREE_SAFETY:'FS',STRONG_SAFETY:'SS'};
-    return aliases[raw.replace(/\s+/g,'')] || raw;
+    const aliases = {HALFBACK:'HB',RUNNINGBACK:'RB',REDG:'REDGE',RDE:'REDGE',RIGHTEND:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LEFTEND:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MIDDLELINEBACKER:'MIKE',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL',DEFENSIVETACKLE:'DT',FREESAFETY:'FS',STRONGSAFETY:'SS'};
+    return aliases[raw.replace(/[\s_-]+/g,'')] || raw;
   };
 
   function parse(input) {

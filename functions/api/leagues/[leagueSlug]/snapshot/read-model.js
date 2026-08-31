@@ -11,8 +11,9 @@ import {
   sourceSupportedContract
 } from '../../../../_lib/live-data-experience.js';
 
-const RELEASE = '7.3.7';
+const RELEASE = '7.3.7.1';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
+const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
 
 const parse = value => {
   try { return JSON.parse(value || 'null'); }
@@ -40,6 +41,10 @@ const numeric = value => {
 };
 
 const text = value => value === null || value === undefined || value === '' ? null : String(value);
+const canonicalPosition = value => {
+  const position = String(value || '').trim().toUpperCase().replace(/[_ -]+/g,'');
+  return POSITION_ALIASES[position] || position || null;
+};
 
 export function normalizeTeam(raw = {}) {
   raw = sourceRecord(raw);
@@ -103,7 +108,7 @@ export function normalizePlayer(raw = {}, publicIdValue = null) {
   const firstName = text(raw.first_name ?? raw.firstName);
   const lastName = text(raw.last_name ?? raw.lastName);
   const displayName = text(raw.display_name ?? raw.displayName) ?? ([firstName,lastName].filter(Boolean).join(' ') || null);
-  const position = text(raw.position ?? raw.position_name ?? raw.positionName ?? raw.pos);
+  const position = canonicalPosition(raw.position ?? raw.position_name ?? raw.positionName ?? raw.pos);
   const overall = numeric(raw.overall ?? raw.overall_rating ?? raw.overallRating ?? raw.ovrRating ?? raw.playerBestOvr ?? raw.bestOverall ?? raw.playerOverall ?? raw.ovr);
   const devTrait = text(raw.development_trait ?? raw.dev_trait ?? raw.devTrait ?? raw.developmentTrait ?? raw.development);
   const contract = sourceSupportedContract({
@@ -124,7 +129,7 @@ export function normalizePlayer(raw = {}, publicIdValue = null) {
     isInjured:Boolean(Number(raw.is_injured ?? raw.isInjured ?? raw.isOnIR ?? 0)),
     rosterStatus,
     depthOrder:numeric(raw.depthOrder ?? raw.depthChartOrder ?? raw.depth_chart_order ?? raw.depth),
-    depthPosition:text(raw.depthPosition ?? raw.depthChartPosition ?? raw.depth_chart_position),
+    depthPosition:canonicalPosition(raw.depthPosition ?? raw.depthChartPosition ?? raw.depth_chart_position),
     portraitId:text(raw.portrait_id ?? raw.portraitId), abilityCount:abilities.length, contract
   };
   return {

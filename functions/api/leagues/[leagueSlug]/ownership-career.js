@@ -5,7 +5,7 @@ import { buildGmSeasonSummaries, careerTotals } from '../../../_lib/gm-career.js
 import { currentFranchiseContext, ownershipChangeStatements } from '../../../_lib/ownership-periods.js';
 import { createTenantAuditContext, writeTenantAuditEvent } from '../../../_lib/tenant-context.js';
 
-const RELEASE='7.3.7';
+const RELEASE='7.3.7.1';
 const safeTeamKey=value=>/^[a-z0-9][a-z0-9._:-]{0,99}$/.test(String(value||'').trim().toLowerCase());
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 const text=value=>value===null||value===undefined?'':String(value).trim();
@@ -68,12 +68,75 @@ function publicSeason(row={}){
   };
 }
 
+function emptyLiveSeason(identityId,franchiseSeasonId,teams=[]){
+  return{gmIdentityId:identityId,franchiseSeasonId,teams:[...new Set(teams)],regularWins:0,regularLosses:0,regularTies:0,playoffWins:0,playoffLosses:0,playoffTies:0,playoffAppearance:0,conferenceChampionships:0,superBowlAppearances:0,superBowlChampionships:0,gameCount:0};
+}
+
+async function leagueCareerResponse(current,teams){
+  const contextState=await currentFranchiseContext(current.db,current.league.id);
+  const identityResult=await current.db.prepare(`SELECT id,public_id,display_name
+    FROM gm_identities identity WHERE identity.league_id=? AND (
+      EXISTS (SELECT 1 FROM team_ownership_periods period WHERE period.league_id=identity.league_id AND period.gm_identity_id=identity.id)
+      OR EXISTS (SELECT 1 FROM gm_season_summaries summary WHERE summary.league_id=identity.league_id AND summary.gm_identity_id=identity.id)
+    ) ORDER BY lower(display_name),id`).bind(current.league.id).all();
+  const periodResult=await current.db.prepare(`SELECT id,gm_identity_id,team_key,franchise_season_id,started_at,ended_at,
+      started_stage,started_week,ended_stage,ended_week
+    FROM team_ownership_periods WHERE league_id=? ORDER BY started_at,id`).bind(current.league.id).all();
+  const periods=periodResult?.results||[];
+  const games=await activeCareerGames(current.db,current.league.id,contextState.franchiseSeasonId,teams);
+  const currentBuilt=buildGmSeasonSummaries({games,periods,franchiseSeasonId:contextState.franchiseSeasonId});
+  const activeSeason=await current.db.prepare(`SELECT id,display_name,season_year FROM franchise_seasons WHERE id=? AND league_id=? LIMIT 1`)
+    .bind(contextState.franchiseSeasonId||'',current.league.id).first();
+  const historyResult=await current.db.prepare(`SELECT summary.*,season.display_name,season.season_year
+    FROM gm_season_summaries summary JOIN franchise_seasons season ON season.id=summary.franchise_season_id AND season.league_id=summary.league_id
+    WHERE summary.league_id=? AND summary.franchise_season_id<>?
+    ORDER BY season.season_year,summary.gm_identity_id`).bind(current.league.id,contextState.franchiseSeasonId||'').all();
+  const historyByIdentity=new Map();
+  for(const row of historyResult?.results||[]){
+    const id=text(row.gm_identity_id);
+    if(!historyByIdentity.has(id))historyByIdentity.set(id,[]);
+    historyByIdentity.get(id).push(publicSeason(row));
+  }
+  const currentByIdentity=new Map(currentBuilt.summaries.map(summary=>[text(summary.gmIdentityId),summary]));
+  const teamName=key=>resolveTeam(teams,key)?.displayName||String(key).toUpperCase();
+  const owners=(identityResult?.results||[]).map(identity=>{
+    const identityId=text(identity.id);
+    const currentPeriodTeams=periods.filter(period=>text(period.gm_identity_id)===identityId&&text(period.franchise_season_id)===text(contextState.franchiseSeasonId)&&!period.ended_at).map(period=>text(period.team_key)).filter(Boolean);
+    const currentSummary=currentByIdentity.get(identityId)||emptyLiveSeason(identityId,contextState.franchiseSeasonId,currentPeriodTeams);
+    const includeLive=Boolean(contextState.franchiseSeasonId&&(currentByIdentity.has(identityId)||currentPeriodTeams.length));
+    const liveSeason={...currentSummary,seasonYear:Number(activeSeason?.season_year)||contextState.seasonYear,label:activeSeason?.display_name||`Season ${contextState.seasonYear}`,frozen:false};
+    const seasons=[...(historyByIdentity.get(identityId)||[]),...(includeLive?[liveSeason]:[])];
+    const totals=careerTotals(seasons);
+    const teamDetails=totals.teams.map(key=>({teamKey:key,displayName:teamName(key)}));
+    const currentTeams=[...new Set(currentPeriodTeams)].map(key=>({teamKey:key,displayName:teamName(key)}));
+    return{
+      owner:{publicId:identity.public_id,displayName:identity.display_name},
+      currentTeams,
+      totals:{...totals,teams:teamDetails},
+      seasons:seasons.map(season=>({...season,teams:(season.teams||[]).map(key=>({teamKey:key,displayName:teamName(key)}))})),
+      currentGameAttributionCount:currentBuilt.attributedGames.filter(row=>text(row.gmIdentityId)===identityId).length
+    };
+  }).sort((left,right)=>
+    Number(right.totals.superBowlChampionships)-Number(left.totals.superBowlChampionships)
+    ||Number(right.totals.superBowlAppearances)-Number(left.totals.superBowlAppearances)
+    ||Number(right.totals.playoffAppearances)-Number(left.totals.playoffAppearances)
+    ||Number(right.totals.regularWins)-Number(left.totals.regularWins)
+    ||String(left.owner.displayName).localeCompare(String(right.owner.displayName))
+  ).map((owner,index)=>({...owner,rank:index+1}));
+  return json({
+    ok:true,release:RELEASE,state:owners.length?'ready':'empty',view:'league',owners,
+    reconciliation:{membershipAuthority:true,maddenOwnerNamesUsed:false,crossTenantInference:false},
+    activeSnapshotChanged:false,freeAgentInterpretedAsZero:false
+  });
+}
+
 export async function onRequestGet(context){
   try{
     const current=await access(context,false);if(current.response)return current.response;
-    const url=new URL(context.request.url),requested=text(url.searchParams.get('teamKey')).toLowerCase();
+    const url=new URL(context.request.url),requested=text(url.searchParams.get('teamKey')).toLowerCase(),view=text(url.searchParams.get('view')).toLowerCase();
     if(requested&&!safeTeamKey(requested))return json({ok:false,error:'Invalid team key.'},400);
     const teams=await activeLeagueTeams(current.db,current.league.id);
+    if(view==='league')return leagueCareerResponse(current,teams);
     const assignments=await activeTeamAssignments(current.db,current.league.id,teams);
     const membershipTeam=resolveTeam(teams,current.authorization.session.membership?.teamId);
     const team=resolveTeam(teams,requested||membershipTeam?.teamKey||'');

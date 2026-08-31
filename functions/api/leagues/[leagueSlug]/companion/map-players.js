@@ -225,7 +225,7 @@ async function latestFreeAgentCapture(db,env,leagueId,source,discoverySessionId)
   }
   return{capture:null,payload:null,objects:[],assessment:{status:'missing',accepted:false},attempts};
 }
-function normalizePosition(v){const p=text(v)?.toUpperCase();const map={HB:'RB'};return p?map[p]||p:null;}
+export function normalizePosition(v){const p=text(v)?.toUpperCase().replace(/[_ -]+/g,'');const map={HB:'RB',REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'};return p?map[p]||p:null;}
 function normalizeDev(v){const s=text(v);if(!s)return null;const n=Number(s);if(Number.isFinite(n)){return ({0:'Normal',1:'Star',2:'Superstar',3:'X-Factor'})[n]||s;}const l=s.toLowerCase().replace(/[_-]/g,' ');if(l.includes('x')&&l.includes('factor'))return 'X-Factor';if(l.includes('superstar'))return 'Superstar';if(l.includes('star'))return 'Star';if(l.includes('normal'))return 'Normal';return s;}
 function heightInches(v){if(v==null)return null;if(Number.isFinite(Number(v)))return int(v);const m=String(v).match(/(\d+)\D+(\d+)/);return m?Number(m[1])*12+Number(m[2]):null;}
 function retiredRecord(record={}){

@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.7",
   "releaseType": "ownership-history-and-player-experience",
-  "status": "validated-review-candidate",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.6",
@@ -18,13 +18,13 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0,
-    "mainChecksPassed": 0,
-    "scope": "Local implementation and validation only; publication is not recorded until the exact candidate is pushed and reviewed."
+    "authorized": true,
+    "status": "published-main-accepted",
+    "commit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb",
+    "pullRequest": 28,
+    "hostedChecksPassed": 4,
+    "mainChecksPassed": 5,
+    "scope": "Exact candidate published through PR #28, accepted on Main, and deployed to Production."
   },
   "staging": {
     "authorized": false,
@@ -32,17 +32,17 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "7.3.6",
-    "currentCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a",
-    "currentPagesDeployment": "3138d4d2-d1f7-498e-a15d-89bdb6bdd162",
+    "authorized": true,
+    "deployed": true,
+    "status": "accepted-with-edge-alias-follow-up",
+    "currentRelease": "7.3.7",
+    "currentCommit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb",
+    "currentPagesDeployment": "5dba5ab4-4591-4f2c-a517-4c4ca7fefc78",
     "currentWorkerBuild": "2c7bc863-539d-45bf-a1a4-24edcf1c31b6",
     "currentWorkerVersion": "d29befdd",
     "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
     "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
-    "scope": "Migration 27 and the application runtime require a separately recorded Production authorization."
+    "scope": "Migration 27 and the application runtime are accepted. Owner acceptance identified raw REDG/LEDG presentation aliases for 7.3.7.1 follow-up."
   },
   "requiredArtifacts": [
     "docs/ROADMAP.md",

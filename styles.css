@@ -6649,3 +6649,18 @@ table td{
 .gm-career-empty{display:grid;gap:8px;padding:18px}.gm-career-empty h3,.gm-career-empty p{margin:0}.gm-career-empty p{color:var(--muted)}.gm-career-empty .button{justify-self:start;margin-top:4px}
 @media(max-width:900px){.gm-career-records{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.gm-career-records{grid-template-columns:1fr 1fr;padding:0 10px 10px}.gm-career-records article:first-child{grid-column:1/-1}}
+
+/* FranchiseHQ 7.3.7.1 — league-wide membership-authoritative History Books */
+.league-history-shell{display:grid;gap:16px}
+.league-history-intro{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px}
+.league-history-intro h2,.league-history-intro p{margin:0}.league-history-intro p{max-width:720px;margin-top:7px;color:var(--muted)}
+.league-history-summary{display:flex;flex:0 0 auto;gap:10px}
+.league-history-summary span{display:grid;min-width:112px;padding:12px;border:1px solid var(--border);border-radius:11px;background:var(--surface-2);text-align:center}
+.league-history-summary strong{font-size:23px;font-variant-numeric:tabular-nums}.league-history-summary small{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+.league-history-table-card{overflow:hidden}.league-history-table-card>.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.league-history-table{width:100%;min-width:1040px;border-collapse:collapse}
+.league-history-table th,.league-history-table td{padding:11px 12px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}
+.league-history-table th{color:var(--muted);background:var(--surface-2);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+.league-history-table th:nth-child(2),.league-history-table td:nth-child(2),.league-history-table th:nth-child(3),.league-history-table td:nth-child(3){text-align:left}
+.league-history-table td:nth-child(2) strong,.league-history-table td:nth-child(2) small{display:block}.league-history-table td:nth-child(2) small{margin-top:3px;color:var(--muted)}
+@media(max-width:700px){.league-history-intro{align-items:stretch;flex-direction:column}.league-history-summary{width:100%}.league-history-summary span{flex:1;min-width:0}.league-history-table{width:max-content}}

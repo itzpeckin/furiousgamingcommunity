@@ -4,7 +4,12 @@ import { activeLeagueTeams, resolveTeam } from '../../../../_lib/league-teams.js
 import { normalizePublicPlayerId, publicPlayerPath, normalizePublicTeamSlug } from '../../../../_lib/public-identity-routes.js';
 import { normalizePlayer } from '../snapshot/read-model.js';
 
-const RELEASE = '7.3.7';
+const RELEASE = '7.3.7.1';
+const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
+const canonicalPosition = value => {
+  const position=String(value||'').trim().toUpperCase().replace(/[_ -]+/g,'');
+  return POSITION_ALIASES[position]||position||null;
+};
 
 const parse = value => {
   try { return JSON.parse(value || 'null'); }
@@ -55,7 +60,7 @@ export async function onRequestGet(context) {
     activePlayer = {
       present:true,
       teamSlug:normalizePublicTeamSlug(team?.teamKey),
-      position:normalized.position,
+      position:canonicalPosition(normalized.position),
       overall:normalized.overall,
       rosterStatus:normalized.rosterStatus
     };

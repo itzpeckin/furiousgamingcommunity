@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.7.1",
+  "releaseType": "edge-position-and-league-history-remediation",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.7",
+    "commit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb",
+    "tree": "42611be5630c4a499d95776f6a163ecd58e6d670",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.7.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Local implementation and validation only; publication is not recorded until the exact candidate is separately authorized."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.3.7",
+    "currentCommit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb",
+    "currentPagesDeployment": "5dba5ab4-4591-4f2c-a517-4c4ca7fefc78",
+    "currentMigration": 27,
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+    "scope": "Code-only candidate. No migration, ownership reconciliation, import, activation, archive, transition, or other Production data operation is required."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "app.js",
+    "styles.css",
+    "league-engine/rosters.js",
+    "league-engine/statistics.js",
+    "league-engine/companion-json-mapper.js",
+    "league-engine/ownership-career.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-players.js",
+    "functions/api/leagues/[leagueSlug]/players/[publicPlayerId].js",
+    "functions/api/leagues/[leagueSlug]/ownership-career.js",
+    "tests/import/gm-career.test.mjs",
+    "releases/7.3.7.1/release-record.md",
+    "releases/7.3.7.1/validation-evidence.json"
+  ]
+}
