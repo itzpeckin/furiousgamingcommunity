@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 7.3.4.5 */
+/* FHQ_BUILD: 7.3.4.6 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='7.3.4.5';
+const RELEASE='7.3.4.6';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -60,7 +60,7 @@ async function phase(context,step,id,work,summarize){
 
 async function mapStatistics(context,step){
   let result=await step.do('map-statistics-start',()=>call(
-    context,companion(context.slug,'map-statistics'),'POST',{action:'start',discoverySessionId:context.discoverySessionId}
+    context,companion(context.slug,'map-statistics'),'POST',{action:'start',discoverySessionId:context.discoverySessionId,candidateImportRunId:context.runId}
   ));
   const runId=result?.mappingRun?.id;
   if(!runId)throw new Error('Statistics mapper did not return its exact run ID.');
@@ -173,7 +173,7 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
     });
 
     const schedule=await phase(context,step,'map-schedule',()=>call(
-      context,companion(context.slug,'map-schedule'),'POST',{discoverySessionId:context.discoverySessionId}
+      context,companion(context.slug,'map-schedule'),'POST',{discoverySessionId:context.discoverySessionId,candidateImportRunId:context.runId}
     ),payload=>({
       summary:`${Number(payload.mappingRun?.gameCount??payload.games?.length??0)} games mapped`,
       counts:{games:Number(payload.mappingRun?.gameCount??payload.games?.length??0)},

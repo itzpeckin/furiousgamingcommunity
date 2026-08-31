@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.55
+**Revision:** 1.56
 
 **Current production:** 7.3.4.5 from exact Main commit `df3bcb7` (Pages deployment `927eb46c`, import Worker version `87b5571a`); validated Madden 27 Week 9 snapshot `518236e4` is active, with snapshot `8b47ec76` retained as its previous pointer
 
-**Current work:** 7.3.4.5 is deployed. It distinguishes unsafe live rollback from a same-season historical backfill, preserves the active Week 9 team/player/roster/standings plane while overlaying only an earlier captured week's games/statistics, and refreshes the active application route without a browser reload after atomic activation. Deployment wrote zero database rows.
+**Current work:** 7.3.4.6 is locally validated and authorized for one consolidated Production delivery. It makes the captured route authoritative over Madden's zero-based schedule payload week and composes every data-bearing retained period through the selected Week 8 source—Preseason Weeks 1–3 and Regular Season Weeks 1–8—into one historical candidate while preserving the live Week 9 current-state plane. Madden's all-zero Preseason Week 4 placeholder is excluded rather than presented as an active week.
 
-**Next gate:** Owner acceptance through one real older-week export and **Import Latest Export** action. The resulting candidate must add only that captured week's games/statistics, retain the live Week 9 teams/players/rosters/standings and live-week position, refresh the current route without a browser reload, and keep Free Agents blocked/unknown.
+**Next gate:** Publish the exact 7.3.4.6 candidate, pass hosted checks, fast-forward it to Main, deploy Production, then retry the already retained Week 8 source exactly once. The resulting atomic activation must retain 32 active teams, 2,042 active rostered players, active rosters/standings, and Regular Season Week 9 while adding every available earlier period's games/statistics and keeping Free Agents blocked/unknown.
 
 ## Product decisions
 
@@ -56,6 +56,7 @@
 | 7.3.4.3 | Production baseline | Exact recovered-session classification and shared Teams route authority produced the retained validated Week 9 candidate |
 | 7.3.4.4 | Production deployed; pending owner UI acceptance | One-action atomic live import, one-action same-edition season archive/preparation, and exact Week 9 snapshot activation |
 | 7.3.4.5 | Production deployed; pending owner backfill acceptance | Same-season historical week backfill without live-state regression and automatic in-place data refresh after activation |
+| 7.3.4.6 | Production authorized; locally validated | Route-authoritative schedule-week normalization and one-candidate composition of all complete retained preseason/regular-season periods |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
@@ -199,6 +200,16 @@
 - Retain accumulated prior backfills, reject unscoped/current/future source rows, make an identical source idempotent, and report remaining historical week gaps without manufacturing data.
 - After atomic activation, invalidate the live read-model and application caches, rehydrate the current route, and update Commissioner HQ without `location.reload()` or a browser refresh. Authentication/session redesign remains at 7.5.0.
 - Gate: tests prove Week 8 can be added to active Week 9 without regressing the current plane, partial/cross-season backfills stop safely, the one-click completion event refreshes the live application, and Production deployment alone changes no data or active pointer.
+
+## 7.3.4.6 — Route Authority and Retained Multi-Period Backfill
+
+- Treat `/week/pre|reg|post/{week}` as the authoritative stage/week for schedules and statistics. Madden payload fields remain source evidence but cannot shift Regular Season Week 8 to Week 7.
+- Keep stage in the canonical period identity so Preseason Week 1 and Regular Season Week 1 never collide.
+- When an eligible older source is selected, construct one exact retained bundle from every complete captured period at or before that source within the current prepared season. Pin one immutable capture per route and exclude incomplete periods instead of manufacturing data.
+- Compose all bundled games and statistics into one candidate while taking teams, players, rosters, standings, and the live week from the active Week 9 snapshot. Reprocess exact statistics routes even when their hashes already appear in the active manifest so the new candidate is self-contained.
+- Require each selected period to yield both route-scoped games and statistics. Stop before activation on any missing period, incompatible season/game year, changed active pointer, or failed validation.
+- Production evidence currently proves data-bearing retained Preseason Weeks 1–3 and Regular Season Weeks 1–8. Madden's Preseason Week 4 schedule and all seven statistics routes are parsed zero-record placeholders and therefore do not represent an active week. No new export, URL rotation, reset, Archive Season, or game-year transition is required or authorized.
+- Gate: one authorized Production retry of the retained Week 8 source must atomically activate a validation-ready multi-period candidate while preserving active Regular Season Week 9 teams, players, rosters, standings, and blocked/null Free Agent semantics.
 
 ## 7.3.5 — Team, Roster, Player, Statistics, Standings, and Free Agent Experience
 
@@ -351,3 +362,4 @@
 - **Revision 1.53:** Published 7.3.4.4 through PR #20 with 4/4 candidate checks and 7/7 Main/deployment checks, fast-forwarded exact commit `5a16ccb` to Main, and deployed exact Pages runtime `51e55575` plus import Worker version `1e01f1a9`. Read-only reconciliation pinned durable run `candidate_import_bb7020cd` to validation-ready Week 9 snapshot `8b47ec76` with 32 teams, 2,043 rostered players, 29 games, 717 statistics, 32 standings, and the visible missing Week 8 warning. The deployed endpoint atomically activated that exact snapshot in 58.674 seconds; Week 7 snapshot `841ce1b5` is archived/retained, one lifecycle and one audit row exist, token version remains 1, eight users and eight memberships remain, the temporary delegation is deleted, foreign keys are clean, and Free Agents remain blocked/null. No staging, migration, new Madden export, Archive Season, game-year transition, reset, permanent deletion, or URL rotation ran.
 - **Revision 1.54:** Authorized and locally implemented 7.3.4.5 from the exact deployed 7.3.4.4 baseline. An older fully covered export is now classified as an exact same-game-year/same-franchise-season historical backfill: it begins with the active immutable snapshot, preserves teams/players/rosters/standings and live week, overlays only the captured earlier week's games/statistics, retains accumulated backfills, reports remaining gaps, and stops on partial or incompatible sources. Successful activation refreshes the live read-model, application caches, and current route in place without a browser reload. Production data, the active Week 9 pointer, permanent URL, Archive Season, transitions, resets, and blocked/null Free Agent semantics remain unchanged during candidate work.
 - **Revision 1.55:** Published exact 7.3.4.5 commit `df3bcb7` through PR #21, passed 4/4 candidate checks and all eight recorded hosted/deployment checks, fast-forwarded that exact commit to Main, and deployed Production Pages `927eb46c` plus import Worker version `87b5571a`. Read-only reconciliation wrote zero rows and found validation-ready Week 9 snapshot `518236e4` active with 32 teams, 2,042 rostered players, 29 games, 910 statistics, 32 standings, token version 1, eight users/eight memberships, and zero foreign-key violations. Its 7.3.4.4 activation preceded the 7.3.4.5 candidate commit and retains `8b47ec76` as its previous pointer. No 7.3.4.5 import, activation, reset, archive, transition, export, URL rotation, or Free Agent reinterpretation ran; owner historical-backfill acceptance is next.
+- **Revision 1.56:** Authorized and locally implemented 7.3.4.6 after Production Week 8 backfill stopped because Madden's schedule payload reported zero-based Week 7 while its authoritative route was `/week/reg/8/schedules`. Read-only retained-source inventory proved data-bearing schedule/statistics coverage for Preseason Weeks 1–3 and Regular Season Weeks 1–8; Preseason Week 4 is an all-zero Madden placeholder, not an active week. The new candidate pins and composes all data-bearing retained periods through Week 8, separates preseason from regular-season week identities, and preserves active Week 9 teams/players/rosters/standings/live-week state. One exact branch/PR/check/Main/Production cycle and one retained-source retry/atomic activation are authorized; no new export, staging cycle, reset, URL rotation, Archive Season, transition, permanent deletion, or Free Agent reinterpretation is included.

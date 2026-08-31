@@ -9,6 +9,7 @@ import {
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import {
   CANDIDATE_IMPORT_PHASES,
+  candidateComparePeriods,
   candidateCoverageWarnings,
   candidateCompleteness,
   candidateRetryGuidance,
@@ -19,7 +20,7 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 
-const RELEASE = '7.3.4.5';
+const RELEASE = '7.3.4.6';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -134,6 +135,70 @@ async function captureDigest(db, leagueId, sessionId) {
   ).join('\n')));
 }
 
+const RETAINED_PERIOD_ROUTE=/(?:^|\/)week\/(pre|reg|post)\/(\d+)\/(schedules|defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
+const canonicalStage=value=>value==='pre'?'preseason':value==='post'?'playoffs':'regular-season';
+function retainedRoutePeriod(routePath){
+  const match=String(routePath||'').match(RETAINED_PERIOD_ROUTE);
+  if(!match)return null;
+  const stage=canonicalStage(match[1].toLowerCase()),week=Number.parseInt(match[2],10);
+  return{stage,week,key:`${stage}:${week}`,datasetType:match[3].toLowerCase()==='schedules'?'schedule':'statistics'};
+}
+function retainedCaptureRecordCount(row){
+  const collections=parseCandidateJson(row?.collections_json,[]);
+  return Array.isArray(collections)?collections.reduce((maximum,item)=>Math.max(maximum,Number(item?.count||0)),0):0;
+}
+
+async function retainedPeriodBundle(db,leagueId,report,identity,active){
+  const parsedBoundary=Date.parse(String(identity?.season_created_at||''));
+  const sourceNotBefore=Number.isFinite(parsedBoundary)?new Date(parsedBoundary).toISOString():'1970-01-01T00:00:00.000Z';
+  const anchorCoverage=candidateSourceCoverage({
+    sourceMarkers:parseCandidateJson(report?.source_markers_json,{}),
+    datasetInventory:parseCandidateJson(report?.dataset_inventory_json,[])
+  },active?.week_index);
+  if(anchorCoverage.importMode!=='historical-backfill'||!anchorCoverage.currentPeriod){
+    const digest=report?await captureDigest(db,leagueId,report.session_id):null;
+    return{coverage:anchorCoverage,digest,sourceCaptureIds:[],sourcePeriods:anchorCoverage.completePeriods||[],routeCount:Number(report?.route_count||0),captureCount:Number(report?.capture_count||0),bytes:Number(report?.total_bytes||0),notBefore:sourceNotBefore};
+  }
+  const franchise=String(identity?.source_franchise_id||'').trim();
+  if(!franchise)return{coverage:anchorCoverage,digest:null,sourceCaptureIds:[],sourcePeriods:[],routeCount:0,captureCount:0,bytes:0,notBefore:sourceNotBefore};
+  const result=await db.prepare(`SELECT id,route_path,payload_hash,byte_length,collections_json,received_at
+    FROM companion_route_captures
+    WHERE league_id=? AND received_at>=? AND route_path LIKE ? AND route_path LIKE '%/week/%'
+    ORDER BY received_at DESC,id DESC`).bind(
+      leagueId,sourceNotBefore,`%/${franchise}/week/%`
+    ).all();
+  const latestByRoute=new Map();
+  for(const row of result.results||[]){
+    const period=retainedRoutePeriod(row.route_path);
+    if(!period||candidateComparePeriods(period,anchorCoverage.currentPeriod)>0)continue;
+    if(!latestByRoute.has(String(row.route_path)))latestByRoute.set(String(row.route_path),{
+      ...row,...period,recordCount:retainedCaptureRecordCount(row)
+    });
+  }
+  const periodDomains=new Map();
+  for(const row of latestByRoute.values()){
+    if(!periodDomains.has(row.key))periodDomains.set(row.key,{schedule:0,statistics:0});
+    const domains=periodDomains.get(row.key);
+    domains[row.datasetType]+=Number(row.recordCount||0);
+  }
+  const completeKeys=new Set([...periodDomains.entries()]
+    .filter(([,domains])=>domains.schedule>0&&domains.statistics>0).map(([key])=>key));
+  const selected=[...latestByRoute.values()].filter(row=>completeKeys.has(row.key));
+  if(!selected.length){
+    const digest=report?await captureDigest(db,leagueId,report.session_id):null;
+    return{coverage:anchorCoverage,digest,sourceCaptureIds:[],sourcePeriods:anchorCoverage.completePeriods||[],routeCount:Number(report?.route_count||0),captureCount:Number(report?.capture_count||0),bytes:Number(report?.total_bytes||0),notBefore:sourceNotBefore};
+  }
+  const inventory=selected.map(row=>({datasetType:row.datasetType,routePath:row.route_path}));
+  const coverage=candidateSourceCoverage({datasetInventory:inventory},active?.week_index);
+  const digest=await sha256Hex(new TextEncoder().encode(selected
+    .map(row=>`${row.route_path}:${row.payload_hash}:${row.id}:${Number(row.byte_length||0)}`).sort().join('\n')));
+  return{
+    coverage,digest,sourceCaptureIds:selected.map(row=>String(row.id)),sourcePeriods:coverage.completePeriods||[],
+    routeCount:selected.length,captureCount:selected.length,bytes:selected.reduce((sum,row)=>sum+Number(row.byte_length||0),0),
+    notBefore:sourceNotBefore
+  };
+}
+
 function publicDestination(row) {
   if (!row) return null;
   return {
@@ -167,9 +232,9 @@ function sourceCounts(report, identity) {
   };
 }
 
-async function sourceFingerprint(db, leagueId, report, identity, destination) {
+async function sourceFingerprint(db, leagueId, report, identity, destination, bundle) {
   if (!report || !identity || !destination) return null;
-  const digest = await captureDigest(db,leagueId,report.session_id);
+  const digest = bundle?.digest || await captureDigest(db,leagueId,report.session_id);
   return sha256Hex(new TextEncoder().encode(
     `${report.report_hash}:${digest}:${identity.preview_run_id || identity.franchise_season_id}:${destination.id}`
   ));
@@ -182,13 +247,11 @@ async function publicState(current, options = {}) {
     : await latestReport(current.db, current.league.id);
   const destination = await destinationFor(current.db, current.league.id, identity?.franchise_season_id);
   const active = await activeSnapshot(current.db,current.league.id);
-  const fingerprint = await sourceFingerprint(current.db,current.league.id,report,identity,destination);
+  const bundle=await retainedPeriodBundle(current.db,current.league.id,report,identity,active);
+  const fingerprint = await sourceFingerprint(current.db,current.league.id,report,identity,destination,bundle);
   const run = await runForSource(current.db,current.league.id,destination?.id,fingerprint);
   const previousRun = run || await latestRun(current.db,current.league.id);
-  const coverage = candidateSourceCoverage({
-    sourceMarkers:parseCandidateJson(report?.source_markers_json,{}),
-    datasetInventory:parseCandidateJson(report?.dataset_inventory_json,[])
-  },active?.week_index);
+  const coverage = bundle.coverage;
   return {
     ok:true,
     release:RELEASE,
@@ -203,6 +266,9 @@ async function publicState(current, options = {}) {
       generatedAt:report.generated_at,
       selectionStatus:run ? 'existing-source' : 'new-source',
       coverage,
+      sourcePeriods:bundle.sourcePeriods,
+      sourcePeriodCount:bundle.sourcePeriods.length,
+      retainedRouteCount:bundle.routeCount,
       coverageWarnings:candidateCoverageWarnings(coverage),
       counts:sourceCounts(report, identity),
       season:identity ? {
@@ -291,7 +357,9 @@ async function startRun(current, destination, report, identity, retry) {
       activeSnapshotChanged:false
     },409) };
   }
-  const digest = await captureDigest(current.db,current.league.id,report.session_id);
+  const active = await activeSnapshot(current.db,current.league.id);
+  const bundle=await retainedPeriodBundle(current.db,current.league.id,report,identity,active);
+  const digest = bundle.digest || await captureDigest(current.db,current.league.id,report.session_id);
   const fingerprint = await sha256Hex(new TextEncoder().encode(
     `${report.report_hash}:${digest}:${identity.preview_run_id || identity.franchise_season_id}:${destination.id}`
   ));
@@ -301,12 +369,8 @@ async function startRun(current, destination, report, identity, retry) {
   if (run?.status === 'preview-ready' || (run?.status === 'running' && !retry)) {
     return { run, reused:true, warm:run.status === 'preview-ready' };
   }
-  const active = await activeSnapshot(current.db,current.league.id);
   const activeBefore = active?.snapshot_id || null;
-  const coverage = candidateSourceCoverage({
-    sourceMarkers:parseCandidateJson(report.source_markers_json,{}),
-    datasetInventory:parseCandidateJson(report.dataset_inventory_json,[])
-  },active?.week_index);
+  const coverage = bundle.coverage;
   if (coverage.importMode === 'historical-backfill') {
     if (coverage.currentWeekStatus !== 'covered') return { response:json({
       ok:false,
@@ -328,7 +392,9 @@ async function startRun(current, destination, report, identity, retry) {
   }
   const coverageWarnings = candidateCoverageWarnings(coverage);
   const counts = { ...sourceCounts(report,identity), sourceWeek:coverage.currentWeek,
-    sourceCoverage:coverage,importMode:coverage.importMode };
+    sourceCoverage:coverage,importMode:coverage.importMode,sourcePeriods:bundle.sourcePeriods,
+    sourceCaptureIds:bundle.sourceCaptureIds,sourceNotBefore:bundle.notBefore,
+    retainedRouteCount:bundle.routeCount,retainedCaptureCount:bundle.captureCount,retainedBytes:bundle.bytes };
   if (run) {
     if (!retry) return { run, reused:true, warm:false };
     await current.db.prepare(`UPDATE companion_candidate_import_runs SET
@@ -456,6 +522,8 @@ async function finalize(current, body) {
   const importMode = String(snapshotManifest.importMode || 'forward');
   const backfillWeeks = Array.isArray(snapshotManifest?.historicalBackfill?.sourceWeeks)
     ? snapshotManifest.historicalBackfill.sourceWeeks : [];
+  const backfillPeriods = Array.isArray(snapshotManifest?.historicalBackfill?.sourcePeriods)
+    ? snapshotManifest.historicalBackfill.sourcePeriods : [];
   const completeness = candidateCompleteness(freeAgentEvidence.status);
   const warnings = parseCandidateJson(run.warnings_json, []);
   if (freeAgentEvidence.status === 'blocked') warnings.push(
@@ -469,7 +537,7 @@ async function finalize(current, body) {
     statistics:Number(snapshot.statistic_count || 0),
     standings:Number(snapshot.standing_count || 0),
     importMode,
-    backfillWeeks,
+    backfillWeeks,backfillPeriods,
     freeAgentStatus:String(freeAgentEvidence.status || 'missing'),
     freeAgentCount:['located','empty-confirmed'].includes(String(freeAgentEvidence.status || ''))
       ? Number(freeAgentEvidence.recordCount || 0) : null
@@ -519,7 +587,7 @@ async function finalize(current, body) {
       SELECT ?,?,?,?,?,? WHERE ${activationGuard}`)
       .bind(lifecycleId,current.league.id,snapshot.id,'import-activated',actor,JSON.stringify({
         candidateRunId:run.id,previousSnapshotId:run.active_snapshot_id_before||null,
-        completeness,importMode,backfillWeeks,forwardDetection:{status:'pending-separate-stage'},
+        completeness,importMode,backfillWeeks,backfillPeriods,forwardDetection:{status:'pending-separate-stage'},
         freeAgentStatus:counts.freeAgentStatus,freeAgentCount:counts.freeAgentCount
       }),current.league.id,snapshot.id),
     current.db.prepare(`INSERT INTO tenant_audit_events
@@ -528,7 +596,7 @@ async function finalize(current, body) {
       .bind(auditId,current.league.id,actor,`request_${crypto.randomUUID()}`,`action_${crypto.randomUUID()}`,
         'companion.live_import.activate','companion_candidate_import',run.id,'success',JSON.stringify({
           candidateSnapshotId:snapshot.id,previousSnapshotId:run.active_snapshot_id_before||null,
-          completeness,importMode,backfillWeeks,durationMs,activationPerformed:true,activeSnapshotChanged:true,
+          completeness,importMode,backfillWeeks,backfillPeriods,durationMs,activationPerformed:true,activeSnapshotChanged:true,
           freeAgentStatus:counts.freeAgentStatus,freeAgentCount:counts.freeAgentCount,
           freeAgentInterpretedAsZero:false
         }),current.league.id,snapshot.id)

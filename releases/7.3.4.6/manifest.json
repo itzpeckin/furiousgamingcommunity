@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.6",
+  "releaseType": "route-authoritative-multi-period-historical-backfill",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.4.5",
+    "commit": "df3bcb7cd927f21acd3362d62a722d582f485884",
+    "tree": "b59df52698ed898a2a88edaab702c274dafcf153",
+    "tag": "v7.0.0",
+    "productionDeployment": "927eb46c-1e53-4f72-a0b6-698c2a351861",
+    "workerVersion": "87b5571a-8aff-49f9-853a-d0749d968d6f"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.4.6",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Publish one exact candidate, pass hosted checks, fast-forward that exact candidate to Main, and deploy Production in one consolidated authorized cycle."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Production-first policy applies. No staging cycle is authorized."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.3.4.5",
+    "currentCommit": "df3bcb7cd927f21acd3362d62a722d582f485884",
+    "currentDeployment": "927eb46c-1e53-4f72-a0b6-698c2a351861",
+    "workerVersion": "87b5571a-8aff-49f9-853a-d0749d968d6f",
+    "activeSnapshot": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+    "activeSnapshotPrevious": "8b47ec76-7369-495e-913f-edc0310b49e1",
+    "scope": "Deploy the route-authority and retained multi-period composition runtime, then retry the retained Week 8 source exactly once and atomically activate only its validated candidate while preserving the active Week 9 current-state plane."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "league-engine/one-click-import.js",
+    "workers/franchise-import-worker/src/index.js",
+    "releases/7.3.4.6/release-record.md",
+    "releases/7.3.4.6/validation-evidence.json",
+    "tests/import/candidate-import.test.mjs"
+  ]
+}

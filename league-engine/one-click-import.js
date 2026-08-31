@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.4.5 */
+/* FHQ_BUILD: 7.3.4.6 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.4.5';
+  const VERSION = '7.3.4.6';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -126,8 +126,8 @@
     }
   }
 
-  async function mapStatistics(discoverySessionId) {
-    let result = await api('map-statistics','POST',{action:'start',discoverySessionId});
+  async function mapStatistics(discoverySessionId,candidateImportRunId) {
+    let result = await api('map-statistics','POST',{action:'start',discoverySessionId,candidateImportRunId});
     const runId = result?.mappingRun?.id;
     if (!runId) throw new Error('Statistics mapper did not return its exact run ID.');
     let guard = 0;
@@ -242,14 +242,14 @@
         };
       },wallStartedAt);
 
-      const schedule = await runPhase(runId,'map-schedule',()=>api('map-schedule','POST',{discoverySessionId}),payload=>({
+      const schedule = await runPhase(runId,'map-schedule',()=>api('map-schedule','POST',{discoverySessionId,candidateImportRunId:runId}),payload=>({
         summary:`${Number(payload.mappingRun?.gameCount ?? payload.games?.length ?? 0)} games mapped`,
         counts:{games:Number(payload.mappingRun?.gameCount ?? payload.games?.length ?? 0)},
         warnings:payload.mappingRun?.warnings||[],
         scheduleMappingRunId:payload.mappingRun?.id
       }),wallStartedAt);
 
-      const statistics = await runPhase(runId,'map-statistics',()=>mapStatistics(discoverySessionId),payload=>({
+      const statistics = await runPhase(runId,'map-statistics',()=>mapStatistics(discoverySessionId,runId),payload=>({
         summary:`${Number(payload.mappingRun?.recordCount||0)} statistics mapped`,
         counts:{statistics:Number(payload.mappingRun?.recordCount||0)},
         warnings:payload.mappingRun?.warnings||[],
@@ -333,6 +333,9 @@
     const sub60=live && Number(run.durationMs)<60000;
     const coverage=source?.coverage||{};
     const historicalBackfill=coverage.importMode==='historical-backfill';
+    const retainedPeriods=Array.isArray(coverage.completePeriods)?coverage.completePeriods:[];
+    const periodLabel=period=>`${period?.stage==='preseason'?'Preseason':period?.stage==='playoffs'?'Playoffs':'Regular Season'} Week ${period?.week}`;
+    const retainedScope=retainedPeriods.length>1?`${retainedPeriods.length} periods (${periodLabel(retainedPeriods[0])} through ${periodLabel(retainedPeriods.at(-1))})`:periodLabel(coverage.currentPeriod||{stage:'regular-season',week:coverage.currentWeek});
     const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
     const sourceIsNew=source?.selectionStatus==='new-source';
     const runDisabled=busy||!source||live;
@@ -343,7 +346,7 @@
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
       <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>One-Click Live Import</h3><p>Analyze, map, validate, and atomically publish the newest eligible export with one action.</p></div><span class="pill pill--${live?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(live?'Live':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
       <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
-      ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> only Week ${esc(coverage.currentWeek)} games and statistics are overlaid. Active Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
+      ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
       ${faStatus==='blocked'?`<div class="league-import-framework-note"><svg><use href="#icon-alert-triangle"></use></svg><span><strong>Free Agents blocked upstream:</strong> this candidate is rostered-player-only. The Free Agent count is unknown, never zero.</span></div>`:''}
       <div class="commissioner-import-summary">
         <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>

@@ -3,7 +3,7 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
-const RELEASE='7.3.2';
+const RELEASE='7.3.4.6';
 const RECORD_CHUNK_SIZE=200;
 const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;
@@ -85,8 +85,20 @@ function captureParseStatus(row){
   const headers=safeParse(row?.request_headers_json,{});
   return text(headers?.parseStatus);
 }
-async function capturedRouteCandidates(db,leagueId,discoverySessionId){
-  const result=discoverySessionId
+async function capturedRouteCandidates(db,leagueId,discoverySessionId,captureIds=[]){
+  let selectedRows=null;
+  if(captureIds.length){
+    selectedRows=[];
+    for(let offset=0;offset<captureIds.length;offset+=75){
+      const ids=captureIds.slice(offset,offset+75),marks=ids.map(()=>'?').join(',');
+      const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,payload_hash,
+        byte_length,collections_json,request_headers_json,received_at
+        FROM companion_route_captures WHERE league_id=? AND id IN (${marks}) ORDER BY received_at DESC`)
+        .bind(leagueId,...ids).all();
+      selectedRows.push(...(result.results||[]));
+    }
+  }
+  const result=selectedRows?{results:selectedRows}:discoverySessionId
     ? await db.prepare(`SELECT c.id capture_id,link.session_id discovery_session_id,c.route_path,c.r2_object_key,c.payload_hash,
       c.byte_length,c.collections_json,c.request_headers_json,c.received_at
     FROM madden_discovery_session_captures link
@@ -142,8 +154,8 @@ async function inspectCaptureShape(env,capture,meta){
   }
 }
 
-async function capturedRoutes(db,env,leagueId,discoverySessionId){
-  const grouped=await capturedRouteCandidates(db,leagueId,discoverySessionId);
+async function capturedRoutes(db,env,leagueId,discoverySessionId,captureIds=[]){
+  const grouped=await capturedRouteCandidates(db,leagueId,discoverySessionId,captureIds);
   const selected=[];
 
   const inspectRoute=async([routePath,rows])=>{
@@ -291,9 +303,13 @@ async function latestRun(db,leagueId,includeRows=false){
   const result=await db.prepare(`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=? ORDER BY category,stage,week_index,player_name,team_external_id,external_key LIMIT 500`).bind(leagueId,run.id).all();
   return{...pub,statistics:(result.results||[]).map(row=>({externalKey:row.external_key,category:row.category,seasonYear:row.season_year,stage:row.stage,weekIndex:row.week_index,playerExternalId:row.player_external_id,teamExternalId:row.team_external_id,playerName:row.player_name,position:row.position,metrics:safeParse(row.metrics_json,{}),sourceRoutePath:row.source_route_path}))};
 }
-async function startRun(db,env,leagueId,discoverySessionId){
-  const routes=await capturedRoutes(db,env,leagueId,discoverySessionId);
+async function startRun(db,env,leagueId,discoverySessionId,captureIds=[]){
+  const routes=await capturedRoutes(db,env,leagueId,discoverySessionId,captureIds);
   if(!routes.length)throw Object.assign(new Error('No weekly statistics datasets were captured.'),{status:422});
+  // A retained-period candidate is an exact, auditable re-composition. Process
+  // every selected route even if its payload hash is already in the live
+  // manifest; skipped routes would otherwise contribute no rows to this run.
+  const forceProcessRetainedBundle=Boolean(captureIds.length);
 
   const bootstrap=await bootstrapActiveStatisticsManifest(db,leagueId);
   const activeId=bootstrap.snapshotId||await activeSnapshotId(db,leagueId);
@@ -312,7 +328,7 @@ async function startRun(db,env,leagueId,discoverySessionId){
       (meta?.stage==='reg' && Number(meta.week)===0) ||
       (meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)
     ));
-    const unchanged=Boolean(capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
+    const unchanged=Boolean(!forceProcessRetainedBundle && capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     if(unchanged||optionalEmpty)skipped++;else pending++;
   }
 
@@ -338,7 +354,7 @@ async function startRun(db,env,leagueId,discoverySessionId){
       (meta.stage==='reg' && Number(meta.week)===0) ||
       (meta.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)
     ));
-    const unchanged=Boolean(capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
+    const unchanged=Boolean(!forceProcessRetainedBundle && capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     statements.push(db.prepare(sql).bind(
       crypto.randomUUID(),runId,leagueId,capture.capture_id,capture.discovery_session_id,capture.route_path,
       capture.r2_object_key,capture.payload_hash||'',meta.category,canonicalStage(meta.stage),meta.week,
@@ -484,7 +500,12 @@ export async function onRequestPost(context){
   try{
     const body=await readBody(context.request),action=String(body.action||'start').toLowerCase();
     if(action==='start'){
-      const started=await startRun(state.db,context.env,state.league.id,text(body.discoverySessionId));
+      const candidateRunId=text(body.candidateImportRunId);
+      const candidateRun=candidateRunId?await state.db.prepare(`SELECT discovery_session_id,source_counts_json FROM companion_candidate_import_runs WHERE id=? AND league_id=? AND status='running' LIMIT 1`).bind(candidateRunId,state.league.id).first():null;
+      if(candidateRunId&&!candidateRun)return json({ok:false,error:'A running candidate import is required for retained-period statistics mapping.',release:RELEASE},409);
+      const sourceCounts=candidateRun?safeParse(candidateRun.source_counts_json,{}):{};
+      const sourceCaptureIds=Array.isArray(sourceCounts.sourceCaptureIds)?sourceCounts.sourceCaptureIds.map(String):[];
+      const started=await startRun(state.db,context.env,state.league.id,candidateRun?.discovery_session_id||text(body.discoverySessionId),sourceCaptureIds);
       const run=await state.db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=?`).bind(started.runId).first();
       const pub=await runPublic(state.db,run);
       return json({ok:true,release:RELEASE,action:'start',...pub,

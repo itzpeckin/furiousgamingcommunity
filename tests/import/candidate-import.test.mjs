@@ -12,7 +12,9 @@ import {
   candidateCompleteness,
   candidateHistoricalBackfill,
   candidateHistoryCarryForward,
+  candidateMergedPeriodCoverage,
   candidateMergedWeekCoverage,
+  candidateNormalizePeriod,
   candidateProgress,
   candidateRetryGuidance,
   candidateSourceCoverage,
@@ -137,8 +139,35 @@ test('an older fully covered week is classified as a safe historical backfill, n
   assert.equal(coverage.continuityStatus,'historical-backfill');
   assert.equal(coverage.importMode,'historical-backfill');
   assert.deepEqual(candidateCoverageWarnings(coverage),[
-    'Historical Week 8 backfill will preserve the active Week 9 teams, players, rosters, standings, and live-week position.'
+    'Historical Regular Season Week 8 will be backfilled while preserving the active Regular Season Week 9 teams, players, rosters, standings, and live-week position.'
   ]);
+});
+
+test('retained coverage keeps preseason and regular-season weeks distinct', () => {
+  const datasetInventory=[];
+  for(const [stage,week] of [['pre',1],['pre',2],['reg',1],['reg',8]]){
+    datasetInventory.push(
+      {datasetType:'schedule',routePath:`xbsx/742482/week/${stage}/${week}/schedules`},
+      {datasetType:'statistics',routePath:`xbsx/742482/week/${stage}/${week}/passing`}
+    );
+  }
+  const coverage=candidateSourceCoverage({datasetInventory},9);
+  assert.equal(coverage.importMode,'historical-backfill');
+  assert.deepEqual(coverage.completePeriods.map(period=>period.key),[
+    'preseason:1','preseason:2','regular-season:1','regular-season:8'
+  ]);
+  assert.equal(coverage.currentPeriod.key,'regular-season:8');
+  assert.match(candidateCoverageWarnings(coverage)[0],/4 retained periods from Preseason Week 1 through Regular Season Week 8/);
+});
+
+test('capture route is authoritative over zero-based Madden schedule payload week metadata', () => {
+  assert.deepEqual(candidateNormalizePeriod({
+    external_id:'week-8-game',stage:'regular-season',week_index:7,
+    source_route_path:'xbsx/742482/week/reg/8/schedules'
+  }),{
+    external_id:'week-8-game',stage:'regular-season',week_index:8,
+    source_route_path:'xbsx/742482/week/reg/8/schedules'
+  });
 });
 
 test('a Week 9 candidate carries older active history forward without overriding fresh records', () => {
@@ -188,6 +217,32 @@ test('historical backfill overlays only the selected earlier week and preserves 
   );
   assert.deepEqual(weekly.completeWeeks,[1,7,8,9]);
   assert.deepEqual(weekly.missingWeeks,[2,3,4,5,6]);
+});
+
+test('multi-period backfill composes preseason and regular-season history without moving live Week 9', () => {
+  const prior=[
+    {external_id:'live-9',data_json:JSON.stringify({external_id:'live-9',stage:'regular-season',week_index:9})}
+  ];
+  const periods=[['preseason',1],['preseason',2],['regular-season',1],['regular-season',8]];
+  const fresh=periods.map(([stage,week])=>({
+    external_id:`${stage}-${week}`,stage,week_index:week,
+    source_route_path:`xbsx/742482/week/${stage==='preseason'?'pre':'reg'}/${week}/schedules`
+  }));
+  const merged=candidateHistoricalBackfill(fresh,prior,{
+    keyName:'external_id',activeWeek:9,activePeriod:{stage:'regular-season',week:9},
+    sourcePeriods:periods.map(([stage,week])=>({stage,week}))
+  });
+  assert.equal(merged.applied,4);
+  assert.equal(merged.records.some(row=>row.external_id==='live-9'),true);
+  assert.deepEqual(merged.appliedPeriods.map(period=>period.key),[
+    'preseason:1','preseason:2','regular-season:1','regular-season:8'
+  ]);
+  const statistics=fresh.map(row=>({...row,external_key:`stat:${row.external_id}`}));
+  const coverage=candidateMergedPeriodCoverage(merged.records,statistics,9);
+  assert.deepEqual(coverage.completePeriods.map(period=>period.key),[
+    'preseason:1','preseason:2','regular-season:1','regular-season:8'
+  ]);
+  assert.deepEqual(coverage.missingWeeks,[2,3,4,5,6,7,9]);
 });
 
 test('one private destination and one idempotent candidate run are enforced per source fingerprint', async () => {
@@ -274,6 +329,17 @@ test('commissioner start accepts a fully covered older week only as an exact sam
     sqlite.prepare(`UPDATE companion_league_export_endpoints SET
       latest_session_id='capture-1',latest_report_id='report-backfill-week-8',
       latest_ready_report_id='report-backfill-week-8' WHERE league_id='league-1'`).run();
+    const captureInsert=sqlite.prepare(`INSERT INTO companion_route_captures
+      (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,
+       r2_object_key,collections_json,received_at) VALUES (?,?,?,?,?,?,?,?,?,?)`);
+    for(const [id,routePath,count] of [
+      ['pre-1-schedule','xbsx/742482/week/pre/1/schedules',2],
+      ['pre-1-passing','xbsx/742482/week/pre/1/passing',5],
+      ['pre-4-schedule','xbsx/742482/week/pre/4/schedules',0],
+      ['pre-4-passing','xbsx/742482/week/pre/4/passing',0],
+      ['reg-8-schedule','xbsx/742482/week/reg/8/schedules',14],
+      ['reg-8-passing','xbsx/742482/week/reg/8/passing',30]
+    ])captureInsert.run(id,'league-1','capture-1',routePath,'POST',100,`hash-${id}`,`captures/${id}.json`,JSON.stringify([{path:'records',count}]),'2090-01-01T00:00:00.000Z');
 
     const binding=d1(sqlite);
     const invoke=()=>candidateImport({
@@ -288,10 +354,16 @@ test('commissioner start accepts a fully covered older week only as an exact sam
     let payload=await response.json();
     assert.equal(payload.source.coverage.importMode,'historical-backfill');
     assert.equal(payload.run.sourceCounts.importMode,'historical-backfill');
+    assert.deepEqual(payload.run.sourceCounts.sourcePeriods.map(period=>period.key),[
+      'preseason:1','regular-season:8'
+    ]);
+    assert.equal(payload.run.sourceCounts.sourceCaptureIds.includes('pre-4-schedule'),false);
+    assert.equal(payload.run.sourceCounts.sourceCaptureIds.includes('pre-4-passing'),false);
     assert.equal(payload.run.activeSnapshotIdBefore,'snapshot-live-week-9');
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM companion_candidate_import_runs
       WHERE id<>'candidate-live-week-9'`).get().count,1);
 
+    sqlite.prepare(`DELETE FROM companion_route_captures WHERE league_id='league-1'`).run();
     sqlite.prepare(`UPDATE madden_discovery_reports SET dataset_inventory_json=?,report_hash=?
       WHERE id='report-backfill-week-8'`).run(
         '[{"datasetType":"schedule","routePath":"xbsx/742482/week/reg/8/schedules"}]',
@@ -409,7 +481,7 @@ test('one finalize request atomically publishes the exact validated snapshot and
 });
 
 test('commissioner live import activates only its validated candidate and never resets, prunes, or reinterprets Free Agents', async () => {
-  const [candidate,builder,lifecycle,ui,worker,job,report,reportHelper,classifier,statistics,app]=await Promise.all([
+  const [candidate,builder,lifecycle,ui,worker,job,report,reportHelper,classifier,schedule,statistics,app]=await Promise.all([
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js',import.meta.url),'utf8'),
@@ -419,6 +491,7 @@ test('commissioner live import activates only its validated candidate and never 
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/_lib/madden-discovery-report.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/classify.js',import.meta.url),'utf8'),
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js',import.meta.url),'utf8'),
     readFile(new URL('../../app.js',import.meta.url),'utf8')
   ]);
@@ -426,6 +499,8 @@ test('commissioner live import activates only its validated candidate and never 
   assert.doesNotMatch(candidate,/requirePlatformOwner/);
   assert.match(candidate,/freeAgentCount:\['located','empty-confirmed'\]/);
   assert.match(candidate,/captureDigest/);
+  assert.match(candidate,/retainedPeriodBundle/);
+  assert.match(candidate,/sourceCaptureIds/);
   assert.match(candidate,/payload_hash/);
   assert.match(candidate,/runForSource/);
   assert.match(candidate,/destination_id=\? AND source_fingerprint=\?/);
@@ -452,6 +527,11 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(builder,/domain IN \('teams','players','games','statistics','standings'\)/);
   assert.doesNotMatch(builder,/DELETE\s+FROM/i);
   assert.doesNotMatch(builder,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
+
+  assert.match(schedule,/const week=meta\.week\?\?/);
+  assert.match(schedule,/candidateImportRunId/);
+  assert.match(statistics,/forceProcessRetainedBundle/);
+  for(const source of [ui,worker])assert.match(source,/candidateImportRunId/);
 
   assert.match(lifecycle,/\['activate','rollback'\]\.includes\(action\)/);
   assert.match(lifecycle,/requirePlatformOwner\(context\)/);

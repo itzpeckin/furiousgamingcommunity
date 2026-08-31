@@ -28,6 +28,8 @@ const isAuthorizedProductionDataChange = (
   version === '7.3.2' && evidence.scopeBoundaries?.gameYearTransition === true
 ) || (
   version === '7.3.4.4' && evidence.scopeBoundaries?.activationPerformed === true
+) || (
+  version === '7.3.4.6' && evidence.scopeBoundaries?.activationPerformed === true
 );
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
@@ -1089,6 +1091,114 @@ if (version === '7.3.4.5') {
     || evidence.scopeBoundaries?.exportUrlRotated !== false
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   ) errors.push('7.3.4.5 evidence must preserve every authorized Production remediation boundary.');
+}
+if (version === '7.3.4.6') {
+  const productionDeployed = isPostDeployment;
+  for (const check of [
+    'routeAuthority',
+    'retainedMultiPeriodImport',
+    'historicalBackfillSafety',
+    'activeSnapshotBaseline',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.4.6 remediation evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.routeAuthority?.scheduleRouteStageAuthoritative !== true
+    || evidence.checks?.routeAuthority?.scheduleRouteWeekAuthoritative !== true
+    || evidence.checks?.routeAuthority?.zeroBasedPayloadWeekCorrected !== true
+    || evidence.checks?.routeAuthority?.statisticsRouteAuthorityPreserved !== true
+    || evidence.checks?.retainedMultiPeriodImport?.preseasonAndRegularSeasonDistinct !== true
+    || evidence.checks?.retainedMultiPeriodImport?.allCompleteRetainedPeriodsComposed !== true
+    || evidence.checks?.retainedMultiPeriodImport?.latestCapturePerExactRoutePinned !== true
+    || evidence.checks?.retainedMultiPeriodImport?.partialPeriodsExcluded !== true
+    || evidence.checks?.retainedMultiPeriodImport?.anotherExportRequired !== false
+    || Number(evidence.checks?.retainedMultiPeriodImport?.expectedPeriodCount) !== 11
+    || JSON.stringify(evidence.checks?.retainedMultiPeriodImport?.expectedPreseasonWeeks) !== '[1,2,3]'
+    || JSON.stringify(evidence.checks?.retainedMultiPeriodImport?.expectedRegularSeasonWeeks) !== '[1,2,3,4,5,6,7,8]'
+    || evidence.checks?.historicalBackfillSafety?.activeTeamsPreserved !== true
+    || evidence.checks?.historicalBackfillSafety?.activePlayersAndRostersPreserved !== true
+    || evidence.checks?.historicalBackfillSafety?.activeStandingsPreserved !== true
+    || evidence.checks?.historicalBackfillSafety?.liveWeekPreserved !== true
+    || evidence.checks?.historicalBackfillSafety?.eachRetainedPeriodRequiresGamesAndStatistics !== true
+    || evidence.checks?.historicalBackfillSafety?.atomicExpectedPointerActivation !== true
+  ) errors.push('7.3.4.6 must prove route-authoritative, stage-aware, complete retained-period composition and atomic live-state preservation.');
+  if (
+    evidence.checks?.activeSnapshotBaseline?.snapshotId !== '518236e4-1cac-41f5-b8c8-757b7150dcd8'
+    || evidence.checks?.activeSnapshotBaseline?.previousSnapshotId !== '8b47ec76-7369-495e-913f-edc0310b49e1'
+    || Number(evidence.checks?.activeSnapshotBaseline?.week) !== 9
+    || Number(evidence.checks?.activeSnapshotBaseline?.teams) !== 32
+    || Number(evidence.checks?.activeSnapshotBaseline?.rosteredPlayers) !== 2042
+    || Number(evidence.checks?.activeSnapshotBaseline?.games) !== 29
+    || Number(evidence.checks?.activeSnapshotBaseline?.statistics) !== 910
+    || Number(evidence.checks?.activeSnapshotBaseline?.standings) !== 32
+    || evidence.checks?.activeSnapshotBaseline?.validationStatus !== 'ready'
+    || Number(evidence.checks?.activeSnapshotBaseline?.validationErrors) !== 0
+    || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+  ) errors.push('7.3.4.6 must retain the exact pre-remediation Week 9 baseline and blocked/null Free Agent evidence.');
+  if (productionDeployed) {
+    if (
+      manifest.status !== 'released'
+      || manifest.repositoryPublication?.status !== 'published-hosted-checks-passed-main'
+      || evidence.external?.githubPublication?.status !== 'published-main'
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || Number(evidence.external?.hostedChecks?.candidatePassed) < 4
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.status !== 'success-owner-accepted'
+      || evidence.external?.productionDeployment?.status !== 'success'
+      || evidence.external?.productionCandidateImport?.status !== 'activated'
+      || Number(evidence.external?.productionCandidateImport?.retryCount) !== 1
+      || Number(evidence.external?.productionCandidateImport?.maximumRetryCount) !== 1
+      || evidence.scopeBoundaries?.candidateImportExecuted !== true
+      || evidence.scopeBoundaries?.activationPerformed !== true
+      || evidence.scopeBoundaries?.activeSnapshotChanged !== true
+    ) errors.push('Released 7.3.4.6 evidence must record exact publication, deployment, one retained-source retry, and atomic activation.');
+  } else if (
+    manifest.status !== 'validated-production-authorized'
+    || manifest.repositoryPublication?.authorized !== true
+    || manifest.repositoryPublication?.status !== 'authorized-not-run'
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+    || manifest.production?.authorized !== true
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'authorized-not-run'
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+    || evidence.external?.productionCandidateImport?.status !== 'authorized-not-run'
+    || Number(evidence.external?.productionCandidateImport?.retryCount) !== 0
+  ) errors.push('Authorized 7.3.4.6 evidence must retain pending publication, deployment, and exact-once retry gates.');
+  if (
+    manifest.staging?.authorized !== false
+    || manifest.staging?.deployed !== false
+    || evidence.external?.stagingDeployment?.status !== 'not-run'
+    || evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-required'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 26
+    || evidence.external?.productionMaddenExport?.authorized !== false
+    || evidence.external?.productionMaddenExport?.status !== 'not-run'
+    || evidence.external?.productionMaddenExport?.anotherExportRequired !== false
+    || evidence.external?.archiveSeason?.status !== 'not-run'
+    || evidence.external?.gameYearTransition?.status !== 'not-run'
+  ) errors.push('7.3.4.6 must preserve staging, migration, new-export, archive-season, and transition boundaries.');
+  if (
+    evidence.scopeBoundaries?.productionChanged !== productionDeployed
+    || evidence.scopeBoundaries?.productionDataChanged !== productionDeployed
+    || evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== productionDeployed
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.archiveGameYearExecuted !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.3.4.6 evidence must preserve every authorized Production remediation boundary.');
 }
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));

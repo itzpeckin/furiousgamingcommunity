@@ -1,8 +1,8 @@
 /* FHQ_BUILD: 5.9.10.6.5.4h-p5d */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-import { candidateCoverageWarnings, candidateHistoricalBackfill, candidateHistoryCarryForward, candidateMergedWeekCoverage, candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
-const RELEASE='7.3.4.5';
+import { candidateCoverageWarnings, candidateHistoricalBackfill, candidateHistoryCarryForward, candidateMergedPeriodCoverage, candidatePeriodLabel, candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
+const RELEASE='7.3.4.6';
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 async function latest(db,table,leagueId,status=true){const where=status?" AND status='pending-preview'":'';return db.prepare(`SELECT * FROM ${table} WHERE league_id=?${where} ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();}
 async function rows(db,sql,...args){const r=await db.prepare(sql).bind(...args).all();return r.results||[];}
@@ -74,7 +74,8 @@ try{
      .bind(candidateRun.active_snapshot_id_before,league.id,candidateRun.game_year_id,
        candidateRun.destination_season_year,candidateRun.franchise_season_id).first():null
  ]);
- const coverage=candidateSourceCoverage({
+ const runSourceCounts=parse(candidateRun.source_counts_json)||{};
+ const coverage=runSourceCounts.sourceCoverage||candidateSourceCoverage({
    sourceMarkers:parse(sourceReport?.source_markers_json)||{},
    datasetInventory:parse(sourceReport?.dataset_inventory_json)||[]
  },activeSource?.week_index);
@@ -87,24 +88,29 @@ try{
  const priorDomain=domain=>priorRecords.filter(row=>row.domain===domain);
  const parsedDomain=domain=>priorDomain(domain).map(row=>parse(row.data_json)).filter(Boolean);
  const currentWeek=coverage.currentWeek;
- const sourceWeeks=currentWeek===null||currentWeek===undefined?[]:[currentWeek];
+ const sourcePeriods=Array.isArray(coverage.completePeriods)&&coverage.completePeriods.length
+   ?coverage.completePeriods:(currentWeek===null||currentWeek===undefined?[]:[{stage:'regular-season',week:currentWeek}]);
+ const sourceWeeks=[...new Set(sourcePeriods.map(period=>Number(period.week)).filter(Number.isInteger))];
  const gameHistory=historicalBackfill
-   ?candidateHistoricalBackfill(freshGames,priorDomain('games'),{keyName:'external_id',activeWeek:activeSource.week_index,sourceWeeks})
+   ?candidateHistoricalBackfill(freshGames,priorDomain('games'),{keyName:'external_id',activeWeek:activeSource.week_index,activePeriod:coverage.activePeriod,sourceWeeks,sourcePeriods})
    :candidateHistoryCarryForward(freshGames,priorDomain('games'),{keyName:'external_id',currentWeek});
  const statisticHistory=historicalBackfill
-   ?candidateHistoricalBackfill(freshStatistics,priorDomain('statistics'),{keyName:'external_key',activeWeek:activeSource.week_index,sourceWeeks})
+   ?candidateHistoricalBackfill(freshStatistics,priorDomain('statistics'),{keyName:'external_key',activeWeek:activeSource.week_index,activePeriod:coverage.activePeriod,sourceWeeks,sourcePeriods})
    :candidateHistoryCarryForward(freshStatistics,priorDomain('statistics'),{keyName:'external_key',currentWeek});
  const teams=historicalBackfill?parsedDomain('teams'):freshTeams;
  const players=historicalBackfill?parsedDomain('players'):freshPlayers;
  const standingRows=historicalBackfill?parsedDomain('standings'):standingSource.records;
  const games=gameHistory.records,statistics=statisticHistory.records;
- if(historicalBackfill&&(!gameHistory.applied||!statisticHistory.applied))return json({ok:false,release:RELEASE,
-   error:`Historical Week ${currentWeek} backfill did not produce both week-scoped games and statistics.`,
+ const gameAppliedPeriods=new Set((gameHistory.appliedPeriods||[]).map(period=>period.key));
+ const statisticAppliedPeriods=new Set((statisticHistory.appliedPeriods||[]).map(period=>period.key));
+ const missingAppliedPeriods=sourcePeriods.filter(period=>!gameAppliedPeriods.has(period.key)||!statisticAppliedPeriods.has(period.key));
+ if(historicalBackfill&&(!gameHistory.applied||!statisticHistory.applied||missingAppliedPeriods.length))return json({ok:false,release:RELEASE,
+   error:`Historical Week/period backfill did not produce both route-scoped games and statistics for ${missingAppliedPeriods.length?missingAppliedPeriods.map(candidatePeriodLabel).join(', '):'every retained period'}.`,
    sourceCoverage:coverage,activeSnapshotChanged:false,activationPerformed:false},422);
- const mergedCoverage=candidateMergedWeekCoverage(games,statistics,historicalBackfill?activeSource.week_index:null);
+ const mergedCoverage=candidateMergedPeriodCoverage(games,statistics,historicalBackfill?activeSource.week_index:null);
  const warnings=candidateCoverageWarnings(coverage);
  if(historicalBackfill){
-   warnings.push(`Historical Week ${currentWeek} backfill applied ${gameHistory.applied} game record(s) and ${statisticHistory.applied} statistic record(s) without changing active Week ${activeSource.week_index}.`);
+   warnings.push(`Historical backfill applied ${gameHistory.applied} game record(s) and ${statisticHistory.applied} statistic record(s) across ${sourcePeriods.length} retained period(s) without changing active Regular Season Week ${activeSource.week_index}.`);
    if(mergedCoverage.missingWeeks.length)warnings.push(`Historical coverage still missing through active Week ${activeSource.week_index}: ${mergedCoverage.missingWeeks.map(week=>`Week ${week}`).join(', ')}.`);
  }else{
    if(activeSource&&gameHistory.retained)warnings.push(`${gameHistory.retained} earlier game record(s) were carried forward from active snapshot ${activeSource.id}.`);
@@ -121,7 +127,7 @@ try{
  if(Number(statisticsRun.warning_count||0))warnings.push(`Statistics mapper reported ${statisticsRun.warning_count} warning(s).`);
  const seasonCandidates=[...games.map(x=>x.season_year),...statistics.map(x=>x.season_year),...standingRows.map(x=>x.calendarYear)].map(Number).filter(Number.isFinite);
  const weekCandidates=[...games.map(x=>x.week_index),...statistics.map(x=>x.week_index),...standingRows.map(x=>x.weekIndex)].map(Number).filter(Number.isFinite);
- const manifest={release:RELEASE,leagueId:league.id,candidateImportRunId:candidateRun.id,storageRetention:retention,sourceCoverage:coverage,importMode:coverage.importMode,historyCarryForward:{sourceSnapshotId:activeSource?.id||null,games:historicalBackfill?0:gameHistory.retained,statistics:historicalBackfill?0:statisticHistory.retained,gameWeeks:historicalBackfill?[]:gameHistory.retainedWeeks,statisticWeeks:historicalBackfill?[]:statisticHistory.retainedWeeks},historicalBackfill:historicalBackfill?{sourceSnapshotId:activeSource.id,sourceWeeks,liveWeekPreserved:Number(activeSource.week_index),gamesApplied:gameHistory.applied,statisticsApplied:statisticHistory.applied,teamsPreserved:teams.length,playersPreserved:players.length,standingsPreserved:standingRows.length,mergedCoverage}:null,sources:{teamMappingRunId:teamRun.id,playerMappingRunId:playerRun.id,scheduleMappingRunId:scheduleRun.id,statisticsMappingRunId:statisticsRun.id,standingsCaptureId:standingSource.capture?.id||null,standingsRoute:standingSource.capture?.route_path||null},pinnedMappingRuns:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},builtAt:new Date().toISOString(),immutable:true,privateCandidate:true,activationPerformed:false,activeSnapshotChanged:false};
+ const manifest={release:RELEASE,leagueId:league.id,candidateImportRunId:candidateRun.id,storageRetention:retention,sourceCoverage:coverage,importMode:coverage.importMode,historyCarryForward:{sourceSnapshotId:activeSource?.id||null,games:historicalBackfill?0:gameHistory.retained,statistics:historicalBackfill?0:statisticHistory.retained,gameWeeks:historicalBackfill?[]:gameHistory.retainedWeeks,statisticWeeks:historicalBackfill?[]:statisticHistory.retainedWeeks},historicalBackfill:historicalBackfill?{sourceSnapshotId:activeSource.id,sourceWeeks,sourcePeriods,liveWeekPreserved:Number(activeSource.week_index),gamesApplied:gameHistory.applied,statisticsApplied:statisticHistory.applied,teamsPreserved:teams.length,playersPreserved:players.length,standingsPreserved:standingRows.length,mergedCoverage}:null,sources:{teamMappingRunId:teamRun.id,playerMappingRunId:playerRun.id,scheduleMappingRunId:scheduleRun.id,statisticsMappingRunId:statisticsRun.id,standingsCaptureId:standingSource.capture?.id||null,standingsRoute:standingSource.capture?.route_path||null},pinnedMappingRuns:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},builtAt:new Date().toISOString(),immutable:true,privateCandidate:true,activationPerformed:false,activeSnapshotChanged:false};
  const snapshotId=crypto.randomUUID();
  await db.batch([
   db.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warning_count,warnings_json,manifest_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(snapshotId,league.id,'pending-validation',Number(candidateRun.destination_season_year)|| (seasonCandidates.length?Math.max(...seasonCandidates):null),weekCandidates.length?Math.max(...weekCandidates):null,teams.length,players.length,games.length,statistics.length,standingRows.length,warnings.length,JSON.stringify(warnings),JSON.stringify(manifest)),

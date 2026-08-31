@@ -1,5 +1,15 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.4.6 route-authority and retained multi-period impact
+
+The authorized 7.3.4.6 runtime adds no migration. It makes the capture route authoritative for schedule stage/week and allows one historical candidate to pin and compose every data-bearing retained period through the selected older source. For the authorized FGC retry, that retained scope is Preseason Weeks 1–3 plus Regular Season Weeks 1–8. Madden's all-zero Preseason Week 4 placeholder is excluded; no new Madden export or export-URL rotation is required.
+
+The candidate starts from active Week 9 snapshot `518236e4-1cac-41f5-b8c8-757b7150dcd8`. It may overlay route-scoped games/statistics for retained earlier periods only. Teams, 2,042 active rostered players, rosters, standings, Madden game year, franchise season, and the live Week 9 position remain authoritative from the active snapshot. Every selected period must produce both games and statistics, validation must be ready, and the expected active pointer must still match before atomic activation.
+
+Runtime rollback restores exact 7.3.4.5 Main commit `df3bcb7cd927f21acd3362d62a722d582f485884`, Pages deployment `927eb46c-1e53-4f72-a0b6-698c2a351861`, and Worker version `87b5571a-8aff-49f9-853a-d0749d968d6f`. Retain all 7.3.4.6 raw captures, reports, mapping runs, candidates, snapshots, lifecycle events, audit rows, and the active pointer produced by an accepted activation. Code rollback does not imply snapshot rollback.
+
+Do not reset data, delete history, rotate the permanent export URL, require another export, run Archive Season, run a game-year transition, roll the live state back to Week 8, or reinterpret blocked/null Free Agents as zero.
+
 ## 7.3.4.5 historical-backfill and live-refresh impact
 
 The authorized 7.3.4.5 patch adds no migration and performs no data operation during deployment. It changes candidate composition only when a commissioner later selects **Import Latest Export** for an eligible source older than the active week. That source must belong to the exact active Madden game year and franchise season and prove schedule plus statistics coverage for its captured week.
