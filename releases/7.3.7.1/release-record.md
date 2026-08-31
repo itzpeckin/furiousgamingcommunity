@@ -37,6 +37,5 @@ Normalize Madden's raw `REDG` and `LEDG` positions to the established `REDGE` an
 
 ## Rollback
 
-- Before publication, discard only the unmerged candidate; Production remains unchanged.
-- After a future accepted deployment, runtime rollback restores exact accepted 7.3.7 commit `3f3bcdddceae2e5a684980cc303083f4ba6639cb` and Pages deployment `5dba5ab4-4591-4f2c-a517-4c4ca7fefc78` while retaining migration 27 and all ownership, identity, membership, audit, import, and snapshot rows.
+- Runtime rollback restores exact accepted 7.3.7 commit `3f3bcdddceae2e5a684980cc303083f4ba6639cb` and Pages deployment `5dba5ab4-4591-4f2c-a517-4c4ca7fefc78` while retaining migration 27 and all ownership, identity, membership, audit, import, and snapshot rows.
 - Never use this code-only rollback to move the active snapshot, reset/import data, run Archive Season, run a game-year transition, rotate the export URL, rewrite ownership history, or reinterpret blocked Free Agents as zero.
