@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.7.1",
   "releaseType": "edge-position-and-league-history-remediation",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.7",
@@ -18,13 +18,13 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0,
-    "mainChecksPassed": 0,
-    "scope": "Local implementation and validation only; publication is not recorded until the exact candidate is separately authorized."
+    "authorized": true,
+    "status": "published-main-accepted",
+    "commit": "25b218956ef775fee3e1a04e0f0bef6001547b21",
+    "pullRequest": 29,
+    "hostedChecksPassed": 4,
+    "mainChecksPassed": 5,
+    "scope": "Exact candidate published through PR #29, fast-forwarded unchanged to Main, and accepted by every hosted check."
   },
   "staging": {
     "authorized": false,
@@ -32,16 +32,17 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "7.3.7",
-    "currentCommit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb",
-    "currentPagesDeployment": "5dba5ab4-4591-4f2c-a517-4c4ca7fefc78",
+    "authorized": true,
+    "deployed": true,
+    "status": "deployed-read-only-verified-pending-owner-acceptance",
+    "currentRelease": "7.3.7.1",
+    "currentCommit": "25b218956ef775fee3e1a04e0f0bef6001547b21",
+    "currentPagesDeployment": "64140548-d20a-411f-8d81-17649cdfe8fa",
+    "currentWorkerBuild": "53833ba4-28db-4ff7-bff8-053c1d8e8095",
     "currentMigration": 27,
     "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
     "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
-    "scope": "Code-only candidate. No migration, ownership reconciliation, import, activation, archive, transition, or other Production data operation is required."
+    "scope": "Code-only release. Read-only HTTPS acceptance verified the exact assets; no migration, ownership reconciliation, import, activation, archive, transition, or other Production data operation ran."
   },
   "requiredArtifacts": [
     "docs/ROADMAP.md",

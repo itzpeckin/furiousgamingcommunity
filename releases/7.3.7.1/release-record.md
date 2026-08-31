@@ -1,8 +1,8 @@
 # FranchiseHQ 7.3.7.1 Release Record
 
-**Status:** Validated local review candidate
+**Status:** Production deployed and read-only verified; pending owner UI acceptance
 
-**Production changed:** No. Production remains on accepted 7.3.7 commit `3f3bcdddceae2e5a684980cc303083f4ba6639cb`, migration 27, Pages deployment `5dba5ab4-4591-4f2c-a517-4c4ca7fefc78`, and active snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`.
+**Production changed:** Application code only. Exact commit `25b218956ef775fee3e1a04e0f0bef6001547b21` is on Main and Production Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa`; migration 27 and active snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e` remain unchanged.
 
 ## Scope
 
@@ -30,9 +30,10 @@ Normalize Madden's raw `REDG` and `LEDG` positions to the established `REDGE` an
 
 ## Deployment status
 
-- The exact 7.3.7.1 candidate has not been published, merged to Main, or deployed.
-- No staging run is planned. A separate owner authorization is required for branch publication, pull request, hosted checks, Main merge, and Production deployment.
-- Production migration 27, the active Week 9 snapshot, 17 existing GM identities, 17 ownership periods, memberships, and every import/audit row remain unchanged.
+- PR #29 published the exact candidate and passed 4/4 pull-request checks. Main is the same exact commit and passed all five Main/build/deployment checks.
+- Production Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa` and Worker build `53833ba4-28db-4ff7-bff8-053c1d8e8095` succeeded. Live HTTPS assets expose release `7.3.7.1`, both edge aliases, and the League History table.
+- No staging run occurred. Production migration 27, the active Week 9 snapshot, 17 existing GM identities, 17 ownership periods, memberships, and every import/audit row remain unchanged.
+- Owner UI acceptance remains open. This read-only deployment verification does not claim that the signed-in league screens have been accepted.
 
 ## Rollback
 

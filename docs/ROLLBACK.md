@@ -1,10 +1,10 @@
 # FranchiseHQ Rollback and Recovery
 
-## 7.3.7.1 edge-position and League History candidate impact
+## 7.3.7.1 edge-position and League History Production impact
 
-The validated 7.3.7.1 candidate is code-only. It canonicalizes Madden's raw `REDG`/`LEDG` source labels to `REDGE`/`LEDGE` across shared player, statistics, roster, depth-chart, stable-API, and future-import paths. It also adds a tenant-scoped, membership-authoritative **League History** table within Standings. It adds no migration and writes no ownership, identity, membership, audit, import, snapshot, archive, transition, or other database row.
+Exact 7.3.7.1 commit `25b218956ef775fee3e1a04e0f0bef6001547b21` is live on Production Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa`. The code-only release canonicalizes Madden's raw `REDG`/`LEDG` source labels to `REDGE`/`LEDGE` across shared player, statistics, roster, depth-chart, stable-API, and future-import paths. It also adds a tenant-scoped, membership-authoritative **League History** table within Standings. It added no migration and wrote no ownership, identity, membership, audit, import, snapshot, archive, transition, or other database row.
 
-Production remains on exact accepted 7.3.7 commit `3f3bcdddceae2e5a684980cc303083f4ba6639cb`, migration 27, and Pages deployment `5dba5ab4-4591-4f2c-a517-4c4ca7fefc78`. A future runtime rollback from 7.3.7.1 restores that exact application while retaining migration 27, all 17 GM identities, all 17 opening ownership periods, frozen summaries, memberships, roles, users, sessions, settings, rules, audits, imports, and snapshots.
+Runtime rollback restores exact accepted 7.3.7 commit `3f3bcdddceae2e5a684980cc303083f4ba6639cb` and Pages deployment `5dba5ab4-4591-4f2c-a517-4c4ca7fefc78` while retaining migration 27, all 17 GM identities, all 17 opening ownership periods, frozen summaries, memberships, roles, users, sessions, settings, rules, audits, imports, and snapshots.
 
 Deployment or rollback does not authorize ownership reconciliation, a Madden export/import, active snapshot change, reset, Archive Season, game-year transition, permanent deletion, export-URL rotation, credential change, or interpretation of blocked Free Agents as zero.
 

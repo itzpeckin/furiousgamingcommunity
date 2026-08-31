@@ -1730,7 +1730,7 @@ if (version === '7.3.7.1') {
     || Number(evidence.checks?.strictMigration?.requiredTables) !== 80
     || evidence.checks?.strictMigration?.productionAlreadyApplied !== true
   ) errors.push('7.3.7.1 must retain migration 27, the exact active Week 9 snapshot, and blocked/null Free Agent baseline.');
-  if (
+  if (!isPostDeployment && (
     manifest.status !== 'validated-review-candidate'
     || manifest.repositoryPublication?.authorized !== false
     || manifest.repositoryPublication?.status !== 'not-run'
@@ -1740,12 +1740,34 @@ if (version === '7.3.7.1') {
     || manifest.production?.currentRelease !== '7.3.7'
     || manifest.production?.currentCommit !== '3f3bcdddceae2e5a684980cc303083f4ba6639cb'
     || manifest.production?.currentPagesDeployment !== '5dba5ab4-4591-4f2c-a517-4c4ca7fefc78'
-    || evidence.external?.productionMigration?.authorized !== false
+  )) errors.push('7.3.7.1 must remain an unpublished code-only candidate on the exact accepted 7.3.7 Production baseline.');
+  if (isPostDeployment && (
+    manifest.status !== 'production-deployed-pending-owner-acceptance'
+    || manifest.repositoryPublication?.authorized !== true
+    || manifest.repositoryPublication?.status !== 'published-main-accepted'
+    || manifest.repositoryPublication?.commit !== '25b218956ef775fee3e1a04e0f0bef6001547b21'
+    || Number(manifest.repositoryPublication?.pullRequest) !== 29
+    || Number(manifest.repositoryPublication?.hostedChecksPassed) !== 4
+    || Number(manifest.repositoryPublication?.mainChecksPassed) !== 5
+    || manifest.production?.authorized !== true
+    || manifest.production?.deployed !== true
+    || manifest.production?.status !== 'deployed-read-only-verified-pending-owner-acceptance'
+    || manifest.production?.currentRelease !== '7.3.7.1'
+    || manifest.production?.currentCommit !== '25b218956ef775fee3e1a04e0f0bef6001547b21'
+    || manifest.production?.currentPagesDeployment !== '64140548-d20a-411f-8d81-17649cdfe8fa'
+    || evidence.checks?.productionHttpsAcceptance?.passed !== true
+    || evidence.checks?.productionHttpsAcceptance?.status !== 'read-only-verified'
+    || evidence.external?.githubPublication?.status !== 'published-main-accepted'
+    || evidence.external?.hostedChecks?.status !== 'passed'
+    || evidence.external?.productionDeployment?.status !== 'deployed-read-only-verified-pending-owner-acceptance'
+  )) errors.push('7.3.7.1 deployed evidence must record exact PR, Main, Pages, and read-only Production acceptance.');
+  if (
+    evidence.external?.productionMigration?.authorized !== false
     || evidence.external?.productionMigration?.status !== 'not-required'
     || Number(evidence.external?.productionMigration?.currentMigration) !== 27
     || Number(evidence.external?.productionMigration?.candidateMigration) !== 27
-  ) errors.push('7.3.7.1 must remain an unpublished code-only candidate on the exact accepted 7.3.7 Production baseline.');
-  if (
+  ) errors.push('7.3.7.1 must remain code-only on already-applied migration 27.');
+  if (!isPostDeployment && (
     evidence.scopeBoundaries?.productionChanged !== false
     || evidence.scopeBoundaries?.productionDataChanged !== false
     || evidence.scopeBoundaries?.activeSnapshotChanged !== false
@@ -1761,7 +1783,24 @@ if (version === '7.3.7.1') {
     || evidence.scopeBoundaries?.identityRowsCreated !== 0
     || evidence.scopeBoundaries?.ownershipRowsCreated !== 0
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
-  ) errors.push('7.3.7.1 must preserve every candidate data-plane and authorization boundary.');
+  )) errors.push('7.3.7.1 must preserve every candidate data-plane and authorization boundary.');
+  if (isPostDeployment && (
+    evidence.scopeBoundaries?.productionChanged !== true
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== true
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.scopeBoundaries?.identityRowsCreated !== 0
+    || evidence.scopeBoundaries?.ownershipRowsCreated !== 0
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  )) errors.push('7.3.7.1 deployed evidence must preserve every code-only data-plane boundary.');
 }
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));

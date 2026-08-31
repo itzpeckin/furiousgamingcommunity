@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.7.1",
   "validatedOn": "2026-08-31",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "edgePositionNormalization": {
@@ -81,17 +81,21 @@
       "requiredTables": 80
     },
     "productionHttpsAcceptance": {
-      "passed": false,
-      "status": "not-run",
-      "reason": "Production publication is not authorized by this local candidate record."
+      "passed": true,
+      "status": "read-only-verified",
+      "releaseHeader": "7.3.7.1",
+      "applicationAssetBytes": 622481,
+      "edgeAliasesVerified": true,
+      "leagueHistoryAssetVerified": true,
+      "reason": "Live HTTPS assets expose the exact release marker, REDG/LEDG aliases, and League History UI after the authorized deployment."
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
     "resetPerformed": false,
     "transitionOperationExecuted": false,
     "archiveSeasonExecuted": false,
@@ -109,14 +113,15 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "commit": "25b218956ef775fee3e1a04e0f0bef6001547b21", "pullRequest": 29 },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestPassed": 4, "mainPassed": 5, "failed": 0, "pending": 0 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRuntimeCommit": "3f3bcdddceae2e5a684980cc303083f4ba6639cb",
-      "pagesDeployment": "5dba5ab4-4591-4f2c-a517-4c4ca7fefc78",
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-owner-acceptance",
+      "currentRuntimeCommit": "25b218956ef775fee3e1a04e0f0bef6001547b21",
+      "pagesDeployment": "64140548-d20a-411f-8d81-17649cdfe8fa",
+      "workerBuild": "53833ba4-28db-4ff7-bff8-053c1d8e8095",
       "workerSourceChanged": false,
       "databaseRowsWrittenByCandidateWork": 0
     },
@@ -126,7 +131,7 @@
     "archiveSeason": { "authorized": false, "status": "not-run" },
     "gameYearTransition": { "authorized": false, "status": "not-run" }
   },
-  "productionChanged": false,
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false
