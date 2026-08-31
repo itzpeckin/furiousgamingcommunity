@@ -127,7 +127,8 @@ export async function loadCanonicalMigrations() {
       23: 'permanent_identity_preview',
       24: 'commissioner_candidate_import',
       25: 'safe_game_year_transition',
-      26: 'permanent_league_export_url'
+      26: 'permanent_league_export_url',
+      27: 'gm_career_history'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);

@@ -18,6 +18,9 @@ function membershipDatabase({ targetMembership = null, occupied = null, membersh
   ];
   return {
     preparedSql,
+    async batch(statements) {
+      return Promise.all(statements.map(statement => statement.run()));
+    },
     prepare(sql) {
       preparedSql.push(sql);
       return {

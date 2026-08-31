@@ -17,6 +17,8 @@ import {
   validateTypedConfirmation
 } from '../../../_lib/game-year-transition.js';
 import { requireCommissioner } from '../../../_lib/permissions.js';
+import { activeLeagueTeams, resolveTeam } from '../../../_lib/league-teams.js';
+import { buildGmSeasonSummaries } from '../../../_lib/gm-career.js';
 
 const RELEASE = GAME_YEAR_TRANSITION_RELEASE;
 const PAGE_SIZE = 250;
@@ -82,6 +84,49 @@ async function access(context) {
 
 async function all(db, sql, ...args) {
   return resultRows(await db.prepare(sql).bind(...args).all());
+}
+
+function ownershipGameRecord(row,teams,franchiseSeasonId){
+  const raw=parse(row.data_json,{})||{};
+  const source=typeof raw.source_record_json==='string'?parse(raw.source_record_json,{}):(raw.source_record_json||raw.source||{});
+  const value=(...keys)=>{for(const key of keys){const candidate=raw[key]??source?.[key];if(candidate!==undefined&&candidate!==null&&candidate!=='')return candidate}return null};
+  const home=value('home_team_external_id','homeTeamId','home_team_id','homeId');
+  const away=value('away_team_external_id','awayTeamId','away_team_id','awayId');
+  return{
+    id:row.external_id,franchiseSeasonId,
+    stage:value('stage','stage_name','stageName','seasonStage'),
+    week:Number(value('week_index','weekIndex','week'))||0,
+    status:value('status','game_status','gameStatus'),
+    homeTeamKey:resolveTeam(teams,home)?.teamKey||'',awayTeamKey:resolveTeam(teams,away)?.teamKey||'',
+    homeScore:Number(value('home_score','homeScore')),awayScore:Number(value('away_score','awayScore'))
+  };
+}
+
+async function gmSeasonFreeze(current,franchiseSeasonId,snapshotId){
+  const teams=await activeLeagueTeams(current.db,current.league.id);
+  const periods=await all(current.db,`SELECT id,gm_identity_id,team_key,franchise_season_id,started_stage,started_week,ended_stage,ended_week
+    FROM team_ownership_periods WHERE league_id=? AND franchise_season_id=?`,current.league.id,franchiseSeasonId);
+  const rows=await all(current.db,`SELECT external_id,data_json FROM league_snapshot_records
+    WHERE league_id=? AND snapshot_id=? AND domain='games' ORDER BY external_id`,current.league.id,snapshotId);
+  const games=rows.map(row=>ownershipGameRecord(row,teams,franchiseSeasonId));
+  const built=buildGmSeasonSummaries({games,periods,franchiseSeasonId});
+  const statements=built.summaries.map(summary=>current.db.prepare(`INSERT INTO gm_season_summaries
+    (league_id,franchise_season_id,gm_identity_id,teams_json,regular_wins,regular_losses,regular_ties,
+     playoff_wins,playoff_losses,playoff_ties,playoff_appearance,conference_championships,
+     super_bowl_appearances,super_bowl_championships,game_count,source_snapshot_id,frozen_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+    ON CONFLICT(league_id,franchise_season_id,gm_identity_id) DO UPDATE SET
+      teams_json=excluded.teams_json,regular_wins=excluded.regular_wins,regular_losses=excluded.regular_losses,
+      regular_ties=excluded.regular_ties,playoff_wins=excluded.playoff_wins,playoff_losses=excluded.playoff_losses,
+      playoff_ties=excluded.playoff_ties,playoff_appearance=excluded.playoff_appearance,
+      conference_championships=excluded.conference_championships,super_bowl_appearances=excluded.super_bowl_appearances,
+      super_bowl_championships=excluded.super_bowl_championships,game_count=excluded.game_count,
+      source_snapshot_id=excluded.source_snapshot_id,frozen_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`)
+    .bind(current.league.id,franchiseSeasonId,summary.gmIdentityId,JSON.stringify(summary.teams),
+      summary.regularWins,summary.regularLosses,summary.regularTies,summary.playoffWins,summary.playoffLosses,summary.playoffTies,
+      summary.playoffAppearance,summary.conferenceChampionships,summary.superBowlAppearances,summary.superBowlChampionships,
+      summary.gameCount,snapshotId));
+  return{summaries:built.summaries,statements,attributedGameCount:built.attributedGames.length};
 }
 
 async function paged(db, sql, args = []) {
@@ -959,14 +1004,16 @@ async function archiveFranchiseSeason(current, gameYear) {
   if(!next)return{response:json({ok:false,error:'The next franchise season identity could not be derived safely.',release:RELEASE},409)};
   const summaries=await all(current.db,`SELECT player_identity_id,career_totals_json,season_totals_json FROM player_season_summaries WHERE league_id=? AND franchise_season_id=? ORDER BY player_identity_id`,current.league.id,previous.id);
   const periods=await all(current.db,`SELECT id,gm_identity_id,team_key,started_at,ended_at FROM team_ownership_periods WHERE league_id=? AND franchise_season_id=? ORDER BY id`,current.league.id,previous.id);
-  const frozenSha=await archiveDigest({summaries,periods});
+  const gmFreeze=await gmSeasonFreeze(current,previous.id,active.id);
+  const frozenSha=await archiveDigest({summaries,periods,gmSeasonSummaries:gmFreeze.summaries});
   const newSeasonId=`franchise_season_${crypto.randomUUID()}`,closureId=`franchise_season_closure_${crypto.randomUUID()}`,transitionId=`game_year_transition_${crypto.randomUUID()}`;
   await current.db.batch([
     current.db.prepare(`UPDATE franchise_seasons SET status='closed',updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=?`).bind(previous.id,current.league.id),
-    current.db.prepare(`UPDATE team_ownership_periods SET ended_at=COALESCE(ended_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND franchise_season_id=?`).bind(current.league.id,previous.id),
+    current.db.prepare(`UPDATE team_ownership_periods SET ended_at=COALESCE(ended_at,CURRENT_TIMESTAMP),ended_stage=COALESCE(ended_stage,'pro-bowl'),ended_week=COALESCE(ended_week,999),updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND franchise_season_id=?`).bind(current.league.id,previous.id),
+    ...gmFreeze.statements,
     current.db.prepare(`INSERT INTO franchise_season_closures
       (id,league_id,game_year_id,franchise_season_id,player_summary_count,ownership_period_count,frozen_totals_sha256,postseason_summary_json,closed_by_user_id)
-      VALUES (?,?,?,?,?,?,?,?,?)`).bind(closureId,current.league.id,gameYear.id,previous.id,summaries.length,periods.length,frozenSha,JSON.stringify({}),current.authorization.session.user.id),
+      VALUES (?,?,?,?,?,?,?,?,?)`).bind(closureId,current.league.id,gameYear.id,previous.id,summaries.length,periods.length,frozenSha,JSON.stringify({gmSeasonSummaryCount:gmFreeze.summaries.length,attributedGameCount:gmFreeze.attributedGameCount}),current.authorization.session.user.id),
     current.db.prepare(`INSERT INTO franchise_seasons
       (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
       VALUES (?,?,?,?,?,?,?,?, 'preview')`).bind(newSeasonId,current.league.id,previous.source_system,previous.source_franchise_id,next.sourceSeasonId,gameYear.game_release,next.displayName,next.seasonYear),
@@ -979,7 +1026,7 @@ async function archiveFranchiseSeason(current, gameYear) {
     current.db.prepare(`INSERT INTO game_year_transition_runs
       (id,league_id,operation,outgoing_game_year_id,incoming_game_year_id,status,phase,confirmation_scope,created_by_user_id,completed_at)
       VALUES (?,?,?,?,?,'completed','season-prepared',?,?,CURRENT_TIMESTAMP)`).bind(transitionId,current.league.id,GAME_YEAR_OPERATIONS.startFranchiseSeason,gameYear.id,gameYear.id,'one-click-archive-season',current.authorization.session.user.id),
-    event(current,transitionId,'franchise_season_closed',{franchiseSeasonId:previous.id,closureId,playerSummaryCount:summaries.length,ownershipPeriodCount:periods.length,frozenTotalsSha256:frozenSha}),
+    event(current,transitionId,'franchise_season_closed',{franchiseSeasonId:previous.id,closureId,playerSummaryCount:summaries.length,ownershipPeriodCount:periods.length,gmSeasonSummaryCount:gmFreeze.summaries.length,attributedGameCount:gmFreeze.attributedGameCount,frozenTotalsSha256:frozenSha}),
     event(current,transitionId,'franchise_season_prepared',{franchiseSeasonId:newSeasonId,sourceSeasonId:next.sourceSeasonId,seasonYear:next.seasonYear,latestExportSelectionCleared:true}),
     await audit(current,'franchise_season.archive_and_prepare','franchise_season',previous.id,{
       transitionId,previousSeasonId:previous.id,nextSeasonId:newSeasonId,closureId,gameYearId:gameYear.id,

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.7",
+  "releaseType": "ownership-history-and-player-experience",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.6",
+    "commit": "7d1b205e45f289efff0e81b58dcbd7123cd3987e",
+    "tree": "35362a04e8d28b19657c97356322ade957a3c5da",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.7",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Local implementation and validation only; publication is not recorded until the exact candidate is pushed and reviewed."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.3.6",
+    "currentCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a",
+    "currentPagesDeployment": "3138d4d2-d1f7-498e-a15d-89bdb6bdd162",
+    "currentWorkerBuild": "2c7bc863-539d-45bf-a1a4-24edcf1c31b6",
+    "currentWorkerVersion": "d29befdd",
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+    "scope": "Migration 27 and the application runtime require a separately recorded Production authorization."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "migrations/0027_gm_career_history.sql",
+    "functions/_lib/gm-career.js",
+    "functions/_lib/ownership-periods.js",
+    "functions/api/leagues/[leagueSlug]/ownership-career.js",
+    "league-engine/ownership-career.js",
+    "app.js",
+    "styles.css",
+    "trade-module.js",
+    "tests/import/gm-career.test.mjs",
+    "releases/7.3.7/release-record.md",
+    "releases/7.3.7/validation-evidence.json"
+  ]
+}

@@ -138,28 +138,28 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 180,
+      ".js": 184,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 31,
+      ".mjs": 32,
       ".png": 1,
-      ".sql": 28,
+      ".sql": 29,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 618395,
+        "bytes": 621562,
         "file": "app.js"
       },
       {
-        "bytes": 391483,
+        "bytes": 396279,
         "file": "styles.css"
       },
       {
-        "bytes": 367608,
+        "bytes": 367923,
         "file": "trade-module.js"
       },
       {
@@ -167,20 +167,20 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 93939,
+        "bytes": 98673,
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 75148,
+        "bytes": 76101,
+        "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
+      },
+      {
+        "bytes": 75213,
         "file": "index.html"
       },
       {
         "bytes": 74551,
         "file": "FHQ-6126-index.html"
-      },
-      {
-        "bytes": 72106,
-        "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
         "bytes": 38439,
@@ -231,7 +231,7 @@
         "file": "migrations/0019_canonical_import_snapshot_foundation.sql"
       }
     ],
-    "total": 541
+    "total": 547
   },
   "frontend": {
     "assets": [
@@ -576,6 +576,11 @@
         "versioned": true
       },
       {
+        "path": "league-engine/ownership-career.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "league-engine/week-context.js",
         "type": "script",
         "versioned": true
@@ -697,11 +702,11 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 90,
+    "scriptCount": 91,
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 67,
+    "routeCount": 68,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1116,6 +1121,14 @@
         "route": "/api/leagues/:leagueSlug/memberships"
       },
       {
+        "file": "functions/api/leagues/[leagueSlug]/ownership-career.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ownership-career"
+      },
+      {
         "file": "functions/api/leagues/[leagueSlug]/players/[publicPlayerId].js",
         "handlers": [
           "onRequestGet"
@@ -1352,10 +1365,16 @@
       "recordsLedger": true,
       "sha256": "e1a48bd151393f2fee728c723ff1db3afc418a505b9057f1cb8f2c114a2f84d4",
       "version": "0026"
+    },
+    {
+      "file": "migrations/0027_gm_career_history.sql",
+      "recordsLedger": true,
+      "sha256": "d093889658d02827616d54c3c1d71b609e0f6c2c40c2756df0d08802f52a91f7",
+      "version": "0027"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.6",
+  "release": "7.3.7",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

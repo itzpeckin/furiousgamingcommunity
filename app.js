@@ -2217,7 +2217,7 @@
       const rec=sum(['recCatches','receptions','catches','rec']),yds=sum(['recYards','recYds','receivingYards']);
       return {REC:rec,YDS:yds,TD:sum(['recTDs','receivingTDs']),DROP:sum(['recDrops','drops']),YAC:sum(['recYdsAfterCatch','recYdsAfterCatc','recYardsAfterCatch']),'Y/R':rec?yds/rec:null,LONG:max(['recLongest','recLong','longReception'])};
     }
-    if(category==='defense')return {TKL:sum(['defTotalTackles','totalTackles','tackles']),SACK:sum(['defSacks','sacks']),INT:sum(['defInts','defInterceptions']),FF:sum(['defForcedFum','forcedFumbles']),FR:sum(['defFumRec','fumbleRecoveries']),DEF:sum(['defDeflections','passDeflections','passesDefended']),'INT YDS':sum(['defIntReturnYds','interceptionReturnYards']),TD:sum(['defTDs','defensiveTDs'])};
+    if(category==='defense')return {TKL:sum(['defTotalTackles','totalTackles','tackles']),TFL:sum(['defTacklesForLoss','tacklesForLoss','tackleForLoss','tfl']),SACK:sum(['defSacks','sacks']),INT:sum(['defInts','defInterceptions']),FF:sum(['defForcedFum','forcedFumbles']),FR:sum(['defFumRec','fumbleRecoveries']),TD:sum(['defTDs','defensiveTDs'])};
     if(category==='kicking'){
       const fga=sum(['fGAtt','kickFGAtt','fieldGoalAttempts']),fgm=sum(['fGMade','kickFGMade','fieldGoalsMade']);
       return {FGA:fga,FGM:fgm,'FG%':fga?((fgm||0)/fga)*100:null,'50+ ATT':sum(['fG50PlusAtt']),'50+ MADE':sum(['fG50PlusMade']),XPA:sum(['xPAtt','kickXPAtt','extraPointAttempts']),XPM:sum(['xPMade','kickXPMade','extraPointsMade']),LONG:max(['fGLongest','kickLongFG','longFieldGoal']),PTS:sum(['kickPts','points'])};
@@ -2329,7 +2329,7 @@
         playerStatisticsState.error=error?.message||'Unable to load player statistics.';
         return [];
       }finally{
-        playerStatisticsState.loading=false;playerStatisticsState.promise=null;rerenderPlayerStatHosts();
+        playerStatisticsState.loading=false;playerStatisticsState.promise=null;rerenderPlayerStatHosts();refreshOpenPlayerGameLogs();
       }
     })();
     return playerStatisticsState.promise;
@@ -3613,7 +3613,7 @@
     passing:[['CMP',['passComp']],['ATT',['passAtt']],['CMP%',['passCompPct']],['YDS',['passYds','passYards']],['TD',['passTDs']],['INT',['passInts']],['Y/A',['passYdsPerAtt']],['RTG',['passRating']],['LONG',['passLongest']],['SACK',['passSacks']]],
     rushing:[['ATT',['rushAtt']],['YDS',['rushYds','rushYards']],['TD',['rushTDs']],['Y/A',['rushYdsPerAtt']],['FUM',['rushFum']],['YACON',['rushYdsAfterContact']],['20+',['rush20PlusYds']],['LONG',['rushLongest']],['BTK',['rushBrokenTackles']]],
     receiving:[['REC',['recCatches']],['YDS',['recYards','recYds']],['TD',['recTDs']],['DROP',['recDrops']],['YAC',['recYdsAfterCatch','recYdsAfterCatc']],['Y/R',['recYdsPerCatch']],['LONG',['recLongest']]],
-    defense:[['TKL',['defTotalTackles']],['SACK',['defSacks']],['INT',['defInts']],['FF',['defForcedFum']],['FR',['defFumRec']],['DEF',['defDeflections']],['INT YDS',['defIntReturnYds']],['TD',['defTDs']]],
+    defense:[['TKL',['defTotalTackles','totalTackles','tackles']],['TFL',['defTacklesForLoss','tacklesForLoss','tackleForLoss','tfl']],['SACK',['defSacks','sacks']],['INT',['defInts','defInterceptions']],['FF',['defForcedFum','forcedFumbles']],['FR',['defFumRec','fumbleRecoveries']],['TD',['defTDs','defensiveTDs']]],
     kicking:[['FGA',['fGAtt']],['FGM',['fGMade']],['FG%',['fGCompPct']],['50+ ATT',['fG50PlusAtt']],['50+ MADE',['fG50PlusMade']],['XPA',['xPAtt']],['XPM',['xPMade']],['LONG',['fGLongest']],['PTS',['kickPts']]],
     punting:[['PUNTS',['puntAtt']],['NET Y/P',['puntNetYdsPerAtt']],['IN20',['puntsIn20']],['TB',['puntTBs']],['LONG',['puntLongest']]]
   };
@@ -3933,6 +3933,18 @@
     </div>`;
   }
 
+  function refreshOpenPlayerGameLogs(){
+    const modal=document.querySelector('[data-value-card-modal].is-open');
+    const playerId=String(modal?.dataset?.canonicalPlayerId||'');
+    if(!playerId)return false;
+    const details=modal.querySelector('.canonical-current-game-log-body');
+    if(details)details.innerHTML=canonicalDetailsGameLog(playerId);
+    const historical=modal.querySelector(`[data-player-game-log-content="${CSS.escape(playerId)}"]`);
+    const season=Number(modal.querySelector(`[data-player-game-log-season="${CSS.escape(playerId)}"]`)?.value);
+    if(historical)historical.innerHTML=canonicalGameLog(playerId,Number.isFinite(season)?season:null);
+    return true;
+  }
+
   function canonicalContractPanel(player={}) {
     const contract=canonicalContract(player);
     const text=value=>value===null||value===undefined?'—':value;
@@ -4191,12 +4203,13 @@
       ['R Fum',['rushFum']]
     ],
     DEFENSE:[
-      ['Tackles',['defTotalTackles']],
-      ['Sacks',['defSacks']],
-      ['INTs',['defInts']],
-      ['FF',['defForcedFum']],
-      ['FR',['defFumRec']],
-      ['TDs',['defTDs']]
+      ['Tackles',['defTotalTackles','totalTackles','tackles']],
+      ['TFL',['defTacklesForLoss','tacklesForLoss','tackleForLoss','tfl']],
+      ['Sacks',['defSacks','sacks']],
+      ['INTs',['defInts','defInterceptions']],
+      ['FF',['defForcedFum','forcedFumbles']],
+      ['FR',['defFumRec','fumbleRecoveries']],
+      ['TDs',['defTDs','defensiveTDs']]
     ],
     K:[
       ['FG Att',['fGAtt']],
@@ -4214,7 +4227,7 @@
   function playerDetailsGameLogColumns(position=''){
     const pos=String(position||'').toUpperCase();
     if(PLAYER_DETAILS_GAMELOG_COLUMNS[pos])return PLAYER_DETAILS_GAMELOG_COLUMNS[pos];
-    if(['LE','RE','DT','DL','LOLB','ROLB','MLB','LB','CB','FS','SS','DB'].includes(pos))return PLAYER_DETAILS_GAMELOG_COLUMNS.DEFENSE;
+    if(['LE','RE','LEDGE','REDGE','EDGE','DT','DL','LOLB','ROLB','MLB','LB','SAM','MIKE','WILL','CB','FS','SS','DB'].includes(pos))return PLAYER_DETAILS_GAMELOG_COLUMNS.DEFENSE;
     return [];
   }
 
@@ -4396,6 +4409,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     const content=document.querySelector('[data-value-card-content]');
     if(!modal||!content)return false;
     if(player.publicId)modal.dataset.publicPlayerId=player.publicId;
+    modal.dataset.canonicalPlayerId=String(player.id||playerId);
+    modal.dataset.playerReturnRoute=publicPlayerReturnRoute||'players';
     const logo=renderTeamMark(team,'canonical-player-team-logo');
     const watermarkLogo=team.logo
       ? `<img class="canonical-player-watermark-image" src="${escapeHtml(team.logo)}" alt="" aria-hidden="true" loading="lazy">`
@@ -4405,8 +4420,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     const dev=normalizeLiveDevelopment(player.developmentTrait||player.dev||player.raw?.developmentTrait);
     const teamPrimary=team.primary||'#27364f', teamSecondary=team.secondary||teamPrimary||'#8fa4c4';
 
-    content.innerHTML=`<div class="value-card-context canonical-player-topbar"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>Back to Roster</span></button><span>Player Card</span></div>
-      <section class="canonical-player-hero canonical-player-hero--approved" style="--player-team-primary:${escapeHtml(teamPrimary)};--player-team-secondary:${escapeHtml(teamSecondary)};background:linear-gradient(118deg,${escapeHtml(teamPrimary)} 0%,${escapeHtml(teamPrimary)} 43%,color-mix(in srgb,${escapeHtml(teamPrimary)} 55%,${escapeHtml(teamSecondary)}) 62%,${escapeHtml(teamSecondary)} 100%)">
+    content.innerHTML=`<div class="value-card-context canonical-player-topbar"><button type="button" data-close-value-card><svg><use href="#icon-arrow"></use></svg><span>${escapeHtml(playerReturnLabel(modal.dataset.playerReturnRoute))}</span></button><span>Player Card</span></div>
+      <section class="canonical-player-hero canonical-player-hero--approved" data-team-abbr="${escapeHtml(team.abbr||'')}" style="--player-team-primary:${escapeHtml(teamPrimary)};--player-team-secondary:${escapeHtml(teamSecondary)};background:linear-gradient(118deg,${escapeHtml(teamPrimary)} 0%,${escapeHtml(teamPrimary)} 43%,color-mix(in srgb,${escapeHtml(teamPrimary)} 55%,${escapeHtml(teamSecondary)}) 62%,${escapeHtml(teamSecondary)} 100%)">
         <div class="canonical-player-hero__stripe" aria-hidden="true"></div>
         <div class="canonical-player-hero__watermark canonical-player-hero__watermark--logo">${watermarkLogo}</div>
         <div class="canonical-player-hero__image">${renderCanonicalPlayerImage(player)}</div>
@@ -4444,6 +4459,11 @@ function canonicalPlayerDashboardStats(playerId='') {
     return true;
   }
 
+  function playerReturnLabel(route='players'){
+    const base=routeBase(String(route||'players'));
+    return ({home:'Back to League Home','league-activity':'Back to League Activity',teams:'Back to Team Roster','my-team':'Back to My Team',players:'Back to Players',stats:'Back to Stats & Leaders',schedule:'Back to Schedule',standings:'Back to Standings',transactions:'Back to Transactions','trade-center':'Back to Trade Center','trade-block':'Back to Trade Block',commissioner:'Back to Commissioner HQ'})[base]||'Back to Previous Page';
+  }
+
   document.addEventListener('click',event=>{
     const tab=event.target.closest('[data-canonical-player-tab]');
     if(!tab)return;
@@ -4478,8 +4498,11 @@ function canonicalPlayerDashboardStats(playerId='') {
       const publicPlayer=playerForPublicRoute(playerId);
       const publicId=String(publicPlayer?.publicId||'').toLowerCase();
       const currentRoute=currentAppRoute();
+      const originRoute=routeBase(currentRoute)==='players'&&currentRoute.split('/')[1]
+        ? (publicPlayerReturnRoute||'players')
+        : currentRoute;
       if(PUBLIC_PLAYER_ID_PATTERN.test(publicId)&&currentRoute!==`players/${publicId}`){
-        publicPlayerReturnRoute=currentRoute;
+        publicPlayerReturnRoute=originRoute;
         setRoute(`players/${publicId}`,{source:'player-link'});
         return true;
       }
@@ -4502,12 +4525,17 @@ function canonicalPlayerDashboardStats(playerId='') {
       return false;
     };
 
-    // Both statistics and schedule/team context must be ready before the card
-    // renders, otherwise the first-open game log has no opponent/result rows.
-    Promise.all([
-      playerStatisticsState.loaded ? Promise.resolve(playerStatisticsState.rows) : hydratePlayerStatistics(false),
-      loadLiveTeamDirectory(false)
-    ]).then(open).catch(error=>{
+    // Open from the already-hydrated roster immediately. Statistics continue
+    // in the shared background request and repaint the two game-log surfaces.
+    if(liveRosterPlayers.has(String(playerId))){
+      open();
+      if(!playerStatisticsState.loaded)hydratePlayerStatistics(false).catch(error=>console.error('[Canonical Player Statistics Prewarm]',error));
+      return;
+    }
+    loadLiveTeamDirectory(false).then(()=>{
+      open();
+      if(!playerStatisticsState.loaded)hydratePlayerStatistics(false).catch(error=>console.error('[Canonical Player Statistics Prewarm]',error));
+    }).catch(error=>{
       console.error('[Canonical Player Card Hydration]',error);
       open();
     });
@@ -4535,7 +4563,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       <div data-team-tab-content>${renderTeamTab(team, rosterModel, roster, teamGames, leaders)}</div>`;
   }
 
-  async function renderTeamDetail(teamId) {
+  async function renderTeamDetail(teamId,options={}) {
     pageContent.setAttribute('aria-busy','true');
     try{
       const directory=await loadLiveTeamDirectory();
@@ -4546,7 +4574,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       }
       const team=teamForPublicRoute(teamId);
       if(!team){setRoute('teams');return;}
-      replaceCurrentPublicUrl(`teams/${team.id}`);
+      if(!options.preserveRoute)replaceCurrentPublicUrl(`teams/${team.id}`);
       const players=directory.playersByTeam.get(String(team.id))||[];
       const rosterModel=liveRosterModel(team,players);
       const roster=players.map(rosterPlayerView);
@@ -4556,7 +4584,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         .map(game=>liveTeamScheduleGame(game));
 
       pageContent.innerHTML=`
-        <div class="page-heading"><div><button class="text-button" data-route="teams"><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>All teams</button></div><div class="heading-actions">${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?`<button class="button button--ghost" data-open-block-drawer><svg><use href="#icon-tag"></use></svg>Manage Trade Block</button>`:''}<button class="button button--primary" data-start-team-trade="${team.id}"><svg><use href="#icon-swap"></use></svg>${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?'Start Trade Proposal':`Start Trade w/ ${escapeHtml(team.fullName)}`}</button></div></div>
+        <div class="page-heading"><div>${options.myTeam?'<span class="eyebrow">Assigned franchise</span><h1>My Team</h1>':'<button class="text-button" data-route="teams"><svg style="transform:rotate(180deg)"><use href="#icon-arrow"></use></svg>All teams</button>'}</div><div class="heading-actions">${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?`<button class="button button--ghost" data-open-block-drawer><svg><use href="#icon-tag"></use></svg>Manage Trade Block</button>`:''}<button class="button button--primary" data-start-team-trade="${team.id}"><svg><use href="#icon-swap"></use></svg>${window.FGC_TRADE?.getCurrentAccount?.()?.teamId===team.id?'Start Trade Proposal':`Start Trade w/ ${escapeHtml(team.fullName)}`}</button></div></div>
         ${renderLiveDataStatus(directory)}
         <section class="team-hero team-hero--watermark team-hero--matchup-colors" style="${teamStyle(team)};background:linear-gradient(125deg,${escapeHtml(team.primary)},${escapeHtml(team.secondary||team.primary)}) !important" data-abbr="${escapeHtml(team.abbr)}">
           ${team.logo?`<img class="team-hero__watermark" src="${escapeHtml(team.logo)}" alt="" aria-hidden="true" loading="lazy">`:''}
@@ -4565,11 +4593,13 @@ function canonicalPlayerDashboardStats(playerId='') {
         <div class="team-summary-grid">
           ${team.ovr?summaryTile('Overall',team.ovr,''):''}${summaryTile('Points For',team.pf,ordinalRank(team.pfRank))}${summaryTile('Points Against',team.pa,ordinalRank(team.paRank))}${summaryTile('Cap Space',compactMoney(team.cap),'')}
         </div>
+        <div data-gm-career-host="${escapeHtml(team.teamKey||team.abbr||team.id)}"></div>
         <div class="subnav" data-team-tabs>
           ${['roster','depth','schedule','stats','cap','trade-history'].map(tab=>`<button data-team-tab="${tab}" class="${state.teamTab===tab?'is-active':''}">${tab==='depth'?'Depth Chart':tab==='trade-history'?'Transaction History':titleCase(tab)}</button>`).join('')}
         </div>
         <div data-team-tab-content>${renderTeamTab(team,rosterModel,roster,teamGames,leaders)}</div>`;
       if(state.teamTab==='trade-history') refreshTeamTransactionHistory(team,pageContent.querySelector('[data-team-tab-content]'));
+      window.FranchiseHQ?.ownershipCareer?.mountTeam?.(pageContent.querySelector('[data-gm-career-host]'),team.teamKey||team.abbr||team.id);
       requestAnimationFrame(()=>{
         if(mainContent?.scrollTo) mainContent.scrollTo({top:0,left:0,behavior:'instant'});
         window.scrollTo({top:0,left:0,behavior:'instant'});
@@ -5812,9 +5842,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   if(typeof requestIdleCallback==='function'){
-    requestIdleCallback(()=>{loadLiveTeamDirectory(false).catch(()=>{});},{timeout:1200});
+    requestIdleCallback(()=>{preloadScheduleMatchupData();},{timeout:650});
   }else{
-    setTimeout(()=>{preloadScheduleMatchupData();},250);
+    setTimeout(()=>{preloadScheduleMatchupData();},120);
   }
 
   function liveTeamScheduleGame(game={}) {
@@ -8587,7 +8617,7 @@ function canonicalPlayerDashboardStats(playerId='') {
           break;
         }
         const account=tradeService.getCurrentAccount();
-        if(account?.teamId){state.teamTab='roster';renderTeamDetail(liveOwnedTeamId()||account.teamId);}
+        if(account?.teamId){state.teamTab='roster';renderTeamDetail(liveOwnedTeamId()||account.teamId,{preserveRoute:true,myTeam:true});}
         else { showToast('My Team unavailable','Switch to an owner or commissioner identity with an assigned franchise.'); setRoute('teams'); }
         break;
       }
@@ -8815,9 +8845,14 @@ function canonicalPlayerDashboardStats(playerId='') {
 
     const closePlayerTarget=event.target.closest('[data-close-value-card]');
     if(closePlayerTarget&&routeBase(currentAppRoute())==='players'&&currentAppRoute().split('/')[1]){
-      const returnRoute=publicPlayerReturnRoute||'players';
-      publicPlayerReturnRoute=null;
-      setTimeout(()=>setRoute(returnRoute,{source:'player-card-close',replace:true}),0);
+      // trade-module owns the shared modal close and emits a navigation event.
+      // Keep a zero-delay fallback for pages where that module is unavailable.
+      setTimeout(()=>{
+        if(!publicPlayerReturnRoute)return;
+        const returnRoute=publicPlayerReturnRoute;
+        publicPlayerReturnRoute=null;
+        setRoute(returnRoute,{source:'player-card-close-fallback',replace:true});
+      },0);
     }
 
     const gameCenterTab=event.target.closest('[data-game-center-tab]');
@@ -9189,6 +9224,14 @@ function canonicalPlayerDashboardStats(playerId='') {
       const open=profileMenu.classList.toggle('is-open'); profileButton.setAttribute('aria-expanded',String(open)); return;
     }
     if (!profileMenu.contains(event.target)&&!profileButton.contains(event.target)) closeProfileMenu();
+  });
+
+  window.addEventListener('franchisehq:player-card-closed',event=>{
+    const returnRoute=String(event.detail?.playerReturnRoute||publicPlayerReturnRoute||'players');
+    publicPlayerReturnRoute=null;
+    if(routeBase(currentAppRoute())==='players'&&currentAppRoute().split('/')[1]){
+      setRoute(returnRoute,{source:'player-card-close',replace:true});
+    }
   });
 
 
@@ -9706,8 +9749,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
 
-  // 7.3.6 — stable team and player URLs and environment marker.
-  const VISIBLE_RELEASE = '7.3.6';
+  // 7.3.7 — ownership careers plus player and mobile experience remediation.
+  const VISIBLE_RELEASE = '7.3.7';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

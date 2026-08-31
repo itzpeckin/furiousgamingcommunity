@@ -4,7 +4,7 @@ import { activeLeagueTeams, resolveTeam } from '../../../../_lib/league-teams.js
 import { normalizePublicPlayerId, publicPlayerPath, normalizePublicTeamSlug } from '../../../../_lib/public-identity-routes.js';
 import { normalizePlayer } from '../snapshot/read-model.js';
 
-const RELEASE = '7.3.6';
+const RELEASE = '7.3.7';
 
 const parse = value => {
   try { return JSON.parse(value || 'null'); }

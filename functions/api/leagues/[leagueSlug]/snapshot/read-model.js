@@ -11,7 +11,7 @@ import {
   sourceSupportedContract
 } from '../../../../_lib/live-data-experience.js';
 
-const RELEASE = '7.3.6';
+const RELEASE = '7.3.7';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {

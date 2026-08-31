@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.7 ownership history and player-experience candidate impact
+
+The validated 7.3.7 candidate adds additive migration 27, season/week-scoped ownership periods, frozen GM season summaries, membership-authoritative career/trophy-case reads, and consolidated player-card/mobile experience repairs. It has not been published, applied to Production, or used to create/reconcile ownership rows. Production remains on exact accepted 7.3.6 commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a`, migration 26, and Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162`.
+
+After any future accepted publication, apply migration 27 before the 7.3.7 runtime. A runtime rollback restores the accepted 7.3.6 application while deliberately retaining migration 27 and every GM identity, team ownership period, GM season summary, membership, role, user, session, setting, rule, audit, import, and snapshot row. Do not drop the additive columns/table or rewrite ownership chronology.
+
+Deployment or rollback does not authorize reviewed membership reconciliation, a Madden export/import, active snapshot change, reset, Archive Season, game-year transition, permanent deletion, export-URL rotation, credential change, or interpretation of blocked Free Agents as zero.
+
 ## 7.3.6 stable team/player URL impact
 
 The accepted 7.3.6 application runtime is exact commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a` on accepted Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162`. It adds no migration and performs no league-data operation. It reads existing permanent player identities and canonical team keys to expose authenticated league paths at `/leagues/{leagueSlug}/players/{publicPlayerId}` and `/leagues/{leagueSlug}/teams/{teamSlug}`. Current hash navigation remains a compatibility layer, and unauthenticated document recovery returns to the exact deep path after Discord authentication.

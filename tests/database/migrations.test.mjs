@@ -127,7 +127,43 @@ test('the production-like legacy upgrade preserves identities and relationships'
       VALUES (?,?,?,?)`).run('league-future-test','Future League','FranchiseHQ','future-league');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints
       WHERE league_id='league-future-test'`).get().count,1);
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 26);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 27);
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
+  } finally {
+    database.close();
+  }
+});
+
+test('migration 27 baselines reviewed active team assignments without changing memberships', async () => {
+  const database = new DatabaseSync(':memory:');
+  try {
+    database.exec('PRAGMA foreign_keys = ON;');
+    const files = await migrationFiles();
+    await applyFiles(database, files.filter(file => !file.includes('/0027_')));
+    seedProtectedData(database);
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(
+        'season-reviewed-2026','league-upgrade-test','madden-companion','franchise-reviewed','2026','Madden NFL 27','Reviewed 2026',2026,'active'
+      );
+    database.prepare(`INSERT INTO league_snapshots
+      (id,league_id,status,season_year,week_index,manifest_json,validation_status)
+      VALUES (?,?,?,?,?,?,?)`).run('snapshot-reviewed-week-9','league-upgrade-test','active',2026,9,'{}','ready');
+    database.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id) VALUES (?,?)`)
+      .run('league-upgrade-test','snapshot-reviewed-week-9');
+
+    await applyFiles(database, files.filter(file => file.includes('/0027_')));
+
+    const identity = database.prepare(`SELECT id,user_id,display_name FROM gm_identities
+      WHERE league_id=? AND user_id=?`).get('league-upgrade-test','user-upgrade-test');
+    assert.equal(identity.user_id, 'user-upgrade-test');
+    assert.equal(identity.display_name, 'Upgrade User');
+    assert.deepEqual({...database.prepare(`SELECT team_key,franchise_season_id,started_stage,started_week,assignment_source
+      FROM team_ownership_periods WHERE league_id=? AND gm_identity_id=?`).get('league-upgrade-test',identity.id)}, {
+      team_key:'tb',franchise_season_id:'season-reviewed-2026',started_stage:'preseason',started_week:1,
+      assignment_source:'commissioner-reviewed-baseline'
+    });
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_memberships`).get().count, 1);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {
     database.close();
@@ -232,7 +268,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 26', async () => {
+test('runtime schema verification fails closed before version 27', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -243,13 +279,13 @@ test('runtime schema verification fails closed before version 26', async () => {
     () => requireDatabaseSchema(outdated),
     error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 17
   );
-  observedVersion = 26;
-  assert.equal((await requireDatabaseSchema(outdated)).version, 26);
+  observedVersion = 27;
+  assert.equal((await requireDatabaseSchema(outdated)).version, 27);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 26, name: 'permanent_league_export_url' }) };
+      return { first: async () => ({ version: 27, name: 'gm_career_history' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 26);
+  assert.equal((await requireDatabaseSchema(current)).version, 27);
 });

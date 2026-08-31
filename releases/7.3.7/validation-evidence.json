@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.7",
+  "validatedOn": "2026-08-31",
+  "status": "validated-review-candidate",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "playerCardExperience": {
+      "passed": true,
+      "hydratedRosterOpensSynchronously": true,
+      "directoryAndStatisticsPrewarmInBackground": true,
+      "statisticsRepaintAfterHydration": true,
+      "exactOriginReturn": true,
+      "supportedOrigins": ["team-roster", "my-team", "players", "stats-and-leaders", "home", "schedule", "standings", "transactions", "trade-center", "trade-block", "commissioner"]
+    },
+    "mobilePlayerTables": {
+      "passed": true,
+      "portraitUsesRealTableLayout": true,
+      "horizontalScrollRetained": true,
+      "teamRosters": true,
+      "playerDirectory": true,
+      "statsAndLeaders": true,
+      "verticalCardTransformationDisabled": true,
+      "browserViewport": "390x844",
+      "playerTableWidth": 940,
+      "playerViewportWidth": 326,
+      "rosterTableWidth": 1062,
+      "rosterViewportWidth": 326
+    },
+    "playerGameLogs": {
+      "passed": true,
+      "dedicatedTabScrolls": true,
+      "detailsGameLogScrolls": true,
+      "defensiveRoleCoverage": ["LEDGE", "REDGE", "EDGE", "SAM", "MIKE", "WILL"],
+      "defensiveColumns": ["TKL", "TFL", "SACK", "INT", "FF", "FR", "TD"],
+      "browserScrollSurface": { "overflowX": "auto", "overflowY": "auto", "verticalScrollable": true, "horizontalScrollable": true }
+    },
+    "teamLogoContrast": {
+      "passed": true,
+      "jets": true,
+      "rams": true,
+      "bannerAndPlayerHeroDefinition": true,
+      "browserComputedOpacity": 0.34,
+      "browserComputedOutlineAndShadow": true
+    },
+    "ownershipCareerHistory": {
+      "passed": true,
+      "membershipAuthorityOnly": true,
+      "maddenOwnerNamesUsed": false,
+      "seasonAndWeekScopedPeriods": true,
+      "existingReviewedAssignmentsBaselineAutomatically": true,
+      "extraCommissionerInitializationRequired": false,
+      "gameAttributionByOwningPeriod": true,
+      "regularAndPlayoffRecords": true,
+      "teamsManaged": true,
+      "playoffAppearances": true,
+      "conferenceChampionships": true,
+      "superBowlAppearances": true,
+      "superBowlChampionships": true,
+      "myTeamCareerSurface": true,
+      "trophyCases": true,
+      "crossTenantInference": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false,
+      "authority": "active-snapshot-player-mapping-lineage"
+    },
+    "activeSnapshotBaseline": {
+      "passed": true,
+      "snapshotId": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+      "previousSnapshotId": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+      "week": 9,
+      "teams": 32,
+      "rosteredPlayers": 2042,
+      "games": 184,
+      "statistics": 6966,
+      "standings": 32,
+      "changedDuringCandidateWork": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 27,
+      "newMigration": true,
+      "requiredTables": 80,
+      "productionApplied": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 130,
+      "failedTests": 0,
+      "focusedGmAndExperienceTests": 3,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 216,
+      "inventoryFiles": 547,
+      "routes": 68,
+      "requiredTables": 80
+    },
+    "productionHttpsAcceptance": {
+      "passed": false,
+      "status": "not-run",
+      "reason": "Production runtime and migration are not authorized by this local implementation record."
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "resetPerformed": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "archiveGameYearExecuted": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "historyPermanentlyDeleted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "identityRowsCreated": 0,
+    "ownershipRowsCreated": 0,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": { "authorized": false, "status": "not-run" },
+    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": { "authorized": false, "status": "not-run", "currentRuntimeCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a", "pagesDeployment": "3138d4d2-d1f7-498e-a15d-89bdb6bdd162", "workerSourceChanged": false, "activeWorkerVersion": "d29befdd", "databaseRowsWrittenByCandidateWork": 0 },
+    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 26, "candidateMigration": 27 },
+    "productionMaddenExport": { "authorized": false, "status": "not-run", "anotherExportRequired": false },
+    "productionCandidateImport": { "authorized": false, "status": "not-run" },
+    "archiveSeason": { "authorized": false, "status": "not-run" },
+    "gameYearTransition": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

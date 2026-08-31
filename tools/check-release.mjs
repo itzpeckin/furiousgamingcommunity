@@ -1562,6 +1562,84 @@ if (version === '7.3.6') {
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   ) errors.push('7.3.6 must preserve every code-only and data-plane authorization boundary.');
 }
+if (version === '7.3.7') {
+  for (const check of [
+    'playerCardExperience',
+    'mobilePlayerTables',
+    'playerGameLogs',
+    'teamLogoContrast',
+    'ownershipCareerHistory',
+    'freeAgentBlockedPreserved',
+    'activeSnapshotBaseline',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.7 evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.playerCardExperience?.hydratedRosterOpensSynchronously !== true
+    || evidence.checks?.playerCardExperience?.directoryAndStatisticsPrewarmInBackground !== true
+    || evidence.checks?.playerCardExperience?.exactOriginReturn !== true
+    || evidence.checks?.mobilePlayerTables?.portraitUsesRealTableLayout !== true
+    || evidence.checks?.mobilePlayerTables?.horizontalScrollRetained !== true
+    || evidence.checks?.playerGameLogs?.dedicatedTabScrolls !== true
+    || evidence.checks?.teamLogoContrast?.jets !== true
+    || evidence.checks?.teamLogoContrast?.rams !== true
+  ) errors.push('7.3.7 must prove the consolidated player-card, return-route, mobile-table, Game Logs, and logo experience repairs.');
+  const positions = new Set(evidence.checks?.playerGameLogs?.defensiveRoleCoverage || []);
+  const columns = new Set(evidence.checks?.playerGameLogs?.defensiveColumns || []);
+  for (const position of ['LEDGE','REDGE','EDGE','SAM','MIKE','WILL']) {
+    if (!positions.has(position)) errors.push(`7.3.7 defensive game-log coverage is missing ${position}.`);
+  }
+  for (const column of ['TKL','TFL','SACK','INT','FF','FR','TD']) {
+    if (!columns.has(column)) errors.push(`7.3.7 defensive game-log columns are missing ${column}.`);
+  }
+  if (
+    evidence.checks?.ownershipCareerHistory?.membershipAuthorityOnly !== true
+    || evidence.checks?.ownershipCareerHistory?.maddenOwnerNamesUsed !== false
+    || evidence.checks?.ownershipCareerHistory?.seasonAndWeekScopedPeriods !== true
+    || evidence.checks?.ownershipCareerHistory?.existingReviewedAssignmentsBaselineAutomatically !== true
+    || evidence.checks?.ownershipCareerHistory?.extraCommissionerInitializationRequired !== false
+    || evidence.checks?.ownershipCareerHistory?.gameAttributionByOwningPeriod !== true
+    || evidence.checks?.ownershipCareerHistory?.crossTenantInference !== false
+    || Number(evidence.checks?.strictMigration?.migrationVersion) !== 27
+    || evidence.checks?.strictMigration?.newMigration !== true
+    || Number(evidence.checks?.strictMigration?.requiredTables) !== 80
+  ) errors.push('7.3.7 must prove membership-authoritative tenant-scoped GM history on additive migration 27.');
+  if (
+    evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+    || evidence.checks?.activeSnapshotBaseline?.snapshotId !== 'b00edb25-ac65-40d4-9969-431f94dd1e3e'
+    || evidence.checks?.activeSnapshotBaseline?.changedDuringCandidateWork !== false
+  ) errors.push('7.3.7 must retain the exact active Week 9 and blocked/null Free Agent baseline.');
+  if (!isPostDeployment && (
+    manifest.repositoryPublication?.authorized !== false
+    || manifest.repositoryPublication?.status !== 'not-run'
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-run'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 26
+    || Number(evidence.external?.productionMigration?.candidateMigration) !== 27
+  )) errors.push('7.3.7 local candidate must preserve unpublished, unmigrated, and undeployed gates.');
+  if (
+    evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.3.7 must preserve every local candidate data-plane and authorization boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

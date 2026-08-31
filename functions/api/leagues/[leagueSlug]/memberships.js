@@ -11,8 +11,9 @@ import {
   publicLeagueTeams,
   resolveTeam
 } from "../../../_lib/league-teams.js";
+import { ownershipChangeStatements } from "../../../_lib/ownership-periods.js";
 
-const RELEASE = "7.3.0";
+const RELEASE = "7.3.7";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -283,8 +284,11 @@ export async function onRequestPost(context) {
         SET role=?, team_id=NULL, active=1, updated_at=CURRENT_TIMESTAMP
         WHERE league_id=? AND user_id=?
       `).bind(input.role, league.id, user.id);
-  const result = await update.run();
-  if (Number(result?.meta?.changes || 0) !== 1) {
+  const ownership = await ownershipChangeStatements(context.env.DB,{
+    leagueId:league.id,userId:user.id,displayName:user.display_name,nextTeamKey:teamId,expectedMembershipActive:1
+  });
+  const results = await context.env.DB.batch([update,...ownership.statements]);
+  if (Number(results?.[0]?.meta?.changes || 0) !== 1) {
     return jsonResponse({ ok:false, error:"That assignment changed before it could be saved. Refresh and try again." }, 409);
   }
 
@@ -321,11 +325,14 @@ export async function onRequestDelete(context) {
     return jsonResponse({ ok:false, error:"A league must retain at least one active commissioner." }, 409);
   }
 
-  const result = await context.env.DB.prepare(`
+  const ownership = await ownershipChangeStatements(context.env.DB,{
+    leagueId:league.id,userId,displayName:null,nextTeamKey:null,expectedMembershipActive:0
+  });
+  const results = await context.env.DB.batch([context.env.DB.prepare(`
     UPDATE league_memberships SET active=0, updated_at=CURRENT_TIMESTAMP
     WHERE league_id=? AND user_id=? AND active=1
-  `).bind(league.id, userId).run();
-  if (Number(result?.meta?.changes || 0) !== 1) return jsonResponse({ ok:false, error:"Membership state changed. Refresh and try again." }, 409);
+  `).bind(league.id, userId),...ownership.statements]);
+  if (Number(results?.[0]?.meta?.changes || 0) !== 1) return jsonResponse({ ok:false, error:"Membership state changed. Refresh and try again." }, 409);
   await audit(context, league, auth.session, userId, "membership_deactivated", {
     previousRole:existing.role,
     previousTeamId:existing.teamId || null

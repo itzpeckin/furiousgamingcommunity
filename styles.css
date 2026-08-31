@@ -6561,3 +6561,91 @@ table td{
 @media(max-width:520px){
   .player-directory-table tr,.team-roster-table--single tr{grid-template-columns:1fr}.player-directory-table td:first-child,.team-roster-table--single td:first-child{grid-column:auto}
 }
+
+/* FranchiseHQ 7.3.7 — phone tables, player-card scrolling, and logo contrast */
+.team-hero--matchup-colors[data-abbr="NYJ"] .team-hero__watermark,
+.team-hero--matchup-colors[data-abbr="LAR"] .team-hero__watermark,
+.canonical-player-hero--approved[data-team-abbr="NYJ"] .canonical-player-watermark-image,
+.canonical-player-hero--approved[data-team-abbr="LAR"] .canonical-player-watermark-image{
+  opacity:.34!important;
+  filter:drop-shadow(0 0 2px rgba(255,255,255,.98)) drop-shadow(0 3px 8px rgba(0,0,0,.92))!important;
+}
+.canonical-game-log-tab [data-player-game-log-content]{
+  max-height:min(62dvh,680px);
+  overflow:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-gutter:stable;
+}
+.canonical-game-log-tab .canonical-history-game-log-wrap{
+  overflow:auto!important;
+  max-height:inherit;
+}
+
+@media(max-width:700px){
+  .player-directory-card>.table-wrap,
+  .roster-table-card>.table-wrap,
+  .live-leaderboard-wrap,
+  .canonical-flat-table-wrap,
+  .canonical-history-game-log-wrap{
+    width:100%;
+    overflow-x:auto!important;
+    overflow-y:visible;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-inline:contain;
+  }
+  .player-directory-table,
+  .team-roster-table--single{
+    display:table!important;
+    width:max-content!important;
+    min-width:940px!important;
+    border-collapse:collapse;
+  }
+  .player-directory-table thead,
+  .team-roster-table--single thead{display:table-header-group!important}
+  .player-directory-table tbody,
+  .team-roster-table--single tbody{display:table-row-group!important}
+  .player-directory-table tr,
+  .team-roster-table--single tr{display:table-row!important;background:transparent;border:0;border-radius:0}
+  .player-directory-table th,
+  .player-directory-table td,
+  .team-roster-table--single th,
+  .team-roster-table--single td{
+    display:table-cell!important;
+    padding:8px 10px!important;
+    white-space:nowrap!important;
+    border-bottom:1px solid var(--border)!important;
+  }
+  .player-directory-table td::before,
+  .team-roster-table--single td::before{content:none!important;display:none!important}
+  .player-directory-table td:first-child,
+  .team-roster-table--single td:first-child{grid-column:auto!important}
+  .player-directory-table .table-team,
+  .roster-player-inline{min-width:190px}
+  .roster-player-inline{display:flex!important;white-space:nowrap}
+  .live-leaderboard-table{width:max-content;min-width:820px}
+  .canonical-flat-table{width:max-content;min-width:720px}
+  .canonical-history-game-log{min-width:max-content}
+  .canonical-game-log-tab [data-player-game-log-content]{max-height:calc(100dvh - 250px)}
+}
+
+/* FranchiseHQ 7.3.7 — My Team GM history and trophy case */
+[data-gm-career-host]{display:block;margin:0 0 16px}
+.gm-career-shell{overflow:hidden}
+.gm-career-shell .card-header p{margin:4px 0 0;color:var(--muted)}
+.gm-career-records{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:0 16px 16px}
+.gm-career-records article{padding:13px;border:1px solid var(--border);border-radius:11px;background:var(--surface-2)}
+.gm-career-records span,.gm-career-records small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+.gm-career-records strong{display:block;margin:5px 0 3px;color:var(--text);font-size:19px;font-variant-numeric:tabular-nums}
+.gm-trophy-case{display:flex;align-items:center;gap:10px;min-height:54px;padding:12px 16px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:linear-gradient(90deg,rgba(245,183,58,.08),transparent)}
+.gm-trophy-case>span:not(.gm-trophy-case__empty){font-size:28px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.4))}
+.gm-trophy-case__empty{color:var(--muted);font-size:11px}
+.gm-season-history{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.gm-season-history table{width:100%;min-width:860px;border-collapse:collapse}
+.gm-season-history th,.gm-season-history td{padding:9px 11px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:center;font-size:11px}
+.gm-season-history th:nth-child(2),.gm-season-history td:nth-child(2){text-align:left}
+.gm-season-history th{color:var(--muted);background:var(--surface-2);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+.gm-career-authority{margin:0;padding:10px 16px;color:var(--muted);font-size:10px}
+.gm-career-empty{display:grid;gap:8px;padding:18px}.gm-career-empty h3,.gm-career-empty p{margin:0}.gm-career-empty p{color:var(--muted)}.gm-career-empty .button{justify-self:start;margin-top:4px}
+@media(max-width:900px){.gm-career-records{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.gm-career-records{grid-template-columns:1fr 1fr;padding:0 10px 10px}.gm-career-records article:first-child{grid-column:1/-1}}

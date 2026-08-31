@@ -6,13 +6,13 @@
 
 **Updated:** August 31, 2026
 
-**Revision:** 1.63
+**Revision:** 1.64
 
 **Current production:** 7.3.6 application runtime `fd04582` from Main, accepted Pages deployment `3138d4d2`, and unchanged active import Worker version `d29befdd`; Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer
 
-**Current work:** 7.3.6 is Production accepted. Stable team slugs and permanent opaque player identities now back authenticated league-scoped URLs, current hash navigation remains a compatibility layer, and existing roster, statistics, transaction, Trade Block, proposal, and team surfaces converge on those canonical routes.
+**Current work:** 7.3.7 is a validated local review candidate. Reviewed membership assignments now create season/week-scoped ownership periods; My Team and team pages expose GM career history and trophy cases. The same candidate removes the cold first-player-card wait, retains exact close-to-origin navigation, repairs portrait-phone tables and Game Logs scrolling, strengthens Jets/Rams logo contrast, and maps EDGE/SAM/MIKE/WILL defensive logs.
 
-**Next gate:** 7.3.7 ownership reconciliation, My Team, GM career history, and trophy cases requires a separately scoped implementation cycle. No Madden export/import, snapshot change, reset, archive, transition, export-URL rotation, credential change, or data mutation is implied by completing 7.3.6.
+**Next gate:** Publish the exact 7.3.7 candidate and require hosted checks. Production migration 27 and application publication remain separately recorded operations and must be ordered migration-first; they do not authorize a Madden export/import, snapshot change, reset, Archive Season, game-year transition, export-URL rotation, credential change, or Free Agent reinterpretation.
 
 ## Product decisions
 
@@ -31,7 +31,7 @@
 ## Current facts and accepted limitations
 
 - 7.1.0 established a reproducible database, continuous migration ledger, preservation checks, and target-locked migration command.
-- Refreshing Commissioner HQ or Trade Center can return a user to Account or require another login, especially on mobile. The owner accepted this as a temporary UX defect.
+- Accepted 7.3.6 runtime work removed the observed full login restart on refresh and hard refresh. The broader authentication/session framework remains scheduled for 7.5.0.
 - Commissioner settings can remain browser-local and disagree between commissioners. The shared schema exists; 7.4.2 moves the feature to server authority.
 - EA has restored Madden NFL 27 Companion data flow. After 7.2, discovery and a safe FGC teams/rosters/players activation are the immediate priority.
 - The real FGC capture received 43 requests (10.17 MB) in 0.448 seconds. It contained 32 teams, all 32 team rosters, 2,044 unique rostered players, standings, 14 current-week games, and 510 statistics rows.
@@ -61,7 +61,7 @@
 | 7.3.5 | Released | Active-snapshot team, roster, player, statistics, standings, and honest Free Agent experience |
 | 7.3.5.1 | Released; owner accepted | Ratings-adapter preservation, Trade Center contract-unit correction, and active-snapshot global shell context |
 | 7.3.6 | Released; Production accepted | Stable authenticated team/player URLs, cold refresh/auth return, back/forward navigation, safe public lookup contracts, and platform-wide canonical cross-links |
-| 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
+| 7.3.7 | Validated local review candidate | Ownership reconciliation, My Team, GM career history, trophy cases, and consolidated player-card/mobile experience repairs |
 | 7.3.8 | Planned | Incremental Madden updates and freshness reporting |
 | 7.3.9 | Research gate | Approved direct-EA and CSV/Excel adapters |
 | 7.4.0–7.4.6 | Planned | Core platform features, mobile polish, consistency, and operations |
@@ -237,6 +237,10 @@
 - Record ownership periods and attribute each game to the owner controlling the team when that game occurred.
 - Track regular-season and playoff records, teams managed, playoff appearances, conference championships, Super Bowl appearances, and Super Bowl championships across teams.
 - Gate: Justin resolves to Buccaneers and Gas to Packers after reviewed assignment; no duplicate owner/cross-tenant inference is possible; career totals reconcile to season records.
+- Validated candidate adds migration 27, recording season/week boundaries on ownership periods and freezing person-owned season summaries during the existing one-action Archive Season workflow. Migration 27 automatically baselines existing active reviewed assignments so there is no second commissioner initialization step. Current assignments remain FranchiseHQ membership facts; Madden owner labels are never an authority.
+- My Team and team roster surfaces show teams managed, regular/playoff records, playoff appearances, conference championships, Super Bowl appearances, and championships across franchise seasons.
+- Consolidated owner-requested player experience work opens hydrated roster cards synchronously while directory/statistics data prewarm, returns a closed card to its exact origin, retains portrait-phone tables with horizontal scrolling, makes the separate Game Logs tab scrollable, adds Jets/Rams mark definition, and maps LEDGE/REDGE/EDGE/SAM/MIKE/WILL logs to TKL, TFL, SACK, INT, FF, FR, and TD.
+- Local validation does not create or reconcile Production ownership rows. Justin→Buccaneers and Gas→Packers remain an explicit reviewed-assignment acceptance gate after migration/runtime publication.
 
 ## 7.3.8 — Incremental Madden Freshness and Change Detail
 
