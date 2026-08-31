@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.4.7",
   "validatedOn": "2026-08-30",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-verified",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "weekLabelNormalization": {
@@ -20,6 +20,15 @@
       "approvedRouteRetainedInReadModel": true,
       "rawSourceRecordReturned": false,
       "privateSourceFieldsReturned": false
+    },
+    "productionDisplayVerification": {
+      "passed": true,
+      "releaseLabel": "Production · Current Release 7.3.4.7",
+      "responseHeaderRelease": "7.3.4.7",
+      "currentContext": "Regular Season Week 9",
+      "preseasonOptions": ["Preseason Week 1", "Preseason Week 2", "Preseason Week 3"],
+      "regularSeasonOptions": ["Regular Season Week 1", "Regular Season Week 2", "Regular Season Week 3", "Regular Season Week 4", "Regular Season Week 5", "Regular Season Week 6", "Regular Season Week 7", "Regular Season Week 8", "Regular Season Week 9"],
+      "deployedCanonicalResolverVerified": true
     },
     "activeSnapshotBaseline": {
       "passed": true,
@@ -68,11 +77,11 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
     "resetPerformed": false,
     "transitionOperationExecuted": false,
     "archiveSeasonExecuted": false,
@@ -86,17 +95,17 @@
     "credentialsChanged": false
   },
   "external": {
-    "githubPublication": { "authorized": true, "status": "not-run", "pullRequest": null, "candidateCommit": null, "mainCommit": "4c9d75a8ec09caa2bc50ae888fd6b2af255f58b3" },
-    "hostedChecks": { "authorized": true, "status": "not-run", "passed": 0, "candidatePassed": 0, "failed": 0, "pending": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main", "pullRequest": 23, "candidateCommit": "e95217cdad8560f8877841d41c4fb972885ac2b8", "mainCommit": "e95217cdad8560f8877841d41c4fb972885ac2b8" },
+    "hostedChecks": { "authorized": true, "status": "passed", "passed": 8, "candidatePassed": 4, "failed": 0, "pending": 0 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "productionDeployment": { "authorized": true, "status": "not-run", "currentDeployment": "dca6eb7d-9e6d-4678-ab7c-a5194429373c", "productionDomain": "https://franchisehq.app", "currentRuntimeCommit": "4c9d75a8ec09caa2bc50ae888fd6b2af255f58b3", "databaseRowsWrittenByDeployment": 0 },
+    "productionDeployment": { "authorized": true, "status": "success", "currentDeployment": "46794626-99af-4309-ba1e-b2751687465f", "deploymentUrl": "https://46794626.franchise-hq.pages.dev", "productionDomain": "https://franchisehq.app", "currentRuntimeCommit": "e95217cdad8560f8877841d41c4fb972885ac2b8", "importWorkerBuild": "a81a16a6-e04d-45c1-afd0-02c5df2c3306", "importWorkerVersion": "dfe7c5cd-fee4-4224-a3f8-70fb45b82510", "databaseRowsWrittenByDeployment": 0 },
     "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 26 },
     "productionMaddenExport": { "authorized": false, "status": "not-run", "anotherExportRequired": false },
     "productionCandidateImport": { "authorized": false, "status": "not-run" },
     "archiveSeason": { "authorized": false, "status": "not-run" },
     "gameYearTransition": { "authorized": false, "status": "not-run" }
   },
-  "productionChanged": false,
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false
