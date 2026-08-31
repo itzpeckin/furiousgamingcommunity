@@ -1530,16 +1530,23 @@ if (version === '7.3.6') {
     || evidence.checks?.activeSnapshotBaseline?.changedDuringCandidateWork !== false
   ) errors.push('7.3.6 must retain the exact active Week 9 and blocked/null Free Agent baseline.');
   if (
-    manifest.status !== 'validated-production-authorized'
+    manifest.status !== 'released'
     || manifest.repositoryPublication?.authorized !== true
-    || manifest.repositoryPublication?.status !== 'authorized-not-run'
+    || manifest.repositoryPublication?.status !== 'published-main-accepted'
+    || manifest.repositoryPublication?.commit !== 'fd0458223f903da5533fec9c1b84ce69c7c4a19a'
+    || Number(manifest.repositoryPublication?.pullRequest) !== 27
+    || Number(manifest.repositoryPublication?.hostedChecksPassed) !== 3
+    || Number(manifest.repositoryPublication?.mainChecksPassed) !== 6
     || manifest.production?.authorized !== true
-    || manifest.production?.deployed !== false
-    || manifest.production?.status !== 'authorized-not-run'
-    || evidence.external?.githubPublication?.status !== 'not-run'
-    || evidence.external?.hostedChecks?.status !== 'not-run'
-    || evidence.external?.productionDeployment?.status !== 'not-run'
-  ) errors.push('7.3.6 must retain the authorized-but-not-yet-run publication and Production gates.');
+    || manifest.production?.deployed !== true
+    || manifest.production?.status !== 'accepted'
+    || manifest.production?.currentCommit !== 'fd0458223f903da5533fec9c1b84ce69c7c4a19a'
+    || manifest.production?.currentPagesDeployment !== '3138d4d2-d1f7-498e-a15d-89bdb6bdd162'
+    || evidence.checks?.productionHttpsAcceptance?.passed !== true
+    || evidence.external?.githubPublication?.status !== 'published-main-accepted'
+    || evidence.external?.hostedChecks?.status !== 'passed'
+    || evidence.external?.productionDeployment?.status !== 'accepted'
+  ) errors.push('7.3.6 must record its exact accepted publication, hosted-check, Main, and Production evidence.');
   if (
     manifest.staging?.authorized !== false
     || evidence.external?.productionMigration?.authorized !== false

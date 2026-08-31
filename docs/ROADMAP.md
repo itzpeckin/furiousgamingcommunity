@@ -6,13 +6,13 @@
 
 **Updated:** August 31, 2026
 
-**Revision:** 1.62
+**Revision:** 1.63
 
-**Current production:** 7.3.5.1 from exact Main commit `b84af9d`, Pages deployment `eb95fd00`, and unchanged import Worker version `d29befdd`; Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer
+**Current production:** 7.3.6 application runtime `fd04582` from Main, accepted Pages deployment `3138d4d2`, and unchanged active import Worker version `d29befdd`; Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer
 
-**Current work:** 7.3.6 is authorized for one consolidated build, validation, pull-request, Main, and Production cycle from exact accepted Main commit `b84af9d`. It promotes stable team slugs and permanent opaque player identities into authenticated league-scoped URLs, preserves current hash navigation as a compatibility layer, and cross-links the existing roster, statistics, transaction, Trade Block, proposal, and team surfaces.
+**Current work:** 7.3.6 is Production accepted. Stable team slugs and permanent opaque player identities now back authenticated league-scoped URLs, current hash navigation remains a compatibility layer, and existing roster, statistics, transaction, Trade Block, proposal, and team surfaces converge on those canonical routes.
 
-**Next gate:** Complete the consolidated 7.3.6 strict gate, publish one exact candidate, require hosted checks, fast-forward that exact commit to Main, deploy Production, and perform read-only same-URL desktop/phone acceptance for one team and one player. No Madden export/import, snapshot change, reset, archive, transition, export-URL rotation, migration, credential change, or database write is authorized.
+**Next gate:** 7.3.7 ownership reconciliation, My Team, GM career history, and trophy cases requires a separately scoped implementation cycle. No Madden export/import, snapshot change, reset, archive, transition, export-URL rotation, credential change, or data mutation is implied by completing 7.3.6.
 
 ## Product decisions
 
@@ -60,7 +60,7 @@
 | 7.3.4.7 | Released; owner accepted | Canonical one-based week display and retained route provenance without a Madden data operation |
 | 7.3.5 | Released | Active-snapshot team, roster, player, statistics, standings, and honest Free Agent experience |
 | 7.3.5.1 | Released; owner accepted | Ratings-adapter preservation, Trade Center contract-unit correction, and active-snapshot global shell context |
-| 7.3.6 | Production authorized | Stable authenticated team/player URLs backed by permanent identities and safe public lookup contracts |
+| 7.3.6 | Released; Production accepted | Stable authenticated team/player URLs, cold refresh/auth return, back/forward navigation, safe public lookup contracts, and platform-wide canonical cross-links |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
 | 7.3.8 | Planned | Incremental Madden updates and freshness reporting |
 | 7.3.9 | Research gate | Approved direct-EA and CSV/Excel adapters |

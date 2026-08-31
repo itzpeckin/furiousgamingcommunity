@@ -167,7 +167,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 93389,
+        "bytes": 93939,
         "file": "tools/check-release.mjs"
       },
       {

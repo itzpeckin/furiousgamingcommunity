@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.6",
   "releaseType": "stable-team-player-urls",
-  "status": "validated-production-authorized",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.5.1",
@@ -19,11 +19,12 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0,
-    "mainChecksPassed": 0,
+    "status": "published-main-accepted",
+    "commit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a",
+    "pullRequest": 27,
+    "pullRequestCandidateCommit": "04a1869b005abbb626b42958a0efb19961feade7",
+    "hostedChecksPassed": 3,
+    "mainChecksPassed": 6,
     "scope": "Publish one exact candidate, create its pull request, require hosted checks, then fast-forward the accepted exact commit to Main."
   },
   "staging": {
@@ -33,11 +34,11 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.3.5.1",
-    "currentCommit": "b84af9d9ffa5adb6cf440e733e83210cea83b3d9",
-    "currentPagesDeployment": "eb95fd00-bdd6-4565-ae21-65da03b4bd0e",
+    "deployed": true,
+    "status": "accepted",
+    "currentRelease": "7.3.6",
+    "currentCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a",
+    "currentPagesDeployment": "3138d4d2-d1f7-498e-a15d-89bdb6bdd162",
     "currentWorkerBuild": "2c7bc863-539d-45bf-a1a4-24edcf1c31b6",
     "currentWorkerVersion": "d29befdd",
     "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",

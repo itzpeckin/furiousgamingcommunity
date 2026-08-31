@@ -2,7 +2,7 @@
 
 ## 7.3.6 stable team/player URL impact
 
-The authorized 7.3.6 runtime adds no migration and performs no league-data operation. It reads existing permanent player identities and canonical team keys to expose authenticated league paths at `/leagues/{leagueSlug}/players/{publicPlayerId}` and `/leagues/{leagueSlug}/teams/{teamSlug}`. Current hash navigation remains a compatibility layer, and unauthenticated document recovery returns to the exact deep path after Discord authentication.
+The accepted 7.3.6 application runtime is exact commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a` on accepted Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162`. It adds no migration and performs no league-data operation. It reads existing permanent player identities and canonical team keys to expose authenticated league paths at `/leagues/{leagueSlug}/players/{publicPlayerId}` and `/leagues/{leagueSlug}/teams/{teamSlug}`. Current hash navigation remains a compatibility layer, and unauthenticated document recovery returns to the exact deep path after Discord authentication.
 
 Runtime rollback restores exact accepted 7.3.5.1 Main commit `b84af9d9ffa5adb6cf440e733e83210cea83b3d9`, Pages deployment `eb95fd00-bdd6-4565-ae21-65da03b4bd0e`, and the unchanged import Worker build `2c7bc863-539d-45bf-a1a4-24edcf1c31b6` / version `d29befdd`. Retain permanent player identities/source aliases, active Week 9 snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`, previous snapshot `518236e4-1cac-41f5-b8c8-757b7150dcd8`, every data/audit row, and the permanent league export URL.
 

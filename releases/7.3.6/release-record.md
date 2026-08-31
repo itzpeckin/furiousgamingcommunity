@@ -1,8 +1,8 @@
 # FranchiseHQ 7.3.6 Release Record
 
-**Status:** Locally validated Production-authorized candidate
+**Status:** Production accepted
 
-**Production changed during candidate work:** No. Production remains on exact accepted 7.3.5.1 commit `b84af9d9ffa5adb6cf440e733e83210cea83b3d9`; active snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e` remains unchanged.
+**Production changed:** Yes, code-only. Accepted application commit `fd0458223f903da5533fec9c1b84ce69c7c4a19a` is live on Pages deployment `3138d4d2-d1f7-498e-a15d-89bdb6bdd162`; active snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e` remains unchanged.
 
 ## Scope
 
@@ -28,11 +28,13 @@ Create stable authenticated league-scoped team and player URLs using the permane
 - Existing permanent identity, tenant isolation, ownership, containment, live-data, route, and release-shell tests pass.
 - The consolidated strict repository gate covers syntax, repository contracts, assets, secrets, environment contracts, migration continuity, release evidence, inventory, and the full automated suite.
 - Migration 26 remains current; 7.3.6 adds no migration or identity/data row.
+- Production acceptance opened `/leagues/furious-gaming-community/teams/tb` and `/leagues/furious-gaming-community/players/plr_4b7a42df20d945ccb77f5d5766f9290b`, hard-refreshed both, opened the copied player URL in a second authenticated tab, exercised player-to-team and browser back/forward navigation, and repeated the pages at a 390×844 viewport without a console error or session loss.
 
 ## Deployment status
 
-- Branch `codex/franchisehq-7.3.6`, pull request publication, hosted checks, exact Main fast-forward, and Production deployment are authorized.
-- Deployment is code-only. No Madden export/import, candidate build, activation, reset, Archive Season, game-year transition, permanent deletion, export-URL rotation, membership, credential, or database mutation is authorized.
+- Pull request [#27](https://github.com/itzpeckin/furiousgamingcommunity/pull/27) introduced candidate `04a1869`; cold Production acceptance found and corrected the asynchronous live-snapshot route fallback in `fd04582`.
+- Corrective commit `fd04582` passed 3/3 branch checks and 6/6 Main/deployment checks, then deployed as Pages `3138d4d2-d1f7-498e-a15d-89bdb6bdd162`.
+- Deployment was code-only. No Madden export/import, candidate build, activation, reset, Archive Season, game-year transition, permanent deletion, export-URL rotation, membership, credential, or database mutation ran.
 
 ## Rollback
 

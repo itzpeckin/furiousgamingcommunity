@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.6",
   "validatedOn": "2026-08-31",
-  "status": "validated-production-authorized",
+  "status": "released",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "stablePublicIdentityRoutes": {
@@ -77,17 +77,31 @@
       "requiredTables": 79
     },
     "productionHttpsAcceptance": {
-      "passed": false,
-      "status": "authorized-pending-exact-deployment",
-      "readOnly": true
+      "passed": true,
+      "status": "accepted",
+      "readOnly": true,
+      "mainRuntimeCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a",
+      "pagesDeployment": "3138d4d2-d1f7-498e-a15d-89bdb6bdd162",
+      "releaseMarker": "Production · Current Release 7.3.6",
+      "canonicalTeamUrl": "/leagues/furious-gaming-community/teams/tb",
+      "canonicalPlayerUrl": "/leagues/furious-gaming-community/players/plr_4b7a42df20d945ccb77f5d5766f9290b",
+      "teamIdentity": "Buccaneers",
+      "playerIdentity": "Tristan Wirfs",
+      "hardRefreshPreserved": true,
+      "secondAuthenticatedTabPreserved": true,
+      "playerToTeamCrossLinkPreserved": true,
+      "historyBackForwardPreserved": true,
+      "authenticatedSessionPreserved": true,
+      "phoneViewport": "390x844",
+      "consoleErrors": 0
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
     "resetPerformed": false,
     "transitionOperationExecuted": false,
     "archiveSeasonExecuted": false,
@@ -103,17 +117,17 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": true, "status": "not-run", "pullRequest": null, "candidateCommit": null, "mainCommit": "b84af9d9ffa5adb6cf440e733e83210cea83b3d9" },
-    "hostedChecks": { "authorized": true, "status": "not-run", "passed": 0, "candidatePassed": 0, "failed": 0, "pending": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "pullRequest": 27, "candidateCommit": "04a1869b005abbb626b42958a0efb19961feade7", "acceptanceCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a", "mainCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a" },
+    "hostedChecks": { "authorized": true, "status": "passed", "passed": 6, "candidatePassed": 3, "mainPassed": 6, "failed": 0, "pending": 0 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "productionDeployment": { "authorized": true, "status": "not-run", "currentRuntimeCommit": "b84af9d9ffa5adb6cf440e733e83210cea83b3d9", "databaseRowsWrittenByCandidateWork": 0 },
+    "productionDeployment": { "authorized": true, "status": "accepted", "currentRuntimeCommit": "fd0458223f903da5533fec9c1b84ce69c7c4a19a", "pagesDeployment": "3138d4d2-d1f7-498e-a15d-89bdb6bdd162", "workerSourceChanged": false, "activeWorkerVersion": "d29befdd", "databaseRowsWrittenByCandidateWork": 0 },
     "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 26 },
     "productionMaddenExport": { "authorized": false, "status": "not-run", "anotherExportRequired": false },
     "productionCandidateImport": { "authorized": false, "status": "not-run" },
     "archiveSeason": { "authorized": false, "status": "not-run" },
     "gameYearTransition": { "authorized": false, "status": "not-run" }
   },
-  "productionChanged": false,
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false
