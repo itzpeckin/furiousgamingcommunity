@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.5 active-snapshot experience impact
+
+The local 7.3.5 candidate adds no migration and performs no league-data operation. It changes the authenticated member read model and browser presentation so Teams, rosters, players, standings, statistics, and Free Agents resolve from one active snapshot. It exposes only an explicit Madden rating allowlist and safe public ability fields, applies documented contract units, labels unavailable current-year contract splits honestly, paginates every rostered player, and removes live demo/legacy identity fallbacks and nested vertical-scroll traps.
+
+Runtime rollback restores exact 7.3.4.7 Main commit `e95217cdad8560f8877841d41c4fb972885ac2b8`. Retain active Week 9 snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`, previous snapshot `518236e4-1cac-41f5-b8c8-757b7150dcd8`, every capture/report/mapping/snapshot/lifecycle/audit row, and the permanent league export URL. The 7.3.5 candidate does not require a schema rollback.
+
+Do not use code rollback to re-export, import, move the active pointer, reset data, rotate the permanent export URL, run Archive Season, run a game-year transition, delete history, or reinterpret Madden's blocked Free Agent route as zero.
+
 ## 7.3.4.7 week-label normalization impact
 
 The authorized 7.3.4.7 runtime adds no migration and performs no league-data operation. It retains the approved schedule route in the member read model and makes the already-normalized one-based game week authoritative in the browser. Madden's raw zero-based week remains a compatibility fallback only when a canonical week and authoritative route are unavailable.

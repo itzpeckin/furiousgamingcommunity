@@ -1,48 +1,23 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../../_lib/permissions.js';
+import { freeAgentStateFromMappingRun, resolveSnapshotPlayerMappingRun } from '../../../../_lib/live-data-experience.js';
+import { normalizePlayer } from '../snapshot/read-model.js';
 
-const RELEASE='7.0.1';
-const FREE_AGENT_ROUTE=/\/free[-_]?agents?\/(?:roster|players)\/?$/i;
-const text=v=>v==null?null:(String(v).trim()||null);
-const int=v=>{const n=Number.parseInt(v,10);return Number.isFinite(n)?n:null};
-const money=v=>{const n=Number(v);return Number.isFinite(n)?Math.round(n):null};
-const bool=v=>v===true||v===1||v==='1'||['true','yes'].includes(String(v??'').trim().toLowerCase());
+const RELEASE='7.3.5';
+const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 
-function retiredRecord(raw={}){
-  if(bool(raw.isRetired??raw.retired??raw.hasRetired))return true;
-  const status=String(raw.rosterStatus??raw.roster_status??raw.playerStatus??raw.player_status??raw.status??'').trim();
-  return /(^|\b)(retired|retirement)(\b|$)/i.test(status);
+async function activeSnapshot(db,leagueId){
+  return db.prepare(`SELECT s.* FROM league_active_snapshots a
+    JOIN league_snapshots s ON s.id=a.snapshot_id AND s.league_id=a.league_id
+    WHERE a.league_id=? LIMIT 1`).bind(leagueId).first();
 }
-function normalizeDev(v){
-  if(v==null)return null;
-  const n=Number(v);
-  if(Number.isFinite(n))return ({0:'Normal',1:'Star',2:'Superstar',3:'X-Factor'})[n]||String(v);
-  return String(v).trim()||null;
-}
-function playerShape(raw,index){
-  const first=text(raw.firstName??raw.first_name),last=text(raw.lastName??raw.last_name);
-  const name=text(raw.displayName??raw.fullName??raw.playerName??raw.name)||[first,last].filter(Boolean).join(' ')||`Free Agent ${index+1}`;
-  const id=text(raw.playerId??raw.playerID??raw.player_id??raw.rosterId??raw.assetId??raw.id);
-  if(!id)return null;
-  return {id,externalId:id,name,displayName:name,firstName:first,lastName:last,teamId:'FA',teamExternalId:null,
-    rosterStatus:'free-agent',status:'free-agent',position:text(raw.position??raw.positionName??raw.pos??raw.positionAbbr),
-    overall:int(raw.overall??raw.overallRating??raw.ovr??raw.playerOverall),age:int(raw.age??raw.playerAge),
-    yearsPro:int(raw.yearsPro??raw.experience??raw.exp),devTrait:normalizeDev(raw.developmentTrait??raw.devTrait??raw.development),
-    developmentTrait:normalizeDev(raw.developmentTrait??raw.devTrait??raw.development),jerseyNumber:int(raw.jerseyNumber??raw.jersey??raw.number),
-    salary:money(raw.salary??raw.totalSalary??raw.contractSalary),capHit:money(raw.capHit??raw.salaryCapHit??raw.cap),
-    portraitId:text(raw.portraitId??raw.portraitID??raw.headshotId)};
-}
-async function payloadFor(context,capture){
-  if(!capture?.r2_object_key)return null;
-  const object=await context.env.COMPANION_EXPORTS?.get?.(capture.r2_object_key);
-  if(!object)return null;
-  try{return JSON.parse(await object.text())}catch{return null}
-}
-async function captures(db,leagueId){
-  const result=await db.prepare(`SELECT id,route_path,r2_object_key,received_at,byte_length
-    FROM companion_route_captures WHERE league_id=? AND LOWER(route_path) LIKE '%free%agent%'
-    ORDER BY received_at DESC LIMIT 20`).bind(leagueId).all();
-  return (result.results||[]).filter(row=>FREE_AGENT_ROUTE.test(String(row.route_path||'')));
+
+async function activeFreeAgents(db,leagueId,snapshotId){
+  const result=await db.prepare(`SELECT data_json FROM league_snapshot_records
+    WHERE league_id=? AND snapshot_id=? AND domain='players' ORDER BY external_id`).bind(leagueId,snapshotId).all();
+  return (result.results||[])
+    .map(row=>normalizePlayer(parse(row.data_json)||{}))
+    .filter(player=>player.rosterStatus==='free-agent');
 }
 
 export async function onRequestGet(context){
@@ -53,27 +28,27 @@ export async function onRequestGet(context){
   const db=database(context.env),league=db?await resolveLeague(context.env,slug):null;
   if(!db||!league||authorization.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.',release:RELEASE},404);
 
-  const rows=await captures(db,league.id);
-  const attempts=[];
-  let selected=null,players=[];
-  for(const capture of rows){
-    const payload=await payloadFor(context,capture);
-    const list=Array.isArray(payload?.rosterInfoList)?payload.rosterInfoList:[];
-    const usable=payload?.success!==false&&list.length>0;
-    attempts.push({captureId:capture.id,routePath:capture.route_path,receivedAt:capture.received_at,
-      byteLength:Number(capture.byte_length||0),payloadSuccess:payload?.success??null,recordCount:list.length,
-      message:text(payload?.message),usable});
-    if(!selected&&usable){
-      selected=capture;
-      players=list.filter(raw=>!retiredRecord(raw)).map(playerShape).filter(Boolean);
-    }
+  const snapshot=await activeSnapshot(db,league.id);
+  if(!snapshot)return json({
+    ok:true,release:RELEASE,mode:'active-snapshot',authoritative:true,snapshotId:null,
+    status:'unavailable',count:null,players:[],reason:'No active snapshot is available.',interpretedAsZero:false
+  });
+
+  const mappingRun=await resolveSnapshotPlayerMappingRun(db,league.id,snapshot);
+  let state=freeAgentStateFromMappingRun(mappingRun);
+  let players=['ready','empty-confirmed'].includes(state.status)
+    ?await activeFreeAgents(db,league.id,snapshot.id)
+    :[];
+  if((state.status==='ready'&&players.length!==Number(state.count))||(state.status==='empty-confirmed'&&players.length!==0)){
+    state={status:'unavailable',count:null,reason:'The active snapshot Free Agent rows do not reconcile to its pinned player-mapping source.',interpretedAsZero:false};
+    players=[];
   }
+  const count=state.status==='ready'?players.length:state.count;
 
   return json({
-    ok:true,release:RELEASE,mode:'source-only',authoritative:true,
-    inferenceDisabled:true,awaitingMadden27Source:!selected,
-    sourceRoute:'companion-freeagents',captureAvailable:Boolean(rows.length),usableCaptureAvailable:Boolean(selected),
-    selectedCapture:selected?{captureId:selected.id,routePath:selected.route_path,receivedAt:selected.received_at}:null,
-    count:players.length,players,attempts
+    ok:true,release:RELEASE,mode:'active-snapshot',authoritative:true,
+    snapshotId:snapshot.id,sourceSnapshotId:mappingRun?.sourceSnapshotId||snapshot.id,status:state.status,count,players,
+    reason:state.reason,interpretedAsZero:false,
+    sourceRoute:'active-snapshot-player-domain',rawPayloadReturned:false
   });
 }

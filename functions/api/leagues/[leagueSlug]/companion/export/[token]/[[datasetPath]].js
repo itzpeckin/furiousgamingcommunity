@@ -17,7 +17,7 @@ import { hashToken } from '../../../../../../_lib/auth.js';
 import { deriveLeagueExportToken } from '../../../../../../_lib/permanent-league-export.js';
 import { generateMaddenDiscoveryReport } from '../../../../../../_lib/madden-discovery-report.js';
 
-const RELEASE = '7.3.4.7';
+const RELEASE = '7.3.5';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
 const AUTOMATIC_COHORT_WINDOW_MS = 2 * 60 * 1000;
 const AUTOMATIC_LATE_CAPTURE_WINDOW_MS = 15 * 1000;

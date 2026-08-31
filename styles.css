@@ -6531,3 +6531,33 @@ table td{
   .game-year-transition-actions>.button{width:100%}
 }
 @media(max-width:480px){.game-year-count-grid{grid-template-columns:1fr}}
+/* FranchiseHQ 7.3.5 — authoritative live-data experience */
+.live-source-status,.free-agent-source-state{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 14px;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+.live-source-status>div:first-child{display:grid;gap:3px}.live-source-status span,.live-source-status small,.free-agent-source-state span{color:var(--muted)}
+.live-source-status strong,.free-agent-source-state strong{color:var(--text)}
+.live-source-status details{flex-basis:100%;padding-top:8px;border-top:1px solid var(--border)}.live-source-status details summary{cursor:pointer;font-weight:800}.live-source-status details ul{margin:8px 0 0;padding-left:20px;color:var(--muted)}
+.free-agent-source-state{justify-content:flex-start;align-items:flex-start;flex-direction:column;gap:4px}.free-agent-source-state.is-blocked{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.08)}
+.player-directory-pagination{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-top:1px solid var(--border);color:var(--muted)}
+.player-directory-pagination>div{display:flex;align-items:center;gap:10px}.player-directory-pagination strong{color:var(--text);white-space:nowrap}
+.canonical-ability-list{display:grid;gap:8px;padding:10px}.canonical-ability-list article{display:grid;gap:7px;padding:11px;border:1px solid #26384d;border-radius:7px;background:#0a1724}.canonical-ability-list article div{display:grid;gap:3px}.canonical-ability-list article span,.canonical-ability-list article small{color:#aeb8c7;font-size:10px;line-height:1.4}.canonical-ability-list article strong{color:#fff;font-size:12px}
+.roster-table-scroll-window,.player-live-game-log,.canonical-game-log-table,.canonical-game-log-table-wrap,.player-details-game-log-scroll,.season-team-stat-table-wrap{max-height:none!important;height:auto!important;overflow-y:visible!important;overscroll-behavior:auto!important}
+.player-live-game-log th{position:static}.canonical-player-panels,.canonical-player-panel,.canonical-player-dashboard,.canonical-player-dashboard>*{min-width:0}
+[data-value-card-modal] .value-card-dialog,[data-value-card-content]{max-width:min(1540px,100vw)!important;overflow-x:clip}
+@media(max-width:700px){
+  .live-source-status{align-items:flex-start;flex-wrap:wrap}.live-source-status .pill{margin-left:0}.live-source-status details{width:100%}
+  .player-directory-pagination{align-items:stretch;flex-direction:column}.player-directory-pagination>div{justify-content:space-between}.player-directory-pagination .button{padding:8px 10px}
+  .player-directory-card>.table-wrap,.roster-table-card>.table-wrap{overflow:visible}
+  .player-directory-table,.team-roster-table--single{display:block;width:100%;min-width:0!important}
+  .player-directory-table thead,.team-roster-table--single thead{display:none}
+  .player-directory-table tbody,.team-roster-table--single tbody{display:grid;gap:10px;padding:10px}
+  .player-directory-table tr,.team-roster-table--single tr{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);overflow:hidden}
+  .player-directory-table td,.team-roster-table--single td{display:grid;grid-template-columns:minmax(78px,.7fr) minmax(0,1.3fr);align-items:center;gap:8px;padding:9px 10px!important;border:0!important;border-bottom:1px solid var(--border)!important;white-space:normal;min-width:0}
+  .player-directory-table td::before,.team-roster-table--single td::before{content:attr(data-label);color:var(--muted);font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+  .team-roster-table--single td:nth-child(1)::before{content:'Player'}.team-roster-table--single td:nth-child(2)::before{content:'Position'}.team-roster-table--single td:nth-child(3)::before{content:'Overall'}.team-roster-table--single td:nth-child(4)::before{content:'Age'}.team-roster-table--single td:nth-child(5)::before{content:'Development'}.team-roster-table--single td:nth-child(6)::before{content:'Speed'}.team-roster-table--single td:nth-child(7)::before{content:'Strength'}.team-roster-table--single td:nth-child(8)::before{content:'Agility'}.team-roster-table--single td:nth-child(9)::before{content:'Acceleration'}.team-roster-table--single td:nth-child(10)::before{content:'Awareness'}.team-roster-table--single td:nth-child(11)::before{content:'Contract'}.team-roster-table--single td:nth-child(12)::before{content:'Status'}
+  .player-directory-table td:first-child,.team-roster-table--single td:first-child{grid-column:1/-1}.player-directory-table td:last-child,.team-roster-table--single td:last-child{border-bottom:0!important}
+  .player-directory-table .table-team,.roster-player-inline{min-width:0}.roster-player-inline{display:grid;grid-template-columns:minmax(0,1fr) auto}.roster-player-inline__identity{white-space:normal}.roster-player-inline__identity strong{max-width:none}
+  [data-value-card-modal] .value-card-dialog{width:100vw!important;max-width:100vw!important;margin:0!important;border-radius:0!important}.canonical-player-tabs--approved{max-width:100%;overflow-x:auto}.canonical-player-hero--approved{border-radius:0!important}.canonical-player-hero--approved .canonical-player-hero__identity{max-width:100%;overflow-wrap:anywhere}.canonical-player-hero--approved .canonical-player-nameblock h2{font-size:clamp(28px,10vw,42px)}
+}
+@media(max-width:520px){
+  .player-directory-table tr,.team-roster-table--single tr{grid-template-columns:1fr}.player-directory-table td:first-child,.team-roster-table--single td:first-child{grid-column:auto}
+}

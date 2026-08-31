@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.5",
+  "validatedOn": "2026-08-31",
+  "status": "validated-review-candidate",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "activeSnapshotAuthority": {
+      "passed": true,
+      "singleSnapshotForCorePages": true,
+      "independentLatestCaptureReadRemoved": true,
+      "demoIdentityFallbackWhenLive": false,
+      "rawSourceRecordReturned": false
+    },
+    "sourceSupportedPlayerExperience": {
+      "passed": true,
+      "approvedRatingFields": 55,
+      "internalAbilityIdentifiersReturned": false,
+      "currentYearContractSplitsManufactured": false,
+      "contractSourceUnitsDocumented": true,
+      "rosterStatusesSourceDerived": true,
+      "freshnessVisible": true,
+      "validationWarningsVisible": true
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false,
+      "authority": "active-snapshot-player-mapping-lineage"
+    },
+    "responsiveExperience": {
+      "passed": true,
+      "staticLayoutContractPassed": true,
+      "browserVisualRun": false,
+      "browserVisualStatus": "blocked-by-local-file-url-policy",
+      "deployedHttpsAcceptanceRequired": true,
+      "desktopPlayerPaging": true,
+      "phonePlayerCards": true,
+      "pageHorizontalOverflow": false,
+      "nestedVerticalScroll": false,
+      "pageSize": 100,
+      "allRosteredPlayersReachable": true
+    },
+    "activeSnapshotBaseline": {
+      "passed": true,
+      "snapshotId": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+      "previousSnapshotId": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+      "week": 9,
+      "teams": 32,
+      "rosteredPlayers": 2042,
+      "games": 184,
+      "statistics": 6966,
+      "standings": 32,
+      "validationStatus": "ready",
+      "validationErrors": 0,
+      "validationWarnings": 2,
+      "changedDuringCandidateWork": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 26,
+      "newMigration": false,
+      "requiredTables": 79
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 120,
+      "failedTests": 0,
+      "focusedLiveExperienceTests": 7,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 207,
+      "inventoryFiles": 537,
+      "routes": 65,
+      "requiredTables": 79
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "resetPerformed": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "archiveGameYearExecuted": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "historyPermanentlyDeleted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false
+  },
+  "external": {
+    "githubPublication": { "authorized": false, "status": "not-run", "pullRequest": null, "candidateCommit": null, "mainCommit": "e95217cdad8560f8877841d41c4fb972885ac2b8" },
+    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0, "candidatePassed": 0, "failed": 0, "pending": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": { "authorized": false, "status": "not-run", "currentRuntimeCommit": "e95217cdad8560f8877841d41c4fb972885ac2b8", "databaseRowsWrittenByCandidateWork": 0 },
+    "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 26 },
+    "productionMaddenExport": { "authorized": false, "status": "not-run", "anotherExportRequired": false },
+    "productionCandidateImport": { "authorized": false, "status": "not-run" },
+    "archiveSeason": { "authorized": false, "status": "not-run" },
+    "gameYearTransition": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

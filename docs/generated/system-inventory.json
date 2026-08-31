@@ -37,7 +37,6 @@
       "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
       "functions/api/leagues/[leagueSlug]/companion/test.js",
       "functions/api/leagues/[leagueSlug]/game-year-transition.js",
-      "functions/api/leagues/[leagueSlug]/players/free-agents.js",
       "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
     ],
     "COMPANION_EXPORT_META": [
@@ -139,11 +138,11 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 176,
+      ".js": 177,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 29,
+      ".mjs": 30,
       ".png": 1,
       ".sql": 28,
       ".txt": 1,
@@ -152,15 +151,15 @@
     },
     "largest": [
       {
-        "bytes": 602077,
+        "bytes": 610601,
         "file": "app.js"
       },
       {
-        "bytes": 385694,
+        "bytes": 391368,
         "file": "styles.css"
       },
       {
-        "bytes": 367608,
+        "bytes": 367606,
         "file": "trade-module.js"
       },
       {
@@ -168,11 +167,11 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 77089,
+        "bytes": 83716,
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 75123,
+        "bytes": 75095,
         "file": "index.html"
       },
       {
@@ -184,19 +183,19 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 38439,
+        "bytes": 38437,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 36875,
+        "bytes": 36873,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 36470,
+        "bytes": 36468,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 35252,
+        "bytes": 35249,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
@@ -220,11 +219,11 @@
         "file": "functions/_lib/madden-discovery.js"
       },
       {
-        "bytes": 22381,
+        "bytes": 22377,
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 20470,
+        "bytes": 20468,
         "file": "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
       },
       {
@@ -232,7 +231,7 @@
         "file": "migrations/0019_canonical_import_snapshot_foundation.sql"
       }
     ],
-    "total": 535
+    "total": 537
   },
   "frontend": {
     "assets": [
@@ -1342,7 +1341,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.3.4.7",
+  "release": "7.3.5",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

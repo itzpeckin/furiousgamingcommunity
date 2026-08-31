@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.5",
+  "releaseType": "active-snapshot-league-experience",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.4.7",
+    "commit": "e95217cdad8560f8877841d41c4fb972885ac2b8",
+    "tree": "5c1fe5404be940d4c9beddc859f9d025a81526f5",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.5",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-authorized",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Local implementation and validation only. Publication requires separate owner authorization."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-authorized",
+    "currentRelease": "7.3.4.7",
+    "currentCommit": "e95217cdad8560f8877841d41c4fb972885ac2b8",
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+    "scope": "No Production runtime or data operation is authorized during candidate work."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/live-data-experience.js",
+    "functions/api/leagues/[leagueSlug]/snapshot/read-model.js",
+    "functions/api/leagues/[leagueSlug]/players/free-agents.js",
+    "league-engine/live-read-model.js",
+    "app.js",
+    "styles.css",
+    "tests/import/live-data-experience.test.mjs",
+    "releases/7.3.5/release-record.md",
+    "releases/7.3.5/validation-evidence.json"
+  ]
+}

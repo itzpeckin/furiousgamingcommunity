@@ -1,8 +1,16 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../../_lib/league-teams.js';
+import {
+  freeAgentStateFromMappingRun,
+  resolveSnapshotPlayerMappingRun,
+  safeAbilityValues,
+  safeRatingValues,
+  sourceRosterStatus,
+  sourceSupportedContract
+} from '../../../../_lib/live-data-experience.js';
 
-const RELEASE = '7.3.4.7';
+const RELEASE = '7.3.5';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 
 const parse = value => {
@@ -31,20 +39,6 @@ const numeric = value => {
 };
 
 const text = value => value === null || value === undefined || value === '' ? null : String(value);
-
-function safeRatings(raw = {}) {
-  const parsed = parse(raw.ratings_json) ?? raw.ratings ?? {};
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-  return Object.fromEntries(Object.entries(parsed)
-    .filter(([key, value]) =>
-      /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)
-      && /(rating|speed|accel|agility|awareness|strength|throw|catch|route|tackle|coverage|block|power|finesse|pursuit|playrec|^spd$|^str$|^agi$|^acc$|^awr$|^aws$)/i.test(key)
-      && numeric(value) !== null
-      && numeric(value) >= 0
-      && numeric(value) <= 100)
-    .slice(0, 150)
-    .map(([key, value]) => [key, numeric(value)]));
-}
 
 export function normalizeTeam(raw = {}) {
   raw = sourceRecord(raw);
@@ -110,30 +104,26 @@ export function normalizePlayer(raw = {}) {
   const position = text(raw.position ?? raw.position_name ?? raw.positionName ?? raw.pos);
   const overall = numeric(raw.overall ?? raw.overall_rating ?? raw.overallRating ?? raw.ovrRating ?? raw.playerBestOvr ?? raw.bestOverall ?? raw.playerOverall ?? raw.ovr);
   const devTrait = text(raw.development_trait ?? raw.dev_trait ?? raw.devTrait ?? raw.developmentTrait ?? raw.development);
-  const contract = {
-    yearsRemaining:numeric(raw.contract_years_remaining ?? raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.contractLength ?? raw.contractYears ?? raw.yearsRemaining ?? raw.yearsLeft ?? raw.contractLengthRemaining),
-    length:numeric(raw.contractLength ?? raw.contractYears ?? raw.totalContractYears),
-    currentYearSalary:numeric(raw.salary ?? raw.currentYearSalary ?? raw.currentSalary ?? raw.capSalary ?? raw.currentSeasonSalary),
-    capHit:numeric(raw.cap_hit ?? raw.capHit ?? raw.salaryCapHit ?? raw.currentCapHit),
-    currentYearBonus:numeric(raw.currentYearBonus ?? raw.contractBonus ?? raw.signingBonus),
-    totalSalary:numeric(raw.totalSalary ?? raw.contractTotalSalary ?? raw.contractValue),
-    releaseNetSavings:numeric(raw.capReleaseNetSavings ?? raw.releaseNetSavings ?? raw.capSavings),
-    releasePenalty:numeric(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney)
-  };
-  const ratings = safeRatings(raw);
+  const contract = sourceSupportedContract({
+    ...raw,
+    sourceCapHit:raw.capHit ?? raw.sourceCapHit
+  });
+  const ratings = safeRatingValues(raw);
+  const abilities = safeAbilityValues(raw);
+  const rosterStatus = sourceRosterStatus(raw, teamId);
   const approved = {
     playerId:id, teamId, firstName, lastName, displayName, position, overall,
     archetype:text(raw.archetype ?? raw.playerArchetype), age:numeric(raw.age),
     yearsPro:numeric(raw.years_pro ?? raw.yearsPro ?? raw.experience), devTrait,
-    developmentTrait:devTrait, jerseyNumber:numeric(raw.jersey_number ?? raw.jerseyNumber),
-    heightInches:numeric(raw.height_inches ?? raw.heightInches), weightLbs:numeric(raw.weight_lbs ?? raw.weightLbs),
+    developmentTrait:devTrait, jerseyNumber:numeric(raw.jersey_number ?? raw.jerseyNumber ?? raw.jerseyNum),
+    heightInches:numeric(raw.height_inches ?? raw.heightInches ?? raw.height), weightLbs:numeric(raw.weight_lbs ?? raw.weightLbs ?? raw.weight),
     college:text(raw.college ?? raw.collegeName ?? raw.school),
     injuryStatus:text(raw.injury_status ?? raw.injuryStatus ?? raw.injury),
-    isInjured:Boolean(Number(raw.is_injured ?? raw.isInjured ?? 0)),
-    rosterStatus:text(raw.rosterStatus ?? raw.roster_status ?? raw.playerStatus ?? raw.status) ?? 'active',
+    isInjured:Boolean(Number(raw.is_injured ?? raw.isInjured ?? raw.isOnIR ?? 0)),
+    rosterStatus,
     depthOrder:numeric(raw.depthOrder ?? raw.depthChartOrder ?? raw.depth_chart_order ?? raw.depth),
     depthPosition:text(raw.depthPosition ?? raw.depthChartPosition ?? raw.depth_chart_position),
-    portraitId:text(raw.portrait_id ?? raw.portraitId), contract
+    portraitId:text(raw.portrait_id ?? raw.portraitId), abilityCount:abilities.length, contract
   };
   return {
     id, teamId, firstName, lastName, displayName, position, overall,
@@ -143,7 +133,7 @@ export function normalizePlayer(raw = {}) {
     college:approved.college, injuryStatus:approved.injuryStatus,
     isInjured:approved.isInjured, rosterStatus:approved.rosterStatus,
     depthOrder:approved.depthOrder, depthPosition:approved.depthPosition,
-    portraitId:approved.portraitId, contract, ratings, source:approved
+    portraitId:approved.portraitId, contract, ratings, abilities, source:approved
   };
 }
 
@@ -258,6 +248,18 @@ async function activeSnapshot(db, leagueId) {
   `).bind(leagueId).first();
 }
 
+function validationIntegrity(active) {
+  const report = parse(active.validation_report_json) || {};
+  const warnings = Array.isArray(report.warnings) ? report.warnings.map(value => String(value)).slice(0, 20) : [];
+  return {
+    status:text(active.validation_status) || 'not-run',
+    score:numeric(active.validation_score),
+    errorCount:Number(active.validation_error_count || 0),
+    warningCount:Number(active.validation_warning_count || warnings.length || 0),
+    warnings
+  };
+}
+
 async function domainRows(db, leagueId, snapshotId, domain, cursor = null, limit = 150, compact = false) {
   const safeLimit = Math.max(25, Math.min(500, Number(limit) || 150));
   let result;
@@ -308,6 +310,9 @@ export async function onRequestGet(context) {
       league:{id:league.id,slug:league.slug,name:league.name},
       snapshot:null,
       domains:{teams:0,players:0,games:0,statistics:0,standings:0},
+      rosteredPlayers:0,
+      freeAgents:{status:'unavailable',count:null,reason:'No active snapshot is available.',interpretedAsZero:false,authority:'active-snapshot',sourceSnapshotId:null},
+      integrity:{status:'not-run',score:null,errorCount:0,warningCount:0,warnings:[]},
       cache:{policy:'client-memory',key:null}
     });
   }
@@ -323,6 +328,14 @@ export async function onRequestGet(context) {
     statistics:Number(active.statistic_count || 0),
     standings:Number(active.standing_count || 0)
   };
+  const includeSummaryMetadata = !ALLOWED_DOMAINS.has(domain);
+  const playerMappingRun = includeSummaryMetadata ? await resolveSnapshotPlayerMappingRun(db, league.id, active) : null;
+  const freeAgents = includeSummaryMetadata ? {
+    ...freeAgentStateFromMappingRun(playerMappingRun),
+    authority:'active-snapshot',
+    sourceSnapshotId:playerMappingRun?.sourceSnapshotId || active.id
+  } : null;
+  const integrity = validationIntegrity(active);
 
   const base = {
     ok:true,
@@ -335,9 +348,16 @@ export async function onRequestGet(context) {
       seasonYear:active.season_year,
       weekIndex:active.week_index,
       activatedAt:active.activated_at,
-      createdAt:active.created_at
+      createdAt:active.created_at,
+      validationStatus:integrity.status,
+      validationScore:integrity.score
     },
     domains:summary,
+    rosteredPlayers:includeSummaryMetadata
+      ? (numeric(playerMappingRun?.rostered_count) ?? (freeAgents?.status === 'ready' ? Math.max(0, summary.players - Number(freeAgents.count || 0)) : summary.players))
+      : summary.players,
+    freeAgents,
+    integrity,
     cache:{policy:'client-memory',key:`${league.id}:${active.id}`}
   };
 

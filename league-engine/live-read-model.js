@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.1.0';
+  const VERSION = '7.3.5';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();
@@ -41,7 +41,7 @@
   }
 
   function storageKey(snapshotId,domain){
-    return `fhq:live-read:7.1.0:${leagueSlug()}:${snapshotId}:${domain}`;
+    return `fhq:live-read:7.3.5:${leagueSlug()}:${snapshotId}:${domain}`;
   }
 
   function readPersisted(snapshotId,domain){
@@ -83,8 +83,11 @@
   }
 
   async function getSnapshot() { return (summary || await request({})).snapshot; }
+  async function getSummary() { return summary || request({}); }
   async function getLeague() { return (summary || await request({})).league; }
   async function getState() { return (summary || await request({})).state; }
+  async function getFreeAgentState() { return (summary || await request({})).freeAgents; }
+  async function getIntegrity() { return (summary || await request({})).integrity; }
   async function getDomain(domain) {
     const domainKey=`${leagueSlug()}:${domain}`;
     if (domainCache.has(domainKey)) return domainCache.get(domainKey);
@@ -236,7 +239,7 @@
     }catch{return false}
   }
 
-  const service = {refresh,warm,invalidateOwnership,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,loadSample,renderPanel,diagnostics};
+  const service = {refresh,warm,invalidateOwnership,getSummary,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,getFreeAgentState,getIntegrity,loadSample,renderPanel,diagnostics};
   HQ.defineModuleService('league','liveData',service,{replace:true,alias:'liveData'});
 
   const scheduleWarm=()=>setTimeout(()=>warm(),0);
