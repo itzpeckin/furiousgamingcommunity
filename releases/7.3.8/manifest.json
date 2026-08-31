@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.8",
+  "releaseType": "commissioner-import-health-and-display-cleanup",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.7.1",
+    "commit": "25b218956ef775fee3e1a04e0f0bef6001547b21",
+    "tree": "6293d256dac53217a4a31bfab2e3047bb3785c85",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.8",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Local implementation and validation only. Publication, PR, hosted checks, and Main remain unauthorized."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.3.7.1",
+    "currentCommit": "25b218956ef775fee3e1a04e0f0bef6001547b21",
+    "currentPagesDeployment": "64140548-d20a-411f-8d81-17649cdfe8fa",
+    "currentWorkerBuild": "53833ba4-28db-4ff7-bff8-053c1d8e8095",
+    "currentMigration": 27,
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+    "scope": "Code-only local candidate. No cloud, database, import, snapshot, archive, transition, credential, membership, or export-URL operation is authorized."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "app.js",
+    "styles.css",
+    "league-engine/one-click-import.js",
+    "league-engine/permanent-export-url.js",
+    "functions/api/leagues/[leagueSlug]/snapshot/read-model.js",
+    "tests/import/candidate-import.test.mjs",
+    "tests/import/live-data-experience.test.mjs",
+    "tests/import/permanent-league-export.test.mjs",
+    "releases/7.3.8/release-record.md",
+    "releases/7.3.8/validation-evidence.json"
+  ]
+}

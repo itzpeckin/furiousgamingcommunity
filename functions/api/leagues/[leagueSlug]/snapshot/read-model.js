@@ -11,7 +11,7 @@ import {
   sourceSupportedContract
 } from '../../../../_lib/live-data-experience.js';
 
-const RELEASE = '7.3.7.1';
+const RELEASE = '7.3.8';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
 
@@ -48,6 +48,7 @@ const canonicalPosition = value => {
 
 export function normalizeTeam(raw = {}) {
   raw = sourceRecord(raw);
+  const retained = raw.record && typeof raw.record === 'object' ? raw.record : {};
   const id = String(raw.external_id ?? raw.team_id ?? raw.teamId ?? '');
   const displayName = text(raw.display_name ?? raw.displayName ?? raw.teamName);
   const city = text(raw.city_name ?? raw.cityName);
@@ -66,7 +67,14 @@ export function normalizeTeam(raw = {}) {
     conferenceName:conference, divisionName:division, logoUrl:logo, primaryColor,
     secondaryColor, userName:null, ownerName:null, totalWins:wins, totalLosses:losses,
     totalTies:ties, overall:numeric(raw.overall ?? raw.ovr_rating ?? raw.ovrRating),
-    capAvailable:numeric(raw.capAvailable ?? raw.cap_available ?? raw.capRoom),
+    capAvailable:numeric(
+      raw.capAvailable ?? raw.cap_available ?? raw.capRoom ?? raw.cap_room
+      ?? raw.availableCap ?? raw.available_cap ?? raw.capSpace ?? raw.cap_space
+      ?? raw.salaryCapRoom ?? raw.salary_cap_room
+      ?? retained.capAvailable ?? retained.cap_available ?? retained.capRoom ?? retained.cap_room
+      ?? retained.availableCap ?? retained.available_cap ?? retained.capSpace ?? retained.cap_space
+      ?? retained.salaryCapRoom ?? retained.salary_cap_room
+    ),
     ptsFor:numeric(raw.ptsFor ?? raw.pointsFor), ptsAgainst:numeric(raw.ptsAgainst ?? raw.pointsAgainst),
     coachName:text(raw.coachName ?? raw.headCoach), stadiumName:text(raw.stadiumName ?? raw.stadium)
   };
@@ -213,6 +221,7 @@ function normalizeStatisticCompact(raw = {}) {
 
 export function normalizeStanding(raw = {}) {
   raw = sourceRecord(raw);
+  const retained = raw.record && typeof raw.record === 'object' ? raw.record : {};
   const teamId = String(raw.teamId ?? raw.team_id ?? raw.external_id ?? '');
   const teamName = text(raw.teamName ?? raw.team_name);
   const wins = numeric(raw.totalWins ?? raw.wins) ?? 0;
@@ -229,6 +238,14 @@ export function normalizeStanding(raw = {}) {
     divWins:numeric(raw.divWins), divLosses:numeric(raw.divLosses), divTies:numeric(raw.divTies),
     confWins:numeric(raw.confWins), confLosses:numeric(raw.confLosses), confTies:numeric(raw.confTies),
     ptsFor:numeric(raw.ptsFor ?? raw.pointsFor), ptsAgainst:numeric(raw.ptsAgainst ?? raw.pointsAgainst),
+    capAvailable:numeric(
+      raw.capAvailable ?? raw.cap_available ?? raw.capRoom ?? raw.cap_room
+      ?? raw.availableCap ?? raw.available_cap ?? raw.capSpace ?? raw.cap_space
+      ?? raw.salaryCapRoom ?? raw.salary_cap_room
+      ?? retained.capAvailable ?? retained.cap_available ?? retained.capRoom ?? retained.cap_room
+      ?? retained.availableCap ?? retained.available_cap ?? retained.capSpace ?? retained.cap_space
+      ?? retained.salaryCapRoom ?? retained.salary_cap_room
+    ),
     netPts:numeric(raw.netPts), winLossStreak:numeric(raw.winLossStreak),
     stageIndex:numeric(raw.stageIndex), weekIndex:numeric(raw.weekIndex),
     seasonYear:numeric(raw.seasonYear ?? raw.calendarYear)

@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.5.1 */
+/* FHQ_BUILD: 7.3.8 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.3.5.1';
+  const VERSION = '7.3.8';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -17,6 +17,7 @@
   const slug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || null;
   const endpoint = () => `/api/leagues/${encodeURIComponent(slug())}/companion/export-url`;
   const count = value => value === null || value === undefined ? 'unknown' : Number(value).toLocaleString();
+  const routineWarning = value => /free agents?|rostered-player-only|carried forward|retained from|source snapshot/i.test(String(value||''));
   const date = value => {
     if (!value) return 'Not received';
     const parsed = new Date(value);
@@ -99,6 +100,32 @@
     }
   }
 
+  function readinessIssue(warnings=[]) {
+    const items=warnings.filter(value=>!routineWarning(value));
+    if(!items.length)return null;
+    const message=items.join(' ');
+    if(/teams?|league info|classified teams dataset/i.test(message))return{
+      title:'League Info is missing',
+      summary:'The newest export did not include a complete 32-team League Info source.',
+      action:'Run the Madden export again with League Info, Rosters, and Weekly Stats selected, using the same league URL.'
+    };
+    if(/schedule|statistics|weekly|week.*(?:missing|gap|incomplete)/i.test(message))return{
+      title:'Weekly data is incomplete',
+      summary:'The newest export is missing schedule or statistics data needed for a safe import.',
+      action:'Export the missing week—or All Weeks—with Weekly Stats selected, then wait for Ready to import.'
+    };
+    if(/roster|players?/i.test(message))return{
+      title:'Roster data is incomplete',
+      summary:'The newest export did not include a complete roster for every team.',
+      action:'Run the Madden export again with Rosters and League Info selected, using the same league URL.'
+    };
+    return{
+      title:'The newest export needs attention',
+      summary:'FranchiseHQ received the export, but it did not pass source readiness checks.',
+      action:'Run the export again with League Info, Rosters, and Weekly Stats selected. If it repeats, open Import Details.'
+    };
+  }
+
   function statusLabel(status) {
     return ({
       'awaiting-export':'Awaiting export',
@@ -119,6 +146,11 @@
     const importDone = latest.importLive === true || latest.importStatus === 'live';
     const importDisabled = busy || status !== 'ready' || importDone;
     const tone = status === 'ready' ? 'success' : status === 'review-required' ? 'warning' : status === 'revoked' ? 'danger' : 'neutral';
+    const sourceIssue=readinessIssue(latest.warnings||[]);
+    const actionIssue=errorMessage?readinessIssue([errorMessage])||{
+      title:'The action could not finish',summary:errorMessage,
+      action:'Check your connection and try once more. If the same message returns, open Import Details.'
+    }:null;
     if (!pollTimer) {
       const delay = !state ? 0 : status === 'receiving' ? 5_000 : 15_000;
       pollTimer=setTimeout(()=>{
@@ -128,7 +160,6 @@
     }
     return `<article class="card commissioner-league-export-card" data-permanent-league-export-panel>
       <div class="card-header"><div><span class="eyebrow">v${VERSION} · Permanent league connection</span><h2>Dedicated Madden Export URL</h2><p>Use the same league URL for every Madden Companion export. FranchiseHQ automatically separates, analyzes, and retains each export revision.</p></div><span class="pill pill--${tone}">${esc(historicalBackfill?'Historical backfill ready':statusLabel(status))}</span></div>
-      <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>The URL is league-specific and remains valid until an authorized commissioner deliberately rotates it. Rotation immediately revokes the previous URL.</span></div>
       <div class="commissioner-import-summary">
         <div><small>Export URL</small><strong>${endpointState.exportUrl ? 'Permanent URL ready' : 'Unavailable'}</strong></div>
         <div><small>Latest export</small><strong>${esc(date(latest.receivedAt))}</strong></div>
@@ -141,15 +172,14 @@
         <div><small>Import status</small><strong>${esc(importDone ? 'Live' : latest.importStatus === 'preview-ready' ? 'Validated · ready to publish' : latest.importStatus || 'Not started')}</strong></div>
       </div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> Week ${esc(latest.capturedWeek)} games and statistics can be added while live Week ${esc(latest.activeSnapshotWeek)} teams, rosters, players, standings, and week position remain unchanged.</span></div>`:''}
-      ${(latest.warnings || []).length ? `<div class="validation-errors"><strong>Latest export not selected</strong><ul>${latest.warnings.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></div>` : ''}
-      ${errorMessage ? `<div class="validation-errors"><strong>Action stopped safely</strong><p>${esc(errorMessage)}</p></div>` : ''}
+      ${sourceIssue?`<section class="commissioner-import-recovery commissioner-import-recovery--warning"><div><h3>${esc(sourceIssue.title)}</h3><p>${esc(sourceIssue.summary)}</p><p><strong>What to do:</strong> ${esc(sourceIssue.action)}</p></div></section>`:''}
+      ${actionIssue?`<section class="commissioner-import-recovery" role="alert"><div><h3>${esc(actionIssue.title)}</h3><p>${esc(actionIssue.summary)}</p><p><strong>What to do:</strong> ${esc(actionIssue.action)}</p></div></section>`:''}
       <div class="league-import-framework-actions">
         <button class="button button--secondary" data-copy-permanent-export-url ${busy || !endpointState.exportUrl ? 'disabled' : ''}>${copied ? 'URL Copied' : 'Copy League Export URL'}</button>
         <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''}>${busy ? 'Working…' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
         <button class="button button--ghost" data-refresh-permanent-export ${busy ? 'disabled' : ''}>Refresh</button>
       </div>
       <details class="commissioner-export-advanced"><summary>Export URL security</summary><p>Rotate only if the URL is exposed or league access changes. The newest ready export and active snapshot are preserved.</p><button class="button ${rotateArmed ? 'button--danger' : 'button--ghost'}" data-rotate-permanent-export ${busy ? 'disabled' : ''}>${rotateArmed ? 'Confirm Rotation — Revoke Previous URL' : 'Rotate Export URL'}</button>${rotateArmed ? '<button class="button button--ghost" data-cancel-export-rotation>Cancel</button>' : ''}</details>
-      <p class="muted">A failed or partial export never replaces the previous ready source. Analysis starts automatically after the Madden export finishes. Free Agents remain blocked/unknown unless Madden returns valid data.</p>
     </article>`;
   }
 

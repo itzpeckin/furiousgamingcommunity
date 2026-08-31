@@ -1802,6 +1802,87 @@ if (version === '7.3.7.1') {
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   )) errors.push('7.3.7.1 deployed evidence must preserve every code-only data-plane boundary.');
 }
+if (version === '7.3.8') {
+  for (const check of [
+    'actionableImportGuidance',
+    'platformCalloutCleanup',
+    'capSpaceReadModel',
+    'freeAgentBlockedPreserved',
+    'activeSnapshotBaseline',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.3.8 evidence is incomplete: ${check}.`);
+  }
+  const failureCategories = new Set(evidence.checks?.actionableImportGuidance?.failureCategories || []);
+  for (const category of ['authorization','source-readiness','weekly-coverage','concurrency','validation','network-server','unknown']) {
+    if (!failureCategories.has(category)) errors.push(`7.3.8 actionable import guidance is missing ${category}.`);
+  }
+  if (
+    evidence.checks?.actionableImportGuidance?.plainLanguageCause !== true
+    || evidence.checks?.actionableImportGuidance?.exactNextAction !== true
+    || evidence.checks?.actionableImportGuidance?.supportCode !== true
+    || evidence.checks?.actionableImportGuidance?.failurePersistsUntilDismissed !== true
+    || evidence.checks?.actionableImportGuidance?.previousLiveDataPreserved !== true
+    || evidence.checks?.actionableImportGuidance?.rawDetailsCollapsed !== true
+  ) errors.push('7.3.8 must provide durable plain-language import recovery while preserving current live data and collapsed technical evidence.');
+  if (
+    evidence.checks?.platformCalloutCleanup?.activeSnapshotBannerRemoved !== true
+    || evidence.checks?.platformCalloutCleanup?.validationWarningBannerRemoved !== true
+    || evidence.checks?.platformCalloutCleanup?.controlledBetaBannerRemoved !== true
+    || evidence.checks?.platformCalloutCleanup?.globalShellNeutralized !== true
+    || evidence.checks?.platformCalloutCleanup?.operationalDiagnosticsRetained !== true
+  ) errors.push('7.3.8 must remove customer-facing platform callouts while retaining operational diagnostics.');
+  if (
+    evidence.checks?.capSpaceReadModel?.retainedTeamSourceUnwrapped !== true
+    || evidence.checks?.capSpaceReadModel?.standingFallbackSupported !== true
+    || evidence.checks?.capSpaceReadModel?.calculatedFallback !== false
+    || evidence.checks?.capSpaceReadModel?.reimportRequired !== false
+  ) errors.push('7.3.8 must restore only explicit retained Madden Cap Space without calculation or re-import.');
+  if (
+    evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+    || evidence.checks?.activeSnapshotBaseline?.snapshotId !== 'b00edb25-ac65-40d4-9969-431f94dd1e3e'
+    || evidence.checks?.activeSnapshotBaseline?.changedDuringCandidateWork !== false
+    || Number(evidence.checks?.strictMigration?.migrationVersion) !== 27
+    || evidence.checks?.strictMigration?.newMigration !== false
+    || Number(evidence.checks?.strictMigration?.requiredTables) !== 80
+  ) errors.push('7.3.8 must retain migration 27, exact active Week 9 data, and blocked/null Free Agent semantics.');
+  if (!isPostDeployment && (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.repositoryPublication?.status !== 'not-run'
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'not-run'
+    || manifest.production?.currentRelease !== '7.3.7.1'
+    || manifest.production?.currentCommit !== '25b218956ef775fee3e1a04e0f0bef6001547b21'
+    || manifest.production?.currentPagesDeployment !== '64140548-d20a-411f-8d81-17649cdfe8fa'
+  )) errors.push('7.3.8 must remain an unpublished code-only candidate on the exact accepted 7.3.7.1 Production baseline.');
+  if (
+    evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-required'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 27
+    || Number(evidence.external?.productionMigration?.candidateMigration) !== 27
+  ) errors.push('7.3.8 must remain code-only on already-applied migration 27.');
+  if (!isPostDeployment && (
+    evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  )) errors.push('7.3.8 must preserve every local candidate data-plane and authorization boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

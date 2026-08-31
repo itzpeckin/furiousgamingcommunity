@@ -9,7 +9,7 @@ import {
   sourceRosterStatus,
   sourceSupportedContract
 } from '../../functions/_lib/live-data-experience.js';
-import { normalizePlayer } from '../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js';
+import { normalizePlayer, normalizeStanding, normalizeTeam } from '../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js';
 
 test('all source-supported Madden ratings survive the member read model and unknown fields do not', () => {
   const source=Object.fromEntries(MADDEN_RATING_FIELDS.map((field,index)=>[field,45+(index%55)]));
@@ -77,7 +77,20 @@ test('normalized player exposes every approved rating, ability, contract, and so
   assert.equal(JSON.stringify(player).includes('abilityGUID'),false);
 });
 
-test('browser and endpoint source contracts bind Free Agents and paging to the active snapshot', async () => {
+test('retained Madden team cap space survives both team and standing read-model paths', () => {
+  const team=normalizeTeam({
+    external_id:'team-27',display_name:'Baltimore Ravens',
+    source_record_json:JSON.stringify({record:{capRoom:43.75}})
+  });
+  const standing=normalizeStanding({
+    team_id:'team-27',team_name:'Baltimore Ravens',
+    source_record_json:JSON.stringify({record:{salaryCapRoom:51250000}})
+  });
+  assert.equal(team.source.capAvailable,43.75);
+  assert.equal(standing.source.capAvailable,51250000);
+});
+
+test('browser and endpoint source contracts keep Free Agents unknown without platform callout clutter', async () => {
   const [app,endpoint,readModel,styles]=await Promise.all([
     readFile(new URL('../../app.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/players/free-agents.js',import.meta.url),'utf8'),
@@ -88,14 +101,22 @@ test('browser and endpoint source contracts bind Free Agents and paging to the a
   assert.deepEqual(MADDEN_RATING_FIELDS.filter(field=>!app.includes(field)),[]);
   assert.equal(app.includes('filtered.slice(0,500)'),false);
   assert.ok(app.includes('data-player-pagination'));
-  assert.ok(app.includes('This is not zero.'));
+  assert.ok(app.includes('Free Agent data is unavailable'));
+  assert.equal(app.includes('This is not zero.'),false);
+  assert.equal(app.includes('renderLiveDataStatus'),false);
+  assert.equal(app.includes('data-live-source-status'),false);
+  assert.equal(app.includes('active snapshot players'),false);
   assert.ok(app.includes("if(liveTeamDirectory?.snapshot) return null"));
   assert.ok(endpoint.includes("mode:'active-snapshot'"));
   assert.equal(endpoint.includes('COMPANION_EXPORTS'),false);
   assert.equal(endpoint.includes('companion_route_captures'),false);
   assert.ok(readModel.includes('freeAgents'));
   assert.ok(readModel.includes('integrity'));
+  assert.match(readModel,/retained\.capRoom/);
+  assert.match(readModel,/capAvailable:numeric/);
   assert.ok(styles.includes('FranchiseHQ 7.3.6 — authoritative live-data experience'));
+  assert.equal(styles.includes('.live-source-status'),false);
+  assert.equal(styles.includes('.free-agent-source-state'),false);
   assert.ok(styles.includes("wrapper.dataset.verticalScroll='page'")||app.includes("wrapper.dataset.verticalScroll='page'"));
 });
 
@@ -110,14 +131,15 @@ test('Production player-card and Trade Center adapters preserve ratings and cont
   assert.match(appSource, /franchisehq:trade-live-cache:v2/);
 });
 
-test('global league shell is hydrated from the active snapshot instead of static mock context', async () => {
+test('global league shell is hydrated from league data without platform implementation callouts', async () => {
   const [appSource,indexSource] = await Promise.all([
     readFile(new URL('../../app.js',import.meta.url),'utf8'),
     readFile(new URL('../../index.html',import.meta.url),'utf8')
   ]);
-  assert.match(indexSource, /data-active-league-context>Loading active Madden data/);
+  assert.match(indexSource, /data-active-league-context>Loading league data/);
   assert.match(indexSource, /data-live-week-chip/);
+  assert.doesNotMatch(indexSource, /controlled-beta-notice|Controlled beta|Powered by the active Madden snapshot/);
   assert.doesNotMatch(indexSource, /Season 4 · Week 8 · Mock Data/);
   assert.match(appSource, /applyActiveSnapshotShell\(snapshotValue,currentContext\)/);
-  assert.match(appSource, /Live Madden Data/);
+  assert.doesNotMatch(appSource, /Live Madden Data|Active Madden 27 snapshot/);
 });

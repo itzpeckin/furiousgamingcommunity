@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.8 importer-health and display-cleanup candidate impact
+
+The local 7.3.8 candidate is code-only. It adds actionable importer failure guidance, removes customer-facing snapshot/validation and controlled-beta implementation callouts, and restores explicit Madden Cap Space from the already-retained nested team/standing source record. It adds no migration, estimates no missing Cap Space, and performs no export, import, snapshot, archive, transition, membership, credential, or Production data operation.
+
+The immutable runtime rollback baseline is exact accepted 7.3.7.1 commit `25b218956ef775fee3e1a04e0f0bef6001547b21` and Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa`. Retain migration 27, all GM identities and ownership periods, memberships, roles, users, sessions, settings, rules, audits, imports, captures, snapshots, and permanent export-URL state.
+
+Do not use deployment or rollback to run an import, move active Week 9 snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`, reset data, run Archive Season, run a game-year transition, permanently delete history, rotate the export URL, change credentials, or reinterpret Madden's blocked/null Free Agent result as zero.
+
 ## 7.3.7.1 edge-position and League History Production impact
 
 Exact 7.3.7.1 commit `25b218956ef775fee3e1a04e0f0bef6001547b21` is live on Production Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa`. The code-only release canonicalizes Madden's raw `REDG`/`LEDG` source labels to `REDGE`/`LEDGE` across shared player, statistics, roster, depth-chart, stable-API, and future-import paths. It also adds a tenant-scoped, membership-authoritative **League History** table within Standings. It added no migration and wrote no ownership, identity, membership, audit, import, snapshot, archive, transition, or other database row.

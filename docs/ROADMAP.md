@@ -6,13 +6,13 @@
 
 **Updated:** August 31, 2026
 
-**Revision:** 1.66
+**Revision:** 1.67
 
 **Current production:** 7.3.7.1 application runtime `25b2189` from Main on Pages deployment `64140548`; additive migration 27 remains applied with 17 GM identities and 17 opening ownership periods. Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer.
 
-**Current work:** 7.3.7.1 is deployed and read-only verified, pending owner UI acceptance. It normalizes Madden's raw `REDG`/`LEDG` labels to canonical `REDGE`/`LEDGE` on player cards, Players, Stats & Leaders, team rosters, depth charts, stable player APIs, and future imports. Standings now includes a membership-authoritative **League History** view for career records, teams managed, playoff appearances, Super Bowl appearances, and Super Bowl wins.
+**Current work:** Owner UI acceptance closed 7.3.7.1. The authorized 7.3.8 local candidate makes failed imports explain what happened and the exact commissioner recovery action, removes member-facing snapshot/validation and controlled-beta implementation callouts, and restores retained Madden Cap Space through the live read model without re-importing data. Its consolidated local gate passes 132/132 tests plus desktop and 390×844 browser checks.
 
-**Next gate:** Owner UI acceptance of edge-role presentation/game logs and **Standings → League History** on desktop and phone. Acceptance does not authorize a Madden export/import, snapshot change, reset, Archive Season, game-year transition, export-URL rotation, membership edit, credential change, or Free Agent reinterpretation.
+**Next gate:** Owner authorization to publish the exact 7.3.8 candidate, create its pull request, run hosted checks, merge to Main, and deploy the code-only Production release. Every Madden/data operation remains separately unauthorized. This work does not authorize a Madden export/import, snapshot change, reset, Archive Season, game-year transition, export-URL rotation, membership edit, credential change, or Free Agent reinterpretation.
 
 ## Product decisions
 
@@ -62,8 +62,8 @@
 | 7.3.5.1 | Released; owner accepted | Ratings-adapter preservation, Trade Center contract-unit correction, and active-snapshot global shell context |
 | 7.3.6 | Released; Production accepted | Stable authenticated team/player URLs, cold refresh/auth return, back/forward navigation, safe public lookup contracts, and platform-wide canonical cross-links |
 | 7.3.7 | Released; owner accepted with edge-alias follow-up | Ownership reconciliation, My Team/team GM history, trophy cases, and consolidated player-card/mobile repairs are live. Acceptance found raw Madden `REDG`/`LEDG` did not reach every display path. |
-| 7.3.7.1 | Production deployed; pending owner UI acceptance | Platform-wide edge-position canonicalization and a league-wide GM/Owner History table within Standings |
-| 7.3.8 | Planned | Incremental Madden updates and freshness reporting |
+| 7.3.7.1 | Released; owner accepted | Platform-wide edge-position canonicalization and a league-wide GM/Owner History table within Standings |
+| 7.3.8 | Local validated review candidate | Actionable commissioner import recovery, member-facing platform-callout cleanup, and retained Madden Cap Space display |
 | 7.3.9 | Research gate | Approved direct-EA and CSV/Excel adapters |
 | 7.4.0–7.4.6 | Planned | Core platform features, mobile polish, consistency, and operations |
 | 7.5.0 | Required before RC | Authentication and session framework |
@@ -253,11 +253,14 @@
 - Gate: focused contracts and the strict repository suite pass; desktop and portrait-phone views preserve a readable, horizontally scrollable history table; no migration or data write occurs.
 - Exact commit `25b218956ef775fee3e1a04e0f0bef6001547b21` passed 4/4 PR checks and five Main/build/deployment checks, fast-forwarded unchanged to Main, and deployed as Production Pages `64140548-d20a-411f-8d81-17649cdfe8fa`. Live HTTPS assets prove the release marker, edge aliases, and League History UI. No migration or Production data operation ran; owner UI acceptance remains open.
 
-## 7.3.8 — Incremental Madden Freshness and Change Detail
+## 7.3.8 — Commissioner Import Health and Display Cleanup
 
-- Build on the permanent intake and 7.3.4.4 atomic live-import contract to expose field-level changes and freshness without a destructive full reset.
-- Compare snapshots and report roster, transaction, schedule, standings, statistics, and source-freshness changes while retaining the one-action atomic publication path.
-- Gate: duplicate exports are idempotent, successful updates are coherent, and failure/rollback retains the previous complete experience.
+- Keep the one-action atomic importer, but translate source, authorization, weekly-coverage, validation, concurrency, network, and server failures into a durable notification that explains what happened, what the commissioner should do next, and a support code when escalation is needed.
+- Keep raw technical evidence available only behind explicit import-detail controls. Routine Madden Free Agent and carry-forward warnings do not become persistent member-facing banners; the blocked Free Agent value remains unknown/null and is described only when that dataset is selected or relevant to import recovery.
+- Remove repeated member-facing active-snapshot, validation-warning, source-warning, and controlled-beta implementation callouts from Teams, Players, Standings, Stats & Leaders, team/player pages, and the global shell. Preserve operational diagnostics inside commissioner/platform-owner tools.
+- Restore Cap Space from the already-retained Madden team/standing source record. Do not calculate or invent a fallback; an unavailable source value remains unavailable.
+- Detailed week-to-week change narration is deferred because commissioners do not need a routine audit of expected weekly churn. Existing immutable import, snapshot, lifecycle, and audit evidence remains available for error diagnosis and future operational work.
+- Gate: focused failure-guidance, callout-cleanup, Cap Space, Free Agent, and live-data contracts pass with the full strict repository suite; no migration, export/import, active-pointer change, Production change, or data write occurs.
 
 ## 7.3.9 — Additional Madden Source Adapters
 
@@ -391,3 +394,4 @@
 - **Revision 1.61:** Production acceptance of exact 7.3.5.1 commit `5d3ed37` proved all non-core ratings and the live Season 2026/Regular Season Week 9 shell, but caught a second player-card Trade Calculator bridge still passing canonical cap-hit dollars into the millions-based model. The contained follow-up applies the same exactly-once conversion at that bridge and advances the `app.js` asset token so the four-hour browser cache cannot retain the incorrect display. This remains the same code-only 7.3.5.1 authorization boundary with no data operation.
 - **Revision 1.65:** Reconciled exact 7.3.7 Production acceptance at commit `3f3bcdd` / Pages deployment `5dba5ab4`: migration 27 is live with 17 GM identities and 17 ownership periods, 4/4 PR checks and 5/5 Main/deployment checks passed, protected rows and active Week 9 snapshot `b00edb25` remained unchanged, and Free Agents remain blocked/null. Owner acceptance identified raw Madden `REDG`/`LEDG` labels missing some presentation mappings. Authorized local 7.3.7.1 work now canonicalizes those roles across player, statistics, team, depth-chart, API, and future-import surfaces and adds membership-authoritative league-wide GM/Owner History within Standings. Publication, Main, Production, data operations, and migration work remain unauthorized.
 - **Revision 1.66:** Published exact 7.3.7.1 commit `25b2189` through PR #29 with 4/4 pull-request checks, fast-forwarded the same commit to Main, passed all five Main/build/deployment checks, and deployed Production Pages `64140548`. Read-only HTTPS verification confirmed release `7.3.7.1`, raw Madden edge aliases, and the League History assets. Migration 27, all 17 identities/ownership periods, active Week 9 snapshot `b00edb25`, imports, memberships, the export URL, and blocked/null Free Agents remain unchanged. Owner signed-in UI acceptance is next.
+- **Revision 1.67:** Recorded owner acceptance of 7.3.7.1 and replaced the planned 7.3.8 field-by-field weekly-change narration with a commissioner-focused health cycle. The local candidate adds durable, actionable importer failure guidance, removes repeated member-facing snapshot/validation and controlled-beta implementation callouts, and restores Cap Space from the already-retained nested Madden team/standing record. All 132 tests, the strict release gate, and desktop/390×844 browser checks pass. Detailed technical evidence remains commissioner/platform-owner-only; migration 27, Production/Main, active Week 9 snapshot `b00edb25`, imports, data, export URL, and blocked/null Free Agents remain unchanged and unauthorized for this cycle.

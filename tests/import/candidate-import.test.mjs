@@ -550,7 +550,14 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(ui,/Make Import Live/);
   assert.match(ui,/Active \/ captured week/);
   assert.match(ui,/under 60 seconds/);
-  assert.match(ui,/Free Agent count is unknown, never zero/);
+  assert.match(ui,/function failureGuidance/);
+  assert.match(ui,/What to do:/);
+  assert.match(ui,/Support code:/);
+  assert.match(ui,/Your current league data is still live/);
+  assert.match(ui,/renderImportNotification/);
+  assert.match(ui,/data-franchise-import-notification/);
+  assert.match(ui,/actionable-failure-guidance/);
+  assert.doesNotMatch(ui,/Free Agent count is unknown, never zero/);
   assert.match(ui,/discoverySessionId/);
   assert.match(ui,/liveData\?\.refresh/);
   assert.match(ui,/franchisehq:one-click-import-complete/);

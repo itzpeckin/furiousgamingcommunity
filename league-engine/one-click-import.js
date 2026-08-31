@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.5.1 */
+/* FHQ_BUILD: 7.3.8 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.5.1';
+  const VERSION = '7.3.8';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -20,6 +20,8 @@
   let busy = false;
   let errorMessage = '';
   let notice = '';
+  let lastOutcome = null;
+  let notificationTimer = null;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
@@ -27,6 +29,78 @@
   const slug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || null;
   const base = () => `/api/leagues/${encodeURIComponent(slug())}/companion/`;
   const now = () => window.performance?.now?.() ?? Date.now();
+
+  const phaseLabel = phase => PHASES.find(row=>row[0]===phase)?.[1] || 'Import setup';
+  const routineWarning = value => /free agents?|rostered-player-only|carried forward|retained from|source snapshot/i.test(String(value||''));
+
+  function failureGuidance(error={},phase=null) {
+    const message=String(error?.message||'The import could not be completed.');
+    const status=Number(error?.status||0);
+    const endpoint=String(error?.endpoint||'');
+    const run=currentRun();
+    const runId=String(run?.id||'');
+    const supportCode=runId ? `${runId.slice(0,12)} · ${phase||run?.currentPhase||'setup'}` : `setup · ${phase||'not-started'}`;
+    const shared={
+      tone:'error',
+      detail:message,
+      phase:phaseLabel(phase||run?.currentPhase),
+      supportCode,
+      runId:runId||null,
+      endpoint:endpoint||null,
+      status:status||null,
+      preserved:true
+    };
+    if(status===401||status===403||/session expired|sign in|not authorized|unauthorized|forbidden/i.test(message))return{
+      ...shared,title:'Sign in again to continue',
+      summary:'Your commissioner session ended before the import could finish.',
+      action:'Sign in with Discord, return to Commissioner HQ, and select Import Latest Export again.'
+    };
+    if(/no analyzed league export|no .*export is ready|selected ready export|exact capture session|recognized teams dataset|teams dataset|team-like record/i.test(message))return{
+      ...shared,title:'The export is not ready',
+      summary:'FranchiseHQ could not find a complete League Info and roster source in the latest export.',
+      action:'In the Madden Companion App, export League Info, Rosters, and Weekly Stats to the same league URL. Wait for Ready to import, then try again.'
+    };
+    if(/historical.*did not produce|week\/period backfill|schedule.*(?:missing|failed|unavailable)|statistics.*(?:missing|failed|unavailable)|missing week|coverage gap/i.test(message))return{
+      ...shared,title:'Weekly game data is incomplete',
+      summary:'The export did not contain both schedules and statistics for every week being added.',
+      action:'Export the missing week—or All Weeks—with Weekly Stats enabled, wait for Ready to import, then try again.'
+    };
+    if(/active snapshot changed|live import.*refused|pointer.*changed|compare-and-swap/i.test(message))return{
+      ...shared,title:'League data changed during the import',
+      summary:'Another league update finished first, so FranchiseHQ stopped this import to avoid replacing newer data.',
+      action:'Select Refresh in Commissioner HQ, confirm the latest export is still Ready to import, and try once more.'
+    };
+    if(/validation|duplicate|invalid assignment|not ready/i.test(message))return{
+      ...shared,title:'The export did not pass validation',
+      summary:'FranchiseHQ found data that could not be published safely.',
+      action:'Open Import Details to review the failed phase. If the source is incomplete, export League Info, Rosters, and Weekly Stats again before retrying.'
+    };
+    if(status>=500||/network|failed to fetch|load failed|timed out|timeout|safety limit|HTTP 5\d\d/i.test(message))return{
+      ...shared,title:'The importer could not finish',
+      summary:'FranchiseHQ or the network interrupted the import before publication.',
+      action:'Check your connection and select Retry once. If it fails again, share the support code shown below.'
+    };
+    return{
+      ...shared,title:'The import could not finish',
+      summary:'FranchiseHQ stopped before publishing the new data.',
+      action:'Select Retry once. If the same message returns, share the support code shown below.'
+    };
+  }
+
+  function renderImportNotification(outcome=lastOutcome) {
+    const existing=document.querySelector('[data-franchise-import-notification]');
+    if(!outcome){existing?.remove();return false;}
+    const node=existing||document.createElement('aside');
+    node.className=`franchise-import-notification is-visible is-${outcome.tone||'running'}`;
+    node.dataset.franchiseImportNotification='';
+    node.setAttribute('role',outcome.tone==='error'?'alert':'status');
+    node.setAttribute('aria-live',outcome.tone==='error'?'assertive':'polite');
+    node.innerHTML=`<span class="franchise-import-notification__indicator" aria-hidden="true"></span><span><strong>${esc(outcome.title)}</strong><small>${esc(outcome.summary||'')}</small>${outcome.action?`<small><b>Next:</b> ${esc(outcome.action)}</small>`:''}</span><button type="button" class="franchise-import-notification__close" data-close-import-notification aria-label="Dismiss import notification">×</button>`;
+    if(!existing)document.body.append(node);
+    if(notificationTimer)clearTimeout(notificationTimer);
+    if(outcome.tone==='success')notificationTimer=setTimeout(()=>node.remove(),8000);
+    return true;
+  }
 
   async function api(endpoint, method='GET', body) {
     const response = await fetch(`${base()}${endpoint}`, {
@@ -40,6 +114,8 @@
     if (!response.ok || payload.ok === false) {
       const failure = new Error(payload.detail || payload.error || `Candidate import request failed (${response.status}).`);
       failure.payload = payload;
+      failure.status = response.status;
+      failure.endpoint = endpoint;
       throw failure;
     }
     return payload;
@@ -76,6 +152,8 @@
     } catch (error) {
       errorMessage = error.message;
       notice = '';
+      lastOutcome=failureGuidance(error,'analyze-source');
+      renderImportNotification();
     } finally {
       busy = false;
       rerender();
@@ -116,6 +194,7 @@
       });
       return result;
     } catch (error) {
+      error.importPhase=phase;
       await api('candidate-import','POST',{
         action:'report-phase',runId,phase,ok:false,
         durationMs:Math.max(0,Math.round(now()-startedAt)),
@@ -184,6 +263,8 @@
     busy = true;
     errorMessage = '';
     notice = 'Starting live league import…';
+    lastOutcome={tone:'running',title:'Importing latest export',summary:'FranchiseHQ is checking and publishing the newest ready league data.'};
+    renderImportNotification();
     rerender();
     const wallStartedAt = now();
     let runId = null;
@@ -204,6 +285,8 @@
           importMode:state.run?.resultCounts?.importMode||state.source?.coverage?.importMode
         });
         if(!refreshed)notice+=' Live data will retry in the background without requiring a browser reload.';
+        lastOutcome={tone:'success',title:'Import complete',summary:`The latest league data is live${finalDuration?` in ${durationLabel(finalDuration)}`:''}.`};
+        renderImportNotification();
         return;
       }
 
@@ -290,9 +373,13 @@
         importMode:state.run?.resultCounts?.importMode||state.source?.coverage?.importMode
       });
       if(!refreshed)notice+=' Live data will retry in the background without requiring a browser reload.';
+      lastOutcome={tone:'success',title:'Import complete',summary:`The latest league data is live in ${durationLabel(finalDuration)}.`};
+      renderImportNotification();
     } catch (error) {
       errorMessage = error.message;
       notice = 'Import stopped safely. The previous live snapshot was preserved.';
+      lastOutcome=failureGuidance(error,error.importPhase||currentRun()?.currentPhase||null);
+      renderImportNotification();
     } finally {
       busy = false;
       await refresh().catch(()=>rerender());
@@ -301,11 +388,19 @@
   }
 
   async function importLatestExport() {
-    await refresh();
-    if (!state?.source) throw new Error('No analyzed league export is ready to import.');
-    if (!state.destination) await createDestination();
-    if (!state?.destination) throw new Error('The franchise-season import destination is unavailable.');
-    return runImport({retry:['failed','running'].includes(currentRun()?.status)});
+    try{
+      await refresh();
+      if (!state?.source) throw new Error('No analyzed league export is ready to import.');
+      if (!state.destination) await createDestination();
+      if (!state?.destination) throw new Error('The franchise-season import destination is unavailable.');
+      return runImport({retry:['failed','running'].includes(currentRun()?.status)});
+    }catch(error){
+      errorMessage=error.message;
+      lastOutcome=failureGuidance(error,'analyze-source');
+      renderImportNotification();
+      rerender();
+      throw error;
+    }
   }
 
   function phaseRows() {
@@ -337,6 +432,7 @@
     const periodLabel=period=>`${period?.stage==='preseason'?'Preseason':period?.stage==='playoffs'?'Playoffs':'Regular Season'} Week ${period?.week}`;
     const retainedScope=retainedPeriods.length>1?`${retainedPeriods.length} periods (${periodLabel(retainedPeriods[0])} through ${periodLabel(retainedPeriods.at(-1))})`:periodLabel(coverage.currentPeriod||{stage:'regular-season',week:coverage.currentWeek});
     const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
+    const actionableSourceWarnings=sourceWarnings.filter(value=>!routineWarning(value));
     const sourceIsNew=source?.selectionStatus==='new-source';
     const runDisabled=busy||!source||live;
     const runLabel=busy?'Import Running…'
@@ -347,7 +443,6 @@
       <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>One-Click Live Import</h3><p>Analyze, map, validate, and atomically publish the newest eligible export with one action.</p></div><span class="pill pill--${live?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(live?'Live':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
       <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
-      ${faStatus==='blocked'?`<div class="league-import-framework-note"><svg><use href="#icon-alert-triangle"></use></svg><span><strong>Free Agents blocked upstream:</strong> this candidate is rostered-player-only. The Free Agent count is unknown, never zero.</span></div>`:''}
       <div class="commissioner-import-summary">
         <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
         <div><small>Season</small><strong>${esc(source?.season?.seasonYear ?? '—')}</strong></div>
@@ -360,14 +455,14 @@
         <div><small>Wall time</small><strong>${durationLabel(run?.durationMs)}</strong></div>
       </div>
       <div class="commissioner-import-progress-block"><div class="commissioner-import-progress-head"><span>${esc(notice||'Candidate workflow')}</span><strong>${Number(run?.progress||0)}%</strong></div><div class="commissioner-import-progress-track"><span style="width:${Number(run?.progress||0)}%"></span></div><ol class="commissioner-import-phase-list">${phaseRows()}</ol></div>
-      ${sourceWarnings.length?`<div class="validation-errors"><strong>Coverage and candidate warnings</strong><ul>${sourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></div>`:''}
-      ${errorMessage?`<div class="validation-errors"><strong>Stopped safely</strong><p>${esc(errorMessage)}</p>${run?.retry?.message?`<p>${esc(run.retry.message)}</p>`:''}</div>`:''}
+      ${actionableSourceWarnings.length?`<details class="commissioner-import-source-notes"><summary>${actionableSourceWarnings.length} source note${actionableSourceWarnings.length===1?'':'s'}</summary><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
+      ${lastOutcome?.tone==='error'?`<section class="commissioner-import-recovery" role="alert"><div><span class="eyebrow">${esc(lastOutcome.phase)}</span><h4>${esc(lastOutcome.title)}</h4><p>${esc(lastOutcome.summary)}</p><p><strong>What to do:</strong> ${esc(lastOutcome.action)}</p><small>Your current league data is still live.</small></div><details><summary>Technical details</summary><p>${esc(lastOutcome.detail)}</p><code>Support code: ${esc(lastOutcome.supportCode)}</code></details></section>`:''}
       ${sub60?`<div class="league-import-framework-note"><svg><use href="#icon-check"></use></svg><span><strong>Performance target met:</strong> ${esc(durationLabel(run.durationMs))}, under 60 seconds.</span></div>`:''}
       <div class="league-import-framework-actions">
         <button class="button button--primary" data-run-candidate-import ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
         <button class="button button--ghost" data-refresh-candidate-import ${busy?'disabled':''}>Refresh</button>
       </div>
-      <p class="muted">Source fingerprint: ${esc(source?.sourceFingerprint?.slice(0,12)||'—')} · snapshot: ${esc(run?.candidateSnapshotId||'—')} · previous snapshot: ${esc(run?.activeSnapshotIdBefore||'—')} · completeness: ${esc(run?.completenessStatus||'not evaluated')} · live: ${live?'yes':'no'}</p>
+      <details class="commissioner-import-technical"><summary>Import identifiers</summary><p class="muted">Source fingerprint: ${esc(source?.sourceFingerprint?.slice(0,12)||'—')} · snapshot: ${esc(run?.candidateSnapshotId||'—')} · previous snapshot: ${esc(run?.activeSnapshotIdBefore||'—')}</p></details>
     </section>`;
   }
 
@@ -376,14 +471,15 @@
   }
 
   document.addEventListener('click', event=>{
+    if(event.target.closest('[data-close-import-notification]')){event.target.closest('[data-franchise-import-notification]')?.remove();return;}
     if (event.target.closest('[data-create-candidate-destination]')) createDestination();
     if (event.target.closest('[data-run-candidate-import]')) runImport({retry:['failed','running'].includes(currentRun()?.status)});
-    if (event.target.closest('[data-refresh-candidate-import]')) refresh().catch(error=>{errorMessage=error.message;rerender();});
+    if (event.target.closest('[data-refresh-candidate-import]')) refresh().catch(error=>{errorMessage=error.message;lastOutcome=failureGuidance(error,'analyze-source');renderImportNotification();rerender();});
   });
 
-  const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,activationPerformed:Boolean(currentRun()?.activationPerformed),activeSnapshotChanged:Boolean(currentRun()?.activeSnapshotChanged)});
+  const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,outcome:lastOutcome,activationPerformed:Boolean(currentRun()?.activationPerformed),activeSnapshotChanged:Boolean(currentRun()?.activeSnapshotChanged)});
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
-  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,renderPanel,diagnostics},{replace:true,alias:'oneClickImport'});
-  HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','one-click-live-import','atomic-snapshot-activation','sub-60-second-target','blocked-free-agents-unknown']});
+  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,renderPanel,renderImportNotification,failureGuidance,diagnostics},{replace:true,alias:'oneClickImport'});
+  HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','one-click-live-import','atomic-snapshot-activation','actionable-failure-guidance','sub-60-second-target','blocked-free-agents-unknown']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();
