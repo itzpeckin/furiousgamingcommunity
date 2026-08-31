@@ -53,6 +53,7 @@
     "functions/api/leagues/[leagueSlug]/teams/[teamSlug].js",
     "functions/leagues/[[path]].js",
     "platform/navigation.js",
+    "league-engine/live-snapshot-boot.js",
     "league-engine/live-read-model.js",
     "app.js",
     "tests/security/public-identity-routes.test.mjs",

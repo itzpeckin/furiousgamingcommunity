@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '5.9.7.2';
+  const VERSION = '7.3.6';
   let running = null;
   let lastResult = null;
   let lastError = null;
@@ -49,7 +49,19 @@
   }
 
   function rerenderCurrentRoute() {
-    const route = String(location.hash || '#home').replace(/^#\/?/, '') || 'home';
+    const deepPath = String(location.pathname || '').match(/^\/leagues\/[^/]+\/(teams|players)\/([^/]+)\/?$/i);
+    let route = '';
+    if (deepPath) {
+      try {
+        route = `${deepPath[1].toLowerCase()}/${decodeURIComponent(deepPath[2])}`;
+      } catch (_) {
+        route = '';
+      }
+    }
+    route = route
+      || HQ?.navigation?.currentRoute?.()
+      || String(location.hash || '#home').replace(/^#\/?/, '')
+      || 'home';
     setTimeout(() => {
       try {
         HQ?.appRouter?.render?.(route, {source:'live-snapshot-boot'});

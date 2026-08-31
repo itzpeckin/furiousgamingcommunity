@@ -13,6 +13,7 @@ Create stable authenticated league-scoped team and player URLs using the permane
 - Active player DTOs now carry an opaque permanent `publicId` resolved from 7.3.1 source aliases; active teams carry a stable canonical slug.
 - Authenticated player/team identity endpoints return canonical paths plus safe display metadata and explicitly omit raw database identity and source-record contracts.
 - The browser router understands deep paths, History API back/forward behavior, and legacy hashes. Hard refresh and Discord recovery retain the exact requested team/player path.
+- The asynchronous live-snapshot boot now re-renders the canonical path instead of falling back to `#home`, preventing a cold deep-link refresh from clearing the requested team or player page.
 - Rosters, player directory, statistics, transactions, game cards, Trade Block, proposals, command search, standings, and team surfaces use the canonical navigation adapter.
 - A permanent player identity absent from the active roster keeps a valid page and is not inferred to be a Free Agent.
 

@@ -46,9 +46,10 @@ test('team and player identity contracts remain membership protected', async () 
 });
 
 test('browser router promotes identity links to canonical league paths and retains hash compatibility', async () => {
-  const [app,navigation,leagueRoute,playerEndpoint,teamEndpoint]=await Promise.all([
+  const [app,navigation,liveSnapshotBoot,leagueRoute,playerEndpoint,teamEndpoint]=await Promise.all([
     readFile(new URL('../../app.js',import.meta.url),'utf8'),
     readFile(new URL('../../platform/navigation.js',import.meta.url),'utf8'),
+    readFile(new URL('../../league-engine/live-snapshot-boot.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/leagues/[[path]].js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/players/[publicPlayerId].js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/teams/[teamSlug].js',import.meta.url),'utf8')
@@ -60,6 +61,9 @@ test('browser router promotes identity links to canonical league paths and retai
   assert.match(app,/data-roster-player-detail/);
   assert.match(app,/data-team-id/);
   assert.match(navigation,/window\.addEventListener\('popstate', handleLocationChange\)/);
+  assert.match(liveSnapshotBoot,/location\.pathname/);
+  assert.match(liveSnapshotBoot,/\(teams\|players\)/);
+  assert.match(liveSnapshotBoot,/HQ\?\.navigation\?\.currentRoute\?\.\(\)/);
   assert.match(leagueRoute,/requestedUrl\.pathname/);
   assert.match(playerEndpoint,/rawDatabaseIdsExposed:false/);
   assert.match(teamEndpoint,/rawDatabaseIdsExposed:false/);
