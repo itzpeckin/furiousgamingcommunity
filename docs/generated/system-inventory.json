@@ -180,7 +180,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 63019,
+        "bytes": 63673,
         "file": "tools/check-release.mjs"
       },
       {

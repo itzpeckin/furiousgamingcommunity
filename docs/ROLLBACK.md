@@ -8,6 +8,8 @@ A historical-backfill candidate starts from the current active immutable snapsho
 
 The runtime rollback baseline is exact 7.3.4.4 Main commit `5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8`, Pages deployment `51e55575-0032-41af-b5d3-a69c67f54d2e`, and Worker version `1e01f1a9`. A code rollback must retain every snapshot and any historical backfill already activated. Restoring a prior active pointer is a separately reviewed snapshot rollback, never an implied runtime rollback.
 
+Production Pages deployment `927eb46c-1e53-4f72-a0b6-698c2a351861` and import Worker build `cee1559b-8fde-4679-8abb-460601915235` / version `87b5571a-8aff-49f9-853a-d0749d968d6f` run exact Main commit `df3bcb7cd927f21acd3362d62a722d582f485884`. Read-only reconciliation recorded zero deployment database writes. Active Week 9 snapshot `518236e4-1cac-41f5-b8c8-757b7150dcd8` was activated earlier by release 7.3.4.4 and retains `8b47ec76-7369-495e-913f-edc0310b49e1` as its previous pointer; both must survive runtime rollback.
+
 Do not use rollback to reset league data, delete historical records, rotate the permanent export URL, run Archive Season, run a game-year transition, roll the active week backward, or reinterpret blocked/null Free Agents as zero.
 
 ## 7.3.4.4 one-action workflow impact

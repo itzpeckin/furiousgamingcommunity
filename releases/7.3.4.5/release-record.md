@@ -1,8 +1,8 @@
 # FranchiseHQ 7.3.4.5 Release Record
 
-**Status:** Locally validated Production-authorized candidate; publication, hosted checks, Main merge, and Production deployment pending
+**Status:** Production deployed; pending owner historical-backfill acceptance
 
-**Production changed:** No. Production remains on exact Main commit `5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8`, Pages deployment `51e55575-0032-41af-b5d3-a69c67f54d2e`, and import Worker version `1e01f1a9`. Exact Week 9 snapshot `8b47ec76-7369-495e-913f-edc0310b49e1` remains active.
+**Production changed:** Runtime only. Production now serves exact Main commit `df3bcb7cd927f21acd3362d62a722d582f485884`, Pages deployment `927eb46c-1e53-4f72-a0b6-698c2a351861`, and import Worker version `87b5571a-8aff-49f9-853a-d0749d968d6f`. Deployment wrote zero D1 rows. Week 9 snapshot `518236e4-1cac-41f5-b8c8-757b7150dcd8`, activated earlier by the 7.3.4.4 workflow, remains active.
 
 ## Scope
 
@@ -29,16 +29,20 @@ Allow commissioners to submit complete older-week Madden exports as historical b
 - Pure regressions prove Week 8 overlays only Week 8 records while preserving Week 7 and Week 9, rejecting unscoped and Week 9 source rows, and reporting remaining gaps.
 - A database-backed authenticated commissioner regression proves a fully covered Week 8 source starts only as a same-game-year/same-franchise-season backfill against active Week 9.
 - Static authority checks prove the builder preserves active teams, players, and standings, never writes the active pointer, and the importer refreshes `liveData` before emitting the application completion event.
-- The focused candidate-import suite passes 10/10. The consolidated strict repository gate remains the publication prerequisite.
+- The focused candidate-import suite passes 10/10. The consolidated strict repository gate passed 107/107 tests across 203 JavaScript modules, 65 routes, 79 required tables, and 533 inventory files.
 - Migration 26 remains current; 7.3.4.5 adds no schema migration.
+- PR #21 published exact candidate `df3bcb7cd927f21acd3362d62a722d582f485884`; 4/4 candidate checks and all eight recorded hosted/deployment checks passed.
+- Read-only Production reconciliation returned `changed_db: false` and zero rows written. The active snapshot remains validation-ready Week 9 with 32 teams, 2,042 rostered players, 29 games, 910 statistics, 32 standings, and zero validation errors; users/memberships remain 8/8, token version remains 1, and foreign-key violations remain zero.
+- The current snapshot was activated at `2026-08-31 01:47:15Z` by the 7.3.4.4 one-click workflow, before the 7.3.4.5 candidate commit existed at `2026-08-31 02:14:49Z`. It names `8b47ec76-7369-495e-913f-edc0310b49e1` as its previous snapshot. This owner import is retained evidence, not a 7.3.4.5 deployment mutation.
 
 ## Deployment status
 
-- Branch `codex/franchisehq-7.3.4.5` is authorized for one exact commit, pull request, hosted checks, Main merge, and Production deployment.
-- No staging deployment, Production data operation, Madden export, candidate import, activation, reset, Archive Season, game-year transition, permanent deletion, or URL rotation is included in deployment.
+- PR #21 is merged at exact commit `df3bcb7cd927f21acd3362d62a722d582f485884`, and Main points to that same commit.
+- Cloudflare Pages Production deployment `927eb46c-1e53-4f72-a0b6-698c2a351861` and import Worker build `cee1559b-8fde-4679-8abb-460601915235` / version `87b5571a-8aff-49f9-853a-d0749d968d6f` succeeded. The live domain visibly reports release 7.3.4.5.
+- No staging deployment, migration, Madden export, candidate import, activation, reset, Archive Season, game-year transition, permanent deletion, or URL rotation ran during 7.3.4.5 delivery.
 
 ## Rollback
 
 - Runtime rollback restores exact 7.3.4.4 Main commit `5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8`, Pages deployment `51e55575-0032-41af-b5d3-a69c67f54d2e`, and Worker version `1e01f1a9`.
-- Retain every active/archived snapshot and any historical backfill later published by a commissioner. Snapshot rollback is separate from code rollback.
+- Retain current active snapshot `518236e4-1cac-41f5-b8c8-757b7150dcd8`, previous snapshot `8b47ec76-7369-495e-913f-edc0310b49e1`, every other active/archived snapshot, and any historical backfill later published by a commissioner. Snapshot rollback is separate from code rollback.
 - Do not reset data, delete history, rotate the export URL, run Archive Season or a game-year transition, roll the live week backward, or reinterpret blocked/null Free Agents.

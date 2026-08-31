@@ -1021,11 +1021,19 @@ if (version === '7.3.4.5') {
     || evidence.checks?.liveApplicationRefresh?.locationReloadUsed !== false
   ) errors.push('7.3.4.5 must prove safe historical overlay and in-place live refresh contracts.');
   if (
-    evidence.checks?.activeSnapshotBaseline?.snapshotId !== '8b47ec76-7369-495e-913f-edc0310b49e1'
+    evidence.checks?.activeSnapshotBaseline?.snapshotId !== '518236e4-1cac-41f5-b8c8-757b7150dcd8'
+    || evidence.checks?.activeSnapshotBaseline?.previousSnapshotId !== '8b47ec76-7369-495e-913f-edc0310b49e1'
     || Number(evidence.checks?.activeSnapshotBaseline?.week) !== 9
     || Number(evidence.checks?.activeSnapshotBaseline?.teams) !== 32
-    || Number(evidence.checks?.activeSnapshotBaseline?.rosteredPlayers) !== 2043
-    || evidence.checks?.activeSnapshotBaseline?.changedDuringCandidateWork !== false
+    || Number(evidence.checks?.activeSnapshotBaseline?.rosteredPlayers) !== 2042
+    || Number(evidence.checks?.activeSnapshotBaseline?.games) !== 29
+    || Number(evidence.checks?.activeSnapshotBaseline?.statistics) !== 910
+    || Number(evidence.checks?.activeSnapshotBaseline?.standings) !== 32
+    || evidence.checks?.activeSnapshotBaseline?.validationStatus !== 'ready'
+    || Number(evidence.checks?.activeSnapshotBaseline?.validationErrors) !== 0
+    || evidence.checks?.activeSnapshotBaseline?.activationRuntimeRelease !== '7.3.4.4'
+    || evidence.checks?.activeSnapshotBaseline?.activationPredatesCandidateCommit !== true
+    || evidence.checks?.activeSnapshotBaseline?.changedByDeployment !== false
     || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
     || evidence.checks?.freeAgentBlockedPreserved?.count !== null
     || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
