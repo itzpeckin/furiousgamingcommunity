@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.4.6",
   "releaseType": "route-authoritative-multi-period-historical-backfill",
-  "status": "validated-production-authorized",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.4.5",
@@ -21,11 +21,11 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0,
-    "mainChecksPassed": 0,
+    "status": "published-hosted-checks-passed-main",
+    "commit": "4c9d75a8ec09caa2bc50ae888fd6b2af255f58b3",
+    "pullRequest": 22,
+    "hostedChecksPassed": 4,
+    "mainChecksPassed": 8,
     "scope": "Publish one exact candidate, pass hosted checks, fast-forward that exact candidate to Main, and deploy Production in one consolidated authorized cycle."
   },
   "staging": {
@@ -36,14 +36,15 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.3.4.5",
-    "currentCommit": "df3bcb7cd927f21acd3362d62a722d582f485884",
-    "currentDeployment": "927eb46c-1e53-4f72-a0b6-698c2a351861",
-    "workerVersion": "87b5571a-8aff-49f9-853a-d0749d968d6f",
-    "activeSnapshot": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
-    "activeSnapshotPrevious": "8b47ec76-7369-495e-913f-edc0310b49e1",
+    "deployed": true,
+    "status": "success-owner-accepted",
+    "currentRelease": "7.3.4.6",
+    "currentCommit": "4c9d75a8ec09caa2bc50ae888fd6b2af255f58b3",
+    "currentDeployment": "dca6eb7d-9e6d-4678-ab7c-a5194429373c",
+    "workerBuild": "845c2a0b-6e1a-4c03-8275-22a49a391a14",
+    "workerVersion": "e7d81630-5d93-4726-a0c2-f71e8c12e96a",
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
     "scope": "Deploy the route-authority and retained multi-period composition runtime, then retry the retained Week 8 source exactly once and atomically activate only its validated candidate while preserving the active Week 9 current-state plane."
   },
   "requiredArtifacts": [

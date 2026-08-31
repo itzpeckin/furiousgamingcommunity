@@ -176,12 +176,12 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 72106,
-        "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
+        "bytes": 72381,
+        "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 70900,
-        "file": "tools/check-release.mjs"
+        "bytes": 72106,
+        "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
         "bytes": 38439,

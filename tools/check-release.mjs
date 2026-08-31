@@ -1155,6 +1155,24 @@ if (version === '7.3.4.6') {
       || evidence.external?.productionCandidateImport?.status !== 'activated'
       || Number(evidence.external?.productionCandidateImport?.retryCount) !== 1
       || Number(evidence.external?.productionCandidateImport?.maximumRetryCount) !== 1
+      || evidence.checks?.productionAcceptance?.passed !== true
+      || evidence.checks?.productionAcceptance?.snapshotId !== 'b00edb25-ac65-40d4-9969-431f94dd1e3e'
+      || evidence.checks?.productionAcceptance?.previousSnapshotId !== '518236e4-1cac-41f5-b8c8-757b7150dcd8'
+      || Number(evidence.checks?.productionAcceptance?.liveWeek) !== 9
+      || Number(evidence.checks?.productionAcceptance?.teams) !== 32
+      || Number(evidence.checks?.productionAcceptance?.rosteredPlayers) !== 2042
+      || Number(evidence.checks?.productionAcceptance?.games) !== 184
+      || Number(evidence.checks?.productionAcceptance?.statistics) !== 6966
+      || Number(evidence.checks?.productionAcceptance?.standings) !== 32
+      || Number(evidence.checks?.productionAcceptance?.sourcePeriods) !== 11
+      || Number(evidence.checks?.productionAcceptance?.sourceCaptures) !== 88
+      || Number(evidence.checks?.productionAcceptance?.routeWeekMismatches) !== 0
+      || Number(evidence.checks?.productionAcceptance?.teamDifferencesFromPrior) !== 0
+      || Number(evidence.checks?.productionAcceptance?.playerDifferencesFromPrior) !== 0
+      || Number(evidence.checks?.productionAcceptance?.standingDifferencesFromPrior) !== 0
+      || Number(evidence.checks?.productionAcceptance?.temporarySessionsRemaining) !== 0
+      || Number(evidence.checks?.productionAcceptance?.activeDelegationsRemaining) !== 0
+      || Number(evidence.checks?.productionAcceptance?.foreignKeyViolations) !== 0
       || evidence.scopeBoundaries?.candidateImportExecuted !== true
       || evidence.scopeBoundaries?.activationPerformed !== true
       || evidence.scopeBoundaries?.activeSnapshotChanged !== true
