@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.4.4 */
+/* FHQ_BUILD: 7.3.4.5 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.4.4';
+  const VERSION = '7.3.4.5';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -164,6 +164,21 @@
     return {...result,snapshot};
   }
 
+  async function refreshLiveApplication(detail={}) {
+    let refreshed=true;
+    const liveData=HQ?.liveData || HQ?.league?.liveData || HQ?.getModuleService?.('league','liveData');
+    try {
+      if (typeof liveData?.refresh === 'function') await liveData.refresh();
+    } catch (error) {
+      refreshed=false;
+      console.warn('[One-Click Import] Live data refresh failed after successful activation.',error);
+    }
+    const eventDetail={...detail,activationPerformed:true,applicationDataRefreshed:refreshed};
+    window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:eventDetail}));
+    window.dispatchEvent(new CustomEvent('franchisehq:league-import-live',{detail:eventDetail}));
+    return refreshed;
+  }
+
   async function runImport({retry=false}={}) {
     if (busy) return;
     busy = true;
@@ -184,6 +199,11 @@
         const finalDuration=Math.max(0,Math.round(now()-wallStartedAt));
         state=await api('candidate-import','POST',{action:'finalize',runId,durationMs:finalDuration});
         notice = `Validated import is live in ${durationLabel(finalDuration)}.`;
+        const refreshed=await refreshLiveApplication({
+          runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:finalDuration,
+          importMode:state.run?.resultCounts?.importMode||state.source?.coverage?.importMode
+        });
+        if(!refreshed)notice+=' Live data will retry in the background without requiring a browser reload.';
         return;
       }
 
@@ -265,9 +285,11 @@
       notice = finalDuration < 60000
         ? `Import live in ${durationLabel(finalDuration)}.`
         : `Import live in ${durationLabel(finalDuration)}; review the sub-60-second performance target.`;
-      window.dispatchEvent(new CustomEvent('franchisehq:league-import-live',{detail:{
-        runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:finalDuration,activationPerformed:true
-      }}));
+      const refreshed=await refreshLiveApplication({
+        runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:finalDuration,
+        importMode:state.run?.resultCounts?.importMode||state.source?.coverage?.importMode
+      });
+      if(!refreshed)notice+=' Live data will retry in the background without requiring a browser reload.';
     } catch (error) {
       errorMessage = error.message;
       notice = 'Import stopped safely. The previous live snapshot was preserved.';
@@ -310,6 +332,7 @@
     const live=Boolean(run?.activationPerformed);
     const sub60=live && Number(run.durationMs)<60000;
     const coverage=source?.coverage||{};
+    const historicalBackfill=coverage.importMode==='historical-backfill';
     const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
     const sourceIsNew=source?.selectionStatus==='new-source';
     const runDisabled=busy||!source||live;
@@ -320,6 +343,7 @@
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
       <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>One-Click Live Import</h3><p>Analyze, map, validate, and atomically publish the newest eligible export with one action.</p></div><span class="pill pill--${live?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(live?'Live':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
       <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
+      ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> only Week ${esc(coverage.currentWeek)} games and statistics are overlaid. Active Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
       ${faStatus==='blocked'?`<div class="league-import-framework-note"><svg><use href="#icon-alert-triangle"></use></svg><span><strong>Free Agents blocked upstream:</strong> this candidate is rostered-player-only. The Free Agent count is unknown, never zero.</span></div>`:''}
       <div class="commissioner-import-summary">
         <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>

@@ -9487,7 +9487,11 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
   document.addEventListener('franchisehq:league-data-state-changed',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
   window.addEventListener('franchisehq:live-snapshot-booted',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
-  window.addEventListener('franchisehq:one-click-import-complete',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
+  window.addEventListener('franchisehq:one-click-import-complete',async()=>{
+    const route=location.hash.slice(1)||'home';
+    await syncTradeCenterLiveBridge({rerender:false,forceLive:true});
+    if((location.hash.slice(1)||'home')===route)renderRoute(route);
+  });
 
   window.addEventListener('franchisehq:live-snapshot-booted',event=>{
     const incoming=String(event?.detail?.snapshotId||event?.detail?.snapshot?.id||'');
@@ -9497,8 +9501,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
 
-  // 7.3.4.4 — authoritative visible release and environment marker.
-  const VISIBLE_RELEASE = '7.3.4.4';
+  // 7.3.4.5 — authoritative visible release and environment marker.
+  const VISIBLE_RELEASE = '7.3.4.5';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

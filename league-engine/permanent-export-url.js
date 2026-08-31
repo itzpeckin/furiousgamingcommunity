@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.4.4 */
+/* FHQ_BUILD: 7.3.4.5 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.3.4.4';
+  const VERSION = '7.3.4.5';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -115,6 +115,7 @@
     const latest = state?.latestExport || {};
     const counts = latest.counts || {};
     const status = latest.status || 'loading';
+    const historicalBackfill = status === 'ready' && latest.importMode === 'historical-backfill';
     const importDone = latest.importLive === true || latest.importStatus === 'live';
     const importDisabled = busy || status !== 'ready' || importDone;
     const tone = status === 'ready' ? 'success' : status === 'review-required' ? 'warning' : status === 'revoked' ? 'danger' : 'neutral';
@@ -126,18 +127,20 @@
       },delay);
     }
     return `<article class="card commissioner-league-export-card" data-permanent-league-export-panel>
-      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Permanent league connection</span><h2>Dedicated Madden Export URL</h2><p>Use the same league URL for every Madden Companion export. FranchiseHQ automatically separates, analyzes, and retains each export revision.</p></div><span class="pill pill--${tone}">${esc(statusLabel(status))}</span></div>
+      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Permanent league connection</span><h2>Dedicated Madden Export URL</h2><p>Use the same league URL for every Madden Companion export. FranchiseHQ automatically separates, analyzes, and retains each export revision.</p></div><span class="pill pill--${tone}">${esc(historicalBackfill?'Historical backfill ready':statusLabel(status))}</span></div>
       <div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>The URL is league-specific and remains valid until an authorized commissioner deliberately rotates it. Rotation immediately revokes the previous URL.</span></div>
       <div class="commissioner-import-summary">
         <div><small>Export URL</small><strong>${endpointState.exportUrl ? 'Permanent URL ready' : 'Unavailable'}</strong></div>
         <div><small>Latest export</small><strong>${esc(date(latest.receivedAt))}</strong></div>
         <div><small>Captured week</small><strong>${esc(latest.capturedWeek ?? 'unknown')}</strong></div>
+        <div><small>Live week</small><strong>${esc(latest.activeSnapshotWeek ?? 'none')}</strong></div>
         <div><small>Captured routes</small><strong>${count(latest.captureCount || 0)}</strong></div>
         <div><small>Teams</small><strong>${count(counts.teams)}</strong></div>
         <div><small>Rostered players</small><strong>${count(counts.rosteredPlayers)}</strong></div>
         <div><small>Free Agents</small><strong>${['located','empty-confirmed'].includes(counts.freeAgentStatus) ? count(counts.freeAgentCount) : 'unknown'}</strong></div>
         <div><small>Import status</small><strong>${esc(importDone ? 'Live' : latest.importStatus === 'preview-ready' ? 'Validated · ready to publish' : latest.importStatus || 'Not started')}</strong></div>
       </div>
+      ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> Week ${esc(latest.capturedWeek)} games and statistics can be added while live Week ${esc(latest.activeSnapshotWeek)} teams, rosters, players, standings, and week position remain unchanged.</span></div>`:''}
       ${(latest.warnings || []).length ? `<div class="validation-errors"><strong>Latest export not selected</strong><ul>${latest.warnings.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></div>` : ''}
       ${errorMessage ? `<div class="validation-errors"><strong>Action stopped safely</strong><p>${esc(errorMessage)}</p></div>` : ''}
       <div class="league-import-framework-actions">

@@ -11,6 +11,7 @@ import {
   leagueExportUrl,
   permanentExportPublicState
 } from '../../../../_lib/permanent-league-export.js';
+import { candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
 import {
   generateMaddenDiscoveryReport,
   publicMaddenDiscoveryReport,
@@ -18,7 +19,7 @@ import {
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.3.4.4';
+const RELEASE = '7.3.4.5';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();
@@ -105,10 +106,13 @@ async function publicState(current) {
   let endpoint = await endpointFor(current.db,current.league.id);
   await maybeAnalyzeIdleExport(current,endpoint);
   endpoint = await endpointFor(current.db,current.league.id);
-  const [latestSession,latestReportRow,readyReportRow] = await Promise.all([
+  const [latestSession,latestReportRow,readyReportRow,activeSnapshot] = await Promise.all([
     sessionFor(current.db,current.league.id,endpoint?.latest_session_id),
     reportFor(current.db,current.league.id,endpoint?.latest_report_id),
-    reportFor(current.db,current.league.id,endpoint?.latest_ready_report_id)
+    reportFor(current.db,current.league.id,endpoint?.latest_ready_report_id),
+    current.db.prepare(`SELECT snapshot.week_index FROM league_active_snapshots active
+      JOIN league_snapshots snapshot ON snapshot.id=active.snapshot_id AND snapshot.league_id=active.league_id
+      WHERE active.league_id=? LIMIT 1`).bind(current.league.id).first()
   ]);
   const latestReport = publicMaddenDiscoveryReport(latestReportRow);
   const readyReport = publicMaddenDiscoveryReport(readyReportRow);
@@ -122,6 +126,7 @@ async function publicState(current) {
   });
   const token = await deriveLeagueExportToken(current.signingSecret,current.league.id,endpoint.token_version);
   const markers = latestReport?.sourceMarkers || readyReport?.sourceMarkers || {};
+  const sourceCoverage = candidateSourceCoverage(readyReport || latestReport || {},activeSnapshot?.week_index);
   const origin = text(current.env.APP_ENV).toLowerCase() === 'production'
     ? CANONICAL_APP_ORIGIN
     : new URL(current.request.url).origin;
@@ -146,6 +151,9 @@ async function publicState(current) {
       receivedAt:latestSession?.last_capture_at || endpoint.last_received_at || null,
       analyzedAt:latestReport?.generatedAt || null,
       capturedWeek:markers?.week?.observed?.[0] ?? markers?.week?.expected ?? null,
+      activeSnapshotWeek:activeSnapshot?.week_index ?? null,
+      sourceCoverage,
+      importMode:sourceCoverage.importMode,
       reportStatus:latestReport?.status || null,
       counts:countsFor(latestReport || readyReport),
       candidateSnapshotId:candidate?.candidate_snapshot_id || null,

@@ -1,5 +1,15 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.4.5 historical-backfill and live-refresh impact
+
+The authorized 7.3.4.5 patch adds no migration and performs no data operation during deployment. It changes candidate composition only when a commissioner later selects **Import Latest Export** for an eligible source older than the active week. That source must belong to the exact active Madden game year and franchise season and prove schedule plus statistics coverage for its captured week.
+
+A historical-backfill candidate starts from the current active immutable snapshot. It preserves teams, players, rosters, standings, season year, live week, later games/statistics, previous backfills, source evidence, and blocked/null Free Agent semantics. Only exact-ID games/statistics scoped to the captured earlier week may overlay the candidate. Validation and expected-prior-pointer activation remain atomic. After success, the browser refreshes its read model and current route in place; no page reload or session mutation is required.
+
+The runtime rollback baseline is exact 7.3.4.4 Main commit `5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8`, Pages deployment `51e55575-0032-41af-b5d3-a69c67f54d2e`, and Worker version `1e01f1a9`. A code rollback must retain every snapshot and any historical backfill already activated. Restoring a prior active pointer is a separately reviewed snapshot rollback, never an implied runtime rollback.
+
+Do not use rollback to reset league data, delete historical records, rotate the permanent export URL, run Archive Season, run a game-year transition, roll the active week backward, or reinterpret blocked/null Free Agents as zero.
+
 ## 7.3.4.4 one-action workflow impact
 
 The authorized 7.3.4.4 candidate changes routine commissioner workflow without adding a migration. **Import Latest Export** now creates or reuses the current franchise-season destination, completes validation, and compare-and-swaps the active pointer to that exact candidate in one request. The active snapshot, snapshot/game-year/season statuses, lifecycle event, and tenant audit are written in one D1 batch guarded by the expected prior pointer. If validation fails or another writer changes the pointer, the prior live snapshot remains authoritative.

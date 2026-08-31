@@ -87,8 +87,12 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null) {
     : scheduleCurrentWeek && statisticsCurrentWeek ? 'covered' : 'partial';
   const continuityStatus = activeWeek === null || currentWeek === null
     ? 'unknown'
-    : currentWeek < activeWeek ? 'stale'
+    : currentWeek < activeWeek ? 'historical-backfill'
       : missingWeeks.length ? 'gap-detected' : 'continuous';
+  const importMode = activeWeek === null || currentWeek === null
+    ? 'unknown'
+    : currentWeek < activeWeek ? 'historical-backfill'
+      : currentWeek === activeWeek ? 'same-week' : 'forward';
   return {
     activeWeek,
     currentWeek,
@@ -99,6 +103,7 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null) {
     statisticsCurrentWeek,
     currentWeekStatus,
     continuityStatus,
+    importMode,
     missingWeeks
   };
 }
@@ -111,13 +116,19 @@ export function candidateCoverageWarnings(coverage = {}) {
   }
   if (!coverage.scheduleCurrentWeek) warnings.push(`Week ${coverage.currentWeek} schedule coverage is missing.`);
   if (!coverage.statisticsCurrentWeek) warnings.push(`Week ${coverage.currentWeek} statistics coverage is missing.`);
-  if (coverage.continuityStatus === 'stale') {
-    warnings.push(`The analyzed Week ${coverage.currentWeek} capture is older than active Week ${coverage.activeWeek}.`);
+  if (coverage.importMode === 'historical-backfill') {
+    warnings.push(`Historical Week ${coverage.currentWeek} backfill will preserve the active Week ${coverage.activeWeek} teams, players, rosters, standings, and live-week position.`);
   }
   if (Array.isArray(coverage.missingWeeks) && coverage.missingWeeks.length) {
     warnings.push(`Week coverage gap after active Week ${coverage.activeWeek}: missing ${coverage.missingWeeks.map(week => `Week ${week}`).join(', ')}.`);
   }
   return warnings;
+}
+
+function candidateRecord(row) {
+  return typeof row?.data_json === 'string'
+    ? parseCandidateJson(row.data_json, null)
+    : row?.data ?? row;
 }
 
 function recordWeek(record) {
@@ -134,9 +145,7 @@ export function candidateHistoryCarryForward(freshRecords = [], priorRows = [], 
   const retainedWeeks = new Set();
   let retained = 0;
   for (const row of priorRows || []) {
-    const item = typeof row?.data_json === 'string'
-      ? parseCandidateJson(row.data_json, null)
-      : row?.data ?? row;
+    const item = candidateRecord(row);
     const key = String(row?.external_id ?? item?.[keyName] ?? '');
     const week = recordWeek(item);
     if (!item || !key || output.has(key)) continue;
@@ -150,6 +159,61 @@ export function candidateHistoryCarryForward(freshRecords = [], priorRows = [], 
     retained,
     retainedWeeks: [...retainedWeeks].sort((left, right) => left - right)
   };
+}
+
+export function candidateHistoricalBackfill(freshRecords = [], priorRows = [], options = {}) {
+  const keyName = String(options.keyName || 'external_id');
+  const activeWeek = Number.parseInt(String(options.activeWeek ?? ''), 10);
+  const sourceWeeks = new Set(weekNumbers(options.sourceWeeks || []));
+  const output = new Map();
+  for (const row of priorRows || []) {
+    const item = candidateRecord(row);
+    const key = String(row?.external_id ?? item?.[keyName] ?? '');
+    if (item && key) output.set(key,item);
+  }
+  let applied = 0;
+  let rejected = 0;
+  const appliedWeeks = new Set();
+  for (const item of freshRecords || []) {
+    const key = String(item?.[keyName] ?? '');
+    const week = recordWeek(item);
+    const eligible = Boolean(
+      item
+      && key
+      && week !== null
+      && sourceWeeks.has(week)
+      && Number.isInteger(activeWeek)
+      && week < activeWeek
+    );
+    if (!eligible) {
+      rejected += 1;
+      continue;
+    }
+    output.set(key,item);
+    applied += 1;
+    appliedWeeks.add(week);
+  }
+  return {
+    records:[...output.values()],
+    applied,
+    rejected,
+    appliedWeeks:[...appliedWeeks].sort((left,right)=>left-right),
+    preserved:output.size-applied
+  };
+}
+
+export function candidateMergedWeekCoverage(games = [], statistics = [], activeWeekIndex = null) {
+  const activeWeek = Number.parseInt(String(activeWeekIndex ?? ''),10);
+  const gameWeeks = weekNumbers((games || []).map(recordWeek));
+  const statisticWeeks = weekNumbers((statistics || []).map(recordWeek));
+  if (!Number.isInteger(activeWeek) || activeWeek < 1) {
+    return {activeWeek:null,gameWeeks,statisticWeeks,completeWeeks:[],missingWeeks:[]};
+  }
+  const gameSet=new Set(gameWeeks),statisticSet=new Set(statisticWeeks);
+  const expectedWeeks=Array.from({length:activeWeek},(_,index)=>index+1);
+  const completeWeeks=expectedWeeks.filter(week=>gameSet.has(week)&&statisticSet.has(week));
+  const missingWeeks=expectedWeeks.filter(week=>!gameSet.has(week)||!statisticSet.has(week));
+  return {activeWeek,gameWeeks,statisticWeeks,completeWeeks,missingWeeks};
 }
 
 export function publicCandidateRun(row) {

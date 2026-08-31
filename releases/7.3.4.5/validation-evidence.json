@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.5",
+  "validatedOn": "2026-08-30",
+  "status": "validated-production-authorized",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "historicalBackfill": {
+      "passed": true,
+      "olderSourceClassifiedAsBackfill": true,
+      "exactGameYearRequired": true,
+      "exactFranchiseSeasonRequired": true,
+      "scheduleAndStatisticsCoverageRequired": true,
+      "activeTeamsPreserved": true,
+      "activePlayersAndRostersPreserved": true,
+      "activeStandingsPreserved": true,
+      "liveWeekPreserved": true,
+      "laterRecordsPreserved": true,
+      "onlyCapturedEarlierWeekOverlaid": true,
+      "remainingGapsReported": true,
+      "partialOrIncompatibleSourceStopped": true
+    },
+    "liveApplicationRefresh": {
+      "passed": true,
+      "liveReadModelInvalidated": true,
+      "applicationCompletionEventEmitted": true,
+      "currentRouteRerendered": true,
+      "browserReloadRequired": false,
+      "locationReloadUsed": false,
+      "sessionChanged": false
+    },
+    "activeSnapshotBaseline": {
+      "passed": true,
+      "snapshotId": "8b47ec76-7369-495e-913f-edc0310b49e1",
+      "week": 9,
+      "teams": 32,
+      "rosteredPlayers": 2043,
+      "games": 29,
+      "statistics": 717,
+      "standings": 32,
+      "changedDuringCandidateWork": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false,
+      "eligibleScope": "rostered-players-only"
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 26,
+      "newMigration": false,
+      "requiredTables": 79
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 107,
+      "failedTests": 0,
+      "focusedCandidateImportTests": 10,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 203,
+      "inventoryFiles": 533,
+      "routes": 65,
+      "requiredTables": 79
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "resetPerformed": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "archiveGameYearExecuted": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "historyPermanentlyDeleted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false
+  },
+  "external": {
+    "githubPublication": { "authorized": true, "status": "not-run", "pullRequest": null, "candidateCommit": null, "mainCommit": null },
+    "hostedChecks": { "authorized": true, "status": "not-run", "passed": 0, "candidatePassed": 0, "failed": 0, "pending": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": { "authorized": true, "status": "not-run", "currentDeployment": "51e55575-0032-41af-b5d3-a69c67f54d2e", "currentRuntimeCommit": "5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8" },
+    "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 26 },
+    "productionMaddenExport": { "authorized": false, "status": "not-run" },
+    "productionCandidateImport": { "authorized": false, "status": "not-run" },
+    "archiveSeason": { "authorized": false, "status": "not-run" },
+    "gameYearTransition": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

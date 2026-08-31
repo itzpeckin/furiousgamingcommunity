@@ -19,7 +19,7 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 
-const RELEASE = '7.3.4.4';
+const RELEASE = '7.3.4.5';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -96,7 +96,16 @@ async function runForSource(db, leagueId, destinationId, fingerprint) {
 }
 
 async function activeSnapshot(db, leagueId) {
-  return db.prepare(`SELECT active.snapshot_id,snapshot.week_index,snapshot.created_at
+  return db.prepare(`SELECT active.snapshot_id,snapshot.week_index,snapshot.season_year,snapshot.created_at,
+      (SELECT linked.game_year_id FROM game_year_snapshots linked
+        WHERE linked.league_id=active.league_id AND linked.snapshot_id=active.snapshot_id LIMIT 1) game_year_id,
+      (SELECT destination.franchise_season_id
+        FROM companion_candidate_import_runs import_run
+        JOIN companion_import_destinations destination
+          ON destination.id=import_run.destination_id AND destination.league_id=import_run.league_id
+        WHERE import_run.league_id=active.league_id
+          AND import_run.candidate_snapshot_id=active.snapshot_id
+        ORDER BY import_run.created_at DESC LIMIT 1) franchise_season_id
     FROM league_active_snapshots active
     JOIN league_snapshots snapshot ON snapshot.id=active.snapshot_id AND snapshot.league_id=active.league_id
     WHERE active.league_id=?`)
@@ -298,15 +307,28 @@ async function startRun(current, destination, report, identity, retry) {
     sourceMarkers:parseCandidateJson(report.source_markers_json,{}),
     datasetInventory:parseCandidateJson(report.dataset_inventory_json,[])
   },active?.week_index);
-  if (coverage.continuityStatus === 'stale') return { response:json({
-    ok:false,
-    error:`The analyzed Week ${coverage.currentWeek} capture is older than active Week ${coverage.activeWeek}. Analyze a current export before building a replacement candidate.`,
-    release:RELEASE,
-    sourceCoverage:coverage,
-    activeSnapshotChanged:false
-  },409) };
+  if (coverage.importMode === 'historical-backfill') {
+    if (coverage.currentWeekStatus !== 'covered') return { response:json({
+      ok:false,
+      error:`Historical Week ${coverage.currentWeek} backfill requires both schedule and statistics route coverage.`,
+      release:RELEASE,sourceCoverage:coverage,activeSnapshotChanged:false
+    },409) };
+    const compatible = Boolean(
+      active
+      && destination.game_year_id
+      && String(active.game_year_id || '') === String(destination.game_year_id)
+      && String(active.franchise_season_id || '') === String(identity.franchise_season_id || '')
+      && Number(active.season_year) === Number(identity.season_year)
+    );
+    if (!compatible) return { response:json({
+      ok:false,
+      error:'Historical backfill is allowed only for the exact active Madden game year and franchise season.',
+      release:RELEASE,sourceCoverage:coverage,activeSnapshotChanged:false
+    },409) };
+  }
   const coverageWarnings = candidateCoverageWarnings(coverage);
-  const counts = { ...sourceCounts(report,identity), sourceWeek:coverage.currentWeek, sourceCoverage:coverage };
+  const counts = { ...sourceCounts(report,identity), sourceWeek:coverage.currentWeek,
+    sourceCoverage:coverage,importMode:coverage.importMode };
   if (run) {
     if (!retry) return { run, reused:true, warm:false };
     await current.db.prepare(`UPDATE companion_candidate_import_runs SET
@@ -328,7 +350,7 @@ async function startRun(current, destination, report, identity, retry) {
     run = await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(id).first();
     await audit(current,'companion.candidate_import.start','companion_candidate_import',id,{
       discoverySessionId:report.session_id,sourceFingerprint:fingerprint,sourceCoverage:coverage,
-      activationPerformed:false
+      importMode:coverage.importMode,activationPerformed:false
     });
   }
   run = await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first();
@@ -430,6 +452,10 @@ async function finalize(current, body) {
     }
   }
   const freeAgentEvidence = parseCandidateJson(report?.free_agent_evidence_json, {});
+  const snapshotManifest = parseCandidateJson(snapshot.manifest_json, {});
+  const importMode = String(snapshotManifest.importMode || 'forward');
+  const backfillWeeks = Array.isArray(snapshotManifest?.historicalBackfill?.sourceWeeks)
+    ? snapshotManifest.historicalBackfill.sourceWeeks : [];
   const completeness = candidateCompleteness(freeAgentEvidence.status);
   const warnings = parseCandidateJson(run.warnings_json, []);
   if (freeAgentEvidence.status === 'blocked') warnings.push(
@@ -442,6 +468,8 @@ async function finalize(current, body) {
     games:Number(snapshot.game_count || 0),
     statistics:Number(snapshot.statistic_count || 0),
     standings:Number(snapshot.standing_count || 0),
+    importMode,
+    backfillWeeks,
     freeAgentStatus:String(freeAgentEvidence.status || 'missing'),
     freeAgentCount:['located','empty-confirmed'].includes(String(freeAgentEvidence.status || ''))
       ? Number(freeAgentEvidence.recordCount || 0) : null
@@ -491,7 +519,7 @@ async function finalize(current, body) {
       SELECT ?,?,?,?,?,? WHERE ${activationGuard}`)
       .bind(lifecycleId,current.league.id,snapshot.id,'import-activated',actor,JSON.stringify({
         candidateRunId:run.id,previousSnapshotId:run.active_snapshot_id_before||null,
-        completeness,forwardDetection:{status:'pending-separate-stage'},
+        completeness,importMode,backfillWeeks,forwardDetection:{status:'pending-separate-stage'},
         freeAgentStatus:counts.freeAgentStatus,freeAgentCount:counts.freeAgentCount
       }),current.league.id,snapshot.id),
     current.db.prepare(`INSERT INTO tenant_audit_events
@@ -500,7 +528,7 @@ async function finalize(current, body) {
       .bind(auditId,current.league.id,actor,`request_${crypto.randomUUID()}`,`action_${crypto.randomUUID()}`,
         'companion.live_import.activate','companion_candidate_import',run.id,'success',JSON.stringify({
           candidateSnapshotId:snapshot.id,previousSnapshotId:run.active_snapshot_id_before||null,
-          completeness,durationMs,activationPerformed:true,activeSnapshotChanged:true,
+          completeness,importMode,backfillWeeks,durationMs,activationPerformed:true,activeSnapshotChanged:true,
           freeAgentStatus:counts.freeAgentStatus,freeAgentCount:counts.freeAgentCount,
           freeAgentInterpretedAsZero:false
         }),current.league.id,snapshot.id)

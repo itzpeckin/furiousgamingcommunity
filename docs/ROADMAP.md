@@ -6,13 +6,13 @@
 
 **Updated:** August 30, 2026
 
-**Revision:** 1.53
+**Revision:** 1.54
 
 **Current production:** 7.3.4.4 from exact Main commit `5a16ccb` (Pages deployment `51e55575`, import Worker version `1e01f1a9`); validated Madden 27 Week 9 snapshot `8b47ec76` is active and prior Week 7 snapshot `841ce1b5` is archived and retained
 
-**Current work:** 7.3.4.4 is deployed from exact Main after PR #20, four candidate checks, seven Main/deployment checks, and successful Pages and import Worker deployments. The exact validated Week 9 run activated atomically in 58.674 seconds. One lifecycle row and one audit row record the pointer change; the temporary delegation is deleted; no Archive Season, game-year transition, reset, URL rotation, migration, or new Madden export ran.
+**Current work:** 7.3.4.5 is authorized and locally implemented from the exact deployed 7.3.4.4 baseline. It distinguishes unsafe live rollback from a same-season historical backfill, preserves the active Week 9 team/player/roster/standings plane while overlaying only an earlier captured week's games/statistics, and refreshes the active application route without a browser reload after atomic activation. Production data is unchanged during candidate work.
 
-**Next gate:** The owner can verify that Commissioner HQ shows the latest export live and that league pages reflect Week 9. Then 7.3.5 builds the complete Production team, roster, player, ratings, statistics, standings, and honest Free Agent experience on the active snapshot.
+**Next gate:** Run the consolidated local gate, publish the exact 7.3.4.5 candidate and pull request, pass hosted checks, merge that exact candidate to Main, deploy Production, and reconcile that the deployment changed no league data or active pointer. Commissioners may then export missing earlier weeks and use **Import Latest Export** once per backfill.
 
 ## Product decisions
 
@@ -55,6 +55,7 @@
 | 7.3.4.2 | Production; pending owner UI acceptance | Atomic concurrent cohort claim, exact real-payload parsing, and verified retained-burst recovery without candidate import or activation |
 | 7.3.4.3 | Production baseline | Exact recovered-session classification and shared Teams route authority produced the retained validated Week 9 candidate |
 | 7.3.4.4 | Production deployed; pending owner UI acceptance | One-action atomic live import, one-action same-edition season archive/preparation, and exact Week 9 snapshot activation |
+| 7.3.4.5 | Production authorized; local candidate | Same-season historical week backfill without live-state regression and automatic in-place data refresh after activation |
 | 7.3.5 | Planned | Production team, roster, player, statistics, standings, and Free Agent experience |
 | 7.3.6 | Planned | Stable shareable team and player URLs |
 | 7.3.7 | Planned | Ownership reconciliation, My Team, GM career history, and trophy cases |
@@ -175,7 +176,7 @@
 ## 7.3.4 — FGC Madden 27 Certification
 
 - Select the import run by the newest analyzed report/capture fingerprint, not by the league's previously completed run. The same exact export remains idempotent; a new fingerprint can build a new isolated snapshot for validation and atomic publication.
-- Show capture time, source fingerprint, active week, captured week, and schedule/statistics coverage before candidate work starts. Refuse a capture older than the active snapshot.
+- Show capture time, source fingerprint, active week, captured week, and schedule/statistics coverage before candidate work starts. Refuse an older capture as a full replacement; accept it only as an exact same-game-year/same-franchise-season historical backfill with complete week-scoped schedule and statistics coverage.
 - Carry older game/statistic records forward only when the active snapshot belongs to the same Madden game year and franchise season. Fresh exact-ID records win; current/future prior-week rows are not copied.
 - If active Week 7 is followed by a capture that supplies only Week 9, visibly report Week 8 as missing. Never imply that an unavailable week was imported or manufacture its games/statistics.
 - Reconcile every source total, unknown route, duplicate, unassigned player, and Free Agent result before the atomic live pointer can move. Blocked Free Agents remain unknown/null.
@@ -190,6 +191,14 @@
 - Treat Madden's blocked Free Agent response as rostered-player-only readiness with a null/unknown count. Never convert the upstream failure into an empty Free Agent pool.
 - Expose the permanent connection and latest received/analyzed time, captured week, route count, counts, warnings, and live-import status in Commissioner HQ. The normal weekly workflow is: export to the same URL, wait for Ready, and select **Import Latest Export** once.
 - The one-click action creates or reuses the season destination, maps and validates the immutable source, and atomically publishes the exact validated snapshot. Any failure retains the prior live pointer. Migration 26 remains additive; import never resets league data, rotates the URL, or converts blocked Free Agents to zero.
+
+## 7.3.4.5 — Historical Week Backfill and Live Refresh
+
+- Classify an eligible export older than the active week as a historical backfill rather than an unsafe replacement. Require the exact active Madden game year and franchise season plus both schedule and statistics coverage for the captured week.
+- Build the backfill candidate from the current active immutable snapshot. Preserve its teams, players, rosters, standings, season year, and live-week position; overlay only exact-ID games and statistics from the captured earlier week.
+- Retain accumulated prior backfills, reject unscoped/current/future source rows, make an identical source idempotent, and report remaining historical week gaps without manufacturing data.
+- After atomic activation, invalidate the live read-model and application caches, rehydrate the current route, and update Commissioner HQ without `location.reload()` or a browser refresh. Authentication/session redesign remains at 7.5.0.
+- Gate: tests prove Week 8 can be added to active Week 9 without regressing the current plane, partial/cross-season backfills stop safely, the one-click completion event refreshes the live application, and Production deployment alone changes no data or active pointer.
 
 ## 7.3.5 — Team, Roster, Player, Statistics, Standings, and Free Agent Experience
 
@@ -340,3 +349,4 @@
 - **Revision 1.51:** Published 7.3.4.3 through PR #19 with 4/4 candidate checks and 7/7 Main/deployment checks, fast-forwarded exact commit `0a5dc06` to Main, and deployed exact Production Pages runtime `3d667ec0` plus import Worker build `8fa92466`. The live domain reports 7.3.4.3. No migration or Production data operation ran: the recovered 43-route source and active snapshot `841ce1b5` remain unchanged, Week 8 remains visibly missing, and Free Agents remain blocked/null. The owner may now retry the same export; import and activation remain separate actions.
 - **Revision 1.52:** Authorized the consolidated 7.3.4.4 Production one-action remediation. The implementation makes a commissioner import click create/reuse its destination, map, validate, compare-and-swap the active pointer, and audit the exact snapshot atomically; removes routine activation UI; and makes one **Archive Season** click freeze the completed same-edition season, prepare the next identity, archive its old import destination, and clear only the selected latest export so Week 1 must be newly exported. Tests prove idempotent activation and archive behavior, prior-pointer preservation on failure, retained History Books, unchanged export token, and blocked/null Free Agents. Publication, Main, Production deployment, and the exact existing Week 9 activation are authorized but have not yet run.
 - **Revision 1.53:** Published 7.3.4.4 through PR #20 with 4/4 candidate checks and 7/7 Main/deployment checks, fast-forwarded exact commit `5a16ccb` to Main, and deployed exact Pages runtime `51e55575` plus import Worker version `1e01f1a9`. Read-only reconciliation pinned durable run `candidate_import_bb7020cd` to validation-ready Week 9 snapshot `8b47ec76` with 32 teams, 2,043 rostered players, 29 games, 717 statistics, 32 standings, and the visible missing Week 8 warning. The deployed endpoint atomically activated that exact snapshot in 58.674 seconds; Week 7 snapshot `841ce1b5` is archived/retained, one lifecycle and one audit row exist, token version remains 1, eight users and eight memberships remain, the temporary delegation is deleted, foreign keys are clean, and Free Agents remain blocked/null. No staging, migration, new Madden export, Archive Season, game-year transition, reset, permanent deletion, or URL rotation ran.
+- **Revision 1.54:** Authorized and locally implemented 7.3.4.5 from the exact deployed 7.3.4.4 baseline. An older fully covered export is now classified as an exact same-game-year/same-franchise-season historical backfill: it begins with the active immutable snapshot, preserves teams/players/rosters/standings and live week, overlays only the captured earlier week's games/statistics, retains accumulated backfills, reports remaining gaps, and stops on partial or incompatible sources. Successful activation refreshes the live read-model, application caches, and current route in place without a browser reload. Production data, the active Week 9 pointer, permanent URL, Archive Season, transitions, resets, and blocked/null Free Agent semantics remain unchanged during candidate work.

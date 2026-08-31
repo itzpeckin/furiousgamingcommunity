@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.4.5",
+  "releaseType": "historical-week-backfill-and-live-refresh",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.4.4",
+    "commit": "5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8",
+    "tree": "644e7a270929b2b18f02575bd5b6a905200fb4a0",
+    "tag": "v7.0.0",
+    "productionDeployment": "51e55575-0032-41af-b5d3-a69c67f54d2e",
+    "workerVersion": "1e01f1a9"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.4.5",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Publish one exact candidate, pass hosted checks, merge that exact candidate to Main, and deploy Production in one consolidated authorized cycle."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "scope": "Production-first policy applies. No staging cycle is authorized."
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.3.4.4",
+    "currentCommit": "5a16ccb311b368ae1df5f7fcf3e4f95bc01c9cd8",
+    "currentDeployment": "51e55575-0032-41af-b5d3-a69c67f54d2e",
+    "activeSnapshot": "8b47ec76-7369-495e-913f-edc0310b49e1",
+    "scope": "Deploy the historical-backfill and in-place refresh runtime only. Do not execute an import, move the active pointer, reset data, rotate the export URL, archive a season, run a transition, or reinterpret blocked Free Agents."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+    "league-engine/one-click-import.js",
+    "league-engine/permanent-export-url.js",
+    "releases/7.3.4.5/release-record.md",
+    "releases/7.3.4.5/validation-evidence.json",
+    "tests/import/candidate-import.test.mjs"
+  ]
+}

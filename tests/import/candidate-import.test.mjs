@@ -10,7 +10,9 @@ import {
   CANDIDATE_IMPORT_PHASES,
   candidateCoverageWarnings,
   candidateCompleteness,
+  candidateHistoricalBackfill,
   candidateHistoryCarryForward,
+  candidateMergedWeekCoverage,
   candidateProgress,
   candidateRetryGuidance,
   candidateSourceCoverage,
@@ -103,6 +105,7 @@ test('Week 9 source coverage is explicit and gaps after the active snapshot are 
   assert.equal(gap.currentWeek,9);
   assert.equal(gap.currentWeekStatus,'covered');
   assert.equal(gap.continuityStatus,'gap-detected');
+  assert.equal(gap.importMode,'forward');
   assert.deepEqual(gap.missingWeeks,[8]);
   assert.deepEqual(candidateCoverageWarnings(gap),[
     'Week coverage gap after active Week 7: missing Week 8.'
@@ -118,6 +121,24 @@ test('Week 9 source coverage is explicit and gaps after the active snapshot are 
   },7);
   assert.equal(continuous.continuityStatus,'continuous');
   assert.deepEqual(continuous.missingWeeks,[]);
+});
+
+test('an older fully covered week is classified as a safe historical backfill, not a live rollback', () => {
+  const coverage=candidateSourceCoverage({
+    sourceMarkers:{week:{expected:'8',observed:['8']}},
+    datasetInventory:[
+      {datasetType:'schedule',routePath:'xbsx/742482/week/reg/8/schedules'},
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/8/passing'}
+    ]
+  },9);
+  assert.equal(coverage.currentWeek,8);
+  assert.equal(coverage.activeWeek,9);
+  assert.equal(coverage.currentWeekStatus,'covered');
+  assert.equal(coverage.continuityStatus,'historical-backfill');
+  assert.equal(coverage.importMode,'historical-backfill');
+  assert.deepEqual(candidateCoverageWarnings(coverage),[
+    'Historical Week 8 backfill will preserve the active Week 9 teams, players, rosters, standings, and live-week position.'
+  ]);
 });
 
 test('a Week 9 candidate carries older active history forward without overriding fresh records', () => {
@@ -136,6 +157,37 @@ test('a Week 9 candidate carries older active history forward without overriding
   assert.equal(merged.records.length,3);
   assert.equal(merged.records.find(row=>row.external_id==='game-week-7').home_score,31);
   assert.equal(merged.records.some(row=>row.external_id==='game-week-9-old'),false);
+});
+
+test('historical backfill overlays only the selected earlier week and preserves all live-week records', () => {
+  const prior=[
+    {external_id:'game-7',data_json:JSON.stringify({external_id:'game-7',week_index:7,home_score:20})},
+    {external_id:'game-8',data_json:JSON.stringify({external_id:'game-8',week_index:8,home_score:10})},
+    {external_id:'game-9',data_json:JSON.stringify({external_id:'game-9',week_index:9,home_score:30})}
+  ];
+  const fresh=[
+    {external_id:'game-8',week_index:8,home_score:24},
+    {external_id:'game-8-new',week_index:8,home_score:17},
+    {external_id:'game-9-stray',week_index:9,home_score:99},
+    {external_id:'unscoped'}
+  ];
+  const merged=candidateHistoricalBackfill(fresh,prior,{
+    keyName:'external_id',activeWeek:9,sourceWeeks:[8]
+  });
+  assert.equal(merged.applied,2);
+  assert.equal(merged.rejected,2);
+  assert.deepEqual(merged.appliedWeeks,[8]);
+  assert.equal(merged.records.find(row=>row.external_id==='game-8').home_score,24);
+  assert.equal(merged.records.find(row=>row.external_id==='game-9').home_score,30);
+  assert.equal(merged.records.some(row=>row.external_id==='game-9-stray'),false);
+
+  const weekly=candidateMergedWeekCoverage(
+    [1,7,8,9].map(week=>({week_index:week})),
+    [1,7,8,9].map(week=>({week_index:week})),
+    9
+  );
+  assert.deepEqual(weekly.completeWeeks,[1,7,8,9]);
+  assert.deepEqual(weekly.missingWeeks,[2,3,4,5,6]);
 });
 
 test('one private destination and one idempotent candidate run are enforced per source fingerprint', async () => {
@@ -161,6 +213,118 @@ test('one private destination and one idempotent candidate run are enforced per 
     assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
     assert.throws(()=>db.prepare(`DELETE FROM franchise_seasons WHERE id='season-2026'`).run(),/FOREIGN KEY constraint failed/i);
   }finally{db.close()}
+});
+
+test('commissioner start accepts a fully covered older week only as an exact same-season backfill', async () => {
+  const sqlite=await database();
+  try{
+    sqlite.prepare(`INSERT INTO league_memberships
+      (id,league_id,user_id,role,active) VALUES (?,?,?,?,1)`)
+      .run('membership-backfill','league-1','commissioner-1','commissioner');
+    const token='historical-backfill-session';
+    sqlite.prepare(`INSERT INTO sessions
+      (id,user_id,session_token_hash,expires_at) VALUES (?,?,?,?)`)
+      .run('session-backfill','commissioner-1',await hashToken(token),'2099-01-01T00:00:00.000Z');
+    sqlite.prepare(`INSERT INTO madden_discovery_sessions
+      (id,league_id,token_hash,status,expires_at,opened_by_user_id)
+      VALUES (?,?,?,?,?,?)`).run(
+        'capture-active','league-1','active-token-hash','passed','2099-01-01T00:00:00.000Z','commissioner-1'
+      );
+    sqlite.prepare(`INSERT INTO league_game_years
+      (id,league_id,game_release,edition_year,display_name,status) VALUES (?,?,?,?,?,'active')`)
+      .run('game-year-backfill','league-1','Madden NFL 27',27,'Madden NFL 27');
+    sqlite.prepare(`INSERT INTO game_year_franchise_seasons
+      (game_year_id,league_id,franchise_season_id) VALUES (?,?,?)`)
+      .run('game-year-backfill','league-1','season-2026');
+    sqlite.prepare(`INSERT INTO companion_import_destinations
+      (id,league_id,franchise_season_id,label,status,created_by_user_id,game_year_id)
+      VALUES (?,?,?,?,?,?,?)`).run(
+        'destination-backfill','league-1','season-2026','Madden 27 live imports','active','commissioner-1','game-year-backfill'
+      );
+    sqlite.prepare(`INSERT INTO league_snapshots
+      (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,
+       standing_count,warnings_json,manifest_json,validation_status,validation_error_count)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        'snapshot-live-week-9','league-1','active',2026,9,32,2043,29,717,32,'[]','{}','ready',0
+      );
+    sqlite.prepare(`INSERT INTO game_year_snapshots
+      (game_year_id,league_id,snapshot_id,snapshot_status) VALUES (?,?,?,'active')`)
+      .run('game-year-backfill','league-1','snapshot-live-week-9');
+    sqlite.prepare(`INSERT INTO league_active_snapshots
+      (league_id,snapshot_id,activated_by) VALUES (?,?,?)`)
+      .run('league-1','snapshot-live-week-9','commissioner-1');
+    sqlite.prepare(`INSERT INTO companion_candidate_import_runs
+      (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,
+       candidate_snapshot_id,active_snapshot_id_after,created_by_user_id)
+      VALUES (?,?,?,?,?,'preview-ready',?,?,?)`).run(
+        'candidate-live-week-9','league-1','destination-backfill','capture-active','active-week-9-fingerprint',
+        'snapshot-live-week-9','snapshot-live-week-9','commissioner-1'
+      );
+    sqlite.prepare(`INSERT INTO madden_discovery_reports
+      (id,league_id,session_id,status,route_count,capture_count,total_bytes,source_markers_json,
+       source_verification_json,dataset_inventory_json,field_inventory_json,relationship_inventory_json,
+       requirement_results_json,free_agent_evidence_json,sanitized_fixture_json,report_hash,generated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        'report-backfill-week-8','league-1','capture-1','passed',43,43,1000,
+        '{"week":{"expected":"8","observed":["8"]}}','{}',
+        '[{"datasetType":"schedule","routePath":"xbsx/742482/week/reg/8/schedules"},{"datasetType":"statistics","routePath":"xbsx/742482/week/reg/8/passing"}]',
+        '{}','{}','{"teams":{"recordCount":32},"players":{"recordCount":2043}}',
+        '{"status":"blocked","recordCount":null}','{}','week-8-backfill-hash','2090-01-01T00:00:00.000Z'
+      );
+    sqlite.prepare(`UPDATE companion_league_export_endpoints SET
+      latest_session_id='capture-1',latest_report_id='report-backfill-week-8',
+      latest_ready_report_id='report-backfill-week-8' WHERE league_id='league-1'`).run();
+
+    const binding=d1(sqlite);
+    const invoke=()=>candidateImport({
+      request:new Request('https://franchisehq.app/api/leagues/fgc/companion/candidate-import',{
+        method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},
+        body:JSON.stringify({action:'start'})
+      }),
+      params:{leagueSlug:'fgc'},env:{DB:binding,FRANCHISE_HQ_DB:binding}
+    });
+    let response=await invoke();
+    assert.equal(response.status,200);
+    let payload=await response.json();
+    assert.equal(payload.source.coverage.importMode,'historical-backfill');
+    assert.equal(payload.run.sourceCounts.importMode,'historical-backfill');
+    assert.equal(payload.run.activeSnapshotIdBefore,'snapshot-live-week-9');
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM companion_candidate_import_runs
+      WHERE id<>'candidate-live-week-9'`).get().count,1);
+
+    sqlite.prepare(`UPDATE madden_discovery_reports SET dataset_inventory_json=?,report_hash=?
+      WHERE id='report-backfill-week-8'`).run(
+        '[{"datasetType":"schedule","routePath":"xbsx/742482/week/reg/8/schedules"}]',
+        'partial-week-8-backfill-hash'
+      );
+    response=await invoke();
+    assert.equal(response.status,409);
+    payload=await response.json();
+    assert.match(payload.error,/requires both schedule and statistics/i);
+
+    sqlite.prepare(`UPDATE madden_discovery_reports SET dataset_inventory_json=?,report_hash=?
+      WHERE id='report-backfill-week-8'`).run(
+        '[{"datasetType":"schedule","routePath":"xbsx/742482/week/reg/8/schedules"},{"datasetType":"statistics","routePath":"xbsx/742482/week/reg/8/passing"}]',
+        'incompatible-week-8-backfill-hash'
+      );
+    sqlite.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(
+        'season-other','league-1','ea-madden-companion','742482','other','Madden NFL 27','Other season',2025,'closed'
+      );
+    sqlite.prepare(`INSERT INTO companion_import_destinations
+      (id,league_id,franchise_season_id,label,status,created_by_user_id,game_year_id)
+      VALUES (?,?,?,?,?,?,?)`).run(
+        'destination-other','league-1','season-other','Other season','archived','commissioner-1','game-year-backfill'
+      );
+    sqlite.prepare(`UPDATE companion_candidate_import_runs SET destination_id='destination-other'
+      WHERE id='candidate-live-week-9'`).run();
+    response=await invoke();
+    assert.equal(response.status,409);
+    payload=await response.json();
+    assert.match(payload.error,/exact active Madden game year and franchise season/i);
+    assert.equal(sqlite.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{sqlite.close()}
 });
 
 test('one finalize request atomically publishes the exact validated snapshot and is idempotent', async () => {
@@ -245,7 +409,7 @@ test('one finalize request atomically publishes the exact validated snapshot and
 });
 
 test('commissioner live import activates only its validated candidate and never resets, prunes, or reinterprets Free Agents', async () => {
-  const [candidate,builder,lifecycle,ui,worker,job,report,reportHelper,classifier,statistics]=await Promise.all([
+  const [candidate,builder,lifecycle,ui,worker,job,report,reportHelper,classifier,statistics,app]=await Promise.all([
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js',import.meta.url),'utf8'),
@@ -255,7 +419,8 @@ test('commissioner live import activates only its validated candidate and never 
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/_lib/madden-discovery-report.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/classify.js',import.meta.url),'utf8'),
-    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js',import.meta.url),'utf8')
+    readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js',import.meta.url),'utf8'),
+    readFile(new URL('../../app.js',import.meta.url),'utf8')
   ]);
   assert.match(candidate,/requireCommissioner\(context\)/);
   assert.doesNotMatch(candidate,/requirePlatformOwner/);
@@ -278,8 +443,13 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(builder,/exact analyzed discovery session/);
   assert.match(builder,/madden_discovery_session_captures/);
   assert.match(builder,/historyCarryForward/);
+  assert.match(builder,/candidateHistoricalBackfill/);
+  assert.match(builder,/Historical Week/);
+  assert.match(builder,/teams=historicalBackfill\?parsedDomain\('teams'\):freshTeams/);
+  assert.match(builder,/players=historicalBackfill\?parsedDomain\('players'\):freshPlayers/);
+  assert.match(builder,/standingRows=historicalBackfill\?parsedDomain\('standings'\):standingSource\.records/);
   assert.match(builder,/candidateCoverageWarnings/);
-  assert.match(builder,/domain IN \('games','statistics'\)/);
+  assert.match(builder,/domain IN \('teams','players','games','statistics','standings'\)/);
   assert.doesNotMatch(builder,/DELETE\s+FROM/i);
   assert.doesNotMatch(builder,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
 
@@ -302,6 +472,13 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(ui,/under 60 seconds/);
   assert.match(ui,/Free Agent count is unknown, never zero/);
   assert.match(ui,/discoverySessionId/);
+  assert.match(ui,/liveData\?\.refresh/);
+  assert.match(ui,/franchisehq:one-click-import-complete/);
+  assert.match(ui,/Historical backfill/);
+  assert.doesNotMatch(ui,/location\.reload/);
+  assert.match(app,/franchisehq:one-click-import-complete/);
+  assert.match(app,/syncTradeCenterLiveBridge\(\{rerender:false,forceLive:true\}\)/);
+  assert.match(app,/renderRoute\(route\)/);
   assert.match(job,/15\*60\*1000/);
   assert.doesNotMatch(job,/x-franchisehq-platform-owner-account-id/);
 
