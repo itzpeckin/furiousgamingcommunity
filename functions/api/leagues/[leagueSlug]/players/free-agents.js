@@ -3,7 +3,7 @@ import { requireActiveMembership } from '../../../../_lib/permissions.js';
 import { freeAgentStateFromMappingRun, resolveSnapshotPlayerMappingRun } from '../../../../_lib/live-data-experience.js';
 import { normalizePlayer } from '../snapshot/read-model.js';
 
-const RELEASE='7.3.5';
+const RELEASE='7.3.5.1';
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 
 async function activeSnapshot(db,leagueId){

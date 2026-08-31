@@ -95,6 +95,27 @@ test('browser and endpoint source contracts bind Free Agents and paging to the a
   assert.equal(endpoint.includes('companion_route_captures'),false);
   assert.ok(readModel.includes('freeAgents'));
   assert.ok(readModel.includes('integrity'));
-  assert.ok(styles.includes('FranchiseHQ 7.3.5 — authoritative live-data experience'));
+  assert.ok(styles.includes('FranchiseHQ 7.3.5.1 — authoritative live-data experience'));
   assert.ok(styles.includes("wrapper.dataset.verticalScroll='page'")||app.includes("wrapper.dataset.verticalScroll='page'"));
+});
+
+test('Production player-card and Trade Center adapters preserve ratings and contract units', async () => {
+  const appSource = await readFile(new URL('../../app.js',import.meta.url),'utf8');
+  assert.match(appSource, /ratings:\{\.\.\.\(player\?\.ratings\|\|raw\.ratings\|\|\{\}\),\.\.\.corePlayerRatings\(raw,player\?\.ratings\|\|raw\.ratings\|\|\{\}\)\}/);
+  assert.match(appSource, /function tradeCalculatorMillions\(value\)/);
+  assert.match(appSource, /salary:tradeCalculatorMillions\(view\.salary\)/);
+  assert.match(appSource, /capHit:tradeCalculatorMillions\(view\.capHit\)/);
+  assert.match(appSource, /franchisehq:trade-live-cache:v2/);
+});
+
+test('global league shell is hydrated from the active snapshot instead of static mock context', async () => {
+  const [appSource,indexSource] = await Promise.all([
+    readFile(new URL('../../app.js',import.meta.url),'utf8'),
+    readFile(new URL('../../index.html',import.meta.url),'utf8')
+  ]);
+  assert.match(indexSource, /data-active-league-context>Loading active Madden data/);
+  assert.match(indexSource, /data-live-week-chip/);
+  assert.doesNotMatch(indexSource, /Season 4 · Week 8 · Mock Data/);
+  assert.match(appSource, /applyActiveSnapshotShell\(snapshotValue,currentContext\)/);
+  assert.match(appSource, /Live Madden Data/);
 });

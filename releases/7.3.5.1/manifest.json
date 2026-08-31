@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.3.5.1",
+  "releaseType": "production-display-integrity-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.5",
+    "commit": "1d9cbc2186762e16da1028bbfd8fd2f326c984e9",
+    "tree": "47adb92bde8d65fc714081022fd53a48534959a7",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.3.5.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0,
+    "scope": "Publish one exact candidate, create its pull request, require hosted checks, then fast-forward the accepted exact commit to Main."
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.3.5",
+    "currentCommit": "1d9cbc2186762e16da1028bbfd8fd2f326c984e9",
+    "currentPagesDeployment": "484acd14-7d27-4dbd-81cc-c97b5fc638a4",
+    "currentWorkerBuild": "b4588f36-cda5-4e83-8219-24e828992e8a",
+    "currentWorkerVersion": "2b745b42",
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "activeSnapshotPrevious": "518236e4-1cac-41f5-b8c8-757b7150dcd8",
+    "scope": "Deploy the exact Main commit and perform read-only HTTPS display acceptance. No Production data operation is authorized."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "docs/ROLLBACK.md",
+    "app.js",
+    "index.html",
+    "league-engine/live-read-model.js",
+    "tests/import/live-data-experience.test.mjs",
+    "releases/7.3.5.1/release-record.md",
+    "releases/7.3.5.1/validation-evidence.json"
+  ]
+}

@@ -1306,6 +1306,22 @@
   let liveTeamDirectoryLoading = false;
   const liveRosterPlayers = new Map();
 
+  function applyActiveSnapshotShell(snapshot=null,currentContext={}) {
+    const contextHost=document.querySelector('[data-active-league-context]');
+    const weekHost=document.querySelector('[data-live-week-chip]');
+    if(!snapshot){
+      if(contextHost)contextHost.textContent='Active Madden data unavailable';
+      if(weekHost)weekHost.innerHTML='<span class="status-dot status-dot--warning"></span>Live week unavailable';
+      return;
+    }
+    const season=Number(snapshot.seasonYear??currentContext.season);
+    const week=Number(currentContext.week??snapshot.weekIndex);
+    const phase=String(currentContext.label||'Regular Season');
+    const period=currentContext.round||currentContext.displayLabel||(Number.isFinite(week)?`${phase} Week ${week}`:phase);
+    if(contextHost)contextHost.textContent=`${Number.isFinite(season)?`Season ${season}`:'Season unavailable'} · ${period} · Live Madden Data`;
+    if(weekHost)weekHost.innerHTML=`<span class="status-dot status-dot--live"></span>${escapeHtml(period)} Live`;
+  }
+
 
   function liveTeamOwnerName(team={}) {
     const owner=team.owner;
@@ -2757,7 +2773,10 @@
       const [stateValue,snapshotValue,teamRows,standingRows,playerRows,gameRows,freeAgentStateValue,integrity]=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getPlayers(),service.getSchedule(),service.getFreeAgentState(),service.getIntegrity()
       ]);
-      if(stateValue!=='live') return null;
+      if(stateValue!=='live') {
+        applyActiveSnapshotShell(null);
+        return null;
+      }
       const standingMap=new Map(standingRows.map(row=>[String(row.teamId),row]));
       const teamsLive=teamRows.map(team=>liveTeamUiShape(team,standingMap.get(String(team.id))));
       [...teamsLive].sort((a,b)=>Number(b.pf)-Number(a.pf)||String(a.fullName).localeCompare(String(b.fullName))).forEach((team,index)=>team.pfRank=index+1);
@@ -2796,6 +2815,7 @@
       };
       window.FranchiseHQ=window.FranchiseHQ||{};
       window.FranchiseHQ.currentSeasonContext=currentContext;
+      applyActiveSnapshotShell(snapshotValue,currentContext);
       return liveTeamDirectory;
     } finally {
       liveTeamDirectoryLoading=false;
@@ -2948,7 +2968,7 @@
       weight: raw.weight || '—',
       tradeBlock: Boolean(raw.tradeBlock),
       initials: raw.initials || String(player?.name || '?').split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase(),
-      ratings: corePlayerRatings(raw,player?.ratings||raw.ratings||{}),
+      ratings:{...(player?.ratings||raw.ratings||{}),...corePlayerRatings(raw,player?.ratings||raw.ratings||{})},
       stats: player?.stats || raw.stats || {}
     };
   }
@@ -6563,7 +6583,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         <div class="player-profile-rating"><strong>${player.overall}</strong><span>Overall Rating</span></div>
       </section>
       <div class="team-summary-grid">
-        ${summaryTile('Team',team.abbr,team.record)}${summaryTile('Age',player.age,'Years old')}${summaryTile('Development',player.dev,'Progression trait')}${summaryTile('Contract',`${player.years} yrs`,formatMoney(player.salary))}${summaryTile('Cap Hit',formatMoney(player.capHit),'Current season')}${summaryTile('Trade Status',player.tradeBlock?'On Block':'Unavailable',player.injury)}
+        ${summaryTile('Team',team.abbr,team.record)}${summaryTile('Age',player.age,'Years old')}${summaryTile('Development',player.dev,'Progression trait')}${summaryTile('Contract',`${player.years} yrs`,compactMoney(player.salary))}${summaryTile('Cap Hit',compactMoney(player.capHit),'Current season')}${summaryTile('Trade Status',player.tradeBlock?'On Block':'Unavailable',player.injury)}
       </div>
       <div class="content-grid">
         <article class="card"><div class="card-header"><div><span class="eyebrow">Madden-style attributes</span><h3>Core ratings</h3></div><span class="pill pill--neutral">Mock values</span></div><div class="rating-bars">${ratings.map(([label,value])=>`<div class="rating-row"><span>${label}</span><div class="rating-track"><div class="rating-fill" style="width:${value}%"></div></div><strong>${value}</strong></div>`).join('')}</div></article>
@@ -9215,7 +9235,13 @@ function canonicalPlayerDashboardStats(playerId='') {
   // v5.9.10.1b — SAFE Trade Center LIVE-data bridge.
   // The Trade Center keeps its original module and references these same arrays.
   // We mutate them in place after LIVE data loads instead of replacing/re-writing the module.
-  const TRADE_LIVE_CACHE_KEY='franchisehq:trade-live-cache:v1';
+  const TRADE_LIVE_CACHE_KEY='franchisehq:trade-live-cache:v2';
+
+  function tradeCalculatorMillions(value) {
+    const amount=Number(value);
+    if(!Number.isFinite(amount))return 0;
+    return Math.abs(amount)>=100000?amount/1000000:amount;
+  }
 
   function tradeLiveCachePlayer(player={}){
     return {
@@ -9350,8 +9376,8 @@ function canonicalPlayerDashboardStats(playerId='') {
       age:Number(view.age||player.age||0)||0,
       dev:view.dev||normalizeLiveDevelopment(player.developmentTrait||raw.devTrait),
       years:Number(view.years||0)||0,
-      salary:Number(view.salary||0)||0,
-      capHit:Number(view.capHit||0)||0,
+      salary:tradeCalculatorMillions(view.salary),
+      capHit:tradeCalculatorMillions(view.capHit),
       number:raw.jerseyNumber??raw.jersey_number??'—',
       college:raw.college||raw.school||raw.collegeName||'—',
       injury:view.injury||player.injuryStatus||raw.injuryStatus||'Healthy',
@@ -9541,8 +9567,8 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
 
-  // 7.3.5 — authoritative visible release and environment marker.
-  const VISIBLE_RELEASE = '7.3.5';
+  // 7.3.5.1 — authoritative visible release and environment marker.
+  const VISIBLE_RELEASE = '7.3.5.1';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

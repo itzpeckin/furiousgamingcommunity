@@ -6531,7 +6531,7 @@ table td{
   .game-year-transition-actions>.button{width:100%}
 }
 @media(max-width:480px){.game-year-count-grid{grid-template-columns:1fr}}
-/* FranchiseHQ 7.3.5 — authoritative live-data experience */
+/* FranchiseHQ 7.3.5.1 — authoritative live-data experience */
 .live-source-status,.free-agent-source-state{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 14px;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
 .live-source-status>div:first-child{display:grid;gap:3px}.live-source-status span,.live-source-status small,.free-agent-source-state span{color:var(--muted)}
 .live-source-status strong,.free-agent-source-state strong{color:var(--text)}

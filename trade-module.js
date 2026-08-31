@@ -872,7 +872,7 @@ async function disableLeagueMember(userId){
 function renderMaddenResetCard(){
  const transition=window.FranchiseHQ?.gameYearTransition||window.FranchiseHQ?.platform?.gameYearTransition||window.FranchiseHQ?.getModuleService?.('platform','gameYearTransition');
  if(transition?.renderPanel)return transition.renderPanel();
- return `<section class="card game-year-transition-card" data-game-year-transition-panel><div class="card-header"><div><span class="eyebrow">Protected edition boundary</span><h3>Game Year & Season Transition</h3><p>The 7.3.5 transition service is still initializing.</p></div><span class="pill pill--neutral">Loading</span></div></section>`;
+ return `<section class="card game-year-transition-card" data-game-year-transition-panel><div class="card-header"><div><span class="eyebrow">Protected edition boundary</span><h3>Game Year & Season Transition</h3><p>The 7.3.5.1 transition service is still initializing.</p></div><span class="pill pill--neutral">Loading</span></div></section>`;
 }
 function renderPermanentLeagueExportCard(){const service=window.FranchiseHQ?.leagueExportUrl||window.FranchiseHQ?.platform?.leagueExportUrl||window.FranchiseHQ?.getModuleService?.('platform','leagueExportUrl');return service?.renderPanel?service.renderPanel():`<article class="card" data-permanent-league-export-panel><div class="card-header"><div><span class="eyebrow">Permanent league connection</span><h2>Dedicated Madden Export URL</h2><p>Loading the league's reusable export connection…</p></div><span class="pill pill--neutral">Loading</span></div></article>`}
 window.addEventListener('franchisehq:open-candidate-import',()=>{ui.showLeagueImport=true;renderCommissioner('league-data')});

@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.3.5.1 display-integrity remediation impact
+
+The authorized 7.3.5.1 runtime adds no migration and performs no league-data operation. It preserves the complete allowlisted ratings object through the final player-card adapter, converts canonical salary/cap-hit dollars once at the Trade Center's millions boundary, invalidates the old mis-scaled browser cache, and replaces static Season 4/Week 8 mock shell labels with active-snapshot season/week context.
+
+Runtime rollback restores exact 7.3.5 Main commit `1d9cbc2186762e16da1028bbfd8fd2f326c984e9`, Pages deployment `484acd14-7d27-4dbd-81cc-c97b5fc638a4`, and import Worker build `b4588f36-cda5-4e83-8219-24e828992e8a` / version `2b745b42`. Retain active Week 9 snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`, previous snapshot `518236e4-1cac-41f5-b8c8-757b7150dcd8`, all data/audit rows, and the permanent league export URL.
+
+Do not use deployment or rollback to export/import Madden data, move the active pointer, reset data, run Archive Season, run a game-year transition, rotate the permanent export URL, delete history, change credentials, or reinterpret Madden's blocked Free Agent route as zero.
+
 ## 7.3.5 active-snapshot experience impact
 
 The local 7.3.5 candidate adds no migration and performs no league-data operation. It changes the authenticated member read model and browser presentation so Teams, rosters, players, standings, statistics, and Free Agents resolve from one active snapshot. It exposes only an explicit Madden rating allowlist and safe public ability fields, applies documented contract units, labels unavailable current-year contract splits honestly, paginates every rostered player, and removes live demo/legacy identity fallbacks and nested vertical-scroll traps.
