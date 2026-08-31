@@ -1,8 +1,8 @@
 # FranchiseHQ 7.3.8 Release Record
 
-**Status:** Local validated review candidate; publication and deployment not authorized
+**Status:** Production deployed and read-only verified; pending owner UI acceptance
 
-**Production changed:** No. Production remains exact 7.3.7.1 commit `25b218956ef775fee3e1a04e0f0bef6001547b21` on Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa`; migration 27 and active snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e` remain unchanged.
+**Production changed:** Application code only. Exact commit `677c226b9289dda4dc4f84fbbe6245e912330541` is on Main and Production Pages deployment `2f96f87a-3a79-40b6-8ae6-296fb19d3a28`; migration 27 and active snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e` remain unchanged.
 
 ## Scope
 
@@ -31,10 +31,12 @@ Make importer failures useful to commissioners, remove member-facing platform im
 
 ## Deployment status
 
-- Local implementation and validation only. No branch publication, pull request, hosted check, Main change, staging deployment, Production deployment, or cloud rehearsal is authorized or claimed.
-- Production remains on 7.3.7.1 with the same Week 9 active snapshot, data, memberships, credentials, and permanent export URL.
+- PR #30 published the exact candidate and passed 4/4 pull-request checks. Main is the same exact commit and passed all five Main/build/deployment checks.
+- Production Pages deployment `2f96f87a-3a79-40b6-8ae6-296fb19d3a28` and exact-commit Worker build `44c70449-57eb-4db8-ac29-f86536d56a49` succeeded. Live HTTPS surfaces report release `7.3.8`; the importer asset contains the actionable recovery and support-code behavior, the old customer callout text is absent from the live application asset, and protected league data still requires authentication.
+- No staging run occurred. Production migration 27, the active Week 9 snapshot, 17 existing GM identities, 17 ownership periods, memberships, every import/audit row, and the permanent export URL remain unchanged.
+- Owner signed-in UI acceptance remains open. This read-only verification does not claim that Cap Space and a naturally occurring failed-import recovery have been accepted in the league UI.
 
 ## Rollback
 
-- Before publication, rollback is deletion/reversion of the local 7.3.8 candidate changes only. The immutable runtime rollback baseline is exact accepted 7.3.7.1 commit `25b218956ef775fee3e1a04e0f0bef6001547b21` and Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa`.
+- Runtime rollback restores exact accepted 7.3.7.1 commit `25b218956ef775fee3e1a04e0f0bef6001547b21` and Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa`.
 - Retain migration 27, all ownership/identity/membership/audit/import rows, every snapshot and capture, and the permanent export URL. Never use rollback to import data, move the active pointer, reset, archive, transition, rotate credentials, or reinterpret blocked Free Agents as zero.

@@ -163,12 +163,12 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 116225,
-        "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
+        "bytes": 117255,
+        "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 114344,
-        "file": "tools/check-release.mjs"
+        "bytes": 116225,
+        "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
         "bytes": 76101,

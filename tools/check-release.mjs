@@ -1861,6 +1861,27 @@ if (version === '7.3.8') {
     || manifest.production?.currentCommit !== '25b218956ef775fee3e1a04e0f0bef6001547b21'
     || manifest.production?.currentPagesDeployment !== '64140548-d20a-411f-8d81-17649cdfe8fa'
   )) errors.push('7.3.8 must remain an unpublished code-only candidate on the exact accepted 7.3.7.1 Production baseline.');
+  if (isPostDeployment && (
+    manifest.status !== 'production-deployed-pending-owner-acceptance'
+    || manifest.repositoryPublication?.authorized !== true
+    || manifest.repositoryPublication?.status !== 'published-main-accepted'
+    || manifest.repositoryPublication?.commit !== '677c226b9289dda4dc4f84fbbe6245e912330541'
+    || Number(manifest.repositoryPublication?.pullRequest) !== 30
+    || Number(manifest.repositoryPublication?.hostedChecksPassed) !== 4
+    || Number(manifest.repositoryPublication?.mainChecksPassed) !== 5
+    || manifest.production?.authorized !== true
+    || manifest.production?.deployed !== true
+    || manifest.production?.status !== 'deployed-read-only-verified-pending-owner-acceptance'
+    || manifest.production?.currentRelease !== '7.3.8'
+    || manifest.production?.currentCommit !== '677c226b9289dda4dc4f84fbbe6245e912330541'
+    || manifest.production?.currentPagesDeployment !== '2f96f87a-3a79-40b6-8ae6-296fb19d3a28'
+    || manifest.production?.currentWorkerBuild !== '44c70449-57eb-4db8-ac29-f86536d56a49'
+    || evidence.checks?.productionHttpsAcceptance?.passed !== true
+    || evidence.checks?.productionHttpsAcceptance?.status !== 'read-only-verified'
+    || evidence.external?.githubPublication?.status !== 'published-main-accepted'
+    || evidence.external?.hostedChecks?.status !== 'passed'
+    || evidence.external?.productionDeployment?.status !== 'deployed-read-only-verified-pending-owner-acceptance'
+  )) errors.push('7.3.8 deployed evidence must record exact PR, Main, Pages, Worker, and read-only Production acceptance.');
   if (
     evidence.external?.productionMigration?.authorized !== false
     || evidence.external?.productionMigration?.status !== 'not-required'
@@ -1882,6 +1903,27 @@ if (version === '7.3.8') {
     || evidence.scopeBoundaries?.databaseRowsWritten !== 0
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   )) errors.push('7.3.8 must preserve every local candidate data-plane and authorization boundary.');
+  if (isPostDeployment && (
+    evidence.scopeBoundaries?.productionChanged !== true
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== true
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.archiveGameYearExecuted !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+    || evidence.scopeBoundaries?.credentialsChanged !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.scopeBoundaries?.identityRowsCreated !== 0
+    || evidence.scopeBoundaries?.ownershipRowsCreated !== 0
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  )) errors.push('7.3.8 deployed evidence must preserve every code-only data-plane boundary.');
 }
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
