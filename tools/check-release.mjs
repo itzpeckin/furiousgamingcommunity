@@ -1925,6 +1925,110 @@ if (version === '7.3.8') {
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   )) errors.push('7.3.8 deployed evidence must preserve every code-only data-plane boundary.');
 }
+if (version === '7.4.0') {
+  for (const check of [
+    'sharedTradeWorkflow',
+    'committeeReview',
+    'sharedNotifications',
+    'draftPickLedger',
+    'tradeBlockOwnership',
+    'sharedCommissionerSettings',
+    'maddenRosterAuthority',
+    'staleAndDuplicateSafety',
+    'mobileTradeExperience',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.0 evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.sharedTradeWorkflow?.serverAuthoritative !== true
+    || Number(evidence.checks?.sharedTradeWorkflow?.minimumTeams) !== 2
+    || Number(evidence.checks?.sharedTradeWorkflow?.maximumTeams) !== 4
+    || evidence.checks?.committeeReview?.participantConflictRecusal !== true
+    || Number(evidence.checks?.committeeReview?.defaultMatchingVotes) !== 3
+    || evidence.checks?.sharedNotifications?.reviewRequired !== true
+    || evidence.checks?.tradeBlockOwnership?.ownerOnlyPlayerStar !== true
+  ) errors.push('7.4.0 must prove the shared multi-team owner, reviewer, notification, and Trade Block lifecycle.');
+  if (
+    evidence.checks?.draftPickLedger?.verifiedMaddenRouteAvailable !== false
+    || evidence.checks?.draftPickLedger?.permanentIdentity !== true
+    || evidence.checks?.draftPickLedger?.retradeByNewOwner !== true
+    || evidence.checks?.draftPickLedger?.staleApprovalAborts !== true
+  ) errors.push('7.4.0 must preserve honest Madden pick-source evidence and permanent, atomically protected ledger ownership.');
+  if (
+    evidence.checks?.maddenRosterAuthority?.immediateFranchiseHqPresentation !== true
+    || evidence.checks?.maddenRosterAuthority?.activeSnapshotMutatedOnApproval !== false
+    || evidence.checks?.maddenRosterAuthority?.nextImportAlwaysWins !== true
+    || evidence.checks?.maddenRosterAuthority?.approvedDecisionRetained !== true
+    || evidence.checks?.maddenRosterAuthority?.publicReconciliationLabels !== false
+    || evidence.checks?.staleAndDuplicateSafety?.optimisticWorkflowRevision !== true
+    || evidence.checks?.staleAndDuplicateSafety?.idempotentSnapshotEvidence !== true
+  ) errors.push('7.4.0 must prove immediate presentation, unconditional Madden authority, private reconciliation, and stale/duplicate safety.');
+  if (
+    evidence.checks?.sharedCommissionerSettings?.optimisticRevision !== true
+    || evidence.checks?.sharedCommissionerSettings?.calculatorToggle !== true
+    || evidence.checks?.sharedCommissionerSettings?.draftRoundValues !== true
+    || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+    || Number(evidence.checks?.strictMigration?.migrationVersion) !== 28
+    || evidence.checks?.strictMigration?.newMigration !== true
+    || Number(evidence.checks?.strictMigration?.requiredTables) !== 90
+  ) errors.push('7.4.0 must prove shared revisioned settings, migration 28, and blocked/null Free Agent preservation.');
+  if (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.repositoryPublication?.status !== 'not-run'
+    || manifest.staging?.authorized !== false
+    || manifest.staging?.deployed !== false
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'unchanged'
+    || manifest.production?.currentRelease !== '7.3.8'
+    || manifest.production?.currentCommit !== '677c226b9289dda4dc4f84fbbe6245e912330541'
+    || Number(manifest.production?.currentMigration) !== 27
+  ) errors.push('7.4.0 must remain an unpublished local candidate on the exact accepted 7.3.8 Production baseline.');
+  if (
+    evidence.external?.githubPublication?.authorized !== false
+    || evidence.external?.hostedChecks?.authorized !== false
+    || evidence.external?.stagingDeployment?.authorized !== false
+    || evidence.external?.productionDeployment?.authorized !== false
+    || evidence.external?.productionMigration?.authorized !== false
+    || evidence.external?.productionMigration?.status !== 'not-run'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 27
+    || Number(evidence.external?.productionMigration?.candidateMigration) !== 28
+  ) errors.push('7.4.0 local work must preserve separate publication, hosted-check, staging, Production, and migration authorization gates.');
+  if (
+    evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.archiveGameYearExecuted !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+    || evidence.scopeBoundaries?.credentialsChanged !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.4.0 must preserve every local candidate data-plane and authorization boundary.');
+  if (
+    Number(evidence.checks?.automatedTests?.passedTests) < 1
+    || Number(evidence.checks?.automatedTests?.failedTests) !== 0
+    || Number(evidence.checks?.strictRepositoryGate?.javascriptModules) < 1
+    || Number(evidence.checks?.strictRepositoryGate?.inventoryFiles) < 1
+    || Number(evidence.checks?.strictRepositoryGate?.routes) < 1
+  ) errors.push('7.4.0 must record non-empty consolidated test and strict repository evidence.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

@@ -10,8 +10,9 @@ import {
   sourceRosterStatus,
   sourceSupportedContract
 } from '../../../../_lib/live-data-experience.js';
+import { applyRosterOverlays } from '../../../../_lib/trade-center.js';
 
-const RELEASE = '7.3.8';
+const RELEASE = '7.4.0';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
 
@@ -422,6 +423,16 @@ export async function onRequestGet(context) {
         ...team,
         slug:normalizePublicTeamSlug(team.teamKey)
       }));
+    }
+    if (domain === 'players' && page.records.length) {
+      const canonicalTeams = await activeLeagueTeams(db, league.id);
+      const teamExternalIds = new Map(canonicalTeams.map(team => [team.teamKey, team.externalId]));
+      const overlays = await rows(db, `
+        SELECT source_player_id, to_team_key, internal_status
+        FROM trade_roster_overlays
+        WHERE league_id=? AND internal_status='active'
+      `, league.id);
+      page.records = applyRosterOverlays(page.records, overlays, teamExternalIds);
     }
     return json({...base,domain,...page});
   }

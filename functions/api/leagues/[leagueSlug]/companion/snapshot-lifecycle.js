@@ -2,7 +2,8 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
-const RELEASE='7.3.5.1',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
+import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
+const RELEASE='7.4.0',DEFAULT_OWNER_ACCOUNT_ID='owner-tb';
 const ownerAccountId=env=>String(env.PLATFORM_OWNER_ACCOUNT_ID||DEFAULT_OWNER_ACCOUNT_ID).trim();
 async function requirePlatformOwner(context){const auth=await requireCommissioner(context);if(!auth.authorized)return auth;const presented=String(context.request.headers.get('x-franchisehq-platform-owner-account-id')||'').trim();if(!presented||presented!==ownerAccountId(context.env))return{authorized:false,response:json({ok:false,error:'Not found.'},404)};return auth;}
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -616,9 +617,12 @@ export async function onRequestPost(context){const c=await contextData(context);
  await c.db.prepare(`UPDATE league_snapshots SET status='active',activated_at=CURRENT_TIMESTAMP,archived_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(snapshot.id).run();
  await c.db.prepare(`UPDATE game_year_snapshots SET snapshot_status=CASE WHEN snapshot_id=? THEN 'active' WHEN snapshot_status='active' THEN 'archived' ELSE snapshot_status END,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND game_year_id=?`).bind(snapshot.id,c.league.id,targetGameYear.id).run();
  await c.db.prepare(`UPDATE league_game_years SET status='active',archived_at=NULL,removed_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=?`).bind(targetGameYear.id,c.league.id).run();
+ const tradeReconciliation=action==='activate'
+   ?await reconcileTradeRosterOverlays(c.db,c.league.id,snapshot.id)
+   :{checked:0,matched:0,reverted:0,differentTeam:0,notifications:0};
  const forwardDetection=action==='activate'
    ?{status:'pending-separate-stage',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id,note:'5.9.10.6.2e runs forward transaction detection in bounded requests after activation.'}
    :{status:'skipped',reason:'rollback-activation',previousSnapshotId:current?.snapshot_id||null,currentSnapshotId:snapshot.id};
- await event(c.db,c.league.id,snapshot.id,action==='rollback'?'rollback-activated':'activated',actor,{previousSnapshotId:current?.snapshot_id||null,forwardDetection});
- return json({ok:true,release:RELEASE,action,activeSnapshotChanged:true,activationPerformed:true,forwardDetection,...await listSnapshots(c.db,c.league.id)});
+ await event(c.db,c.league.id,snapshot.id,action==='rollback'?'rollback-activated':'activated',actor,{previousSnapshotId:current?.snapshot_id||null,forwardDetection,tradeReconciliation});
+ return json({ok:true,release:RELEASE,action,activeSnapshotChanged:true,activationPerformed:true,forwardDetection,tradeReconciliation,...await listSnapshots(c.db,c.league.id)});
 }

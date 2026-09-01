@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.8';
+  const VERSION = '7.4.0';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();
@@ -41,7 +41,7 @@
   }
 
   function storageKey(snapshotId,domain){
-    return `fhq:live-read:7.3.8:${leagueSlug()}:${snapshotId}:${domain}`;
+    return `fhq:live-read:7.4.0:${leagueSlug()}:${snapshotId}:${domain}`;
   }
 
   function readPersisted(snapshotId,domain){
@@ -137,6 +137,17 @@
     domainCache.delete(`${leagueSlug()}:teams`);
     for (const key of [...cache.keys()]) {
       if (key.includes('"domain":"teams"')) cache.delete(key);
+    }
+  }
+
+  function invalidateRosterAuthority() {
+    domainCache.delete(`${leagueSlug()}:players`);
+    for (const key of [...cache.keys()]) {
+      if (key.includes('"domain":"players"')) cache.delete(key);
+    }
+    const snapshotId=summary?.snapshot?.id;
+    if(snapshotId){
+      try{sessionStorage.removeItem(storageKey(snapshotId,'players'))}catch{}
     }
   }
 
@@ -239,7 +250,7 @@
     }catch{return false}
   }
 
-  const service = {refresh,warm,invalidateOwnership,getSummary,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,getFreeAgentState,getIntegrity,loadSample,renderPanel,diagnostics};
+  const service = {refresh,warm,invalidateOwnership,invalidateRosterAuthority,getSummary,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,getFreeAgentState,getIntegrity,loadSample,renderPanel,diagnostics};
   HQ.defineModuleService('league','liveData',service,{replace:true,alias:'liveData'});
 
   const scheduleWarm=()=>setTimeout(()=>warm(),0);

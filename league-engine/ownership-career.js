@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const HQ=window.FranchiseHQ;
-  const VERSION='7.3.8';
+  const VERSION='7.4.0';
   const cache=new Map();
   const esc=value=>String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const leagueSlug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||location.pathname.match(/^\/leagues\/([^/]+)/i)?.[1]||null;

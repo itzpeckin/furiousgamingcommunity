@@ -65,7 +65,7 @@ function bucket(initial={}) {
   };
 }
 
-async function createDatabase(maxVersion=27) {
+async function createDatabase(maxVersion=28) {
   const database=new DatabaseSync(':memory:');
   database.exec('PRAGMA foreign_keys=ON');
   const files=(await walkFiles())
@@ -130,6 +130,35 @@ async function fixture({activeSnapshot=true}={}) {
     (league_id,snapshot_id,player_count) VALUES (?,?,?)`).run('league-1','snapshot-1',2);
   database.prepare(`INSERT INTO canonical_roster_snapshot_players
     (league_id,snapshot_id,player_id,team_id,roster_status) VALUES (?,?,?,?,?)`).run('league-1','snapshot-1','p1','tb','active');
+  database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,?,?,?)`).run('identity-p1','league-1','player-p1','Player One');
+  database.prepare(`INSERT INTO trade_workflows
+    (id,league_id,franchise_season_id,status,mutation_token,proposer_user_id,proposer_team_key,approved_at)
+    VALUES (?,?,?,'approved',?,?,?,CURRENT_TIMESTAMP)`).run('trade-1','league-1','season-1','fixture-mutation','commissioner-1','tb');
+  database.prepare(`INSERT INTO trade_workflow_participants (trade_id,league_id,team_key,accepted_revision) VALUES (?,?,?,1)`).run('trade-1','league-1','tb');
+  database.prepare(`INSERT INTO league_draft_picks
+    (id,league_id,franchise_season_id,draft_class,round,original_team_key,current_team_key)
+    VALUES (?,?,?,?,?,?,?)`).run('pick-1','league-1','season-1',2027,1,'tb','gb');
+  database.prepare(`INSERT INTO trade_workflow_assets
+    (id,trade_id,league_id,revision,asset_type,draft_pick_id,from_team_key,to_team_key)
+    VALUES (?,?,?,1,'draft-pick',?,?,?)`).run('trade-asset-1','trade-1','league-1','pick-1','tb','gb');
+  database.prepare(`INSERT INTO trade_workflow_messages
+    (id,trade_id,league_id,author_user_id,event_type,message) VALUES (?,?,?,?,?,?)`).run('trade-message-1','trade-1','league-1','commissioner-1','approved','Approved trade');
+  database.prepare(`INSERT INTO trade_workflow_reviews
+    (trade_id,league_id,revision,reviewer_user_id,decision) VALUES (?,?,1,?,'approve')`).run('trade-1','league-1','commissioner-1');
+  database.prepare(`INSERT INTO trade_block_listings
+    (id,league_id,team_key,asset_type,draft_pick_id,requested_return,active,listed_by_user_id)
+    VALUES (?,?,?,'draft-pick',?,?,0,?)`).run('listing-1','league-1','tb','pick-1','Open to offers','commissioner-1');
+  database.prepare(`INSERT INTO league_notifications
+    (id,league_id,user_id,trade_id,notification_type,title,message) VALUES (?,?,?,?,?,?,?)`).run('notification-1','league-1','commissioner-1','trade-1','approved','Trade approved','Approved');
+  database.prepare(`INSERT INTO trade_roster_overlays
+    (trade_id,league_id,player_identity_id,source_player_id,from_team_key,to_team_key,source_snapshot_id)
+    VALUES (?,?,?,?,?,?,?)`).run('trade-1','league-1','identity-p1','p1','tb','gb','snapshot-1');
+  database.prepare(`INSERT INTO trade_reconciliation_events
+    (id,league_id,trade_id,player_identity_id,snapshot_id,outcome,expected_team_key,madden_team_key)
+    VALUES (?,?,?,?,?,'matched',?,?)`).run('reconciliation-1','league-1','trade-1','identity-p1','snapshot-1','gb','gb');
+  database.prepare(`INSERT INTO canonical_transactions
+    (id,league_id,event_type,authority,execution_status,workflow_trade_id,first_snapshot_id,last_snapshot_id)
+    VALUES (?,?,'trade','snapshot-inferred','observed-roster',?,?,?)`).run('transaction-trade-1','league-1','trade-1','snapshot-1','snapshot-1');
   return {database,token};
 }
 
@@ -356,6 +385,8 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     assert.equal(payload.freeAgents.status,'blocked');
     assert.equal(payload.freeAgents.count,null);
     assert.equal(payload.affectedCounts.league_snapshot_records,3);
+    assert.equal(payload.affectedCounts.trade_workflows,1);
+    assert.equal(payload.affectedCounts.league_draft_picks,1);
 
     const confirmations=payload.confirmations;
     response=await onRequestPost(context({db,token,archives,sources,method:'POST',body:{
@@ -390,6 +421,8 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     }}));
     assert.equal(response.status,200);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshots`).get().count,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_workflows`).get().count,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks`).get().count,0);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM users`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_memberships`).get().count,1);
     assert.equal(sources.objects.has('source/capture-1.json'),false);
@@ -403,6 +436,9 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     assert.equal(database.prepare(`SELECT snapshot_id FROM league_active_snapshots`).get().snapshot_id,'snapshot-1');
     assert.equal(database.prepare(`SELECT team_id FROM league_memberships WHERE id='membership-1'`).get().team_id,'tb');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,3);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_workflows`).get().count,1);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks`).get().count,1);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_reconciliation_events`).get().count,1);
     assert.equal(sources.objects.has('source/capture-1.json'),true);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{database.close();}
@@ -566,6 +602,6 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.doesNotMatch(ui,/data-game-year-season-confirmation/);
   assert.match(ui,/Archive \/ Remove Madden Game Year/);
   assert.match(ui,/Free Agents remain blocked\/unknown/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.3\.8/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.4\.0/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0",
+  "releaseType": "full-shared-trade-center",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.3.8",
+    "commit": "9b60966c30b728db5454b780c86174b78bdfcaa9",
+    "tree": "ade49bb051543b73c4e37026c56b8549ff199414",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.0",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "unchanged",
+    "currentRelease": "7.3.8",
+    "currentCommit": "677c226b9289dda4dc4f84fbbe6245e912330541",
+    "currentPagesDeployment": "2f96f87a-3a79-40b6-8ae6-296fb19d3a28",
+    "currentMigration": 27,
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "scope": "Local implementation and validation only. Migration 28, publication, Main, and Production remain separately unauthorized."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "functions/_lib/trade-center.js",
+    "functions/_lib/trade-reconciliation.js",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "functions/api/leagues/[leagueSlug]/snapshot/read-model.js",
+    "league-engine/trade-center-live.js",
+    "migrations/0028_full_trade_center.sql",
+    "tests/trade/full-trade-center.test.mjs",
+    "releases/7.4.0/release-record.md",
+    "releases/7.4.0/validation-evidence.json"
+  ]
+}

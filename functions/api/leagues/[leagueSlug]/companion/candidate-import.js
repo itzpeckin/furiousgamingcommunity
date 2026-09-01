@@ -19,8 +19,9 @@ import {
   publicCandidateRun
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
+import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
 
-const RELEASE = '7.3.5.1';
+const RELEASE = '7.4.0';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -606,7 +607,8 @@ async function finalize(current, body) {
   if(activated!==snapshot.id){
     return { response:json({ok:false,error:'The active snapshot changed during live import; activation was refused.',release:RELEASE},409) };
   }
-  return { run:await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first() };
+  const tradeReconciliation=await reconcileTradeRosterOverlays(current.db,current.league.id,snapshot.id);
+  return { run:await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first(), tradeReconciliation };
 }
 
 export async function onRequestGet(context) {
@@ -645,7 +647,7 @@ export async function onRequestPost(context) {
   if (action === 'finalize') {
     const result = await finalize(current,body);
     if (result.response) return result.response;
-    return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run) });
+    return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run),tradeReconciliation:result.tradeReconciliation||null });
   }
   return json({ ok:false,error:`Unsupported action: ${action || 'none'}.`,release:RELEASE }, 400);
 }
