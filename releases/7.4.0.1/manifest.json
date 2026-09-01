@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.1",
+  "releaseType": "production-import-cohort-readiness-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.0",
+    "commit": "3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974",
+    "tree": "2724a152ff43ba6e0b7eb2b2aef1c2376d27bbad",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.0.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0
+  },
+  "staging": { "authorized": false, "deployed": false, "status": "not-run" },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.4.0",
+    "currentCommit": "3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974",
+    "currentPagesDeployment": "03c111d0-a4d9-458e-b91c-9ece937016d0",
+    "currentWorkerBuild": "7131fe69-1537-43cd-b0ee-e2ca60a03761",
+    "currentMigration": 28,
+    "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "scope": "Code-only Production remediation plus automatic structural reanalysis of retained partial Week 10 capture links. No candidate import, activation, reset, archive, transition, URL rotation, or Free Agent reinterpretation."
+  },
+  "requiredArtifacts": [
+    "docs/ROADMAP.md",
+    "functions/_lib/madden-discovery-report.js",
+    "functions/_lib/madden-discovery.js",
+    "functions/_lib/permanent-league-export.js",
+    "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+    "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
+    "league-engine/permanent-export-url.js",
+    "tests/import/madden-discovery.test.mjs",
+    "tests/import/permanent-league-export.test.mjs",
+    "releases/7.4.0.1/release-record.md",
+    "releases/7.4.0.1/validation-evidence.json"
+  ]
+}

@@ -17,10 +17,11 @@ import { hashToken } from '../../../../../../_lib/auth.js';
 import { deriveLeagueExportToken } from '../../../../../../_lib/permanent-league-export.js';
 import { generateMaddenDiscoveryReport } from '../../../../../../_lib/madden-discovery-report.js';
 
-const RELEASE = '7.3.5.1';
+const RELEASE = '7.4.0.1';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
 const AUTOMATIC_COHORT_WINDOW_MS = 2 * 60 * 1000;
 const AUTOMATIC_LATE_CAPTURE_WINDOW_MS = 15 * 1000;
+const AUTOMATIC_PARTIAL_COHORT_WINDOW_MS = 6 * 60 * 60 * 1000;
 const AUTOMATIC_SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 const AUTOMATIC_ANALYSIS_IDLE_MS = 3_000;
 const AUTOMATIC_ANALYSIS_MAX_WAIT_MS = 24_000;
@@ -176,7 +177,9 @@ export async function automaticSessionFor(db, league, suppliedEndpoint) {
   const previousActivity = Date.parse(previous?.last_capture_at || previous?.created_at || '') || 0;
   const reuseWindow = previous?.status === 'open'
     ? AUTOMATIC_COHORT_WINDOW_MS
-    : AUTOMATIC_LATE_CAPTURE_WINDOW_MS;
+    : previous?.status === 'review_required'
+      ? AUTOMATIC_PARTIAL_COHORT_WINDOW_MS
+      : AUTOMATIC_LATE_CAPTURE_WINDOW_MS;
   if (previous && Number(endpoint.latest_session_token_version) === Number(endpoint.token_version)
     && !['expired','cancelled'].includes(previous.status)
     && Date.now()-previousActivity <= reuseWindow) return previous;

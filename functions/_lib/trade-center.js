@@ -1,6 +1,6 @@
 import { canonicalTeamKey } from './league-teams.js';
 
-export const TRADE_CENTER_RELEASE = '7.4.0';
+export const TRADE_CENTER_RELEASE = '7.4.0.1';
 
 export const DEFAULT_TRADE_CENTER_SETTINGS = Object.freeze({
   seasonTradeLimitEnabled: true,

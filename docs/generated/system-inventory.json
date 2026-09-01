@@ -151,15 +151,15 @@
     },
     "largest": [
       {
-        "bytes": 619670,
+        "bytes": 619672,
         "file": "app.js"
       },
       {
-        "bytes": 401198,
+        "bytes": 401200,
         "file": "styles.css"
       },
       {
-        "bytes": 368597,
+        "bytes": 368650,
         "file": "trade-module.js"
       },
       {
@@ -175,7 +175,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 74943,
+        "bytes": 74985,
         "file": "index.html"
       },
       {
@@ -187,15 +187,19 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 38739,
+        "bytes": 38742,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 38706,
+        "bytes": 38708,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 36946,
+        "bytes": 37578,
+        "file": "tests/import/madden-discovery.test.mjs"
+      },
+      {
+        "bytes": 36948,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -203,7 +207,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 36783,
+        "bytes": 36785,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
@@ -211,11 +215,7 @@
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 31133,
-        "file": "tests/import/madden-discovery.test.mjs"
-      },
-      {
-        "bytes": 28918,
+        "bytes": 28922,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -223,12 +223,12 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
-        "bytes": 22790,
-        "file": "platform/validate.js"
+        "bytes": 23153,
+        "file": "functions/_lib/madden-discovery-report.js"
       },
       {
-        "bytes": 22678,
-        "file": "functions/_lib/madden-discovery.js"
+        "bytes": 22790,
+        "file": "platform/validate.js"
       }
     ],
     "total": 553
@@ -1395,7 +1395,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.0",
+  "release": "7.4.0.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

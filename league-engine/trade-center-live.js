@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ=window.FranchiseHQ;
-  const VERSION='7.4.0';
+  const VERSION='7.4.0.1';
   const page=()=>document.querySelector('[data-page-content]');
   const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||null;

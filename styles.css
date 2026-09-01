@@ -6665,7 +6665,7 @@ table td{
 .league-history-table th:nth-child(2),.league-history-table td:nth-child(2),.league-history-table th:nth-child(3),.league-history-table td:nth-child(3){text-align:left}
 .league-history-table td:nth-child(2) strong,.league-history-table td:nth-child(2) small{display:block}.league-history-table td:nth-child(2) small{margin-top:3px;color:var(--muted)}
 @media(max-width:700px){.league-history-intro{align-items:stretch;flex-direction:column}.league-history-summary{width:100%}.league-history-summary span{flex:1;min-width:0}.league-history-table{width:max-content}}
-/* FranchiseHQ 7.4.0 — shared Trade Center */
+/* FranchiseHQ 7.4.0.1 — shared Trade Center */
 .live-trade-list{display:grid;gap:12px}
 .live-trade-card{width:100%;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px;text-align:left;border:1px solid var(--border);background:var(--surface-1);color:inherit;cursor:pointer}
 .live-trade-card:hover{border-color:var(--accent)}

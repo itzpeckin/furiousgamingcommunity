@@ -469,7 +469,9 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
   const sourceVerification = sourceGate(markers);
   const datasetsPassed = REQUIRED_DATASETS.every(type => {
     const status = requirements[type]?.status;
-    return status === 'located' || (type === 'free-agents' && status === 'empty-confirmed');
+    return status === 'located'
+      || (type === 'free-agents' && status === 'empty-confirmed')
+      || (type === 'statistics' && status === 'empty' && requirements.statistics.routes.length > 0);
   });
   const timestamps = analyses.map(item => Date.parse(item.receivedAt)).filter(Number.isFinite).sort((left, right) => left - right);
   const firstCaptureAt = timestamps.length ? new Date(timestamps[0]).toISOString() : null;

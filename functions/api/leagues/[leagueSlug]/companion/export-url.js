@@ -15,11 +15,12 @@ import { candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
 import {
   generateMaddenDiscoveryReport,
   publicMaddenDiscoveryReport,
-  recoverMaddenDiscoveryCohort
+  recoverMaddenDiscoveryCohort,
+  stitchRecentPartialMaddenCohort
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.3.5.1';
+const RELEASE = '7.4.0.1';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();
@@ -86,6 +87,42 @@ async function maybeAnalyzeIdleExport(current, endpoint) {
   }
 }
 
+async function maybeStitchPartialExport(current, endpoint) {
+  const latest = await sessionFor(current.db,current.league.id,endpoint?.latest_session_id);
+  if (!latest || !['open','review_required'].includes(String(latest.status || ''))) return null;
+  try {
+    return await stitchRecentPartialMaddenCohort({
+      db:current.db,
+      env:current.env,
+      leagueId:current.league.id,
+      anchorSessionId:latest.id
+    });
+  } catch {
+    return null;
+  }
+}
+
+function readinessProblems(report) {
+  if (!report) return [];
+  const problems = [];
+  const requirements = report.requirements || {};
+  const located = name => String(requirements?.[name]?.status || '').toLowerCase() === 'located';
+  const explicitEmptyStatistics = String(requirements?.statistics?.status || '').toLowerCase() === 'empty'
+    && Array.isArray(requirements?.statistics?.routes)
+    && requirements.statistics.routes.length > 0;
+  if (!located('teams')) problems.push('League Info did not provide a complete Teams dataset.');
+  if (!located('team-rosters') || !located('players')) problems.push('The export did not provide a complete roster for all teams.');
+  if (!located('standings')) problems.push('Standings were not received in this export revision.');
+  if (!located('schedule')) problems.push('The current-week schedule route was not received.');
+  if (!located('statistics') && !explicitEmptyStatistics) problems.push('The current-week Weekly Stats routes were not received.');
+  if (report.sourceVerification?.passed !== true) {
+    const weekStatus = String(report.sourceMarkers?.week?.status || '').toLowerCase();
+    if (!['matched','observed'].includes(weekStatus)) problems.push('The export does not contain an authoritative current-week marker.');
+    else problems.push('The export source identity did not pass verification.');
+  }
+  return [...new Set(problems)];
+}
+
 function countsFor(report) {
   const requirements = report?.requirements || {};
   const freeAgents = report?.freeAgentEvidence || {};
@@ -105,6 +142,8 @@ function countsFor(report) {
 async function publicState(current) {
   let endpoint = await endpointFor(current.db,current.league.id);
   await maybeAnalyzeIdleExport(current,endpoint);
+  endpoint = await endpointFor(current.db,current.league.id);
+  await maybeStitchPartialExport(current,endpoint);
   endpoint = await endpointFor(current.db,current.league.id);
   const [latestSession,latestReportRow,readyReportRow,activeSnapshot] = await Promise.all([
     sessionFor(current.db,current.league.id,endpoint?.latest_session_id),
@@ -127,6 +166,7 @@ async function publicState(current) {
   const token = await deriveLeagueExportToken(current.signingSecret,current.league.id,endpoint.token_version);
   const markers = latestReport?.sourceMarkers || readyReport?.sourceMarkers || {};
   const sourceCoverage = candidateSourceCoverage(readyReport || latestReport || {},activeSnapshot?.week_index);
+  const problems = summary.status === 'review-required' ? readinessProblems(latestReport) : [];
   const origin = text(current.env.APP_ENV).toLowerCase() === 'production'
     ? CANONICAL_APP_ORIGIN
     : new URL(current.request.url).origin;
@@ -158,8 +198,9 @@ async function publicState(current) {
       counts:countsFor(latestReport || readyReport),
       candidateSnapshotId:candidate?.candidate_snapshot_id || null,
       durationMs:candidate?.duration_ms === null || candidate?.duration_ms === undefined ? null : Number(candidate.duration_ms),
+      readinessProblems:problems,
       warnings:summary.status === 'review-required'
-        ? ['The newest export is incomplete or failed source validation. The previous ready export remains selected.']
+        ? [...problems,'The newest export is incomplete or failed source validation. The previous ready export remains selected.']
         : []
     },
     selectedReportId:readyReport?.id || null,

@@ -5,6 +5,7 @@ import { reportImportReadiness } from './permanent-league-export.js';
 const MAX_CAPTURE_COUNT = 250;
 const READ_CONCURRENCY = 8;
 const MAX_RECOVERY_WINDOW_MS = 10_000;
+const PARTIAL_STITCH_WINDOW_MINUTES = 360;
 
 function parse(value, fallback) {
   try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
@@ -54,11 +55,155 @@ async function captureRows(db, leagueId, sessionId) {
     JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
     WHERE link.league_id=? AND link.session_id=?
     ORDER BY link.observed_at ASC LIMIT ?`).bind(leagueId,sessionId,MAX_CAPTURE_COUNT).all();
-  if ((linked.results || []).length) return linked.results;
+  if ((linked.results || []).length) return latestCapturePerRoute(linked.results);
   const legacy = await db.prepare(`SELECT *,received_at session_observed_at
     FROM companion_route_captures WHERE league_id=? AND discovery_session_id=?
     ORDER BY received_at ASC LIMIT ?`).bind(leagueId,sessionId,MAX_CAPTURE_COUNT).all();
-  return legacy.results || [];
+  return latestCapturePerRoute(legacy.results || []);
+}
+
+export function latestCapturePerRoute(rows = []) {
+  const latest = new Map();
+  for (const row of rows) {
+    const route = String(row?.route_path || '').trim().toLowerCase();
+    if (!route) continue;
+    const observedAt = Date.parse(row?.session_observed_at || row?.received_at || '') || 0;
+    const retained = latest.get(route);
+    const retainedAt = Date.parse(retained?.session_observed_at || retained?.received_at || '') || 0;
+    if (!retained || observedAt > retainedAt || (observedAt === retainedAt && String(row?.id || '') > String(retained?.id || ''))) {
+      latest.set(route,row);
+    }
+  }
+  return [...latest.values()].sort((left,right) => {
+    const leftAt = Date.parse(left?.session_observed_at || left?.received_at || '') || 0;
+    const rightAt = Date.parse(right?.session_observed_at || right?.received_at || '') || 0;
+    return leftAt-rightAt || String(left?.route_path || '').localeCompare(String(right?.route_path || ''));
+  });
+}
+
+function markerValues(row, marker) {
+  const markers = parse(row?.source_markers_json, {});
+  const values = Array.isArray(markers?.[marker]?.observed) ? markers[marker].observed : [];
+  return values.map(value=>String(value ?? '').trim().toLowerCase()).filter(Boolean);
+}
+
+export function partialReportsCanStitch(rows = []) {
+  if (rows.length < 2) return false;
+  for (const marker of ['sourceFranchiseId','week','stage']) {
+    const observed = new Set(rows.flatMap(row=>markerValues(row,marker)));
+    if (observed.size > 1) return false;
+  }
+  return true;
+}
+
+export function partialCaptureRoutesCanStitch(rows = []) {
+  const franchises = new Set();
+  const periods = new Set();
+  for (const row of rows) {
+    const segments = String(row?.route_path || '').trim().toLowerCase().replace(/^\/+|\/+$/g,'').split('/');
+    if (/^(?:xbsx|xbox|ps5|ps4|pc)$/.test(segments[0] || '') && segments[1]) {
+      franchises.add(segments[1] === 'franchise' ? segments[2] : segments[1]);
+    }
+    const weekIndex = segments.indexOf('week');
+    if (weekIndex >= 0 && segments[weekIndex+1] && segments[weekIndex+2]) {
+      periods.add(`${segments[weekIndex+1]}:${segments[weekIndex+2]}`);
+    }
+  }
+  return franchises.size <= 1 && periods.size <= 1;
+}
+
+export async function stitchRecentPartialMaddenCohort({
+  db,env,leagueId,anchorSessionId,generatedByUserId=null
+}) {
+  const anchor = await sessionFor(db,leagueId,anchorSessionId);
+  if (!anchor || !['open','review_required'].includes(String(anchor.status || ''))) {
+    return { stitched:false,ready:false,reason:'anchor-not-partial' };
+  }
+  const anchorAt = anchor.last_capture_at || anchor.created_at;
+  const candidates = await db.prepare(`SELECT session.*,report.id report_id,
+      report.source_markers_json,report.requirement_results_json
+    FROM madden_discovery_sessions session
+    LEFT JOIN madden_discovery_reports report
+      ON report.league_id=session.league_id AND report.session_id=session.id
+    WHERE session.league_id=? AND session.status IN ('open','review_required')
+      AND session.id NOT LIKE 'm27_stitched_%'
+      AND datetime(COALESCE(session.last_capture_at,session.created_at))>=datetime(?,'-${PARTIAL_STITCH_WINDOW_MINUTES} minutes')
+      AND datetime(COALESCE(session.last_capture_at,session.created_at))<=datetime(?,'+30 seconds')
+    ORDER BY COALESCE(session.last_capture_at,session.created_at) DESC LIMIT 12`)
+    .bind(leagueId,anchorAt,anchorAt).all();
+  const rows = candidates.results || [];
+  if (!rows.some(row=>row.id===anchor.id) || !partialReportsCanStitch(rows)) {
+    return { stitched:false,ready:false,reason:'no-compatible-partials' };
+  }
+  const placeholders = rows.map(()=>'?').join(',');
+  const linked = await db.prepare(`SELECT capture.*,link.observed_at session_observed_at,
+      link.session_id source_session_id
+    FROM madden_discovery_session_captures link
+    JOIN companion_route_captures capture
+      ON capture.id=link.capture_id AND capture.league_id=link.league_id
+    WHERE link.league_id=? AND link.session_id IN (${placeholders})
+    ORDER BY link.observed_at ASC,capture.id ASC LIMIT ?`)
+    .bind(leagueId,...rows.map(row=>row.id),MAX_CAPTURE_COUNT).all();
+  const selected = latestCapturePerRoute(linked.results || []);
+  if (selected.length < 2 || !selected.some(row=>row.source_session_id===anchor.id)
+    || !partialCaptureRoutesCanStitch(selected)) {
+    return { stitched:false,ready:false,reason:'insufficient-routes' };
+  }
+  const digest = await sha256Hex(new TextEncoder().encode(selected.map(row=>row.id).sort().join(':')));
+  const sessionId = `m27_stitched_${digest.slice(0,24)}`;
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now()+24*60*60*1000).toISOString();
+  const tokenHash = await sha256Hex(new TextEncoder().encode(`stitched:${leagueId}:${digest}`));
+  await db.prepare(`INSERT OR IGNORE INTO madden_discovery_sessions
+    (id,league_id,token_hash,status,expected_game_release,expected_platform,expected_league_name,
+     expected_season,expected_week,capture_count,expires_at,last_capture_at,created_at,updated_at)
+    VALUES (?,?,?,'open',?,?,?,?,?,?,?,?,?,?)`).bind(
+      sessionId,leagueId,tokenHash,anchor.expected_game_release,anchor.expected_platform,
+      anchor.expected_league_name,anchor.expected_season,anchor.expected_week,selected.length,
+      expiresAt,anchorAt,now,now
+    ).run();
+  const links = selected.map(row=>db.prepare(`INSERT OR IGNORE INTO madden_discovery_session_captures
+    (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`).bind(
+      leagueId,sessionId,row.id,row.route_path,row.session_observed_at || row.received_at
+    ));
+  for (let offset=0; offset<links.length; offset+=75) await db.batch(links.slice(offset,offset+75));
+  await db.prepare(`UPDATE madden_discovery_sessions SET capture_count=(
+      SELECT COUNT(*) FROM madden_discovery_session_captures WHERE league_id=? AND session_id=?
+    ),last_capture_at=?,updated_at=? WHERE league_id=? AND id=?`).bind(
+      leagueId,sessionId,anchorAt,now,leagueId,sessionId
+    ).run();
+  const generated = await generateMaddenDiscoveryReport({
+    db,env,leagueId,sessionId,generatedByUserId,reuseExisting:true
+  });
+  if (generated.readiness?.ready !== true) {
+    return { stitched:true,ready:false,sessionId,reportId:generated.report.id,selectedRouteCount:selected.length };
+  }
+  const advanced = await db.prepare(`UPDATE companion_league_export_endpoints SET
+    latest_session_id=?,latest_session_token_version=token_version,latest_report_id=?,latest_ready_report_id=?,
+    last_analyzed_at=?,analysis_requested_at=NULL,updated_at=?
+    WHERE league_id=? AND latest_session_id=?`).bind(
+      sessionId,generated.report.id,generated.report.id,generated.report.generatedAt,
+      generated.report.generatedAt,leagueId,anchor.id
+    ).run();
+  if (Number(advanced?.meta?.changes || 0)) {
+    await db.prepare(`INSERT INTO tenant_audit_events
+      (id,league_id,request_id,action_id,action,resource_type,resource_id,outcome,detail_json)
+      VALUES (?,?,?,?,?,?,?,?,?)`).bind(
+        `tenant_audit_${crypto.randomUUID()}`,leagueId,`request_${crypto.randomUUID()}`,
+        `action_${crypto.randomUUID()}`,'companion.export_cohort.auto_stitch',
+        'madden_discovery_session',sessionId,'success',JSON.stringify({
+          sourceSessionIds:rows.map(row=>row.id),selectedRouteCount:selected.length,
+          activeSnapshotChanged:false,activationPerformed:false,
+          freeAgentStatus:generated.readiness.freeAgentStatus,
+          freeAgentCount:generated.readiness.freeAgentCount,
+          freeAgentInterpretedAsZero:false
+        })
+      ).run();
+  }
+  return {
+    stitched:true,ready:Boolean(Number(advanced?.meta?.changes || 0)),sessionId,
+    reportId:generated.report.id,selectedRouteCount:selected.length
+  };
 }
 
 function recoveryDataset(routePath) {
