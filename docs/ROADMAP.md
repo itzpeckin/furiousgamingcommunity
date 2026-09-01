@@ -6,13 +6,13 @@
 
 **Updated:** August 31, 2026
 
-**Revision:** 1.69
+**Revision:** 1.70
 
-**Current production:** 7.3.8 application runtime `677c226` from Main on Pages deployment `2f96f87a`; exact-commit Worker build `44c70449` passed. Additive migration 27 remains applied with 17 GM identities and 17 opening ownership periods. Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer.
+**Current production:** 7.4.0 implementation `b17e124` is merged to Main as `3c5cfc8` and live on Pages deployment `03c111d0`; exact implementation Worker build `7131fe69` passed. Additive migration 28 is applied with 90 canonical tables and no foreign-key violations. Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer.
 
-**Current work:** The owner accepted the 7.3.8 display cleanup and authorized one local 7.4.0 implementation cycle. The review candidate replaces the device-only trade prototype with a tenant-scoped shared Trade Center, permanent draft-pick ledger, shared notifications/settings, advanced Trade Block, three-vote non-conflicted review, immediate FranchiseHQ roster presentation, and hidden Madden reconciliation. Production, Main, migration 28, the active snapshot, and every live data row remain unchanged.
+**Current work:** 7.4.0 is deployed and read-only verified. PR #31 passed 4/4 candidate checks; Main passed all five build/deployment checks. Production displays release 7.4.0, Season 2026 · Regular Season Week 9, and the shared empty Trade Center without browser errors. Migration 28 preserved one league, 20 users, 20 memberships, 19 active team assignments, and active snapshot `b00edb25`; all new trade tables remain empty.
 
-**Next gate:** Review the exact locally validated 7.4.0 candidate and decide whether to authorize one branch publication, pull request, hosted-check, additive migration 28, Main, and Production cycle. No staging cycle is planned. Every Madden export/import, snapshot activation, reset, archive, transition, export-URL rotation, and Free Agent reinterpretation remains separately unauthorized.
+**Next gate:** Owner signed-in UI acceptance of the empty 7.4.0 Trade Center, Trade Block, owner-only player controls, shared Commissioner settings, and draft-pick baseline controls. Do not create a test trade or seed picks unless the owner explicitly chooses that acceptance action. Every Madden export/import, snapshot activation, reset, archive, transition, export-URL rotation, and Free Agent reinterpretation remains separately unauthorized.
 
 ## Product decisions
 
@@ -32,7 +32,7 @@
 
 - 7.1.0 established a reproducible database, continuous migration ledger, preservation checks, and target-locked migration command.
 - Accepted 7.3.6 runtime work removed the observed full login restart on refresh and hard refresh. The broader authentication/session framework remains scheduled for 7.5.0.
-- Commissioner settings can remain browser-local and disagree between commissioners. The shared schema exists; 7.4.2 moves the feature to server authority.
+- Trade Center limits, calculator values, Free Trade policy, and review threshold are now shared server authority. 7.4.2 extends the same revisioned pattern to remaining Commissioner HQ features and Rules.
 - EA has restored Madden NFL 27 Companion data flow. After 7.2, discovery and a safe FGC teams/rosters/players activation are the immediate priority.
 - The real FGC capture received 43 requests (10.17 MB) in 0.448 seconds. It contained 32 teams, all 32 team rosters, 2,044 unique rostered players, standings, 14 current-week games, and 510 statistics rows.
 - All 2,044 captured team-roster players have a valid team assignment and `isFreeAgent: false`; 2,031 are active and 13 are inactive. No duplicate roster identifiers or unassigned players were found.
@@ -64,7 +64,7 @@
 | 7.3.7 | Released; owner accepted with edge-alias follow-up | Ownership reconciliation, My Team/team GM history, trophy cases, and consolidated player-card/mobile repairs are live. Acceptance found raw Madden `REDG`/`LEDG` did not reach every display path. |
 | 7.3.7.1 | Released; owner accepted | Platform-wide edge-position canonicalization and a league-wide GM/Owner History table within Standings |
 | 7.3.8 | Production; owner accepted | Actionable commissioner import recovery, member-facing platform-callout cleanup, and retained Madden Cap Space display |
-| 7.4.0 | Locally validated review candidate | Shared Full Trade Center, advanced Trade Block, permanent pick ledger, shared settings/notifications, and Madden-authoritative roster reconciliation |
+| 7.4.0 | Production deployed; pending owner UI acceptance | Shared Full Trade Center, advanced Trade Block, permanent pick ledger, shared settings/notifications, and Madden-authoritative roster reconciliation |
 | 7.4.1–7.4.6 | Planned | Transactions/history, Commissioner tools, GOTW/Confidence Pool, mobile polish, consistency, and operations |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Required before RC | Authentication and session framework |
@@ -85,7 +85,7 @@
 
 **Still deferred**
 
-- Shared settings are schema only until 7.4.2.
+- Trade Center settings became server-authoritative in 7.4.0; remaining Commissioner/Rules settings stay scheduled for 7.4.2.
 - No Madden reset/import, membership edit, Discord change, or session redesign was included.
 
 ## 7.2.0 — Tenant-Ready Core
@@ -283,7 +283,7 @@
 
 ## 7.4.2 — Commissioner HQ and Rules
 
-- Move settings to `league_settings` with revisions, validation, and optimistic concurrency.
+- Extend revisioned `league_settings` authority from the Trade Center to remaining Commissioner HQ features and Rules.
 - Consolidate member/team/role administration, feature controls, audit history, and Rules drafts/publication.
 - Gate: Commissioner A's saved revision becomes authoritative for Commissioner B and conflicts cannot silently overwrite newer work.
 
@@ -406,3 +406,4 @@
 - **Revision 1.67:** Recorded owner acceptance of 7.3.7.1 and replaced the planned 7.3.8 field-by-field weekly-change narration with a commissioner-focused health cycle. The local candidate adds durable, actionable importer failure guidance, removes repeated member-facing snapshot/validation and controlled-beta implementation callouts, and restores Cap Space from the already-retained nested Madden team/standing record. All 132 tests, the strict release gate, and desktop/390×844 browser checks pass. Detailed technical evidence remains commissioner/platform-owner-only; migration 27, Production/Main, active Week 9 snapshot `b00edb25`, imports, data, export URL, and blocked/null Free Agents remain unchanged and unauthorized for this cycle.
 - **Revision 1.68:** Published exact 7.3.8 commit `677c226` through PR #30 with 4/4 pull-request checks, fast-forwarded it unchanged to Main, passed all five Main/build/deployment checks, and deployed Production Pages `2f96f87a` with exact-commit Worker build `44c70449`. Read-only HTTPS acceptance verified release `7.3.8`, actionable importer recovery, removed customer-facing platform callouts, and the protected authentication boundary. Migration 27, active Week 9 snapshot `b00edb25`, every data row, the permanent export URL, and blocked/null Free Agents remain unchanged. Owner signed-in UI acceptance is next.
 - **Revision 1.69:** Recorded owner acceptance of 7.3.8 and the authorized consolidated 7.4.0 local build. The candidate replaces device-only trades with a tenant-scoped shared workflow, two-to-four-team player/pick packages, three matching non-conflicted reviews, shared notifications/settings, owner-controlled Trade Block listings, and a permanent commissioner-baselined pick ledger because the verified Madden capture exposes no pick route. Approval changes FranchiseHQ's roster presentation immediately without mutating the active snapshot; the next Madden import always wins and reconciles privately without member-facing Pending/Confirmed labels. Additive migration 28 and all focused/full local validation are candidate-only. Production remains exact 7.3.8 on migration 27 and active Week 9 snapshot `b00edb25`; Main, cloud publication, live data, imports, resets, archives, transitions, URL rotation, and blocked/null Free Agents remain unchanged. Additional source-adapter research moves to 7.4.7 behind the core platform cycle.
+- **Revision 1.70:** Published exact 7.4.0 implementation `b17e124` through PR #31 with 4/4 pull-request checks, merged it to Main as `3c5cfc8`, passed all five Main/build/deployment checks, and deployed Pages `03c111d0` plus Worker build `7131fe69`. Production migration 28 advanced 80 tables/version 27 to 90 tables/version 28 between recovery bookmarks `0000005b-0000088c-000050d9-6ce946e1b6ac4175ab4603f3209f0729` and `0000005b-00000898-000050d9-a9c0903c08e3e0ed753eefe12bbb5e9f`; one league, 20 users, 20 memberships, 19 active team assignments, and active Week 9 snapshot `b00edb25` were unchanged, all new trade tables remained empty, and foreign keys were clean. Signed-in read-only acceptance confirmed Production 7.4.0, Season 2026 · Regular Season Week 9, the shared empty Trade Center, and no browser errors. No staging, trade/pick seeding, Madden export/import, snapshot change, reset, archive, transition, URL rotation, membership/credential change, or Free Agent reinterpretation ran; owner UI acceptance is next.

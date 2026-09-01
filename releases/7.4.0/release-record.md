@@ -1,8 +1,8 @@
 # FranchiseHQ 7.4.0 Release Record
 
-**Status:** Locally validated review candidate; publication, migration, Main, and Production are not authorized
+**Status:** Production deployed and read-only verified; pending owner UI acceptance
 
-**Production changed:** No. Production remains exact 7.3.8 commit `677c226b9289dda4dc4f84fbbe6245e912330541`, migration 27, and active Week 9 snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`.
+**Production changed:** Yes, within the authorized application and additive-migration scope. Implementation commit `b17e12468e7f013687d88fcdf1f6fc2437aef949` is merged to Main as `3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974`; migration 28, Pages deployment `03c111d0-a4d9-458e-b91c-9ece937016d0`, and Worker build `7131fe69-1537-43cd-b0ee-e2ca60a03761` are live. Active Week 9 snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e` is unchanged.
 
 ## Scope
 
@@ -39,8 +39,12 @@ Madden's explicit Free Agent route remains blocked upstream. Its count remains u
 
 ## Deployment status
 
-No branch push, pull request, hosted check, migration application, staging deployment, Main update, Production deployment, import, snapshot activation, reset, archive, transition, export URL rotation, or Production data write is included in the current authorization.
+- PR #31 published exact implementation commit `b17e12468e7f013687d88fcdf1f6fc2437aef949` and passed 4/4 pull-request checks. Main merge `3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974` passed all five Main/build/deployment checks.
+- Production migration 28 advanced the canonical ledger from 27/80 tables to 28/90 tables. Protected counts stayed at one league, 20 users, 20 memberships, 19 active team assignments, and one active snapshot; every new Trade Center table is empty and foreign-key verification is clean.
+- Recovery bookmarks are `0000005b-0000088c-000050d9-6ce946e1b6ac4175ab4603f3209f0729` before migration and `0000005b-00000898-000050d9-a9c0903c08e3e0ed753eefe12bbb5e9f` after migration.
+- Signed-in read-only acceptance shows Production release 7.4.0, Season 2026 · Regular Season Week 9, the shared empty Trade Center, and no browser errors. The protected endpoint returns HTTP 401 without authentication.
+- No staging run, Madden export/import, snapshot activation, reset, Archive Season, game-year transition, permanent deletion, export-URL rotation, membership/credential change, or Trade Center seed/action occurred.
 
 ## Rollback
 
-The immutable application rollback baseline remains exact 7.3.8 Production commit `677c226b9289dda4dc4f84fbbe6245e912330541`. If migration 28 is later authorized and applied, runtime rollback must retain its additive tables and all trade, notification, ledger, audit, and reconciliation rows; rollback must not reset league data or change the active snapshot.
+Runtime rollback restores accepted 7.3.8 commit `677c226b9289dda4dc4f84fbbe6245e912330541` and Pages deployment `2f96f87a-3a79-40b6-8ae6-296fb19d3a28`. Retain additive migration 28 and every future trade, notification, pick-ledger, overlay, audit, and reconciliation row; rollback must not reset league data, move the active snapshot, rotate the export URL, or reinterpret blocked Free Agents.

@@ -32,6 +32,8 @@ const isAuthorizedProductionDataChange = (
   version === '7.3.4.6' && evidence.scopeBoundaries?.activationPerformed === true
 ) || (
   version === '7.3.7' && evidence.checks?.strictMigration?.productionApplied === true
+) || (
+  version === '7.4.0' && evidence.checks?.strictMigration?.productionApplied === true
 );
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
@@ -1978,49 +1980,118 @@ if (version === '7.4.0') {
     || evidence.checks?.strictMigration?.newMigration !== true
     || Number(evidence.checks?.strictMigration?.requiredTables) !== 90
   ) errors.push('7.4.0 must prove shared revisioned settings, migration 28, and blocked/null Free Agent preservation.');
-  if (
-    manifest.status !== 'validated-review-candidate'
-    || manifest.repositoryPublication?.authorized !== false
-    || manifest.repositoryPublication?.status !== 'not-run'
-    || manifest.staging?.authorized !== false
-    || manifest.staging?.deployed !== false
-    || manifest.production?.authorized !== false
-    || manifest.production?.deployed !== false
-    || manifest.production?.status !== 'unchanged'
-    || manifest.production?.currentRelease !== '7.3.8'
-    || manifest.production?.currentCommit !== '677c226b9289dda4dc4f84fbbe6245e912330541'
-    || Number(manifest.production?.currentMigration) !== 27
-  ) errors.push('7.4.0 must remain an unpublished local candidate on the exact accepted 7.3.8 Production baseline.');
-  if (
-    evidence.external?.githubPublication?.authorized !== false
-    || evidence.external?.hostedChecks?.authorized !== false
-    || evidence.external?.stagingDeployment?.authorized !== false
-    || evidence.external?.productionDeployment?.authorized !== false
-    || evidence.external?.productionMigration?.authorized !== false
-    || evidence.external?.productionMigration?.status !== 'not-run'
-    || Number(evidence.external?.productionMigration?.currentMigration) !== 27
-    || Number(evidence.external?.productionMigration?.candidateMigration) !== 28
-  ) errors.push('7.4.0 local work must preserve separate publication, hosted-check, staging, Production, and migration authorization gates.');
-  if (
-    evidence.scopeBoundaries?.productionChanged !== false
-    || evidence.scopeBoundaries?.productionDataChanged !== false
-    || evidence.scopeBoundaries?.stagingChanged !== false
-    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
-    || evidence.scopeBoundaries?.gitMainChanged !== false
-    || evidence.scopeBoundaries?.resetPerformed !== false
-    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
-    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
-    || evidence.scopeBoundaries?.archiveGameYearExecuted !== false
-    || evidence.scopeBoundaries?.captureExecuted !== false
-    || evidence.scopeBoundaries?.candidateImportExecuted !== false
-    || evidence.scopeBoundaries?.activationPerformed !== false
-    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
-    || evidence.scopeBoundaries?.exportUrlRotated !== false
-    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
-    || evidence.scopeBoundaries?.credentialsChanged !== false
-    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
-    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
-  ) errors.push('7.4.0 must preserve every local candidate data-plane and authorization boundary.');
+  const productionDeployed = manifest.status === 'production-deployed-pending-owner-acceptance';
+  if (!productionDeployed) {
+    if (
+      manifest.status !== 'validated-review-candidate'
+      || manifest.repositoryPublication?.authorized !== false
+      || manifest.repositoryPublication?.status !== 'not-run'
+      || manifest.staging?.authorized !== false
+      || manifest.staging?.deployed !== false
+      || manifest.production?.authorized !== false
+      || manifest.production?.deployed !== false
+      || manifest.production?.status !== 'unchanged'
+      || manifest.production?.currentRelease !== '7.3.8'
+      || manifest.production?.currentCommit !== '677c226b9289dda4dc4f84fbbe6245e912330541'
+      || Number(manifest.production?.currentMigration) !== 27
+      || evidence.checks?.strictMigration?.productionApplied !== false
+    ) errors.push('7.4.0 must remain an unpublished local candidate on the exact accepted 7.3.8 Production baseline.');
+    if (
+      evidence.external?.githubPublication?.authorized !== false
+      || evidence.external?.hostedChecks?.authorized !== false
+      || evidence.external?.stagingDeployment?.authorized !== false
+      || evidence.external?.productionDeployment?.authorized !== false
+      || evidence.external?.productionMigration?.authorized !== false
+      || evidence.external?.productionMigration?.status !== 'not-run'
+      || Number(evidence.external?.productionMigration?.currentMigration) !== 27
+      || Number(evidence.external?.productionMigration?.candidateMigration) !== 28
+    ) errors.push('7.4.0 local work must preserve separate publication, hosted-check, staging, Production, and migration authorization gates.');
+    if (
+      evidence.scopeBoundaries?.productionChanged !== false
+      || evidence.scopeBoundaries?.productionDataChanged !== false
+      || evidence.scopeBoundaries?.stagingChanged !== false
+      || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+      || evidence.scopeBoundaries?.gitMainChanged !== false
+      || evidence.scopeBoundaries?.resetPerformed !== false
+      || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+      || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+      || evidence.scopeBoundaries?.archiveGameYearExecuted !== false
+      || evidence.scopeBoundaries?.captureExecuted !== false
+      || evidence.scopeBoundaries?.candidateImportExecuted !== false
+      || evidence.scopeBoundaries?.activationPerformed !== false
+      || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+      || evidence.scopeBoundaries?.exportUrlRotated !== false
+      || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+      || evidence.scopeBoundaries?.credentialsChanged !== false
+      || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+      || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+    ) errors.push('7.4.0 must preserve every local candidate data-plane and authorization boundary.');
+  } else {
+    if (
+      manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'published-main-accepted'
+      || manifest.repositoryPublication?.commit !== 'b17e12468e7f013687d88fcdf1f6fc2437aef949'
+      || manifest.repositoryPublication?.mainCommit !== '3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974'
+      || Number(manifest.repositoryPublication?.pullRequest) !== 31
+      || Number(manifest.repositoryPublication?.hostedChecksPassed) !== 4
+      || Number(manifest.repositoryPublication?.mainChecksPassed) !== 5
+      || manifest.staging?.authorized !== false
+      || manifest.staging?.deployed !== false
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.status !== 'deployed-read-only-verified-pending-owner-acceptance'
+      || manifest.production?.currentRelease !== '7.4.0'
+      || manifest.production?.currentCommit !== '3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974'
+      || manifest.production?.implementationCommit !== 'b17e12468e7f013687d88fcdf1f6fc2437aef949'
+      || manifest.production?.currentPagesDeployment !== '03c111d0-a4d9-458e-b91c-9ece937016d0'
+      || manifest.production?.currentWorkerBuild !== '7131fe69-1537-43cd-b0ee-e2ca60a03761'
+      || Number(manifest.production?.currentMigration) !== 28
+      || manifest.production?.activeSnapshot !== 'b00edb25-ac65-40d4-9969-431f94dd1e3e'
+    ) errors.push('7.4.0 deployed evidence must identify the exact PR, Main merge, Pages deployment, Worker build, migration, and unchanged active snapshot.');
+    if (
+      evidence.checks?.strictMigration?.productionApplied !== true
+      || evidence.checks?.productionMigrationEvidence?.passed !== true
+      || Number(evidence.checks?.productionMigrationEvidence?.beforeVersion) !== 27
+      || Number(evidence.checks?.productionMigrationEvidence?.afterVersion) !== 28
+      || Number(evidence.checks?.productionMigrationEvidence?.beforeTables) !== 80
+      || Number(evidence.checks?.productionMigrationEvidence?.afterTables) !== 90
+      || Number(evidence.checks?.productionMigrationEvidence?.newTradeRows) !== 0
+      || Number(evidence.checks?.productionMigrationEvidence?.foreignKeyViolations) !== 0
+      || evidence.checks?.productionHttpsAcceptance?.passed !== true
+      || evidence.checks?.productionHttpsAcceptance?.releaseHeader !== '7.4.0'
+      || Number(evidence.checks?.productionHttpsAcceptance?.week) !== 9
+      || evidence.checks?.productionHttpsAcceptance?.activeSnapshotId !== 'b00edb25-ac65-40d4-9969-431f94dd1e3e'
+    ) errors.push('7.4.0 deployed evidence must prove migration preservation and read-only Production acceptance.');
+    if (
+      evidence.external?.githubPublication?.authorized !== true
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || evidence.external?.stagingDeployment?.authorized !== false
+      || evidence.external?.productionDeployment?.authorized !== true
+      || evidence.external?.productionMigration?.authorized !== true
+      || evidence.external?.productionMigration?.status !== 'applied-and-verified'
+      || Number(evidence.external?.productionMigration?.currentMigration) !== 28
+      || Number(evidence.external?.productionMigration?.candidateMigration) !== 28
+      || evidence.scopeBoundaries?.productionChanged !== true
+      || evidence.scopeBoundaries?.productionDataChanged !== true
+      || evidence.scopeBoundaries?.stagingChanged !== false
+      || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+      || evidence.scopeBoundaries?.gitMainChanged !== true
+      || evidence.scopeBoundaries?.resetPerformed !== false
+      || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+      || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+      || evidence.scopeBoundaries?.archiveGameYearExecuted !== false
+      || evidence.scopeBoundaries?.captureExecuted !== false
+      || evidence.scopeBoundaries?.candidateImportExecuted !== false
+      || evidence.scopeBoundaries?.activationPerformed !== false
+      || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+      || evidence.scopeBoundaries?.exportUrlRotated !== false
+      || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+      || evidence.scopeBoundaries?.credentialsChanged !== false
+      || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 1
+      || Number(evidence.scopeBoundaries?.leagueDataRowsWritten) !== 0
+      || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+    ) errors.push('7.4.0 deployed evidence must preserve every non-migration Production data boundary.');
+  }
   if (
     Number(evidence.checks?.automatedTests?.passedTests) < 1
     || Number(evidence.checks?.automatedTests?.failedTests) !== 0

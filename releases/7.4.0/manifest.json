@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.4.0",
   "releaseType": "full-shared-trade-center",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.3.8",
@@ -18,11 +18,13 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0
+    "authorized": true,
+    "status": "published-main-accepted",
+    "commit": "b17e12468e7f013687d88fcdf1f6fc2437aef949",
+    "mainCommit": "3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974",
+    "pullRequest": 31,
+    "hostedChecksPassed": 4,
+    "mainChecksPassed": 5
   },
   "staging": {
     "authorized": false,
@@ -30,15 +32,17 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "unchanged",
-    "currentRelease": "7.3.8",
-    "currentCommit": "677c226b9289dda4dc4f84fbbe6245e912330541",
-    "currentPagesDeployment": "2f96f87a-3a79-40b6-8ae6-296fb19d3a28",
-    "currentMigration": 27,
+    "authorized": true,
+    "deployed": true,
+    "status": "deployed-read-only-verified-pending-owner-acceptance",
+    "currentRelease": "7.4.0",
+    "currentCommit": "3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974",
+    "implementationCommit": "b17e12468e7f013687d88fcdf1f6fc2437aef949",
+    "currentPagesDeployment": "03c111d0-a4d9-458e-b91c-9ece937016d0",
+    "currentWorkerBuild": "7131fe69-1537-43cd-b0ee-e2ca60a03761",
+    "currentMigration": 28,
     "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
-    "scope": "Local implementation and validation only. Migration 28, publication, Main, and Production remain separately unauthorized."
+    "scope": "PR #31, additive migration 28, Main, Pages, and the exact implementation Worker build are live. Read-only acceptance changed no import, snapshot, archive, transition, export URL, membership, or credential row."
   },
   "requiredArtifacts": [
     "docs/ROADMAP.md",

@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.4.0",
   "validatedOn": "2026-08-31",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "sharedTradeWorkflow": {
@@ -99,7 +99,7 @@
       "migrationVersion": 28,
       "newMigration": true,
       "requiredTables": 90,
-      "productionApplied": false
+      "productionApplied": true
     },
     "automatedTests": {
       "passed": true,
@@ -114,14 +114,42 @@
       "inventoryFiles": 553,
       "routes": 69,
       "requiredTables": 90
+    },
+    "productionMigrationEvidence": {
+      "passed": true,
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "beforeVersion": 27,
+      "afterVersion": 28,
+      "beforeTables": 80,
+      "afterTables": 90,
+      "preMigrationBookmark": "0000005b-0000088c-000050d9-6ce946e1b6ac4175ab4603f3209f0729",
+      "postMigrationBookmark": "0000005b-00000898-000050d9-a9c0903c08e3e0ed753eefe12bbb5e9f",
+      "protectedBefore": { "leagues": 1, "users": 20, "memberships": 20, "activeTeamAssignments": 19, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1 },
+      "protectedAfter": { "leagues": 1, "users": 20, "memberships": 20, "activeTeamAssignments": 19, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1 },
+      "newTradeRows": 0,
+      "foreignKeyViolations": 0
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified-pending-owner-acceptance",
+      "releaseHeader": "7.4.0",
+      "franchiseSeasonYear": 2026,
+      "seasonType": "Regular Season",
+      "week": 9,
+      "tradeCenterVisible": true,
+      "initialTradeCount": 0,
+      "browserErrors": 0,
+      "protectedApiStatus": 401,
+      "activeSnapshotId": "b00edb25-ac65-40d4-9969-431f94dd1e3e"
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "productionDataChanged": false,
+    "productionChanged": true,
+    "productionDataChanged": true,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
     "resetPerformed": false,
     "transitionOperationExecuted": false,
     "archiveSeasonExecuted": false,
@@ -134,21 +162,22 @@
     "freeAgentInterpretedAsZero": false,
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
-    "databaseRowsWritten": 0
+    "databaseRowsWritten": 1,
+    "leagueDataRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "commit": "b17e12468e7f013687d88fcdf1f6fc2437aef949", "mainCommit": "3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974", "pullRequest": 31 },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestPassed": 4, "mainPassed": 5, "failed": 0, "pending": 0 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "productionDeployment": { "authorized": false, "status": "not-run", "currentRuntimeCommit": "677c226b9289dda4dc4f84fbbe6245e912330541" },
-    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 27, "candidateMigration": 28 },
+    "productionDeployment": { "authorized": true, "status": "deployed-read-only-verified-pending-owner-acceptance", "currentRuntimeCommit": "3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974", "implementationCommit": "b17e12468e7f013687d88fcdf1f6fc2437aef949", "pagesDeployment": "03c111d0-a4d9-458e-b91c-9ece937016d0", "workerBuild": "7131fe69-1537-43cd-b0ee-e2ca60a03761", "databaseRowsWrittenByCandidateWork": 1, "leagueDataRowsWrittenByCandidateWork": 0 },
+    "productionMigration": { "authorized": true, "status": "applied-and-verified", "currentMigration": 28, "candidateMigration": 28, "foreignKeyViolations": 0 },
     "productionMaddenExport": { "authorized": false, "status": "not-run" },
     "productionCandidateImport": { "authorized": false, "status": "not-run" },
     "archiveSeason": { "authorized": false, "status": "not-run" },
     "gameYearTransition": { "authorized": false, "status": "not-run" }
   },
-  "productionChanged": false,
-  "dataChanged": false,
-  "productionDataChanged": false,
+  "productionChanged": true,
+  "dataChanged": true,
+  "productionDataChanged": true,
   "credentialsChanged": false
 }
