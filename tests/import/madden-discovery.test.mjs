@@ -213,6 +213,32 @@ test('normalizes Companion paths and recognizes explicit Madden Free Agent paylo
   assert.equal(analysis.freeAgentEvidence.recordCount, 1);
 });
 
+test('All Weeks aggregate route markers and inventory use the non-empty payload period', () => {
+  const report=buildMaddenDiscoveryReport([
+    capture('xbsx/fr-1/week/reg/0/schedules',{
+      scheduleInfoList:[{gameId:'week-10-game',stageIndex:1,weekIndex:9,homeTeamId:'1',awayTeamId:'2'}]
+    }),
+    capture('xbsx/fr-1/week/reg/0/passing',{
+      playerStatInfoList:[{playerId:'1',teamId:'1',stageIndex:1,weekIndex:9,passingYards:250}]
+    }),
+    capture('xbsx/fr-1/week/reg/0/kicking',{playerStatInfoList:[]})
+  ],{expected:{week:'10'}});
+  assert.deepEqual(report.sourceMarkers.week.observed,['10']);
+  assert.equal(report.sourceMarkers.week.status,'matched');
+  const schedule=report.datasetInventory.find(item=>item.datasetType==='schedule');
+  assert.equal(schedule.canonicalStage,'regular-season');
+  assert.equal(schedule.canonicalWeek,10);
+  assert.equal(schedule.periodSource,'payload-sentinel');
+  const fixtureSchedule=report.sanitizedFixture.datasets.find(item=>item.datasetType==='schedule');
+  assert.deepEqual(fixtureSchedule.period,{
+    canonicalStage:'regular-season',canonicalWeek:10,source:'payload-sentinel',
+    playable:true,sentinel:true,placeholder:false
+  });
+  const empty=report.datasetInventory.find(item=>item.routePath.endsWith('/kicking'));
+  assert.equal(empty.placeholder,true);
+  assert.equal(empty.canonicalWeek,null);
+});
+
 test('builds a passing structural source-lock report without exposing player or team values', () => {
   const report = buildMaddenDiscoveryReport(completeCaptureSet(), {
     discoverySessionId: 'm27-test-session',

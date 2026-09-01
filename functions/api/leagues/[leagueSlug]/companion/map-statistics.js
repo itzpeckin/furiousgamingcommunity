@@ -2,8 +2,9 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
+import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
 
-const RELEASE='7.3.5.1';
+const RELEASE='7.4.0.2';
 const RECORD_CHUNK_SIZE=200;
 const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;
@@ -137,7 +138,9 @@ async function inspectCaptureShape(env,capture,meta){
     if(meta.category===TEAMSTATS_CATEGORY){
       const teamSignalCount=sample.filter(row=>text(first(row,TEAM))).length;
       if(!teamSignalCount)return{usable:false,recordCount:objects.length,reason:'teamstats-collection-has-no-team-identifiers',collectionPath:collection?.path||null};
-      return{usable:true,recordCount:objects.length,reason:null,collectionPath:collection?.path||null};
+      const period=resolveMaddenPeriod(capture.route_path,objects);
+      if(period?.sentinel&&!period.playable)return{usable:false,recordCount:objects.length,reason:'aggregate-route-payload-period-unresolved',collectionPath:collection?.path||null,period};
+      return{usable:true,recordCount:objects.length,reason:null,collectionPath:collection?.path||null,period};
     }
 
     const statSignalCount=sample.filter(row=>{
@@ -148,7 +151,9 @@ async function inspectCaptureShape(env,capture,meta){
     }).length;
 
     if(!statSignalCount)return{usable:false,recordCount:objects.length,reason:'collection-does-not-look-like-player-statistics',collectionPath:collection?.path||null};
-    return{usable:true,recordCount:objects.length,reason:null,collectionPath:collection?.path||null};
+    const period=resolveMaddenPeriod(capture.route_path,objects);
+    if(period?.sentinel&&!period.playable)return{usable:false,recordCount:objects.length,reason:'aggregate-route-payload-period-unresolved',collectionPath:collection?.path||null,period};
+    return{usable:true,recordCount:objects.length,reason:null,collectionPath:collection?.path||null,period};
   }catch(error){
     return{usable:false,recordCount:0,reason:`payload-read-failed: ${error?.message||String(error)}`,collectionPath:null};
   }
@@ -177,7 +182,7 @@ async function capturedRoutes(db,env,leagueId,discoverySessionId,captureIds=[]){
         ...shape
       });
       if(shape.usable){
-        chosen={...candidate,discoveredRecordCount:shape.recordCount,collectionPath:shape.collectionPath};
+        chosen={...candidate,discoveredRecordCount:shape.recordCount,collectionPath:shape.collectionPath,resolvedPeriod:shape.period};
         break;
       }
     }
@@ -357,7 +362,7 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[]){
     const unchanged=Boolean(!forceProcessRetainedBundle && capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     statements.push(db.prepare(sql).bind(
       crypto.randomUUID(),runId,leagueId,capture.capture_id,capture.discovery_session_id,capture.route_path,
-      capture.r2_object_key,capture.payload_hash||'',meta.category,canonicalStage(meta.stage),meta.week,
+      capture.r2_object_key,capture.payload_hash||'',meta.category,capture.resolvedPeriod?.playable?capture.resolvedPeriod.stage:canonicalStage(meta.stage),capture.resolvedPeriod?.playable?capture.resolvedPeriod.week:meta.week,
       prior?.season_year==null?null:Number(prior.season_year),
       (unchanged||optionalEmpty)?'skipped':capture.captureUsable?'pending':'failed',
       unchanged?Number(prior?.record_count||0):0,
@@ -395,6 +400,7 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[]){
       if(row.captureUsable)return false;
       const meta=routeMeta(row.route_path);
       if(meta?.stage==='pre')return false;
+      if(meta?.stage==='reg' && Number(meta.week)===0)return false;
       if(meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)return false;
       return true;
     }).map(row=>({
@@ -447,14 +453,14 @@ async function processNext(db,env,leagueId,runId){
         const teamId=text(first(record,TEAM));if(!teamId)continue;
         const values=flattenMetrics(record),gameId=text(first(record,GAME_IDS)),seasonYear=int(first(record,['calendarYear','seasonYear','year']));
         if(gameId){values.__gameId=gameId;values.scheduleId=gameId}values.__sourceCategory='team';
-        output.push({externalKey:`team:${seasonYear??'unknown'}:${canonicalStage(meta.stage)}:${meta.week}:${teamId}:${gameId||index}`,category:'team-game',seasonYear,stage:canonicalStage(meta.stage),weekIndex:meta.week,playerExternalId:null,teamExternalId:teamId,playerName:null,position:null,metrics:values,route:batch.route_path,source:record});
+        output.push({externalKey:`team:${seasonYear??'unknown'}:${batch.stage}:${batch.week_index}:${teamId}:${gameId||index}`,category:'team-game',seasonYear,stage:batch.stage,weekIndex:Number(batch.week_index),playerExternalId:null,teamExternalId:teamId,playerName:null,position:null,metrics:values,route:batch.route_path,source:record});
         continue;
       }
       const sourceId=text(first(record,IDS)),firstName=text(first(record,FIRST)),lastName=text(first(record,LAST)),sourceName=text(first(record,NAME))||[firstName,lastName].filter(Boolean).join(' ')||null;
       let player=sourceId?players.byId.get(sourceId):null;if(!player&&sourceName)player=players.byName.get(sourceName.toLowerCase());
       if(player)resolved++;else{unresolved++;if(warnings.length<MAX_STORED_WARNINGS_PER_BATCH)warnings.push(`Unresolved ${meta.category} player ${sourceId||sourceName||`record ${index+1}`} in ${batch.route_path}`)}
       const teamId=text(first(record,TEAM))||text(player?.team_external_id),seasonYear=int(first(record,['calendarYear','seasonYear','year']));
-      output.push({externalKey:`${meta.category}:${seasonYear??'unknown'}:${canonicalStage(meta.stage)}:${meta.week}:${player?.external_id||sourceId||sourceName||index}:${teamId||'none'}`,category:meta.category,seasonYear,stage:canonicalStage(meta.stage),weekIndex:meta.week,playerExternalId:text(player?.external_id)||sourceId,teamExternalId:teamId,playerName:text(player?.display_name)||sourceName,position:text(first(record,POS))||text(player?.position),metrics:flattenMetrics(record),route:batch.route_path,source:record});
+      output.push({externalKey:`${meta.category}:${seasonYear??'unknown'}:${batch.stage}:${batch.week_index}:${player?.external_id||sourceId||sourceName||index}:${teamId||'none'}`,category:meta.category,seasonYear,stage:batch.stage,weekIndex:Number(batch.week_index),playerExternalId:text(player?.external_id)||sourceId,teamExternalId:teamId,playerName:text(player?.display_name)||sourceName,position:text(first(record,POS))||text(player?.position),metrics:flattenMetrics(record),route:batch.route_path,source:record});
     }
     const unique=[...new Map(output.map(row=>[row.externalKey,row])).values()];
     await insertRows(db,runId,leagueId,unique);

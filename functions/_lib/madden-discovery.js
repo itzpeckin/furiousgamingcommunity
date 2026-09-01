@@ -1,3 +1,5 @@
+import { resolveMaddenPeriod } from './madden-period.js';
+
 const DATASET_ORDER = Object.freeze([
   'league-info',
   'teams',
@@ -172,7 +174,7 @@ function relationshipFields(fields) {
   return relationships;
 }
 
-function markerCandidates(payload, routeValue) {
+function markerCandidates(payload, routeValue, period) {
   const found = Object.fromEntries(Object.keys(MARKER_ALIASES).map(key => [key, []]));
   const walk = (value, path = '$', depth = 0) => {
     if (depth > 6 || !value || typeof value !== 'object' || Array.isArray(value)) return;
@@ -201,8 +203,13 @@ function markerCandidates(payload, routeValue) {
   }
   const weekIndex = segments.indexOf('week');
   if (weekIndex >= 0 && segments[weekIndex + 1] && segments[weekIndex + 2]) {
-    found.stage.push({ value: segments[weekIndex + 1], path: '$route.stage' });
-    found.week.push({ value: segments[weekIndex + 2], path: '$route.week' });
+    if(period?.source==='payload-sentinel'){
+      found.stage.push({value:'reg',path:'$payload.stageIndex'});
+      found.week.push({value:String(period.week),path:'$payload.weekIndex+1'});
+    }else if(!period?.sentinel){
+      found.stage.push({ value: segments[weekIndex + 1], path: '$route.stage' });
+      found.week.push({ value: segments[weekIndex + 2], path: '$route.week' });
+    }
   }
   return found;
 }
@@ -221,6 +228,7 @@ export function analyzeMaddenCapture(capture) {
   const payload = capture?.payload ?? null;
   const collection = datasetType === 'free-agents' ? freeAgentCollection(payload) : primaryCollection(payload);
   const rows = collection?.values?.filter(item => item && typeof item === 'object' && !Array.isArray(item)) || [];
+  const period = resolveMaddenPeriod(routePath,rows);
   const fields = fieldInventory(rows);
   const payloadSuccess = payload && typeof payload === 'object' && !Array.isArray(payload)
     ? payload.success ?? null
@@ -244,7 +252,8 @@ export function analyzeMaddenCapture(capture) {
     recordCount: rows.length,
     fields,
     relationships: relationshipFields(fields),
-    markers: markerCandidates(payload, routePath),
+    markers: markerCandidates(payload, routePath, period),
+    period,
     freeAgentEvidence: explicitFreeAgentRoute ? {
       explicitRoute: true,
       status: freeAgentStatus,
@@ -444,7 +453,7 @@ function fixtureFor(analyses, requirements, markers, playerImportReadiness) {
   return {
     schemaVersion: 1,
     product: 'FranchiseHQ',
-    release: '7.3.0',
+    release: '7.4.0.2',
     rawValuesIncluded: false,
     sourceMarkerStatuses: Object.fromEntries(Object.entries(markers).map(([key, item]) => [key, item.status])),
     requirements: Object.fromEntries(Object.entries(requirements).map(([key, item]) => [key, { status: item.status, recordCount: item.recordCount }])),
@@ -454,6 +463,14 @@ function fixtureFor(analyses, requirements, markers, playerImportReadiness) {
       datasetType: item.datasetType,
       recordCount: item.recordCount,
       collectionPath: item.collectionPath,
+      period:item.period?{
+        canonicalStage:item.period.playable===true?item.period.stage:null,
+        canonicalWeek:item.period.playable===true?item.period.week:null,
+        source:item.period.source,
+        playable:item.period.playable===true,
+        sentinel:item.period.sentinel===true,
+        placeholder:item.period.placeholder===true
+      }:null,
       fields: item.fields.map(field => ({ name: field.name, types: field.types })),
       relationships: item.relationships
     }))
@@ -494,14 +511,18 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
     recordCount: item.recordCount,
     collectionPath: item.collectionPath,
     parseStatus: item.parseStatus,
-    receivedAt: item.receivedAt
+    receivedAt: item.receivedAt,
+    canonicalStage:item.period?.playable===true?item.period.stage:null,
+    canonicalWeek:item.period?.playable===true?item.period.week:null,
+    periodSource:item.period?.source||null,
+    placeholder:item.period?.placeholder===true
   }));
   const fieldInventory = analyses.map(item => ({ routePath: item.routePath, datasetType: item.datasetType, fields: item.fields }));
   const relationshipInventory = analyses.map(item => ({ routePath: item.routePath, datasetType: item.datasetType, relationships: item.relationships }));
   return {
     schemaVersion: 1,
     product: 'FranchiseHQ',
-    release: '7.3.0',
+    release: '7.4.0.2',
     discoverySessionId: options.discoverySessionId || null,
     status: datasetsPassed && sourceVerification.passed ? 'passed' : 'review_required',
     routeCount: new Set(analyses.map(item => item.routePath)).size,

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.2",
+  "validatedOn": "2026-09-01",
+  "status": "validated-production-authorized",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "allWeeksSentinelResolution": {
+      "passed": true,
+      "route": "/week/reg/0/",
+      "rawStageIndex": 1,
+      "rawWeekIndex": 9,
+      "canonicalStage": "regular-season",
+      "canonicalWeek": 10
+    },
+    "normalRouteAuthority": { "passed": true, "preserved": true },
+    "emptyWeekZeroPlaceholder": { "passed": true, "playable": false, "snapshotWeekCreated": false },
+    "correctedSourceFingerprint": { "passed": true, "newCandidateRequired": true },
+    "malformedCarryForwardExclusion": { "passed": true, "malformedWeekZeroRowsRetainedInSourceSnapshotOnly": true },
+    "snapshotRetention": { "passed": true, "malformedSnapshotDeleted": false, "previousSnapshotDeleted": false, "auditsDeleted": false },
+    "freeAgentBlockedPreserved": { "passed": true, "status": "blocked", "count": null, "interpretedAsZero": false },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 28,
+      "newMigration": false,
+      "requiredTables": 90,
+      "productionAlreadyApplied": true
+    },
+    "automatedTests": { "passed": true, "passedTests": 149, "failedTests": 0, "scope": "full-consolidated-release-gate" },
+    "strictRepositoryGate": { "passed": true, "status": "passed" }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "anotherExportRequired": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": { "authorized": true, "status": "not-run", "commit": null, "pullRequest": null },
+    "hostedChecks": { "authorized": true, "status": "not-run", "pullRequestPassed": 0, "mainPassed": 0, "failed": 0 },
+    "productionDeployment": { "authorized": true, "status": "not-run", "currentRuntimeCommit": "f04a41529fa901836ef7d49adf8789a281b7626f" },
+    "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 28, "candidateMigration": 28 },
+    "productionMaddenExport": { "authorized": false, "status": "not-run", "anotherExportRequired": false },
+    "productionRetainedSourceReanalysis": { "authorized": true, "status": "not-run" },
+    "productionCandidateImport": { "authorized": true, "status": "not-run" },
+    "productionSnapshotActivation": { "authorized": true, "status": "not-run" },
+    "archiveSeason": { "authorized": false, "status": "not-run" },
+    "gameYearTransition": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

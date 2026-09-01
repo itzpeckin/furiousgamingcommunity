@@ -6,6 +6,7 @@ import path from 'node:path';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
+import { resolveMaddenPeriod } from '../../functions/_lib/madden-period.js';
 import {
   CANDIDATE_IMPORT_PHASES,
   candidateCoverageWarnings,
@@ -168,6 +169,54 @@ test('capture route is authoritative over zero-based Madden schedule payload wee
     external_id:'week-8-game',stage:'regular-season',week_index:8,
     source_route_path:'xbsx/742482/week/reg/8/schedules'
   });
+});
+
+test('non-empty All Weeks sentinel routes resolve payload Week 10 while empty placeholders remain harmless', () => {
+  assert.deepEqual(resolveMaddenPeriod('xbsx/742482/week/reg/0/schedules',[
+    {gameId:'game-10',stageIndex:1,weekIndex:9}
+  ]),{
+    stage:'regular-season',week:10,key:'regular-season:10',source:'payload-sentinel',
+    playable:true,sentinel:true,placeholder:false,rawStageIndex:1,rawWeekIndex:9,
+    routeStage:'regular-season',routeWeek:0
+  });
+  assert.deepEqual(resolveMaddenPeriod('xbsx/742482/week/reg/0/passing',[]),{
+    stage:'regular-season',week:0,key:'regular-season:0',source:'empty-placeholder',
+    playable:false,sentinel:true,placeholder:true
+  });
+  assert.equal(resolveMaddenPeriod('xbsx/742482/week/reg/9/schedules',[
+    {stageIndex:1,weekIndex:0}
+  ]).week,9);
+
+  const coverage=candidateSourceCoverage({
+    sourceMarkers:{week:{expected:'10',observed:['10']}},
+    datasetInventory:[
+      {datasetType:'schedule',routePath:'xbsx/742482/week/reg/0/schedules',recordCount:14,
+        canonicalStage:'regular-season',canonicalWeek:10,periodSource:'payload-sentinel'},
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/0/passing',recordCount:6,
+        canonicalStage:'regular-season',canonicalWeek:10,periodSource:'payload-sentinel'},
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/0/kicking',recordCount:0,
+        canonicalStage:null,canonicalWeek:null,periodSource:'empty-placeholder',placeholder:true}
+    ]
+  },9);
+  assert.equal(coverage.currentPeriod.key,'regular-season:10');
+  assert.equal(coverage.currentWeekStatus,'covered');
+  assert.equal(coverage.importMode,'forward');
+  assert.deepEqual(coverage.partialPeriods,[]);
+});
+
+test('malformed Week 0 snapshot rows resolve from retained payload provenance and are not carried into Week 10', () => {
+  const malformed={
+    external_id:'stat-week-0-key',
+    data_json:JSON.stringify({
+      external_key:'stat-week-0-key',stage:'regular-season',week_index:0,
+      source_route_path:'xbsx/742482/week/reg/0/passing',
+      source_record_json:JSON.stringify({stageIndex:1,weekIndex:9,playerId:'player-1'})
+    })
+  };
+  assert.equal(candidateNormalizePeriod(JSON.parse(malformed.data_json)).week_index,10);
+  const merged=candidateHistoryCarryForward([], [malformed], {keyName:'external_key',currentWeek:10});
+  assert.equal(merged.retained,0);
+  assert.deepEqual(merged.records,[]);
 });
 
 test('a Week 9 candidate carries older active history forward without overriding fresh records', () => {
@@ -528,7 +577,8 @@ test('commissioner live import activates only its validated candidate and never 
   assert.doesNotMatch(builder,/DELETE\s+FROM/i);
   assert.doesNotMatch(builder,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
 
-  assert.match(schedule,/const week=meta\.week\?\?/);
+  assert.match(schedule,/resolveMaddenPeriod\(capture\.route_path,collection\.objects\)/);
+  assert.match(schedule,/period\?\.playable\?period\.week:meta\.week\?\?/);
   assert.match(schedule,/candidateImportRunId/);
   assert.match(statistics,/forceProcessRetainedBundle/);
   for(const source of [ui,worker])assert.match(source,/candidateImportRunId/);

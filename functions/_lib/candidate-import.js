@@ -1,3 +1,5 @@
+import { canonicalMaddenStage, periodFromInventoryItem, resolveMaddenPeriod } from './madden-period.js';
+
 export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'analyze-source',
   'classify-captures',
@@ -48,11 +50,7 @@ const WEEK_ROUTE = /(?:^|\/)week\/(pre|reg|post)\/(\d+)(?:\/|$)/i;
 const PERIOD_STAGE_ORDER = Object.freeze({ preseason:0, 'regular-season':1, playoffs:2 });
 
 export function candidateCanonicalStage(value) {
-  const stage=String(value??'').trim().toLowerCase();
-  if (['0','pre','preseason'].includes(stage)) return 'preseason';
-  if (['2','post','postseason','playoff','playoffs'].includes(stage)) return 'playoffs';
-  if (['1','reg','regular','regular-season'].includes(stage)) return 'regular-season';
-  return null;
+  return canonicalMaddenStage(value);
 }
 
 export function candidatePeriodKey(period) {
@@ -112,10 +110,11 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null) {
   ]);
   const routes = datasetInventory.map(item => ({
     datasetType: String(item?.datasetType || item?.dataset_type || ''),
-    routePath: String(item?.routePath || item?.route_path || '')
+    routePath: String(item?.routePath || item?.route_path || ''),
+    period:periodFromInventoryItem(item)
   }));
-  const schedulePeriods=uniquePeriods(routes.filter(item=>item.datasetType==='schedule').map(item=>periodFromRoute(item.routePath)));
-  const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics').map(item=>periodFromRoute(item.routePath)));
+  const schedulePeriods=uniquePeriods(routes.filter(item=>item.datasetType==='schedule').map(item=>item.period));
+  const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics').map(item=>item.period));
   const scheduleKeys=new Set(schedulePeriods.map(period=>period.key));
   const statisticKeys=new Set(statisticsPeriods.map(period=>period.key));
   const completePeriods=uniquePeriods(schedulePeriods.filter(period=>statisticKeys.has(period.key)));
@@ -123,7 +122,6 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null) {
     ...schedulePeriods.filter(period=>!statisticKeys.has(period.key)),
     ...statisticsPeriods.filter(period=>!scheduleKeys.has(period.key))
   ]);
-  const routeWeek = item => periodFromRoute(item.routePath)?.week ?? null;
   const scheduleWeeks = weekNumbers(schedulePeriods.map(period=>period.week));
   const statisticsWeeks = weekNumbers(statisticsPeriods.map(period=>period.week));
   const observedWeeks = weekNumbers([...markerWeeks, ...scheduleWeeks, ...statisticsWeeks]);
@@ -214,8 +212,11 @@ function recordWeek(record) {
 }
 
 function recordPeriod(record) {
-  const routed=periodFromRoute(record?.source_route_path??record?.sourceRoutePath);
-  if(routed)return routed;
+  const routePath=record?.source_route_path??record?.sourceRoutePath;
+  const sourceRecord=parseCandidateJson(record?.source_record_json,record?.sourceRecord??null);
+  const routed=resolveMaddenPeriod(routePath,sourceRecord?[sourceRecord]:[]);
+  if(routed?.playable)return{stage:routed.stage,week:routed.week,key:routed.key};
+  if(routed&&!routed.sentinel)return routed;
   const week=recordWeek(record);
   // Snapshots created before 7.3.4.6 only persisted week_index. Those rows are
   // regular-season records unless an authoritative capture route says otherwise.

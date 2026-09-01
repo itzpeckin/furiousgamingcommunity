@@ -138,7 +138,7 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 188,
+      ".js": 189,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
@@ -187,6 +187,10 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
+        "bytes": 38943,
+        "file": "tests/import/madden-discovery.test.mjs"
+      },
+      {
         "bytes": 38742,
         "file": "tests/import/game-year-transition.test.mjs"
       },
@@ -195,23 +199,19 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 37578,
-        "file": "tests/import/madden-discovery.test.mjs"
+        "bytes": 37675,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
         "bytes": 36948,
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 36875,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
-      },
-      {
         "bytes": 36785,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 33267,
+        "bytes": 35877,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -223,15 +223,15 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
-        "bytes": 23153,
-        "file": "functions/_lib/madden-discovery-report.js"
+        "bytes": 23765,
+        "file": "functions/_lib/madden-discovery.js"
       },
       {
-        "bytes": 22790,
-        "file": "platform/validate.js"
+        "bytes": 23153,
+        "file": "functions/_lib/madden-discovery-report.js"
       }
     ],
-    "total": 553
+    "total": 554
   },
   "frontend": {
     "assets": [
@@ -1395,7 +1395,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.0.1",
+  "release": "7.4.0.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
