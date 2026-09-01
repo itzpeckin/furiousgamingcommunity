@@ -8,7 +8,12 @@ import {
   permanentExportPublicState,
   reportImportReadiness
 } from '../../functions/_lib/permanent-league-export.js';
-import { recoveryCohortSummary } from '../../functions/_lib/madden-discovery-report.js';
+import {
+  latestCapturePerRoute,
+  partialCaptureRoutesCanStitch,
+  partialReportsCanStitch,
+  recoveryCohortSummary
+} from '../../functions/_lib/madden-discovery-report.js';
 import { automaticSessionFor } from '../../functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js';
 
 function eligibleReport(freeAgentStatus='blocked') {
@@ -55,6 +60,47 @@ test('blocked Free Agents stay unknown while the 32-team roster source remains i
   partial.requirements.schedule={status:'missing',recordCount:0};
   assert.equal(reportImportReadiness(partial).ready,false);
   assert.equal(reportImportReadiness(partial).freeAgentCount,null);
+});
+
+test('explicit empty current-week statistics routes are ready but missing routes are not', () => {
+  const advancedWeek=eligibleReport('blocked');
+  advancedWeek.requirements.statistics={
+    status:'empty',recordCount:0,routes:['xbsx/742482/week/reg/10/passing']
+  };
+  assert.equal(reportImportReadiness(advancedWeek).ready,true);
+  advancedWeek.requirements.statistics.routes=[];
+  assert.equal(reportImportReadiness(advancedWeek).ready,false);
+});
+
+test('repeated routes retain only the newest capture for one cohort', () => {
+  const selected=latestCapturePerRoute([
+    {id:'old-roster',route_path:'xbsx/742482/team/1/roster',session_observed_at:'2026-08-31T20:00:00.000Z'},
+    {id:'schedule',route_path:'xbsx/742482/week/reg/10/schedules',session_observed_at:'2026-08-31T20:00:01.000Z'},
+    {id:'new-roster',route_path:'XBSX/742482/team/1/roster',session_observed_at:'2026-08-31T20:00:02.000Z'}
+  ]);
+  assert.deepEqual(selected.map(row=>row.id),['schedule','new-roster']);
+});
+
+test('partial report stitching accepts one observed week and rejects cross-week mixing', () => {
+  const markers=week=>JSON.stringify({
+    sourceFranchiseId:{observed:['742482']},week:{observed:week===null?[]:[String(week)]},stage:{observed:week===null?[]:['reg']}
+  });
+  assert.equal(partialReportsCanStitch([
+    {source_markers_json:markers(null)},
+    {source_markers_json:markers(10)}
+  ]),true);
+  assert.equal(partialReportsCanStitch([
+    {source_markers_json:markers(9)},
+    {source_markers_json:markers(10)}
+  ]),false);
+  assert.equal(partialCaptureRoutesCanStitch([
+    {route_path:'xbsx/742482/team/1/roster'},
+    {route_path:'xbsx/742482/week/reg/10/passing'}
+  ]),true);
+  assert.equal(partialCaptureRoutesCanStitch([
+    {route_path:'xbsx/742482/week/reg/9/passing'},
+    {route_path:'xbsx/742482/week/reg/10/passing'}
+  ]),false);
 });
 
 test('an incomplete newest report never replaces the retained ready source', () => {
@@ -148,6 +194,16 @@ test('43 concurrent Madden routes atomically claim one automatic cohort', async 
   assert.equal(db.sessions.size,2);
   assert.equal(db.endpoint.latest_session_id,sessions[0].id);
   assert.equal(sessions[0].status,'open');
+});
+
+test('a recent review-required cohort remains appendable across phased Madden exports', async () => {
+  const db=concurrentCohortDatabase();
+  const recent=new Date(Date.now()-5*60*1000).toISOString();
+  Object.assign(db.sessions.get('previous-session'),{status:'review_required',last_capture_at:recent});
+  Object.assign(db.endpoint,{last_received_at:recent,updated_at:recent});
+  const session=await automaticSessionFor(db,{id:'league-1',name:'Furious Gaming Community'},{...db.endpoint});
+  assert.equal(session.id,'previous-session');
+  assert.equal(db.sessions.size,1);
 });
 
 test('the observed 43-route Production burst satisfies exact recovery structure', () => {

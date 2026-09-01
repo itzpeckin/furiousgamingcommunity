@@ -6,13 +6,13 @@
 
 **Updated:** August 31, 2026
 
-**Revision:** 1.69
+**Revision:** 1.70
 
-**Current production:** 7.3.8 application runtime `677c226` from Main on Pages deployment `2f96f87a`; exact-commit Worker build `44c70449` passed. Additive migration 27 remains applied with 17 GM identities and 17 opening ownership periods. Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer.
+**Current production:** 7.4.0 implementation `b17e124` is merged to Main as `3c5cfc8` and live on Pages deployment `03c111d0`; exact implementation Worker build `7131fe69` passed. Additive migration 28 is applied with 90 canonical tables and no foreign-key violations. Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer.
 
-**Current work:** The owner accepted the 7.3.8 display cleanup and authorized one local 7.4.0 implementation cycle. The review candidate replaces the device-only trade prototype with a tenant-scoped shared Trade Center, permanent draft-pick ledger, shared notifications/settings, advanced Trade Block, three-vote non-conflicted review, immediate FranchiseHQ roster presentation, and hidden Madden reconciliation. Production, Main, migration 28, the active snapshot, and every live data row remain unchanged.
+**Current work:** 7.4.0.1 is locally validated and Production-authorized from Main `3c5cfc8`. A real Week 10 attempt arrived as a rejected 35-route partial source while the last eligible 43-route Week 9 report remained selected. The patch keeps adjacent phased exports appendable, selects the newest capture per route, safely stitches compatible retained partial sessions, accepts explicitly captured zero-row Weekly Stats routes for a newly advanced week, and shows diagnostics for the actual rejected source. The consolidated strict gate passed 146 tests with zero failures.
 
-**Next gate:** Review the exact locally validated 7.4.0 candidate and decide whether to authorize one branch publication, pull request, hosted-check, additive migration 28, Main, and Production cycle. No staging cycle is planned. Every Madden export/import, snapshot activation, reset, archive, transition, export-URL rotation, and Free Agent reinterpretation remains separately unauthorized.
+**Next gate:** Consolidated 7.4.0.1 validation, PR/hosted checks, merge to Main, Production deployment, and retained Week 10 source reanalysis. Reanalysis may create only discovery session/report/link and audit evidence. Do not run a candidate import, activate a snapshot, reset data, archive or transition a season, rotate the export URL, or reinterpret blocked Free Agents as zero.
 
 ## Product decisions
 
@@ -64,7 +64,8 @@
 | 7.3.7 | Released; owner accepted with edge-alias follow-up | Ownership reconciliation, My Team/team GM history, trophy cases, and consolidated player-card/mobile repairs are live. Acceptance found raw Madden `REDG`/`LEDG` did not reach every display path. |
 | 7.3.7.1 | Released; owner accepted | Platform-wide edge-position canonicalization and a league-wide GM/Owner History table within Standings |
 | 7.3.8 | Production; owner accepted | Actionable commissioner import recovery, member-facing platform-callout cleanup, and retained Madden Cap Space display |
-| 7.4.0 | Locally validated review candidate | Shared Full Trade Center, advanced Trade Block, permanent pick ledger, shared settings/notifications, and Madden-authoritative roster reconciliation |
+| 7.4.0 | Production deployed; pending owner UI acceptance | Shared Full Trade Center, advanced Trade Block, permanent pick ledger, shared settings/notifications, and Madden-authoritative roster reconciliation |
+| 7.4.0.1 | Locally validated; Production authorized | Phased Madden cohort continuity, newly advanced-week empty-stat readiness, retained Week 10 source stitching, and truthful rejected-export diagnostics |
 | 7.4.1–7.4.6 | Planned | Transactions/history, Commissioner tools, GOTW/Confidence Pool, mobile polish, consistency, and operations |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Required before RC | Authentication and session framework |
@@ -275,6 +276,15 @@
 - Give every player a Trade action. Show the Trade Block star only to that roster's assigned owner; support player/pick listings and a desired-return note.
 - Migration 28 adds ten tenant-scoped shared workflow/ledger/notification/reconciliation tables plus database constraints for one active player overlay, one canonical transaction per workflow, and atomic draft-pick authority.
 - Gate: two authenticated owners see one workflow and notification lifecycle; three eligible reviewers resolve it; shared settings are revision-safe; two-to-four-team limits hold; owner/reviewer/commissioner and cross-tenant boundaries fail closed; stale revisions and stale pick authority cannot overwrite; Madden reconciliation is idempotent and invisible; phone and desktop layouts remain usable.
+
+## 7.4.0.1 — Madden Export Cohort and Advanced-Week Readiness Remediation
+
+- Keep a review-required automatic export cohort appendable for six hours so League Info, Rosters, and Weekly Stats delivered in adjacent Companion phases remain one revision.
+- Resolve repeated normalized routes to the newest immutable capture before analysis, preventing duplicate roster identities when a commissioner retries one phase.
+- Automatically stitch only recent compatible partial sessions. A conflict in observed franchise, week, or stage stops stitching; a successful stitch advances only the latest eligible report pointer.
+- Accept a newly advanced week with zero completed-game statistics only when explicit current-week Weekly Stats routes were captured. Missing routes remain a blocking source error.
+- Show domain-specific diagnostics for the newest rejected export and label the separate candidate panel as the last ready import so an older `9 / 9` report cannot be mistaken for Week 10.
+- Retained Week 10 reanalysis may create discovery-session, capture-link, report, and audit rows. It does not import, activate, reset, archive, transition, rotate the permanent URL, or reinterpret blocked Free Agents as zero.
 
 ## 7.4.1 — Transactions and League History
 

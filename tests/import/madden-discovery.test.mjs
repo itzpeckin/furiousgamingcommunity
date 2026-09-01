@@ -14,7 +14,11 @@ import {
 } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { hashToken } from '../../functions/_lib/auth.js';
 import { deriveLeagueExportToken } from '../../functions/_lib/permanent-league-export.js';
-import { recoverMaddenDiscoveryCohort } from '../../functions/_lib/madden-discovery-report.js';
+import {
+  generateMaddenDiscoveryReport,
+  recoverMaddenDiscoveryCohort,
+  stitchRecentPartialMaddenCohort
+} from '../../functions/_lib/madden-discovery-report.js';
 import { onRequestPost as startDiscoverySession } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-session.js';
 import { onRequestPost as generateDiscoveryReport } from '../../functions/api/leagues/[leagueSlug]/companion/discovery-report.js';
 import { onRequestPost as classifyDiscoveryCaptures } from '../../functions/api/leagues/[leagueSlug]/companion/classify.js';
@@ -259,6 +263,15 @@ test('records a successful explicit zero-player Free Agent response as precisely
   assert.equal(report.requirements['free-agents'].status, 'empty-confirmed');
   assert.equal(report.freeAgentEvidence.recordCount, 0);
   assert.equal(report.freeAgentEvidence.explicitRouteCaptured, true);
+});
+
+test('accepts explicit empty Weekly Stats routes immediately after a week advance', () => {
+  const captures=completeCaptureSet();
+  captures.at(-1).payload={playerPassingStatInfoList:[]};
+  const report=buildMaddenDiscoveryReport(captures,{expected});
+  assert.equal(report.requirements.statistics.status,'empty');
+  assert.equal(report.requirements.statistics.routes.length,1);
+  assert.equal(report.status,'passed');
 });
 
 test('does not accept an unsuccessful Free Agent response as an empty league', () => {
@@ -651,6 +664,102 @@ test('an existing shattered 43-route burst is recovered without importing or act
     assert.equal(exactClassification.classificationSummary.teams,1);
     assert.equal(exactClassification.classificationSummary.statistics,7);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
+  } finally {
+    database.close();
+  }
+});
+
+test('recent phased League Info, Rosters, and empty Weekly Stats are stitched into one ready Week 10 source', async () => {
+  const database=new DatabaseSync(':memory:');
+  try {
+    database.exec('PRAGMA foreign_keys = ON;');
+    for(const migration of MIGRATIONS)database.exec(await readFile(new URL(migration,import.meta.url),'utf8'));
+    database.prepare(`INSERT INTO leagues
+      (id,name,product_name,slug,public_status,tenant_status,timezone)
+      VALUES (?,?,?,?,?,?,?)`).run(
+        'league-stitch','Furious Gaming Community','FranchiseHQ','stitch-league','active','enabled','America/Chicago'
+      );
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(
+        'season-stitch','league-stitch','ea-madden-companion','742482','1','Madden NFL 27','Stitch Season',2026,'active'
+      );
+    database.prepare(`INSERT INTO league_game_years
+      (id,league_id,game_release,edition_year,display_name,status)
+      VALUES (?,?,?,?,?,'active')`).run(
+        'game-year-stitch','league-stitch','Madden NFL 27',27,'Madden NFL 27'
+      );
+    const sessionRows=[
+      ['stats-partial','stats-token','2026-08-31T22:38:00.000Z'],
+      ['base-partial','base-token','2026-08-31T22:39:00.000Z']
+    ];
+    for(const [id,token,lastCaptureAt] of sessionRows)database.prepare(`INSERT INTO madden_discovery_sessions
+      (id,league_id,token_hash,status,expected_game_release,expected_league_name,expected_season,
+       expires_at,last_capture_at,created_at,updated_at)
+      VALUES (?,?,'${token}','review_required','Madden NFL 27','Furious Gaming Community','1',?,?,?,?)`).run(
+        id,'league-stitch','2099-01-01T00:00:00.000Z',lastCaptureAt,lastCaptureAt,lastCaptureAt
+      );
+    const captures=liveLikeRosterCaptureSet().filter(item=>!item.routePath.endsWith('/league'));
+    const schedule=captures.find(item=>item.routePath.endsWith('/schedules'));
+    schedule.routePath='xbsx/742482/week/reg/10/schedules';
+    const passing=captures.find(item=>item.routePath.endsWith('/passing'));
+    passing.routePath='xbsx/742482/week/reg/10/passing';
+    passing.payload={playerPassingStatInfoList:[]};
+    for(const category of ['receiving','defense','punting','rushing','kicking','team'])captures.push(capture(
+      `xbsx/742482/week/reg/10/${category}`,
+      {[`player${category[0].toUpperCase()}${category.slice(1)}StatInfoList`]:[]},3_900+captures.length
+    ));
+    assert.equal(captures.length,43);
+    const binding=d1(database),r2=memoryR2();
+    for(let index=0;index<captures.length;index+=1){
+      const item=captures[index];
+      const weekly=/\/week\/reg\/10\//.test(item.routePath);
+      const sessionId=weekly?'stats-partial':'base-partial';
+      const id=`stitch-capture-${index}`,key=`stitch/${id}.json`;
+      const encoded=new TextEncoder().encode(JSON.stringify(item.payload));
+      await r2.put(key,encoded.buffer);
+      const observedAt=weekly?'2026-08-31T22:38:00.000Z':'2026-08-31T22:39:00.000Z';
+      database.prepare(`INSERT INTO companion_route_captures
+        (id,league_id,discovery_session_id,route_path,request_method,content_type,byte_length,
+         payload_hash,r2_object_key,top_level_keys_json,collections_json,request_headers_json,received_at)
+        VALUES (?,?,?,?,'POST','application/json',?,?,?,?,?,?,?)`).run(
+          id,'league-stitch',sessionId,item.routePath,encoded.byteLength,`stitch-hash-${index}`,
+          key,'[]','[]','{}',observedAt
+        );
+      database.prepare(`INSERT INTO madden_discovery_session_captures
+        (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`).run(
+          'league-stitch',sessionId,id,item.routePath,observedAt
+        );
+    }
+    for(const sessionId of ['stats-partial','base-partial'])database.prepare(`UPDATE madden_discovery_sessions SET
+      capture_count=(SELECT COUNT(*) FROM madden_discovery_session_captures WHERE league_id='league-stitch' AND session_id=?)
+      WHERE id=?`).run(sessionId,sessionId);
+    database.prepare(`UPDATE companion_league_export_endpoints SET latest_session_id='base-partial',
+      latest_session_token_version=token_version,last_received_at='2026-08-31T22:39:00.000Z'
+      WHERE league_id='league-stitch'`).run();
+    const env={COMPANION_EXPORTS:r2};
+    await generateMaddenDiscoveryReport({db:binding,env,leagueId:'league-stitch',sessionId:'stats-partial'});
+    await generateMaddenDiscoveryReport({db:binding,env,leagueId:'league-stitch',sessionId:'base-partial'});
+    const stitched=await stitchRecentPartialMaddenCohort({
+      db:binding,env,leagueId:'league-stitch',anchorSessionId:'base-partial'
+    });
+    assert.equal(stitched.stitched,true);
+    assert.equal(stitched.ready,true);
+    assert.equal(stitched.selectedRouteCount,43);
+    const endpoint=database.prepare(`SELECT * FROM companion_league_export_endpoints
+      WHERE league_id='league-stitch'`).get();
+    assert.equal(endpoint.latest_session_id,stitched.sessionId);
+    assert.equal(endpoint.latest_ready_report_id,stitched.reportId);
+    const report=database.prepare(`SELECT requirement_results_json,source_verification_json
+      FROM madden_discovery_reports WHERE id=?`).get(stitched.reportId);
+    const requirements=JSON.parse(report.requirement_results_json);
+    assert.equal(requirements.statistics.status,'empty');
+    assert.equal(requirements.statistics.routes.length,7);
+    assert.equal(JSON.parse(report.source_verification_json).passed,true);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM tenant_audit_events
+      WHERE action='companion.export_cohort.auto_stitch'`).get().count,1);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   } finally {
     database.close();

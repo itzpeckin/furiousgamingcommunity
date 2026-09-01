@@ -37,6 +37,9 @@ export function reportImportReadiness(report = {}) {
   const players = report.playerImportReadiness || requirements?.players?.assignmentEvidence || {};
   const freeAgentStatus = text(report.freeAgentEvidence?.status || requirements?.['free-agents']?.status || 'missing').toLowerCase();
   const located = name => text(requirements?.[name]?.status).toLowerCase() === 'located';
+  const explicitEmptyStatistics = text(requirements?.statistics?.status).toLowerCase() === 'empty'
+    && Array.isArray(requirements?.statistics?.routes)
+    && requirements.statistics.routes.length > 0;
   const sourcePassed = report.sourceVerification?.passed === true;
   const ready = sourcePassed
     && located('teams')
@@ -44,7 +47,7 @@ export function reportImportReadiness(report = {}) {
     && located('players')
     && located('standings')
     && located('schedule')
-    && located('statistics')
+    && (located('statistics') || explicitEmptyStatistics)
     && players.canBuildRosteredPlayerPreview === true
     && ['located', 'empty-confirmed', 'blocked'].includes(freeAgentStatus);
   return {
@@ -60,7 +63,7 @@ export function reportImportReadiness(report = {}) {
 }
 
 export function permanentExportPublicState({ endpoint, latestSession, latestReport, readyReport, candidateRun } = {}) {
-  const captureCount = Number(latestSession?.capture_count || latestReport?.capture_count || 0);
+  const captureCount = Number(latestReport?.capture_count || latestSession?.capture_count || 0);
   const latestReportId = latestReport?.id || null;
   const readyReportId = readyReport?.id || null;
   const status = !endpoint || endpoint.status !== 'active'

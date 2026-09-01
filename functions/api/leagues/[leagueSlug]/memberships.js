@@ -13,7 +13,7 @@ import {
 } from "../../../_lib/league-teams.js";
 import { ownershipChangeStatements } from "../../../_lib/ownership-periods.js";
 
-const RELEASE = "7.4.0";
+const RELEASE = "7.4.0.1";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;

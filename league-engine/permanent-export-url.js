@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.4.0 */
+/* FHQ_BUILD: 7.4.0.1 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.4.0';
+  const VERSION = '7.4.0.1';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -173,6 +173,7 @@
       </div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> Week ${esc(latest.capturedWeek)} games and statistics can be added while live Week ${esc(latest.activeSnapshotWeek)} teams, rosters, players, standings, and week position remain unchanged.</span></div>`:''}
       ${sourceIssue?`<section class="commissioner-import-recovery commissioner-import-recovery--warning"><div><h3>${esc(sourceIssue.title)}</h3><p>${esc(sourceIssue.summary)}</p><p><strong>What to do:</strong> ${esc(sourceIssue.action)}</p></div></section>`:''}
+      ${Array.isArray(latest.readinessProblems)&&latest.readinessProblems.length?`<details class="commissioner-import-source-notes" open><summary>Latest rejected export diagnostics</summary><ul>${latest.readinessProblems.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
       ${actionIssue?`<section class="commissioner-import-recovery" role="alert"><div><h3>${esc(actionIssue.title)}</h3><p>${esc(actionIssue.summary)}</p><p><strong>What to do:</strong> ${esc(actionIssue.action)}</p></div></section>`:''}
       <div class="league-import-framework-actions">
         <button class="button button--secondary" data-copy-permanent-export-url ${busy || !endpointState.exportUrl ? 'disabled' : ''}>${copied ? 'URL Copied' : 'Copy League Export URL'}</button>
