@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** August 31, 2026
+**Updated:** September 1, 2026
 
-**Revision:** 1.70
+**Revision:** 1.71
 
-**Current production:** 7.4.0 implementation `b17e124` is merged to Main as `3c5cfc8` and live on Pages deployment `03c111d0`; exact implementation Worker build `7131fe69` passed. Additive migration 28 is applied with 90 canonical tables and no foreign-key violations. Madden 27 Week 9 snapshot `b00edb25` remains active, with snapshot `518236e4` retained as its previous pointer.
+**Current production:** 7.4.0.1 is merged to Main as `f04a415`. Additive migration 28 remains applied with 90 canonical tables and no foreign-key violations. The latest 43-route All Weeks import activated malformed snapshot `ab083570`, whose 14 schedule rows and six statistic rows were assigned to Regular Season Week 0. Prior valid Week 9 snapshot `b00edb25` remains retained.
 
-**Current work:** 7.4.0.1 is locally validated and Production-authorized from Main `3c5cfc8`. A real Week 10 attempt arrived as a rejected 35-route partial source while the last eligible 43-route Week 9 report remained selected. The patch keeps adjacent phased exports appendable, selects the newest capture per route, safely stitches compatible retained partial sessions, accepts explicitly captured zero-row Weekly Stats routes for a newly advanced week, and shows diagnostics for the actual rejected source. The consolidated strict gate passed 146 tests with zero failures.
+**Current work:** 7.4.0.2 is locally validated and Production-authorized from Main `f04a415`. The remediation recognizes non-empty `/week/reg/0/` All Weeks routes as aggregate routes, resolves their zero-based payload `stageIndex: 1, weekIndex: 9` to Regular Season Week 10, preserves normal route authority, and treats empty Week 0 routes as non-playable placeholders. The corrected source evidence creates a new candidate fingerprint, while malformed Week 0 rows are excluded from Week 10 carry-forward.
 
-**Next gate:** Consolidated 7.4.0.1 validation, PR/hosted checks, merge to Main, Production deployment, and retained Week 10 source reanalysis. Reanalysis may create only discovery session/report/link and audit evidence. Do not run a candidate import, activate a snapshot, reset data, archive or transition a season, rotate the export URL, or reinterpret blocked Free Agents as zero.
+**Next gate:** Publish 7.4.0.2, pass hosted checks, merge to Main, deploy Production, reanalyze the retained 43-route source, build and validate one corrected Week 10 candidate, and atomically activate it. Stop unless Week 10 schedule/statistics coverage and snapshot validation pass. Do not request another export, reset or delete data, rotate the URL, archive or transition a season, or reinterpret blocked Free Agents as zero. Retain the malformed and prior snapshots and all audits.
 
 ## Product decisions
 
@@ -37,7 +37,7 @@
 - The real FGC capture received 43 requests (10.17 MB) in 0.448 seconds. It contained 32 teams, all 32 team rosters, 2,044 unique rostered players, standings, 14 current-week games, and 510 statistics rows.
 - All 2,044 captured team-roster players have a valid team assignment and `isFreeAgent: false`; 2,031 are active and 13 are inactive. No duplicate roster identifiers or unassigned players were found.
 - Madden's explicit `xbsx/742482/freeagents/roster` response failed upstream with an empty `rosterInfoList`. This is recorded as **blocked**, not as proof of zero Free Agents. It does not block safe rostered-player preview work, but FranchiseHQ cannot claim a complete player pool until a successful or explicitly empty Free Agent response is received.
-- The owner authorized the Madden 26-to-27 Production transition. Madden 26 is no longer attached to the live application: its D1 database is retained as a detached relational archive, a private 38-table/76,712-row archive was verified, and 1,295 obsolete raw R2 objects were permanently deleted. The clean Madden 27 Production database preserves the league and account plane while clearing all eight legacy team assignments. Validated Week 9 snapshot `b00edb25` is active; prior snapshots `518236e4`, `8b47ec76`, and Week 7 snapshot `841ce1b5` remain retained for explicit recovery.
+- The owner authorized the Madden 26-to-27 Production transition. Madden 26 is no longer attached to the live application: its D1 database is retained as a detached relational archive, a private 38-table/76,712-row archive was verified, and 1,295 obsolete raw R2 objects were permanently deleted. The clean Madden 27 Production database preserves the league and account plane while clearing all eight legacy team assignments. Malformed All Weeks snapshot `ab083570` is currently active; valid Week 9 snapshot `b00edb25` and prior snapshots `518236e4`, `8b47ec76`, and Week 7 snapshot `841ce1b5` remain retained for explicit recovery.
 
 ## Release tracker
 
@@ -65,7 +65,8 @@
 | 7.3.7.1 | Released; owner accepted | Platform-wide edge-position canonicalization and a league-wide GM/Owner History table within Standings |
 | 7.3.8 | Production; owner accepted | Actionable commissioner import recovery, member-facing platform-callout cleanup, and retained Madden Cap Space display |
 | 7.4.0 | Production deployed; pending owner UI acceptance | Shared Full Trade Center, advanced Trade Block, permanent pick ledger, shared settings/notifications, and Madden-authoritative roster reconciliation |
-| 7.4.0.1 | Locally validated; Production authorized | Phased Madden cohort continuity, newly advanced-week empty-stat readiness, retained Week 10 source stitching, and truthful rejected-export diagnostics |
+| 7.4.0.1 | Production | Phased Madden cohort continuity, newly advanced-week empty-stat readiness, retained Week 10 source stitching, and truthful rejected-export diagnostics |
+| 7.4.0.2 | Locally validated; Production authorized | All Weeks `/reg/0/` payload-period correction and retained-source Week 10 rebuild/atomic activation |
 | 7.4.1–7.4.6 | Planned | Transactions/history, Commissioner tools, GOTW/Confidence Pool, mobile polish, consistency, and operations |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Required before RC | Authentication and session framework |
@@ -285,6 +286,15 @@
 - Accept a newly advanced week with zero completed-game statistics only when explicit current-week Weekly Stats routes were captured. Missing routes remain a blocking source error.
 - Show domain-specific diagnostics for the newest rejected export and label the separate candidate panel as the last ready import so an older `9 / 9` report cannot be mistaken for Week 10.
 - Retained Week 10 reanalysis may create discovery-session, capture-link, report, and audit rows. It does not import, activate, reset, archive, transition, rotate the permanent URL, or reinterpret blocked Free Agents as zero.
+
+## 7.4.0.2 — All Weeks Sentinel Remediation
+
+- Treat a non-empty `/week/reg/0/` schedule or statistics route as Madden's All Weeks current-period aggregate only when its payload proves one consistent zero-based period.
+- Resolve Production payload `stageIndex: 1, weekIndex: 9` to canonical Regular Season Week 10 in report markers, dataset inventory, schedule mapping, statistics mapping, candidate coverage, and snapshot construction.
+- Preserve nonzero route authority unchanged. Empty `/week/reg/0/` routes remain harmless lifecycle placeholders and cannot manufacture a playable Week 0.
+- Include canonical period evidence in the sanitized source fingerprint so the malformed already-live candidate is not reused.
+- Exclude malformed Week 0 rows from Week 10 carry-forward using retained raw source provenance. Retain the malformed snapshot, prior Week 9 snapshot, raw captures, reports, candidates, and audits for recovery.
+- Gate: deploy the exact validated code, reanalyze the retained 43-route source without another export, require a validation-ready Week 10 candidate, then atomically activate and verify it. No reset, deletion, URL rotation, season archive, game-year transition, migration, or blocked-Free-Agent reinterpretation is allowed.
 
 ## 7.4.1 — Transactions and League History
 

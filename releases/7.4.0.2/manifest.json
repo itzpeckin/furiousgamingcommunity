@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.2",
+  "releaseType": "production-all-weeks-sentinel-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.0.1",
+    "commit": "f04a41529fa901836ef7d49adf8789a281b7626f",
+    "tree": "e2168b3077e845edee3805d12ddfbedd0aba344a",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.0.2",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "not-run",
+    "commit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0
+  },
+  "staging": { "authorized": false, "deployed": false, "status": "not-run" },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.4.0.1",
+    "currentCommit": "f04a41529fa901836ef7d49adf8789a281b7626f",
+    "currentMigration": 28,
+    "activeSnapshot": "ab083570-091a-4583-a8f7-54b99087e87a",
+    "previousSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "scope": "Deploy the sentinel correction, reanalyze the retained 43-route source, build and validate one corrected Week 10 candidate, and atomically activate it. Retain both existing snapshots and all audit evidence."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/madden-period.js",
+    "functions/_lib/madden-discovery.js",
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "tests/import/madden-discovery.test.mjs",
+    "tests/import/candidate-import.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.0.2/release-record.md",
+    "releases/7.4.0.2/validation-evidence.json"
+  ]
+}

@@ -4,7 +4,7 @@ import { activeLeagueTeams, resolveTeam } from '../../../../_lib/league-teams.js
 import { normalizePublicPlayerId, publicPlayerPath, normalizePublicTeamSlug } from '../../../../_lib/public-identity-routes.js';
 import { normalizePlayer } from '../snapshot/read-model.js';
 
-const RELEASE = '7.4.0.1';
+const RELEASE = '7.4.0.2';
 const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
 const canonicalPosition = value => {
   const position=String(value||'').trim().toUpperCase().replace(/[_ -]+/g,'');
