@@ -1,8 +1,8 @@
 # FranchiseHQ 7.4.0.1 Release Record
 
-**Status:** Locally validated Production-authorized candidate
+**Status:** Production deployed and verified; retained Week 10 source remains incomplete
 
-**Production changed:** Not yet. Production remains on 7.4.0 with active Week 9 snapshot `b00edb25-ac65-40d4-9969-431f94dd1e3e`.
+**Production changed:** Yes, within the authorized code-only remediation scope. Exact implementation commit `900f63ac5e148447246c97869f383a56ec0e4e7b` is merged to Main as `f04a41529fa901836ef7d49adf8789a281b7626f` and live as Pages deployment `61151621-9121-4469-a3b0-ee67832d4b4d`. The retained-source check did not import or activate a snapshot; the live week remains Week 9.
 
 ## Scope
 
@@ -38,8 +38,12 @@ Focused tests cover phased cohort continuity, newest-route replacement, cross-we
 
 ## Deployment status
 
-The strict 146-test gate passed with 221 JavaScript modules, 553 inventoried files, 69 routes, 90 required tables, and zero failures. Publication and Production deployment remain pending. Production remains on 7.4.0 and migration 28; the active Week 9 snapshot is unchanged.
+The strict 146-test gate passed with 221 JavaScript modules, 553 inventoried files, 69 routes, 90 required tables, and zero failures. PR #32 published the exact implementation commit and passed 4/4 pull-request checks. Main merge `f04a41529fa901836ef7d49adf8789a281b7626f` passed all five Main/build/deployment checks. Production reports release 7.4.0.1 on Pages deployment `61151621-9121-4469-a3b0-ee67832d4b4d`; migration 28 remains current and no migration ran.
+
+The authorized Production reanalysis inspected the retained 8/31/2026 10:39:21 PM source. It contains 35 routes, 32 teams, and 2,038 rostered players, but no current-week schedule route, no current-week Weekly Stats routes, and no authoritative Week 10 marker. It therefore remains **Review required** with captured week unknown. No compatible retained route fragments existed to complete it, so another Companion export using the same permanent URL is required. The commissioner should send League Info, Rosters, and Weekly Stats again; once those routes arrive, the six-hour cohort and explicit-empty-stat handling can make the source eligible without inventing data.
+
+No candidate import, activation, reset, Archive Season, game-year transition, URL rotation, membership/credential change, or staging run occurred. The live week remains Week 9 and blocked Madden Free Agents remain unknown/null.
 
 ## Rollback
 
-Restore the accepted 7.4.0 Main runtime and Pages deployment `03c111d0-a4d9-458e-b91c-9ece937016d0`. Retain all discovery captures, stitched session/report/link rows, and audit evidence. Rollback must not import data, move the active snapshot, rotate the export URL, or delete retained source evidence.
+Restore the accepted 7.4.0 Main runtime and Pages deployment `03c111d0-a4d9-458e-b91c-9ece937016d0`. Retain all discovery captures, session/report/link rows, and audit evidence. Rollback must not import data, move the active snapshot, rotate the export URL, or delete retained source evidence.

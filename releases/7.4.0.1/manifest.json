@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.4.0.1",
   "releaseType": "production-import-cohort-readiness-remediation",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.4.0",
@@ -19,22 +19,38 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "not-run",
-    "commit": null,
-    "pullRequest": null,
-    "hostedChecksPassed": 0
+    "status": "published-main-accepted",
+    "commit": "900f63ac5e148447246c97869f383a56ec0e4e7b",
+    "mainCommit": "f04a41529fa901836ef7d49adf8789a281b7626f",
+    "pullRequest": 32,
+    "pullRequestChecksPassed": 4,
+    "mainChecksPassed": 5
   },
   "staging": { "authorized": false, "deployed": false, "status": "not-run" },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.4.0",
-    "currentCommit": "3c5cfc8004a7f18f0ed86b5722ed9a3e0f4c2974",
-    "currentPagesDeployment": "03c111d0-a4d9-458e-b91c-9ece937016d0",
-    "currentWorkerBuild": "7131fe69-1537-43cd-b0ee-e2ca60a03761",
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.4.0.1",
+    "currentCommit": "f04a41529fa901836ef7d49adf8789a281b7626f",
+    "implementationCommit": "900f63ac5e148447246c97869f383a56ec0e4e7b",
+    "currentPagesDeployment": "61151621-9121-4469-a3b0-ee67832d4b4d",
+    "exactImplementationWorkerBuild": "c2d5d0fd-bcf9-4dae-be29-083424baea57",
     "currentMigration": 28,
     "activeSnapshot": "b00edb25-ac65-40d4-9969-431f94dd1e3e",
+    "liveWeek": 9,
+    "retainedSourceReanalysis": {
+      "status": "completed-source-remains-incomplete",
+      "capturedAt": "2026-08-31T22:39:21-05:00",
+      "capturedRoutes": 35,
+      "teams": 32,
+      "rosteredPlayers": 2038,
+      "capturedWeek": null,
+      "missingCurrentWeekSchedule": true,
+      "missingCurrentWeekStatistics": true,
+      "missingAuthoritativeCurrentWeekMarker": true,
+      "anotherExportRequired": true
+    },
     "scope": "Code-only Production remediation plus automatic structural reanalysis of retained partial Week 10 capture links. No candidate import, activation, reset, archive, transition, URL rotation, or Free Agent reinterpretation."
   },
   "requiredArtifacts": [
