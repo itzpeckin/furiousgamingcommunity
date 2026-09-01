@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.3.8",
   "validatedOn": "2026-08-31",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "baselineGate": { "passed": true, "unregisteredFailures": 0 },
   "checks": {
     "actionableImportGuidance": {
@@ -79,14 +79,25 @@
       "inventoryFiles": 547,
       "routes": 68,
       "requiredTables": 80
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified",
+      "releaseHeader": "7.3.8",
+      "applicationAssetBytes": 619176,
+      "importRecoveryAssetBytes": 28918,
+      "actionableImportGuidanceVerified": true,
+      "platformCalloutCleanupVerified": true,
+      "protectedApiBoundaryVerified": true,
+      "reason": "Live HTTPS surfaces report release 7.3.8; the exact importer asset contains persistent recovery, commissioner next-action, support-code, and current-data-preservation behavior, while protected league data still requires authentication."
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
     "resetPerformed": false,
     "transitionOperationExecuted": false,
     "archiveSeasonExecuted": false,
@@ -104,15 +115,16 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0, "failed": 0, "pending": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "commit": "677c226b9289dda4dc4f84fbbe6245e912330541", "pullRequest": 30 },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestPassed": 4, "mainPassed": 5, "failed": 0, "pending": 0 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRuntimeCommit": "25b218956ef775fee3e1a04e0f0bef6001547b21",
-      "pagesDeployment": "64140548-d20a-411f-8d81-17649cdfe8fa",
-      "workerBuild": "53833ba4-28db-4ff7-bff8-053c1d8e8095",
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-owner-acceptance",
+      "currentRuntimeCommit": "677c226b9289dda4dc4f84fbbe6245e912330541",
+      "pagesDeployment": "2f96f87a-3a79-40b6-8ae6-296fb19d3a28",
+      "workerBuild": "44c70449-57eb-4db8-ac29-f86536d56a49",
+      "workerSourceChanged": false,
       "databaseRowsWrittenByCandidateWork": 0
     },
     "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 27, "candidateMigration": 27 },
@@ -121,7 +133,7 @@
     "archiveSeason": { "authorized": false, "status": "not-run" },
     "gameYearTransition": { "authorized": false, "status": "not-run" }
   },
-  "productionChanged": false,
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false

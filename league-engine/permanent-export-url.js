@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.8 */
+/* FHQ_BUILD: 7.4.0 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.3.8';
+  const VERSION = '7.4.0';
   let state = null;
   let busy = false;
   let errorMessage = '';

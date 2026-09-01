@@ -44,11 +44,11 @@ test('only missing canonical migrations are planned', () => {
   assert.deepEqual(pendingMigrations(ledger, migrations).map(item => item.version), [19, 20]);
 });
 
-test('canonical migration loading includes GM career history', async () => {
+test('canonical migration loading includes the full Trade Center', async () => {
   const { contract, migrations } = await loadCanonicalMigrations();
-  assert.equal(contract.currentVersion, 27);
-  assert.equal(migrations.at(-1)?.version, 27);
-  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0027_gm_career_history.sql');
+  assert.equal(contract.currentVersion, 28);
+  assert.equal(migrations.at(-1)?.version, 28);
+  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0028_full_trade_center.sql');
   const tenantMigration = migrations.find(item => item.version === 21);
   assert.equal(
     tenantMigration?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,

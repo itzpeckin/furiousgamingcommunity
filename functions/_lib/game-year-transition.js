@@ -1,6 +1,6 @@
 import { sha256Hex } from './cloud-platform.js';
 
-export const GAME_YEAR_TRANSITION_RELEASE = '7.3.8';
+export const GAME_YEAR_TRANSITION_RELEASE = '7.4.0';
 export const GAME_YEAR_ARCHIVE_FORMAT = 1;
 
 export const GAME_YEAR_OPERATIONS = Object.freeze({
@@ -48,6 +48,16 @@ export const ARCHIVE_DATASETS = Object.freeze([
   'canonical_transactions',
   'canonical_transaction_evidence',
   'canonical_historical_player_states',
+  'trade_workflows',
+  'league_draft_picks',
+  'trade_workflow_participants',
+  'trade_workflow_assets',
+  'trade_workflow_messages',
+  'trade_workflow_reviews',
+  'trade_block_listings',
+  'league_notifications',
+  'trade_roster_overlays',
+  'trade_reconciliation_events',
   'companion_candidate_import_runs',
   'identity_preview_runs',
   'identity_preview_teams',

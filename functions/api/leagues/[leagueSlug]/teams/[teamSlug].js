@@ -3,7 +3,7 @@ import { requireActiveMembership } from '../../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../../_lib/league-teams.js';
 import { normalizePublicTeamSlug, publicTeamPath } from '../../../../_lib/public-identity-routes.js';
 
-const RELEASE = '7.3.8';
+const RELEASE = '7.4.0';
 
 export async function onRequestGet(context) {
   const authorization = await requireActiveMembership(context);

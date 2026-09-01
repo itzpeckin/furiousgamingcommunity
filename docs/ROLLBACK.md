@@ -1,8 +1,8 @@
 # FranchiseHQ Rollback and Recovery
 
-## 7.3.8 importer-health and display-cleanup candidate impact
+## 7.3.8 importer-health and display-cleanup Production impact
 
-The local 7.3.8 candidate is code-only. It adds actionable importer failure guidance, removes customer-facing snapshot/validation and controlled-beta implementation callouts, and restores explicit Madden Cap Space from the already-retained nested team/standing source record. It adds no migration, estimates no missing Cap Space, and performs no export, import, snapshot, archive, transition, membership, credential, or Production data operation.
+Exact 7.3.8 commit `677c226b9289dda4dc4f84fbbe6245e912330541` is live on Production Pages deployment `2f96f87a-3a79-40b6-8ae6-296fb19d3a28` with exact-commit Worker build `44c70449-57eb-4db8-ac29-f86536d56a49`. The code-only release adds actionable importer failure guidance, removes customer-facing snapshot/validation and controlled-beta implementation callouts, and restores explicit Madden Cap Space from the already-retained nested team/standing source record. It added no migration, estimated no missing Cap Space, and performed no export, import, snapshot, archive, transition, membership, credential, or Production data operation.
 
 The immutable runtime rollback baseline is exact accepted 7.3.7.1 commit `25b218956ef775fee3e1a04e0f0bef6001547b21` and Pages deployment `64140548-d20a-411f-8d81-17649cdfe8fa`. Retain migration 27, all GM identities and ownership periods, memberships, roles, users, sessions, settings, rules, audits, imports, captures, snapshots, and permanent export-URL state.
 

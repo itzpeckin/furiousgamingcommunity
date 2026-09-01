@@ -53,6 +53,16 @@ const RESTORE_ORDER = Object.freeze([
   'snapshot_validation_jobs',
   'snapshot_validation_player_ids',
   'league_snapshot_lifecycle_events',
+  'trade_workflows',
+  'league_draft_picks',
+  'trade_workflow_participants',
+  'trade_workflow_assets',
+  'trade_workflow_messages',
+  'trade_workflow_reviews',
+  'trade_block_listings',
+  'trade_roster_overlays',
+  'trade_reconciliation_events',
+  'league_notifications',
   'canonical_statistics_snapshot_manifest',
   'import_performance_certifications',
   'canonical_roster_snapshots',
@@ -208,6 +218,9 @@ function datasetQueries(leagueId, gameYearId) {
     JOIN companion_import_destinations destination ON destination.id=run.destination_id
     WHERE run.league_id=? AND destination.game_year_id=? AND ${column} IS NOT NULL`;
   const args = [leagueId, gameYearId];
+  const seasonScope = `SELECT franchise_season_id FROM game_year_franchise_seasons WHERE league_id=? AND game_year_id=?`;
+  const tradeScope = `SELECT id FROM trade_workflows WHERE league_id=? AND franchise_season_id IN (${seasonScope})`;
+  const pickScope = `SELECT id FROM league_draft_picks WHERE league_id=? AND franchise_season_id IN (${seasonScope})`;
   return {
     league_snapshots:[`SELECT * FROM league_snapshots WHERE league_id=? AND id IN (${snapshotScope}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
     league_snapshot_records:[`SELECT * FROM league_snapshot_records WHERE league_id=? AND snapshot_id IN (${snapshotScope}) ORDER BY snapshot_id,domain,external_id`, [leagueId, leagueId, gameYearId]],
@@ -225,6 +238,16 @@ function datasetQueries(leagueId, gameYearId) {
     canonical_transactions:[`SELECT * FROM canonical_transactions WHERE league_id=? AND (first_snapshot_id IN (${snapshotScope}) OR last_snapshot_id IN (${snapshotScope})) ORDER BY id`, [leagueId, leagueId, gameYearId, leagueId, gameYearId]],
     canonical_transaction_evidence:[`SELECT * FROM canonical_transaction_evidence WHERE league_id=? AND snapshot_id IN (${snapshotScope}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
     canonical_historical_player_states:[`SELECT * FROM canonical_historical_player_states WHERE league_id=? AND snapshot_id IN (${snapshotScope}) ORDER BY snapshot_id,player_id`, [leagueId, leagueId, gameYearId]],
+    trade_workflows:[`SELECT * FROM trade_workflows WHERE league_id=? AND franchise_season_id IN (${seasonScope}) ORDER BY id`, [leagueId,leagueId,gameYearId]],
+    league_draft_picks:[`SELECT * FROM league_draft_picks WHERE league_id=? AND franchise_season_id IN (${seasonScope}) ORDER BY id`, [leagueId,leagueId,gameYearId]],
+    trade_workflow_participants:[`SELECT * FROM trade_workflow_participants WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,team_key`, [leagueId,leagueId,leagueId,gameYearId]],
+    trade_workflow_assets:[`SELECT * FROM trade_workflow_assets WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,revision,ordinal,id`, [leagueId,leagueId,leagueId,gameYearId]],
+    trade_workflow_messages:[`SELECT * FROM trade_workflow_messages WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,created_at,id`, [leagueId,leagueId,leagueId,gameYearId]],
+    trade_workflow_reviews:[`SELECT * FROM trade_workflow_reviews WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,revision,reviewer_user_id`, [leagueId,leagueId,leagueId,gameYearId]],
+    trade_block_listings:[`SELECT * FROM trade_block_listings WHERE league_id=? AND (trade_block_listings.draft_pick_id IN (${pickScope}) OR trade_block_listings.draft_pick_id IS NULL) ORDER BY id`, [leagueId,leagueId,leagueId,gameYearId]],
+    league_notifications:[`SELECT * FROM league_notifications WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY created_at,id`, [leagueId,leagueId,leagueId,gameYearId]],
+    trade_roster_overlays:[`SELECT * FROM trade_roster_overlays WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,player_identity_id`, [leagueId,leagueId,leagueId,gameYearId]],
+    trade_reconciliation_events:[`SELECT * FROM trade_reconciliation_events WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,player_identity_id,snapshot_id`, [leagueId,leagueId,leagueId,gameYearId]],
     companion_candidate_import_runs:[`SELECT run.* FROM companion_candidate_import_runs run JOIN companion_import_destinations destination ON destination.id=run.destination_id WHERE run.league_id=? AND destination.game_year_id=? ORDER BY run.id`, args],
     identity_preview_runs:[`SELECT * FROM identity_preview_runs WHERE league_id=? AND id IN (${identityScope}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
     identity_preview_teams:[`SELECT * FROM identity_preview_teams WHERE league_id=? AND preview_run_id IN (${identityScope}) ORDER BY preview_run_id,team_external_id`, [leagueId, leagueId, gameYearId]],
@@ -610,6 +633,9 @@ async function removeActiveData(current, gameYear, transition, body) {
   const statisticsRunIds = unique((data.companion_statistics_mapping_runs || []).map(row=>row.id));
   const sessionIds = unique((data.madden_discovery_sessions || []).map(row=>row.id));
   const captureIds = unique((data.companion_route_captures || []).map(row=>row.id));
+  const tradeIds = unique((data.trade_workflows || []).map(row=>row.id));
+  const pickIds = unique((data.league_draft_picks || []).map(row=>row.id));
+  const listingIds = unique((data.trade_block_listings || []).map(row=>row.id));
   const statements = [
     ...deleteWhere(current.db,'identity_preview_players','preview_run_id',identityRunIds),
     ...deleteWhere(current.db,'identity_preview_teams','preview_run_id',identityRunIds),
@@ -629,8 +655,18 @@ async function removeActiveData(current, gameYear, transition, body) {
     ...deleteWhere(current.db,'companion_dataset_inspections','capture_id',captureIds),
     ...deleteWhere(current.db,'companion_route_captures','id',captureIds),
     ...deleteWhere(current.db,'madden_discovery_sessions','id',sessionIds),
+    ...deleteWhere(current.db,'league_notifications','trade_id',tradeIds),
+    ...deleteWhere(current.db,'trade_reconciliation_events','trade_id',tradeIds),
+    ...deleteWhere(current.db,'trade_roster_overlays','trade_id',tradeIds),
+    ...deleteWhere(current.db,'trade_workflow_reviews','trade_id',tradeIds),
+    ...deleteWhere(current.db,'trade_workflow_messages','trade_id',tradeIds),
+    ...deleteWhere(current.db,'trade_workflow_assets','trade_id',tradeIds),
+    ...deleteWhere(current.db,'trade_workflow_participants','trade_id',tradeIds),
+    ...deleteWhere(current.db,'trade_block_listings','id',listingIds),
     ...deleteWhere(current.db,'canonical_transaction_evidence','transaction_id',transactionIds),
     ...deleteWhere(current.db,'canonical_transactions','id',transactionIds),
+    ...deleteWhere(current.db,'trade_workflows','id',tradeIds),
+    ...deleteWhere(current.db,'league_draft_picks','id',pickIds),
     ...deleteWhere(current.db,'transaction_movement_classifications','movement_id',movementIds),
     ...deleteWhere(current.db,'forward_roster_movements','id',movementIds),
     ...deleteWhere(current.db,'forward_detection_jobs','current_snapshot_id',snapshotIds),

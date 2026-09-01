@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0",
+  "validatedOn": "2026-08-31",
+  "status": "validated-review-candidate",
+  "baselineGate": { "passed": true, "unregisteredFailures": 0 },
+  "checks": {
+    "sharedTradeWorkflow": {
+      "passed": true,
+      "serverAuthoritative": true,
+      "minimumTeams": 2,
+      "maximumTeams": 4,
+      "offers": true,
+      "counters": true,
+      "accepts": true,
+      "rejects": true
+    },
+    "committeeReview": {
+      "passed": true,
+      "defaultMatchingVotes": 3,
+      "participantConflictRecusal": true,
+      "optionalRejectionReason": true,
+      "freeTradeDesignation": true
+    },
+    "sharedNotifications": {
+      "passed": true,
+      "received": true,
+      "accepted": true,
+      "reviewRequired": true,
+      "approved": true,
+      "rejected": true,
+      "loginSurface": true
+    },
+    "draftPickLedger": {
+      "passed": true,
+      "verifiedMaddenRouteAvailable": false,
+      "permanentIdentity": true,
+      "commissionerBaseline": true,
+      "approvedOwnershipMovement": true,
+      "retradeByNewOwner": true,
+      "staleApprovalAborts": true
+    },
+    "tradeBlockOwnership": {
+      "passed": true,
+      "ownerOnlyPlayerStar": true,
+      "ownerOnlyPickControl": true,
+      "requestedReturn": true,
+      "playerAndPickListings": true
+    },
+    "sharedCommissionerSettings": {
+      "passed": true,
+      "optimisticRevision": true,
+      "seasonTradeLimit": true,
+      "perTeamPlayerLimit": true,
+      "perTeamPickLimit": true,
+      "freeTradeToggle": true,
+      "calculatorToggle": true,
+      "valueWeights": true,
+      "draftRoundValues": true,
+      "futurePickRetention": true
+    },
+    "maddenRosterAuthority": {
+      "passed": true,
+      "immediateFranchiseHqPresentation": true,
+      "activeSnapshotMutatedOnApproval": false,
+      "nextImportAlwaysWins": true,
+      "matchingResultDeduplicated": true,
+      "differentResultRestored": true,
+      "approvedDecisionRetained": true,
+      "seasonSlotReleasedOnDifference": true,
+      "commissionerDiscrepancyNotification": true,
+      "publicReconciliationLabels": false
+    },
+    "staleAndDuplicateSafety": {
+      "passed": true,
+      "optimisticWorkflowRevision": true,
+      "mutationToken": true,
+      "oneActivePlayerOverlay": true,
+      "oneCanonicalWorkflowTransaction": true,
+      "idempotentSnapshotEvidence": true
+    },
+    "mobileTradeExperience": {
+      "passed": true,
+      "responsiveBuilder": true,
+      "scrollableAssetPickers": true,
+      "singleColumnPhoneLayout": true
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "blockingIssues": 0,
+      "migrationVersion": 28,
+      "newMigration": true,
+      "requiredTables": 90,
+      "productionApplied": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 140,
+      "failedTests": 0,
+      "focusedTradeTests": 8,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 221,
+      "inventoryFiles": 553,
+      "routes": 69,
+      "requiredTables": 90
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "resetPerformed": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "archiveGameYearExecuted": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "historyPermanentlyDeleted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": { "authorized": false, "status": "not-run" },
+    "hostedChecks": { "authorized": false, "status": "not-run", "passed": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": { "authorized": false, "status": "not-run", "currentRuntimeCommit": "677c226b9289dda4dc4f84fbbe6245e912330541" },
+    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 27, "candidateMigration": 28 },
+    "productionMaddenExport": { "authorized": false, "status": "not-run" },
+    "productionCandidateImport": { "authorized": false, "status": "not-run" },
+    "archiveSeason": { "authorized": false, "status": "not-run" },
+    "gameYearTransition": { "authorized": false, "status": "not-run" }
+  },
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false
+}

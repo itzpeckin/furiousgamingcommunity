@@ -25,6 +25,7 @@ const checks = [
     'tests/import/gm-career.test.mjs',
     'tests/import/week-label-normalization.test.mjs',
     'tests/import/live-data-experience.test.mjs',
+    'tests/trade/full-trade-center.test.mjs',
     'tests/security/containment.test.mjs',
     'tests/security/public-identity-routes.test.mjs',
     'tests/security/session.test.mjs',
