@@ -13,6 +13,7 @@ import {
   workflowDecision
 } from '../../functions/_lib/trade-center.js';
 import { reconcileTradeRosterOverlays } from '../../functions/_lib/trade-reconciliation.js';
+import { applyVersionedDraftPickBaseline, ensureDraftPickHorizon } from '../../functions/_lib/draft-pick-baselines.js';
 import { hashToken, AUTH_CONSTANTS } from '../../functions/_lib/auth.js';
 import { onRequestGet as getTradeCenter, onRequestPost as postTradeCenter } from '../../functions/api/leagues/[leagueSlug]/trade-center.js';
 
@@ -43,7 +44,40 @@ test('trade settings and transfer limits are normalized server-side',()=>{
     {type:'player',assetId:'c',fromTeamId:'tb',toTeamId:'gb'},
     {type:'pick',assetId:'p',fromTeamId:'gb',toTeamId:'tb'}
   ],settings),/player limit/i);
-  assert.equal(stableDraftPickId({leagueId:'league-1',franchiseSeasonId:'season-1',draftClass:2027,round:1,originalTeamKey:'TB'}),'pick:league-1:season-1:2027:1:tb');
+  assert.equal(stableDraftPickId({leagueId:'league-1',franchiseSeasonId:'season-1',draftClass:2027,round:1,originalTeamKey:'TB'}),'pick:league-1:2027:1:tb');
+  assert.equal(settings.valueModel.draft.roundBases[1],4200);
+  assert.equal(settings.valueModel.draft.futureRetention[2],65);
+});
+
+test('generic draft horizon is tenant-scoped, complete, retry-safe, and ownership preserving',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await migrate(database);
+    for(const leagueId of ['league-1','league-2']){
+      database.prepare(`INSERT INTO leagues (id,name,product_name,slug,public_status,tenant_status) VALUES (?,?,?,?,?,?)`).run(leagueId,leagueId,'FranchiseHQ',leagueId,'active','enabled');
+      database.prepare(`INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status) VALUES (?,?,?,?,?,?,?,?,?)`).run(`season-${leagueId}`,leagueId,'madden-companion',`franchise-${leagueId}`,'2026','Madden NFL 27','2026',2026,'active');
+    }
+    const db=d1(database),teams=[{teamKey:'tb'},{teamKey:'gb'}];
+    const first=await ensureDraftPickHorizon(db,{leagueId:'league-1',franchiseSeasonId:'season-league-1',seasonYear:2026,gameRelease:'Madden NFL 27',teams});
+    assert.deepEqual(first.classes,[2027,2028,2029]);
+    assert.equal(first.expectedPickCount,42);
+    await ensureDraftPickHorizon(db,{leagueId:'league-1',franchiseSeasonId:'season-league-1',seasonYear:2026,gameRelease:'Madden NFL 27',teams});
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks WHERE league_id='league-1'`).get().count,42);
+    database.prepare(`UPDATE league_draft_picks SET current_team_key='gb',revision=revision+1 WHERE id='pick:league-1:2027:1:tb'`).run();
+    database.prepare(`INSERT INTO draft_pick_ledger_events (id,league_id,draft_pick_id,event_type,from_team_key,to_team_key) VALUES (?,?,?,?,?,?)`).run('trade-event','league-1','pick:league-1:2027:1:tb','trade-approved','tb','gb');
+    const entries=[2027,2028,2029].flatMap(draftClass=>teams.flatMap(team=>[1,2,3,4,5,6,7].map(round=>({draftClass,round,originalTeamKey:team.teamKey,currentTeamKey:draftClass===2028&&round===1&&team.teamKey==='tb'?'gb':team.teamKey}))));
+    await applyVersionedDraftPickBaseline(db,{leagueId:'league-1',franchiseSeasonId:'season-league-1',seasonYear:2026,gameRelease:'Madden NFL 27',teams,baselineKey:'fgc-week-11',baselineVersion:1,sourceType:'imported-sheet',sourceReference:'commissioner-reviewed',entries});
+    assert.equal(database.prepare(`SELECT current_team_key owner FROM league_draft_picks WHERE id='pick:league-1:2027:1:tb'`).get().owner,'gb');
+    assert.equal(database.prepare(`SELECT current_team_key owner FROM league_draft_picks WHERE id='pick:league-1:2028:1:tb'`).get().owner,'gb');
+    database.prepare(`INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status) VALUES (?,?,?,?,?,?,?,?,?)`).run('season-next','league-1','madden-companion','franchise-league-1','2027','Madden NFL 27','2027',2027,'preview');
+    await ensureDraftPickHorizon(db,{leagueId:'league-1',franchiseSeasonId:'season-next',seasonYear:2027,gameRelease:'Madden NFL 27',teams});
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks WHERE league_id='league-1'`).get().count,56);
+    assert.equal(database.prepare(`SELECT current_team_key owner FROM league_draft_picks WHERE id='pick:league-1:2027:1:tb'`).get().owner,'gb');
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks WHERE league_id='league-1' AND draft_class=2030`).get().count,14);
+    await ensureDraftPickHorizon(db,{leagueId:'league-2',franchiseSeasonId:'season-league-2',seasonYear:2026,gameRelease:'Madden NFL 27',teams});
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks WHERE league_id='league-2'`).get().count,42);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_pick_baselines`).get().count,3);
+  }finally{database.close()}
 });
 
 test('three matching non-conflicted review decisions resolve the workflow',()=>{
@@ -155,6 +189,7 @@ test('authenticated owners share proposals while commissioner-only controls stay
     for(const [id,discord,name,role,team] of [
       ['owner-tb','d-tb','TB Owner','team_owner','1'],
       ['owner-gb','d-gb','GB Owner','team_owner','2'],
+      ['owner-kc','d-kc','KC Owner','team_owner','3'],
       ['commissioner','d-c','Commissioner','commissioner',null],
       ['reviewer-2','d-r2','Reviewer Two','commissioner',null],
       ['reviewer-3','d-r3','Reviewer Three','commissioner',null]
@@ -162,12 +197,12 @@ test('authenticated owners share proposals while commissioner-only controls stay
       database.prepare(`INSERT INTO users (id,discord_user_id,discord_username,display_name) VALUES (?,?,?,?)`).run(id,discord,id,name);
       database.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,team_id,active) VALUES (?,?,?,?,?,1)`).run(`membership-${id}`,'league-1',id,role,team);
     }
-    const tokens={tb:'session-token-tb',gb:'session-token-gb',commissioner:'session-token-commissioner',reviewer2:'session-token-reviewer-2',reviewer3:'session-token-reviewer-3'};
-    for(const [key,userId] of [['tb','owner-tb'],['gb','owner-gb'],['commissioner','commissioner'],['reviewer2','reviewer-2'],['reviewer3','reviewer-3']])database.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at) VALUES (?,?,?,?)`).run(`session-${key}`,userId,await hashToken(tokens[key]),'2099-01-01T00:00:00.000Z');
+    const tokens={tb:'session-token-tb',gb:'session-token-gb',kc:'session-token-kc',commissioner:'session-token-commissioner',reviewer2:'session-token-reviewer-2',reviewer3:'session-token-reviewer-3'};
+    for(const [key,userId] of [['tb','owner-tb'],['gb','owner-gb'],['kc','owner-kc'],['commissioner','commissioner'],['reviewer2','reviewer-2'],['reviewer3','reviewer-3']])database.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at) VALUES (?,?,?,?)`).run(`session-${key}`,userId,await hashToken(tokens[key]),'2099-01-01T00:00:00.000Z');
     database.prepare(`INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status) VALUES (?,?,?,?,?,?,?,?,?)`).run('season-1','league-1','madden-companion','franchise-1','2026','Madden NFL 27','2026',2026,'active');
     database.prepare(`INSERT INTO league_snapshots (id,league_id,status,manifest_json,validation_status) VALUES (?,?,?,'{}','ready')`).run('snapshot-1','league-1','active');
     database.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id) VALUES (?,?)`).run('league-1','snapshot-1');
-    for(const [externalId,abbr] of [['1','TB'],['2','GB']])database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','teams',?,?)`).run(externalId,JSON.stringify({external_id:externalId,abbreviation:abbr,display_name:abbr}));
+    for(const [externalId,abbr] of [['1','TB'],['2','GB'],['3','KC']])database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','teams',?,?)`).run(externalId,JSON.stringify({external_id:externalId,abbreviation:abbr,display_name:abbr}));
     for(const [sourceId,teamId,identityId,publicId,name] of [['player-tb','1','identity-tb','player-tb-public','TB Player'],['player-gb','2','identity-gb','player-gb-public','GB Player']]){
       database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','players',?,?)`).run(sourceId,JSON.stringify({external_id:sourceId,team_external_id:teamId,display_name:name}));
       database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,?,?,?)`).run(identityId,'league-1',publicId,name);
@@ -180,12 +215,25 @@ test('authenticated owners share proposals while commissioner-only controls stay
     });
     const forbidden=await postTradeCenter(context(tokens.tb,'POST',{action:'seed-picks',draftClasses:[2027]}));
     assert.equal(forbidden.status,403);
+    const missingAsk=await postTradeCenter(context(tokens.tb,'POST',{action:'trade-block',assetType:'player',assetId:'player-tb',active:true,requestedReturn:''}));
+    assert.equal(missingAsk.status,400);
+    const listed=await postTradeCenter(context(tokens.tb,'POST',{action:'trade-block',assetType:'player',assetId:'player-tb',active:true,requestedReturn:'Young corner or a Day 2 pick'}));
+    assert.equal(listed.status,200);
+    const savedDraft=await postTradeCenter(context(tokens.tb,'POST',{action:'save-draft',note:'Private draft',transfers:[
+      {type:'player',assetId:'player-tb',fromTeamId:'tb',toTeamId:'gb'},
+      {type:'player',assetId:'player-gb',fromTeamId:'gb',toTeamId:'tb'}
+    ]}));
+    assert.equal(savedDraft.status,200);
+    assert.equal((await savedDraft.clone().json()).workflows.find(item=>item.status==='draft')?.note,'Private draft');
+    assert.equal((await (await getTradeCenter(context(tokens.gb))).json()).workflows.length,0);
     const proposed=await postTradeCenter(context(tokens.tb,'POST',{action:'propose',note:'Player swap',transfers:[
       {type:'player',assetId:'player-tb',fromTeamId:'tb',toTeamId:'gb'},
       {type:'player',assetId:'player-gb',fromTeamId:'gb',toTeamId:'tb'}
     ]}));
     const proposedPayload=await proposed.clone().json();
     assert.equal(proposed.status,200,JSON.stringify(proposedPayload));
+    const outsiderBefore=await (await getTradeCenter(context(tokens.kc))).json();
+    assert.equal(outsiderBefore.workflows.length,0);
     const recipient=await getTradeCenter(context(tokens.gb));
     const payload=await recipient.json();
     assert.equal(payload.workflows.length,1);
@@ -203,6 +251,12 @@ test('authenticated owners share proposals while commissioner-only controls stay
     }
     assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(tradeId).status,'approved');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_roster_overlays WHERE trade_id=? AND internal_status='active'`).get(tradeId).count,2);
+    assert.equal(database.prepare(`SELECT active FROM trade_block_listings WHERE player_identity_id='identity-tb'`).get().active,0);
+    const outsiderAfter=await (await getTradeCenter(context(tokens.kc))).json();
+    assert.equal(outsiderAfter.workflows.length,1);
+    assert.equal(outsiderAfter.workflows[0].status,'approved');
+    assert.equal(outsiderAfter.workflows[0].note,'');
+    assert.deepEqual(outsiderAfter.workflows[0].messages,[]);
     const duplicate=await postTradeCenter(context(tokens.tb,'POST',{action:'propose',note:'Duplicate player',transfers:[
       {type:'player',assetId:'player-gb',fromTeamId:'tb',toTeamId:'gb'},
       {type:'player',assetId:'player-tb',fromTeamId:'gb',toTeamId:'tb'}
@@ -210,11 +264,11 @@ test('authenticated owners share proposals while commissioner-only controls stay
     assert.equal(duplicate.status,409);
     const commissionerSeed=await postTradeCenter(context(tokens.commissioner,'POST',{action:'seed-picks',draftClasses:[2027]}));
     assert.equal(commissionerSeed.status,200);
-    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks`).get().count,14);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks`).get().count,63);
   }finally{database.close()}
 });
 
-test('7.4.0 client uses server state and contains no public reconciliation labels',async()=>{
+test('7.4.0.3 client uses server state, exact navigation, and private history boundaries',async()=>{
   const [client,endpoint,readModel,qualityGate]=await Promise.all([
     readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/trade-center.js',import.meta.url),'utf8'),
@@ -223,7 +277,13 @@ test('7.4.0 client uses server state and contains no public reconciliation label
   ]);
   assert.match(client,/\/trade-center`/);
   assert.match(client,/data-live-submit-trade/);
+  assert.match(client,/\['received','Received'\],\['sent','Sent'\],\['drafts','Drafts'\],\['committee','Committee'\],\['approved','Approved'\],\['rejected','Rejected'\],\['history','History'\]/);
+  assert.match(client,/Team Trade Assets/);
+  assert.match(client,/Multi-Team Fairness/);
+  assert.match(client,/Requested return required/);
+  assert.doesNotMatch(client,/data-live-seed-picks/);
   assert.match(endpoint,/pending-madden-execution/);
+  assert.match(endpoint,/continuity_key IS NOT NULL/);
   assert.match(readModel,/applyRosterOverlays/);
   assert.match(qualityGate,/tests\/trade\/full-trade-center\.test\.mjs/);
   assert.doesNotMatch(client,/pending madden|madden confirmed|reconciliation status/i);

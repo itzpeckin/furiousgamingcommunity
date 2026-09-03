@@ -453,7 +453,7 @@ function fixtureFor(analyses, requirements, markers, playerImportReadiness) {
   return {
     schemaVersion: 1,
     product: 'FranchiseHQ',
-    release: '7.4.0.2',
+    release: '7.4.0.3',
     rawValuesIncluded: false,
     sourceMarkerStatuses: Object.fromEntries(Object.entries(markers).map(([key, item]) => [key, item.status])),
     requirements: Object.fromEntries(Object.entries(requirements).map(([key, item]) => [key, { status: item.status, recordCount: item.recordCount }])),
@@ -522,7 +522,7 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
   return {
     schemaVersion: 1,
     product: 'FranchiseHQ',
-    release: '7.4.0.2',
+    release: '7.4.0.3',
     discoverySessionId: options.discoverySessionId || null,
     status: datasetsPassed && sourceVerification.passed ? 'passed' : 'review_required',
     routeCount: new Set(analyses.map(item => item.routePath)).size,

@@ -19,6 +19,7 @@ import {
 import { requireCommissioner } from '../../../_lib/permissions.js';
 import { activeLeagueTeams, resolveTeam } from '../../../_lib/league-teams.js';
 import { buildGmSeasonSummaries } from '../../../_lib/gm-career.js';
+import { ensureDraftPickHorizon } from '../../../_lib/draft-pick-baselines.js';
 
 const RELEASE = GAME_YEAR_TRANSITION_RELEASE;
 const PAGE_SIZE = 250;
@@ -55,6 +56,7 @@ const RESTORE_ORDER = Object.freeze([
   'league_snapshot_lifecycle_events',
   'trade_workflows',
   'league_draft_picks',
+  'draft_pick_ledger_events',
   'trade_workflow_participants',
   'trade_workflow_assets',
   'trade_workflow_messages',
@@ -240,6 +242,7 @@ function datasetQueries(leagueId, gameYearId) {
     canonical_historical_player_states:[`SELECT * FROM canonical_historical_player_states WHERE league_id=? AND snapshot_id IN (${snapshotScope}) ORDER BY snapshot_id,player_id`, [leagueId, leagueId, gameYearId]],
     trade_workflows:[`SELECT * FROM trade_workflows WHERE league_id=? AND franchise_season_id IN (${seasonScope}) ORDER BY id`, [leagueId,leagueId,gameYearId]],
     league_draft_picks:[`SELECT * FROM league_draft_picks WHERE league_id=? AND franchise_season_id IN (${seasonScope}) ORDER BY id`, [leagueId,leagueId,gameYearId]],
+    draft_pick_ledger_events:[`SELECT * FROM draft_pick_ledger_events WHERE league_id=? AND draft_pick_id IN (${pickScope}) ORDER BY draft_pick_id,created_at,id`, [leagueId,leagueId,leagueId,gameYearId]],
     trade_workflow_participants:[`SELECT * FROM trade_workflow_participants WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,team_key`, [leagueId,leagueId,leagueId,gameYearId]],
     trade_workflow_assets:[`SELECT * FROM trade_workflow_assets WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,revision,ordinal,id`, [leagueId,leagueId,leagueId,gameYearId]],
     trade_workflow_messages:[`SELECT * FROM trade_workflow_messages WHERE league_id=? AND trade_id IN (${tradeScope}) ORDER BY trade_id,created_at,id`, [leagueId,leagueId,leagueId,gameYearId]],
@@ -663,6 +666,7 @@ async function removeActiveData(current, gameYear, transition, body) {
     ...deleteWhere(current.db,'trade_workflow_assets','trade_id',tradeIds),
     ...deleteWhere(current.db,'trade_workflow_participants','trade_id',tradeIds),
     ...deleteWhere(current.db,'trade_block_listings','id',listingIds),
+    ...deleteWhere(current.db,'draft_pick_ledger_events','draft_pick_id',pickIds),
     ...deleteWhere(current.db,'canonical_transaction_evidence','transaction_id',transactionIds),
     ...deleteWhere(current.db,'canonical_transactions','id',transactionIds),
     ...deleteWhere(current.db,'trade_workflows','id',tradeIds),
@@ -1031,6 +1035,9 @@ async function archiveFranchiseSeason(current, gameYear) {
       ON snapshot.id=pointer.snapshot_id AND snapshot.league_id=pointer.league_id
     WHERE pointer.league_id=?`).bind(current.league.id).first();
   if(previous.status==='preview'&&Number(active?.season_year)!==Number(previous.season_year)){
+    const teams=await activeLeagueTeams(current.db,current.league.id);
+    await ensureDraftPickHorizon(current.db,{leagueId:current.league.id,franchiseSeasonId:previous.id,
+      seasonYear:previous.season_year,gameRelease:previous.game_release,teams});
     return{completed:true,alreadyPrepared:true,franchiseSeasonId:previous.id,seasonYear:Number(previous.season_year)};
   }
   if(!active||Number(active.season_year)!==Number(previous.season_year)){
@@ -1070,6 +1077,9 @@ async function archiveFranchiseSeason(current, gameYear) {
       historyPermanentlyDeleted:false,exportUrlRotated:false,freeAgentInterpretedAsZero:false
     })
   ]);
+  const teams=await activeLeagueTeams(current.db,current.league.id);
+  await ensureDraftPickHorizon(current.db,{leagueId:current.league.id,franchiseSeasonId:newSeasonId,
+    seasonYear:next.seasonYear,gameRelease:gameYear.game_release,teams});
   return{completed:true,archivedSeasonId:previous.id,franchiseSeasonId:newSeasonId,
     seasonYear:next.seasonYear,closureId,frozenTotalsSha256:frozenSha,historyPermanentlyDeleted:false};
 }

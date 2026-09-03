@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.3",
+  "releaseType": "trade-center-restoration-and-draft-pick-continuity",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.0.2",
+    "commit": "b131cdafbf84a65adbb0905e09a2cc859df40e04",
+    "tree": "974bf95c8e0ecb32f6ff4bb89fbb530b72428540",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.0.3",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": { "authorized": false, "status": "not-run", "commit": null, "pullRequest": null },
+  "staging": { "authorized": false, "deployed": false, "status": "not-run" },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.4.0.2",
+    "currentMigration": 28,
+    "candidateMigration": 29
+  },
+  "requiredArtifacts": [
+    "migrations/0029_draft_pick_baselines.sql",
+    "functions/_lib/draft-pick-baselines.js",
+    "functions/_lib/trade-center.js",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "functions/api/leagues/[leagueSlug]/game-year-transition.js",
+    "league-engine/trade-center-live.js",
+    "trade-module.js",
+    "styles.css",
+    "tests/trade/full-trade-center.test.mjs",
+    "tests/import/game-year-transition.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.0.3/release-record.md",
+    "releases/7.4.0.3/validation-evidence.json"
+  ]
+}
