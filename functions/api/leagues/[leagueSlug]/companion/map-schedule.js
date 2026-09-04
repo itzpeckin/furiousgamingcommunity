@@ -2,7 +2,7 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
 
-const RELEASE='7.4.0.4';
+const RELEASE='7.4.0.5';
 const SCHEDULE_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/schedules\/?$/i;
 const A=Object.freeze({
   id:['gameId','scheduleId','id','eventId'],home:['homeTeamId','homeTeamID','homeId','home_team_id'],away:['awayTeamId','awayTeamID','awayId','away_team_id'],

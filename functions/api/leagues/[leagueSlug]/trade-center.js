@@ -360,6 +360,27 @@ async function reject(c, row, participants, reason) {
   ]);
 }
 
+async function withdraw(c, row, participants) {
+  const ownTeam=await ensureParticipantAction(c,row,participants);
+  if (row.status!=='negotiating') throw Object.assign(new Error('This trade can no longer be cancelled.'),{status:409});
+  if (canonicalTeamKey(row.proposer_team_key)!==ownTeam) {
+    throw Object.assign(new Error('Only the team that created this trade may cancel it.'),{status:403});
+  }
+  const result=await c.db.prepare(`UPDATE trade_workflows SET status='withdrawn',updated_at=CURRENT_TIMESTAMP
+    WHERE id=? AND league_id=? AND status='negotiating' AND revision=? AND mutation_token=?`)
+    .bind(row.id,c.league.id,row.revision,row.mutation_token).run();
+  if(Number(result?.meta?.changes||0)!==1)throw Object.assign(new Error('This trade changed in another session. Refresh before cancelling it.'),{status:409});
+  const users=await participantUserIds(c.db,c.league.id,participants.map(item=>item.team_key));
+  const audit=createTenantAuditContext({request:c.request},c.league,c.session,'trade_withdrawn');
+  await c.db.batch([
+    c.db.prepare(`INSERT INTO trade_workflow_messages
+      (id,trade_id,league_id,author_user_id,event_type,message,created_at) VALUES (?,?,?,?,?,'Trade offer cancelled by the proposing team.',CURRENT_TIMESTAMP)`)
+      .bind(`trade_message_${crypto.randomUUID()}`,row.id,c.league.id,c.session.user.id,'withdrawn'),
+    ...await notificationStatements(c.db,c.league.id,row.id,users.filter(id=>id!==c.session.user.id),'withdrawn','Trade offer cancelled',`${ownTeam.toUpperCase()} cancelled the trade offer.`),
+    tenantAuditStatement(c.db,audit,{resourceType:'trade_workflow',resourceId:row.id,detail:{revision:Number(row.revision),status:'withdrawn'}})
+  ]);
+}
+
 async function review(c, row, participants, decision, reason, freeTrade) {
   if (!isReviewer(c.session)) throw Object.assign(new Error('Trade Committee access is required.'),{status:403});
   if (row.status!=='committee') throw Object.assign(new Error('This trade is not awaiting review.'),{status:409});
@@ -586,10 +607,11 @@ export async function onRequestPost(context) {
       const row=await workflow(c.db,c.league.id,tradeId);
       if(!row)throw Object.assign(new Error('Trade not found.'),{status:404});
       const participants=await workflowParticipants(c.db,c.league.id,tradeId);
-      if(['counter','accept','reject','review'].includes(action))requireCurrentRevision(body,row);
+      if(['counter','accept','reject','withdraw','review'].includes(action))requireCurrentRevision(body,row);
       if(action==='counter')await counter(c,body,row,participants);
       else if(action==='accept')await accept(c,row,participants);
       else if(action==='reject')await reject(c,row,participants,body.reason);
+      else if(action==='withdraw')await withdraw(c,row,participants);
       else if(action==='review')await review(c,row,participants,String(body.decision||''),body.reason,body.freeTrade);
       else if(action==='message'){
         await ensureParticipantAction(c,row,participants);

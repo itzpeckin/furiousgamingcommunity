@@ -203,7 +203,12 @@ test('authenticated owners share proposals while commissioner-only controls stay
     database.prepare(`INSERT INTO league_snapshots (id,league_id,status,manifest_json,validation_status) VALUES (?,?,?,'{}','ready')`).run('snapshot-1','league-1','active');
     database.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id) VALUES (?,?)`).run('league-1','snapshot-1');
     for(const [externalId,abbr] of [['1','TB'],['2','GB'],['3','KC']])database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','teams',?,?)`).run(externalId,JSON.stringify({external_id:externalId,abbreviation:abbr,display_name:abbr}));
-    for(const [sourceId,teamId,identityId,publicId,name] of [['player-tb','1','identity-tb','player-tb-public','TB Player'],['player-gb','2','identity-gb','player-gb-public','GB Player']]){
+    for(const [sourceId,teamId,identityId,publicId,name] of [
+      ['player-tb','1','identity-tb','player-tb-public','TB Player'],
+      ['player-gb','2','identity-gb','player-gb-public','GB Player'],
+      ['player-tb-cancel','1','identity-tb-cancel','player-tb-cancel-public','TB Cancel Player'],
+      ['player-kc-cancel','3','identity-kc-cancel','player-kc-cancel-public','KC Cancel Player']
+    ]){
       database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','players',?,?)`).run(sourceId,JSON.stringify({external_id:sourceId,team_external_id:teamId,display_name:name}));
       database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,?,?,?)`).run(identityId,'league-1',publicId,name);
       database.prepare(`INSERT INTO player_source_aliases (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id) VALUES (?,?,?,?,?,?,?)`).run('league-1','madden-companion','franchise-1',sourceId,identityId,'season-1','season-1');
@@ -230,6 +235,22 @@ test('authenticated owners share proposals while commissioner-only controls stay
     assert.equal(savedDraft.status,200);
     assert.equal((await savedDraft.clone().json()).workflows.find(item=>item.status==='draft')?.note,'Private draft');
     assert.equal((await (await getTradeCenter(context(tokens.gb))).json()).workflows.length,0);
+    const cancellable=await postTradeCenter(context(tokens.tb,'POST',{action:'propose',note:'Temporary offer',transfers:[
+      {type:'player',assetId:'player-tb-cancel',fromTeamId:'tb',toTeamId:'kc'},
+      {type:'player',assetId:'player-kc-cancel',fromTeamId:'kc',toTeamId:'tb'}
+    ]}));
+    const cancellablePayload=await cancellable.clone().json(),cancellableTradeId=cancellablePayload.tradeId;
+    assert.equal(cancellable.status,200,JSON.stringify(cancellablePayload));
+    const recipientCannotCancel=await postTradeCenter(context(tokens.kc,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:1}));
+    assert.equal(recipientCannotCancel.status,403);
+    const staleCancellation=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:0}));
+    assert.equal(staleCancellation.status,409);
+    const cancelled=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:1}));
+    assert.equal(cancelled.status,200);
+    assert.equal((await cancelled.clone().json()).workflows.find(item=>item.id===cancellableTradeId)?.status,'withdrawn');
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_workflow_messages WHERE trade_id=? AND event_type='withdrawn'`).get(cancellableTradeId).count,1);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM tenant_audit_events WHERE resource_id=? AND action='trade_withdrawn'`).get(cancellableTradeId).count,1);
+    assert.equal((await (await getTradeCenter(context(tokens.commissioner))).json()).workflows.length,0,'commissioners must not see a cancelled private negotiation');
     const proposed=await postTradeCenter(context(tokens.tb,'POST',{action:'propose',note:'Player swap',transfers:[
       {type:'player',assetId:'player-tb',fromTeamId:'tb',toTeamId:'gb'},
       {type:'player',assetId:'player-gb',fromTeamId:'gb',toTeamId:'tb'}
@@ -237,7 +258,9 @@ test('authenticated owners share proposals while commissioner-only controls stay
     const proposedPayload=await proposed.clone().json();
     assert.equal(proposed.status,200,JSON.stringify(proposedPayload));
     const outsiderBefore=await (await getTradeCenter(context(tokens.kc))).json();
-    assert.equal(outsiderBefore.workflows.length,0);
+    assert.equal(outsiderBefore.workflows.length,1);
+    assert.equal(outsiderBefore.workflows[0].status,'withdrawn');
+    assert.ok(!outsiderBefore.workflows.some(item=>item.id===proposedPayload.tradeId));
     const commissionerBefore=await (await getTradeCenter(context(tokens.commissioner))).json();
     assert.equal(commissionerBefore.workflows.length,0,'commissioners must not see unrelated active negotiations');
     const recipient=await getTradeCenter(context(tokens.gb));
@@ -251,6 +274,8 @@ test('authenticated owners share proposals while commissioner-only controls stay
     const accepted=await postTradeCenter(context(tokens.gb,'POST',{action:'accept',tradeId,revision:1}));
     assert.equal(accepted.status,200);
     assert.equal((await accepted.clone().json()).workflows[0].status,'committee');
+    const cannotCancelCommittee=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId,revision:1}));
+    assert.equal(cannotCancelCommittee.status,409);
     const commissionerCommittee=await (await getTradeCenter(context(tokens.commissioner))).json();
     assert.equal(commissionerCommittee.workflows.length,1,'commissioners may see unrelated trades only once committee review is required');
     assert.equal(commissionerCommittee.workflows[0].status,'committee');
@@ -259,13 +284,15 @@ test('authenticated owners share proposals while commissioner-only controls stay
       assert.equal(reviewed.status,200,JSON.stringify(await reviewed.clone().json()));
     }
     assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(tradeId).status,'approved');
+    const cannotCancelApproved=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId,revision:1}));
+    assert.equal(cannotCancelApproved.status,409);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_roster_overlays WHERE trade_id=? AND internal_status='active'`).get(tradeId).count,2);
     assert.equal(database.prepare(`SELECT active FROM trade_block_listings WHERE player_identity_id='identity-tb'`).get().active,0);
     const outsiderAfter=await (await getTradeCenter(context(tokens.kc))).json();
-    assert.equal(outsiderAfter.workflows.length,1);
-    assert.equal(outsiderAfter.workflows[0].status,'approved');
-    assert.equal(outsiderAfter.workflows[0].note,'');
-    assert.deepEqual(outsiderAfter.workflows[0].messages,[]);
+    assert.equal(outsiderAfter.workflows.length,2);
+    const publicApproved=outsiderAfter.workflows.find(item=>item.status==='approved');
+    assert.equal(publicApproved.note,'');
+    assert.deepEqual(publicApproved.messages,[]);
     const duplicate=await postTradeCenter(context(tokens.tb,'POST',{action:'propose',note:'Duplicate player',transfers:[
       {type:'player',assetId:'player-gb',fromTeamId:'tb',toTeamId:'gb'},
       {type:'player',assetId:'player-tb',fromTeamId:'gb',toTeamId:'tb'}
@@ -277,7 +304,7 @@ test('authenticated owners share proposals while commissioner-only controls stay
   }finally{database.close()}
 });
 
-test('7.4.0.4 client uses server state, premium navigation, and private activity boundaries',async()=>{
+test('7.4.0.5 client uses the premium builder, explainable value controls, and private activity boundaries',async()=>{
   const [client,endpoint,readModel,qualityGate]=await Promise.all([
     readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/trade-center.js',import.meta.url),'utf8'),
@@ -286,14 +313,21 @@ test('7.4.0.4 client uses server state, premium navigation, and private activity
   ]);
   assert.match(client,/\/trade-center`/);
   assert.match(client,/data-live-submit-trade/);
+  assert.match(client,/Build the package\. Review the value\. Send the offer\./);
+  assert.match(client,/data-live-open-asset-value/);
+  assert.match(client,/data-live-open-package-value/);
+  assert.match(client,/data-live-open-fairness-value/);
+  assert.match(client,/League commissioners control the shared calculator settings/);
+  assert.match(client,/data-live-confirm-withdraw/);
   assert.match(client,/\['received','Received'\],\['sent','Sent'\],\['drafts','Drafts'\],\['committee','Committee'\],\['approved','Approved'\],\['rejected','Rejected'\],\['history','History'\]/);
-  assert.match(client,/Team Trade Assets/);
+  assert.match(client,/Add participating team/);
   assert.match(client,/Multi-Team Fairness/);
   assert.match(client,/Trade Activity/);
   assert.match(client,/completed commissioner-approved trades from other teams/);
   assert.match(client,/workflowInvolvesTeam\(workflow\)\|\|workflow\.status==='approved'/);
   assert.match(client,/Notes are optional/);
   assert.match(client,/data-live-open-player-button/);
+  assert.match(client,/player\?\.imageUrl\|\|player\?\.headshot/);
   assert.match(client,/trade-block-needs/);
   assert.doesNotMatch(client,/Requested return required/);
   assert.doesNotMatch(client,/data-live-seed-picks/);
@@ -302,6 +336,8 @@ test('7.4.0.4 client uses server state, premium navigation, and private activity
   assert.match(endpoint,/status\)==='approved'/);
   assert.match(endpoint,/status\)==='committee' && isReviewer/);
   assert.match(endpoint,/trade_block_team_profiles/);
+  assert.match(endpoint,/trade_withdrawn/);
+  assert.match(endpoint,/Only the team that created this trade may cancel it/);
   assert.match(readModel,/applyRosterOverlays/);
   assert.match(qualityGate,/tests\/trade\/full-trade-center\.test\.mjs/);
   assert.doesNotMatch(client,/pending madden|madden confirmed|reconciliation status/i);
