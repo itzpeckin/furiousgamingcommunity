@@ -1,8 +1,8 @@
 # FranchiseHQ 7.4.0.7 Release Record
 
-**Status:** Locally validated review candidate; publication and Production remain unauthorized
+**Status:** Production deployed; read-only verification passed; owner UI acceptance pending
 
-**Production changed:** No. Production remains FranchiseHQ 7.4.0.6 on migration 30.
+**Production changed:** Code only. FranchiseHQ 7.4.0.7 is live on migration 30; no database or league-data operation ran.
 
 ## Scope
 
@@ -19,7 +19,7 @@ This release converts the two commissioner-reviewed spreadsheets into a reusable
 
 ## Authority and privacy boundaries
 
-The reusable source is product-wide Madden 27 configuration; FGC remains tenant configuration, never the product identity. The FGC overlay does not auto-apply. This local build did not seed or change draft-pick ownership, write Production rows, import Madden data, change the active snapshot, archive or transition a season, reset or delete data, rotate the export URL, or change credentials or memberships. Madden's blocked Free Agent source remains unknown/null and is never interpreted as zero.
+The reusable source is product-wide Madden 27 configuration; FGC remains tenant configuration, never the product identity. The FGC overlay does not auto-apply. Publication and code deployment did not seed or change draft-pick ownership, write Production rows, import Madden data, change the active snapshot, archive or transition a season, reset or delete data, rotate the export URL, or change credentials or memberships. Madden's blocked Free Agent source remains unknown/null and is never interpreted as zero.
 
 ## Known inherited blockers
 
@@ -31,7 +31,7 @@ Read-only workbook validation proved 672 unique, complete pick identities in eac
 
 ## Deployment status
 
-No GitHub publication, pull request, hosted check, staging deployment, Main change, Production deployment, migration, or Production data operation is authorized or claimed in this candidate record. Production remains exact 7.4.0.6 application merge `d138e1a` on migration 30.
+Owner authorization published exact candidate `66def9a48fa20130d35b1a7418b72b955615ddfa` through [PR #38](https://github.com/itzpeckin/furiousgamingcommunity/pull/38). All four candidate checks passed. The PR merged to Main as exact merge `637a48c25ea2187f60263955ef11010b101b4ac6`, and all six Main build, quality, deployment, Pages, and Worker checks passed. Production Pages deployment `1e4eaad8-2ffb-442c-8e37-af8cd27293aa` and Worker build `e8613496-efe6-4f03-b948-aac1493fb3b6` / version `7cae5f20-a37d-4b5f-b275-7ba1ca11cd3d` succeeded. Read-only HTTPS checks confirmed the public 7.4.0.7 marker, exact Trade Center asset, and a healthy tenant-list endpoint. Migration 30 remains current; staging and all Production data operations remained untouched.
 
 ## Rollback
 
@@ -39,4 +39,4 @@ The immutable rollback baseline is exact Main evidence commit `e0e66cdf3de25182e
 
 ## Next gate
 
-The owner may separately authorize publication of the exact 7.4.0.7 candidate. Applying the private FGC source is a distinct Production data operation and must remain separately authorized after private preview review.
+Owner signed-in UI acceptance is next. Applying the private FGC source remains a distinct Production data operation and requires separate authorization after commissioner-only preview review.

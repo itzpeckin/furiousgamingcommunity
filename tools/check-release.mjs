@@ -2039,7 +2039,8 @@ if (version === '7.4.0.7') {
     'freeAgentBlockedPreserved',
     'strictMigration',
     'automatedTests',
-    'strictRepositoryGate'
+    'strictRepositoryGate',
+    ...(isPostDeployment ? ['productionHttpsAcceptance'] : [])
   ]) {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.0.7 evidence is incomplete: ${check}.`);
   }
@@ -2064,7 +2065,7 @@ if (version === '7.4.0.7') {
     || evidence.checks?.seasonHorizon?.newClass !== 2030
     || Number(evidence.checks?.seasonHorizon?.newClassPickCount) !== 224
   ) errors.push('7.4.0.7 must preserve tenant privacy, audited ownership, and the rolling three-class horizon.');
-  if (
+  if (!isPostDeployment && (
     manifest.status !== 'validated-review-candidate'
     || manifest.repositoryPublication?.authorized !== false
     || manifest.production?.authorized !== false
@@ -2081,7 +2082,38 @@ if (version === '7.4.0.7') {
     || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
     || evidence.scopeBoundaries?.databaseRowsWritten !== 0
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
-  ) errors.push('7.4.0.7 must remain an unpublished, migration-free, data-unchanged review candidate.');
+  )) errors.push('7.4.0.7 must remain an unpublished, migration-free, data-unchanged review candidate.');
+  if (isPostDeployment && (
+    manifest.status !== 'production-deployed-pending-owner-acceptance'
+    || manifest.repositoryPublication?.authorized !== true
+    || manifest.repositoryPublication?.status !== 'published-main-accepted'
+    || manifest.repositoryPublication?.commit !== '66def9a48fa20130d35b1a7418b72b955615ddfa'
+    || manifest.repositoryPublication?.mergeCommit !== '637a48c25ea2187f60263955ef11010b101b4ac6'
+    || Number(manifest.repositoryPublication?.pullRequest) !== 38
+    || Number(manifest.repositoryPublication?.hostedChecksPassed) !== 4
+    || Number(manifest.repositoryPublication?.mainChecksPassed) !== 6
+    || manifest.production?.authorized !== true
+    || manifest.production?.deployed !== true
+    || manifest.production?.status !== 'deployed-read-only-verified-pending-owner-acceptance'
+    || manifest.production?.currentRelease !== '7.4.0.7'
+    || manifest.production?.currentCommit !== '637a48c25ea2187f60263955ef11010b101b4ac6'
+    || Number(manifest.production?.currentMigration) !== 30
+    || Number(manifest.production?.candidateMigration) !== 30
+    || evidence.checks?.productionHttpsAcceptance?.publicLandingRelease !== '7.4.0.7'
+    || evidence.checks?.productionHttpsAcceptance?.tradeCenterAssetRelease !== '7.4.0.7'
+    || evidence.checks?.productionHttpsAcceptance?.readOnly !== true
+    || evidence.scopeBoundaries?.productionChanged !== true
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== true
+    || evidence.scopeBoundaries?.gitRemoteChanged !== true
+    || evidence.scopeBoundaries?.migrationApplied !== false
+    || evidence.scopeBoundaries?.draftPickBaselineApplied !== false
+    || evidence.scopeBoundaries?.draftPickOwnershipChanged !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  )) errors.push('Deployed 7.4.0.7 evidence must record exact code publication while preserving every data-plane boundary.');
 }
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));

@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.0.7",
   "validatedOn": "2026-09-04",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": { "unregisteredFailures": 0 },
@@ -87,15 +87,22 @@
       "javascriptModules": 225,
       "inventoryFiles": 561,
       "routes": 69
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "publicLandingRelease": "7.4.0.7",
+      "tradeCenterAssetRelease": "7.4.0.7",
+      "publicTenantApiHealthy": true,
+      "readOnly": true
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "draftPickBaselineApplied": false,
     "draftPickOwnershipChanged": false,
@@ -114,14 +121,18 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run" },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "pullRequest": 38, "candidateCommit": "66def9a48fa20130d35b1a7418b72b955615ddfa", "mergeCommit": "637a48c25ea2187f60263955ef11010b101b4ac6" },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestChecksPassed": 4, "mainChecksPassed": 6 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
     "productionDeployment": {
-      "authorized": false,
-      "status": "unchanged",
-      "currentRelease": "7.4.0.6",
-      "currentCommit": "d138e1aa07621222a961bbb83b4a521343c1e162"
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-owner-acceptance",
+      "currentRelease": "7.4.0.7",
+      "mainCommit": "637a48c25ea2187f60263955ef11010b101b4ac6",
+      "pagesDeployment": "1e4eaad8-2ffb-442c-8e37-af8cd27293aa",
+      "workerBuild": "e8613496-efe6-4f03-b948-aac1493fb3b6",
+      "workerVersion": "7cae5f20-a37d-4b5f-b275-7ba1ca11cd3d",
+      "liveReleaseMarker": "7.4.0.7"
     },
     "productionMigration": {
       "authorized": false,
