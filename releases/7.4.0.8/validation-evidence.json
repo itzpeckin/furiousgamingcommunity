@@ -3,9 +3,10 @@
   "product": "FranchiseHQ",
   "version": "7.4.0.8",
   "validatedOn": "2026-09-04",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
-  "dataChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
+  "dataChanged": true,
+  "productionDataChanged": true,
   "credentialsChanged": false,
   "baselineGate": { "unregisteredFailures": 0 },
   "checks": {
@@ -40,10 +41,23 @@
       "expectedPickCount": 672,
       "draftClasses": [2027, 2028, 2029],
       "roundsPerClass": 7,
-      "currentProductionState": "generic-horizon-only-fgc-overlay-not-applied",
+      "currentProductionState": "exact-fgc-overlay-applied-and-verified",
       "productionOperationRequired": true,
-      "productionOperationAuthorized": false,
-      "productionOperationApplied": false,
+      "productionOperationAuthorized": true,
+      "productionOperationApplied": true,
+      "productionOperationVerified": true,
+      "appliedPickCount": 672,
+      "nonOriginalOwnerCount": 110,
+      "unprotectedMappingMismatches": 0,
+      "protectedOwnershipEventsBefore": 0,
+      "protectedOwnershipEventsAfter": 0,
+      "baselineLedgerEvents": 672,
+      "applicationStatus": "complete",
+      "tenantAuditRows": 1,
+      "productionDatabase": "franchise-hq-db-madden27",
+      "productionDatabaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "beforeBookmark": "000000f6-000002c0-000050dc-5a3f0e43b49e66893958c0cb9b3e5108",
+      "afterBookmark": "000000f6-00000306-000050dc-dd5bb4594e5c184a06a8c9a0e5ce2df9",
       "auditedTradeOwnershipPreserved": true,
       "commissionerCorrectionPreserved": true,
       "retrySafe": true
@@ -74,18 +88,41 @@
       "javascriptModules": 225,
       "inventoryFiles": 561,
       "routes": 69
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "publicLandingRelease": "7.4.0.8",
+      "tradeCenterAssetRelease": "7.4.0.8",
+      "publicTenantApiHealthy": true,
+      "readOnly": true
+    },
+    "productionProtectedState": {
+      "passed": true,
+      "leaguesBefore": 1,
+      "leaguesAfter": 1,
+      "usersBefore": 28,
+      "usersAfter": 28,
+      "membershipsBefore": 28,
+      "membershipsAfter": 28,
+      "activeTeamAssignmentsBefore": 27,
+      "activeTeamAssignmentsAfter": 27,
+      "activeSnapshotsBefore": 1,
+      "activeSnapshotsAfter": 1,
+      "activeSnapshotBefore": "7433846f-3750-4b9b-965a-3ead8f38590f",
+      "activeSnapshotAfter": "7433846f-3750-4b9b-965a-3ead8f38590f",
+      "foreignKeyViolations": 0
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "productionDataChanged": false,
+    "productionChanged": true,
+    "productionDataChanged": true,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
-    "draftPickBaselineApplied": false,
-    "draftPickOwnershipChanged": false,
+    "draftPickBaselineApplied": true,
+    "draftPickOwnershipChanged": true,
     "captureExecuted": false,
     "candidateImportExecuted": false,
     "activationPerformed": false,
@@ -98,17 +135,22 @@
     "freeAgentInterpretedAsZero": false,
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
-    "databaseRowsWritten": 0
+    "databaseRowsWritten": 2020,
+    "databaseEngineRowsWritten": 6059
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run" },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "pullRequest": 39, "candidateCommit": "1c6c62f7d4a28a055fbed5a16b7f25dc3c7cabbc", "mergeCommit": "37be901a60234c3ef844280527872eec4586d4ba" },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestChecksPassed": 4, "mainChecksPassed": 6 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
     "productionDeployment": {
-      "authorized": false,
-      "status": "unchanged",
-      "currentRelease": "7.4.0.7",
-      "currentCommit": "637a48c25ea2187f60263955ef11010b101b4ac6"
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-owner-acceptance",
+      "currentRelease": "7.4.0.8",
+      "mainCommit": "37be901a60234c3ef844280527872eec4586d4ba",
+      "pagesDeployment": "52ae9935-decc-447d-abc2-0b8cf8a5732f",
+      "workerBuild": "706fda54-186e-4559-9ef3-77fcaa30516a",
+      "workerVersion": "fb32429a-19b3-4837-869f-2df057e5547b",
+      "liveReleaseMarker": "7.4.0.8"
     },
     "productionMigration": {
       "authorized": false,
@@ -117,10 +159,17 @@
       "candidateMigration": 30
     },
     "productionFgcPickBaseline": {
-      "authorized": false,
-      "status": "not-run",
+      "authorized": true,
+      "status": "applied-verified",
       "sourceKey": "fgc-madden-27-opening-ownership",
-      "expectedPickCount": 672
+      "expectedPickCount": 672,
+      "appliedPickCount": 672,
+      "nonOriginalOwnerCount": 110,
+      "sourceMappingSha256": "2d7aef1b23d1e3a31c79d04a039858a00a24bc6a09ab2f2866dd7f28ce4cc9ec",
+      "unprotectedMappingMismatches": 0,
+      "auditRows": 1,
+      "beforeBookmark": "000000f6-000002c0-000050dc-5a3f0e43b49e66893958c0cb9b3e5108",
+      "afterBookmark": "000000f6-00000306-000050dc-dd5bb4594e5c184a06a8c9a0e5ce2df9"
     }
   }
 }

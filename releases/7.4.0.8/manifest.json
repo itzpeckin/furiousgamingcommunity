@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.4.0.8",
   "releaseType": "trade-review-layout-filter-and-fgc-pick-activation-remediation",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.4.0.7",
@@ -18,27 +18,40 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-run"
+    "authorized": true,
+    "status": "published-main-accepted",
+    "commit": "1c6c62f7d4a28a055fbed5a16b7f25dc3c7cabbc",
+    "mergeCommit": "37be901a60234c3ef844280527872eec4586d4ba",
+    "pullRequest": 39,
+    "hostedChecksPassed": 4,
+    "mainChecksPassed": 6
   },
   "staging": { "authorized": false, "deployed": false, "status": "not-run" },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "unchanged",
-    "currentRelease": "7.4.0.7",
-    "currentCommit": "637a48c25ea2187f60263955ef11010b101b4ac6",
-    "currentPagesDeployment": "4451c15f-f425-4a70-8254-f0232c5404fd",
-    "currentWorkerBuild": "e8613496-efe6-4f03-b948-aac1493fb3b6",
+    "authorized": true,
+    "deployed": true,
+    "status": "deployed-read-only-verified-pending-owner-acceptance",
+    "currentRelease": "7.4.0.8",
+    "currentCommit": "37be901a60234c3ef844280527872eec4586d4ba",
+    "currentPagesDeployment": "52ae9935-decc-447d-abc2-0b8cf8a5732f",
+    "currentWorkerBuild": "706fda54-186e-4559-9ef3-77fcaa30516a",
+    "currentWorkerVersion": "fb32429a-19b3-4837-869f-2df057e5547b",
     "currentMigration": 30,
     "candidateMigration": 30
   },
   "productionDataOperation": {
-    "authorized": false,
-    "status": "not-run",
+    "authorized": true,
+    "status": "applied-verified",
     "leagueSlug": "furious-gaming-community",
     "sourceKey": "fgc-madden-27-opening-ownership",
-    "expectedPickCount": 672
+    "expectedPickCount": 672,
+    "appliedPickCount": 672,
+    "nonOriginalOwnerCount": 110,
+    "sourceMappingSha256": "2d7aef1b23d1e3a31c79d04a039858a00a24bc6a09ab2f2866dd7f28ce4cc9ec",
+    "database": "franchise-hq-db-madden27",
+    "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+    "beforeBookmark": "000000f6-000002c0-000050dc-5a3f0e43b49e66893958c0cb9b3e5108",
+    "afterBookmark": "000000f6-00000306-000050dc-dd5bb4594e5c184a06a8c9a0e5ce2df9"
   },
   "requiredArtifacts": [
     "league-engine/trade-center-live.js",
