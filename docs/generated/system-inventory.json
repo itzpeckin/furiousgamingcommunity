@@ -143,8 +143,8 @@
       ".jsonc": 1,
       ".md": 277,
       ".mjs": 33,
-      ".png": 1,
-      ".sql": 31,
+      ".png": 3,
+      ".sql": 32,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
@@ -155,7 +155,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 403846,
+        "bytes": 419590,
         "file": "styles.css"
       },
       {
@@ -183,11 +183,11 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 57416,
+        "bytes": 69188,
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 40969,
+        "bytes": 42497,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
@@ -219,19 +219,19 @@
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 27168,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
+        "bytes": 28317,
+        "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 26855,
-        "file": "tests/trade/full-trade-center.test.mjs"
+        "bytes": 27168,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
         "bytes": 23765,
         "file": "functions/_lib/madden-discovery.js"
       }
     ],
-    "total": 556
+    "total": 559
   },
   "frontend": {
     "assets": [
@@ -1398,10 +1398,16 @@
       "recordsLedger": true,
       "sha256": "94a39c90004a5e353bf2afa46f820292b8b2047ec565bbaef32abe1847f8ebf4",
       "version": "0029"
+    },
+    {
+      "file": "migrations/0030_trade_block_team_profiles.sql",
+      "recordsLedger": true,
+      "sha256": "9e7f999ba239b0b7ac9a4fd0c0fca78d68c45c478ec0218162db80fbcf18088a",
+      "version": "0030"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.0.3",
+  "release": "7.4.0.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

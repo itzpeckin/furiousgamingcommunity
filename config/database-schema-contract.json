@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "7.4.0.3",
+  "release": "7.4.0.4",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 29,
+  "currentVersion": 30,
   "requiredTables": [
     "canonical_capture_lifecycle_sessions",
     "canonical_free_agents",
@@ -84,6 +84,7 @@
     "teams",
     "team_ownership_periods",
     "trade_block_listings",
+    "trade_block_team_profiles",
     "trade_reconciliation_events",
     "trade_roster_overlays",
     "trade_workflow_assets",
@@ -129,6 +130,7 @@
     "league_draft_pick_baseline_applications": ["id", "baseline_id", "league_id", "franchise_season_id", "season_year", "expected_pick_count", "applied_pick_count", "status"],
     "draft_pick_ledger_events": ["id", "league_id", "draft_pick_id", "event_type", "from_team_key", "to_team_key", "trade_id", "baseline_id"],
     "trade_block_listings": ["id", "league_id", "team_key", "asset_type", "player_identity_id", "draft_pick_id", "requested_return", "active"],
+    "trade_block_team_profiles": ["league_id", "team_key", "needs_json", "updated_by_user_id", "created_at", "updated_at"],
     "league_notifications": ["id", "league_id", "user_id", "trade_id", "notification_type", "title", "message", "read_at"],
     "trade_roster_overlays": ["trade_id", "league_id", "player_identity_id", "source_player_id", "from_team_key", "to_team_key", "source_snapshot_id", "internal_status", "resolved_snapshot_id"],
     "trade_reconciliation_events": ["id", "league_id", "trade_id", "player_identity_id", "snapshot_id", "outcome", "expected_team_key", "madden_team_key"],

@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 3, 2026
+**Updated:** September 4, 2026
 
-**Revision:** 1.72
+**Revision:** 1.73
 
-**Current production:** 7.4.0.2 is active and the owner has validated the All Weeks correction plus a subsequent Week 11 import. Migration 28 remains the current Production database boundary. Blocked Madden Free Agents remain unknown/null and are not interpreted as zero.
+**Current production:** 7.4.0.3 is active from exact Main merge `5b93172`; the live public release marker was verified on September 4, 2026. Migration 29 is the current Production database boundary. No league-specific draft-pick baseline has been seeded. Blocked Madden Free Agents remain unknown/null and are not interpreted as zero.
 
-**Current work:** 7.4.0.3 is a local FranchiseHQ-wide candidate based on exact 7.4.0.2 commit `b131cdaf`. It restores the detailed Trade Calculator, rebuilds Trade Center and Trade Block UX, adds private server-backed drafts and approved-only league History, and introduces automatic tenant-scoped 2027–2029 Round 1–7 pick initialization for a 2026 Franchise season. Permanent continuity keys, versioned Madden-release baselines, ownership audit events, and retry-safe three-class rollover preserve every traded pick.
+**Current work:** 7.4.0.4 is a local FranchiseHQ-wide experience candidate based on exact 7.4.0.3 Main merge `5b93172`. It replaces the sparse Trade Center with a package-first workspace, applies team identities and gradients to Trade Block cards, routes every player entry to the canonical player card, makes roster-star listing immediate with optional notes, restores server-backed team needs, and redesigns Manage My Trade Block around only listed players plus an on-demand roster drawer.
 
-**Next gate:** Complete local 7.4.0.3 validation, receive the commissioner-reviewed league-specific and FGC draft-pick ownership baselines, and validate their exact versioned application without overwriting any Trade Center movement. Publication, migration 29, Main, and Production deployment remain separately authorized. Do not reset, delete, archive, rotate, transition, or reinterpret blocked Free Agents as zero.
+**Next gate:** Complete one consolidated local 7.4.0.4 validation cycle, then obtain explicit publication and Production authorization for additive migration 30, PR/Main, and the code deployment. Trade Activity must expose only the signed-in owner's team activity plus completed commissioner-approved trades from other teams; unrelated live proposals and negotiations remain private. Do not seed picks, import, reset, delete, archive, rotate, transition, change the active snapshot, or reinterpret blocked Free Agents as zero.
 
 ## Product decisions
 
@@ -67,7 +67,8 @@
 | 7.4.0 | Production deployed; pending owner UI acceptance | Shared Full Trade Center, advanced Trade Block, permanent pick ledger, shared settings/notifications, and Madden-authoritative roster reconciliation |
 | 7.4.0.1 | Production | Phased Madden cohort continuity, newly advanced-week empty-stat readiness, retained Week 10 source stitching, and truthful rejected-export diagnostics |
 | 7.4.0.2 | Production; owner accepted | All Weeks `/reg/0/` payload-period correction; owner validated the correction and a subsequent Week 11 import |
-| 7.4.0.3 | Local candidate | FranchiseHQ-wide Trade Center/Trade Block restoration, automatic versioned pick baselines, ownership-preserving rollover, and full server-backed calculator |
+| 7.4.0.3 | Production | FranchiseHQ-wide Trade Center/Trade Block restoration, automatic versioned pick baselines, ownership-preserving rollover, and full server-backed calculator |
+| 7.4.0.4 | Local candidate | Premium package-first Trade Center, private owner-scoped activity, team-branded Trade Block, canonical player cards, instant optional-note listings, and server-backed team needs |
 | 7.4.1–7.4.6 | Planned | Transactions/history, Commissioner tools, GOTW/Confidence Pool, mobile polish, consistency, and operations |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Required before RC | Authentication and session framework |
@@ -306,9 +307,20 @@
 - Versioned Madden-release and league-specific baseline records support later commissioner-reviewed sources. New baselines update only picks with no audited Trade Center or commissioner movement.
 - Trade Center navigation is Received, Sent, Drafts, Committee, Approved, Rejected, and History. League-wide History contains only committee-approved FranchiseHQ trades and excludes all private negotiation and rejection material.
 - The full player, package, and draft-pick calculator model is restored as server-backed league configuration, including per-team Early/Mid/Late/Super Bowl pick projections and 2–4 team fairness using the least-balanced participant.
-- Trade Block uses player-focused filtered cards and a mandatory requested-return side rail. Owners can enter it from roster/player surfaces or Manage My Trade Block; completed player trades remove stale listings.
+- Trade Block uses player-focused filtered cards and a requested-return side rail. Owners can enter it from roster/player surfaces or Manage My Trade Block; completed player trades remove stale listings.
 - AI suggestion navigation and exports are disabled. Madden remains authoritative for player ownership after the next import; FranchiseHQ remains authoritative for picks while Madden exposes none.
-- Gate: migration 29, fresh/upgrade/rollback behavior, tenant isolation, pick preservation, history privacy, settings concurrency, Trade Center UI contracts, full tests, and the strict repository gate pass locally before publication is requested.
+- Gate: migration 29, fresh/upgrade/rollback behavior, tenant isolation, pick preservation, history privacy, settings concurrency, Trade Center UI contracts, full tests, and the strict repository gate passed before publication and Production deployment.
+
+## 7.4.0.4 — Trade Center and Trade Block Experience
+
+- Present trades as clear team-versus-team packages with team identity, asset cards, status, the next available action, package values, and an at-a-glance dashboard.
+- Keep **Trade Activity** owner-scoped: the signed-in owner sees activity involving their team plus completed commissioner-approved trades from other teams. Unrelated proposals, negotiations, rejections, and drafts never appear.
+- Keep required committee-review access and notifications in the dedicated Committee workflow without turning unrelated negotiations into public activity.
+- Render Trade Block cards with source team colors, logo definition, player imagery, team needs, optional requested-return notes, and a direct route to the canonical player card.
+- A roster or player-card star immediately adds or removes an owned player without a second confirmation dialog. Notes are optional and can be added later.
+- Manage My Trade Block shows only currently listed players in spacious player rows, exposes inline optional notes, and opens an on-demand roster drawer to add more players.
+- Store team needs once per league team in additive migration 30 so every member and device sees the same marketplace intent.
+- Gate: privacy is enforced in the API and client, mobile/desktop layouts remain usable, migration 30 passes fresh and upgrade tests, the full suite and strict repository gate pass, and publication/Production remain separately authorized.
 
 ## 7.4.1 — Transactions and League History
 
@@ -441,3 +453,4 @@
 - **Revision 1.68:** Published exact 7.3.8 commit `677c226` through PR #30 with 4/4 pull-request checks, fast-forwarded it unchanged to Main, passed all five Main/build/deployment checks, and deployed Production Pages `2f96f87a` with exact-commit Worker build `44c70449`. Read-only HTTPS acceptance verified release `7.3.8`, actionable importer recovery, removed customer-facing platform callouts, and the protected authentication boundary. Migration 27, active Week 9 snapshot `b00edb25`, every data row, the permanent export URL, and blocked/null Free Agents remain unchanged. Owner signed-in UI acceptance is next.
 - **Revision 1.69:** Recorded owner acceptance of 7.3.8 and the authorized consolidated 7.4.0 local build. The candidate replaces device-only trades with a tenant-scoped shared workflow, two-to-four-team player/pick packages, three matching non-conflicted reviews, shared notifications/settings, owner-controlled Trade Block listings, and a permanent commissioner-baselined pick ledger because the verified Madden capture exposes no pick route. Approval changes FranchiseHQ's roster presentation immediately without mutating the active snapshot; the next Madden import always wins and reconciles privately without member-facing Pending/Confirmed labels. Additive migration 28 and all focused/full local validation are candidate-only. Production remains exact 7.3.8 on migration 27 and active Week 9 snapshot `b00edb25`; Main, cloud publication, live data, imports, resets, archives, transitions, URL rotation, and blocked/null Free Agents remain unchanged. Additional source-adapter research moves to 7.4.7 behind the core platform cycle.
 - **Revision 1.72:** Recorded owner acceptance of active 7.4.0.2 and a subsequent Week 11 import, then implemented authorized local 7.4.0.3 from exact commit `b131cdaf`. The candidate is FranchiseHQ-wide, not FGC-specific: it automatically creates the next three complete Round 1–7 pick classes per tenant, preserves traded ownership through retry and rollover, accepts later versioned league-specific baselines without resetting audited movements, restores the full shared calculator and team projections, rebuilds the seven Trade Center views and approved-only History, adds server-backed drafts and multi-team fairness, and replaces Trade Block prompts with a mandatory-comment side rail. Migration 29 and all code remain local; Production, Main, cloud publication, data, snapshots, exports, resets, archives, transitions, credentials, memberships, and blocked/null Free Agent semantics remain unchanged.
+- **Revision 1.73:** Reconciled 7.4.0.3 as live from exact Main merge `5b93172` with migration 29, then began the owner-approved 7.4.0.4 local Trade Center experience cycle. The candidate implements both reviewed visual concepts, direct canonical player-card navigation, immediate star-based Trade Block listing with optional notes, a listed-player-only manager, an on-demand roster drawer, and tenant-scoped team needs via additive migration 30. The API hides unrelated drafts, proposals, negotiations, and rejections; Trade Activity is limited to the signed-in owner's team plus completed commissioner-approved trades from other teams. Required committee reviewers retain their separate workflow access. Main, Production, migration 30, league data, snapshots, imports, draft-pick baselines, resets, archives, transitions, credentials, memberships, export URLs, and blocked/null Free Agent semantics remain unchanged and unauthorized in this local cycle.

@@ -2,13 +2,13 @@
   'use strict';
 
   const HQ=window.FranchiseHQ;
-  const VERSION='7.4.0.3';
+  const VERSION='7.4.0.4';
   const page=()=>document.querySelector('[data-page-content]');
   const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||null;
   const route=()=>String(location.hash||'#home').replace(/^#\/?/,'');
   const routePart=()=>route().split('/')[1]||'';
-  let state=null,loading=null,lastError=null,builder=null,blockLookup=new Set(),blockManagerOpen=false,blockEditor=null;
+  let state=null,loading=null,lastError=null,builder=null,blockLookup=new Set(),blockManagerOpen=false,blockRosterOpen=false,blockEditor=null,blockRosterSearch='';
   const assetFilters=new Map(),blockFilters={scope:'league',name:'',position:'All',team:'All',overall:'All',development:'All'};
 
   const app=()=>window.FGC_APP;
@@ -22,6 +22,14 @@
   const teamName=key=>state?.teams?.find(team=>team.teamKey===key)?.displayName||teamById(key)?.fullName||String(key||'').toUpperCase();
   const teamAbbr=key=>state?.teams?.find(team=>team.teamKey===key)?.abbreviation||teamById(key)?.abbr||String(key||'').toUpperCase();
   const teamRecord=key=>state?.teams?.find(team=>team.teamKey===key)||teamById(key)||{};
+  const cssColor=(value,fallback)=>/^#[0-9a-f]{3,8}$/i.test(String(value||'').trim())?String(value).trim():fallback;
+  const teamVisual=key=>{const team=teamRecord(key);return{
+    primary:cssColor(team.primaryColor||team.primary,'#27354a'),
+    secondary:cssColor(team.secondaryColor||team.secondary,'#111827'),
+    logo:team.logoUrl||team.logo||'',abbr:team.abbreviation||team.abbr||teamAbbr(key)
+  }};
+  const teamStyle=key=>{const visual=teamVisual(key);return `--trade-team-primary:${visual.primary};--trade-team-secondary:${visual.secondary}`};
+  const teamMark=key=>{const visual=teamVisual(key);return visual.logo?`<img src="${esc(visual.logo)}" alt="">`:`<span>${esc(visual.abbr)}</span>`};
   const money=value=>{const n=Number(value||0);return n?new Intl.NumberFormat(undefined,{style:'currency',currency:'USD',maximumFractionDigits:1,notation:'compact'}).format(n):'—'};
   const teamKeyForPlayer=player=>{
     const raw=player?.teamId;
@@ -104,9 +112,15 @@
     return `<div class="live-trade-asset"><span><strong>${esc(assetLabel(asset))}</strong><small>${esc(teamAbbr(asset.fromTeamKey))} → ${esc(teamAbbr(asset.toTeamKey))}</small></span>${valueMarkup(asset)}</div>`;
   }
 
+  function workflowInvolvesTeam(workflow,teamKey=currentTeam()){
+    return Boolean(teamKey&&workflow?.participants?.some(item=>item.teamKey===teamKey));
+  }
+
+  function tabCount(tab){return filteredWorkflows(tab).length}
+
   function nav(active='all'){
     const tabs=[['received','Received'],['sent','Sent'],['drafts','Drafts'],['committee','Committee'],['approved','Approved'],['rejected','Rejected'],['history','History']];
-    return `<div class="filter-bar trade-tabs trade-center-nav"><div class="segmented-tabs">${tabs.map(([key,label])=>`<button class="${active===key?'is-active':''}" data-live-trade-tab="${key}">${label}</button>`).join('')}</div></div>`;
+    return `<div class="trade-center-nav"><div class="segmented-tabs">${tabs.map(([key,label])=>{const count=tabCount(key);return `<button class="${active===key?'is-active':''}" data-live-trade-tab="${key}"><span>${label}</span>${count?`<b>${count}</b>`:''}</button>`}).join('')}</div></div>`;
   }
 
   function filteredWorkflows(tab){
@@ -124,15 +138,72 @@
     });
   }
 
-  function tradeCard(workflow){
-    const teamsLabel=workflow.participants.map(item=>teamAbbr(item.teamKey)).join(' ↔ ');
-    return `<button class="card live-trade-card" data-live-open-trade="${esc(workflow.id)}"><div><span class="pill pill--${workflow.status==='approved'?'success':workflow.status==='rejected'?'danger':workflow.status==='committee'?'warning':'accent'}">${esc(statusLabel(workflow.status))}</span><h3>${esc(teamsLabel)}</h3><p>${esc(workflow.note||(workflow.status==='approved'?'Committee-approved league trade':'Private league trade'))}</p></div><div><strong>${workflow.assets.length} asset${workflow.assets.length===1?'':'s'}</strong><small>${esc(date(workflow.updatedAt))}</small></div></button>`;
+  function packageAsset(asset){
+    if(asset.assetType==='player'){
+      const player=playerById(asset.sourcePlayerId)||playerById(asset.playerIdentityId)||{};
+      const image=player.headshot||player.image||player.portraitUrl||player.photoUrl||'';
+      return `<div class="trade-package-asset trade-package-asset--player">${image?`<img src="${esc(image)}" alt="">`:'<span class="trade-package-asset__placeholder">P</span>'}<span><strong>${esc(player.name||player.displayName||assetLabel(asset))}</strong><small>${esc(player.position||'—')} · ${esc(player.overall??'—')} OVR</small></span>${valueMarkup(asset)}</div>`;
+    }
+    return `<div class="trade-package-asset trade-package-asset--pick"><span class="trade-pick-ticket">PICK</span><span><strong>${esc(assetLabel(asset))}</strong><small>Draft capital</small></span>${valueMarkup(asset)}</div>`;
+  }
+
+  function workflowTitle(workflow,tab){
+    const own=currentTeam(),others=workflow.participants.filter(item=>item.teamKey!==own).map(item=>teamName(item.teamKey)).join(', ');
+    if(tab==='received')return `Offer from ${others||teamName(workflow.proposerTeamKey)}`;
+    if(tab==='sent')return `Negotiation with ${others||'league owner'}`;
+    if(tab==='committee')return `Committee review · ${workflow.participants.map(item=>teamAbbr(item.teamKey)).join(' ↔ ')}`;
+    if(workflow.status==='approved')return `${workflow.participants.map(item=>teamAbbr(item.teamKey)).join(' ↔ ')} approved`;
+    if(workflow.status==='rejected')return `${workflow.participants.map(item=>teamAbbr(item.teamKey)).join(' ↔ ')} closed`;
+    return workflow.participants.map(item=>teamAbbr(item.teamKey)).join(' ↔ ');
+  }
+
+  function workflowActionLabel(workflow,tab){
+    if(tab==='received')return'Review Offer';
+    if(tab==='committee')return'Review Trade';
+    if(tab==='drafts')return'Continue Draft';
+    return workflow.status==='approved'?'View Trade':'Open Trade';
+  }
+
+  function tradeCard(workflow,tab){
+    const received=workflow.participants.map(participant=>{
+      const assets=workflow.assets.filter(asset=>asset.toTeamKey===participant.teamKey);
+      return `<section class="trade-package-team" style="${teamStyle(participant.teamKey)}"><div class="trade-package-team__watermark">${teamMark(participant.teamKey)}</div><header>${teamMark(participant.teamKey)}<strong>${esc(teamAbbr(participant.teamKey))} RECEIVE${assets.length===1?'S':''}</strong></header><div>${assets.map(packageAsset).join('')||'<span class="empty-mini">No incoming assets</span>'}</div></section>`;
+    }).join('<span class="trade-package-swap" aria-hidden="true">⇄</span>');
+    const fairness=calculatorEnabled()?tradeFairness(workflow.assets,workflow.participants.map(item=>item.teamKey)):null;
+    const tone=workflow.status==='approved'?'success':workflow.status==='rejected'?'danger':workflow.status==='committee'?'warning':'accent';
+    return `<article class="card live-trade-card live-trade-card--premium"><div class="live-trade-card__head"><div><span class="pill pill--${tone}">${esc(statusLabel(workflow.status))}</span><h3>${esc(workflowTitle(workflow,tab))}</h3><small>${esc(date(workflow.updatedAt))}</small></div><button class="button button--primary" data-live-open-trade="${esc(workflow.id)}">${workflowActionLabel(workflow,tab)}</button></div><div class="trade-package-matchup">${received}</div>${fairness?`<div class="trade-package-value"><span><small>Assets</small><strong>${workflow.assets.length}</strong></span><span><small>Package balance</small><strong>${fairness.overall}%</strong></span><span class="${fairness.overall>=91?'is-positive':''}"><small>Calculator</small><strong>${fairness.overall>=91?'Fair value':'Review value'}</strong></span></div>`:''}</article>`;
+  }
+
+  function activityWorkflows(){
+    return (state?.workflows||[]).filter(workflow=>workflow.status!=='draft'&&(workflowInvolvesTeam(workflow)||workflow.status==='approved')).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||''))).slice(0,5);
+  }
+
+  function activityItem(workflow){
+    const involved=workflowInvolvesTeam(workflow),teams=workflow.participants.map(item=>teamAbbr(item.teamKey)).join(' ↔ ');
+    let title=`${teams} trade updated`,copy='Your team trade has new activity.';
+    if(workflow.status==='approved'){title=`${teams} trade approved`;copy=involved?'Your completed trade is now in league History.':'Commissioner-approved league trade.'}
+    else if(workflow.status==='committee'){title='Committee review requested';copy=involved?`${teams} is awaiting a league decision.`:`${teams} is ready for your review.`}
+    else if(workflow.status==='rejected'){title=`${teams} trade closed`;copy='A trade involving your team was rejected.'}
+    else if(workflow.proposerTeamKey===currentTeam()){title='Your team sent an offer';copy=`Negotiation with ${workflow.participants.filter(item=>item.teamKey!==currentTeam()).map(item=>teamAbbr(item.teamKey)).join(', ')}.`}
+    else {title=`${teamAbbr(workflow.proposerTeamKey)} sent your team an offer`;copy='Review the package or open the conversation.'}
+    return `<button data-live-open-trade="${esc(workflow.id)}"><i class="trade-activity-dot trade-activity-dot--${esc(workflow.status)}"></i><span><strong>${esc(title)}</strong><small>${esc(copy)}</small></span><time>${esc(date(workflow.updatedAt))}</time></button>`;
+  }
+
+  function tradeBlockTargets(){
+    const own=currentTeam();
+    return (state?.listings||[]).filter(item=>item.assetType==='player'&&item.teamKey!==own).slice(0,3).map(item=>{const player=playerById(item.playerPublicId)||players().find(candidate=>candidate.name===item.playerName)||{};return `<button class="trade-target" style="${teamStyle(item.teamKey)}" data-live-open-player="${esc(player.id||item.playerPublicId||'')}"><span class="trade-target__team">${teamMark(item.teamKey)}</span><span><strong>${esc(player.name||item.playerName||'Player')}</strong><small>${esc(player.position||'—')} · ${esc(player.overall??'—')} OVR</small></span></button>`}).join('');
+  }
+
+  function dashboardSummary(){
+    const received=tabCount('received'),negotiating=(state?.workflows||[]).filter(workflow=>workflow.status==='negotiating'&&workflowInvolvesTeam(workflow)).length,committee=canReview()?tabCount('committee'):0,completed=(state?.workflows||[]).filter(workflow=>workflow.status==='approved').length;
+    return `<div class="trade-summary-strip"><div><span>Needs your attention</span><strong>${received+committee}</strong></div><div><span>Active negotiations</span><strong>${negotiating}</strong></div><div><span>Committee review</span><strong>${committee}</strong></div><div><span>Completed</span><strong>${completed}</strong></div></div>`;
   }
 
   function renderDashboard(tab='received'){
     const list=filteredWorkflows(tab);
     const copy=tab==='history'?'Committee-approved FranchiseHQ trades are visible to the full league. Private negotiations and rejected proposals never appear here.':'Propose, negotiate, approve, and manage shared league trades.';
-    page().innerHTML=`<div class="page-heading"><div><span class="eyebrow">League transactions</span><h1>Trade Center</h1><p>${copy}</p></div>${currentTeam()?'<button class="button button--primary" data-live-start-trade>Create Trade</button>':''}</div>${nav(tab)}${list.length?`<div class="live-trade-list">${list.map(tradeCard).join('')}</div>`:`<article class="empty-state card"><h2>No trades in this view</h2><p>New shared league transactions will appear here.</p></article>`}`;
+    const activity=activityWorkflows(),targets=tradeBlockTargets();
+    page().innerHTML=`<div class="trade-center-page"><div class="page-heading"><div><span class="eyebrow">League transactions</span><h1>Trade Center</h1><p>${copy}</p></div>${currentTeam()?'<button class="button button--primary" data-live-start-trade>⇄&nbsp; Create Trade</button>':''}</div>${dashboardSummary()}<div class="trade-center-workspace"><main>${nav(tab)}${list.length?`<div class="live-trade-list">${list.map(workflow=>tradeCard(workflow,tab)).join('')}</div>`:`<article class="empty-state card trade-center-empty"><h2>No trades in this view</h2><p>When a relevant offer arrives, it will appear here with both team packages and the next action.</p>${currentTeam()?'<button class="button button--primary" data-live-start-trade>Create a Trade</button>':''}</article>`}</main><aside class="trade-center-rail"><section class="card trade-activity"><header><h2>Trade Activity</h2><span>Private to you</span></header><div>${activity.map(activityItem).join('')||'<p class="empty-mini">No relevant activity yet.</p>'}</div><small class="trade-activity__privacy">Only activity involving your team and completed commissioner-approved trades from other teams appears here.</small></section><section class="card trade-targets"><header><h2>Trade Block Targets</h2><button class="text-button" data-route="trade-block">View all</button></header><div>${targets||'<p class="empty-mini">No other teams have listed players.</p>'}</div></section></aside></div></div>`;
   }
 
   function initBuilder(initialAsset=null,workflow=null){
@@ -221,16 +292,23 @@
     if(!ensureState('Trade Block'))return;
     const own=currentTeam();
     const listings=(state.listings||[]).filter(item=>item.assetType==='player');
-    const managePlayers=own?players().filter(player=>teamKeyForPlayer(player)===own).sort((a,b)=>Number(b.overall||0)-Number(a.overall||0)):[];
+    const ownListings=listings.filter(item=>item.teamKey===own).map(item=>({...item,player:playerById(item.playerPublicId)||players().find(player=>String(player.name)===String(item.playerName))}));
+    const rosterPlayers=own?players().filter(player=>teamKeyForPlayer(player)===own).sort((a,b)=>Number(b.overall||0)-Number(a.overall||0)):[];
     const visible=listings.filter(item=>blockFilters.scope!=='mine'||item.teamKey===own).map(item=>({...item,player:playerById(item.playerPublicId)||players().find(player=>String(player.name)===String(item.playerName))})).filter(item=>{
       const player=item.player||{},term=blockFilters.name.toLowerCase();
       return(!term||String(player.name||item.playerName||'').toLowerCase().includes(term))&&(blockFilters.position==='All'||player.position===blockFilters.position)&&(blockFilters.team==='All'||item.teamKey===blockFilters.team)&&(blockFilters.development==='All'||String(player.dev||player.developmentTrait||'Normal')===blockFilters.development)&&(blockFilters.overall==='All'||(blockFilters.overall==='90+'?Number(player.overall)>=90:blockFilters.overall==='80-89'?Number(player.overall)>=80&&Number(player.overall)<=89:Number(player.overall)<80));
     });
     const positions=['All',...new Set(players().map(player=>player.position).filter(Boolean))],development=['All','Normal','Star','Superstar','X-Factor'];
-    const cards=visible.map(item=>{const player=item.player||{},team=teamRecord(item.teamKey),image=player.headshot||player.image||player.portraitUrl||player.photoUrl||'',logo=team.logo||team.logoUrl||'',style=`--team-primary:${esc(team.primary||team.primaryColor||'#27354a')};--team-secondary:${esc(team.secondary||team.secondaryColor||'#111827')}`;return `<article class="card live-block-player-card" style="${style}" data-live-open-player="${esc(player.id||item.playerPublicId||'')}" role="button" tabindex="0"><div class="live-block-brand">${logo?`<img src="${esc(logo)}" alt="">`:''}<span>${esc(teamAbbr(item.teamKey))}</span></div><div class="live-block-copy"><button class="text-button" data-open-value-card="${esc(player.id||item.playerPublicId||'')}">${esc(player.name||item.playerName||'Player')}</button><strong>${esc(player.overall??'—')} OVR · ${esc(player.position||'—')}</strong><span>${esc(player.dev||player.developmentTrait||'Normal')} · Age ${esc(player.age??'—')} · ${esc(money(player.capHit??player.contract?.capHit))}</span><small>Looking for: ${esc(item.requestedReturn)}</small></div>${image?`<img class="live-block-player-image" src="${esc(image)}" alt="">`:''}<div class="live-block-actions">${item.teamKey===own?`<button class="icon-button" data-live-edit-block="${esc(player.id||item.playerPublicId||'')}" aria-label="Edit Trade Block listing">★</button>`:`<button class="button button--primary" data-live-start-block-type="player" data-live-start-block-id="${esc(player.id||item.playerPublicId||'')}">Add to Trade</button>`}</div></article>`}).join('');
-    const manager=blockManagerOpen?`<div class="block-drawer-shell is-open" data-live-block-manager aria-hidden="false"><button class="block-drawer-backdrop" data-live-close-block-manager aria-label="Close"></button><aside class="block-drawer" role="dialog" aria-modal="true"><header class="block-drawer__header"><div><span class="eyebrow">${esc(teamName(own))}</span><h2>Manage My Trade Block</h2><p>Select a player from your roster to add or edit the listing.</p></div><button class="icon-button" data-live-close-block-manager>×</button></header><div class="block-drawer__body"><div class="drawer-card-list">${managePlayers.map(player=>`<article class="drawer-player-card ${onBlock(player)?'is-listed':''}"><button class="drawer-player-card__identity text-button" data-open-value-card="${esc(player.id)}"><strong>${esc(player.name)}</strong><small>${esc(player.position)} · ${esc(player.overall??'—')} OVR · ${esc(player.dev||'Normal')}</small></button><button class="icon-button" data-live-edit-block="${esc(player.id)}" aria-label="${onBlock(player)?'Edit':'Add'} ${esc(player.name)}">${onBlock(player)?'★':'☆'}</button></article>`).join('')}</div></div></aside></div>`:'';
-    const editing=blockEditor?(()=>{const player=playerById(blockEditor.playerId),listing=listings.find(item=>String(item.playerPublicId)===String(player?.id)||String(item.playerIdentityId)===String(player?.id)||String(item.playerName)===String(player?.name));return `<div class="block-drawer-shell is-open" data-live-block-editor aria-hidden="false"><button class="block-drawer-backdrop" data-live-close-block-editor aria-label="Close"></button><aside class="block-drawer" role="dialog" aria-modal="true"><header class="block-drawer__header"><div><span class="eyebrow">Manage Trade Block</span><h2>${esc(player?.name||'Player')}</h2><p>A requested return is required before this listing is published.</p></div><button class="icon-button" data-live-close-block-editor>×</button></header><div class="block-drawer__body"><label class="field"><span>What are you looking for?</span><textarea required data-live-block-request placeholder="Describe players, positions, or draft compensation…">${esc(listing?.requestedReturn||'')}</textarea></label></div><footer class="block-drawer__footer">${listing?'<button class="button button--danger button--subtle" data-live-remove-block>Remove from Trade Block</button>':''}<button class="button button--primary" data-live-confirm-block>OK</button></footer></aside></div>`})():'';
-    page().innerHTML=`<div class="page-heading"><div><span class="eyebrow">League marketplace</span><h1>Trade Block</h1><p>Browse players that team owners have explicitly made available.</p></div>${own?'<button class="button button--primary" data-live-open-block-manager>Manage My Trade Block</button>':''}</div><div class="filter-bar trade-block-filters"><div class="segmented-tabs"><button class="${blockFilters.scope==='league'?'is-active':''}" data-live-block-scope="league">League Trade Block</button><button class="${blockFilters.scope==='mine'?'is-active':''}" data-live-block-scope="mine">My Trade Block</button></div><label class="field field--grow"><span>Name</span><input data-live-block-filter="name" value="${esc(blockFilters.name)}" placeholder="Player name"></label><label class="field"><span>Position</span><select data-live-block-filter="position">${positions.map(value=>`<option ${blockFilters.position===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><label class="field"><span>Team</span><select data-live-block-filter="team"><option>All</option>${(state.teams||[]).map(team=>`<option value="${esc(team.teamKey)}" ${blockFilters.team===team.teamKey?'selected':''}>${esc(team.abbreviation)}</option>`).join('')}</select></label><label class="field"><span>Overall</span><select data-live-block-filter="overall">${['All','90+','80-89','Under 80'].map(value=>`<option value="${value==='Under 80'?'under-80':value}" ${blockFilters.overall===(value==='Under 80'?'under-80':value)?'selected':''}>${value}</option>`).join('')}</select></label><label class="field"><span>Development Trait</span><select data-live-block-filter="development">${development.map(value=>`<option ${blockFilters.development===value?'selected':''}>${value}</option>`).join('')}</select></label></div><div class="trade-block-grid trade-block-grid--full">${cards}</div>${cards?'':'<article class="empty-state card"><h2>No matching Trade Block players</h2><p>Adjust the filters or manage your team’s listings.</p></article>'}${manager}${editing}`;
+    const cards=visible.map(item=>{const player=item.player||{},image=player.headshot||player.image||player.portraitUrl||player.photoUrl||'',needs=state.teamNeeds?.find(profile=>profile.teamKey===item.teamKey)?.needs||[];return `<article class="card live-block-player-card" style="${teamStyle(item.teamKey)}" data-live-open-player="${esc(player.id||item.playerPublicId||'')}" role="button" tabindex="0"><div class="live-block-brand">${teamMark(item.teamKey)}<span>${esc(teamAbbr(item.teamKey))}</span></div><div class="live-block-copy"><button class="text-button" data-live-open-player-button="${esc(player.id||item.playerPublicId||'')}">${esc(player.name||item.playerName||'Player')}</button><strong>${esc(player.overall??'—')} OVR · ${esc(player.position||'—')}</strong><span>${esc(player.dev||player.developmentTrait||'Normal')} · Age ${esc(player.age??'—')} · ${esc(money(player.capHit??player.contract?.capHit))}</span><small>Looking for: ${esc(item.requestedReturn||'Open to offers')}</small>${needs.length?`<div class="live-block-needs">${needs.slice(0,3).map(need=>`<em>${esc(need)}</em>`).join('')}</div>`:''}</div>${image?`<img class="live-block-player-image" src="${esc(image)}" alt="">`:''}<div class="live-block-actions">${item.teamKey===own?`<button class="icon-button is-active" data-live-edit-block="${esc(player.id||item.playerPublicId||'')}" aria-label="Manage ${esc(player.name||'player')} listing">★</button>`:`<button class="button button--primary" data-live-start-block-type="player" data-live-start-block-id="${esc(player.id||item.playerPublicId||'')}">Add to Trade</button>`}</div></article>`}).join('');
+    if(blockManagerOpen){
+      const visual=teamVisual(own),needs=state.teamNeeds?.find(profile=>profile.teamKey===own)?.needs||[];
+      const available=rosterPlayers.filter(player=>!onBlock(player)&&String(player.name||'').toLowerCase().includes(blockRosterSearch.toLowerCase()));
+      const rows=ownListings.map(item=>{const player=item.player||{},image=player.headshot||player.image||player.portraitUrl||player.photoUrl||'';return `<article class="block-manager-row" style="${teamStyle(own)}">${image?`<img src="${esc(image)}" alt="">`:'<span class="block-manager-row__avatar">P</span>'}<button class="block-manager-row__identity text-button" data-live-open-player-button="${esc(player.id||item.playerPublicId||'')}"><strong>★ ${esc(player.name||item.playerName||'Player')}</strong><small>${esc(player.position||'—')} · ${esc(player.overall??'—')} OVR · ${esc(player.dev||player.developmentTrait||'Normal')} · Age ${esc(player.age??'—')}</small></button><label><span>Notes for trade</span><input data-live-block-note="${esc(player.id||item.playerPublicId||'')}" value="${esc(item.requestedReturn||'')}" placeholder="Notes are optional"></label><div class="block-manager-row__actions"><button class="button button--secondary" data-live-save-block-note="${esc(player.id||item.playerPublicId||'')}">Save</button><button class="text-button text-button--danger" data-live-remove-block-player="${esc(player.id||item.playerPublicId||'')}">Remove</button></div></article>`}).join('');
+      const drawer=blockRosterOpen?`<div class="block-drawer-shell is-open" aria-hidden="false"><button class="block-drawer-backdrop" data-live-close-block-roster aria-label="Close Add Players"></button><aside class="block-drawer block-add-player-drawer" role="dialog" aria-modal="true"><header class="block-drawer__header"><div><span class="eyebrow">${esc(teamName(own))}</span><h2>Add Players</h2><p>Select a star to add instantly. Notes are optional.</p></div><button class="icon-button" data-live-close-block-roster>×</button></header><div class="block-drawer__body"><label class="field"><span>Search roster</span><input data-live-block-roster-search value="${esc(blockRosterSearch)}" placeholder="Search roster"></label><div class="drawer-card-list">${available.map(player=>`<article class="drawer-player-card"><button class="drawer-player-card__identity text-button" data-live-open-player-button="${esc(player.id)}"><strong>${esc(player.name)}</strong><small>${esc(player.position)} · ${esc(player.overall??'—')} OVR · ${esc(player.dev||'Normal')}</small></button><button class="icon-button" data-live-add-block-player="${esc(player.id)}" aria-label="Add ${esc(player.name)} to Trade Block">☆</button></article>`).join('')||'<div class="empty-mini">Every matching player is already listed.</div>'}</div></div></aside></div>`:'';
+      page().innerHTML=`<div class="block-manager-page"><div class="page-heading"><div><span class="eyebrow">Team marketplace</span><h1>Manage My Trade Block</h1><p>Control who is available and what your team is looking for.</p></div><div class="heading-actions"><button class="text-button" data-live-close-block-manager>← Back to League Trade Block</button><button class="button button--primary" data-live-open-block-roster>Add Players</button></div></div><section class="block-manager-team-hero" style="${teamStyle(own)}"><div>${teamMark(own)}<span><small>${esc(visual.abbr)}</small><strong>${esc(teamName(own))}</strong><em>${ownListings.length} player${ownListings.length===1?'':'s'} listed</em></span></div><b>${esc(visual.abbr)}</b></section><section class="card block-manager-needs"><div><strong>Team Needs</strong><span>${needs.length?needs.map(need=>`<em>${esc(need)}</em>`).join(''):'<small>No team needs added yet.</small>'}</span></div><label><span>Update needs</span><input data-live-team-needs value="${esc(needs.join(', '))}" placeholder="Cornerback, Pass Rush, Offensive Line"></label><button class="button button--secondary" data-live-save-team-needs>Save Needs</button></section><div class="block-manager-list">${rows||'<article class="empty-state card"><h2>Your Trade Block is empty</h2><p>Add players from your roster. Notes can be added later.</p><button class="button button--primary" data-live-open-block-roster>Add Players</button></article>'}</div>${drawer}</div>`;
+      return;
+    }
+    page().innerHTML=`<div class="page-heading"><div><span class="eyebrow">League marketplace</span><h1>Trade Block</h1><p>Browse players that team owners have explicitly made available.</p></div>${own?'<button class="button button--primary" data-live-open-block-manager>Manage My Trade Block</button>':''}</div><div class="filter-bar trade-block-filters"><div class="segmented-tabs"><button class="${blockFilters.scope==='league'?'is-active':''}" data-live-block-scope="league">League Trade Block</button><button class="${blockFilters.scope==='mine'?'is-active':''}" data-live-block-scope="mine">My Trade Block</button></div><label class="field field--grow"><span>Name</span><input data-live-block-filter="name" value="${esc(blockFilters.name)}" placeholder="Player name"></label><label class="field"><span>Position</span><select data-live-block-filter="position">${positions.map(value=>`<option ${blockFilters.position===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><label class="field"><span>Team</span><select data-live-block-filter="team"><option>All</option>${(state.teams||[]).map(team=>`<option value="${esc(team.teamKey)}" ${blockFilters.team===team.teamKey?'selected':''}>${esc(team.abbreviation)}</option>`).join('')}</select></label><label class="field"><span>Overall</span><select data-live-block-filter="overall">${['All','90+','80-89','Under 80'].map(value=>`<option value="${value==='Under 80'?'under-80':value}" ${blockFilters.overall===(value==='Under 80'?'under-80':value)?'selected':''}>${value}</option>`).join('')}</select></label><label class="field"><span>Development Trait</span><select data-live-block-filter="development">${development.map(value=>`<option ${blockFilters.development===value?'selected':''}>${value}</option>`).join('')}</select></label></div><div class="trade-block-grid trade-block-grid--full">${cards}</div>${cards?'':'<article class="empty-state card"><h2>No matching Trade Block players</h2><p>Adjust the filters or manage your team’s listings.</p></article>'}`;
   }
 
   function renderCommissionerSettings(){
@@ -251,13 +329,25 @@
     initBuilder({assetType,assetId});setRoute('trade-center/new');
   }
   function startPlayerTrade(playerId){startAssetTrade('player',playerId)}
-  async function openLiveBlockManager(){if(!state)await load();blockManagerOpen=true;blockEditor=null;if(route()==='trade-block')renderTradeBlock();else setRoute('trade-block')}
+  async function openLiveBlockManager(){if(!state)await load();blockManagerOpen=true;blockRosterOpen=false;blockEditor=null;if(route()==='trade-block')renderTradeBlock();else setRoute('trade-block')}
 
   async function togglePlayerBlock(playerId,trigger=null){
     if(!state)await load();
     const player=playerById(playerId);
     if(!player||teamKeyForPlayer(player)!==currentTeam()){showToast('Trade Block unavailable','Only the owner of this roster can change the listing.');return}
-    blockEditor={playerId:String(player.id)};trigger?.blur?.();if(route()==='trade-block')renderTradeBlock();else setRoute('trade-block');
+    const active=onBlock(player);
+    if(trigger)trigger.disabled=true;
+    try{
+      await request('trade-block',{assetType:'player',assetId:String(player.id),active:!active,requestedReturn:''});
+      if(trigger){
+        trigger.classList.toggle('is-active',!active);trigger.setAttribute('aria-pressed',String(!active));
+        trigger.setAttribute('aria-label',!active?'Remove from Trade Block':'Add to Trade Block');
+        trigger.title=!active?'Remove from Trade Block':'Add to Trade Block';
+      }
+      showToast(!active?'Added to Trade Block':'Removed from Trade Block',!active?'You can add optional notes later in Manage My Trade Block.':'The player is no longer listed.');
+      if(route()==='trade-block')renderTradeBlock();
+    }catch(error){showToast('Trade Block not updated',error.message)}
+    finally{if(trigger)trigger.disabled=false}
   }
 
   function calculatorEnabled(){return state?.settings?.calculatorEnabled!==false}
@@ -327,7 +417,7 @@
   }
 
   function setDeep(target,path,value){const parts=String(path).split('.');let ref=target;for(const key of parts.slice(0,-1)){ref[key]=ref[key]&&typeof ref[key]==='object'?ref[key]:{};ref=ref[key]}ref[parts.at(-1)]=value}
-  function openPlayerCard(playerId){const trigger=document.createElement('button');trigger.type='button';trigger.hidden=true;trigger.dataset.openValueCard=String(playerId||'');document.body.append(trigger);trigger.click();trigger.remove()}
+  function openPlayerCard(playerId){return app()?.openRosterPlayerDetail?.(String(playerId||''))}
 
   document.addEventListener('click',event=>{
     let target;
@@ -350,13 +440,17 @@
     if(target=event.target.closest('[data-live-send-message]')){event.preventDefault();const input=document.querySelector('[data-live-message-text]');if(input?.value.trim())act('message',{tradeId:target.dataset.liveSendMessage,message:input.value},'Message sent');return}
     if(target=event.target.closest('[data-live-toggle-block]')){event.preventDefault();const [assetType,...rest]=target.dataset.liveToggleBlock.split(':');const assetId=rest.join(':');if(assetType==='player')togglePlayerBlock(assetId,target);return}
     if(target=event.target.closest('[data-live-start-block-id]')){event.preventDefault();startAssetTrade(target.dataset.liveStartBlockType,target.dataset.liveStartBlockId);return}
-    if(target=event.target.closest('[data-live-open-block-manager]')){event.preventDefault();blockManagerOpen=true;renderTradeBlock();return}
-    if(target=event.target.closest('[data-live-close-block-manager]')){event.preventDefault();blockManagerOpen=false;renderTradeBlock();return}
-    if(target=event.target.closest('[data-live-edit-block]')){event.preventDefault();blockEditor={playerId:target.dataset.liveEditBlock};renderTradeBlock();return}
-    if(target=event.target.closest('[data-live-close-block-editor]')){event.preventDefault();blockEditor=null;renderTradeBlock();return}
-    if(target=event.target.closest('[data-live-confirm-block]')){event.preventDefault();const requestedReturn=document.querySelector('[data-live-block-request]')?.value.trim()||'';if(!requestedReturn){showToast('Requested return required','Describe what you want before adding this player to the Trade Block.');return}act('trade-block',{assetType:'player',assetId:blockEditor?.playerId,active:true,requestedReturn},'Trade Block listing saved').then(ok=>{if(ok){blockEditor=null;blockManagerOpen=false;renderTradeBlock()}});return}
-    if(target=event.target.closest('[data-live-remove-block]')){event.preventDefault();act('trade-block',{assetType:'player',assetId:blockEditor?.playerId,active:false},'Player removed from Trade Block').then(ok=>{if(ok){blockEditor=null;blockManagerOpen=false;renderTradeBlock()}});return}
+    if(target=event.target.closest('[data-live-open-block-manager]')){event.preventDefault();blockManagerOpen=true;blockRosterOpen=false;renderTradeBlock();return}
+    if(target=event.target.closest('[data-live-close-block-manager]')){event.preventDefault();blockManagerOpen=false;blockRosterOpen=false;renderTradeBlock();return}
+    if(target=event.target.closest('[data-live-open-block-roster]')){event.preventDefault();blockRosterOpen=true;renderTradeBlock();return}
+    if(target=event.target.closest('[data-live-close-block-roster]')){event.preventDefault();blockRosterOpen=false;renderTradeBlock();return}
+    if(target=event.target.closest('[data-live-edit-block]')){event.preventDefault();blockManagerOpen=true;blockRosterOpen=false;renderTradeBlock();requestAnimationFrame(()=>document.querySelector(`[data-live-block-note="${CSS.escape(target.dataset.liveEditBlock)}"]`)?.focus());return}
+    if(target=event.target.closest('[data-live-add-block-player]')){event.preventDefault();act('trade-block',{assetType:'player',assetId:target.dataset.liveAddBlockPlayer,active:true,requestedReturn:''},'Player added to Trade Block');return}
+    if(target=event.target.closest('[data-live-save-block-note]')){event.preventDefault();const playerId=target.dataset.liveSaveBlockNote,requestedReturn=document.querySelector(`[data-live-block-note="${CSS.escape(playerId)}"]`)?.value.trim()||'';act('trade-block',{assetType:'player',assetId:playerId,active:true,requestedReturn},'Trade Block notes saved');return}
+    if(target=event.target.closest('[data-live-remove-block-player]')){event.preventDefault();act('trade-block',{assetType:'player',assetId:target.dataset.liveRemoveBlockPlayer,active:false},'Player removed from Trade Block');return}
+    if(target=event.target.closest('[data-live-save-team-needs]')){event.preventDefault();const needs=document.querySelector('[data-live-team-needs]')?.value||'';act('trade-block-needs',{needs},'Team needs saved');return}
     if(target=event.target.closest('[data-live-block-scope]')){event.preventDefault();blockFilters.scope=target.dataset.liveBlockScope;renderTradeBlock();return}
+    if(target=event.target.closest('[data-live-open-player-button]')){event.preventDefault();openPlayerCard(target.dataset.liveOpenPlayerButton);return}
     if(target=event.target.closest('[data-live-open-player]')){if(event.target.closest('button'))return;event.preventDefault();openPlayerCard(target.dataset.liveOpenPlayer);return}
     if(target=event.target.closest('[data-live-save-settings]')){event.preventDefault();const settings=structuredClone(state.settings);document.querySelectorAll('[data-live-setting]').forEach(input=>{settings[input.dataset.liveSetting]=input.type==='checkbox'?input.checked:Number(input.value)});document.querySelectorAll('[data-live-value-path]').forEach(input=>setDeep(settings,input.dataset.liveValuePath,Number(input.value)));document.querySelectorAll('[data-live-projection]').forEach(input=>setDeep(settings,`valueModel.draft.teamProjections.${input.dataset.liveProjection}`,input.value));act('settings',{revision:state.settings.revision,settings},'League settings saved');return}
     if(target=event.target.closest('[data-live-notifications-read]')){event.preventDefault();act('notifications-read',{},'Notifications read');return}
@@ -368,7 +462,7 @@
     if(destination&&builder){builder.transfers[Number(destination.dataset.liveTransferDestination)].toTeamKey=destination.value}
     const filter=event.target.closest('[data-live-block-filter]');if(filter){blockFilters[filter.dataset.liveBlockFilter]=filter.value;renderTradeBlock()}
   });
-  document.addEventListener('input',event=>{const filter=event.target.closest('[data-live-block-filter="name"]');if(filter){blockFilters.name=filter.value;renderTradeBlock();document.querySelector('[data-live-block-filter="name"]')?.focus()}});
+  document.addEventListener('input',event=>{const filter=event.target.closest('[data-live-block-filter="name"]');if(filter){blockFilters.name=filter.value;renderTradeBlock();document.querySelector('[data-live-block-filter="name"]')?.focus();return}const rosterSearch=event.target.closest('[data-live-block-roster-search]');if(rosterSearch){blockRosterSearch=rosterSearch.value;renderTradeBlock();const next=document.querySelector('[data-live-block-roster-search]');next?.focus();next?.setSelectionRange?.(blockRosterSearch.length,blockRosterSearch.length)}});
 
   window.addEventListener('franchisehq:auth-changed',event=>{
     if(event.detail?.status!=='ready')return;
@@ -378,7 +472,7 @@
       rerender();
     }).catch(()=>{});
   });
-  window.addEventListener('franchisehq:league-tenant-changed',()=>{state=null;builder=null;blockManagerOpen=false;blockEditor=null;blockLookup.clear();assetFilters.clear()});
+  window.addEventListener('franchisehq:league-tenant-changed',()=>{state=null;builder=null;blockManagerOpen=false;blockRosterOpen=false;blockEditor=null;blockRosterSearch='';blockLookup.clear();assetFilters.clear()});
 
   const service={version:VERSION,load,refresh:()=>load(true),request,renderTradeCenter,renderTradeBlock,renderCommissionerSettings,
     renderNotificationMenu,badges,startPlayerTrade,startAssetTrade,togglePlayerBlock,onBlock,calculatorEnabled,playerValuation,pickValuation,packageValuation,

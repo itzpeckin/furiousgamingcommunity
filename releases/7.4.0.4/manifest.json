@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.4",
+  "releaseType": "trade-center-and-trade-block-experience",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.0.3",
+    "commit": "5b9317266aa5b7b3019457078432f0aa11ca8d53",
+    "tree": "72bb64f4b7923aa3e8d7e1795e81cf4144a9f919",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.0.4",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": { "authorized": false, "status": "not-run", "commit": null, "pullRequest": null },
+  "staging": { "authorized": false, "deployed": false, "status": "not-run" },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.4.0.3",
+    "currentCommit": "5b9317266aa5b7b3019457078432f0aa11ca8d53",
+    "currentMigration": 29,
+    "candidateMigration": 30
+  },
+  "requiredArtifacts": [
+    "docs/design/7.4.0.4/trade-center-concept.png",
+    "docs/design/7.4.0.4/trade-block-management-concept.png",
+    "migrations/0030_trade_block_team_profiles.sql",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "league-engine/trade-center-live.js",
+    "styles.css",
+    "tests/trade/full-trade-center.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.0.4/release-record.md",
+    "releases/7.4.0.4/validation-evidence.json"
+  ]
+}
