@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.0.4",
   "validatedOn": "2026-09-04",
-  "status": "local-validated",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": { "unregisteredFailures": 0 },
@@ -19,18 +19,18 @@
     "responsiveExperience": { "passed": true, "desktop": true, "tablet": true, "phone": true },
     "maddenAuthority": { "passed": true, "playerOwnershipImportWins": true, "draftPickAuthority": "franchisehq-while-unavailable-from-madden" },
     "freeAgentBlockedPreserved": { "passed": true, "status": "blocked", "count": null, "interpretedAsZero": false },
-    "strictMigration": { "passed": true, "expectedFailure": false, "migrationVersion": 30, "requiredTables": 95, "foreignKeyViolations": 0 },
+    "strictMigration": { "passed": true, "expectedFailure": false, "migrationVersion": 30, "requiredTables": 95, "foreignKeyViolations": 0, "productionApplied": true },
     "automatedTests": { "passed": true, "passedTests": 150, "failedTests": 0, "scope": "full-consolidated-release-gate" },
     "strictRepositoryGate": { "passed": true, "status": "passed", "javascriptModules": 223, "inventoryFiles": 559, "routes": 69 }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
-    "migrationApplied": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
+    "migrationApplied": true,
     "draftPickBaselineApplied": false,
     "captureExecuted": false,
     "candidateImportExecuted": false,
@@ -47,11 +47,11 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run" },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "pullRequest": 35, "candidateCommit": "875f83e5809b9d453a6189c048a82b6dac930c73", "mergeCommit": "7d69003eb1ed3fc89fd0530f091e241a105c3e32" },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestChecksPassed": 4, "mainChecksPassed": 6 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "productionDeployment": { "authorized": false, "status": "not-run", "currentRelease": "7.4.0.3" },
-    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 29, "candidateMigration": 30 },
+    "productionDeployment": { "authorized": true, "status": "deployed-read-only-verified-pending-owner-acceptance", "currentRelease": "7.4.0.4", "mainCommit": "7d69003eb1ed3fc89fd0530f091e241a105c3e32", "pagesDeployment": "f7e85bed-bb3b-45df-ab80-d65164165507", "workerBuild": "6b971ea4-5218-40b4-be9f-0441edd48c0a", "liveReleaseMarker": "7.4.0.4" },
+    "productionMigration": { "authorized": true, "status": "applied-and-verified", "databaseName": "franchise-hq-db-madden27", "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6", "previousMigration": 29, "currentMigration": 30, "candidateMigration": 30, "preMigrationBookmark": "000000f3-000002a8-000050dc-8ddbc6b9fd4e7c418ecdd010b221b723", "postMigrationBookmark": "000000f3-000002b4-000050dc-dfc0f9df326e05b964843dabaae43cd7", "profileRowsSeeded": 0, "foreignKeyViolations": 0, "protectedCountsBefore": { "leagues": 1, "users": 28, "memberships": 28, "activeTeamAssignments": 27, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1 }, "protectedCountsAfter": { "leagues": 1, "users": 28, "memberships": 28, "activeTeamAssignments": 27, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1 } },
     "productionDataOperation": { "authorized": false, "status": "not-run" }
   }
 }
