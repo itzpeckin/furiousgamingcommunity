@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 1, 2026
+**Updated:** September 3, 2026
 
-**Revision:** 1.71
+**Revision:** 1.72
 
-**Current production:** 7.4.0.1 is merged to Main as `f04a415`. Additive migration 28 remains applied with 90 canonical tables and no foreign-key violations. The latest 43-route All Weeks import activated malformed snapshot `ab083570`, whose 14 schedule rows and six statistic rows were assigned to Regular Season Week 0. Prior valid Week 9 snapshot `b00edb25` remains retained.
+**Current production:** 7.4.0.2 is active and the owner has validated the All Weeks correction plus a subsequent Week 11 import. Migration 28 remains the current Production database boundary. Blocked Madden Free Agents remain unknown/null and are not interpreted as zero.
 
-**Current work:** 7.4.0.2 is locally validated and Production-authorized from Main `f04a415`. The remediation recognizes non-empty `/week/reg/0/` All Weeks routes as aggregate routes, resolves their zero-based payload `stageIndex: 1, weekIndex: 9` to Regular Season Week 10, preserves normal route authority, and treats empty Week 0 routes as non-playable placeholders. The corrected source evidence creates a new candidate fingerprint, while malformed Week 0 rows are excluded from Week 10 carry-forward.
+**Current work:** 7.4.0.3 is a local FranchiseHQ-wide candidate based on exact 7.4.0.2 commit `b131cdaf`. It restores the detailed Trade Calculator, rebuilds Trade Center and Trade Block UX, adds private server-backed drafts and approved-only league History, and introduces automatic tenant-scoped 2027–2029 Round 1–7 pick initialization for a 2026 Franchise season. Permanent continuity keys, versioned Madden-release baselines, ownership audit events, and retry-safe three-class rollover preserve every traded pick.
 
-**Next gate:** Publish 7.4.0.2, pass hosted checks, merge to Main, deploy Production, reanalyze the retained 43-route source, build and validate one corrected Week 10 candidate, and atomically activate it. Stop unless Week 10 schedule/statistics coverage and snapshot validation pass. Do not request another export, reset or delete data, rotate the URL, archive or transition a season, or reinterpret blocked Free Agents as zero. Retain the malformed and prior snapshots and all audits.
+**Next gate:** Complete local 7.4.0.3 validation, receive the commissioner-reviewed league-specific and FGC draft-pick ownership baselines, and validate their exact versioned application without overwriting any Trade Center movement. Publication, migration 29, Main, and Production deployment remain separately authorized. Do not reset, delete, archive, rotate, transition, or reinterpret blocked Free Agents as zero.
 
 ## Product decisions
 
@@ -66,7 +66,8 @@
 | 7.3.8 | Production; owner accepted | Actionable commissioner import recovery, member-facing platform-callout cleanup, and retained Madden Cap Space display |
 | 7.4.0 | Production deployed; pending owner UI acceptance | Shared Full Trade Center, advanced Trade Block, permanent pick ledger, shared settings/notifications, and Madden-authoritative roster reconciliation |
 | 7.4.0.1 | Production | Phased Madden cohort continuity, newly advanced-week empty-stat readiness, retained Week 10 source stitching, and truthful rejected-export diagnostics |
-| 7.4.0.2 | Locally validated; Production authorized | All Weeks `/reg/0/` payload-period correction and retained-source Week 10 rebuild/atomic activation |
+| 7.4.0.2 | Production; owner accepted | All Weeks `/reg/0/` payload-period correction; owner validated the correction and a subsequent Week 11 import |
+| 7.4.0.3 | Local candidate | FranchiseHQ-wide Trade Center/Trade Block restoration, automatic versioned pick baselines, ownership-preserving rollover, and full server-backed calculator |
 | 7.4.1–7.4.6 | Planned | Transactions/history, Commissioner tools, GOTW/Confidence Pool, mobile polish, consistency, and operations |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Required before RC | Authentication and session framework |
@@ -296,6 +297,19 @@
 - Exclude malformed Week 0 rows from Week 10 carry-forward using retained raw source provenance. Retain the malformed snapshot, prior Week 9 snapshot, raw captures, reports, candidates, and audits for recovery.
 - Gate: deploy the exact validated code, reanalyze the retained 43-route source without another export, require a validation-ready Week 10 candidate, then atomically activate and verify it. No reset, deletion, URL rotation, season archive, game-year transition, migration, or blocked-Free-Agent reinterpretation is allowed.
 
+## 7.4.0.3 — Trade Center Restoration and Draft-Pick Continuity
+
+- Scope is FranchiseHQ-wide and tenant-scoped. FGC is not embedded in product logic or the generic baseline.
+- A 2026 Franchise season automatically receives 2027, 2028, and 2029 Rounds 1–7 for every active league team, with each original team initially owning its own picks. A 32-team league receives 672 picks.
+- Initialization and rollover are retry-safe. The active three-class horizon extends by one class at season rollover and never overwrites current ownership.
+- Permanent pick continuity is league + class + round + original team; historical database IDs remain valid for referenced trades.
+- Versioned Madden-release and league-specific baseline records support later commissioner-reviewed sources. New baselines update only picks with no audited Trade Center or commissioner movement.
+- Trade Center navigation is Received, Sent, Drafts, Committee, Approved, Rejected, and History. League-wide History contains only committee-approved FranchiseHQ trades and excludes all private negotiation and rejection material.
+- The full player, package, and draft-pick calculator model is restored as server-backed league configuration, including per-team Early/Mid/Late/Super Bowl pick projections and 2–4 team fairness using the least-balanced participant.
+- Trade Block uses player-focused filtered cards and a mandatory requested-return side rail. Owners can enter it from roster/player surfaces or Manage My Trade Block; completed player trades remove stale listings.
+- AI suggestion navigation and exports are disabled. Madden remains authoritative for player ownership after the next import; FranchiseHQ remains authoritative for picks while Madden exposes none.
+- Gate: migration 29, fresh/upgrade/rollback behavior, tenant isolation, pick preservation, history privacy, settings concurrency, Trade Center UI contracts, full tests, and the strict repository gate pass locally before publication is requested.
+
 ## 7.4.1 — Transactions and League History
 
 - Canonical trades, signings, releases, movements, evidence, corrections, season history, and permanent links.
@@ -426,3 +440,4 @@
 - **Revision 1.67:** Recorded owner acceptance of 7.3.7.1 and replaced the planned 7.3.8 field-by-field weekly-change narration with a commissioner-focused health cycle. The local candidate adds durable, actionable importer failure guidance, removes repeated member-facing snapshot/validation and controlled-beta implementation callouts, and restores Cap Space from the already-retained nested Madden team/standing record. All 132 tests, the strict release gate, and desktop/390×844 browser checks pass. Detailed technical evidence remains commissioner/platform-owner-only; migration 27, Production/Main, active Week 9 snapshot `b00edb25`, imports, data, export URL, and blocked/null Free Agents remain unchanged and unauthorized for this cycle.
 - **Revision 1.68:** Published exact 7.3.8 commit `677c226` through PR #30 with 4/4 pull-request checks, fast-forwarded it unchanged to Main, passed all five Main/build/deployment checks, and deployed Production Pages `2f96f87a` with exact-commit Worker build `44c70449`. Read-only HTTPS acceptance verified release `7.3.8`, actionable importer recovery, removed customer-facing platform callouts, and the protected authentication boundary. Migration 27, active Week 9 snapshot `b00edb25`, every data row, the permanent export URL, and blocked/null Free Agents remain unchanged. Owner signed-in UI acceptance is next.
 - **Revision 1.69:** Recorded owner acceptance of 7.3.8 and the authorized consolidated 7.4.0 local build. The candidate replaces device-only trades with a tenant-scoped shared workflow, two-to-four-team player/pick packages, three matching non-conflicted reviews, shared notifications/settings, owner-controlled Trade Block listings, and a permanent commissioner-baselined pick ledger because the verified Madden capture exposes no pick route. Approval changes FranchiseHQ's roster presentation immediately without mutating the active snapshot; the next Madden import always wins and reconciles privately without member-facing Pending/Confirmed labels. Additive migration 28 and all focused/full local validation are candidate-only. Production remains exact 7.3.8 on migration 27 and active Week 9 snapshot `b00edb25`; Main, cloud publication, live data, imports, resets, archives, transitions, URL rotation, and blocked/null Free Agents remain unchanged. Additional source-adapter research moves to 7.4.7 behind the core platform cycle.
+- **Revision 1.72:** Recorded owner acceptance of active 7.4.0.2 and a subsequent Week 11 import, then implemented authorized local 7.4.0.3 from exact commit `b131cdaf`. The candidate is FranchiseHQ-wide, not FGC-specific: it automatically creates the next three complete Round 1–7 pick classes per tenant, preserves traded ownership through retry and rollover, accepts later versioned league-specific baselines without resetting audited movements, restores the full shared calculator and team projections, rebuilds the seven Trade Center views and approved-only History, adds server-backed drafts and multi-team fairness, and replaces Trade Block prompts with a mandatory-comment side rail. Migration 29 and all code remain local; Production, Main, cloud publication, data, snapshots, exports, resets, archives, transitions, credentials, memberships, and blocked/null Free Agent semantics remain unchanged.

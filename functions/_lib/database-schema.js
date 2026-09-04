@@ -1,4 +1,4 @@
-export const REQUIRED_DATABASE_VERSION = 28;
+export const REQUIRED_DATABASE_VERSION = 29;
 
 const checks = new WeakMap();
 

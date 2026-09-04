@@ -4,7 +4,7 @@ import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '.
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
-const RELEASE='7.4.0.2';
+const RELEASE='7.4.0.3';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}

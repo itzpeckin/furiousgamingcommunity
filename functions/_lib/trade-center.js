@@ -1,6 +1,7 @@
 import { canonicalTeamKey } from './league-teams.js';
+export { stableDraftPickId } from './draft-pick-baselines.js';
 
-export const TRADE_CENTER_RELEASE = '7.4.0.2';
+export const TRADE_CENTER_RELEASE = '7.4.0.3';
 
 export const DEFAULT_TRADE_CENTER_SETTINGS = Object.freeze({
   seasonTradeLimitEnabled: true,
@@ -11,13 +12,16 @@ export const DEFAULT_TRADE_CENTER_SETTINGS = Object.freeze({
   calculatorEnabled: true,
   reviewApprovalThreshold: 3,
   valueModel: Object.freeze({
-    overallWeight: 1,
-    ageCurveWeight: 1,
-    developmentWeight: 1,
-    positionWeight: 1,
-    contractWeight: 1,
-    draftRoundValues: Object.freeze({1:1000,2:520,3:300,4:180,5:110,6:70,7:40}),
-    futurePickRetention: Object.freeze({1:1,2:0.82,3:0.68})
+    player:Object.freeze({overall:100,age:100,development:100,position:100,contract:100,production:100,elite:100,injury:100}),
+    model:Object.freeze({overallQuadratic:4.25,overall84Bonus:210,overall92Bonus:420,devStar:8,devSuperstar:18,devXFactor:28,
+      age21_23:0,age24_26:0,age27_29:0,age30_32:0,age33Plus:0,positionQB:134,positionWR:107,positionEDGE:120,
+      positionCB:115,positionOT:112,positionDT:109,positionRB:94,positionTE:92,positionOG:102,positionC:102,
+      positionMLB:104,positionOLB:104,positionS:100,positionK:45,positionP:45,positionFB:72,
+      contractCapEfficiencyRate:15,contractRookiePremium:13,contractFourYearControl:6,contractExpiringPenalty:7,
+      contractMaxPremium:20,contractMaxPenalty:24}),
+    package:Object.freeze({eliteScarcity:100,bestPlayer:100,dilution:100,rosterSpot:100,assetMix:100}),
+    draft:Object.freeze({roundBases:Object.freeze({1:4200,2:2100,3:1325,4:825,5:500,6:275,7:125}),
+      futureRetention:Object.freeze({1:100,2:65,3:40}),earlyPickMultiplier:134,latePickMultiplier:84,teamProjections:Object.freeze({})})
   })
 });
 
@@ -36,8 +40,24 @@ const object = value => value && typeof value === 'object' && !Array.isArray(val
 export function normalizeTradeCenterSettings(value = {}) {
   const source = object(value);
   const model = object(source.valueModel);
-  const roundSource = object(model.draftRoundValues);
-  const retentionSource = object(model.futurePickRetention);
+  const defaults=DEFAULT_TRADE_CENTER_SETTINGS.valueModel;
+  const playerSource=object(model.player),modelSource=object(model.model),packageSource=object(model.package),draftSource=object(model.draft);
+  const oldRoundSource=object(model.draftRoundValues),roundSource=Object.keys(object(draftSource.roundBases)).length?object(draftSource.roundBases):oldRoundSource;
+  const oldRetentionSource=object(model.futurePickRetention),retentionSource=Object.keys(object(draftSource.futureRetention)).length?object(draftSource.futureRetention):oldRetentionSource;
+  const oldWeights={overall:model.overallWeight,age:model.ageCurveWeight,development:model.developmentWeight,position:model.positionWeight,contract:model.contractWeight};
+  const weight=(key)=>{
+    if(playerSource[key]!==undefined)return finite(playerSource[key],defaults.player[key],0,500);
+    const legacy=Number(oldWeights[key]);return Number.isFinite(legacy)?finite(legacy*100,defaults.player[key],0,500):defaults.player[key];
+  };
+  const roundValue=round=>{
+    const value=Number(roundSource[round]),simplified={1:1000,2:520,3:300,4:180,5:110,6:70,7:40}[round];
+    return !Number.isFinite(value)||value===simplified?defaults.draft.roundBases[round]:integer(value,defaults.draft.roundBases[round],0,100000);
+  };
+  const retentionValue=distance=>{
+    const value=Number(retentionSource[distance]);
+    if(!Number.isFinite(value)||[1,.82,.68][distance-1]===value)return defaults.draft.futureRetention[distance];
+    return finite(value<=1?value*100:value,defaults.draft.futureRetention[distance],0,150);
+  };
   return {
     seasonTradeLimitEnabled: source.seasonTradeLimitEnabled !== false,
     seasonTradeLimit: integer(source.seasonTradeLimit, 4, 1, 100),
@@ -47,19 +67,16 @@ export function normalizeTradeCenterSettings(value = {}) {
     calculatorEnabled: source.calculatorEnabled !== false,
     reviewApprovalThreshold: integer(source.reviewApprovalThreshold, 3, 1, 12),
     valueModel: {
-      overallWeight: finite(model.overallWeight, 1, 0, 10),
-      ageCurveWeight: finite(model.ageCurveWeight, 1, 0, 10),
-      developmentWeight: finite(model.developmentWeight, 1, 0, 10),
-      positionWeight: finite(model.positionWeight, 1, 0, 10),
-      contractWeight: finite(model.contractWeight, 1, 0, 10),
-      draftRoundValues: Object.fromEntries(Array.from({length:7}, (_, index) => {
-        const round = String(index + 1);
-        return [round, integer(roundSource[round], DEFAULT_TRADE_CENTER_SETTINGS.valueModel.draftRoundValues[round], 0, 100000)];
-      })),
-      futurePickRetention: Object.fromEntries(Array.from({length:3}, (_, index) => {
-        const distance = String(index + 1);
-        return [distance, finite(retentionSource[distance], DEFAULT_TRADE_CENTER_SETTINGS.valueModel.futurePickRetention[distance], 0, 1)];
-      }))
+      player:{...Object.fromEntries(Object.keys(defaults.player).map(key=>[key,weight(key)]))},
+      model:{...Object.fromEntries(Object.entries(defaults.model).map(([key,fallback])=>[key,finite(modelSource[key],fallback,key.startsWith('age')?-100:0,10000)]))},
+      package:{...Object.fromEntries(Object.entries(defaults.package).map(([key,fallback])=>[key,finite(packageSource[key],fallback,0,500)]))},
+      draft:{
+        roundBases:Object.fromEntries(Array.from({length:7},(_,index)=>[String(index+1),roundValue(String(index+1))])),
+        futureRetention:Object.fromEntries(Array.from({length:3},(_,index)=>[String(index+1),retentionValue(String(index+1))])),
+        earlyPickMultiplier:finite(draftSource.earlyPickMultiplier,defaults.draft.earlyPickMultiplier,25,250),
+        latePickMultiplier:finite(draftSource.latePickMultiplier,defaults.draft.latePickMultiplier,25,250),
+        teamProjections:Object.fromEntries(Object.entries(object(draftSource.teamProjections)).map(([key,value])=>[canonicalTeamKey(key),['early','mid','late','super-bowl'].includes(String(value))?String(value):'mid']))
+      }
     }
   };
 }
@@ -70,12 +87,6 @@ export function tradeCenterSettingsFromLeagueDocument(document = {}) {
 
 export function withTradeCenterSettings(document = {}, settings = {}) {
   return {...object(document), tradeCenter:normalizeTradeCenterSettings(settings)};
-}
-
-export function stableDraftPickId({leagueId, franchiseSeasonId, draftClass, round, originalTeamKey}) {
-  const parts = [leagueId, franchiseSeasonId, integer(draftClass, 0, 1900, 3000), integer(round, 0, 1, 7), canonicalTeamKey(originalTeamKey)];
-  if (parts.some(value => !value)) throw new TypeError('A complete permanent draft-pick identity is required.');
-  return `pick:${parts.join(':')}`;
 }
 
 export function normalizeTradeTransfers(transfers = [], settings = DEFAULT_TRADE_CENTER_SETTINGS) {

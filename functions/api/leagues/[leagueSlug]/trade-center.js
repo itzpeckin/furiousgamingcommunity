@@ -8,9 +8,9 @@ import {
   tradeCenterSettingsFromLeagueDocument,
   withTradeCenterSettings,
   normalizeTradeTransfers,
-  stableDraftPickId,
   workflowDecision
 } from '../../../_lib/trade-center.js';
+import { applyVersionedDraftPickBaseline, ensureDraftPickHorizon } from '../../../_lib/draft-pick-baselines.js';
 
 const jsonParse = (value, fallback = null) => {
   try { return JSON.parse(value || 'null') ?? fallback; }
@@ -44,7 +44,7 @@ async function requestContext(context) {
 
 async function currentSeason(db, leagueId) {
   const imported = await db.prepare(`SELECT destination.franchise_season_id AS id, season.season_year AS seasonYear,
-      season.display_name AS displayName
+      season.display_name AS displayName,season.game_release AS gameRelease
     FROM league_active_snapshots active
     JOIN companion_candidate_import_runs run
       ON run.league_id=active.league_id AND run.candidate_snapshot_id=active.snapshot_id
@@ -55,7 +55,7 @@ async function currentSeason(db, leagueId) {
     WHERE active.league_id=?
     ORDER BY run.completed_at DESC, run.created_at DESC LIMIT 1`).bind(leagueId).first();
   if (imported) return imported;
-  return db.prepare(`SELECT id,season_year AS seasonYear,display_name AS displayName
+  return db.prepare(`SELECT id,season_year AS seasonYear,display_name AS displayName,game_release AS gameRelease
       FROM franchise_seasons WHERE league_id=? AND status='active'
       ORDER BY season_year DESC,created_at DESC LIMIT 1`).bind(leagueId).first();
 }
@@ -124,7 +124,8 @@ function requireCurrentRevision(body, row) {
 }
 
 function maySeeWorkflow(row, participants, session) {
-  if (isReviewer(session) || ['approved','rejected'].includes(String(row.status))) return true;
+  if (String(row.status)==='draft') return String(row.proposer_user_id)===String(session?.user?.id);
+  if (String(row.status)==='approved' || isReviewer(session)) return true;
   const ownTeam = memberTeam(session);
   return Boolean(ownTeam && participants.some(item => canonicalTeamKey(item.team_key) === ownTeam));
 }
@@ -132,16 +133,19 @@ function maySeeWorkflow(row, participants, session) {
 async function publicWorkflow(db, leagueId, row, session) {
   const participants = await workflowParticipants(db, leagueId, row.id);
   if (!maySeeWorkflow(row, participants, session)) return null;
+  const ownTeam=memberTeam(session);
+  const participant=Boolean(ownTeam&&participants.some(item=>canonicalTeamKey(item.team_key)===ownTeam));
+  const privateAccess=participant||isReviewer(session)||String(row.proposer_user_id)===String(session?.user?.id);
   const assets = await resultRows(db, `SELECT id,revision,asset_type AS assetType,source_player_id AS sourcePlayerId,
       player_identity_id AS playerIdentityId,draft_pick_id AS draftPickId,from_team_key AS fromTeamKey,
       to_team_key AS toTeamKey,ordinal
     FROM trade_workflow_assets WHERE league_id=? AND trade_id=? AND revision=? ORDER BY ordinal,id`,
     leagueId,row.id,row.revision);
-  const messages = await resultRows(db, `SELECT message.id,message.author_user_id AS authorUserId,
+  const messages = privateAccess ? await resultRows(db, `SELECT message.id,message.author_user_id AS authorUserId,
       user.display_name AS authorName,message.event_type AS eventType,message.message,message.created_at AS createdAt
     FROM trade_workflow_messages message LEFT JOIN users user ON user.id=message.author_user_id
-    WHERE message.league_id=? AND message.trade_id=? ORDER BY message.created_at,message.id`,leagueId,row.id);
-  const reviews = isReviewer(session) || ['approved','rejected'].includes(String(row.status))
+    WHERE message.league_id=? AND message.trade_id=? ORDER BY message.created_at,message.id`,leagueId,row.id) : [];
+  const reviews = privateAccess
     ? await resultRows(db, `SELECT review.reviewer_user_id AS reviewerUserId,user.display_name AS reviewerName,
         review.decision,review.reason,review.updated_at AS updatedAt
       FROM trade_workflow_reviews review JOIN users user ON user.id=review.reviewer_user_id
@@ -149,8 +153,8 @@ async function publicWorkflow(db, leagueId, row, session) {
     : [];
   return {
     id:row.id,status:row.status,revision:Number(row.revision),proposerTeamKey:row.proposer_team_key,
-    note:row.note || '',freeTrade:Boolean(row.free_trade),reviewThreshold:Number(row.review_threshold),
-    decisionReason:row.decision_reason || null,approvedAt:row.approved_at || null,rejectedAt:row.rejected_at || null,
+    note:privateAccess?(row.note || ''):'',freeTrade:Boolean(row.free_trade),reviewThreshold:Number(row.review_threshold),
+    decisionReason:privateAccess?(row.decision_reason || null):null,approvedAt:row.approved_at || null,rejectedAt:privateAccess?(row.rejected_at || null):null,
     createdAt:row.created_at,updatedAt:row.updated_at,
     participants:participants.map(item => ({teamKey:item.team_key,acceptedRevision:item.accepted_revision,acceptedAt:item.accepted_at})),
     assets,messages,reviews,
@@ -160,6 +164,8 @@ async function publicWorkflow(db, leagueId, row, session) {
 
 async function publicState(c) {
   const season = await currentSeason(c.db,c.league.id);
+  const pickBaseline=season ? await ensureDraftPickHorizon(c.db,{leagueId:c.league.id,franchiseSeasonId:season.id,
+    seasonYear:season.seasonYear,gameRelease:season.gameRelease,teams:c.teams}) : null;
   const settings = await leagueSettings(c.db,c.league.id);
   const assignments = await activeTeamAssignments(c.db,c.league.id,c.teams);
   const allRows = await resultRows(c.db, `SELECT * FROM trade_workflows WHERE league_id=?
@@ -172,7 +178,8 @@ async function publicState(c) {
   const picks = season ? await resultRows(c.db, `SELECT id,draft_class AS draftClass,round,
       original_team_key AS originalTeamKey,current_team_key AS currentTeamKey,source_authority AS sourceAuthority,
       revision,updated_at AS updatedAt FROM league_draft_picks
-    WHERE league_id=? AND franchise_season_id=? ORDER BY draft_class,round,original_team_key`,c.league.id,season.id) : [];
+    WHERE league_id=? AND draft_class BETWEEN ? AND ? AND continuity_key IS NOT NULL
+    ORDER BY draft_class,round,original_team_key`,c.league.id,Number(season.seasonYear)+1,Number(season.seasonYear)+3) : [];
   const listings = await resultRows(c.db, `SELECT listing.id,listing.team_key AS teamKey,listing.asset_type AS assetType,
       listing.player_identity_id AS playerIdentityId,identity.public_id AS playerPublicId,identity.display_name AS playerName,
       listing.draft_pick_id AS draftPickId,listing.requested_return AS requestedReturn,
@@ -188,7 +195,7 @@ async function publicState(c) {
     league:{id:c.league.id,slug:c.league.slug,name:c.league.name},
     session:{userId:c.session.user.id,role:c.session.membership.role,teamKey:memberTeam(c.session)},
     season:season || null,settings:{revision:settings.revision,updatedAt:settings.updatedAt,...settings.tradeCenter},
-    teams:publicLeagueTeams(c.teams,assignments),picks,workflows,
+    teams:publicLeagueTeams(c.teams,assignments),picks,pickBaseline,workflows,
     listings:listings.map(item => ({...item,needs:jsonParse(item.needsJson,{})})),notifications
   };
 }
@@ -218,7 +225,7 @@ async function playerAsset(c, assetId, fromTeamKey) {
   return identity;
 }
 
-async function validatedTransfers(c, bodyTransfers, settings, seasonId) {
+async function validatedTransfers(c, bodyTransfers, settings) {
   const normalized = normalizeTradeTransfers(bodyTransfers,settings);
   const assets = [];
   for (const transfer of normalized.transfers) {
@@ -227,7 +234,7 @@ async function validatedTransfers(c, bodyTransfers, settings, seasonId) {
       assets.push({...transfer,...identity});
     } else {
       const pick = await c.db.prepare(`SELECT id,current_team_key AS currentTeamKey FROM league_draft_picks
-        WHERE id=? AND league_id=? AND franchise_season_id=?`).bind(transfer.assetId,c.league.id,seasonId).first();
+        WHERE id=? AND league_id=?`).bind(transfer.assetId,c.league.id).first();
       if (!pick || canonicalTeamKey(pick.currentTeamKey) !== transfer.fromTeamKey) {
         throw Object.assign(new Error('Draft-pick ownership changed. Refresh the Trade Center and try again.'),{status:409});
       }
@@ -245,36 +252,38 @@ async function ensureParticipantAction(c, row, participants) {
   return ownTeam;
 }
 
-async function propose(c, body) {
+async function propose(c, body, draft = false) {
   const season = await currentSeason(c.db,c.league.id);
   if (!season) throw Object.assign(new Error('An active Franchise season is required.'),{status:409});
   const ownTeam = memberTeam(c.session);
   if (!ownTeam) throw Object.assign(new Error('An active team assignment is required.'),{status:403});
   const settings = (await leagueSettings(c.db,c.league.id)).tradeCenter;
-  const prepared = await validatedTransfers(c,body.transfers,settings,season.id);
+  const prepared = await validatedTransfers(c,body.transfers,settings);
   if (!prepared.participants.includes(ownTeam)) throw Object.assign(new Error('Your assigned team must participate in the trade.'),{status:403});
   const tradeId=`trade_${crypto.randomUUID()}`;
   const mutationToken=`trade_mutation_${crypto.randomUUID()}`;
   const statements=[c.db.prepare(`INSERT INTO trade_workflows
     (id,league_id,franchise_season_id,status,revision,mutation_token,proposer_user_id,proposer_team_key,note,review_threshold,created_at,updated_at)
-    VALUES (?,?,?,'negotiating',1,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).bind(
-      tradeId,c.league.id,season.id,mutationToken,c.session.user.id,ownTeam,cleanText(body.note),settings.reviewApprovalThreshold
+    VALUES (?,?,?,?,1,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).bind(
+      tradeId,c.league.id,season.id,draft?'draft':'negotiating',mutationToken,c.session.user.id,ownTeam,cleanText(body.note),settings.reviewApprovalThreshold
     )];
   for (const teamKey of prepared.participants) statements.push(c.db.prepare(`INSERT INTO trade_workflow_participants
     (trade_id,league_id,team_key,accepted_revision,accepted_by_user_id,accepted_at)
-    VALUES (?,?,?,CASE WHEN ?=? THEN 1 ELSE NULL END,CASE WHEN ?=? THEN ? ELSE NULL END,CASE WHEN ?=? THEN CURRENT_TIMESTAMP ELSE NULL END)`)
-    .bind(tradeId,c.league.id,teamKey,teamKey,ownTeam,teamKey,ownTeam,c.session.user.id,teamKey,ownTeam));
+    VALUES (?,?,?,CASE WHEN ?=0 AND ?=? THEN 1 ELSE NULL END,CASE WHEN ?=0 AND ?=? THEN ? ELSE NULL END,CASE WHEN ?=0 AND ?=? THEN CURRENT_TIMESTAMP ELSE NULL END)`)
+    .bind(tradeId,c.league.id,teamKey,draft?1:0,teamKey,ownTeam,draft?1:0,teamKey,ownTeam,c.session.user.id,draft?1:0,teamKey,ownTeam));
   for (const asset of prepared.assets) statements.push(c.db.prepare(`INSERT INTO trade_workflow_assets
     (id,trade_id,league_id,revision,asset_type,player_identity_id,draft_pick_id,source_player_id,from_team_key,to_team_key,ordinal)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`).bind(`trade_asset_${crypto.randomUUID()}`,tradeId,c.league.id,1,asset.assetType,
       asset.playerIdentityId || null,asset.draftPickId || null,asset.sourcePlayerId || null,asset.fromTeamKey,asset.toTeamKey,asset.ordinal));
   statements.push(c.db.prepare(`INSERT INTO trade_workflow_messages
-    (id,trade_id,league_id,author_user_id,event_type,message,created_at) VALUES (?,?,?,?,'proposed',?,CURRENT_TIMESTAMP)`)
-    .bind(`trade_message_${crypto.randomUUID()}`,tradeId,c.league.id,c.session.user.id,cleanText(body.note) || 'Trade proposed.'));
-  const users=await participantUserIds(c.db,c.league.id,prepared.participants.filter(team=>team!==ownTeam));
-  statements.push(...await notificationStatements(c.db,c.league.id,tradeId,users,'received','Trade offer received',`${ownTeam.toUpperCase()} sent your team a trade offer.`));
-  const audit=createTenantAuditContext({request:c.request},c.league,c.session,'trade_proposed');
-  statements.push(tenantAuditStatement(c.db,audit,{resourceType:'trade_workflow',resourceId:tradeId,detail:{participants:prepared.participants,assetCount:prepared.assets.length}}));
+    (id,trade_id,league_id,author_user_id,event_type,message,created_at) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)`)
+    .bind(`trade_message_${crypto.randomUUID()}`,tradeId,c.league.id,c.session.user.id,draft?'draft-saved':'proposed',cleanText(body.note) || (draft?'Trade draft saved.':'Trade proposed.')));
+  if(!draft){
+    const users=await participantUserIds(c.db,c.league.id,prepared.participants.filter(team=>team!==ownTeam));
+    statements.push(...await notificationStatements(c.db,c.league.id,tradeId,users,'received','Trade offer received',`${ownTeam.toUpperCase()} sent your team a trade offer.`));
+  }
+  const audit=createTenantAuditContext({request:c.request},c.league,c.session,draft?'trade_draft_saved':'trade_proposed');
+  statements.push(tenantAuditStatement(c.db,audit,{resourceType:'trade_workflow',resourceId:tradeId,detail:{draft,participants:prepared.participants,assetCount:prepared.assets.length}}));
   await c.db.batch(statements);
   return {tradeId};
 }
@@ -283,7 +292,7 @@ async function counter(c, body, row, participants) {
   const ownTeam=await ensureParticipantAction(c,row,participants);
   if (!['negotiating','draft'].includes(row.status)) throw Object.assign(new Error('This trade cannot be revised.'),{status:409});
   const settings=(await leagueSettings(c.db,c.league.id)).tradeCenter;
-  const prepared=await validatedTransfers(c,body.transfers,settings,row.franchise_season_id);
+  const prepared=await validatedTransfers(c,body.transfers,settings);
   if (!prepared.participants.includes(ownTeam)) throw Object.assign(new Error('Your team must remain in the trade.'),{status:403});
   const revision=Number(row.revision)+1;
   const mutationToken=`trade_mutation_${crypto.randomUUID()}`;
@@ -395,7 +404,7 @@ async function review(c, row, participants, decision, reason, freeTrade) {
     if (asset.asset_type==='player') await playerAsset(c,asset.source_player_id,canonicalTeamKey(asset.from_team_key));
     if (asset.asset_type==='draft-pick') {
       const pick=await c.db.prepare(`SELECT current_team_key AS currentTeamKey FROM league_draft_picks
-        WHERE id=? AND league_id=? AND franchise_season_id=?`).bind(asset.draft_pick_id,c.league.id,row.franchise_season_id).first();
+        WHERE id=? AND league_id=?`).bind(asset.draft_pick_id,c.league.id).first();
       if (!pick || canonicalTeamKey(pick.currentTeamKey)!==canonicalTeamKey(asset.from_team_key)) {
         throw Object.assign(new Error('Draft-pick ownership changed before approval. Revise the trade with the current ledger.'),{status:409});
       }
@@ -416,6 +425,11 @@ async function review(c, row, participants, decision, reason, freeTrade) {
         WHERE id=? AND league_id=? AND current_team_key=?`).bind(asset.to_team_key,asset.draft_pick_id,c.league.id,asset.from_team_key));
       statements.push(c.db.prepare(`UPDATE trade_block_listings SET active=0,updated_at=CURRENT_TIMESTAMP
         WHERE league_id=? AND draft_pick_id=? AND active=1`).bind(c.league.id,asset.draft_pick_id));
+      statements.push(c.db.prepare(`INSERT INTO draft_pick_ledger_events
+        (id,league_id,draft_pick_id,event_type,from_team_key,to_team_key,trade_id,detail_json,created_by_user_id,created_at)
+        VALUES (?,?,?,'trade-approved',?,?,?,?,?,CURRENT_TIMESTAMP)`)
+        .bind(`draft_pick_event:${row.id}:${asset.draft_pick_id}`,c.league.id,asset.draft_pick_id,asset.from_team_key,asset.to_team_key,row.id,
+          JSON.stringify({revision:Number(row.revision)}),c.session.user.id));
     }
   }
   const transactionId=`canonical_transaction_${crypto.randomUUID()}`;
@@ -460,17 +474,22 @@ async function seedPicks(c, body) {
   if (!isCommissioner(c.session)) throw Object.assign(new Error('Commissioner access is required.'),{status:403});
   const season=await currentSeason(c.db,c.league.id);
   if (!season) throw Object.assign(new Error('An active Franchise season is required.'),{status:409});
-  const draftClasses=[...new Set((Array.isArray(body.draftClasses)?body.draftClasses:[]).map(Number).filter(year=>Number.isInteger(year)&&year>=2026&&year<=2040))];
-  if (!draftClasses.length || draftClasses.length>5) throw Object.assign(new Error('Choose one to five draft classes.'),{status:400});
-  const statements=[];
-  for (const draftClass of draftClasses) for (const team of c.teams) for (let round=1;round<=7;round++) {
-    const pickId=stableDraftPickId({leagueId:c.league.id,franchiseSeasonId:season.id,draftClass,round,originalTeamKey:team.teamKey});
-    statements.push(c.db.prepare(`INSERT OR IGNORE INTO league_draft_picks
-      (id,league_id,franchise_season_id,draft_class,round,original_team_key,current_team_key,source_authority,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,'franchisehq-ledger',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
-      .bind(pickId,c.league.id,season.id,draftClass,round,team.teamKey,team.teamKey));
-  }
-  for(let index=0;index<statements.length;index+=75) await c.db.batch(statements.slice(index,index+75));
+  return ensureDraftPickHorizon(c.db,{leagueId:c.league.id,franchiseSeasonId:season.id,seasonYear:season.seasonYear,
+    gameRelease:season.gameRelease,teams:c.teams});
+}
+
+async function applyPickBaseline(c, body) {
+  if (!isCommissioner(c.session)) throw Object.assign(new Error('Commissioner access is required.'),{status:403});
+  const season=await currentSeason(c.db,c.league.id);
+  if (!season) throw Object.assign(new Error('An active Franchise season is required.'),{status:409});
+  const result=await applyVersionedDraftPickBaseline(c.db,{leagueId:c.league.id,franchiseSeasonId:season.id,
+    seasonYear:season.seasonYear,gameRelease:season.gameRelease,teams:c.teams,baselineKey:cleanText(body.baselineKey,100),
+    baselineVersion:Number(body.baselineVersion),sourceType:String(body.sourceType||'league-specific'),
+    sourceReference:cleanText(body.sourceReference,500),entries:Array.isArray(body.entries)?body.entries:[]});
+  const audit=createTenantAuditContext({request:c.request},c.league,c.session,'draft_pick_baseline_applied');
+  await tenantAuditStatement(c.db,audit,{resourceType:'league_draft_pick_baseline',resourceId:result.baselineId,
+    detail:{baselineKey:result.baselineKey,baselineVersion:result.baselineVersion,pickCount:result.expectedPickCount,preservedTradedOwnership:true}}).run();
+  return result;
 }
 
 async function updateBlock(c, body) {
@@ -483,9 +502,8 @@ async function updateBlock(c, body) {
     const identity=await playerAsset(c,String(body.assetId||''),ownTeam);
     playerIdentityId=identity.playerIdentityId;
   } else {
-    const season=await currentSeason(c.db,c.league.id);
     const pick=await c.db.prepare(`SELECT id,current_team_key AS currentTeamKey FROM league_draft_picks
-      WHERE id=? AND league_id=? AND franchise_season_id=?`).bind(String(body.assetId||''),c.league.id,season?.id||'').first();
+      WHERE id=? AND league_id=?`).bind(String(body.assetId||''),c.league.id).first();
     if (!pick||canonicalTeamKey(pick.currentTeamKey)!==ownTeam) throw Object.assign(new Error('You may list only your team’s draft picks.'),{status:403});
     draftPickId=pick.id;
   }
@@ -495,17 +513,19 @@ async function updateBlock(c, body) {
       .bind(c.league.id,playerIdentityId,playerIdentityId,draftPickId,draftPickId).run();
     return;
   }
+  const requestedReturn=cleanText(body.requestedReturn,1000);
+  if(!requestedReturn)throw Object.assign(new Error('Describe what you want in return before listing this asset.'),{status:400});
   const existing=await c.db.prepare(`SELECT id FROM trade_block_listings WHERE league_id=? AND active=1
     AND ((? IS NOT NULL AND player_identity_id=?) OR (? IS NOT NULL AND draft_pick_id=?))`)
     .bind(c.league.id,playerIdentityId,playerIdentityId,draftPickId,draftPickId).first();
   if (existing) {
     await c.db.prepare(`UPDATE trade_block_listings SET requested_return=?,needs_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-      .bind(cleanText(body.requestedReturn,1000)||null,JSON.stringify(body.needs&&typeof body.needs==='object'?body.needs:{}),existing.id).run();
+      .bind(requestedReturn,JSON.stringify(body.needs&&typeof body.needs==='object'?body.needs:{}),existing.id).run();
   } else {
     await c.db.prepare(`INSERT INTO trade_block_listings
       (id,league_id,team_key,asset_type,player_identity_id,draft_pick_id,requested_return,needs_json,active,listed_by_user_id,created_at,updated_at)
       VALUES (?,?,?,?,?,?,?,?,1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).bind(`trade_block_${crypto.randomUUID()}`,c.league.id,ownTeam,
-        assetType,playerIdentityId,draftPickId,cleanText(body.requestedReturn,1000)||null,
+        assetType,playerIdentityId,draftPickId,requestedReturn,
         JSON.stringify(body.needs&&typeof body.needs==='object'?body.needs:{}),c.session.user.id).run();
   }
 }
@@ -525,9 +545,11 @@ export async function onRequestPost(context) {
     let body={}; try{body=await context.request.json()}catch{throw Object.assign(new Error('Request body must be valid JSON.'),{status:400})}
     const action=cleanText(body.action,50);
     let tradeId=cleanText(body.tradeId,100);
-    if(action==='propose')({tradeId}=await propose(c,body));
+    if(action==='propose')({tradeId}=await propose(c,body,false));
+    else if(action==='save-draft')({tradeId}=await propose(c,body,true));
     else if(action==='settings')await updateSettings(c,body);
     else if(action==='seed-picks')await seedPicks(c,body);
+    else if(action==='apply-pick-baseline')await applyPickBaseline(c,body);
     else if(action==='trade-block')await updateBlock(c,body);
     else if(action==='notifications-read')await c.db.prepare(`UPDATE league_notifications SET read_at=CURRENT_TIMESTAMP
       WHERE league_id=? AND user_id=? AND read_at IS NULL`).bind(c.league.id,c.session.user.id).run();

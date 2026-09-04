@@ -138,13 +138,13 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 189,
+      ".js": 190,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
       ".mjs": 33,
       ".png": 1,
-      ".sql": 30,
+      ".sql": 31,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
@@ -155,11 +155,11 @@
         "file": "app.js"
       },
       {
-        "bytes": 401200,
+        "bytes": 403846,
         "file": "styles.css"
       },
       {
-        "bytes": 368650,
+        "bytes": 368899,
         "file": "trade-module.js"
       },
       {
@@ -171,7 +171,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 79664,
+        "bytes": 80561,
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
@@ -183,7 +183,11 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 39128,
+        "bytes": 57416,
+        "file": "league-engine/trade-center-live.js"
+      },
+      {
+        "bytes": 40969,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
@@ -203,10 +207,6 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 36948,
-        "file": "league-engine/trade-center-live.js"
-      },
-      {
         "bytes": 36785,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
@@ -223,15 +223,15 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
-        "bytes": 23765,
-        "file": "functions/_lib/madden-discovery.js"
+        "bytes": 26855,
+        "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 23153,
-        "file": "functions/_lib/madden-discovery-report.js"
+        "bytes": 23765,
+        "file": "functions/_lib/madden-discovery.js"
       }
     ],
-    "total": 554
+    "total": 556
   },
   "frontend": {
     "assets": [
@@ -1392,10 +1392,16 @@
       "recordsLedger": true,
       "sha256": "fd03e0fdeca52ea14909be870a8b96e7307e778a14a608ad312305a4fad1806d",
       "version": "0028"
+    },
+    {
+      "file": "migrations/0029_draft_pick_baselines.sql",
+      "recordsLedger": true,
+      "sha256": "94a39c90004a5e353bf2afa46f820292b8b2047ec565bbaef32abe1847f8ebf4",
+      "version": "0029"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.0.2",
+  "release": "7.4.0.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.3",
+  "validatedOn": "2026-09-03",
+  "status": "local-validated",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": { "unregisteredFailures": 0 },
+  "checks": {
+    "platformScope": { "passed": true, "tenantScoped": true, "fgcHardCodeAdded": false },
+    "genericPickBaseline": { "passed": true, "seasonYear": 2026, "draftClasses": [2027, 2028, 2029], "rounds": [1, 2, 3, 4, 5, 6, 7], "picksPer32TeamLeague": 672 },
+    "retrySafety": { "passed": true, "initializer": true, "rollover": true, "versionedApplication": true },
+    "ownershipPreservation": { "passed": true, "existingPickIdsRewritten": false, "auditedTradesOverwritten": false },
+    "tradeHistoryPrivacy": { "passed": true, "approvedOnly": true, "privateMessagesExposed": false, "rejectedTradesExposed": false },
+    "calculatorRestoration": { "passed": true, "serverBacked": true, "teamProjections": true, "multiTeamFairness": true },
+    "tradeBlock": { "passed": true, "mandatoryRequestedReturn": true, "approvedTradeRemovesListing": true, "aiSuggestionNavigationDisabled": true },
+    "maddenAuthority": { "passed": true, "playerOwnershipImportWins": true, "draftPickAuthority": "franchisehq-while-unavailable-from-madden" },
+    "freeAgentBlockedPreserved": { "passed": true, "status": "blocked", "count": null, "interpretedAsZero": false },
+    "strictMigration": { "passed": true, "expectedFailure": false, "migrationVersion": 29, "requiredTables": 94, "foreignKeyViolations": 0 },
+    "automatedTests": { "passed": true, "passedTests": 150, "failedTests": 0, "scope": "full-consolidated-release-gate" },
+    "strictRepositoryGate": { "passed": true, "status": "passed", "javascriptModules": 223, "inventoryFiles": 556, "routes": 69 }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": { "authorized": false, "status": "not-run" },
+    "productionDeployment": { "authorized": false, "status": "not-run", "currentRelease": "7.4.0.2" },
+    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 28, "candidateMigration": 29 },
+    "productionDataOperation": { "authorized": false, "status": "not-run" }
+  }
+}
