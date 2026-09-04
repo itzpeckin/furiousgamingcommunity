@@ -320,7 +320,7 @@ test('authenticated owners share proposals while commissioner-only controls stay
   }finally{database.close()}
 });
 
-test('7.4.0.7 client preserves revision context and provides responsive Trade Block controls',async()=>{
+test('7.4.0.8 keeps trade reviews stacked and filters Trade Block names without replacing the input',async()=>{
   const [client,endpoint,readModel,qualityGate,styles]=await Promise.all([
     readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/trade-center.js',import.meta.url),'utf8'),
@@ -351,6 +351,10 @@ test('7.4.0.7 client preserves revision context and provides responsive Trade Bl
   assert.match(client,/Add participating team/);
   assert.match(client,/Multi-Team Fairness/);
   assert.match(client,/Trade Activity/);
+  assert.match(client,/trade-package-matchup--review/);
+  assert.match(client,/filterTradeBlockByName/);
+  assert.match(client,/data-live-block-player-name/);
+  assert.doesNotMatch(client,/blockFilters\.name=filter\.value;renderTradeBlock\(\)/);
   assert.match(client,/completed commissioner-approved trades from other teams/);
   assert.match(client,/workflowInvolvesTeam\(workflow\)\|\|workflow\.status==='approved'/);
   assert.match(client,/Notes are optional/);
@@ -369,6 +373,9 @@ test('7.4.0.7 client preserves revision context and provides responsive Trade Bl
   assert.match(readModel,/applyRosterOverlays/);
   assert.match(qualityGate,/tests\/trade\/full-trade-center\.test\.mjs/);
   assert.match(styles,/Trade Center acceptance refinements/);
+  assert.match(styles,/compact Trade Center review flow/);
+  assert.match(styles,/grid-template-columns:minmax\(0,1fr\) minmax\(220px,260px\)/);
+  assert.match(styles,/\.trade-package-matchup--review\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
   assert.match(styles,/\.trade-detail-asset/);
   assert.match(styles,/\.trade-confirm-dialog/);
   assert.match(styles,/@media\(max-width:760px\)/);

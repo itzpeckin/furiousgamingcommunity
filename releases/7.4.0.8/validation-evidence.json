@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.8",
+  "validatedOn": "2026-09-04",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": { "unregisteredFailures": 0 },
+  "checks": {
+    "compactDashboardRail": {
+      "passed": true,
+      "desktopMinimumPixels": 220,
+      "desktopMaximumPixels": 260,
+      "mainColumnCanShrink": true,
+      "responsiveRailStacks": true
+    },
+    "stackedTradeReview": {
+      "passed": true,
+      "receivingTeamBoxesPerRow": 1,
+      "supportsParticipantCount": [2, 3, 4],
+      "reviewArrowsRendered": false,
+      "calculatorLayoutInvariant": true,
+      "calculatorRemainsBelowPackages": true,
+      "teamBoxGapPixels": 13
+    },
+    "tradeBlockNameFilter": {
+      "passed": true,
+      "fullNameTypingSupported": true,
+      "filtersAsCharactersChange": true,
+      "inputNodeReplacedPerKeystroke": false,
+      "emptyStateUpdatesInPlace": true
+    },
+    "fgcDraftPickActivationPlan": {
+      "passed": true,
+      "leagueSlug": "furious-gaming-community",
+      "sourceKey": "fgc-madden-27-opening-ownership",
+      "sourceMappingSha256": "2d7aef1b23d1e3a31c79d04a039858a00a24bc6a09ab2f2866dd7f28ce4cc9ec",
+      "expectedPickCount": 672,
+      "draftClasses": [2027, 2028, 2029],
+      "roundsPerClass": 7,
+      "currentProductionState": "generic-horizon-only-fgc-overlay-not-applied",
+      "productionOperationRequired": true,
+      "productionOperationAuthorized": false,
+      "productionOperationApplied": false,
+      "auditedTradeOwnershipPreserved": true,
+      "commissionerCorrectionPreserved": true,
+      "retrySafe": true
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 30,
+      "requiredTables": 95,
+      "foreignKeyViolations": 0,
+      "migrationRequired": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 155,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "status": "passed",
+      "javascriptModules": 225,
+      "inventoryFiles": 561,
+      "routes": 69
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "draftPickBaselineApplied": false,
+    "draftPickOwnershipChanged": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": { "authorized": false, "status": "not-run" },
+    "hostedChecks": { "authorized": false, "status": "not-run" },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "unchanged",
+      "currentRelease": "7.4.0.7",
+      "currentCommit": "637a48c25ea2187f60263955ef11010b101b4ac6"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required-not-run",
+      "currentMigration": 30,
+      "candidateMigration": 30
+    },
+    "productionFgcPickBaseline": {
+      "authorized": false,
+      "status": "not-run",
+      "sourceKey": "fgc-madden-27-opening-ownership",
+      "expectedPickCount": 672
+    }
+  }
+}

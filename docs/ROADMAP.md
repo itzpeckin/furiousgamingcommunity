@@ -6,13 +6,13 @@
 
 **Updated:** September 4, 2026
 
-**Revision:** 1.80
+**Revision:** 1.81
 
 **Current production:** 7.4.0.7 is active from exact Main merge `637a48c`; the public release marker and Trade Center asset were verified on September 4, 2026. Migration 30 is the current Production database boundary. No migration, league-data operation, or league-specific draft-pick baseline ran. Blocked Madden Free Agents remain unknown/null and are not interpreted as zero.
 
-**Current work:** 7.4.0.7 code is deployed. The corrected reusable Madden 27 workbook and FGC workbook each resolve to a complete 32-team, 2027–2029, Round 1–7 map of 672 permanent pick identities. The reusable source includes 58 real-world ownership overrides; the private FGC overlay differs from it on 59 assignments. New Madden 27 leagues receive the reusable source automatically, FGC remains an explicit commissioner-only overlay, and each franchise-season advance preserves the next two classes while opening all 224 picks in the new third class.
+**Current work:** 7.4.0.8 is an authorized local candidate for the final Trade Center review-layout and Trade Block filter refinements. It also packages the exact corrected 672-pick FGC overlay as a separately controlled Production data operation; that overlay is not currently applied to FGC.
 
-**Next gate:** Owner signed-in UI acceptance, followed by commissioner-only review of the private FGC mapping. Applying that mapping remains separately authorized. Do not seed picks, import, reset, delete, archive, rotate, transition, change the active snapshot, or reinterpret blocked Free Agents as zero.
+**Next gate:** Complete the consolidated 7.4.0.8 gate and present one exact candidate. Publication, Main, Production code deployment, and the one-time FGC baseline operation remain pending owner authorization. No migration is required. Do not import, reset, delete, archive, rotate, transition, change the active snapshot, or reinterpret blocked Free Agents as zero.
 
 ## Product decisions
 
@@ -37,7 +37,7 @@
 - The real FGC capture received 43 requests (10.17 MB) in 0.448 seconds. It contained 32 teams, all 32 team rosters, 2,044 unique rostered players, standings, 14 current-week games, and 510 statistics rows.
 - All 2,044 captured team-roster players have a valid team assignment and `isFreeAgent: false`; 2,031 are active and 13 are inactive. No duplicate roster identifiers or unassigned players were found.
 - Madden's explicit `xbsx/742482/freeagents/roster` response failed upstream with an empty `rosterInfoList`. This is recorded as **blocked**, not as proof of zero Free Agents. It does not block safe rostered-player preview work, but FranchiseHQ cannot claim a complete player pool until a successful or explicitly empty Free Agent response is received.
-- The owner authorized the Madden 26-to-27 Production transition. Madden 26 is no longer attached to the live application: its D1 database is retained as a detached relational archive, a private 38-table/76,712-row archive was verified, and 1,295 obsolete raw R2 objects were permanently deleted. The clean Madden 27 Production database preserves the league and account plane while clearing all eight legacy team assignments. Malformed All Weeks snapshot `ab083570` is currently active; valid Week 9 snapshot `b00edb25` and prior snapshots `518236e4`, `8b47ec76`, and Week 7 snapshot `841ce1b5` remain retained for explicit recovery.
+- The owner authorized the Madden 26-to-27 Production transition. Madden 26 is no longer attached to the live application: its D1 database is retained as a detached relational archive, a private 38-table/76,712-row archive was verified, and 1,295 obsolete raw R2 objects were permanently deleted. The clean Madden 27 Production database preserves the league and account plane while clearing all eight legacy team assignments. Later owner-accepted Week 10 and Week 11 imports superseded the earlier malformed All Weeks incident; the malformed and prior snapshots remain retained for explicit recovery.
 
 ## Release tracker
 
@@ -72,6 +72,7 @@
 | 7.4.0.5 | Production deployed; pending owner UI acceptance | Complete premium Trade Center/Create Trade UX, explainable values, proposer-only negotiation cancellation, horizontal Trade Block rows, and responsive Add Players experience |
 | 7.4.0.6 | Production deployed; pending owner UI acceptance | Sent-offer revision, premium proposal details, stable multi-team selection position, direct Trade Block editing/removal, and consolidated mobile remediation |
 | 7.4.0.7 | Production deployed; pending owner UI acceptance | Reusable Madden 27 opening pick source, private FGC ownership overlay, commissioner-only preview/apply contract, and automatic three-class season rollover |
+| 7.4.0.8 | Local candidate | Compact Trade Center rail, vertically stacked multi-team review packages, calculator-invariant layout, stable Trade Block name filtering, and planned exact FGC pick activation |
 | 7.4.1–7.4.6 | Planned | Transactions/history, Commissioner tools, GOTW/Confidence Pool, mobile polish, consistency, and operations |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Required before RC | Authentication and session framework |
@@ -325,6 +326,15 @@
 - Store team needs once per league team in additive migration 30 so every member and device sees the same marketplace intent.
 - Gate: privacy is enforced in the API and client, mobile/desktop layouts remain usable, migration 30 passes fresh and upgrade tests, the full suite and strict repository gate pass, and publication/Production remain separately authorized.
 
+## 7.4.0.8 — Final Trade Center Review and FGC Pick Activation
+
+- Narrow Trade Activity and Trade Block Targets to a compact desktop rail so review content does not require horizontal scrolling.
+- Stack every receiving team's package in one vertical review column for two-, three-, and four-team trades, with consistent spacing and no directional arrows.
+- Keep review layout identical when the calculator is disabled; only the value and fairness information below the packages disappears.
+- Filter Trade Block player names in place so full names can be typed normally and matching updates as characters change.
+- Apply the exact private FGC 672-pick overlay only during a separately authorized Production data operation. Preserve ownership protected by approved Trade Center events or commissioner corrections, verify retry safety, and retain an audit trail.
+- Gate: focused layout/filter regressions, exact FGC map reconstruction, protected ownership, retry behavior, all tests, and the strict repository gate pass before publication or data application.
+
 ## 7.4.1 — Transactions and League History
 
 - Canonical trades, signings, releases, movements, evidence, corrections, season history, and permanent links.
@@ -464,3 +474,4 @@
 - **Revision 1.78:** Published exact 7.4.0.6 candidate `598ba57` through PR #37 with 4/4 pull-request checks, merged it to Main as `d138e1a`, and passed all six Main build, quality, Pages, Worker, and deployment checks. Cloudflare Pages deployment `6092a340` and Worker build `b2673ed7` succeeded; authenticated read-only HTTPS verification confirmed FranchiseHQ 7.4.0.6 on the protected Trade Center route with matching application assets. Migration 30, every league-data row, the active snapshot, draft-pick baselines, credentials, memberships, permanent export URL, and blocked/null Free Agent semantics remain unchanged. Signed-in owner UI acceptance is next.
 - **Revision 1.79:** Validated both owner-corrected draft-pick workbooks and began the authorized consolidated 7.4.0.7 local build from exact Main evidence commit `e0e66cd`. Each source contains 672 unique pick identities across 32 teams, three future classes, and seven rounds with no missing or duplicate original-team identity; the remaining reusable-sheet `Pacekrs` typo is deterministically normalized to Packers. The reusable Madden 27 source records 58 opening ownership overrides, while the FGC source differs on 59 assignments and is bound to a commissioner-only, tenant-scoped private preview/apply contract. Complete existing horizons short-circuit without writes, approved/corrected ledger ownership remains protected, and Archive Season returns evidence that the next three classes are ready while generating all 224 Round 1–7 picks for the newly opened third year. This local cycle adds no migration and performs no Production data operation, pick seed/baseline application, import, snapshot change, reset, archive, transition, URL rotation, credential/membership change, or Free Agent reinterpretation.
 - **Revision 1.80:** Published exact 7.4.0.7 candidate `66def9a` through PR #38 with 4/4 candidate checks, merged it to Main as `637a48c`, and passed all six Main build, quality, Pages, Worker, and deployment checks. Cloudflare Pages deployment `1e4eaad8` and Worker build `e8613496` / version `7cae5f20` succeeded; read-only HTTPS verification confirmed the 7.4.0.7 landing marker, Trade Center asset, and healthy tenant listing. Migration 30, every league-data row, existing draft-pick ownership, the active snapshot, credentials, memberships, permanent export URL, and blocked/null Free Agent semantics remain unchanged. The private FGC ownership overlay was not applied; signed-in owner UI acceptance and later commissioner-only mapping review are next.
+- **Revision 1.81:** Began owner-authorized local 7.4.0.8 from exact Main evidence commit `14d3ff7`. The candidate narrows the Trade Center side rail, stacks each receiving team's package in one spaced review column for every participant count, makes calculator visibility layout-neutral, and changes Trade Block name matching to update existing rows without destroying the active input. A full-database regression reconstructs and applies the exact 672-pick FGC source, preserves approved-trade and commissioner-correction ownership, and proves retries do not duplicate ledger evidence. Production remains 7.4.0.7 on migration 30; GitHub, Main, Production, the FGC baseline, all other data, the active snapshot, imports, resets, archives, transitions, credentials, memberships, the permanent export URL, and blocked/null Free Agent semantics remain unchanged and unauthorized during local work.

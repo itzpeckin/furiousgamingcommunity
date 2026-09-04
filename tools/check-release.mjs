@@ -32,6 +32,8 @@ const isAuthorizedProductionDataChange = (
   version === '7.3.4.6' && evidence.scopeBoundaries?.activationPerformed === true
 ) || (
   version === '7.3.7' && evidence.checks?.strictMigration?.productionApplied === true
+) || (
+  version === '7.4.0.8' && evidence.checks?.fgcDraftPickActivationPlan?.productionOperationApplied === true
 );
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
@@ -2114,6 +2116,98 @@ if (version === '7.4.0.7') {
     || evidence.scopeBoundaries?.databaseRowsWritten !== 0
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
   )) errors.push('Deployed 7.4.0.7 evidence must record exact code publication while preserving every data-plane boundary.');
+}
+if (version === '7.4.0.8') {
+  for (const check of [
+    'compactDashboardRail',
+    'stackedTradeReview',
+    'tradeBlockNameFilter',
+    'fgcDraftPickActivationPlan',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.0.8 evidence is incomplete: ${check}.`);
+  }
+  if (
+    Number(evidence.checks?.compactDashboardRail?.desktopMinimumPixels) !== 220
+    || Number(evidence.checks?.compactDashboardRail?.desktopMaximumPixels) !== 260
+    || evidence.checks?.compactDashboardRail?.mainColumnCanShrink !== true
+    || evidence.checks?.stackedTradeReview?.receivingTeamBoxesPerRow !== 1
+    || JSON.stringify(evidence.checks?.stackedTradeReview?.supportsParticipantCount) !== '[2,3,4]'
+    || evidence.checks?.stackedTradeReview?.reviewArrowsRendered !== false
+    || evidence.checks?.stackedTradeReview?.calculatorLayoutInvariant !== true
+    || evidence.checks?.stackedTradeReview?.calculatorRemainsBelowPackages !== true
+    || evidence.checks?.tradeBlockNameFilter?.fullNameTypingSupported !== true
+    || evidence.checks?.tradeBlockNameFilter?.inputNodeReplacedPerKeystroke !== false
+  ) errors.push('7.4.0.8 must prove compact, stacked, calculator-invariant reviews and stable full-name filtering.');
+  if (
+    evidence.checks?.fgcDraftPickActivationPlan?.leagueSlug !== 'furious-gaming-community'
+    || evidence.checks?.fgcDraftPickActivationPlan?.sourceKey !== 'fgc-madden-27-opening-ownership'
+    || evidence.checks?.fgcDraftPickActivationPlan?.sourceMappingSha256 !== '2d7aef1b23d1e3a31c79d04a039858a00a24bc6a09ab2f2866dd7f28ce4cc9ec'
+    || Number(evidence.checks?.fgcDraftPickActivationPlan?.expectedPickCount) !== 672
+    || evidence.checks?.fgcDraftPickActivationPlan?.auditedTradeOwnershipPreserved !== true
+    || evidence.checks?.fgcDraftPickActivationPlan?.commissionerCorrectionPreserved !== true
+    || evidence.checks?.fgcDraftPickActivationPlan?.retrySafe !== true
+    || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+  ) errors.push('7.4.0.8 must retain the exact private FGC source and every ownership/Free Agent boundary.');
+  if (!isPostDeployment && (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.currentRelease !== '7.4.0.7'
+    || Number(manifest.production?.currentMigration) !== 30
+    || Number(manifest.production?.candidateMigration) !== 30
+    || manifest.productionDataOperation?.authorized !== false
+    || manifest.productionDataOperation?.status !== 'not-run'
+    || evidence.checks?.fgcDraftPickActivationPlan?.productionOperationAuthorized !== false
+    || evidence.checks?.fgcDraftPickActivationPlan?.productionOperationApplied !== false
+    || evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.draftPickBaselineApplied !== false
+    || evidence.scopeBoundaries?.draftPickOwnershipChanged !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+  )) errors.push('7.4.0.8 must remain unpublished and data-unchanged until the exact candidate is authorized.');
+  if (isPostDeployment && (
+    manifest.production?.authorized !== true
+    || manifest.production?.deployed !== true
+    || manifest.production?.currentRelease !== '7.4.0.8'
+    || Number(manifest.production?.currentMigration) !== 30
+    || Number(manifest.production?.candidateMigration) !== 30
+    || manifest.productionDataOperation?.authorized !== true
+    || manifest.productionDataOperation?.status !== 'applied-verified'
+    || evidence.checks?.fgcDraftPickActivationPlan?.productionOperationAuthorized !== true
+    || evidence.checks?.fgcDraftPickActivationPlan?.productionOperationApplied !== true
+    || evidence.scopeBoundaries?.productionChanged !== true
+    || evidence.scopeBoundaries?.productionDataChanged !== true
+    || evidence.scopeBoundaries?.gitMainChanged !== true
+    || evidence.scopeBoundaries?.gitRemoteChanged !== true
+    || evidence.scopeBoundaries?.migrationApplied !== false
+    || evidence.scopeBoundaries?.draftPickBaselineApplied !== true
+    || evidence.scopeBoundaries?.draftPickOwnershipChanged !== true
+    || Number(evidence.scopeBoundaries?.databaseRowsWritten) < 1
+  )) errors.push('Deployed 7.4.0.8 evidence must record the exact authorized code and FGC pick operation.');
+  if (
+    evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.dataDeleted !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+    || evidence.scopeBoundaries?.credentialsChanged !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+  ) errors.push('7.4.0.8 must preserve every excluded environment, snapshot, identity, and Free Agent boundary.');
 }
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
