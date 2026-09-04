@@ -155,7 +155,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 450710,
+        "bytes": 451642,
         "file": "styles.css"
       },
       {
@@ -163,7 +163,7 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 128858,
+        "bytes": 134765,
         "file": "tools/check-release.mjs"
       },
       {
@@ -171,7 +171,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 89474,
+        "bytes": 90150,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -215,7 +215,7 @@
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 33283,
+        "bytes": 33791,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
@@ -1408,7 +1408,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.0.7",
+  "release": "7.4.0.8",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

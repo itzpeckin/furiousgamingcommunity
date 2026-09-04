@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.8",
+  "releaseType": "trade-review-layout-filter-and-fgc-pick-activation-remediation",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.0.7",
+    "commit": "14d3ff7803917975c10f0d46d48ce0e6f574b029",
+    "tree": "d7609b8c036e02b8e4867a1a68a6dc29f9631dd0",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.0.8",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run"
+  },
+  "staging": { "authorized": false, "deployed": false, "status": "not-run" },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "unchanged",
+    "currentRelease": "7.4.0.7",
+    "currentCommit": "637a48c25ea2187f60263955ef11010b101b4ac6",
+    "currentPagesDeployment": "4451c15f-f425-4a70-8254-f0232c5404fd",
+    "currentWorkerBuild": "e8613496-efe6-4f03-b948-aac1493fb3b6",
+    "currentMigration": 30,
+    "candidateMigration": 30
+  },
+  "productionDataOperation": {
+    "authorized": false,
+    "status": "not-run",
+    "leagueSlug": "furious-gaming-community",
+    "sourceKey": "fgc-madden-27-opening-ownership",
+    "expectedPickCount": 672
+  },
+  "requiredArtifacts": [
+    "league-engine/trade-center-live.js",
+    "styles.css",
+    "functions/_lib/draft-pick-source-data.js",
+    "functions/_lib/draft-pick-baselines.js",
+    "tests/trade/draft-pick-sources.test.mjs",
+    "tests/trade/full-trade-center.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.0.8/release-record.md",
+    "releases/7.4.0.8/validation-evidence.json"
+  ]
+}
