@@ -130,7 +130,8 @@ export async function loadCanonicalMigrations() {
       26: 'permanent_league_export_url',
       27: 'gm_career_history',
       28: 'full_trade_center',
-      29: 'draft_pick_baselines'
+      29: 'draft_pick_baselines',
+      30: 'trade_block_team_profiles'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);

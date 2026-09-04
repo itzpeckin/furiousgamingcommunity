@@ -127,7 +127,7 @@ test('the production-like legacy upgrade preserves identities and relationships'
       VALUES (?,?,?,?)`).run('league-future-test','Future League','FranchiseHQ','future-league');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints
       WHERE league_id='league-future-test'`).get().count,1);
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 29);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 30);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {
     database.close();
@@ -268,7 +268,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 29', async () => {
+test('runtime schema verification fails closed before version 30', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -279,13 +279,13 @@ test('runtime schema verification fails closed before version 29', async () => {
     () => requireDatabaseSchema(outdated),
     error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 17
   );
-  observedVersion = 29;
-  assert.equal((await requireDatabaseSchema(outdated)).version, 29);
+  observedVersion = 30;
+  assert.equal((await requireDatabaseSchema(outdated)).version, 30);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 29, name: 'draft_pick_baselines' }) };
+      return { first: async () => ({ version: 30, name: 'trade_block_team_profiles' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 29);
+  assert.equal((await requireDatabaseSchema(current)).version, 30);
 });

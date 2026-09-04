@@ -12,7 +12,7 @@ import {
   publicMaddenDiscoveryReport
 } from '../../../../_lib/madden-discovery-report.js';
 
-const RELEASE = '7.4.0.3';
+const RELEASE = '7.4.0.4';
 
 async function state(context) {
   const slug = normalizeLeagueSlug(context);

@@ -216,7 +216,11 @@ test('authenticated owners share proposals while commissioner-only controls stay
     const forbidden=await postTradeCenter(context(tokens.tb,'POST',{action:'seed-picks',draftClasses:[2027]}));
     assert.equal(forbidden.status,403);
     const missingAsk=await postTradeCenter(context(tokens.tb,'POST',{action:'trade-block',assetType:'player',assetId:'player-tb',active:true,requestedReturn:''}));
-    assert.equal(missingAsk.status,400);
+    assert.equal(missingAsk.status,200);
+    assert.equal((await missingAsk.clone().json()).listings[0].requestedReturn,'');
+    const savedNeeds=await postTradeCenter(context(tokens.tb,'POST',{action:'trade-block-needs',needs:'Cornerback, Pass Rush, Cornerback'}));
+    assert.equal(savedNeeds.status,200);
+    assert.deepEqual((await savedNeeds.clone().json()).teamNeeds.find(item=>item.teamKey==='tb')?.needs,['Cornerback','Pass Rush']);
     const listed=await postTradeCenter(context(tokens.tb,'POST',{action:'trade-block',assetType:'player',assetId:'player-tb',active:true,requestedReturn:'Young corner or a Day 2 pick'}));
     assert.equal(listed.status,200);
     const savedDraft=await postTradeCenter(context(tokens.tb,'POST',{action:'save-draft',note:'Private draft',transfers:[
@@ -234,6 +238,8 @@ test('authenticated owners share proposals while commissioner-only controls stay
     assert.equal(proposed.status,200,JSON.stringify(proposedPayload));
     const outsiderBefore=await (await getTradeCenter(context(tokens.kc))).json();
     assert.equal(outsiderBefore.workflows.length,0);
+    const commissionerBefore=await (await getTradeCenter(context(tokens.commissioner))).json();
+    assert.equal(commissionerBefore.workflows.length,0,'commissioners must not see unrelated active negotiations');
     const recipient=await getTradeCenter(context(tokens.gb));
     const payload=await recipient.json();
     assert.equal(payload.workflows.length,1);
@@ -245,6 +251,9 @@ test('authenticated owners share proposals while commissioner-only controls stay
     const accepted=await postTradeCenter(context(tokens.gb,'POST',{action:'accept',tradeId,revision:1}));
     assert.equal(accepted.status,200);
     assert.equal((await accepted.clone().json()).workflows[0].status,'committee');
+    const commissionerCommittee=await (await getTradeCenter(context(tokens.commissioner))).json();
+    assert.equal(commissionerCommittee.workflows.length,1,'commissioners may see unrelated trades only once committee review is required');
+    assert.equal(commissionerCommittee.workflows[0].status,'committee');
     for(const token of [tokens.commissioner,tokens.reviewer2,tokens.reviewer3]){
       const reviewed=await postTradeCenter(context(token,'POST',{action:'review',tradeId,revision:1,decision:'approve'}));
       assert.equal(reviewed.status,200,JSON.stringify(await reviewed.clone().json()));
@@ -268,7 +277,7 @@ test('authenticated owners share proposals while commissioner-only controls stay
   }finally{database.close()}
 });
 
-test('7.4.0.3 client uses server state, exact navigation, and private history boundaries',async()=>{
+test('7.4.0.4 client uses server state, premium navigation, and private activity boundaries',async()=>{
   const [client,endpoint,readModel,qualityGate]=await Promise.all([
     readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/trade-center.js',import.meta.url),'utf8'),
@@ -280,10 +289,19 @@ test('7.4.0.3 client uses server state, exact navigation, and private history bo
   assert.match(client,/\['received','Received'\],\['sent','Sent'\],\['drafts','Drafts'\],\['committee','Committee'\],\['approved','Approved'\],\['rejected','Rejected'\],\['history','History'\]/);
   assert.match(client,/Team Trade Assets/);
   assert.match(client,/Multi-Team Fairness/);
-  assert.match(client,/Requested return required/);
+  assert.match(client,/Trade Activity/);
+  assert.match(client,/completed commissioner-approved trades from other teams/);
+  assert.match(client,/workflowInvolvesTeam\(workflow\)\|\|workflow\.status==='approved'/);
+  assert.match(client,/Notes are optional/);
+  assert.match(client,/data-live-open-player-button/);
+  assert.match(client,/trade-block-needs/);
+  assert.doesNotMatch(client,/Requested return required/);
   assert.doesNotMatch(client,/data-live-seed-picks/);
   assert.match(endpoint,/pending-madden-execution/);
   assert.match(endpoint,/continuity_key IS NOT NULL/);
+  assert.match(endpoint,/status\)==='approved'/);
+  assert.match(endpoint,/status\)==='committee' && isReviewer/);
+  assert.match(endpoint,/trade_block_team_profiles/);
   assert.match(readModel,/applyRosterOverlays/);
   assert.match(qualityGate,/tests\/trade\/full-trade-center\.test\.mjs/);
   assert.doesNotMatch(client,/pending madden|madden confirmed|reconciliation status/i);
