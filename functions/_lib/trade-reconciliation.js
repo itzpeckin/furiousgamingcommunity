@@ -58,6 +58,10 @@ export async function reconcileTradeRosterOverlays(db, leagueId, snapshotId) {
       const authority=matched?'snapshot-inferred':'trade-center';
       statements.push(db.prepare(`UPDATE canonical_transactions SET authority=?,execution_status=?,last_snapshot_id=?,updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND league_id=?`).bind(authority,executionStatus,snapshotId,transaction.id,leagueId));
+      statements.push(db.prepare(`UPDATE league_transaction_history
+        SET authority=?,execution_status=?,source_types_json='["franchisehq-workflow","snapshot-reconciliation"]',
+          source_count=MAX(source_count,2),updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND league_id=?`).bind(authority,executionStatus,transaction.id,leagueId));
       statements.push(db.prepare(`INSERT OR IGNORE INTO canonical_transaction_evidence
         (id,league_id,transaction_id,source_type,source_key,snapshot_id,evidence_json,created_at)
         VALUES (?,? ,?,'snapshot-reconciliation',?,?,?,CURRENT_TIMESTAMP)`).bind(`canonical_evidence_${crypto.randomUUID()}`,leagueId,transaction.id,

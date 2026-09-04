@@ -205,6 +205,9 @@ test('authenticated owners share proposals while commissioner-only controls stay
     database.prepare(`INSERT INTO league_snapshots (id,league_id,status,manifest_json,validation_status) VALUES (?,?,?,'{}','ready')`).run('snapshot-1','league-1','active');
     database.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id) VALUES (?,?)`).run('league-1','snapshot-1');
     for(const [externalId,abbr] of [['1','TB'],['2','GB'],['3','KC']])database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','teams',?,?)`).run(externalId,JSON.stringify({external_id:externalId,abbreviation:abbr,display_name:abbr}));
+    for(const [externalId,wins,losses] of [['1',0,11],['2',2,9],['3',7,4]])database.prepare(`INSERT INTO league_snapshot_records
+      (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','standings',?,?)`)
+      .run(externalId,JSON.stringify({teamId:externalId,totalWins:wins,totalLosses:losses,weekIndex:11}));
     for(const [sourceId,teamId,identityId,publicId,name] of [
       ['player-tb','1','identity-tb','player-tb-public','TB Player'],
       ['player-gb','2','identity-gb','player-gb-public','GB Player'],
@@ -284,6 +287,17 @@ test('authenticated owners share proposals while commissioner-only controls stay
     assert.equal(payload.workflows.length,1);
     assert.equal(payload.workflows[0].status,'negotiating');
     assert.equal(payload.notifications[0].type,'received');
+    assert.equal(payload.standingsProjection.available,true);
+    assert.equal(payload.standingsProjection.officialTiebreakersApplied,false);
+    assert.equal(payload.picks.find(pick=>pick.originalTeamKey==='tb'&&pick.round===1)?.projectedPick,'1.01');
+    database.prepare(`UPDATE league_snapshot_records SET data_json=?
+      WHERE snapshot_id='snapshot-1' AND league_id='league-1' AND domain='standings' AND external_id='1'`)
+      .run(JSON.stringify({teamId:'1',totalWins:3,totalLosses:11,weekIndex:13}));
+    database.prepare(`UPDATE league_snapshot_records SET data_json=?
+      WHERE snapshot_id='snapshot-1' AND league_id='league-1' AND domain='standings' AND external_id='2'`)
+      .run(JSON.stringify({teamId:'2',totalWins:1,totalLosses:12,weekIndex:13}));
+    const updatedProjection=await (await getTradeCenter(context(tokens.gb))).json();
+    assert.equal(updatedProjection.picks.find(pick=>pick.originalTeamKey==='gb'&&pick.round===1)?.projectedPick,'1.01');
     const tradeId=proposedPayload.tradeId;
     const stale=await postTradeCenter(context(tokens.gb,'POST',{action:'accept',tradeId,revision:0}));
     assert.equal(stale.status,409);
@@ -303,6 +317,8 @@ test('authenticated owners share proposals while commissioner-only controls stay
     const cannotCancelApproved=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId,revision:1}));
     assert.equal(cannotCancelApproved.status,409);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_roster_overlays WHERE trade_id=? AND internal_status='active'`).get(tradeId).count,2);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_transaction_history WHERE workflow_trade_id=?`).get(tradeId).count,1);
+    assert.equal(database.prepare(`SELECT source_types_json AS sourceTypes FROM league_transaction_history WHERE workflow_trade_id=?`).get(tradeId).sourceTypes,'["franchisehq-workflow"]');
     assert.equal(database.prepare(`SELECT active FROM trade_block_listings WHERE player_identity_id='identity-tb'`).get().active,0);
     const outsiderAfter=await (await getTradeCenter(context(tokens.kc))).json();
     assert.equal(outsiderAfter.workflows.length,2);
@@ -320,7 +336,7 @@ test('authenticated owners share proposals while commissioner-only controls stay
   }finally{database.close()}
 });
 
-test('7.4.0.8 keeps trade reviews stacked and filters Trade Block names without replacing the input',async()=>{
+test('7.4.1 keeps trade reviews full-width and calculator-invariant while preserving stable Trade Block filtering',async()=>{
   const [client,endpoint,readModel,qualityGate,styles]=await Promise.all([
     readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/trade-center.js',import.meta.url),'utf8'),
@@ -352,6 +368,12 @@ test('7.4.0.8 keeps trade reviews stacked and filters Trade Block names without 
   assert.match(client,/Multi-Team Fairness/);
   assert.match(client,/Trade Activity/);
   assert.match(client,/trade-package-matchup--review/);
+  assert.match(client,/trade-detail-asset__metrics/);
+  assert.match(client,/<small>DEV<\/small>/);
+  assert.match(client,/<small>AGE<\/small>/);
+  assert.match(client,/<small>CONTRACT<\/small>/);
+  assert.match(client,/<small>PROJECTED<\/small>/);
+  assert.match(client,/official tiebreakers are not applied/);
   assert.match(client,/filterTradeBlockByName/);
   assert.match(client,/data-live-block-player-name/);
   assert.doesNotMatch(client,/blockFilters\.name=filter\.value;renderTradeBlock\(\)/);
@@ -376,6 +398,9 @@ test('7.4.0.8 keeps trade reviews stacked and filters Trade Block names without 
   assert.match(styles,/compact Trade Center review flow/);
   assert.match(styles,/grid-template-columns:minmax\(0,1fr\) minmax\(220px,260px\)/);
   assert.match(styles,/\.trade-package-matchup--review\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(styles,/full-width Trade Review asset rows/);
+  assert.match(styles,/\.trade-package-matchup--review \.trade-detail-asset\{/);
+  assert.match(styles,/width:100%/);
   assert.match(styles,/\.trade-detail-asset/);
   assert.match(styles,/\.trade-confirm-dialog/);
   assert.match(styles,/@media\(max-width:760px\)/);

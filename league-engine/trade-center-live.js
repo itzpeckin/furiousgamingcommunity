@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ=window.FranchiseHQ;
-  const VERSION='7.4.0.8';
+  const VERSION='7.4.1';
   const page=()=>document.querySelector('[data-page-content]');
   const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||null;
@@ -103,6 +103,15 @@
     return pick?`${pick.draftClass} Round ${pick.round} (${teamAbbr(pick.originalTeamKey)})`:'Draft Pick';
   }
 
+  function pickForAsset(asset){
+    return state?.picks?.find(item=>String(item.id)===String(asset?.draftPickId||asset?.assetId||''))||null;
+  }
+
+  function pickProjectionText(pick){
+    if(!pick?.projectedPick)return'Projection unavailable';
+    return `Projected ${pick.projectedPick}${pick.projectedRecord?` · ${pick.projectedRecord}`:''}${pick.projectionTied?' · tied estimate':''}`;
+  }
+
   function assetValue(asset){
     if(!calculatorEnabled())return null;
     if(asset.assetType==='player')return playerValuation(playerById(asset.sourcePlayerId)||playerById(asset.playerIdentityId))?.total??null;
@@ -123,9 +132,12 @@
   function assetRow(asset){
     if(asset.assetType==='player'){
       const player=playerById(asset.sourcePlayerId)||playerById(asset.playerIdentityId)||{},image=playerImage(player),id=player.id||asset.sourcePlayerId||asset.playerIdentityId;
-      return `<article class="trade-detail-asset trade-detail-asset--player">${image?`<img class="trade-detail-asset__photo" src="${esc(image)}" alt="">`:`<span class="trade-detail-asset__photo trade-detail-asset__photo--empty">${esc(player.position||'P')}</span>`}<span class="trade-detail-asset__identity"><button type="button" class="trade-package-player-link" data-live-open-player-button="${esc(id)}">${esc(assetLabel(asset))}</button><small><b>${esc(player.position||'—')}</b><b>${esc(player.overall??'—')} OVR</b><b>${esc(player.dev||player.developmentTrait||'Normal')}</b></small></span><span class="trade-detail-asset__route"><small>Moves from</small><strong>${esc(teamAbbr(asset.fromTeamKey))} <i aria-hidden="true">→</i> ${esc(teamAbbr(asset.toTeamKey))}</strong></span>${valueMarkup(asset)}</article>`;
+      const years=player.contractYears??player.years??player.contract?.yearsRemaining;
+      const contract=[years!=null?`${years} yr${Number(years)===1?'':'s'}`:null,money(player.capHit??player.contract?.capHit)].filter(value=>value&&value!=='—').join(' · ')||'—';
+      return `<article class="trade-detail-asset trade-detail-asset--player" style="${teamStyle(asset.fromTeamKey)}"><span class="trade-detail-asset__brand">${teamMark(asset.fromTeamKey)}</span>${image?`<img class="trade-detail-asset__photo" src="${esc(image)}" alt="">`:`<span class="trade-detail-asset__photo trade-detail-asset__photo--empty">${esc(player.position||'P')}</span>`}<button type="button" class="trade-detail-asset__identity" data-live-open-player-button="${esc(id)}"><strong>${esc(assetLabel(asset))}</strong><small>${esc(teamName(asset.fromTeamKey))}</small></button><div class="trade-detail-asset__metrics"><span><small>POS</small><strong>${esc(player.position||'—')}</strong></span><span><small>OVR</small><strong>${esc(player.overall??'—')}</strong></span><span><small>DEV</small><strong>${esc(player.dev||player.developmentTrait||'Normal')}</strong></span><span><small>AGE</small><strong>${esc(player.age??'—')}</strong></span><span><small>CONTRACT</small><strong>${esc(contract)}</strong></span></div><span class="trade-detail-asset__route"><small>Moves from</small><strong>${esc(teamAbbr(asset.fromTeamKey))} <i aria-hidden="true">→</i> ${esc(teamAbbr(asset.toTeamKey))}</strong></span>${valueMarkup(asset)}</article>`;
     }
-    return `<article class="trade-detail-asset trade-detail-asset--pick"><span class="trade-detail-asset__photo trade-detail-asset__photo--pick">R${esc(state?.picks?.find(item=>item.id===asset.draftPickId)?.round||'—')}</span><span class="trade-detail-asset__identity"><strong>${esc(assetLabel(asset))}</strong><small><b>Draft pick</b><b>FranchiseHQ ledger</b></small></span><span class="trade-detail-asset__route"><small>Moves from</small><strong>${esc(teamAbbr(asset.fromTeamKey))} <i aria-hidden="true">→</i> ${esc(teamAbbr(asset.toTeamKey))}</strong></span>${valueMarkup(asset)}</article>`;
+    const pick=pickForAsset(asset);
+    return `<article class="trade-detail-asset trade-detail-asset--pick" style="${teamStyle(asset.fromTeamKey)}"><span class="trade-detail-asset__brand">${teamMark(pick?.originalTeamKey||asset.fromTeamKey)}</span><span class="trade-detail-asset__photo trade-detail-asset__photo--pick">R${esc(pick?.round||'—')}</span><span class="trade-detail-asset__identity"><strong>${esc(assetLabel(asset))}</strong><small>${esc(teamName(pick?.originalTeamKey||asset.fromTeamKey))} original pick</small></span><div class="trade-detail-asset__metrics trade-detail-asset__metrics--pick"><span><small>CLASS</small><strong>${esc(pick?.draftClass||'—')}</strong></span><span><small>ROUND</small><strong>${esc(pick?.round||'—')}</strong></span><span><small>PROJECTED</small><strong title="Estimated from the active standings; official tiebreakers are not applied.">${esc(pick?.projectedPick||'—')}</strong></span><span><small>RECORD</small><strong>${esc(pick?.projectedRecord||'—')}</strong></span></div><span class="trade-detail-asset__route"><small>Moves from</small><strong>${esc(teamAbbr(asset.fromTeamKey))} <i aria-hidden="true">→</i> ${esc(teamAbbr(asset.toTeamKey))}</strong></span>${valueMarkup(asset)}</article>`;
   }
 
   function workflowInvolvesTeam(workflow,teamKey=currentTeam()){
@@ -155,12 +167,7 @@
   }
 
   function packageAsset(asset){
-    if(asset.assetType==='player'){
-      const player=playerById(asset.sourcePlayerId)||playerById(asset.playerIdentityId)||{};
-      const image=playerImage(player),id=player.id||asset.sourcePlayerId||asset.playerIdentityId;
-      return `<div class="trade-package-asset trade-package-asset--player">${image?`<img src="${esc(image)}" alt="">`:'<span class="trade-package-asset__placeholder">P</span>'}<span><button type="button" class="trade-package-player-link" data-live-open-player-button="${esc(id)}">${esc(player.name||player.displayName||assetLabel(asset))}</button><small>${esc(player.position||'—')} · ${esc(player.overall??'—')} OVR</small></span>${valueMarkup(asset,'Value')}</div>`;
-    }
-    return `<div class="trade-package-asset trade-package-asset--pick"><span class="trade-pick-ticket">PICK</span><span><strong>${esc(assetLabel(asset))}</strong><small>Draft capital</small></span>${valueMarkup(asset,'Value')}</div>`;
+    return assetRow(asset);
   }
 
   function workflowTitle(workflow,tab){
@@ -280,7 +287,7 @@
     const picks=(state?.picks||[]).filter(pick=>pick.currentTeamKey===teamKey);
     const filter=assetFilters.get(teamKey)||'players',needs=teamNeeds(teamKey),visual=teamVisual(teamKey);
     const playerRows=filter==='picks'?'':roster.map(player=>{const active=selected('player',player.id),image=playerImage(player),asset={assetType:'player',sourcePlayerId:player.id},addLabel=active?'Player selected':`Add ${player.name||'player'} to trade`;return `<article class="live-trade-picker-row ${active?'is-selected':''}">${image?`<img class="live-trade-picker-photo" src="${esc(image)}" alt="">`:`<span class="live-trade-picker-photo live-trade-picker-photo--empty">${esc(player.position||'P')}</span>`}<span class="live-trade-picker-identity"><button type="button" class="trade-package-player-link" data-live-open-player-button="${esc(player.id)}">${esc(player.name)}</button><small>${esc(player.position||'—')} · ${esc(player.overall??'—')} OVR · ${esc(player.dev||player.developmentTrait||'Normal')}</small></span>${calculatorEnabled()?valueMarkup(asset):''}<button type="button" class="trade-builder-add" data-live-add-asset="player" data-live-asset-id="${esc(player.id)}" data-live-from-team="${esc(teamKey)}" ${active?'disabled':''} aria-label="${esc(addLabel)}">${active?'✓':'+'}</button></article>`}).join('');
-    const pickRows=filter==='players'?'':picks.map(pick=>{const active=selected('draft-pick',pick.id),asset={assetType:'draft-pick',draftPickId:pick.id};return `<article class="live-trade-picker-row ${active?'is-selected':''}"><span class="trade-pick-ticket">R${esc(pick.round)}</span><span class="live-trade-picker-identity"><strong>${pick.draftClass} Round ${pick.round}</strong><small>Originally ${esc(teamAbbr(pick.originalTeamKey))}</small></span>${calculatorEnabled()?valueMarkup(asset):''}<button type="button" class="trade-builder-add" data-live-add-asset="draft-pick" data-live-asset-id="${esc(pick.id)}" data-live-from-team="${esc(teamKey)}" ${active?'disabled':''} aria-label="${active?'Pick selected':'Add pick to trade'}">${active?'✓':'+'}</button></article>`}).join('');
+    const pickRows=filter==='players'?'':picks.map(pick=>{const active=selected('draft-pick',pick.id),asset={assetType:'draft-pick',draftPickId:pick.id};return `<article class="live-trade-picker-row ${active?'is-selected':''}"><span class="trade-pick-ticket">R${esc(pick.round)}</span><span class="live-trade-picker-identity"><strong>${pick.draftClass} Round ${pick.round}</strong><small>Originally ${esc(teamAbbr(pick.originalTeamKey))} · ${esc(pickProjectionText(pick))}</small></span>${calculatorEnabled()?valueMarkup(asset):''}<button type="button" class="trade-builder-add" data-live-add-asset="draft-pick" data-live-asset-id="${esc(pick.id)}" data-live-from-team="${esc(teamKey)}" ${active?'disabled':''} aria-label="${active?'Pick selected':'Add pick to trade'}">${active?'✓':'+'}</button></article>`}).join('');
     return `<article class="trade-builder-team" data-live-builder-team="${esc(teamKey)}" style="${teamStyle(teamKey)}"><header class="trade-builder-team__hero"><span class="trade-builder-team__mark">${teamMark(teamKey)}</span><div><small>${esc(visual.abbr)}</small><h2>${esc(teamName(teamKey))}</h2></div><dl><div><dt>Cap Space</dt><dd>${esc(teamCapSpace(teamKey))}</dd></div><div><dt>Team Needs</dt><dd>${esc(needs.slice(0,3).join(', ')||'Open')}</dd></div></dl>${teamKey!==currentTeam()?`<button class="icon-button" data-live-remove-team="${esc(teamKey)}" aria-label="Remove ${esc(teamName(teamKey))}">×</button>`:''}</header><div class="trade-builder-team__tools"><div class="segmented-tabs live-asset-filters" aria-label="${esc(teamName(teamKey))} asset filters">${[['players','Players'],['picks','Picks']].map(([key,label])=>`<button class="${filter===key?'is-active':''}" data-live-asset-filter="${key}" data-live-filter-team="${esc(teamKey)}">${label}</button>`).join('')}</div><label class="trade-builder-search"><span aria-hidden="true">⌕</span><input data-live-asset-search="${esc(teamKey)}" value="${esc(search)}" placeholder="Search ${esc(teamName(teamKey))} ${filter}…" aria-label="Search ${esc(teamName(teamKey))} ${filter}"></label></div><div class="live-trade-picker-list" data-live-picker-scroll="${esc(teamKey)}">${playerRows}${pickRows||(!playerRows?'<div class="empty-mini">No matching assets.</div>':'')}</div></article>`;
   }
 
@@ -478,7 +485,7 @@
     const draft=state?.settings?.valueModel?.draft||{},round=Number(pick.round||1),base=Number(draft.roundBases?.[round]||0);
     const seasonYear=Number(state?.season?.seasonYear||2026),distance=Math.max(1,Number(pick.draftClass||seasonYear+1)-seasonYear);
     const configured=Number(draft.futureRetention?.[Math.min(3,distance)]),retention=Number.isFinite(configured)?configured/100:Math.max(.18,.4-Math.max(0,distance-3)*.08);
-    const projection=draft.teamProjections?.[pick.currentTeamKey]||'mid',slot={early:5.5,mid:15.5,late:24.5,'super-bowl':30.5}[projection]||15.5,early=Number(draft.earlyPickMultiplier||134)/100,late=Number(draft.latePickMultiplier||84)/100,multiplier=early-((slot-1)/31)*(early-late);
+    const projection=draft.teamProjections?.[pick.originalTeamKey]||'mid',slot={early:5.5,mid:15.5,late:24.5,'super-bowl':30.5}[projection]||15.5,early=Number(draft.earlyPickMultiplier||134)/100,late=Number(draft.latePickMultiplier||84)/100,multiplier=early-((slot-1)/31)*(early-late);
     const projected=Math.round(base*(multiplier-1)),future=Math.round(base*multiplier*(retention-1)),total=Math.max(50,Math.round(base*multiplier*retention));
     return calculatorEnabled()?{model:'Draft Pick Engine 1.2',total,base,distance,retention,projection,breakdown:[['Round base',base,`${pick.draftClass} Round ${round}`],['Projected range',projected,projection],['Timeline adjustment',future,`${Math.round(retention*100)}% retained value`]]}:{model:'Draft Pick Engine 1.2',total:0,enabled:false,breakdown:[]};
   }

@@ -101,6 +101,7 @@
     transactionSearch: '',
     transactionType: 'all',
     transactionTeam: 'all',
+    transactionSeason: 'all',
     activityFilter: 'all',
     featuredGameId: null,
     homeLeaderMetrics: {
@@ -6347,6 +6348,16 @@ function canonicalPlayerDashboardStats(playerId='') {
     return canonicalTransactionUiCache.promise;
   }
 
+  async function loadCanonicalTransactionById(transactionId){
+    const slug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'';
+    const response=await fetch(`/api/leagues/${encodeURIComponent(slug)}/transactions/canonical?transactionId=${encodeURIComponent(transactionId)}`,{
+      credentials:'include',cache:'no-store',headers:{accept:'application/json'}
+    });
+    const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
+    if(!response.ok||payload?.ok===false)throw new Error(payload?.detail||payload?.error||'Transaction record unavailable.');
+    return payload;
+  }
+
   window.FranchiseHQ=window.FranchiseHQ||{};
   window.FranchiseHQ.transactionUiLoader={
     load:(force=false)=>loadCanonicalTransactionsForUi(force),
@@ -6472,6 +6483,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   function transactionDisplayType(transaction={}){
     const rawType=String(transaction.eventType||transaction.type||'').toLowerCase();
+    if(transaction.corrected&&rawType)return rawType;
     const evidence=Array.isArray(transaction.evidence)?transaction.evidence:[];
     const evidenceTypes=new Set(evidence.map(item=>String(item?.sourceType||'').toLowerCase()));
     const strongTradeEvidence=
@@ -6572,9 +6584,9 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function transactionAuthorityMarkup(transaction={}){
-    const label=transactionAuthorityLabel(transaction);
-    if(label==='Roster Detected')return'';
-    return `<span class="pill pill--neutral">${escapeHtml(label)}</span>`;
+    // Reconciliation authority is retained for audit and diagnostics, but it is
+    // intentionally not exposed as Pending/Confirmed status language to members.
+    return'';
   }
 
   function transactionPlayerRows(transaction={}){
@@ -7568,11 +7580,88 @@ function canonicalPlayerDashboardStats(playerId='') {
     }));
   }
 
+  function transactionSourceLabel(value=''){
+    return ({
+      'franchisehq-workflow':'Trade Center',
+      'madden-explicit':'Madden transaction feed',
+      'snapshot-diff':'Madden roster comparison',
+      'snapshot-reconciliation':'Madden roster comparison',
+      'history-summary':'History Books summary'
+    })[String(value||'').toLowerCase()]||titleCase(String(value||'record').replace(/-/g,' '));
+  }
+
+  function transactionSourceSummary(transaction={}){
+    const labels=[...new Set((transaction.evidence||[]).map(item=>transactionSourceLabel(item.sourceType)).filter(Boolean))];
+    if(labels.length)return labels.join(' + ');
+    const authority=String(transaction.authority||'').toLowerCase();
+    if(authority.includes('madden')||authority.includes('snapshot'))return'Madden roster';
+    if(authority.includes('workflow')||authority.includes('trade-center'))return'Trade Center';
+    return'League record';
+  }
+
+  function transactionUniqueMoves(transaction={}){
+    const map=new Map();
+    transactionMoves(transaction).forEach(move=>{
+      const key=[move.playerId,move.fromTeamId,move.toTeamId,move.oldStatus,move.newStatus].map(value=>String(value||'')).join('|');
+      if(!map.has(key))map.set(key,move);
+    });
+    return [...map.values()];
+  }
+
+  function transactionMoveForPlayer(transaction={},playerId=''){
+    return transactionUniqueMoves(transaction).find(move=>String(move.playerId||'')===String(playerId||''))||{};
+  }
+
+  function transactionTeamChip(teamId){
+    if(!teamId||String(teamId).toUpperCase()==='FA')return '<span class="transaction-team-chip transaction-team-chip--fa"><b>FA</b><span>Free Agent</span></span>';
+    const team=transactionTeamByCanonicalId(teamId)||{id:teamId,abbr:String(teamId).toUpperCase(),fullName:String(teamId).toUpperCase()};
+    return `<span class="transaction-team-chip">${renderTeamMark(team,'mini-team')}<span>${escapeHtml(team.abbr||team.fullName)}</span></span>`;
+  }
+
+  function transactionHistoryCard(transaction={}){
+    const players=transactionPlayerRows(transaction),moves=transactionUniqueMoves(transaction),type=transactionDisplayType(transaction);
+    const playerRows=players.length?players.map(player=>{
+      const move=transactionMoveForPlayer(transaction,player.id);
+      return `<div class="transaction-history-player"><button type="button" data-roster-player-detail="${escapeHtml(player.id||'')}"><strong>${escapeHtml(player.name||'Unknown Player')}</strong><small>${escapeHtml(player.position||'—')}${player.overall?` · ${escapeHtml(player.overall)} OVR`:''}</small></button><span>${transactionTeamChip(move.fromTeamId)}<i aria-hidden="true">→</i>${transactionTeamChip(move.toTeamId)}</span></div>`;
+    }).join(''):`<div class="transaction-history-player transaction-history-player--empty"><strong>Roster movement recorded</strong><small>${moves.length} movement record${moves.length===1?'':'s'}</small></div>`;
+    const sourceCount=Number.isFinite(Number(transaction.sourceCount))?Number(transaction.sourceCount):(transaction.evidence||[]).length;
+    return `<article class="card transaction-history-card"><header><div><span class="pill pill--${transactionEventTone(type)}">${escapeHtml(transactionEventLabel(type))}</span>${transaction.corrected?'<span class="pill pill--warning">Corrected</span>':''}</div><strong>${escapeHtml(transactionDirectionLabel(transaction)||'League transaction')}</strong><small>${escapeHtml(transactionTimeLabel(transaction))}</small></header><div class="transaction-history-card__players">${playerRows}</div><footer><span>${sourceCount} source record${sourceCount===1?'':'s'}${transaction.correction?` · corrected revision ${transaction.correction.revision}`:''}</span><button type="button" class="text-button" data-route="transactions/${escapeHtml(transaction.id)}">View record <svg><use href="#icon-arrow"></use></svg></button></footer></article>`;
+  }
+
+  function transactionLocalDateTime(value=''){
+    const date=new Date(value);
+    if(Number.isNaN(date.getTime()))return'';
+    const local=new Date(date.getTime()-date.getTimezoneOffset()*60000);
+    return local.toISOString().slice(0,16);
+  }
+
+  function transactionCorrectionPanel(transaction,payload){
+    if(!payload?.permissions?.canCorrect)return'';
+    const types=['trade','signing','drafted','release','waiver-claim','waived','team-change','signed-off-practice-squad','practice-squad-promotion','practice-squad-demotion','ir-placement','ir-activation','roster-move'];
+    if(!types.includes(transaction.eventType))types.push(transaction.eventType);
+    return `<details class="card transaction-correction-panel"><summary><span><small>Commissioner control</small><strong>Correct display classification</strong></span><span>Revision ${transaction.correctionRevision||0} →</span></summary><form data-canonical-correction-form="${escapeHtml(transaction.id)}" data-correction-revision="${transaction.correctionRevision||0}"><div class="transaction-correction-grid"><label class="field"><span>Transaction type</span><select name="eventType">${types.map(type=>`<option value="${escapeHtml(type)}" ${type===transaction.eventType?'selected':''}>${escapeHtml(transactionEventLabel(type))}</option>`).join('')}</select></label><label class="field"><span>Franchise season</span><input name="season" type="number" min="1900" max="2200" value="${escapeHtml(transaction.season??'')}"></label><label class="field"><span>Madden week</span><input name="week" type="number" min="0" max="40" value="${escapeHtml(transaction.week??'')}"></label><label class="field"><span>Occurred at</span><input name="occurredAt" type="datetime-local" value="${escapeHtml(transactionLocalDateTime(transaction.occurredAt))}"></label></div><label class="field"><span>Correction reason</span><textarea name="reason" required minlength="5" maxlength="500" placeholder="Explain what was wrong and why this display correction is accurate."></textarea></label><div class="transaction-correction-note"><strong>Source evidence remains immutable.</strong><span>This creates a new audited correction revision; it does not rewrite Madden data, Trade Center evidence, or prior corrections.</span></div><button class="button button--primary" type="submit">Save audited correction</button></form></details>`;
+  }
+
+  function renderLeagueTransactionDetail(transaction,payload){
+    const type=transactionDisplayType(transaction),players=transactionPlayerRows(transaction),moves=transactionUniqueMoves(transaction);
+    const assets=players.map(player=>{const move=transactionMoveForPlayer(transaction,player.id);return `<article class="transaction-detail-player"><button type="button" data-roster-player-detail="${escapeHtml(player.id||'')}"><strong>${escapeHtml(player.name||'Unknown Player')}</strong><small>${escapeHtml(player.position||'—')}${player.overall?` · ${escapeHtml(player.overall)} OVR`:''}</small></button><div><span><small>Before</small>${transactionTeamChip(move.fromTeamId)}</span><i aria-hidden="true">→</i><span><small>After</small>${transactionTeamChip(move.toTeamId)}</span></div></article>`}).join('');
+    const evidence=(transaction.evidence||[]).map(item=>`<article class="transaction-evidence-row"><span class="transaction-evidence-icon"><svg><use href="#icon-${String(item.sourceType).includes('workflow')?'swap':'shield'}"></use></svg></span><div><strong>${escapeHtml(transactionSourceLabel(item.sourceType))}</strong><small>${escapeHtml(item.createdAt?new Date(item.createdAt).toLocaleString():'Recorded')}</small></div><b>${(item.evidence?.moves||[]).length} movement${(item.evidence?.moves||[]).length===1?'':'s'}</b></article>`).join('');
+    const corrections=(transaction.corrections||[]).map(item=>`<div class="transaction-correction-history"><strong>Revision ${item.revision} · ${escapeHtml(item.correctedBy)}</strong><span>${escapeHtml(item.reason)}</span><small>${escapeHtml(item.createdAt?new Date(item.createdAt).toLocaleString():'')}</small></div>`).join('');
+    pageContent.innerHTML=`<div class="transaction-detail-page"><div class="page-heading"><div><button class="text-button" data-route="transactions">← Transactions</button><span class="eyebrow">Permanent league record</span><h1>${escapeHtml(transactionEventLabel(type))}</h1><p>${escapeHtml(transactionDirectionLabel(transaction)||'FranchiseHQ transaction')}</p></div><div class="heading-actions"><button type="button" class="button button--secondary" data-copy-transaction-link="${escapeHtml(transaction.permanentHref||'')}">Copy Link</button>${transaction.workflowTradeId?`<button type="button" class="button button--primary" data-route="trade-center/${escapeHtml(transaction.workflowTradeId)}">View Trade</button>`:''}</div></div><section class="transaction-detail-summary"><div><small>Franchise season</small><strong>${escapeHtml(transaction.season??'—')}</strong></div><div><small>Madden period</small><strong>${escapeHtml(transactionMaddenWeekLabel(transaction))}</strong></div><div><small>Recorded from</small><strong>${escapeHtml(transactionSourceSummary(transaction))}</strong></div><div><small>Record status</small><strong>${transaction.corrected?'Corrected':'Original'}</strong></div></section><div class="transaction-detail-grid"><main><section class="card transaction-detail-assets"><div class="card-header"><div><span class="eyebrow">Before and after roster state</span><h2>Player movement</h2><p>Each player is shown with the team recorded before and after this transaction.</p></div><span class="pill pill--${moves.length?'success':'warning'}">${moves.length?'Complete details':'Limited details'}</span></div>${assets||'<div class="empty-state"><h3>No player rows available</h3><p>The source recorded a transaction without a player identity.</p></div>'}</section>${transactionCorrectionPanel(transaction,payload)}</main><aside><section class="card transaction-evidence-card"><div class="card-header"><div><span class="eyebrow">Immutable evidence</span><h2>Source history</h2></div><span class="pill pill--neutral">${(transaction.evidence||[]).length}</span></div>${evidence||'<div class="empty-mini">No evidence summary is available.</div>'}</section>${corrections?`<section class="card transaction-correction-history-card"><div class="card-header"><div><h3>Correction history</h3><p>Append-only commissioner revisions.</p></div></div>${corrections}</section>`:''}</aside></div></div>`;
+  }
+
   function renderLeagueTransactionTable(payload){
     const publicRows=(payload?.transactions||[]).filter(transactionIsPubliclyVisible);
     const teamOptions=(liveTeamDirectory?.teams||[]).slice().sort((a,b)=>String(a.fullName||a.abbr).localeCompare(String(b.fullName||b.abbr)));
     const typeOptions=[...new Set(publicRows.map(row=>transactionDisplayType(row)).filter(Boolean))]
       .sort((a,b)=>transactionEventLabel(a).localeCompare(transactionEventLabel(b)));
+    const seasonOptions=[...new Set([...(payload?.availableSeasons||[]),...publicRows.map(row=>row.season)].filter(Number.isFinite))].sort((a,b)=>b-a);
+
+    const detailId=currentAppRoute().split('/')[1]||'';
+    if(detailId){
+      const transaction=publicRows.find(row=>String(row.id)===String(detailId));
+      if(transaction){renderLeagueTransactionDetail(transaction,payload);return}
+    }
 
     const matchesTeam=row=>{
       if(state.transactionTeam==='all')return true;
@@ -7595,38 +7684,37 @@ function canonicalPlayerDashboardStats(playerId='') {
 
     const transactions=publicRows
       .filter(row=>state.transactionType==='all'||transactionDisplayType(row)===state.transactionType)
+      .filter(row=>state.transactionSeason==='all'||String(row.season)===String(state.transactionSeason))
       .filter(matchesTeam)
       .filter(matchesSearch)
       .sort((a,b)=>(Number(b.season||0)-Number(a.season||0))||(Number(b.week||0)-Number(a.week||0))||((new Date(b.occurredAt||b.createdAt||0).getTime()||0)-(new Date(a.occurredAt||a.createdAt||0).getTime()||0)));
 
-    const tableRows=transactions.flatMap(transaction=>transactionTablePlayerRows(transaction));
+    const groups=new Map();
+    transactions.forEach(transaction=>{const key=Number.isFinite(Number(transaction.season))?String(transaction.season):'unknown';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(transaction)});
 
-    pageContent.innerHTML=`<div class="page-heading"><div><h1>Transactions</h1></div></div>
+    pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Canonical league history</span><h1>Transactions</h1><p>Trades, signings, releases, and roster movements reconciled against Madden roster states.</p></div></div>
       <div class="filter-bar league-transaction-filters">
         <label class="field field--grow"><span>Search</span><input data-transaction-search value="${escapeHtml(state.transactionSearch||'')}" placeholder="Player, team, transaction..."></label>
         <label class="field"><span>Type</span><select data-transaction-type><option value="all">All Types</option>${typeOptions.map(type=>`<option value="${escapeHtml(type)}" ${state.transactionType===type?'selected':''}>${escapeHtml(transactionEventLabel(type))}</option>`).join('')}</select></label>
         <label class="field"><span>Team</span><select data-transaction-team><option value="all">All Teams</option>${teamOptions.map(team=>`<option value="${escapeHtml(String(team.id))}" ${String(state.transactionTeam)===String(team.id)?'selected':''}>${escapeHtml(team.fullName||team.abbr)}</option>`).join('')}</select></label>
-        <span class="result-count">${tableRows.length} player row${tableRows.length===1?'':'s'}</span>
+        <label class="field"><span>Franchise season</span><select data-transaction-season><option value="all">All Seasons</option>${seasonOptions.map(season=>`<option value="${season}" ${String(state.transactionSeason)===String(season)?'selected':''}>Season ${season}</option>`).join('')}</select></label>
+        <span class="result-count">${transactions.length} transaction${transactions.length===1?'':'s'}</span>
       </div>
-      ${tableRows.length?`<article class="card transaction-table-card"><div class="table-wrap transaction-table-wrap"><table class="league-transactions-table">
-        <thead><tr><th>Team Name</th><th>Player Name</th><th>Position</th><th>Overall</th><th>Action</th><th>Madden Week</th></tr></thead>
-        <tbody>${tableRows.map(row=>`<tr ${row.playerId?`class="clickable-row" data-roster-player-detail="${escapeHtml(row.playerId)}"`:''}>
-          <td><strong>${escapeHtml(row.team)}</strong></td>
-          <td><strong>${escapeHtml(row.player)}</strong></td>
-          <td>${escapeHtml(row.position)}</td>
-          <td>${escapeHtml(row.overall)}</td>
-          <td><span class="pill pill--${transactionEventTone(row.actionType)}">${escapeHtml(row.action)}</span></td>
-          <td>${escapeHtml(row.week)}</td>
-        </tr>`).join('')}</tbody>
-      </table></div></article>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No transactions found</h3><p>No public executed transactions match the current filters.</p></div></article>`}`;
+      ${transactions.length?`<div class="transaction-history-groups">${[...groups.entries()].map(([season,rows])=>`<section class="transaction-season-group"><header><span>Franchise season</span><h2>${season==='unknown'?'Season unavailable':escapeHtml(season)}</h2><b>${rows.length} record${rows.length===1?'':'s'}</b></header><div>${rows.map(transactionHistoryCard).join('')}</div></section>`).join('')}</div>`:`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No transactions found</h3><p>No public executed transactions match the current filters.</p></div></article>`}`;
   }
 
-  async function renderLeagueTransactions() {
+  async function renderLeagueTransactions(transactionId=currentAppRoute().split('/')[1]||'') {
     // Performance rule: never refetch or recompute the ledger when the five-minute
     // canonical UI cache is already warm. Paint from memory immediately.
     const cached=canonicalTransactionUiCache?.payload;
     if(cached){
-      renderLeagueTransactionTable(cached);
+      if(!transactionId||(cached.transactions||[]).some(item=>String(item.id)===String(transactionId))){
+        renderLeagueTransactionTable(cached);
+        return;
+      }
+      pageContent.innerHTML='<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Loading permanent transaction record…</h3><p>Reading the requested canonical league record.</p></div></article>';
+      try{renderLeagueTransactionTable(await loadCanonicalTransactionById(transactionId))}
+      catch(error){pageContent.innerHTML=`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>Transaction unavailable</h3><p>${escapeHtml(error?.message||'The permanent record could not be loaded.')}</p><button class="button button--secondary" data-route="transactions">Back to Transactions</button></div></article>`}
       return;
     }
 
@@ -7641,8 +7729,11 @@ function canonicalPlayerDashboardStats(playerId='') {
       </article>`;
 
     try{
-      const payload=await loadCanonicalTransactionsForUi(false);
+      let payload=await loadCanonicalTransactionsForUi(false);
       if(routeBase(currentAppRoute())!=='transactions')return;
+      if(transactionId&&!(payload.transactions||[]).some(item=>String(item.id)===String(transactionId))){
+        payload=await loadCanonicalTransactionById(transactionId);
+      }
       renderLeagueTransactionTable(payload);
     }catch(error){
       console.error('[League Transactions]',error);
@@ -8630,7 +8721,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         break;
       case 'schedule': renderSchedule(); break;
       case 'news': renderNews(); break;
-      case 'transactions': renderLeagueTransactions(); break;
+      case 'transactions': renderLeagueTransactions(id); break;
       case 'trade-center': window.FGC_TRADE?.renderTradeCenter ? window.FGC_TRADE.renderTradeCenter(id) : window.FranchiseHQ?.trade?.renderTradeCenter ? window.FranchiseHQ.trade.renderTradeCenter(id) : renderRoadmap(base); break;
       case 'trade-block': window.FGC_TRADE?.renderTradeBlock ? window.FGC_TRADE.renderTradeBlock() : window.FranchiseHQ?.trade?.renderTradeBlock ? window.FranchiseHQ.trade.renderTradeBlock() : renderRoadmap(base); break;
       case 'design-system': renderDesignSystem(); break;
@@ -9313,6 +9404,51 @@ function canonicalPlayerDashboardStats(playerId='') {
       state.transactionTeam=event.target.value||'all';
       if(canonicalTransactionUiCache?.payload)renderLeagueTransactionTable(canonicalTransactionUiCache.payload);
       else renderLeagueTransactions();
+      return;
+    }
+    if(event.target.matches('[data-transaction-season]')){
+      state.transactionSeason=event.target.value||'all';
+      if(canonicalTransactionUiCache?.payload)renderLeagueTransactionTable(canonicalTransactionUiCache.payload);
+      else renderLeagueTransactions();
+    }
+  });
+
+  document.addEventListener('click',event=>{
+    const button=event.target.closest('[data-copy-transaction-link]');
+    if(!button)return;
+    event.preventDefault();
+    const href=button.dataset.copyTransactionLink||'';
+    const value=new URL(href||location.href,location.origin).toString();
+    navigator.clipboard?.writeText(value)
+      .then(()=>showToast('Transaction link copied','This permanent league record can be opened by any signed-in league member.'))
+      .catch(()=>showToast('Copy unavailable','Your browser blocked clipboard access.'));
+  });
+
+  document.addEventListener('submit',async event=>{
+    const form=event.target.closest('[data-canonical-correction-form]');
+    if(!form)return;
+    event.preventDefault();
+    const submit=form.querySelector('[type="submit"]');
+    if(submit)submit.disabled=true;
+    const fields=new FormData(form),localTime=String(fields.get('occurredAt')||'');
+    try{
+      await canonicalTransactionRequest('POST',{
+        action:'correct',
+        transactionId:form.dataset.canonicalCorrectionForm,
+        correctionRevision:Number(form.dataset.correctionRevision||0),
+        eventType:String(fields.get('eventType')||''),
+        season:fields.get('season')===''?null:Number(fields.get('season')),
+        week:fields.get('week')===''?null:Number(fields.get('week')),
+        occurredAt:localTime?new Date(localTime).toISOString():null,
+        reason:String(fields.get('reason')||'')
+      });
+      window.FranchiseHQ?.transactionUiLoader?.clear?.();
+      const payload=await loadCanonicalTransactionById(form.dataset.canonicalCorrectionForm);
+      renderLeagueTransactionTable(payload);
+      showToast('Transaction corrected','The audited display revision is live. Original source evidence was retained.');
+    }catch(error){
+      showToast('Correction not saved',error?.message||'Refresh and try again.');
+      if(submit)submit.disabled=false;
     }
   });
 
@@ -9751,7 +9887,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.4.0.8';
+  const VISIBLE_RELEASE = '7.4.1';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

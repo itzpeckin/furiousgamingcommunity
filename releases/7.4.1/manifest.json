@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.1",
+  "releaseType": "transactions-history-and-draft-projection",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.0.8",
+    "commit": "ffcb61145b4d5a5e68a6d371ebef588249b01c7e",
+    "tree": "99cbc4475b2b1a80d8f072dd60110ac232a2a0cf",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-published",
+    "commit": null,
+    "mergeCommit": null,
+    "pullRequest": null,
+    "hostedChecksPassed": 0,
+    "mainChecksPassed": 0
+  },
+  "staging": { "authorized": false, "deployed": false, "status": "not-run" },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-authorized-not-run",
+    "currentRelease": "7.4.0.8",
+    "currentCommit": "37be901a60234c3ef844280527872eec4586d4ba",
+    "currentPagesDeployment": "52ae9935-decc-447d-abc2-0b8cf8a5732f",
+    "currentWorkerBuild": "706fda54-186e-4559-9ef3-77fcaa30516a",
+    "currentWorkerVersion": "fb32429a-19b3-4837-869f-2df057e5547b",
+    "currentMigration": 30,
+    "candidateMigration": 31
+  },
+  "requiredArtifacts": [
+    "functions/_lib/draft-pick-projections.js",
+    "functions/_lib/trade-reconciliation.js",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "functions/api/leagues/[leagueSlug]/transactions/canonical.js",
+    "league-engine/trade-center-live.js",
+    "migrations/0031_canonical_transaction_corrections.sql",
+    "tests/trade/draft-pick-projections.test.mjs",
+    "tests/trade/full-trade-center.test.mjs",
+    "tests/transactions/canonical-history.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.1/release-record.md",
+    "releases/7.4.1/validation-evidence.json"
+  ]
+}

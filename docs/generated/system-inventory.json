@@ -138,24 +138,24 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 191,
+      ".js": 192,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 34,
+      ".mjs": 36,
       ".png": 3,
-      ".sql": 32,
+      ".sql": 33,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 619672,
+        "bytes": 634610,
         "file": "app.js"
       },
       {
-        "bytes": 451642,
+        "bytes": 464437,
         "file": "styles.css"
       },
       {
@@ -163,15 +163,15 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 134765,
+        "bytes": 138644,
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 116225,
+        "bytes": 130597,
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 90150,
+        "bytes": 91020,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -179,7 +179,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 74985,
+        "bytes": 74943,
         "file": "index.html"
       },
       {
@@ -187,11 +187,11 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 45354,
+        "bytes": 47420,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 39029,
+        "bytes": 39026,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
@@ -199,27 +199,27 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 38708,
+        "bytes": 38706,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 37675,
+        "bytes": 37673,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 36785,
+        "bytes": 36783,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
+      },
+      {
+        "bytes": 35946,
+        "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
         "bytes": 35877,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 33791,
-        "file": "tests/trade/full-trade-center.test.mjs"
-      },
-      {
-        "bytes": 28922,
+        "bytes": 28918,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -227,11 +227,11 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
-        "bytes": 23765,
+        "bytes": 23761,
         "file": "functions/_lib/madden-discovery.js"
       }
     ],
-    "total": 561
+    "total": 565
   },
   "frontend": {
     "assets": [
@@ -1405,10 +1405,16 @@
       "recordsLedger": true,
       "sha256": "9e7f999ba239b0b7ac9a4fd0c0fca78d68c45c478ec0218162db80fbcf18088a",
       "version": "0030"
+    },
+    {
+      "file": "migrations/0031_canonical_transaction_corrections.sql",
+      "recordsLedger": true,
+      "sha256": "c239442d0b11502c6ce07b889b14d8f104671574c50b625dc2f6fb262c0fb7c3",
+      "version": "0031"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.0.8",
+  "release": "7.4.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
