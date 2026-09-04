@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.7",
+  "validatedOn": "2026-09-04",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": { "unregisteredFailures": 0 },
+  "checks": {
+    "reusableMadden27Source": {
+      "passed": true,
+      "teamCount": 32,
+      "draftClasses": [2027, 2028, 2029],
+      "roundsPerClass": 7,
+      "pickCount": 672,
+      "ownershipOverrides": 58,
+      "missingOriginalTeams": 0,
+      "duplicatePickIdentities": 0,
+      "mappingSha256": "490fb6c83761dd0ed5bae8853578c623fb79733bf28b54a14f60c41c0897b173",
+      "sourceTypoNormalized": "Pacekrs via Cowboys -> Packers via Cowboys"
+    },
+    "fgcDraftPickSource": {
+      "passed": true,
+      "teamCount": 32,
+      "draftClasses": [2027, 2028, 2029],
+      "roundsPerClass": 7,
+      "pickCount": 672,
+      "differencesFromReusableSource": 59,
+      "differencesByClass": { "2027": 40, "2028": 15, "2029": 4 },
+      "missingOriginalTeams": 0,
+      "duplicatePickIdentities": 0,
+      "mappingSha256": "2d7aef1b23d1e3a31c79d04a039858a00a24bc6a09ab2f2866dd7f28ce4cc9ec",
+      "correctedFifthRoundVerified": true
+    },
+    "tenantPrivacy": {
+      "passed": true,
+      "commissionerOnlyPreview": true,
+      "commissionerOnlyApply": true,
+      "fgcTenantBound": true,
+      "otherLeagueRejected": true,
+      "fgcAutoApplied": false
+    },
+    "ownershipPreservation": {
+      "passed": true,
+      "completeHorizonWrites": 0,
+      "stableContinuityIdentity": true,
+      "approvedTradeOwnershipPreserved": true,
+      "commissionerCorrectionPreserved": true,
+      "existingFgcOwnershipChanged": false
+    },
+    "seasonHorizon": {
+      "passed": true,
+      "visibleFutureClassCount": 3,
+      "advanceFromSeasonYear": 2026,
+      "advanceToSeasonYear": 2027,
+      "preservedClasses": [2028, 2029],
+      "newClass": 2030,
+      "newClassPickCount": 224,
+      "newClassRounds": [1, 2, 3, 4, 5, 6, 7],
+      "automaticDuringArchiveSeason": true
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 30,
+      "requiredTables": 95,
+      "foreignKeyViolations": 0,
+      "migrationRequired": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 154,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "status": "passed",
+      "javascriptModules": 225,
+      "inventoryFiles": 561,
+      "routes": 69
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "draftPickBaselineApplied": false,
+    "draftPickOwnershipChanged": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": { "authorized": false, "status": "not-run" },
+    "hostedChecks": { "authorized": false, "status": "not-run" },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "unchanged",
+      "currentRelease": "7.4.0.6",
+      "currentCommit": "d138e1aa07621222a961bbb83b4a521343c1e162"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required-not-run",
+      "currentMigration": 30,
+      "candidateMigration": 30
+    },
+    "productionDataOperation": {
+      "authorized": false,
+      "status": "not-run"
+    }
+  }
+}

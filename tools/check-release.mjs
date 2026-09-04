@@ -2029,6 +2029,60 @@ if (version === '7.4.0') {
     || Number(evidence.checks?.strictRepositoryGate?.routes) < 1
   ) errors.push('7.4.0 must record non-empty consolidated test and strict repository evidence.');
 }
+if (version === '7.4.0.7') {
+  for (const check of [
+    'reusableMadden27Source',
+    'fgcDraftPickSource',
+    'tenantPrivacy',
+    'ownershipPreservation',
+    'seasonHorizon',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.0.7 evidence is incomplete: ${check}.`);
+  }
+  if (
+    Number(evidence.checks?.reusableMadden27Source?.teamCount) !== 32
+    || Number(evidence.checks?.reusableMadden27Source?.pickCount) !== 672
+    || Number(evidence.checks?.reusableMadden27Source?.ownershipOverrides) !== 58
+    || evidence.checks?.reusableMadden27Source?.mappingSha256 !== '490fb6c83761dd0ed5bae8853578c623fb79733bf28b54a14f60c41c0897b173'
+    || Number(evidence.checks?.fgcDraftPickSource?.pickCount) !== 672
+    || Number(evidence.checks?.fgcDraftPickSource?.differencesFromReusableSource) !== 59
+    || evidence.checks?.fgcDraftPickSource?.mappingSha256 !== '2d7aef1b23d1e3a31c79d04a039858a00a24bc6a09ab2f2866dd7f28ce4cc9ec'
+    || evidence.checks?.fgcDraftPickSource?.correctedFifthRoundVerified !== true
+  ) errors.push('7.4.0.7 must prove both exact 672-pick source mappings and the corrected FGC fifth round.');
+  if (
+    evidence.checks?.tenantPrivacy?.commissionerOnlyPreview !== true
+    || evidence.checks?.tenantPrivacy?.commissionerOnlyApply !== true
+    || evidence.checks?.tenantPrivacy?.fgcTenantBound !== true
+    || evidence.checks?.tenantPrivacy?.fgcAutoApplied !== false
+    || evidence.checks?.ownershipPreservation?.completeHorizonWrites !== 0
+    || evidence.checks?.ownershipPreservation?.approvedTradeOwnershipPreserved !== true
+    || evidence.checks?.ownershipPreservation?.commissionerCorrectionPreserved !== true
+    || evidence.checks?.seasonHorizon?.newClass !== 2030
+    || Number(evidence.checks?.seasonHorizon?.newClassPickCount) !== 224
+  ) errors.push('7.4.0.7 must preserve tenant privacy, audited ownership, and the rolling three-class horizon.');
+  if (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.currentRelease !== '7.4.0.6'
+    || Number(manifest.production?.currentMigration) !== 30
+    || Number(manifest.production?.candidateMigration) !== 30
+    || evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.draftPickBaselineApplied !== false
+    || evidence.scopeBoundaries?.draftPickOwnershipChanged !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+  ) errors.push('7.4.0.7 must remain an unpublished, migration-free, data-unchanged review candidate.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

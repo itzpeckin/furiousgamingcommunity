@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.0.7",
+  "releaseType": "draft-pick-source-and-season-horizon-remediation",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.0.6",
+    "commit": "e0e66cdf3de25182e30b641aed32b99d37ab1853",
+    "tree": "e6d844cd16dbe6cf02d34b2cff4f0a9897aab315",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.0.7",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run"
+  },
+  "staging": { "authorized": false, "deployed": false, "status": "not-run" },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "unchanged",
+    "currentRelease": "7.4.0.6",
+    "currentCommit": "d138e1aa07621222a961bbb83b4a521343c1e162",
+    "currentPagesDeployment": "6092a340-d83e-4454-9eae-4cfeb300b173",
+    "currentWorkerBuild": "b2673ed7-c1bc-4ee3-9b20-94f8cb0d4763",
+    "currentMigration": 30,
+    "candidateMigration": 30
+  },
+  "sourceSheets": {
+    "reusableMadden27": {
+      "mappingSha256": "490fb6c83761dd0ed5bae8853578c623fb79733bf28b54a14f60c41c0897b173",
+      "workbookSha256": "1f34c0ace58c0be07aaf666f6272c69af91f6de08979d0f106bac1ba314b6a7a"
+    },
+    "furiousGamingCommunity": {
+      "mappingSha256": "2d7aef1b23d1e3a31c79d04a039858a00a24bc6a09ab2f2866dd7f28ce4cc9ec",
+      "workbookSha256": "66403da484b8f35e3f4c1ab08624153b0e8ea0dafc558f08e1084007c72440c7"
+    }
+  },
+  "requiredArtifacts": [
+    "functions/_lib/draft-pick-source-data.js",
+    "functions/_lib/draft-pick-baselines.js",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "functions/api/leagues/[leagueSlug]/game-year-transition.js",
+    "tests/trade/draft-pick-sources.test.mjs",
+    "tests/trade/full-trade-center.test.mjs",
+    "tests/import/game-year-transition.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.0.7/release-record.md",
+    "releases/7.4.0.7/validation-evidence.json"
+  ]
+}

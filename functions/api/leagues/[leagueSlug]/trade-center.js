@@ -10,7 +10,11 @@ import {
   normalizeTradeTransfers,
   workflowDecision
 } from '../../../_lib/trade-center.js';
-import { applyVersionedDraftPickBaseline, ensureDraftPickHorizon } from '../../../_lib/draft-pick-baselines.js';
+import {
+  applyVersionedDraftPickBaseline,
+  configuredDraftPickBaseline,
+  ensureDraftPickHorizon
+} from '../../../_lib/draft-pick-baselines.js';
 
 const jsonParse = (value, fallback = null) => {
   try { return JSON.parse(value || 'null') ?? fallback; }
@@ -504,17 +508,31 @@ async function seedPicks(c, body) {
     gameRelease:season.gameRelease,teams:c.teams});
 }
 
+async function configuredPickBaseline(c, body) {
+  if (!isCommissioner(c.session)) throw Object.assign(new Error('Commissioner access is required.'),{status:403});
+  const season=await currentSeason(c.db,c.league.id);
+  if (!season) throw Object.assign(new Error('An active Franchise season is required.'),{status:409});
+  return configuredDraftPickBaseline({gameRelease:season.gameRelease,seasonYear:season.seasonYear,teams:c.teams,
+    sourceKey:cleanText(body.sourceKey,100),leagueSlug:c.league.slug});
+}
+
 async function applyPickBaseline(c, body) {
   if (!isCommissioner(c.session)) throw Object.assign(new Error('Commissioner access is required.'),{status:403});
   const season=await currentSeason(c.db,c.league.id);
   if (!season) throw Object.assign(new Error('An active Franchise season is required.'),{status:409});
+  const configured=body.sourceKey ? await configuredPickBaseline(c,body) : null;
   const result=await applyVersionedDraftPickBaseline(c.db,{leagueId:c.league.id,franchiseSeasonId:season.id,
-    seasonYear:season.seasonYear,gameRelease:season.gameRelease,teams:c.teams,baselineKey:cleanText(body.baselineKey,100),
-    baselineVersion:Number(body.baselineVersion),sourceType:String(body.sourceType||'league-specific'),
-    sourceReference:cleanText(body.sourceReference,500),entries:Array.isArray(body.entries)?body.entries:[]});
+    seasonYear:season.seasonYear,gameRelease:season.gameRelease,teams:c.teams,
+    baselineKey:configured?.sourceKey||cleanText(body.baselineKey,100),
+    baselineVersion:configured?.sourceVersion||Number(body.baselineVersion),
+    sourceType:configured?'imported-sheet':String(body.sourceType||'league-specific'),
+    sourceReference:configured?.sourceReference||cleanText(body.sourceReference,500),
+    contentSha256:configured?.normalizedMappingSha256||cleanText(body.contentSha256,100),
+    entries:configured?.entries||(Array.isArray(body.entries)?body.entries:[])});
   const audit=createTenantAuditContext({request:c.request},c.league,c.session,'draft_pick_baseline_applied');
   await tenantAuditStatement(c.db,audit,{resourceType:'league_draft_pick_baseline',resourceId:result.baselineId,
-    detail:{baselineKey:result.baselineKey,baselineVersion:result.baselineVersion,pickCount:result.expectedPickCount,preservedTradedOwnership:true}}).run();
+    detail:{baselineKey:result.baselineKey,baselineVersion:result.baselineVersion,pickCount:result.expectedPickCount,
+      configuredSource:Boolean(configured),preservedTradedOwnership:true}}).run();
   return result;
 }
 
@@ -597,6 +615,8 @@ export async function onRequestPost(context) {
     else if(action==='save-draft')({tradeId}=await propose(c,body,true));
     else if(action==='settings')await updateSettings(c,body);
     else if(action==='seed-picks')await seedPicks(c,body);
+    else if(action==='preview-pick-baseline')return json({ok:true,release:TRADE_CENTER_RELEASE,
+      action,preview:await configuredPickBaseline(c,body)});
     else if(action==='apply-pick-baseline')await applyPickBaseline(c,body);
     else if(action==='trade-block')await updateBlock(c,body);
     else if(action==='trade-block-needs')await updateTeamNeeds(c,body);

@@ -61,7 +61,9 @@ test('generic draft horizon is tenant-scoped, complete, retry-safe, and ownershi
     const first=await ensureDraftPickHorizon(db,{leagueId:'league-1',franchiseSeasonId:'season-league-1',seasonYear:2026,gameRelease:'Madden NFL 27',teams});
     assert.deepEqual(first.classes,[2027,2028,2029]);
     assert.equal(first.expectedPickCount,42);
-    await ensureDraftPickHorizon(db,{leagueId:'league-1',franchiseSeasonId:'season-league-1',seasonYear:2026,gameRelease:'Madden NFL 27',teams});
+    assert.equal(first.initialized,true);
+    const retry=await ensureDraftPickHorizon(db,{leagueId:'league-1',franchiseSeasonId:'season-league-1',seasonYear:2026,gameRelease:'Madden NFL 27',teams});
+    assert.equal(retry.initialized,false);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks WHERE league_id='league-1'`).get().count,42);
     database.prepare(`UPDATE league_draft_picks SET current_team_key='gb',revision=revision+1 WHERE id='pick:league-1:2027:1:tb'`).run();
     database.prepare(`INSERT INTO draft_pick_ledger_events (id,league_id,draft_pick_id,event_type,from_team_key,to_team_key) VALUES (?,?,?,?,?,?)`).run('trade-event','league-1','pick:league-1:2027:1:tb','trade-approved','tb','gb');
@@ -220,6 +222,10 @@ test('authenticated owners share proposals while commissioner-only controls stay
     });
     const forbidden=await postTradeCenter(context(tokens.tb,'POST',{action:'seed-picks',draftClasses:[2027]}));
     assert.equal(forbidden.status,403);
+    const forbiddenPreview=await postTradeCenter(context(tokens.tb,'POST',{
+      action:'preview-pick-baseline',sourceKey:'fgc-madden-27-opening-ownership'
+    }));
+    assert.equal(forbiddenPreview.status,403);
     const missingAsk=await postTradeCenter(context(tokens.tb,'POST',{action:'trade-block',assetType:'player',assetId:'player-tb',active:true,requestedReturn:''}));
     assert.equal(missingAsk.status,200);
     assert.equal((await missingAsk.clone().json()).listings[0].requestedReturn,'');
@@ -314,7 +320,7 @@ test('authenticated owners share proposals while commissioner-only controls stay
   }finally{database.close()}
 });
 
-test('7.4.0.6 client preserves revision context and provides responsive Trade Block controls',async()=>{
+test('7.4.0.7 client preserves revision context and provides responsive Trade Block controls',async()=>{
   const [client,endpoint,readModel,qualityGate,styles]=await Promise.all([
     readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/trade-center.js',import.meta.url),'utf8'),

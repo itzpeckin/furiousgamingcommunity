@@ -138,11 +138,11 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 190,
+      ".js": 191,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 33,
+      ".mjs": 34,
       ".png": 3,
       ".sql": 32,
       ".txt": 1,
@@ -163,7 +163,7 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 123503,
+        "bytes": 126609,
         "file": "tools/check-release.mjs"
       },
       {
@@ -175,7 +175,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 80561,
+        "bytes": 80829,
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
@@ -187,16 +187,16 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 44293,
+        "bytes": 45354,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
+      },
+      {
+        "bytes": 39029,
+        "file": "tests/import/game-year-transition.test.mjs"
       },
       {
         "bytes": 38943,
         "file": "tests/import/madden-discovery.test.mjs"
-      },
-      {
-        "bytes": 38742,
-        "file": "tests/import/game-year-transition.test.mjs"
       },
       {
         "bytes": 38708,
@@ -215,7 +215,7 @@
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 32973,
+        "bytes": 33283,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
@@ -231,7 +231,7 @@
         "file": "functions/_lib/madden-discovery.js"
       }
     ],
-    "total": 559
+    "total": 561
   },
   "frontend": {
     "assets": [
@@ -1300,12 +1300,13 @@
       "files": [
         "FHQ-6126-index.html",
         "config/tenant-data-contract.json",
+        "functions/_lib/draft-pick-source-data.js",
         "functions/api/leagues/[leagueSlug]/ea-direct/discovery-plan.js",
         "index.html",
         "migrations/legacy/0001_cloud_platform_foundation.sql",
         "migrations/legacy/0001_create_leagues.sql"
       ],
-      "occurrences": 11
+      "occurrences": 12
     },
     "ownerTb": {
       "files": [
@@ -1407,7 +1408,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.0.6",
+  "release": "7.4.0.7",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

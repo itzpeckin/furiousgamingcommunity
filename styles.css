@@ -7049,7 +7049,7 @@ table td{
   .trade-value-explainer>footer{align-items:stretch;flex-direction:column}.trade-value-explainer>footer .button{width:100%}
 }
 
-/* FranchiseHQ 7.4.0.6 — Trade Center acceptance refinements */
+/* FranchiseHQ 7.4.0.7 — Trade Center acceptance refinements */
 .trade-center-page,.trade-builder-page,.trade-detail-page,.trade-block-page,.block-manager-page{max-width:100%;overflow-x:clip}
 .trade-detail-heading{align-items:flex-end;padding:18px 20px;border:1px solid var(--trade-line);border-radius:16px;background:linear-gradient(145deg,#13233a,#0b1726)}
 .trade-detail-heading h1{margin-block:5px 0}.trade-detail-heading p{max-width:780px;margin-bottom:0}
