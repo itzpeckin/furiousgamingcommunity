@@ -1036,9 +1036,10 @@ async function archiveFranchiseSeason(current, gameYear) {
     WHERE pointer.league_id=?`).bind(current.league.id).first();
   if(previous.status==='preview'&&Number(active?.season_year)!==Number(previous.season_year)){
     const teams=await activeLeagueTeams(current.db,current.league.id);
-    await ensureDraftPickHorizon(current.db,{leagueId:current.league.id,franchiseSeasonId:previous.id,
+    const draftPickHorizon=await ensureDraftPickHorizon(current.db,{leagueId:current.league.id,franchiseSeasonId:previous.id,
       seasonYear:previous.season_year,gameRelease:previous.game_release,teams});
-    return{completed:true,alreadyPrepared:true,franchiseSeasonId:previous.id,seasonYear:Number(previous.season_year)};
+    return{completed:true,alreadyPrepared:true,franchiseSeasonId:previous.id,seasonYear:Number(previous.season_year),
+      draftPickHorizon:{classes:draftPickHorizon.classes,expectedPickCount:draftPickHorizon.expectedPickCount}};
   }
   if(!active||Number(active.season_year)!==Number(previous.season_year)){
     return{response:json({ok:false,error:'The live snapshot does not match the franchise season selected for archive.',release:RELEASE},409)};
@@ -1078,10 +1079,11 @@ async function archiveFranchiseSeason(current, gameYear) {
     })
   ]);
   const teams=await activeLeagueTeams(current.db,current.league.id);
-  await ensureDraftPickHorizon(current.db,{leagueId:current.league.id,franchiseSeasonId:newSeasonId,
+  const draftPickHorizon=await ensureDraftPickHorizon(current.db,{leagueId:current.league.id,franchiseSeasonId:newSeasonId,
     seasonYear:next.seasonYear,gameRelease:gameYear.game_release,teams});
   return{completed:true,archivedSeasonId:previous.id,franchiseSeasonId:newSeasonId,
-    seasonYear:next.seasonYear,closureId,frozenTotalsSha256:frozenSha,historyPermanentlyDeleted:false};
+    seasonYear:next.seasonYear,closureId,frozenTotalsSha256:frozenSha,historyPermanentlyDeleted:false,
+    draftPickHorizon:{classes:draftPickHorizon.classes,expectedPickCount:draftPickHorizon.expectedPickCount}};
 }
 
 export async function onRequestGet(context) {

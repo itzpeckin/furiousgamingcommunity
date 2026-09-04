@@ -221,6 +221,7 @@ test('one Archive Season action freezes History Books and prepares the next seas
     assert.equal(response.status,200,JSON.stringify(payload));
     assert.equal(payload.result.completed,true);
     assert.equal(payload.result.historyPermanentlyDeleted,false);
+    assert.deepEqual(payload.result.draftPickHorizon,{classes:[2028,2029,2030],expectedPickCount:21});
     assert.equal(database.prepare(`SELECT status FROM franchise_seasons WHERE id='season-1'`).get().status,'closed');
     const prepared=database.prepare(`SELECT id,source_season_id,season_year,status FROM franchise_seasons
       WHERE league_id='league-1' AND id<>'season-1'`).get();
@@ -241,6 +242,8 @@ test('one Archive Season action freezes History Books and prepares the next seas
     },{users:before.users,memberships:before.memberships,snapshots:before.snapshots,active:before.active});
     assert.equal(database.prepare(`SELECT action FROM tenant_audit_events
       WHERE action='franchise_season.archive_and_prepare'`).get().action,'franchise_season.archive_and_prepare');
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks
+      WHERE league_id='league-1' AND draft_class=2030 AND continuity_key IS NOT NULL`).get().count,7);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
 
     response=await onRequestPost(context({db,token,archives,sources,method:'POST',body:{
@@ -602,6 +605,6 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.doesNotMatch(ui,/data-game-year-season-confirmation/);
   assert.match(ui,/Archive \/ Remove Madden Game Year/);
   assert.match(ui,/Free Agents remain blocked\/unknown/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.4\.0\.6/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.4\.0\.7/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });

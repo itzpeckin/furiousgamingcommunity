@@ -21,7 +21,7 @@ import {
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
 
-const RELEASE = '7.4.0.6';
+const RELEASE = '7.4.0.7';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
