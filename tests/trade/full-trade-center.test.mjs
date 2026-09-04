@@ -241,11 +241,21 @@ test('authenticated owners share proposals while commissioner-only controls stay
     ]}));
     const cancellablePayload=await cancellable.clone().json(),cancellableTradeId=cancellablePayload.tradeId;
     assert.equal(cancellable.status,200,JSON.stringify(cancellablePayload));
-    const recipientCannotCancel=await postTradeCenter(context(tokens.kc,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:1}));
+    const revised=await postTradeCenter(context(tokens.tb,'POST',{action:'counter',tradeId:cancellableTradeId,revision:1,note:'Temporary offer revised',transfers:[
+      {type:'player',assetId:'player-tb-cancel',fromTeamId:'tb',toTeamId:'kc'},
+      {type:'player',assetId:'player-kc-cancel',fromTeamId:'kc',toTeamId:'tb'}
+    ]}));
+    const revisedPayload=await revised.clone().json(),revisedWorkflow=revisedPayload.workflows.find(item=>item.id===cancellableTradeId);
+    assert.equal(revised.status,200,JSON.stringify(revisedPayload));
+    assert.equal(revisedWorkflow.revision,2);
+    assert.equal(revisedWorkflow.note,'Temporary offer revised');
+    assert.equal(revisedWorkflow.participants.find(item=>item.teamKey==='tb')?.acceptedRevision,2);
+    assert.equal(revisedWorkflow.participants.find(item=>item.teamKey==='kc')?.acceptedRevision,null);
+    const recipientCannotCancel=await postTradeCenter(context(tokens.kc,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:2}));
     assert.equal(recipientCannotCancel.status,403);
-    const staleCancellation=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:0}));
+    const staleCancellation=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:1}));
     assert.equal(staleCancellation.status,409);
-    const cancelled=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:1}));
+    const cancelled=await postTradeCenter(context(tokens.tb,'POST',{action:'withdraw',tradeId:cancellableTradeId,revision:2}));
     assert.equal(cancelled.status,200);
     assert.equal((await cancelled.clone().json()).workflows.find(item=>item.id===cancellableTradeId)?.status,'withdrawn');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_workflow_messages WHERE trade_id=? AND event_type='withdrawn'`).get(cancellableTradeId).count,1);
@@ -304,12 +314,13 @@ test('authenticated owners share proposals while commissioner-only controls stay
   }finally{database.close()}
 });
 
-test('7.4.0.5 client uses the premium builder, explainable value controls, and private activity boundaries',async()=>{
-  const [client,endpoint,readModel,qualityGate]=await Promise.all([
+test('7.4.0.6 client preserves revision context and provides responsive Trade Block controls',async()=>{
+  const [client,endpoint,readModel,qualityGate,styles]=await Promise.all([
     readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/trade-center.js',import.meta.url),'utf8'),
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js',import.meta.url),'utf8'),
-    readFile(new URL('../../tools/run-quality.mjs',import.meta.url),'utf8')
+    readFile(new URL('../../tools/run-quality.mjs',import.meta.url),'utf8'),
+    readFile(new URL('../../styles.css',import.meta.url),'utf8')
   ]);
   assert.match(client,/\/trade-center`/);
   assert.match(client,/data-live-submit-trade/);
@@ -319,6 +330,17 @@ test('7.4.0.5 client uses the premium builder, explainable value controls, and p
   assert.match(client,/data-live-open-fairness-value/);
   assert.match(client,/League commissioners control the shared calculator settings/);
   assert.match(client,/data-live-confirm-withdraw/);
+  assert.match(client,/Revise Offer/);
+  assert.match(client,/mayRevise/);
+  assert.match(client,/data-live-builder-grid/);
+  assert.match(client,/data-live-picker-scroll/);
+  assert.match(client,/captureBuilderViewport/);
+  assert.match(client,/restoreBuilderViewport/);
+  assert.match(client,/data-live-request-block-remove/);
+  assert.match(client,/data-live-confirm-block-remove/);
+  assert.match(client,/data-live-block-manager-player/);
+  assert.match(client,/scrollIntoView/);
+  assert.match(client,/trade-detail-asset/);
   assert.match(client,/\['received','Received'\],\['sent','Sent'\],\['drafts','Drafts'\],\['committee','Committee'\],\['approved','Approved'\],\['rejected','Rejected'\],\['history','History'\]/);
   assert.match(client,/Add participating team/);
   assert.match(client,/Multi-Team Fairness/);
@@ -340,5 +362,10 @@ test('7.4.0.5 client uses the premium builder, explainable value controls, and p
   assert.match(endpoint,/Only the team that created this trade may cancel it/);
   assert.match(readModel,/applyRosterOverlays/);
   assert.match(qualityGate,/tests\/trade\/full-trade-center\.test\.mjs/);
+  assert.match(styles,/Trade Center acceptance refinements/);
+  assert.match(styles,/\.trade-detail-asset/);
+  assert.match(styles,/\.trade-confirm-dialog/);
+  assert.match(styles,/@media\(max-width:760px\)/);
+  assert.match(styles,/\.block-add-player-drawer/);
   assert.doesNotMatch(client,/pending madden|madden confirmed|reconciliation status/i);
 });

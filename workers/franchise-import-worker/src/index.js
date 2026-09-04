@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 7.4.0.5 */
+/* FHQ_BUILD: 7.4.0.6 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='7.4.0.5';
+const RELEASE='7.4.0.6';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
