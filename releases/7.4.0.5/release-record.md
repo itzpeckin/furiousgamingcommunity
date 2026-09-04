@@ -1,8 +1,8 @@
 # FranchiseHQ 7.4.0.5 Release Record
 
-**Status:** Validated local review candidate; publication, Main, and Production are not authorized
+**Status:** Production deployed and read-only verified; owner UI acceptance pending
 
-**Production changed:** No. Production remains on FranchiseHQ 7.4.0.4 at migration 30.
+**Production changed:** Yes, within the authorized code-only release boundary. Production now serves exact Main merge `0c372bd` and remains at migration 30.
 
 ## Scope
 
@@ -36,7 +36,9 @@ The focused Trade Center suite passes all 9 tests, including proposer-only cance
 
 ## Deployment status
 
-Not run and not authorized. No migration is required; Production remains on release 7.4.0.4 and schema migration 30.
+Exact candidate `2f57d9a` was published through PR #36 and passed all four pull-request checks. The PR merged to Main as `0c372bd`; all six Main build, quality, Pages, Worker, and deployment checks passed. Cloudflare Pages deployment `ba800e97-49c9-4b49-932f-0a3afff767ee` and Worker build `a24de565-bce9-4bf3-bc48-96c399dfae33` succeeded. Read-only HTTPS verification confirmed the public landing marker and protected league route both report FranchiseHQ 7.4.0.5.
+
+No migration or Production data operation ran. Migration 30, every league-data row, the active snapshot, credentials, memberships, export URL, and blocked/null Free Agent semantics remain unchanged.
 
 ## Rollback
 
@@ -44,4 +46,4 @@ The immutable rollback baseline is exact Main commit `6bfe495e6173c49b1c21dc4eaf
 
 ## Next gate
 
-One consolidated authorization may publish the exact candidate branch, create and validate its pull request, merge to Main after hosted checks pass, deploy the code-only release to Production, and perform read-only signed-in acceptance. No migration or league-data operation is needed.
+Signed-in owner acceptance should verify the horizontal Create Trade flow, value explanations, negotiating-offer cancellation, canonical player cards, Trade Activity, League Trade Block, and mobile behavior. No import, migration, or league-data operation is required for acceptance.

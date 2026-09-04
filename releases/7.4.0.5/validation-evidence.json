@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.0.5",
   "validatedOn": "2026-09-04",
-  "status": "local-validated",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": { "unregisteredFailures": 0 },
@@ -23,12 +23,12 @@
     "strictRepositoryGate": { "passed": true, "status": "passed", "javascriptModules": 223, "inventoryFiles": 559, "routes": 69 }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "draftPickBaselineApplied": false,
     "captureExecuted": false,
@@ -46,10 +46,10 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run" },
-    "hostedChecks": { "authorized": false, "status": "not-run" },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "pullRequest": 36, "candidateCommit": "2f57d9a9fae1782f7fe641b1b59411135ab4475b", "mergeCommit": "0c372bd2a36ff52e491b8b6b84637a0fe1513e03" },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestChecksPassed": 4, "mainChecksPassed": 6 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "productionDeployment": { "authorized": false, "status": "not-run", "currentRelease": "7.4.0.4", "currentCommit": "7d69003eb1ed3fc89fd0530f091e241a105c3e32" },
+    "productionDeployment": { "authorized": true, "status": "deployed-read-only-verified-pending-owner-acceptance", "currentRelease": "7.4.0.5", "mainCommit": "0c372bd2a36ff52e491b8b6b84637a0fe1513e03", "pagesDeployment": "ba800e97-49c9-4b49-932f-0a3afff767ee", "workerBuild": "a24de565-bce9-4bf3-bc48-96c399dfae33", "workerVersion": "b62aae49-d777-4b16-97ef-6cdbf75a76be", "liveReleaseMarker": "7.4.0.5" },
     "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 30, "candidateMigration": 30 },
     "productionDataOperation": { "authorized": false, "status": "not-run" }
   }
