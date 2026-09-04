@@ -8,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '7.4.0.5';
+const RELEASE = '7.4.0.6';
 const INSPECTION_CONCURRENCY = 8;
 
 const RULES = [
