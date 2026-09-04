@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.0.6",
   "validatedOn": "2026-09-04",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": { "unregisteredFailures": 0 },
@@ -21,12 +21,12 @@
     "strictRepositoryGate": { "passed": true, "status": "passed", "javascriptModules": 223, "inventoryFiles": 559, "routes": 69 }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "draftPickBaselineApplied": false,
     "captureExecuted": false,
@@ -44,11 +44,11 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run", "pullRequest": null, "candidateCommit": null, "mergeCommit": null },
-    "hostedChecks": { "authorized": false, "status": "not-run", "pullRequestChecksPassed": 0, "mainChecksPassed": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "pullRequest": 37, "candidateCommit": "598ba5732f6aa54be22ba4408e0f90e7108c6aa6", "mergeCommit": "d138e1aa07621222a961bbb83b4a521343c1e162" },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestChecksPassed": 4, "mainChecksPassed": 6 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "productionDeployment": { "authorized": false, "status": "not-run", "currentRelease": "7.4.0.5", "mainCommit": "0c372bd2a36ff52e491b8b6b84637a0fe1513e03", "pagesDeployment": "ba800e97-49c9-4b49-932f-0a3afff767ee", "workerBuild": "a24de565-bce9-4bf3-bc48-96c399dfae33", "liveReleaseMarker": "7.4.0.5" },
-    "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 30, "candidateMigration": 30 },
+    "productionDeployment": { "authorized": true, "status": "deployed-read-only-verified-pending-owner-acceptance", "currentRelease": "7.4.0.6", "mainCommit": "d138e1aa07621222a961bbb83b4a521343c1e162", "pagesDeployment": "6092a340-d83e-4454-9eae-4cfeb300b173", "workerBuild": "b2673ed7-c1bc-4ee3-9b20-94f8cb0d4763", "workerVersion": "c7745a8b-50e6-4478-9995-22b3c298247a", "liveReleaseMarker": "7.4.0.6" },
+    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 30, "candidateMigration": 30 },
     "productionDataOperation": { "authorized": false, "status": "not-run" }
   }
 }

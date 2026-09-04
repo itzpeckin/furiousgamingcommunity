@@ -1,8 +1,8 @@
 # FranchiseHQ 7.4.0.6 Release Record
 
-**Status:** Locally validated review candidate
+**Status:** Production deployed and read-only verified; owner UI acceptance pending
 
-**Production changed:** No. Production remains FranchiseHQ 7.4.0.5 on migration 30.
+**Production changed:** Yes, within the authorized code-only release boundary. Production now serves exact Main merge `d138e1a` and remains at migration 30.
 
 ## Scope
 
@@ -19,7 +19,7 @@ This code-only remediation completes the requested sent-offer revision path, red
 
 ## Authority and privacy boundaries
 
-Revising or cancelling a negotiation does not move a player or draft pick. Approved Trade Center roster overlays remain presentation-only until Madden Import confirms or overrides player ownership. No import, snapshot operation, pick seed/baseline, league-data mutation, or Production operation was performed. Blocked Madden Free Agents remain unknown/null and are never interpreted as zero.
+Revising or cancelling a negotiation does not move a player or draft pick. Approved Trade Center roster overlays remain presentation-only until Madden Import confirms or overrides player ownership. No import, snapshot operation, pick seed/baseline, migration, or league-data mutation was performed. Blocked Madden Free Agents remain unknown/null and are never interpreted as zero.
 
 ## Known inherited blockers
 
@@ -31,7 +31,9 @@ The focused Trade Center suite passes all 9 tests, including a proposer revision
 
 ## Deployment status
 
-This release is local only on `codex/franchisehq-7.4.0.6`. GitHub publication, a pull request, hosted checks, Main, Cloudflare Pages, the Worker, and Production remain unchanged and require a separate exact-commit authorization.
+Exact candidate `598ba57` was published through PR #37 and passed all four pull-request checks. The PR merged to Main as `d138e1a`; all six Main build, quality, Pages, Worker, and deployment checks passed. Cloudflare Pages deployment `6092a340-d83e-4454-9eae-4cfeb300b173` and Worker build `b2673ed7-c1bc-4ee3-9b20-94f8cb0d4763` succeeded. Read-only authenticated HTTPS verification confirmed the protected league Trade Center reports FranchiseHQ 7.4.0.6 and loads the 7.4.0.6 application and Trade Center assets.
+
+No migration or Production data operation ran. Migration 30, every league-data row, the active snapshot, credentials, memberships, export URL, and blocked/null Free Agent semantics remain unchanged.
 
 ## Rollback
 
@@ -39,4 +41,4 @@ The immutable rollback baseline is exact Main evidence commit `4e39c09f3c45e5bc7
 
 ## Next gate
 
-Authorize publication of the final exact 7.4.0.6 commit, creation of its pull request, hosted checks, merge to Main, and code-only Production deployment. No migration or league-data operation is required.
+Signed-in owner acceptance should verify sent-offer revision, the redesigned opened-proposal assets, stable multi-team selection position, direct Trade Block removal, exact-player notes focus, and portrait-phone behavior. No import, migration, or league-data operation is required for acceptance.
