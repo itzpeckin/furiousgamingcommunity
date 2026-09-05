@@ -13,7 +13,7 @@ import {
 } from "../../../_lib/league-teams.js";
 import { ownershipChangeStatements } from "../../../_lib/ownership-periods.js";
 
-const RELEASE = "7.4.1";
+const RELEASE = "7.4.3";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -113,7 +113,7 @@ function lastAccessActionSql(withAudit) {
   if (withAudit) {
     return `(SELECT a.action FROM league_membership_audit a
        WHERE a.league_id=lm.league_id AND a.subject_user_id=lm.user_id
-         AND a.action IN ('membership_deactivated','membership_restored_pending')
+         AND a.action IN ('membership_deactivated','membership_restored_pending','membership_removed')
        ORDER BY a.created_at DESC, a.rowid DESC LIMIT 1)`;
   }
   return `CASE
@@ -156,9 +156,17 @@ export async function onRequestGet(context) {
     SELECT lm.id, lm.role, lm.team_id AS teamId, lm.active,
            CASE
              WHEN lm.active=1 THEN 'active'
+             WHEN COALESCE(${lastAccessActionSql(includeAudit)}, '')='membership_removed' THEN 'removed'
              WHEN COALESCE(${lastAccessActionSql(includeAudit)}, '')='membership_deactivated' THEN 'disabled'
              ELSE 'pending'
            END AS status,
+           (SELECT MAX(session.last_seen_at) FROM sessions session
+             WHERE session.user_id=lm.user_id AND session.revoked_at IS NULL
+               AND session.expires_at>CURRENT_TIMESTAMP) AS lastSeenAt,
+           CASE WHEN EXISTS (SELECT 1 FROM sessions session
+             WHERE session.user_id=lm.user_id AND session.revoked_at IS NULL
+               AND session.expires_at>CURRENT_TIMESTAMP
+               AND session.last_seen_at>=datetime('now','-5 minutes')) THEN 1 ELSE 0 END AS online,
            lm.created_at AS createdAt, lm.updated_at AS updatedAt,
            u.id AS userId, u.discord_user_id AS discordUserId, u.discord_username AS discordUsername,
            u.discord_global_name AS discordGlobalName, u.display_name AS displayName, u.avatar_url AS avatarUrl
@@ -181,13 +189,14 @@ export async function onRequestGet(context) {
   const teams = await activeLeagueTeams(context.env.DB, league.id);
   const policy = await membershipPolicy(context.env, league);
   const assignments = await activeTeamAssignments(context.env.DB, league.id, teams);
-  const memberships = (rows?.results || []).map(member => {
+  const memberships = (rows?.results || []).filter(member => member.status !== 'removed').map(member => {
     const team = resolveTeam(teams, member.teamId);
     return {
       ...member,
       teamId:team?.teamKey || null,
       teamName:team?.displayName || null,
-      active:Boolean(Number(member.active))
+      active:Boolean(Number(member.active)),
+      online:Boolean(Number(member.online))
     };
   });
   return jsonResponse({
@@ -207,6 +216,31 @@ export async function onRequestPost(context) {
   const parsed = await readJsonObject(context.request);
   if (parsed.response) return parsed.response;
   const body = parsed.body;
+
+  if (body.action === "unassign") {
+    const userId = String(body.userId || "").trim();
+    if (!SAFE_ID.test(userId)) return jsonResponse({ok:false,error:"Valid userId is required."}, 400);
+    const existing = await findMembership(context.env.DB,league.id,userId);
+    if (!existing) return jsonResponse({ok:false,error:"League member not found."}, 404);
+    if (!Number(existing.active)) return jsonResponse({ok:false,error:"Restore this member before changing their team."}, 409);
+    if (!existing.teamId) return jsonResponse({ok:false,error:"That member is not assigned to a team."}, 409);
+    const user = await context.env.DB.prepare(`SELECT display_name FROM users WHERE id=? LIMIT 1`).bind(userId).first();
+    const ownership = await ownershipChangeStatements(context.env.DB,{
+      leagueId:league.id,userId,displayName:user?.display_name || null,nextTeamKey:null,expectedMembershipActive:1
+    });
+    const results = await context.env.DB.batch([
+      context.env.DB.prepare(`UPDATE league_memberships SET team_id=NULL,updated_at=CURRENT_TIMESTAMP
+        WHERE league_id=? AND user_id=? AND active=1 AND team_id IS NOT NULL`).bind(league.id,userId),
+      ...ownership.statements
+    ]);
+    if (Number(results?.[0]?.meta?.changes || 0) !== 1) {
+      return jsonResponse({ok:false,error:"Team assignment changed. Refresh and try again."}, 409);
+    }
+    await audit(context,league,auth.session,userId,"membership_unassigned",{
+      role:existing.role,previousTeamId:existing.teamId
+    });
+    return jsonResponse({ok:true,release:RELEASE,status:"active",teamId:null});
+  }
 
   if (body.action === "restore_pending") {
     const userId = String(body.userId || "").trim();
@@ -320,7 +354,11 @@ export async function onRequestDelete(context) {
 
   const existing = await findMembership(context.env.DB, league.id, userId);
   if (!existing) return jsonResponse({ ok:false, error:"League member not found." }, 404);
-  if (!Number(existing.active)) return jsonResponse({ ok:false, error:"That member is already inactive." }, 409);
+  const remove = parsed.body.action === "remove";
+  if (remove && Number(existing.active) && existing.teamId) {
+    return jsonResponse({ok:false,error:"Remove this member from their team before removing league access."}, 409);
+  }
+  if (!remove && !Number(existing.active)) return jsonResponse({ ok:false, error:"That member is already inactive." }, 409);
   if (existing.role === "commissioner" && await activeCommissionerCount(context.env.DB, league.id) <= 1) {
     return jsonResponse({ ok:false, error:"A league must retain at least one active commissioner." }, 409);
   }
@@ -328,14 +366,17 @@ export async function onRequestDelete(context) {
   const ownership = await ownershipChangeStatements(context.env.DB,{
     leagueId:league.id,userId,displayName:null,nextTeamKey:null,expectedMembershipActive:0
   });
-  const results = await context.env.DB.batch([context.env.DB.prepare(`
+  const results = await context.env.DB.batch([context.env.DB.prepare(remove ? `
+    UPDATE league_memberships SET active=0,team_id=NULL,updated_at=CURRENT_TIMESTAMP
+    WHERE league_id=? AND user_id=?
+  ` : `
     UPDATE league_memberships SET active=0, updated_at=CURRENT_TIMESTAMP
     WHERE league_id=? AND user_id=? AND active=1
   `).bind(league.id, userId),...ownership.statements]);
   if (Number(results?.[0]?.meta?.changes || 0) !== 1) return jsonResponse({ ok:false, error:"Membership state changed. Refresh and try again." }, 409);
-  await audit(context, league, auth.session, userId, "membership_deactivated", {
+  await audit(context, league, auth.session, userId, remove ? "membership_removed" : "membership_deactivated", {
     previousRole:existing.role,
     previousTeamId:existing.teamId || null
   });
-  return jsonResponse({ ok:true, release:RELEASE, changed:1 });
+  return jsonResponse({ ok:true, release:RELEASE, changed:1, removed:remove });
 }

@@ -14,6 +14,11 @@ import {
   onRequestGet as getCommissionerHq,
   onRequestPost as postCommissionerHq
 } from '../../functions/api/leagues/[leagueSlug]/commissioner-hq.js';
+import {
+  onRequestDelete as deleteMembership,
+  onRequestGet as getMemberships,
+  onRequestPost as postMembership
+} from '../../functions/api/leagues/[leagueSlug]/memberships.js';
 
 async function migrationFiles() {
   return (await walkFiles()).filter(file => /^migrations\/\d+_.+\.sql$/.test(file)).sort();
@@ -177,7 +182,8 @@ test('Rules drafts stay private, publishing is explicit, and stale commissioner 
     assert.equal(publication.status,200,JSON.stringify(publicationPayload));
     assert.equal(publicationPayload.workspace.dirty,false);
     assert.equal(publicationPayload.publication.revision,2);
-    assert.deepEqual((await (await getRules(requestContext(db,'owner-token','rules'))).json()).rules,draft);
+    assert.deepEqual((await (await getRules(requestContext(db,'owner-token','rules'))).json()).rules,
+      normalizeRulesDocument(draft));
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM tenant_audit_events
       WHERE league_id='league-command'`).get().count,2);
   } finally {
@@ -223,11 +229,58 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.4.2');
+    assert.equal(overviewPayload.release,'7.4.3');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM league_setting_revisions
       WHERE league_id='league-command' AND revision=2`).get().count,1);
+
+    const quick = await postCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq','POST',{
+      action:'quick-control',key:'calculatorEnabled',enabled:false,revision:2
+    }));
+    const quickPayload = await quick.json();
+    assert.equal(quick.status,200,JSON.stringify(quickPayload));
+    assert.equal(quickPayload.settings.revision,3);
+    assert.equal(quickPayload.quickControls.calculatorEnabled,false);
+    const settingsDocument = JSON.parse(database.prepare(`SELECT settings_json AS settingsJson
+      FROM league_settings WHERE league_id='league-command'`).get().settingsJson);
+    assert.equal(settingsDocument.tradeCenter.calculatorEnabled,false);
+  } finally {
+    database.close();
+  }
+});
+
+test('Teams & Owners unassigns a member before league-scoped removal and preserves the global identity', async () => {
+  const database = new DatabaseSync(':memory:');
+  try {
+    database.exec('PRAGMA foreign_keys=ON');
+    await applyFiles(database, await migrationFiles());
+    seedLeague(database);
+    await seedIdentity(database,{id:'commissioner',role:'commissioner',token:'commissioner-token'});
+    await seedIdentity(database,{id:'owner',role:'team_owner',teamId:'tb',token:'owner-token'});
+    const db = d1(database);
+
+    const unassigned = await postMembership(requestContext(db,'commissioner-token','memberships','POST',{
+      action:'unassign',userId:'owner'
+    }));
+    assert.equal(unassigned.status,200,JSON.stringify(await unassigned.clone().json()));
+    assert.deepEqual({...database.prepare(`SELECT active,team_id AS teamId FROM league_memberships
+      WHERE league_id='league-command' AND user_id='owner'`).get()},{active:1,teamId:null});
+
+    const removed = await deleteMembership(requestContext(db,'commissioner-token','memberships','DELETE',{
+      action:'remove',userId:'owner'
+    }));
+    assert.equal(removed.status,200,JSON.stringify(await removed.clone().json()));
+    assert.equal(database.prepare(`SELECT active FROM league_memberships
+      WHERE league_id='league-command' AND user_id='owner'`).get().active,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM users WHERE id='owner'`).get().count,1);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM league_membership_audit
+      WHERE league_id='league-command' AND subject_user_id='owner'`).get().count,2);
+
+    const listing = await getMemberships(requestContext(db,'commissioner-token','memberships'));
+    const payload = await listing.json();
+    assert.equal(listing.status,200,JSON.stringify(payload));
+    assert.deepEqual(payload.memberships.map(member => member.userId),['commissioner']);
   } finally {
     database.close();
   }
@@ -236,11 +289,20 @@ test('Commissioner HQ shares feature state through one guarded settings revision
 test('Rules input validation rejects empty text and duplicate identifiers', () => {
   assert.throws(() => normalizeRulesDocument({categories:[{
     id:'general',title:'General',sections:[{id:'conduct',title:'Conduct',rules:[{id:'rule-1',text:''}]}]
-  }]}),/Rule text is required/);
+  }]}),/Rule text or an image is required/);
   assert.throws(() => normalizeRulesDocument({categories:[
     {id:'duplicate',title:'One',sections:[]},
     {id:'duplicate',title:'Two',sections:[]}
   ]}),/Duplicate category id/);
+  const rich = normalizeRulesDocument({categories:[{
+    id:'rich',title:'Rich',sections:[{id:'formatting',title:'Formatting',rules:[{
+      id:'styled',title:'Styled',
+      html:'<p><font face="Georgia" size="5" color="#22cc88">League <b>rule</b></font><script>alert(1)</script></p>'
+    }]}]
+  }]});
+  assert.equal(rich.categories[0].sections[0].rules[0].html,
+    '<p><span style="color:#22cc88;font-size:24px;font-family:Georgia">League <strong>rule</strong></span></p>');
+  assert.equal(rich.categories[0].sections[0].rules[0].text,'League rule');
 });
 
 test('Commissioner HQ exposes the complete command shell and phone-safe presentation', async () => {
@@ -252,9 +314,15 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   for (const workspace of ['overview','league-data','teams','controls','rules','audit']) {
     assert.match(ui,new RegExp(`commissionerTabButton\\('${workspace}'`));
   }
-  assert.match(ui,/League control room/);
-  assert.match(ui,/People & Teams/);
+  assert.match(ui,/League operations and the items that genuinely need your attention/);
+  assert.match(ui,/Teams & Owners/);
+  assert.match(ui,/data-commissioner-quick-control="\$\{key\}"/);
+  assert.match(ui,/Enable Confidence Pool/);
+  assert.match(ui,/data-unassign-league-member/);
+  assert.match(ui,/data-remove-league-member/);
   assert.match(ui,/Rules Studio/);
+  assert.match(ui,/data-rule-richtext/);
+  assert.match(ui,/data-rule-media-upload/);
   assert.match(ui,/Audit & Revisions/);
   assert.match(ui,/window\.FranchiseHQ\?\.currentSeasonContext/);
   assert.match(styles,/@media\(max-width:760px\)/);
@@ -262,4 +330,9 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(styles,/\.commissioner-feature-grid\{grid-template-columns:1fr\}/);
   assert.match(app,/function applyLeagueFeaturePresentation\(\)/);
   assert.match(app,/A league commissioner has turned this feature off/);
+  const rulesMedia = await readFile(path.join(ROOT,'functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js'),'utf8');
+  assert.match(rulesMedia,/requireActiveMembership/);
+  assert.match(rulesMedia,/requireCommissioner/);
+  assert.match(rulesMedia,/documentReferencesMedia/);
+  assert.match(rulesMedia,/cache-control':'private, max-age=300/);
 });

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.3",
+  "releaseType": "commissioner-operations-and-competition",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.2",
+    "commit": "cbd028031a2984049264363b3baf96bf91f9b729",
+    "tree": "7f5ff90a057bf5c8d0f97a572129a0d588534d0e",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.3",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run"
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.4.2",
+    "currentCommit": "cbd028031a2984049264363b3baf96bf91f9b729",
+    "currentMigration": 32,
+    "candidateMigration": 33
+  },
+  "requiredArtifacts": [
+    "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
+    "functions/api/leagues/[leagueSlug]/competition.js",
+    "functions/api/leagues/[leagueSlug]/memberships.js",
+    "functions/api/leagues/[leagueSlug]/rules.js",
+    "functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js",
+    "league-engine/competition.js",
+    "migrations/0033_commissioner_operations.sql",
+    "tests/commissioner/commissioner-hq.test.mjs",
+    "tests/commissioner/competition.test.mjs",
+    "trade-module.js",
+    "styles.css",
+    "docs/ROADMAP.md",
+    "releases/7.4.3/release-record.md",
+    "releases/7.4.3/validation-evidence.json"
+  ]
+}

@@ -593,7 +593,8 @@ test('commissioner live import activates only its validated candidate and never 
     assert.match(source,/activationPerformed:true/);
   }
   assert.doesNotMatch(ui,/Create Private Destination/);
-  assert.match(ui,/One-Click Live Import/);
+  assert.match(ui,/Import Latest Export/);
+  assert.match(ui,/CURRENT STEP/);
   assert.match(ui,/Atomic safety/);
   assert.match(ui,/Import Latest Export/);
   assert.match(ui,/Latest Export Live/);

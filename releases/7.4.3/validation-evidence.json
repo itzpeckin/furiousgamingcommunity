@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.3",
+  "validatedOn": "2026-09-05",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "commissionerCommandCenter": {
+      "passed": true,
+      "priorityCountsExcludeRevokedMembers": true,
+      "assignmentMismatchExplained": true,
+      "fastAccessRemoved": true,
+      "leagueAuthorityRemoved": true,
+      "recentLeagueActivityRetained": true,
+      "operationalToggles": ["enforce_trade_limit", "allow_free_trades", "trade_calculator", "confidence_pool"]
+    },
+    "leagueDataExperience": {
+      "passed": true,
+      "horizontalImportProgress": true,
+      "latestReadyPanelRemoved": true,
+      "currentDataSourcePanelRemoved": true,
+      "safeSourceModes": ["none", "demo", "madden"],
+      "sourceSwitchDeletesData": false,
+      "archiveSeasonOnlyVisibleTransition": true
+    },
+    "membershipLifecycle": {
+      "passed": true,
+      "onlinePresenceFromRecentSession": true,
+      "unassignTeamSupported": true,
+      "removeFromLeagueSupported": true,
+      "globalUserIdentityPreserved": true,
+      "commissionerOnlyMutations": true,
+      "tenantAudited": true
+    },
+    "sharedCompetition": {
+      "passed": true,
+      "scheduleBackedGameOfTheWeek": true,
+      "sharedConfidencePool": true,
+      "ownerPicks": true,
+      "commissionerWindowsAndLocks": true,
+      "scoringAndLeaderboard": true,
+      "tenantAudited": true,
+      "deviceLocalAuthorityRemoved": true
+    },
+    "rulesStudio": {
+      "passed": true,
+      "safeRichFormatting": true,
+      "customCategories": true,
+      "privateLeagueMedia": true,
+      "arbitraryMarkupRemoved": true,
+      "explicitDraftSave": true,
+      "explicitPublication": true,
+      "existingPublicationHistoryPreserved": true
+    },
+    "responsiveExperience": {
+      "passed": true,
+      "desktop": true,
+      "portraitPhone": true,
+      "sectionOverlap": false,
+      "pageHorizontalOverflow": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 33,
+      "requiredTables": 105,
+      "foreignKeyViolations": 0,
+      "productionApplied": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 169,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "status": "passed",
+      "javascriptModules": 234,
+      "inventoryFiles": 573,
+      "routes": 72
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "stagingDeployment": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "not-run",
+      "currentRelease": "7.4.2"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-run",
+      "currentMigration": 32,
+      "candidateMigration": 33,
+      "migrationSha256": "3d46a7c93d18162ac98ad0d752e03ab3e8ab56f5cd5c95794ff7681118819e3a"
+    }
+  }
+}

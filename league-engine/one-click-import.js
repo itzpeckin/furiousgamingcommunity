@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.4.1 */
+/* FHQ_BUILD: 7.4.3 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.4.1';
+  const VERSION = '7.4.3';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -439,8 +439,13 @@
       :live?'Latest Export Live'
         :run?.status==='failed'?'Retry Candidate Import'
           :'Import Latest Export';
+    const activePhase=run?.currentPhase||(!source?'analyze-source':live?'preview-ready':'analyze-source');
+    const activePhaseIndex=Math.max(0,PHASES.findIndex(([id])=>id===activePhase));
+    const segment=100/PHASES.length,overall=Number(run?.progress||0);
+    const activeItem=run?.phaseState?.[activePhase];
+    const phaseProgress=live||activeItem?.status==='complete'?100:Math.max(0,Math.min(99,Math.round((overall-activePhaseIndex*segment)/segment*100)));
     return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
-      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Commissioner-operated Madden importer</span><h3>One-Click Live Import</h3><p>Analyze, map, validate, and atomically publish the newest eligible export with one action.</p></div><span class="pill pill--${live?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(live?'Live':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
+      <div class="card-header commissioner-import-header"><div><span class="eyebrow">Madden Companion import</span><h3>Import Latest Export</h3><p>Analyze, map, validate, and make the newest eligible export live with one action.</p></div><span class="pill pill--${live?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(live?'Live':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
       <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
       <div class="commissioner-import-summary">
@@ -454,7 +459,7 @@
         <div><small>Free Agents</small><strong>${esc(faCount)}</strong></div>
         <div><small>Wall time</small><strong>${durationLabel(run?.durationMs)}</strong></div>
       </div>
-      <div class="commissioner-import-progress-block"><div class="commissioner-import-progress-head"><span>${esc(notice||'Candidate workflow')}</span><strong>${Number(run?.progress||0)}%</strong></div><div class="commissioner-import-progress-track"><span style="width:${Number(run?.progress||0)}%"></span></div><ol class="commissioner-import-phase-list">${phaseRows()}</ol></div>
+      <div class="commissioner-import-progress-block commissioner-import-progress-block--modern"><div class="commissioner-import-progress-head"><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" aria-label="${esc(phaseLabel(activePhase))} ${phaseProgress}% complete"><span style="width:${phaseProgress}%"></span></div><p>${esc(notice||'Ready when the next Madden export arrives.')}</p><ol class="commissioner-import-phase-list">${phaseRows()}</ol></div>
       ${actionableSourceWarnings.length?`<details class="commissioner-import-source-notes"><summary>${actionableSourceWarnings.length} source note${actionableSourceWarnings.length===1?'':'s'}</summary><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
       ${lastOutcome?.tone==='error'?`<section class="commissioner-import-recovery" role="alert"><div><span class="eyebrow">${esc(lastOutcome.phase)}</span><h4>${esc(lastOutcome.title)}</h4><p>${esc(lastOutcome.summary)}</p><p><strong>What to do:</strong> ${esc(lastOutcome.action)}</p><small>Your current league data is still live.</small></div><details><summary>Technical details</summary><p>${esc(lastOutcome.detail)}</p><code>Support code: ${esc(lastOutcome.supportCode)}</code></details></section>`:''}
       ${sub60?`<div class="league-import-framework-note"><svg><use href="#icon-check"></use></svg><span><strong>Performance target met:</strong> ${esc(durationLabel(run.durationMs))}, under 60 seconds.</span></div>`:''}

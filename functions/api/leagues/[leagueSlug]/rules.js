@@ -9,13 +9,81 @@ import {
 } from "../../../_lib/cloud-platform.js";
 import { createTenantAuditContext, tenantAuditStatement } from "../../../_lib/tenant-context.js";
 
-const RELEASE = "7.4.2";
+const RELEASE = "7.4.3";
 const EMPTY_RULES = Object.freeze({ categories: [] });
 const MAX_DOCUMENT_BYTES = 256 * 1024;
 const MAX_CATEGORIES = 50;
 const MAX_SECTIONS_PER_CATEGORY = 50;
 const MAX_RULES_PER_SECTION = 100;
 const MAX_TEXT_LENGTH = 10_000;
+const MAX_MEDIA_PER_RULE = 12;
+const SAFE_MEDIA_ID = /^rule_media_[A-Za-z0-9-]{1,96}$/;
+
+const ALLOWED_RICH_TAGS = new Set(['strong','b','em','i','u','ul','ol','li','p','br','span']);
+const ALLOWED_FONTS = new Map([
+  ['inter','Inter'],['arial','Arial'],['georgia','Georgia'],
+  ['times new roman','Times New Roman'],['courier new','Courier New']
+]);
+const FONT_SIZE_MAP = new Map([
+  ['1','12px'],['2','14px'],['3','16px'],['4','18px'],['5','24px'],['6','28px'],['7','32px']
+]);
+
+function safeColor(value) {
+  const color = String(value || '').trim().toLowerCase();
+  return /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/.test(color) ? color : null;
+}
+
+function richSpanStyle(tag) {
+  const styles = [];
+  const style = String(tag.match(/\bstyle\s*=\s*(["'])(.*?)\1/i)?.[2] || '');
+  const color = safeColor(style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)?.[1]);
+  const size = String(style.match(/(?:^|;)\s*font-size\s*:\s*([^;]+)/i)?.[1] || '').trim().toLowerCase();
+  const family = String(style.match(/(?:^|;)\s*font-family\s*:\s*([^;]+)/i)?.[1] || '')
+    .replace(/["']/g,'').split(',')[0].trim().toLowerCase();
+  if (color) styles.push(`color:${color}`);
+  if (/^(?:12|14|16|18|20|24|28|32)px$/.test(size)) styles.push(`font-size:${size}`);
+  if (ALLOWED_FONTS.has(family)) styles.push(`font-family:${ALLOWED_FONTS.get(family)}`);
+  return styles.length ? ` style="${styles.join(';')}"` : '';
+}
+
+function richFontStyle(tag) {
+  const styles = [];
+  const color = safeColor(tag.match(/\bcolor\s*=\s*(["'])(.*?)\1/i)?.[2]);
+  const face = String(tag.match(/\bface\s*=\s*(["'])(.*?)\1/i)?.[2] || '')
+    .split(',')[0].trim().toLowerCase();
+  const size = FONT_SIZE_MAP.get(String(tag.match(/\bsize\s*=\s*(["']?)([1-7])\1/i)?.[2] || ''));
+  if (color) styles.push(`color:${color}`);
+  if (size) styles.push(`font-size:${size}`);
+  if (ALLOWED_FONTS.has(face)) styles.push(`font-family:${ALLOWED_FONTS.get(face)}`);
+  return styles.length ? ` style="${styles.join(';')}"` : '';
+}
+
+export function sanitizeRichTextHtml(value) {
+  const source = String(value || '').slice(0, MAX_TEXT_LENGTH * 3)
+    .replace(/<!--[\s\S]*?-->/g,'')
+    .replace(/<(script|style|iframe|object|embed|svg|math)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,'');
+  return source.replace(/<[^>]*>/g, rawTag => {
+    const match = rawTag.match(/^<\s*(\/?)\s*([a-z0-9]+)\b/i);
+    if (!match) return '';
+    const closing = Boolean(match[1]);
+    let name = match[2].toLowerCase();
+    if (name === 'div') name = 'p';
+    if (name === 'font') return closing ? '</span>' : `<span${richFontStyle(rawTag)}>`;
+    if (!ALLOWED_RICH_TAGS.has(name)) return '';
+    if (name === 'b') name = 'strong';
+    if (name === 'i') name = 'em';
+    if (name === 'br') return '<br>';
+    if (closing) return `</${name}>`;
+    return name === 'span' ? `<span${richSpanStyle(rawTag)}>` : `<${name}>`;
+  }).trim();
+}
+
+function plainTextFromHtml(value) {
+  return String(value || '').replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>/gi,'\n')
+    .replace(/<[^>]*>/g,'').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&')
+    .replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/&quot;/gi,'"')
+    .replace(/&#39;/gi,"'").trim();
+}
 
 function notFound() {
   return jsonResponse({ ok: false, error: "Not found." }, 404);
@@ -67,10 +135,20 @@ function normalizeRulesDocument(body) {
         const ruleId = cleanText(rule.id || `${sectionId}-rule-${ruleIndex + 1}`, "Rule id", { required: true, max: 100 });
         if (ruleIds.has(ruleId)) throw new Error(`Duplicate rule id: ${ruleId}.`);
         ruleIds.add(ruleId);
+        const html = sanitizeRichTextHtml(rule.html || '');
+        const media = (Array.isArray(rule.media) ? rule.media : []).slice(0, MAX_MEDIA_PER_RULE).map((item, mediaIndex) => {
+          const mediaId = cleanText(item?.id || item?.mediaId, `Rule media ${mediaIndex + 1}`, {required:true,max:120});
+          if (!SAFE_MEDIA_ID.test(mediaId)) throw new Error(`Rule media ${mediaIndex + 1} is invalid.`);
+          return {id:mediaId,altText:cleanText(item?.altText, 'Image description', {max:300})};
+        });
+        const text = cleanText(rule.text ?? rule.description ?? plainTextFromHtml(html), "Rule text");
+        if (!text && !html && !media.length) throw new Error('Rule text or an image is required.');
         return {
           id: ruleId,
           title: cleanText(rule.title, "Rule title", { max: 200 }),
-          text: cleanText(rule.text ?? rule.description, "Rule text", { required: true })
+          text,
+          html,
+          media
         };
       });
       return {
@@ -94,6 +172,18 @@ function normalizeRulesDocument(body) {
 }
 
 export { normalizeRulesDocument };
+
+async function verifyRulesMedia(db, leagueId, rules) {
+  const requested = [...new Set(rules.categories.flatMap(category => category.sections)
+    .flatMap(section => section.rules).flatMap(rule => rule.media || []).map(item => item.id))];
+  if (!requested.length) return;
+  const placeholders = requested.map(() => '?').join(',');
+  const result = await db.prepare(`SELECT id FROM league_rule_media
+    WHERE league_id=? AND deleted_at IS NULL AND id IN (${placeholders})`)
+    .bind(leagueId,...requested).all();
+  const found = new Set((result?.results || []).map(row => row.id));
+  if (requested.some(id => !found.has(id))) throw new Error('One or more Rules images are unavailable for this league.');
+}
 
 async function authorizedLeague(context, authorization) {
   const league = await resolveLeague(context.env, canonicalLeagueSlug(context.params?.leagueSlug));
@@ -159,6 +249,8 @@ export async function onRequestPut(context) {
   let rules;
   try { rules = normalizeRulesDocument(body.rules || body); }
   catch (error) { return jsonResponse({ ok: false, error: error.message }, 400); }
+  try { await verifyRulesMedia(context.env.DB, league.id, rules); }
+  catch (error) { return jsonResponse({ok:false,error:error.message}, 400); }
   const workspace = await context.env.DB.prepare(`SELECT revision,
       base_publication_revision AS basePublicationRevision
     FROM league_rules_workspaces WHERE league_id=? LIMIT 1`).bind(league.id).first();

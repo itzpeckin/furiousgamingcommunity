@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.3.5.1 */
+/* FHQ_BUILD: 7.4.3 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.3.5.1';
+  const VERSION = '7.4.3';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -169,8 +169,16 @@
     </section>`;
   }
 
+  function renderArchivePanel() {
+    if (!state) return `<section class="commissioner-archive-card" data-game-year-transition-panel data-game-year-archive-panel><div><span class="eyebrow">Season history</span><h2>Archive Season</h2><p>Loading the active franchise season…</p></div><button class="button button--primary" disabled>Loading…</button></section>`;
+    const gameYear=state.gameYear;
+    const activeSeason=state.franchiseSeasons?.find(season=>['active','preview'].includes(season.status))||state.franchiseSeasons?.[0];
+    if(!gameYear)return `<section class="commissioner-archive-card" data-game-year-transition-panel data-game-year-archive-panel><div><span class="eyebrow">Season history</span><h2>Archive Season</h2><p>Create an active Madden franchise season before archiving.</p></div><button class="button button--primary" disabled>Unavailable</button></section>`;
+    return `<section class="commissioner-archive-card" data-game-year-transition-panel data-game-year-archive-panel><div class="commissioner-archive-card__icon"><svg><use href="#icon-trophy"></use></svg></div><div><span class="eyebrow">History Books</span><h2>Archive Season</h2><p>Freeze ${esc(activeSeason?.displayName||'the completed franchise season')} into league history and prepare the next season in one protected action.</p>${errorMessage?`<small class="is-error">${esc(errorMessage)}</small>`:notice?`<small>${esc(notice)}</small>`:''}</div><button class="button button--primary" data-game-year-archive-season ${busy?'disabled':''}>${busy?'Archiving…':'Archive Season'}</button></section>`;
+  }
+
   function rerender() {
-    document.querySelectorAll('[data-game-year-transition-panel]').forEach(node=>{node.outerHTML=renderPanel();});
+    document.querySelectorAll('[data-game-year-transition-panel]').forEach(node=>{node.outerHTML=node.hasAttribute('data-game-year-archive-panel')?renderArchivePanel():renderPanel();});
   }
 
   document.addEventListener('input',event=>{
@@ -194,7 +202,7 @@
   });
 
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before game-year-transition.js.');
-  HQ.defineModuleService('platform','gameYearTransition',{refresh,renderPanel,diagnostics:()=>({release:VERSION,busy,state,error:errorMessage})},{replace:true,alias:'gameYearTransition'});
+  HQ.defineModuleService('platform','gameYearTransition',{refresh,renderPanel,renderArchivePanel,diagnostics:()=>({release:VERSION,busy,state,error:errorMessage})},{replace:true,alias:'gameYearTransition'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'game-year-transition',service:'gameYearTransition',script:'league-engine/game-year-transition.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['game-year-boundary','one-click-franchise-season-archive','immutable-history','recovery-bookmark','no-free-agent-zero-default']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();
