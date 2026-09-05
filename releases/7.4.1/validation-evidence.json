@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.1",
   "validatedOn": "2026-09-04",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -75,7 +75,7 @@
       "migrationVersion": 31,
       "requiredTables": 97,
       "foreignKeyViolations": 0,
-      "productionApplied": false
+      "productionApplied": true
     },
     "automatedTests": {
       "passed": true,
@@ -89,16 +89,50 @@
       "javascriptModules": 228,
       "inventoryFiles": 565,
       "routes": 69
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "publicLandingRelease": "7.4.1",
+      "tradeCenterAssetRelease": "7.4.1",
+      "publicTenantApiHealthy": true,
+      "signedOutTenantApiStatus": 401,
+      "readOnly": true
+    },
+    "productionProtectedState": {
+      "passed": true,
+      "leaguesBefore": 1,
+      "leaguesAfter": 1,
+      "usersBefore": 28,
+      "usersAfter": 28,
+      "membershipsBefore": 28,
+      "membershipsAfter": 28,
+      "activeTeamAssignmentsBefore": 27,
+      "activeTeamAssignmentsAfter": 27,
+      "teamsBefore": 0,
+      "teamsAfter": 0,
+      "playersBefore": 0,
+      "playersAfter": 0,
+      "snapshotsBefore": 0,
+      "snapshotsAfter": 0,
+      "activeSnapshotsBefore": 1,
+      "activeSnapshotsAfter": 1,
+      "activeSnapshotBefore": "ee1d3679-563d-4e6a-a2ef-4eb44b91af24",
+      "activeSnapshotAfter": "ee1d3679-563d-4e6a-a2ef-4eb44b91af24",
+      "draftPicksBefore": 672,
+      "draftPicksAfter": 672,
+      "draftPickLedgerEventsBefore": 1344,
+      "draftPickLedgerEventsAfter": 1344,
+      "foreignKeyViolations": 0
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
-    "migrationApplied": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
+    "migrationApplied": true,
     "draftPickBaselineApplied": false,
     "draftPickOwnershipChanged": false,
     "captureExecuted": false,
@@ -116,10 +150,34 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": { "authorized": false, "status": "not-run", "pullRequest": null, "candidateCommit": null },
-    "hostedChecks": { "authorized": false, "status": "not-run", "pullRequestChecksPassed": 0, "mainChecksPassed": 0 },
+    "githubPublication": { "authorized": true, "status": "published-main-accepted", "pullRequest": 40, "candidateCommit": "555fab9f5ae002c26baddb6fe98bce174e6437c5", "mergeCommit": "9903a969dd224d76b001c6272234b1967090e603" },
+    "hostedChecks": { "authorized": true, "status": "passed", "pullRequestChecksPassed": 4, "mainChecksPassed": 6 },
     "stagingDeployment": { "authorized": false, "status": "not-run" },
-    "productionDeployment": { "authorized": false, "status": "not-run", "currentRelease": "7.4.0.8" },
-    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 30, "candidateMigration": 31 }
+    "productionDeployment": {
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-owner-acceptance",
+      "currentRelease": "7.4.1",
+      "mainCommit": "9903a969dd224d76b001c6272234b1967090e603",
+      "pagesDeployment": "a8087a3a-80da-4ea7-a7d7-9240a68923ef",
+      "workerBuild": "b87f1bb1-71cc-4695-af0c-c3fe1415223f",
+      "workerVersion": "326ee7ef-55b2-4041-8eb2-db4ee9358bd0",
+      "liveReleaseMarker": "7.4.1"
+    },
+    "productionMigration": {
+      "authorized": true,
+      "status": "applied-and-verified",
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "previousMigration": 30,
+      "currentMigration": 31,
+      "candidateMigration": 31,
+      "preMigrationBookmark": "000000f8-00000148-000050dd-22fb74dae910207e3c250ee20d092278",
+      "postMigrationBookmark": "000000f8-00000154-000050dd-c04ac9c04cbc6114062ce08ee77f860a",
+      "transactionHistoryRows": 0,
+      "transactionCorrectionRows": 0,
+      "foreignKeyViolations": 0,
+      "protectedCountsBefore": { "leagues": 1, "users": 28, "memberships": 28, "activeTeamAssignments": 27, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1 },
+      "protectedCountsAfter": { "leagues": 1, "users": 28, "memberships": 28, "activeTeamAssignments": 27, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1 }
+    }
   }
 }

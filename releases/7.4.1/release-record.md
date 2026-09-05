@@ -1,8 +1,8 @@
 # FranchiseHQ 7.4.1 Release Record
 
-**Status:** Locally validated review candidate; publication, migration, Main, and Production are not authorized
+**Status:** Production deployed and read-only verified; signed-in owner acceptance pending
 
-**Production changed:** No. Production remains FranchiseHQ 7.4.0.8 on migration 30.
+**Production changed:** Yes. Exact candidate `555fab9f5ae002c26baddb6fe98bce174e6437c5` is merged to Main as `9903a969dd224d76b001c6272234b1967090e603`, Production serves FranchiseHQ 7.4.1, and additive migration 31 is verified.
 
 ## Scope
 
@@ -29,7 +29,11 @@ The strict repository gate passes 228 JavaScript modules, 565 inventoried files,
 
 ## Deployment status
 
-Not authorized and not run. The release branch remains local. Migration 31 has not been applied anywhere outside disposable test databases, no pull request exists, Git Main remains unchanged, and Production remains on 7.4.0.8/migration 30.
+Published through [PR #40](https://github.com/itzpeckin/furiousgamingcommunity/pull/40) after all four candidate checks passed. Before the schema change, Production D1 target `franchise-hq-db-madden27` (`b2529150-28af-42ca-a07b-69506764ccb6`) was confirmed and Time Travel bookmark `000000f8-00000148-000050dd-22fb74dae910207e3c250ee20d092278` was recorded. Additive migration 31 then created `league_transaction_history` and `canonical_transaction_corrections`; the ledger, both table contracts, required foreign keys, protected counts, active snapshot, 672 draft picks, 1,344 pick-ledger events, and blocked Free Agent state were verified. `PRAGMA foreign_key_check` returned no violations. Post-migration bookmark `000000f8-00000154-000050dd-c04ac9c04cbc6114062ce08ee77f860a` is retained.
+
+PR #40 merged to Main as `9903a969dd224d76b001c6272234b1967090e603`. All six Main checks passed, including the repository quality gate, Pages, and Worker builds. Production Pages deployment `a8087a3a-80da-4ea7-a7d7-9240a68923ef`, Worker build `b87f1bb1-71cc-4695-af0c-c3fe1415223f`, and Worker version `326ee7ef-55b2-4041-8eb2-db4ee9358bd0` are live. Read-only HTTPS acceptance found the 7.4.1 public marker and Trade Center asset, while the signed-out tenant Transactions endpoint correctly returned `401 Authentication required`.
+
+No import, active-snapshot change, reset, deletion, Archive Season, edition transition, export-URL rotation, credential/membership change, or draft-pick ownership operation ran. Free Agents remain explicitly blocked/unknown and were not interpreted as zero.
 
 ## Rollback
 
@@ -37,4 +41,4 @@ The immutable rollback baseline is exact commit `ffcb61145b4d5a5e68a6d371ebef588
 
 ## Next gate
 
-Finish the consolidated local gate and create one exact local candidate commit. Publication, pull request, Production migration 31, merge to Main, Production deployment, and read-only acceptance each remain unexecuted until the owner authorizes that exact candidate.
+The owner can perform signed-in acceptance of the Transactions experience, projected draft-slot labels, full-width Trade Review asset rows, and commissioner correction controls. No data-changing acceptance action is required.
