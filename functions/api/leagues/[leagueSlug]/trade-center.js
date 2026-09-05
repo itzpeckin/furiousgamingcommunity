@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, canonicalTeamKey, resolveTeam, publicLeagueTeams } from '../../../_lib/league-teams.js';
-import { createTenantAuditContext, tenantAuditStatement } from '../../../_lib/tenant-context.js';
+import { createTenantAuditContext, tenantAuditStatement, tenantFeatureEnabled } from '../../../_lib/tenant-context.js';
 import {
   TRADE_CENTER_RELEASE,
   normalizeTradeCenterSettings,
@@ -48,6 +48,10 @@ async function requestContext(context) {
     membership:{...authorization.session.membership,teamKey:assignedTeam?.teamKey||canonicalTeamKey(storedTeamId)}
   };
   return {db, league, teams, session};
+}
+
+function featureAvailable(league, featureKey) {
+  return !Object.hasOwn(league?.features || {}, featureKey) || tenantFeatureEnabled(league, featureKey);
 }
 
 async function currentSeason(db, leagueId) {
@@ -632,6 +636,9 @@ async function updateTeamNeeds(c, body) {
 export async function onRequestGet(context) {
   try {
     const c=await requestContext(context); if(c.response)return c.response;
+    if(!featureAvailable(c.league,'trade_center')&&!featureAvailable(c.league,'trade_block')) {
+      return json({ok:false,release:TRADE_CENTER_RELEASE,error:'Trade features are disabled for this league.'},403);
+    }
     return json(await publicState(c));
   } catch (error) {
     return json({ok:false,release:TRADE_CENTER_RELEASE,error:error?.message||'Trade Center could not be loaded.'},Number(error?.status)||500);
@@ -643,6 +650,9 @@ export async function onRequestPost(context) {
     const c=await requestContext(context); if(c.response)return c.response;
     let body={}; try{body=await context.request.json()}catch{throw Object.assign(new Error('Request body must be valid JSON.'),{status:400})}
     const action=cleanText(body.action,50);
+    const blockAction=action==='trade-block'||action==='trade-block-needs';
+    if(blockAction&&!featureAvailable(c.league,'trade_block'))throw Object.assign(new Error('Trade Block is disabled for this league.'),{status:403});
+    if(!blockAction&&action!=='notifications-read'&&!featureAvailable(c.league,'trade_center'))throw Object.assign(new Error('Trade Center is disabled for this league.'),{status:403});
     let tradeId=cleanText(body.tradeId,100);
     if(action==='propose')({tradeId}=await propose(c,body,false));
     else if(action==='save-draft')({tradeId}=await propose(c,body,true));

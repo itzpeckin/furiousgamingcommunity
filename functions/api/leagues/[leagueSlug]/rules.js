@@ -9,7 +9,7 @@ import {
 } from "../../../_lib/cloud-platform.js";
 import { createTenantAuditContext, tenantAuditStatement } from "../../../_lib/tenant-context.js";
 
-const RELEASE = "7.3.0";
+const RELEASE = "7.4.2";
 const EMPTY_RULES = Object.freeze({ categories: [] });
 const MAX_DOCUMENT_BYTES = 256 * 1024;
 const MAX_CATEGORIES = 50;
@@ -114,7 +114,34 @@ export async function onRequestGet(context) {
   `).bind(league.id).first();
   let rules = EMPTY_RULES;
   try { if (row?.rulesJson) rules = JSON.parse(row.rulesJson); } catch {}
-  return jsonResponse({ ok: true, release: RELEASE, league, rules, updatedAt: row?.updatedAt || null });
+  const commissioner = authorization.session.membership?.role === 'commissioner';
+  if (!commissioner) {
+    return jsonResponse({ ok:true, release:RELEASE, league, rules, updatedAt:row?.updatedAt || null });
+  }
+  const [workspace, publication] = await Promise.all([
+    context.env.DB.prepare(`SELECT revision,base_publication_revision AS basePublicationRevision,
+        draft_rules_json AS draftRulesJson,updated_at AS updatedAt
+      FROM league_rules_workspaces WHERE league_id=? LIMIT 1`).bind(league.id).first(),
+    context.env.DB.prepare(`SELECT publication_revision AS publicationRevision,created_at AS publishedAt
+      FROM league_rule_publications WHERE league_id=?
+      ORDER BY publication_revision DESC LIMIT 1`).bind(league.id).first()
+  ]);
+  let draft = rules;
+  try { if (workspace?.draftRulesJson) draft = JSON.parse(workspace.draftRulesJson); } catch {}
+  return jsonResponse({
+    ok:true,release:RELEASE,league,rules,updatedAt:row?.updatedAt || null,
+    workspace:{
+      draft,
+      revision:Number(workspace?.revision || 0),
+      basePublicationRevision:Number(workspace?.basePublicationRevision || 0),
+      updatedAt:workspace?.updatedAt || null,
+      dirty:JSON.stringify(draft) !== JSON.stringify(rules)
+    },
+    publication:{
+      revision:Number(publication?.publicationRevision || 0),
+      publishedAt:publication?.publishedAt || row?.updatedAt || null
+    }
+  });
 }
 
 export async function onRequestPut(context) {
@@ -130,19 +157,93 @@ export async function onRequestPut(context) {
   try { body = await context.request.json(); }
   catch { return jsonResponse({ ok: false, error: "Request body must be valid JSON." }, 400); }
   let rules;
-  try { rules = normalizeRulesDocument(body); }
+  try { rules = normalizeRulesDocument(body.rules || body); }
   catch (error) { return jsonResponse({ ok: false, error: error.message }, 400); }
-  const audit = createTenantAuditContext(context, league, authorization.session, 'league_rules_update');
-  await context.env.DB.batch([context.env.DB.prepare(`
-    INSERT INTO league_rules_documents (league_id, rules_json, updated_by_user_id, updated_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(league_id) DO UPDATE SET
-      rules_json = excluded.rules_json,
-      updated_by_user_id = excluded.updated_by_user_id,
-      updated_at = CURRENT_TIMESTAMP
-  `).bind(league.id, JSON.stringify(rules), authorization.session.user.id), tenantAuditStatement(context.env.DB, audit, {
-    resourceType:'league_rules', resourceId:league.id,
-    detail:{categoryCount:rules.categories.length}
-  })]);
-  return jsonResponse({ ok: true, release: RELEASE, rules, requestId:audit.requestId });
+  const workspace = await context.env.DB.prepare(`SELECT revision,
+      base_publication_revision AS basePublicationRevision
+    FROM league_rules_workspaces WHERE league_id=? LIMIT 1`).bind(league.id).first();
+  const expectedRevision = Number(body.revision);
+  const currentRevision = Number(workspace?.revision || 0);
+  if (!Number.isInteger(expectedRevision) || expectedRevision !== currentRevision) {
+    return jsonResponse({
+      ok:false,error:'The Rules draft changed in another session. Refresh before saving.',
+      code:'RULES_REVISION_CONFLICT',currentRevision
+    }, 409);
+  }
+  const action = body.action === 'publish' ? 'publish' : 'save-draft';
+  const nextWorkspaceRevision = currentRevision + 1;
+  if (action === 'save-draft') {
+    const audit = createTenantAuditContext(context, league, authorization.session, 'league_rules_draft_saved');
+    await context.env.DB.batch([
+      context.env.DB.prepare(`INSERT INTO league_rule_workspace_revisions
+        (id,league_id,revision,base_publication_revision,draft_rules_json,
+         changed_by_user_id,change_type,created_at)
+        VALUES (?,?,?,?,?,?,'draft',CURRENT_TIMESTAMP)`)
+        .bind(`rule_workspace_revision_${crypto.randomUUID()}`,league.id,nextWorkspaceRevision,
+          Number(workspace?.basePublicationRevision || 0),JSON.stringify(rules),authorization.session.user.id),
+      context.env.DB.prepare(`INSERT INTO league_rules_workspaces
+        (league_id,revision,base_publication_revision,draft_rules_json,updated_by_user_id,updated_at)
+        VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)
+        ON CONFLICT(league_id) DO UPDATE SET revision=excluded.revision,
+          draft_rules_json=excluded.draft_rules_json,updated_by_user_id=excluded.updated_by_user_id,
+          updated_at=CURRENT_TIMESTAMP`)
+        .bind(league.id,nextWorkspaceRevision,Number(workspace?.basePublicationRevision || 0),
+          JSON.stringify(rules),authorization.session.user.id),
+      tenantAuditStatement(context.env.DB, audit, {
+        resourceType:'league_rules_draft',resourceId:league.id,
+        detail:{workspaceRevision:nextWorkspaceRevision,categoryCount:rules.categories.length}
+      })
+    ]);
+    return jsonResponse({
+      ok:true,release:RELEASE,rules,
+      workspace:{draft:rules,revision:nextWorkspaceRevision,
+        basePublicationRevision:Number(workspace?.basePublicationRevision || 0),dirty:true},
+      requestId:audit.requestId
+    });
+  }
+
+  const publication = await context.env.DB.prepare(`SELECT MAX(publication_revision) AS revision
+    FROM league_rule_publications WHERE league_id=?`).bind(league.id).first();
+  const publicationRevision = Number(publication?.revision || 0) + 1;
+  const audit = createTenantAuditContext(context, league, authorization.session, 'league_rules_published');
+  await context.env.DB.batch([
+    context.env.DB.prepare(`INSERT INTO league_rules_documents
+      (league_id,rules_json,updated_by_user_id,updated_at)
+      VALUES (?,?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(league_id) DO UPDATE SET rules_json=excluded.rules_json,
+        updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP`)
+      .bind(league.id,JSON.stringify(rules),authorization.session.user.id),
+    context.env.DB.prepare(`INSERT INTO league_rule_publications
+      (id,league_id,publication_revision,rules_json,published_by_user_id,created_at)
+      VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)`)
+      .bind(`rule_publication_${crypto.randomUUID()}`,league.id,publicationRevision,
+        JSON.stringify(rules),authorization.session.user.id),
+    context.env.DB.prepare(`INSERT INTO league_rule_workspace_revisions
+      (id,league_id,revision,base_publication_revision,draft_rules_json,
+       changed_by_user_id,change_type,created_at)
+      VALUES (?,?,?,?,?,?,'publication',CURRENT_TIMESTAMP)`)
+      .bind(`rule_workspace_revision_${crypto.randomUUID()}`,league.id,nextWorkspaceRevision,
+        publicationRevision,JSON.stringify(rules),authorization.session.user.id),
+    context.env.DB.prepare(`INSERT INTO league_rules_workspaces
+      (league_id,revision,base_publication_revision,draft_rules_json,updated_by_user_id,updated_at)
+      VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(league_id) DO UPDATE SET revision=excluded.revision,
+        base_publication_revision=excluded.base_publication_revision,
+        draft_rules_json=excluded.draft_rules_json,
+        updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP`)
+      .bind(league.id,nextWorkspaceRevision,publicationRevision,JSON.stringify(rules),
+        authorization.session.user.id),
+    tenantAuditStatement(context.env.DB, audit, {
+      resourceType:'league_rules_publication',resourceId:league.id,
+      detail:{workspaceRevision:nextWorkspaceRevision,publicationRevision,
+        categoryCount:rules.categories.length}
+    })
+  ]);
+  return jsonResponse({
+    ok:true,release:RELEASE,rules,
+    workspace:{draft:rules,revision:nextWorkspaceRevision,
+      basePublicationRevision:publicationRevision,dirty:false},
+    publication:{revision:publicationRevision,publishedAt:new Date().toISOString()},
+    requestId:audit.requestId
+  });
 }

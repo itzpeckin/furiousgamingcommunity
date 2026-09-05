@@ -42,6 +42,10 @@ test('maps Pages Function file names to stable route patterns', () => {
     functionRoutePath('functions/api/leagues/[leagueSlug]/trade-center.js'),
     '/api/leagues/:leagueSlug/trade-center'
   );
+  assert.equal(
+    functionRoutePath('functions/api/leagues/[leagueSlug]/commissioner-hq.js'),
+    '/api/leagues/:leagueSlug/commissioner-hq'
+  );
   assert.equal(functionRoutePath('functions/leagues/[[path]].js'), '/leagues/*path');
   assert.equal(functionRoutePath('functions/_lib/auth.js'), null);
   assert.equal(functionRoutePath('functions/api/example/_common.js'), null);
@@ -63,13 +67,13 @@ test('production shell exposes the exact release and environment', async () => {
     readFile(new URL('../../functions/leagues/index.js', import.meta.url), 'utf8'),
     readFile(new URL('../../functions/leagues/[[path]].js', import.meta.url), 'utf8')
   ]);
-  assert.match(index, /franchise-hq-platform-version" content="7\.4\.1"/);
-  assert.match(index, /Candidate · Release 7\.4\.1/);
-  assert.match(index, /app\.js\?v=7\.4\.1/);
-  assert.match(index, /trade-module\.js\?v=7\.4\.1/);
-  assert.match(app, /const VISIBLE_RELEASE = '7\.4\.1'/);
+  assert.match(index, /franchise-hq-platform-version" content="7\.4\.2"/);
+  assert.match(index, /Candidate · Release 7\.4\.2/);
+  assert.match(index, /app\.js\?v=7\.4\.2/);
+  assert.match(index, /trade-module\.js\?v=7\.4\.2/);
+  assert.match(app, /const VISIBLE_RELEASE = '7\.4\.2'/);
   assert.match(app, /hostname==='franchisehq\.app'.*return 'Production'/);
   for (const source of [landing, selector, leagueRoute]) {
-    assert.match(source, /const RELEASE ?= ?["']7\.4\.1["']/);
+    assert.match(source, /const RELEASE ?= ?["']7\.4\.2["']/);
   }
 });
