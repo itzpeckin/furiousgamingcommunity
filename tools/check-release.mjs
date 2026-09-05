@@ -2378,7 +2378,8 @@ if (version === '7.4.3') {
     'freeAgentBlockedPreserved',
     'strictMigration',
     'automatedTests',
-    'strictRepositoryGate'
+    'strictRepositoryGate',
+    ...(isPostDeployment ? ['productionHttpsAcceptance', 'productionProtectedState'] : [])
   ]) {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.3 evidence is incomplete: ${check}.`);
   }
@@ -2402,7 +2403,42 @@ if (version === '7.4.3') {
     || evidence.checks?.freeAgentBlockedPreserved?.count !== null
     || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
   ) errors.push('7.4.3 must prove the exact Commissioner operations, competition authority, Rules media, and responsive contracts.');
-  if (
+  if (isPostDeployment) {
+    if (
+      manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'published-main-accepted'
+      || Number(manifest.repositoryPublication?.pullRequest) !== 42
+      || manifest.repositoryPublication?.candidateCommit !== '0d98815adce264d7cb6c3b42e62d66bce3551d18'
+      || manifest.repositoryPublication?.mergeCommit !== 'fa8b6b194850ee1bb68ba3d1211496481dc53b43'
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.currentRelease !== '7.4.3'
+      || manifest.production?.currentCommit !== 'fa8b6b194850ee1bb68ba3d1211496481dc53b43'
+      || manifest.production?.currentPagesDeployment !== '61210167-29a5-41af-b8aa-35d4f321777f'
+      || Number(manifest.production?.currentMigration) !== 33
+      || Number(manifest.production?.candidateMigration) !== 33
+      || evidence.checks?.strictMigration?.productionApplied !== true
+      || evidence.checks?.productionHttpsAcceptance?.status !== 'read-only-verified'
+      || evidence.checks?.productionHttpsAcceptance?.deployedAssetsMatchMain !== true
+      || evidence.checks?.productionProtectedState?.passed !== true
+      || evidence.scopeBoundaries?.productionChanged !== true
+      || evidence.scopeBoundaries?.productionDataChanged !== false
+      || evidence.scopeBoundaries?.productionConfigurationChanged !== true
+      || evidence.scopeBoundaries?.protectedLeagueDataChanged !== false
+      || evidence.scopeBoundaries?.gitMainChanged !== true
+      || evidence.scopeBoundaries?.gitRemoteChanged !== true
+      || evidence.scopeBoundaries?.migrationApplied !== true
+      || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 1
+      || evidence.external?.githubPublication?.status !== 'published-main-accepted'
+      || Number(evidence.external?.hostedChecks?.pullRequestChecksPassed) !== 4
+      || Number(evidence.external?.hostedChecks?.mainChecksPassed) !== 5
+      || evidence.external?.productionMigration?.status !== 'applied-and-verified'
+      || Number(evidence.external?.productionMigration?.currentMigration) !== 33
+      || evidence.external?.productionMigration?.freeAgentCount !== null
+      || Number(evidence.external?.productionMigration?.foreignKeyViolations) !== 0
+      || evidence.external?.productionDeployment?.currentRelease !== '7.4.3'
+    ) errors.push('Deployed 7.4.3 evidence must record the exact authorized publication, migration, preservation, and read-only Production acceptance.');
+  } else if (
     manifest.status !== 'validated-review-candidate'
     || manifest.repositoryPublication?.authorized !== false
     || manifest.production?.authorized !== false
