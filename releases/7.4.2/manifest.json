@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.4.2",
   "releaseType": "commissioner-hq-and-rules",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.4.1",
@@ -18,8 +18,11 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-published"
+    "authorized": true,
+    "status": "published-main-accepted",
+    "pullRequest": 41,
+    "candidateCommit": "9cd8087b0e70d728eeb0d919dd6c99e9130a21d8",
+    "mergeCommit": "f09f5611cbca7ac6b12685f167300c2c06322f99"
   },
   "staging": {
     "authorized": false,
@@ -27,16 +30,21 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "7.4.1",
-    "currentCommit": "9903a969dd224d76b001c6272234b1967090e603",
-    "currentPagesDeployment": "a8087a3a-80da-4ea7-a7d7-9240a68923ef",
+    "authorized": true,
+    "deployed": true,
+    "status": "deployed-read-only-verified-pending-owner-acceptance",
+    "currentRelease": "7.4.2",
+    "currentCommit": "f09f5611cbca7ac6b12685f167300c2c06322f99",
+    "currentPagesDeployment": "c1ea3828-1918-4717-a13d-ba03f72c5cf6",
     "currentWorkerBuild": "b87f1bb1-71cc-4695-af0c-c3fe1415223f",
     "currentWorkerVersion": "326ee7ef-55b2-4041-8eb2-db4ee9358bd0",
-    "currentMigration": 31,
-    "candidateMigration": 32
+    "workerSourceChanged": false,
+    "candidateWorkerBuild": "1c79a4f0-1992-4193-bb6e-8cc5f31afb5d",
+    "candidateWorkerVersion": "a204f33f-8a98-44b3-b097-95d2e7918cac",
+    "currentMigration": 32,
+    "candidateMigration": 32,
+    "preMigrationBookmark": "000000f8-00000532-000050dd-89b92d5647f4c1d78a5b6a782388ca33",
+    "postMigrationBookmark": "000000f8-00000550-000050dd-ff21f7db3dd0a347781491898d23320b"
   },
   "requiredArtifacts": [
     "functions/api/leagues/[leagueSlug]/commissioner-hq.js",

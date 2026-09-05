@@ -2311,7 +2311,31 @@ if (version === '7.4.2') {
     || evidence.checks?.membershipAuthority?.serverAuthoritative !== true
     || evidence.checks?.membershipAuthority?.commissionerOnlyMutations !== true
   ) errors.push('7.4.2 must prove private Rules drafting, explicit publication, conflict safety, and membership authority.');
-  if (
+  if (isPostDeployment) {
+    if (
+      manifest.repositoryPublication?.authorized !== true
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.currentRelease !== '7.4.2'
+      || Number(manifest.production?.currentMigration) !== 32
+      || Number(manifest.production?.candidateMigration) !== 32
+      || evidence.scopeBoundaries?.productionChanged !== true
+      || evidence.scopeBoundaries?.productionDataChanged !== false
+      || evidence.scopeBoundaries?.productionConfigurationChanged !== true
+      || evidence.scopeBoundaries?.protectedLeagueDataChanged !== false
+      || evidence.scopeBoundaries?.gitMainChanged !== true
+      || evidence.scopeBoundaries?.gitRemoteChanged !== true
+      || evidence.scopeBoundaries?.migrationApplied !== true
+      || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 1
+      || evidence.external?.githubPublication?.status !== 'published-main-accepted'
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || evidence.external?.productionMigration?.status !== 'applied-and-verified'
+      || evidence.external?.productionDeployment?.currentRelease !== '7.4.2'
+      || evidence.checks?.strictMigration?.productionApplied !== true
+      || evidence.checks?.productionHttpsAcceptance?.passed !== true
+      || evidence.checks?.productionProtectedState?.passed !== true
+    ) errors.push('Deployed 7.4.2 evidence must record the authorized publication, migration, preservation checks, and read-only Production acceptance.');
+  } else if (
     manifest.status !== 'validated-review-candidate'
     || manifest.repositoryPublication?.authorized !== false
     || manifest.production?.authorized !== false

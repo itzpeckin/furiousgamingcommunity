@@ -1,8 +1,8 @@
 # FranchiseHQ 7.4.2 Release Record
 
-**Status:** Locally validated review candidate; publication and Production are not authorized
+**Status:** Production deployed and read-only verified; signed-in owner acceptance pending
 
-**Production changed:** No. Production remains FranchiseHQ 7.4.1 on migration 31.
+**Production changed:** Yes. Exact candidate `9cd8087b0e70d728eeb0d919dd6c99e9130a21d8` is merged to Main as `f09f5611cbca7ac6b12685f167300c2c06322f99`, Production serves FranchiseHQ 7.4.2, and additive migration 32 is verified.
 
 ## Scope
 
@@ -29,9 +29,15 @@ The full consolidated repository gate covers every existing import, transition, 
 
 ## Deployment status
 
-No branch publication, pull request, hosted check, cloud deployment, Production migration, or Production data operation is authorized or performed in this cycle. Production remains FranchiseHQ 7.4.1 with migration 31.
+Published through [PR #41](https://github.com/itzpeckin/furiousgamingcommunity/pull/41) after all four candidate checks passed. Before the schema change, Production D1 target `franchise-hq-db-madden27` (`b2529150-28af-42ca-a07b-69506764ccb6`) was confirmed and Time Travel bookmark `000000f8-00000532-000050dd-89b92d5647f4c1d78a5b6a782388ca33` was recorded. Exact migration hash `cacf18ef86c03459cefc3c0bcbdbaa65a013fb76456c9047799beca46efd0a67` then advanced the continuous ledger from 31 to 32 and created the three revisioned Rules tables.
 
-No import, snapshot activation, reset, deletion, Archive Season, game-year transition, export-URL rotation, credential change, membership change, or draft-pick ownership operation ran. Free Agents remain explicitly blocked/unknown.
+Production had no published `league_rules_documents` row to backfill, so the new Rules workspace, publication, and revision tables correctly begin empty. The migration preserved all seven existing feature rows and added only the previously implicit `trade_block` managed-feature default; Trade Center, Trade Block, Confidence Pool, and Game of the Week are now all present and enabled. Settings remained exactly one row at revision 6 and 1,688 bytes, audits remained 79 rows, and the post-migration bookmark is `000000f8-00000550-000050dd-ff21f7db3dd0a347781491898d23320b`.
+
+PR #41 merged to Main as `f09f5611cbca7ac6b12685f167300c2c06322f99`. All five Main quality, build, Pages, report, and deployment checks passed. Production Pages deployment `c1ea3828-1918-4717-a13d-ba03f72c5cf6` is live. The import Worker source did not change, so Production correctly retains build `b87f1bb1-71cc-4695-af0c-c3fe1415223f` / version `326ee7ef-55b2-4041-8eb2-db4ee9358bd0`; exact-candidate preview build `1c79a4f0-1992-4193-bb6e-8cc5f31afb5d` / version `a204f33f-8a98-44b3-b097-95d2e7918cac` passed before merge.
+
+Read-only HTTPS acceptance confirmed the 7.4.2 public and canonical-league release markers, exact Main hashes for `trade-module.js` and `styles.css`, and a `401 Authentication required` response from the signed-out Commissioner HQ endpoint. Protected counts remain exactly 1 league, 28 users, 28 memberships, 27 active team assignments, zero legacy teams/players/snapshots, one active pointer at `ee1d3679-563d-4e6a-a2ef-4eb44b91af24`, 672 draft picks, and 1,344 pick-ledger events. `PRAGMA foreign_key_check` returned no violations.
+
+No import, snapshot activation, reset, deletion, Archive Season, game-year transition, export-URL rotation, credential change, membership change, draft-pick ownership operation, Rules publication, or commissioner setting mutation ran. Free Agents remain explicitly blocked with a null count and were not interpreted as zero.
 
 ## Rollback
 
@@ -39,4 +45,4 @@ The immutable rollback baseline is exact Main evidence commit `2b691a046aa6afdca
 
 ## Next gate
 
-The exact local candidate passes the consolidated gate. Obtain explicit owner authorization before branch publication, pull request, hosted checks, Production migration 32, merge to Main, and Production deployment.
+The owner can perform signed-in acceptance of the Command Center, People & Teams, League Data, League Controls, Rules Studio, and Audit workspaces. No data-changing acceptance action is required.
