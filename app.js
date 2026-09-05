@@ -307,26 +307,18 @@
 
   let publicPlayerReturnRoute=null;
 
-  const GOTW_STORAGE_KEY = 'franchisehq:home.gotw.v1';
-  function readGotwSelections() {
-    try { return JSON.parse(localStorage.getItem(GOTW_STORAGE_KEY) || '{}') || {}; }
-    catch { return {}; }
-  }
   function currentHomeWeek() {
     return schedule.find(week => Number(week.week) === Number(state.scheduleWeek || 8)) || schedule.find(week => Number(week.week) === 8) || schedule[0];
   }
   function officialGotwId(weekNumber = currentHomeWeek()?.week) {
-    const selections = readGotwSelections();
-    return selections[String(weekNumber)] || null;
+    return window.FranchiseHQ?.competition?.gotw?.getOfficialGameId?.(weekNumber,'regular') || null;
   }
-  function saveOfficialGotw(weekNumber, gameId) {
+  async function saveOfficialGotw(weekNumber, gameId) {
     const week = schedule.find(item => Number(item.week) === Number(weekNumber));
     if (!week || !week.games.some(game => String(game.id) === String(gameId))) return { ok:false, error:'The selected matchup is not available for this week.' };
-    const selections = readGotwSelections();
-    selections[String(weekNumber)] = String(gameId);
-    localStorage.setItem(GOTW_STORAGE_KEY, JSON.stringify(selections));
-    window.dispatchEvent(new CustomEvent('franchisehq:gotw-changed', { detail:{ week:Number(weekNumber), gameId:String(gameId) } }));
-    return { ok:true, gameId:String(gameId) };
+    const shared = window.FranchiseHQ?.competition?.gotw;
+    if (shared?.saveOfficial) return shared.saveOfficial(weekNumber,gameId,'regular');
+    return {ok:false,error:'Shared Game of the Week controls are still loading. Try again in a moment.'};
   }
   function allTimeTeamProfile(team) {
     const games = seededNumber(`${team.abbr}-all-time-games`, 210, 430);
@@ -7418,7 +7410,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   const confidenceDirtyWeeks=new Set();
   function confidenceCurrentIdentity(){const snap=window.FranchiseHQ?.auth?.getSnapshot?.()||{};return snap.authenticated&&snap.user?{id:String(snap.user.id),name:window.FranchiseHQ?.auth?.getDisplayName?.()||snap.user.displayName||'Member',teamId:snap.membership?.teamId||null}:{id:'anonymous',name:'Member',teamId:null}}
   function confidenceUnsavedPrompt(){return !confidenceDirtyWeeks.size||confirm('You have Confidence Pool picks that have not been submitted for this week. Leave without submitting them?')}
-  function renderScheduleConfidence(week,teamMap){const service=scheduleService(),identity=confidenceCurrentIdentity();if(!service?.confidence||identity.id==='anonymous')return'';const poolWeek=service.getWeek(week),entry=service.confidence.getEntry(identity.id),open=service.confidence.isWeekOpen(week,identity.id),submitted=Boolean(entry.submittedWeeks?.[String(week)]);if(!poolWeek?.games?.length)return'';return `<section class="schedule-confidence-shell"><div class="card schedule-confidence-head"><div><span class="eyebrow">Confidence Pool</span><h2>Week ${week} Picks</h2><p>Choose each winner and confidence value. Submit or clear this week independently.</p></div><div class="confidence-week-actions"><button class="button button--ghost" data-confidence-clear-week="${week}" ${!open?'disabled':''}>Clear Week</button><button class="button button--primary" data-confidence-submit-week="${week}" ${!open?'disabled':''}>${submitted?'Week Submitted':'Submit Week'}</button></div></div><div class="confidence-pick-list">${poolWeek.games.map(game=>{const away=teamMap.get(String(game.awayId))||teamById(game.awayId),home=teamMap.get(String(game.homeId))||teamById(game.homeId),pick=entry.picks?.[game.id]||{};return `<article class="card confidence-pick-card"><div class="confidence-matchup"><strong>${escapeHtml(away?.abbr||game.awayId)} @ ${escapeHtml(home?.abbr||game.homeId)}</strong></div><div class="confidence-team-choice"><button type="button" data-confidence-team="${game.id}:${game.awayId}" class="${pick.selectedTeamId===game.awayId?'is-selected':''}" ${!open?'disabled':''}>${away?renderTeamMark(away,'mini-team'):''}<span>${escapeHtml(away?.abbr||game.awayId)}</span></button><button type="button" data-confidence-team="${game.id}:${game.homeId}" class="${pick.selectedTeamId===game.homeId?'is-selected':''}" ${!open?'disabled':''}>${home?renderTeamMark(home,'mini-team'):''}<span>${escapeHtml(home?.abbr||game.homeId)}</span></button></div><label class="field confidence-value"><span>Confidence</span><select data-confidence-value="${game.id}" ${!open?'disabled':''}><option value="">Select</option>${poolWeek.games.map((_,i)=>`<option value="${i+1}" ${Number(pick.confidence)===i+1?'selected':''}>${i+1}</option>`).join('')}</select></label></article>`}).join('')}</div></section>`}
+  function renderScheduleConfidence(week,teamMap){const service=scheduleService(),identity=confidenceCurrentIdentity(),shared=window.FranchiseHQ?.competition?.getState?.();if(!service?.confidence||identity.id==='anonymous'||shared?.features?.confidencePool===false)return'';const poolWeek=service.getWeek(week),entry=service.confidence.getEntry(identity.id),open=service.confidence.isWeekOpen(week,identity.id),submitted=Boolean(entry.submittedWeeks?.[String(week)]);if(!poolWeek?.games?.length)return'';return `<section class="schedule-confidence-shell"><div class="card schedule-confidence-head"><div><span class="eyebrow">Confidence Pool</span><h2>Week ${week} Picks</h2><p>Choose each winner and confidence value. Submit or clear this week independently.</p></div><div class="confidence-week-actions"><button class="button button--ghost" data-confidence-clear-week="${week}" ${!open?'disabled':''}>Clear Week</button><button class="button button--primary" data-confidence-submit-week="${week}" ${!open?'disabled':''}>${submitted?'Week Submitted':'Submit Week'}</button></div></div><div class="confidence-pick-list">${poolWeek.games.map(game=>{const away=teamMap.get(String(game.awayId))||teamById(game.awayId),home=teamMap.get(String(game.homeId))||teamById(game.homeId),pick=entry.picks?.[game.id]||{};return `<article class="card confidence-pick-card"><div class="confidence-matchup"><strong>${escapeHtml(away?.abbr||game.awayId)} @ ${escapeHtml(home?.abbr||game.homeId)}</strong></div><div class="confidence-team-choice"><button type="button" data-confidence-team="${game.id}:${game.awayId}" class="${pick.selectedTeamId===game.awayId?'is-selected':''}" ${!open?'disabled':''}>${away?renderTeamMark(away,'mini-team'):''}<span>${escapeHtml(away?.abbr||game.awayId)}</span></button><button type="button" data-confidence-team="${game.id}:${game.homeId}" class="${pick.selectedTeamId===game.homeId?'is-selected':''}" ${!open?'disabled':''}>${home?renderTeamMark(home,'mini-team'):''}<span>${escapeHtml(home?.abbr||game.homeId)}</span></button></div><label class="field confidence-value"><span>Confidence</span><select data-confidence-value="${game.id}" ${!open?'disabled':''}><option value="">Select</option>${poolWeek.games.map((_,i)=>`<option value="${i+1}" ${Number(pick.confidence)===i+1?'selected':''}>${i+1}</option>`).join('')}</select></label></article>`}).join('')}</div></section>`}
   async function renderSchedule() {
     preloadScheduleMatchupData();
     pageContent.innerHTML='<section class="empty-state"><strong>Loading schedule…</strong><p>Reading league data.</p></section>';
@@ -9301,14 +9293,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     const confidenceWeekChange=event.target.closest('[data-confidence-week-change]');
     if(confidenceWeekChange){state.confidenceWeek=clamp(state.confidenceWeek+Number(confidenceWeekChange.dataset.confidenceWeekChange),1,schedule.length);renderSchedule();return;}
     const confidenceTeam=event.target.closest('[data-confidence-team]');
-    if(confidenceTeam){confidenceDirtyWeeks.add(Number(state.scheduleWeek));const [gameId,teamId]=confidenceTeam.dataset.confidenceTeam.split(':');const result=scheduleService()?.confidence?.saveSelection(gameId,teamId);if(!result?.ok)showToast('Pick not saved',result?.error||'Unable to save pick.');renderSchedule();return;}
+    if(confidenceTeam){confidenceDirtyWeeks.add(Number(state.scheduleWeek));const [gameId,teamId]=confidenceTeam.dataset.confidenceTeam.split(':');void (async()=>{try{const result=await scheduleService()?.confidence?.saveSelection(gameId,teamId);if(!result?.ok)showToast('Pick not saved',result?.error||'Unable to save pick.')}catch(error){showToast('Pick not saved',error?.message||String(error))}await renderSchedule()})();return;}
     const confidenceClearWeek=event.target.closest('[data-confidence-clear-week]');
-    if(confidenceClearWeek){const week=Number(confidenceClearWeek.dataset.confidenceClearWeek);if(confirm(`Clear every winner and confidence value for Week ${week}? This cannot be undone.`)){const result=scheduleService()?.confidence?.clearWeek(week);if(result?.ok)confidenceDirtyWeeks.delete(week);showToast(result?.ok?'Week cleared':'Unable to clear week',result?.error||`Week ${week} selections were removed.`);renderSchedule();}return;}
+    if(confidenceClearWeek){const week=Number(confidenceClearWeek.dataset.confidenceClearWeek);if(confirm(`Clear every winner and confidence value for Week ${week}? This cannot be undone.`)){void (async()=>{try{const result=await scheduleService()?.confidence?.clearWeek(week);if(result?.ok)confidenceDirtyWeeks.delete(week);showToast(result?.ok?'Week cleared':'Unable to clear week',result?.error||`Week ${week} selections were removed.`)}catch(error){showToast('Unable to clear week',error?.message||String(error))}await renderSchedule()})()}return;}
     const confidenceClearSeason=event.target.closest('[data-confidence-clear-season]');
-    if(confidenceClearSeason){const confirmation=prompt(`Type CLEAR to remove every Confidence Pool pick for Season ${scheduleService()?.confidence?.config?.()?.season||''}.`);if(confirmation==='CLEAR'){const result=scheduleService()?.confidence?.clearSeason();showToast(result?.ok?'Season entry cleared':'Unable to clear season',result?.error||'All season selections were removed.');renderSchedule();}else if(confirmation!==null){showToast('Season not cleared','The confirmation text did not match CLEAR.');}return;}
+    if(confidenceClearSeason){const confirmation=prompt(`Type CLEAR to remove every unsubmitted Confidence Pool pick for Season ${scheduleService()?.confidence?.config?.()?.season||''}.`);if(confirmation==='CLEAR'){void (async()=>{try{const result=await scheduleService()?.confidence?.clearSeason();showToast(result?.ok?'Season entry cleared':'Unable to clear season',result?.error||'All unsubmitted season selections were removed.')}catch(error){showToast('Unable to clear season',error?.message||String(error))}await renderSchedule()})()}else if(confirmation!==null){showToast('Season not cleared','The confirmation text did not match CLEAR.');}return;}
     const confidenceAuto=event.target.closest('[data-confidence-auto]');
-    if(confidenceAuto){const result=scheduleService()?.confidence?.autoAssign(Number(confidenceAuto.dataset.confidenceAuto));showToast(result?.ok?'Week predicted and assigned':'Unable to assign',result?.error||`Week ${state.confidenceWeek} picks and confidence values were assigned from league history.`);renderSchedule();return;}
-    const submitWeekButton=event.target.closest('[data-confidence-submit-week]');if(submitWeekButton){const week=Number(submitWeekButton.dataset.confidenceSubmitWeek);const result=scheduleService()?.confidence?.submitWeek(week);if(result?.ok)confidenceDirtyWeeks.delete(week);showToast(result?.ok?`Week ${week} submitted`:'Week incomplete',result?.error||`Week ${week} is locked and ready for scoring.`);renderSchedule();return;}
+    if(confidenceAuto){void (async()=>{try{const result=await scheduleService()?.confidence?.autoAssign(Number(confidenceAuto.dataset.confidenceAuto));showToast(result?.ok?'Week predicted and assigned':'Unable to assign',result?.error||`Week ${state.confidenceWeek} picks and confidence values were assigned from league history.`)}catch(error){showToast('Unable to assign',error?.message||String(error))}await renderSchedule()})();return;}
+    const submitWeekButton=event.target.closest('[data-confidence-submit-week]');if(submitWeekButton){const week=Number(submitWeekButton.dataset.confidenceSubmitWeek);void (async()=>{try{const result=await scheduleService()?.confidence?.submitWeek(week);if(result?.ok)confidenceDirtyWeeks.delete(week);showToast(result?.ok?`Week ${week} submitted`:'Week incomplete',result?.error||`Week ${week} is locked and ready for scoring.`)}catch(error){showToast('Week incomplete',error?.message||String(error))}await renderSchedule()})();return;}
 
     const weekButton=event.target.closest('[data-week]');
     if (weekButton) { state.scheduleWeek=Number(weekButton.dataset.week); renderSchedule(); return; }
@@ -9539,7 +9531,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     if (event.target.matches('[data-player-rookie]')) { state.playerRookiesOnly=Boolean(event.target.checked); state.playerPage=1; refreshPlayerTable(); }
     if (event.target.matches('[data-player-sort]')) { state.playerSort=event.target.value; state.playerPage=1; refreshPlayerTable(); }
     if (event.target.matches('[data-schedule-team]')) { state.scheduleTeam=event.target.value; renderSchedule(); }
-    if (event.target.matches('[data-confidence-value]')) { const gameId=event.target.dataset.confidenceValue; const result=scheduleService()?.confidence?.saveConfidence(gameId,event.target.value); if(!result?.ok) showToast('Confidence not saved',result?.error||'Choose another confidence value.'); renderSchedule(); }
+    if (event.target.matches('[data-confidence-value]')) { const gameId=event.target.dataset.confidenceValue,value=event.target.value; void (async()=>{try{const result=await scheduleService()?.confidence?.saveConfidence(gameId,value);if(!result?.ok)showToast('Confidence not saved',result?.error||'Choose another confidence value.')}catch(error){showToast('Confidence not saved',error?.message||String(error))}await renderSchedule()})(); }
     if (event.target.matches('[data-stats-scope]')) { state.statsScope=event.target.value; renderStats(); }
     if (event.target.matches('[data-stats-week]')) { state.statsWeek=Number(event.target.value)||1; renderStats(); }
     if (event.target.matches('[data-stats-team]')) { state.statsTeam=event.target.value; renderStats(); }
@@ -9577,6 +9569,13 @@ function canonicalPlayerDashboardStats(playerId='') {
     const currentWeek=currentHomeWeek();
     if(Number(event.detail?.week)===Number(currentWeek?.week)) state.featuredGameId=event.detail?.gameId||null;
     if(routeBase(currentAppRoute())==='home') renderLeagueHome();
+  });
+
+  window.addEventListener('franchisehq:competition-updated', ()=>{
+    const active=routeBase(currentAppRoute());
+    if(active==='home') renderLeagueHome();
+    else if(active==='schedule') renderSchedule();
+    else if(active==='standings') renderStandings();
   });
 
   window.FranchiseHQ?.sidebar?.init?.({ sidebar, overlay: mobileOverlay });
@@ -9914,7 +9913,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.4.2';
+  const VISIBLE_RELEASE = '7.4.3';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

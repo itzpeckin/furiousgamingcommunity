@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.4.1 */
+/* FHQ_BUILD: 7.4.3 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.4.1';
+  const VERSION = '7.4.3';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -159,7 +159,7 @@
       },delay);
     }
     return `<article class="card commissioner-league-export-card" data-permanent-league-export-panel>
-      <div class="card-header"><div><span class="eyebrow">v${VERSION} · Permanent league connection</span><h2>Dedicated Madden Export URL</h2><p>Use the same league URL for every Madden Companion export. FranchiseHQ automatically separates, analyzes, and retains each export revision.</p></div><span class="pill pill--${tone}">${esc(historicalBackfill?'Historical backfill ready':statusLabel(status))}</span></div>
+      <div class="card-header"><div><span class="eyebrow">Permanent league connection</span><h2>Dedicated Madden Export URL</h2><p>Use the same league URL for every Madden Companion export. FranchiseHQ automatically separates, analyzes, and retains each export revision.</p></div><span class="pill pill--${tone}">${esc(historicalBackfill?'Historical backfill ready':statusLabel(status))}</span></div>
       <div class="commissioner-import-summary">
         <div><small>Export URL</small><strong>${endpointState.exportUrl ? 'Permanent URL ready' : 'Unavailable'}</strong></div>
         <div><small>Latest export</small><strong>${esc(date(latest.receivedAt))}</strong></div>

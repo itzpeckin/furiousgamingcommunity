@@ -178,7 +178,20 @@ test('rules validation preserves the commissioner editor category-section-rule s
       }]
     }]
   };
-  assert.deepEqual(normalizeRulesDocument(input), input);
+  const normalized = normalizeRulesDocument(input);
+  assert.deepEqual(normalized, {
+    categories: [{
+      id: 'gameplay',
+      title: 'Gameplay',
+      sections: [{
+        id: 'fourth-down',
+        title: 'Fourth Down',
+        rules: [{
+          id: 'fd-1', title: 'Attempts', text: 'Follow the league limits.', html: '', media: []
+        }]
+      }]
+    }]
+  });
   assert.throws(() => normalizeRulesDocument({
     categories: [{ ...input.categories[0], sections: [input.categories[0].sections[0], input.categories[0].sections[0]] }]
   }), /Duplicate section id/);

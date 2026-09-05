@@ -2367,6 +2367,80 @@ if (version === '7.4.2') {
     || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
   ) errors.push('7.4.2 must preserve every excluded environment, data, snapshot, identity, and Free Agent boundary.');
 }
+if (version === '7.4.3') {
+  for (const check of [
+    'commissionerCommandCenter',
+    'leagueDataExperience',
+    'membershipLifecycle',
+    'sharedCompetition',
+    'rulesStudio',
+    'responsiveExperience',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.3 evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.commissionerCommandCenter?.priorityCountsExcludeRevokedMembers !== true
+    || evidence.checks?.commissionerCommandCenter?.fastAccessRemoved !== true
+    || evidence.checks?.commissionerCommandCenter?.leagueAuthorityRemoved !== true
+    || evidence.checks?.leagueDataExperience?.horizontalImportProgress !== true
+    || evidence.checks?.leagueDataExperience?.sourceSwitchDeletesData !== false
+    || evidence.checks?.leagueDataExperience?.archiveSeasonOnlyVisibleTransition !== true
+    || evidence.checks?.membershipLifecycle?.globalUserIdentityPreserved !== true
+    || evidence.checks?.membershipLifecycle?.commissionerOnlyMutations !== true
+    || evidence.checks?.membershipLifecycle?.tenantAudited !== true
+    || evidence.checks?.sharedCompetition?.scheduleBackedGameOfTheWeek !== true
+    || evidence.checks?.sharedCompetition?.sharedConfidencePool !== true
+    || evidence.checks?.sharedCompetition?.deviceLocalAuthorityRemoved !== true
+    || evidence.checks?.rulesStudio?.privateLeagueMedia !== true
+    || evidence.checks?.rulesStudio?.arbitraryMarkupRemoved !== true
+    || evidence.checks?.responsiveExperience?.sectionOverlap !== false
+    || evidence.checks?.responsiveExperience?.pageHorizontalOverflow !== false
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+  ) errors.push('7.4.3 must prove the exact Commissioner operations, competition authority, Rules media, and responsive contracts.');
+  if (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.currentRelease !== '7.4.2'
+    || Number(manifest.production?.currentMigration) !== 32
+    || Number(manifest.production?.candidateMigration) !== 33
+    || evidence.checks?.strictMigration?.productionApplied !== false
+    || evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.gitRemoteChanged !== false
+    || evidence.scopeBoundaries?.migrationApplied !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+    || evidence.external?.productionMigration?.status !== 'not-run'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 32
+    || Number(evidence.external?.productionMigration?.candidateMigration) !== 33
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+  ) errors.push('7.4.3 must remain an unpublished, unapplied review candidate until separately authorized.');
+  if (
+    evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.dataDeleted !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+    || evidence.scopeBoundaries?.credentialsChanged !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+  ) errors.push('7.4.3 must preserve every excluded environment, data, snapshot, identity, and Free Agent boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

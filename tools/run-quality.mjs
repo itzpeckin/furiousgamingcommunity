@@ -18,6 +18,7 @@ const checks = [
     'tests/tooling/d1-release.test.mjs',
     'tests/database/migrations.test.mjs',
     'tests/commissioner/commissioner-hq.test.mjs',
+    'tests/commissioner/competition.test.mjs',
     'tests/import/madden-discovery.test.mjs',
     'tests/import/permanent-identity.test.mjs',
     'tests/import/candidate-import.test.mjs',

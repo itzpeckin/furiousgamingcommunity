@@ -5,8 +5,13 @@ import {
   resolveRequestTenant,
   tenantAuditStatement
 } from '../../../_lib/tenant-context.js';
+import {
+  normalizeTradeCenterSettings,
+  tradeCenterSettingsFromLeagueDocument,
+  withTradeCenterSettings
+} from '../../../_lib/trade-center.js';
 
-const RELEASE = '7.4.2';
+const RELEASE = '7.4.3';
 const MANAGED_FEATURES = new Map([
   ['trade_center', 'Trade Center'],
   ['trade_block', 'Trade Block'],
@@ -50,16 +55,35 @@ async function settingsState(db, leagueId) {
 }
 
 async function overview(c) {
-  const [settings, membershipCounts, activeSnapshot, featureRows, ruleWorkspace,
+  const [settings, membershipCounts, memberAttentionRows, activeSnapshot, featureRows, ruleWorkspace,
     publishedRules, settingHistory, auditRows, transactionCount] = await Promise.all([
     settingsState(c.db, c.league.id),
     c.db.prepare(`SELECT COUNT(*) AS total,
         SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) AS active,
-        SUM(CASE WHEN active=0 THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN active=0 AND COALESCE((SELECT audit.action FROM league_membership_audit audit
+          WHERE audit.league_id=league_memberships.league_id
+            AND audit.subject_user_id=league_memberships.user_id
+            AND audit.action IN ('membership_deactivated','membership_restored_pending','membership_removed')
+          ORDER BY audit.created_at DESC,audit.rowid DESC LIMIT 1),'')
+          NOT IN ('membership_deactivated','membership_removed') THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN active=1 AND team_id IS NULL THEN 1 ELSE 0 END) AS unassigned,
         SUM(CASE WHEN active=1 AND team_id IS NOT NULL THEN 1 ELSE 0 END) AS assigned,
+        SUM(CASE WHEN active=1 AND EXISTS (SELECT 1 FROM sessions session
+          WHERE session.user_id=league_memberships.user_id AND session.revoked_at IS NULL
+            AND session.expires_at>CURRENT_TIMESTAMP
+            AND session.last_seen_at>=datetime('now','-5 minutes')) THEN 1 ELSE 0 END) AS online,
         SUM(CASE WHEN active=1 AND role='commissioner' THEN 1 ELSE 0 END) AS commissioners,
         SUM(CASE WHEN active=1 AND role='trade_committee' THEN 1 ELSE 0 END) AS committee
       FROM league_memberships WHERE league_id=?`).bind(c.league.id).first(),
+    rows(c.db, `SELECT membership.user_id AS userId,membership.active,membership.team_id AS teamId,
+        user.display_name AS displayName,
+        (SELECT audit.action FROM league_membership_audit audit
+          WHERE audit.league_id=membership.league_id AND audit.subject_user_id=membership.user_id
+            AND audit.action IN ('membership_deactivated','membership_restored_pending','membership_removed')
+          ORDER BY audit.created_at DESC,audit.rowid DESC LIMIT 1) AS lastAccessAction
+      FROM league_memberships membership
+      INNER JOIN users user ON user.id=membership.user_id
+      WHERE membership.league_id=? ORDER BY lower(user.display_name)`, c.league.id),
     c.db.prepare(`SELECT active.snapshot_id AS snapshotId,active.activated_at AS activatedAt,
         snapshot.validation_status AS validationStatus,snapshot.validation_score AS validationScore
       FROM league_active_snapshots active
@@ -112,10 +136,18 @@ async function overview(c) {
     detail:parseJson(item.detailJson, {}),
     detailJson:undefined
   }));
+  const removedMembers = memberAttentionRows.filter(item => !Number(item.active) && item.lastAccessAction === 'membership_removed');
+  const pendingMembers = memberAttentionRows.filter(item => !Number(item.active)
+    && !['membership_deactivated','membership_removed'].includes(item.lastAccessAction));
+  const unassignedMembers = memberAttentionRows.filter(item => Number(item.active) && !item.teamId);
   const attention = [];
-  if (Number(membershipCounts?.pending || 0)) attention.push({
-    code:'pending_members',tone:'warning',title:`${membershipCounts.pending} member${Number(membershipCounts.pending) === 1 ? '' : 's'} awaiting assignment`,
-    message:'Assign a team and role before they can enter the league.',target:'teams'
+  if (pendingMembers.length) attention.push({
+    code:'pending_members',tone:'warning',title:`${pendingMembers.length} member${pendingMembers.length === 1 ? '' : 's'} awaiting approval`,
+    message:`Approve ${pendingMembers.slice(0,3).map(item => item.displayName).join(', ')}${pendingMembers.length > 3 ? ` and ${pendingMembers.length-3} more` : ''}.`,target:'teams'
+  });
+  if (unassignedMembers.length) attention.push({
+    code:'unassigned_members',tone:'warning',title:`${unassignedMembers.length} active member${unassignedMembers.length === 1 ? '' : 's'} without a team`,
+    message:`Assign ${unassignedMembers.slice(0,3).map(item => item.displayName).join(', ')}${unassignedMembers.length > 3 ? ` and ${unassignedMembers.length-3} more` : ''}, or remove league access.`,target:'teams'
   });
   if (rulesDirty) attention.push({
     code:'rules_draft',tone:'accent',title:'Rules draft not published',
@@ -135,10 +167,16 @@ async function overview(c) {
       currentWeek:Number(c.league.current_week || 1),timezone:c.league.timezone || 'UTC'
     },
     settings:{revision:settings.revision,updatedAt:settings.updatedAt},
+    quickControls:{
+      seasonTradeLimitEnabled:tradeCenterSettingsFromLeagueDocument(settings.document).seasonTradeLimitEnabled,
+      freeTradeDesignationEnabled:tradeCenterSettingsFromLeagueDocument(settings.document).freeTradeDesignationEnabled,
+      calculatorEnabled:tradeCenterSettingsFromLeagueDocument(settings.document).calculatorEnabled,
+      confidencePool:features.find(item => item.featureKey === 'confidence_pool')?.enabled !== false
+    },
     memberships:{
-      total:Number(membershipCounts?.total || 0),active:Number(membershipCounts?.active || 0),
-      pending:Number(membershipCounts?.pending || 0),assigned:Number(membershipCounts?.assigned || 0),
-      commissioners:Number(membershipCounts?.commissioners || 0),committee:Number(membershipCounts?.committee || 0)
+      total:Math.max(0,Number(membershipCounts?.total || 0)-removedMembers.length),active:Number(membershipCounts?.active || 0),
+      pending:Number(membershipCounts?.pending || 0),unassigned:Number(membershipCounts?.unassigned || 0),assigned:Number(membershipCounts?.assigned || 0),
+      online:Number(membershipCounts?.online || 0),commissioners:Number(membershipCounts?.commissioners || 0),committee:Number(membershipCounts?.committee || 0)
     },
     activeSnapshot:activeSnapshot ? {
       snapshotId:activeSnapshot.snapshotId,activatedAt:activeSnapshot.activatedAt,
@@ -158,6 +196,43 @@ async function overview(c) {
     audit,
     attention
   };
+}
+
+async function updateQuickControl(c, body) {
+  const key = String(body.key || '');
+  const value = body.enabled === true;
+  if (key === 'confidencePool') {
+    await updateFeature(c,{featureKey:'confidence_pool',enabled:value,revision:body.revision});
+    return;
+  }
+  if (!['seasonTradeLimitEnabled','freeTradeDesignationEnabled','calculatorEnabled'].includes(key)) {
+    throw Object.assign(new Error('That Command Center control is not available.'), {status:400});
+  }
+  const current = await settingsState(c.db,c.league.id);
+  if (!Number.isInteger(Number(body.revision)) || Number(body.revision) !== current.revision) {
+    throw Object.assign(new Error('League settings changed in another session. Refresh before saving.'), {status:409});
+  }
+  const settings = normalizeTradeCenterSettings({...tradeCenterSettingsFromLeagueDocument(current.document),[key]:value});
+  const document = withTradeCenterSettings(current.document,settings);
+  const nextRevision = current.revision + 1;
+  const label = ({seasonTradeLimitEnabled:'Trade limit enforcement',freeTradeDesignationEnabled:'Free Trade designations',calculatorEnabled:'Trade Calculator'})[key];
+  const audit = createTenantAuditContext({request:c.request},c.league,c.session,'trade_settings_updated');
+  await c.db.batch([
+    c.db.prepare(`INSERT INTO league_settings
+      (league_id,revision,settings_json,updated_by_user_id,updated_at)
+      VALUES (?,?,?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(league_id) DO UPDATE SET revision=excluded.revision,
+        settings_json=excluded.settings_json,updated_by_user_id=excluded.updated_by_user_id,
+        updated_at=CURRENT_TIMESTAMP`)
+      .bind(c.league.id,nextRevision,JSON.stringify(document),c.session.user.id),
+    c.db.prepare(`INSERT INTO league_setting_revisions
+      (id,league_id,revision,settings_json,changed_by_user_id,change_reason,created_at)
+      VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)`)
+      .bind(`setting_revision_${crypto.randomUUID()}`,c.league.id,nextRevision,JSON.stringify(document),
+        c.session.user.id,`${label} ${value ? 'enabled' : 'disabled'}`),
+    tenantAuditStatement(c.db,audit,{resourceType:'league_settings',resourceId:c.league.id,
+      detail:{revision:nextRevision,scope:'tradeCenter',key,enabled:value}})
+  ]);
 }
 
 async function updateFeature(c, body) {
@@ -219,6 +294,10 @@ export async function onRequestPost(context) {
     const c = await requestContext(context);
     if (c.response) return c.response;
     const body = await context.request.json();
+    if (body?.action === 'quick-control') {
+      await updateQuickControl(c,body);
+      return jsonResponse({...await overview(c),action:'quick-control'});
+    }
     if (body?.action !== 'feature') {
       return jsonResponse({ok:false,release:RELEASE,error:'Unknown Commissioner HQ action.'}, 400);
     }
