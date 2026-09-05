@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.2",
+  "releaseType": "commissioner-hq-and-rules",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.1",
+    "commit": "2b691a046aa6afdcaaa8ee453901b2743b94ff90",
+    "tree": "1f7ed57d41d821132450b1d19db08f2c010af666",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.2",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-published"
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.4.1",
+    "currentCommit": "9903a969dd224d76b001c6272234b1967090e603",
+    "currentPagesDeployment": "a8087a3a-80da-4ea7-a7d7-9240a68923ef",
+    "currentWorkerBuild": "b87f1bb1-71cc-4695-af0c-c3fe1415223f",
+    "currentWorkerVersion": "326ee7ef-55b2-4041-8eb2-db4ee9358bd0",
+    "currentMigration": 31,
+    "candidateMigration": 32
+  },
+  "requiredArtifacts": [
+    "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
+    "functions/api/leagues/[leagueSlug]/rules.js",
+    "functions/api/leagues/[leagueSlug]/memberships.js",
+    "migrations/0032_commissioner_hq_rules.sql",
+    "tests/commissioner/commissioner-hq.test.mjs",
+    "trade-module.js",
+    "styles.css",
+    "docs/ROADMAP.md",
+    "releases/7.4.2/release-record.md",
+    "releases/7.4.2/validation-evidence.json"
+  ]
+}

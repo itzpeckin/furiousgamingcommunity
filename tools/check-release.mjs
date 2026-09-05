@@ -2276,6 +2276,73 @@ if (version === '7.4.1') {
     || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
   ) errors.push('7.4.1 must preserve every excluded environment, data, snapshot, identity, and Free Agent boundary.');
 }
+if (version === '7.4.2') {
+  for (const check of [
+    'commissionerCommandCenter',
+    'authoritativeFeatureSettings',
+    'rulesStudio',
+    'membershipAuthority',
+    'auditVisibility',
+    'responsiveExperience',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.2 evidence is incomplete: ${check}.`);
+  }
+  if (
+    evidence.checks?.commissionerCommandCenter?.workspaces?.join(',') !== 'command-center,league-data,people-and-teams,league-controls,rules-studio,audit-and-revisions'
+    || evidence.checks?.commissionerCommandCenter?.activeSnapshotContext !== true
+    || evidence.checks?.commissionerCommandCenter?.legacyProtectedOperationsPreserved !== true
+    || evidence.checks?.authoritativeFeatureSettings?.serverAuthority !== true
+    || evidence.checks?.authoritativeFeatureSettings?.revisionGuarded !== true
+    || Number(evidence.checks?.authoritativeFeatureSettings?.staleWriteStatus) !== 409
+    || evidence.checks?.authoritativeFeatureSettings?.tenantAudited !== true
+  ) errors.push('7.4.2 must prove the complete command-center and authoritative feature-settings contracts.');
+  if (
+    evidence.checks?.rulesStudio?.privateDrafts !== true
+    || evidence.checks?.rulesStudio?.ownersSeeDrafts !== false
+    || evidence.checks?.rulesStudio?.explicitPublication !== true
+    || evidence.checks?.rulesStudio?.immutablePublications !== true
+    || evidence.checks?.rulesStudio?.immutableWorkspaceRevisions !== true
+    || Number(evidence.checks?.rulesStudio?.staleWriteStatus) !== 409
+    || evidence.checks?.rulesStudio?.existingPublishedRulesPreserved !== true
+    || evidence.checks?.membershipAuthority?.serverAuthoritative !== true
+    || evidence.checks?.membershipAuthority?.commissionerOnlyMutations !== true
+  ) errors.push('7.4.2 must prove private Rules drafting, explicit publication, conflict safety, and membership authority.');
+  if (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.currentRelease !== '7.4.1'
+    || Number(manifest.production?.currentMigration) !== 31
+    || Number(manifest.production?.candidateMigration) !== 32
+    || evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.gitRemoteChanged !== false
+    || evidence.scopeBoundaries?.migrationApplied !== false
+    || evidence.scopeBoundaries?.databaseRowsWritten !== 0
+  ) errors.push('7.4.2 must remain an unpublished, unapplied review candidate until separately authorized.');
+  if (
+    evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.dataDeleted !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+    || evidence.scopeBoundaries?.credentialsChanged !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+  ) errors.push('7.4.2 must preserve every excluded environment, data, snapshot, identity, and Free Agent boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

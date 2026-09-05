@@ -8668,6 +8668,24 @@ function canonicalPlayerDashboardStats(playerId='') {
     print:()=>console.log(JSON.stringify(lastPerformanceCertification(),null,2))
   };
 
+  function leagueFeatureEnabled(featureKey){
+    const feature=window.FranchiseHQ?.leagueTenant?.getCurrentLeague?.()?.features?.[featureKey];
+    return feature?.enabled!==false;
+  }
+
+  function applyLeagueFeaturePresentation(){
+    const routeFeatures={trade_center:'trade-center',trade_block:'trade-block'};
+    Object.entries(routeFeatures).forEach(([featureKey,routeName])=>{
+      document.querySelectorAll(`[data-route="${routeName}"]`).forEach(node=>{node.hidden=!leagueFeatureEnabled(featureKey)});
+    });
+    if(!leagueFeatureEnabled('confidence_pool')){
+      document.querySelectorAll('[data-standings-view="confidence"],.schedule-confidence-shell,.confidence-pool-shell').forEach(node=>{node.hidden=true});
+    }
+    if(!leagueFeatureEnabled('game_of_the_week')){
+      document.querySelectorAll('.featured-game--live-gotw').forEach(node=>{node.hidden=true});
+    }
+  }
+
   function renderRoute(routeInput=currentAppRoute()||'home') {
     const route=routeInput||'home';
     const [base,id]=route.split('/');
@@ -8681,6 +8699,14 @@ function canonicalPlayerDashboardStats(playerId='') {
     closeSidebar();
     document.querySelectorAll('.nav-item[data-route]').forEach(item=>item.classList.toggle('is-active',item.dataset.route===base));
     pageContent.innerHTML='';
+    applyLeagueFeaturePresentation();
+    const requiredFeature=base==='trade-center'?'trade_center':base==='trade-block'?'trade_block':null;
+    if(requiredFeature&&!leagueFeatureEnabled(requiredFeature)){
+      pageContent.innerHTML=`<section class="empty-state card"><strong>${base==='trade-center'?'Trade Center':'Trade Block'} is unavailable</strong><p>A league commissioner has turned this feature off.</p></section>`;
+      mainContent.focus({preventScroll:true});
+      window.scrollTo({top:0,behavior:'smooth'});
+      return {base,id,route,featureDisabled:true};
+    }
     renderGlobalLeagueDataBanner();
     const emptySubjects = {
       home: 'league data',
@@ -8759,6 +8785,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       case 'schedule-source-inspector': renderScheduleSourceInspector(); break;
       default: renderRoadmap(base);
     }
+    applyLeagueFeaturePresentation();
     mainContent.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:'smooth'});
     return { base, id, route };
@@ -9887,7 +9914,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.4.1';
+  const VISIBLE_RELEASE = '7.4.2';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

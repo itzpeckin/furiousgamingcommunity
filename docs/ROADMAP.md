@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 4, 2026
+**Updated:** September 5, 2026
 
-**Revision:** 1.83
+**Revision:** 1.85
 
-**Current production:** Owner-accepted 7.4.0.8 is active from exact Main merge `37be901`; the public release marker, Trade Center asset, and exact private FGC 672-pick ownership baseline were verified on September 4, 2026. Migration 30 is the current Production database boundary. The baseline has 110 non-original owners; all protected league state and active snapshot `7433846f` remain unchanged. Blocked Madden Free Agents remain unknown/null and are not interpreted as zero.
+**Current production:** FranchiseHQ 7.4.1 is active from exact Main merge `9903a96`; its public release marker and protected tenant boundary were verified on September 4, 2026. Migration 31 is the current Production database boundary. The active snapshot and protected league state remain unchanged. Blocked Madden Free Agents remain unknown/null and are not interpreted as zero.
 
-**Current work:** Owner-authorized 7.4.1 is a locally validated candidate on `codex/franchisehq-7.4.1`. It completes Transactions and League History, adds full-width Trade Review rows, and estimates pick numbers from inverse active standings without claiming official tiebreakers. Additive migration 31 exists only in disposable local databases.
+**Current work:** Owner-authorized 7.4.2 is a locally validated candidate on `codex/franchisehq-7.4.2` from exact Main evidence commit `2b691a0`. It replaces the fragmented Commissioner HQ with a responsive command center, moves managed feature state behind revision-guarded server authority, and separates private Rules drafts from explicit publication. Additive migration 32 exists only in disposable local databases.
 
-**Next gate:** Finish the exact local 7.4.1 candidate evidence, then obtain separate owner authorization before branch publication, pull request, hosted checks, Production migration 31, Main, or Production deployment. Do not import, reset, delete, archive, rotate, transition, change the active snapshot, or reinterpret blocked Free Agents as zero.
+**Next gate:** Obtain separate owner authorization before branch publication, pull request, hosted checks, Production migration 32, Main, or Production deployment. Do not import, reset, delete, archive, rotate, transition, change the active snapshot, or reinterpret blocked Free Agents as zero.
 
 ## Product decisions
 
@@ -32,7 +32,7 @@
 
 - 7.1.0 established a reproducible database, continuous migration ledger, preservation checks, and target-locked migration command.
 - Accepted 7.3.6 runtime work removed the observed full login restart on refresh and hard refresh. The broader authentication/session framework remains scheduled for 7.5.0.
-- Commissioner settings can remain browser-local and disagree between commissioners. The shared schema exists; 7.4.2 moves the feature to server authority.
+- Managed Commissioner feature state is server-authoritative and revision guarded in the 7.4.2 candidate. Remaining feature-specific configuration is migrated only through an explicit validated settings contract rather than silently copied from browser storage.
 - EA has restored Madden NFL 27 Companion data flow. After 7.2, discovery and a safe FGC teams/rosters/players activation are the immediate priority.
 - The real FGC capture received 43 requests (10.17 MB) in 0.448 seconds. It contained 32 teams, all 32 team rosters, 2,044 unique rostered players, standings, 14 current-week games, and 510 statistics rows.
 - All 2,044 captured team-roster players have a valid team assignment and `isFreeAgent: false`; 2,031 are active and 13 are inactive. No duplicate roster identifiers or unassigned players were found.
@@ -73,8 +73,9 @@
 | 7.4.0.6 | Production deployed; pending owner UI acceptance | Sent-offer revision, premium proposal details, stable multi-team selection position, direct Trade Block editing/removal, and consolidated mobile remediation |
 | 7.4.0.7 | Production deployed; pending owner UI acceptance | Reusable Madden 27 opening pick source, private FGC ownership overlay, commissioner-only preview/apply contract, and automatic three-class season rollover |
 | 7.4.0.8 | Production; owner accepted | Compact Trade Center rail, vertically stacked multi-team review packages, calculator-invariant layout, stable Trade Block name filtering, and verified exact FGC 672-pick ownership |
-| 7.4.1 | Local candidate | Full-width Trade Review, standings-based pick projections, canonical transactions, permanent History Books links, and audited corrections |
-| 7.4.2–7.4.6 | Planned | Commissioner tools, GOTW/Confidence Pool, mobile polish, consistency, and operations |
+| 7.4.1 | Production deployed; pending owner Transactions acceptance | Full-width Trade Review, standings-based pick projections, canonical transactions, permanent History Books links, and audited corrections |
+| 7.4.2 | Local candidate | Responsive Commissioner command center, authoritative feature controls, Rules drafts/publication, and consolidated audit visibility |
+| 7.4.3–7.4.6 | Planned | GOTW/Confidence Pool, mobile polish, consistency, and operations |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Required before RC | Authentication and session framework |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
@@ -350,9 +351,13 @@
 
 ## 7.4.2 — Commissioner HQ and Rules
 
-- Move settings to `league_settings` with revisions, validation, and optimistic concurrency.
-- Consolidate member/team/role administration, feature controls, audit history, and Rules drafts/publication.
-- Gate: Commissioner A's saved revision becomes authoritative for Commissioner B and conflicts cannot silently overwrite newer work.
+- Replace the fragmented legacy surface with a responsive six-workspace experience: Command Center, League Data, People & Teams, League Controls, Rules Studio, and Audit & Revisions.
+- Keep every existing protected import, Archive Season, edition-transition, membership, and Trade Center operation behind its current permission and confirmation boundary while giving it a consistent Commissioner HQ shell.
+- Read the Command Center from tenant-scoped server state: active snapshot health, membership and assignment totals, enabled features, unpublished Rules work, setting revisions, transactions, and recent audit activity.
+- Move the managed feature switches for Trade Center, Trade Block, Confidence Pool, and Game of the Week to `league_features` plus `league_settings` revisions. Each change is league-wide, commissioner-only, tenant-audited, and rejected when another commissioner has already saved a newer revision.
+- Separate the published rulebook from a private commissioner workspace. Save Draft never changes what owners see; Publish creates an immutable publication and workspace revision. Validation bounds document size and structure, and stale editors receive a conflict instead of overwriting newer work.
+- Consolidate Discord membership, team assignment, role, and access management around the existing server-authoritative membership endpoint; no browser-seeded identity becomes league authority.
+- Gate: fresh and production-shaped upgrades reach migration 32 without changing existing Rules/settings, Commissioner A's revision becomes authoritative for Commissioner B, stale Rules or feature writes cannot overwrite it, owners cannot read Rules drafts or mutate Commissioner HQ, and desktop/phone layouts remain usable.
 
 ## 7.4.3 — GOTW and Confidence Pool
 
@@ -486,3 +491,4 @@
 - **Revision 1.82:** Published exact 7.4.0.8 candidate `1c6c62f` through PR #39 with 4/4 candidate checks, merged it to Main as `37be901`, and passed all six Main build, quality, Pages, Worker, and deployment checks. Production Pages deployment `52ae9935` and Worker build `706fda54` / version `fb32429a` succeeded; read-only HTTPS verification confirmed the 7.4.0.8 release marker, exact Trade Center asset, and healthy tenant API. After recovery bookmark `000000f6-000002c0-000050dc-5a3f0e43b49e66893958c0cb9b3e5108`, the separately authorized operation applied the exact FGC source hash `2d7aef1b` to all 672 picks: 224 per class for 2027–2029 and 110 non-original owners. Production readback found zero unprotected mapping mismatches, a complete 672/672 application, 672 baseline ledger events, one tenant audit, and zero foreign-key violations; post-operation bookmark `000000f6-00000306-000050dc-dd5bb4594e5c184a06a8c9a0e5ce2df9` is retained. Production contained no pre-existing approved-trade or commissioner-correction pick events, while the guard remained active and local rehearsal proved a protected correction remains untouched. Users, memberships, team assignments, active snapshot `7433846f`, imports, resets, deletions, archives, transitions, credentials, export URL, and blocked/null Free Agent semantics remained unchanged. Signed-in owner UI acceptance is next.
 - **Revision 1.83:** Recorded owner acceptance of the exact FGC pick ownership and began the authorized consolidated 7.4.1 local cycle from Main evidence commit `ffcb611`. Trade Review asset rows now fill their team widget and expose Development, Contract, Age, and optional explainable value without calculator-off reflow. Future picks receive an automatically refreshed inverse-standings estimate based on the original team; ties are explicitly approximate and incomplete standings produce no slot. The canonical Transactions surface is season-grouped with before/after player movement, sanitized evidence, signed-in permanent links, and commissioner-only append-only audited corrections. Additive migration 31 retains compact History Books summaries so links and corrections survive future active-edition cleanup without retaining raw private payloads. Focused projection, Trade Center, transaction access, correction, permanent-history, migration, transition, and tenant tests pass. Production remains exact 7.4.0.8 on migration 30; GitHub, Main, cloud environments, active snapshot, data, imports, resets, archives, transitions, credentials, memberships, export URL, and blocked/null Free Agent semantics remain unchanged and unauthorized.
 - **Revision 1.84:** Published exact 7.4.1 candidate `555fab9` through PR #40 with 4/4 candidate checks, recorded Production D1 recovery bookmark `000000f8-00000148-000050dd-22fb74dae910207e3c250ee20d092278`, and applied additive migration 31 only to `franchise-hq-db-madden27`. Both transaction-history tables, their foreign keys, the continuous migration ledger, and zero foreign-key violations are verified. Protected counts remain exactly 1 league, 28 users, 28 memberships, 27 active team assignments, zero legacy teams/players/snapshots, one active pointer at `ee1d3679`, 672 draft picks, and 1,344 pick-ledger events. PR #40 merged to Main as `9903a969`; all six Main quality/build/deployment checks passed; Pages `a8087a3a`, Worker build `b87f1bb1`, and Worker version `326ee7ef` are live. Read-only HTTPS acceptance confirms the 7.4.1 public marker, exact Trade Center asset, and protected tenant API boundary. No import, snapshot change, reset, deletion, archive, transition, export-URL rotation, credential/membership change, pick ownership operation, or Free Agent reinterpretation ran. Signed-in owner UI acceptance is next.
+- **Revision 1.85:** Completed the owner-authorized 7.4.2 consolidated local cycle from exact Main evidence commit `2b691a0`. The candidate replaces Commissioner HQ's fragmented presentation with a responsive Command Center, six focused workspaces, live tenant metrics, priority actions, and unified People & Teams, League Data, Controls, Rules, and Audit navigation. Managed feature switches now write `league_features` and `league_settings` together behind optimistic revision checks and tenant audit rows. Additive migration 32 backfills existing published Rules into a private revisioned workspace and immutable publication history; Save Draft remains commissioner-only and Publish is the sole action that changes the owner-visible rulebook. Existing protected operations and active snapshot authority are preserved. The full gate passes 167/167 tests, 230 JavaScript modules, 100 required tables, 70 routes, and zero foreign-key violations. GitHub, Main, cloud environments, Production migration 32, league data, imports, active snapshot, resets, archives, transitions, credentials, memberships, export URL, and blocked/null Free Agent semantics remain unchanged and unauthorized during local work.

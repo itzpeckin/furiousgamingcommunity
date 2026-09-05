@@ -127,7 +127,7 @@ test('the production-like legacy upgrade preserves identities and relationships'
       VALUES (?,?,?,?)`).run('league-future-test','Future League','FranchiseHQ','future-league');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints
       WHERE league_id='league-future-test'`).get().count,1);
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 31);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 32);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {
     database.close();

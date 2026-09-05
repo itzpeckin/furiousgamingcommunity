@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.2",
+  "validatedOn": "2026-09-05",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "commissionerCommandCenter": {
+      "passed": true,
+      "workspaces": ["command-center", "league-data", "people-and-teams", "league-controls", "rules-studio", "audit-and-revisions"],
+      "activeSnapshotContext": true,
+      "priorityQueue": true,
+      "liveTenantMetrics": true,
+      "legacyProtectedOperationsPreserved": true
+    },
+    "authoritativeFeatureSettings": {
+      "passed": true,
+      "serverAuthority": true,
+      "leagueScoped": true,
+      "revisionGuarded": true,
+      "staleWriteStatus": 409,
+      "tenantAudited": true,
+      "managedFeatures": ["trade_center", "trade_block", "confidence_pool", "game_of_the_week"]
+    },
+    "rulesStudio": {
+      "passed": true,
+      "privateDrafts": true,
+      "ownersSeeDrafts": false,
+      "explicitPublication": true,
+      "immutablePublications": true,
+      "immutableWorkspaceRevisions": true,
+      "staleWriteStatus": 409,
+      "sizeAndStructureValidated": true,
+      "existingPublishedRulesPreserved": true
+    },
+    "membershipAuthority": {
+      "passed": true,
+      "serverAuthoritative": true,
+      "commissionerOnlyMutations": true,
+      "discordIdentityPreserved": true,
+      "teamAssignmentPreserved": true
+    },
+    "auditVisibility": {
+      "passed": true,
+      "tenantScoped": true,
+      "actorAndTimeVisible": true,
+      "requestInternalsHidden": true,
+      "settingsRevisionHistoryVisible": true
+    },
+    "responsiveExperience": {
+      "passed": true,
+      "desktop": true,
+      "phone": true,
+      "stickyScrollableNavigation": true,
+      "singleColumnPhoneLayouts": true,
+      "reducedMotionSupported": true
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 32,
+      "requiredTables": 100,
+      "foreignKeyViolations": 0,
+      "productionApplied": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 167,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "status": "passed",
+      "javascriptModules": 230,
+      "inventoryFiles": 568,
+      "routes": 70
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "draftPickBaselineApplied": false,
+    "draftPickOwnershipChanged": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "stagingDeployment": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "not-run",
+      "currentRelease": "7.4.1"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-run",
+      "currentMigration": 31,
+      "candidateMigration": 32
+    }
+  }
+}

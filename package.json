@@ -1,6 +1,6 @@
 {
   "name": "franchisehq",
-  "version": "7.4.1",
+  "version": "7.4.2",
   "private": true,
   "type": "module",
   "description": "FranchiseHQ league-management platform",
@@ -22,7 +22,7 @@
     "db:apply": "node tools/run-d1-release.mjs --apply",
     "inventory": "node tools/generate-inventory.mjs",
     "inventory:verify": "node tools/generate-inventory.mjs --verify",
-    "test": "node --test --test-isolation=none tests/tooling/environment.test.mjs tests/tooling/routes.test.mjs tests/tooling/d1-release.test.mjs tests/database/migrations.test.mjs tests/import/madden-discovery.test.mjs tests/import/permanent-identity.test.mjs tests/import/candidate-import.test.mjs tests/import/permanent-league-export.test.mjs tests/import/game-year-transition.test.mjs tests/import/gm-career.test.mjs tests/import/week-label-normalization.test.mjs tests/import/live-data-experience.test.mjs tests/trade/draft-pick-sources.test.mjs tests/trade/draft-pick-projections.test.mjs tests/trade/full-trade-center.test.mjs tests/transactions/canonical-history.test.mjs tests/security/containment.test.mjs tests/security/public-identity-routes.test.mjs tests/security/session.test.mjs tests/security/onboarding.test.mjs tests/security/ownership.test.mjs tests/security/tenancy.test.mjs",
+    "test": "node --test --test-isolation=none tests/tooling/environment.test.mjs tests/tooling/routes.test.mjs tests/tooling/d1-release.test.mjs tests/database/migrations.test.mjs tests/commissioner/commissioner-hq.test.mjs tests/import/madden-discovery.test.mjs tests/import/permanent-identity.test.mjs tests/import/candidate-import.test.mjs tests/import/permanent-league-export.test.mjs tests/import/game-year-transition.test.mjs tests/import/gm-career.test.mjs tests/import/week-label-normalization.test.mjs tests/import/live-data-experience.test.mjs tests/trade/draft-pick-sources.test.mjs tests/trade/draft-pick-projections.test.mjs tests/trade/full-trade-center.test.mjs tests/transactions/canonical-history.test.mjs tests/security/containment.test.mjs tests/security/public-identity-routes.test.mjs tests/security/session.test.mjs tests/security/onboarding.test.mjs tests/security/ownership.test.mjs tests/security/tenancy.test.mjs",
     "ci": "node tools/run-quality.mjs"
   }
 }

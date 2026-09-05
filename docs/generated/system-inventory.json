@@ -59,6 +59,7 @@
       "functions/api/auth/discord/login.js",
       "functions/api/auth/logout.js",
       "functions/api/auth/session/claim.js",
+      "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
       "functions/api/leagues/[leagueSlug]/memberships.js",
       "functions/api/leagues/[leagueSlug]/rules.js",
       "functions/index.js",
@@ -138,32 +139,32 @@
       ".css": 9,
       ".example": 1,
       ".html": 2,
-      ".js": 192,
+      ".js": 193,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 36,
+      ".mjs": 37,
       ".png": 3,
-      ".sql": 33,
+      ".sql": 34,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 634610,
+        "bytes": 636112,
         "file": "app.js"
       },
       {
-        "bytes": 464437,
+        "bytes": 485355,
         "file": "styles.css"
       },
       {
-        "bytes": 368899,
+        "bytes": 383777,
         "file": "trade-module.js"
       },
       {
-        "bytes": 138644,
+        "bytes": 142518,
         "file": "tools/check-release.mjs"
       },
       {
@@ -187,7 +188,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 47420,
+        "bytes": 48229,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
@@ -231,7 +232,7 @@
         "file": "functions/_lib/madden-discovery.js"
       }
     ],
-    "total": 565
+    "total": 568
   },
   "frontend": {
     "assets": [
@@ -711,7 +712,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 69,
+    "routeCount": 70,
     "routes": [
       {
         "file": "functions/index.js",
@@ -784,6 +785,14 @@
           "onRequestGet"
         ],
         "route": "/api/leagues/:leagueSlug"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/commissioner-hq"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
@@ -1411,10 +1420,16 @@
       "recordsLedger": true,
       "sha256": "c239442d0b11502c6ce07b889b14d8f104671574c50b625dc2f6fb262c0fb7c3",
       "version": "0031"
+    },
+    {
+      "file": "migrations/0032_commissioner_hq_rules.sql",
+      "recordsLedger": false,
+      "sha256": "cacf18ef86c03459cefc3c0bcbdbaa65a013fb76456c9047799beca46efd0a67",
+      "version": "0032"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.1",
+  "release": "7.4.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
