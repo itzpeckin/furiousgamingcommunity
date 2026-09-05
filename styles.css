@@ -7145,3 +7145,91 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 @media(max-width:760px){
   .live-trade-card--premium .trade-package-matchup--review{padding-inline:10px}
 }
+
+/* FranchiseHQ 7.4.1 — full-width Trade Review asset rows */
+.trade-package-matchup--review .trade-detail-package-team__assets,
+.trade-package-matchup--review>.trade-package-team>div:not(.trade-package-team__watermark){width:100%;box-sizing:border-box}
+.trade-package-matchup--review .trade-detail-asset{
+  isolation:isolate;
+  width:100%;
+  box-sizing:border-box;
+  grid-template-columns:44px 62px minmax(150px,.8fr) minmax(360px,1.7fr) minmax(96px,auto) auto;
+  overflow:hidden;
+  background:linear-gradient(105deg,color-mix(in srgb,var(--trade-team-primary) 42%,#101c2d),color-mix(in srgb,var(--trade-team-secondary) 22%,#0e1a2a) 35%,#101d30 78%);
+}
+.trade-package-matchup--review .trade-detail-asset::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,10,17,.06),rgba(5,10,17,.5) 44%,rgba(5,10,17,.76))}
+.trade-detail-asset__brand{display:grid;place-items:center;width:42px;height:42px}
+.trade-detail-asset__brand img{max-width:40px;max-height:40px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.58))}
+.trade-detail-asset__brand>span{font-size:.65rem;font-weight:900}
+button.trade-detail-asset__identity{padding:0;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer}
+button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__identity:focus-visible strong{color:#9cbdff}
+.trade-detail-asset__identity>small{color:rgba(255,255,255,.67);font-size:.61rem}
+.trade-detail-asset__metrics{display:grid;grid-template-columns:repeat(5,minmax(54px,1fr));gap:1px;overflow:hidden;border:1px solid rgba(255,255,255,.11);border-radius:9px;background:rgba(5,10,17,.38)}
+.trade-detail-asset__metrics--pick{grid-template-columns:repeat(4,minmax(62px,1fr))}
+.trade-detail-asset__metrics>span{display:grid;align-content:center;justify-items:center;gap:2px;min-width:0;padding:7px 5px;border-left:1px solid rgba(255,255,255,.1)}
+.trade-detail-asset__metrics>span:first-child{border-left:0}
+.trade-detail-asset__metrics small{color:rgba(255,255,255,.57);font-size:.49rem;font-weight:850;letter-spacing:.06em}
+.trade-detail-asset__metrics strong{max-width:100%;overflow:hidden;color:#fff;font-size:.66rem;text-overflow:ellipsis;white-space:nowrap}
+.trade-package-matchup--review .trade-detail-asset>.trade-value-button{height:100%;align-content:center}
+
+@media(max-width:1100px){
+  .trade-package-matchup--review .trade-detail-asset{grid-template-columns:42px 58px minmax(135px,.7fr) minmax(300px,1.5fr) minmax(86px,auto) auto}
+}
+@media(max-width:820px){
+  .trade-package-matchup--review .trade-detail-asset{grid-template-columns:40px 54px minmax(0,1fr) auto;gap:8px}
+  .trade-detail-asset__metrics{grid-column:1/-1;grid-row:2;overflow-x:auto}
+  .trade-detail-asset__route{grid-column:1/4;grid-row:3;justify-items:start;text-align:left}
+  .trade-package-matchup--review .trade-detail-asset>.trade-value-button{grid-column:4;grid-row:1;min-width:66px}
+}
+@media(max-width:520px){
+  .trade-package-matchup--review .trade-detail-asset{grid-template-columns:34px 47px minmax(0,1fr) auto;padding:8px}
+  .trade-detail-asset__brand{width:32px;height:32px}.trade-detail-asset__brand img{max-width:31px;max-height:31px}
+  .trade-detail-asset__photo{width:45px;height:51px;margin-bottom:-8px}
+  .trade-detail-asset__metrics{grid-template-columns:repeat(5,minmax(62px,1fr))}
+  .trade-detail-asset__metrics--pick{grid-template-columns:repeat(4,minmax(68px,1fr))}
+  .trade-detail-asset__route{grid-column:1/-1}
+  .trade-package-matchup--review .trade-detail-asset>.trade-value-button{grid-column:4;grid-row:1}
+}
+
+/* FranchiseHQ 7.4.1 — canonical Transactions and League History */
+.transaction-history-groups{display:grid;gap:24px}
+.transaction-season-group{display:grid;gap:12px}
+.transaction-season-group>header{display:grid;grid-template-columns:1fr auto;align-items:end;gap:2px;padding:0 4px}
+.transaction-season-group>header span{grid-column:1;color:var(--muted);font-size:.61rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
+.transaction-season-group>header h2{grid-column:1;margin:0;font-size:1.2rem}.transaction-season-group>header b{grid-column:2;grid-row:1/3;color:var(--muted);font-size:.68rem}
+.transaction-season-group>div{display:grid;gap:11px}
+.transaction-history-card{display:grid;grid-template-columns:minmax(170px,.7fr) minmax(0,1.7fr);gap:14px;padding:0;overflow:hidden}
+.transaction-history-card>header{display:grid;align-content:center;gap:7px;padding:17px 18px;border-right:1px solid var(--border);background:linear-gradient(145deg,color-mix(in srgb,var(--surface-2) 93%,var(--accent)),var(--surface-2))}
+.transaction-history-card>header>div{display:flex;gap:6px;flex-wrap:wrap}.transaction-history-card>header>strong{font-size:.85rem}.transaction-history-card>header>small{color:var(--muted);font-size:.65rem}
+.transaction-history-card__players{display:grid;align-content:center;gap:7px;padding:12px 14px}
+.transaction-history-player{display:grid;grid-template-columns:minmax(140px,.8fr) minmax(220px,1.2fr);align-items:center;gap:12px;padding:9px 11px;border:1px solid var(--line-soft);border-radius:11px;background:var(--canvas-2)}
+.transaction-history-player>button{display:grid;gap:2px;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.transaction-history-player>button:hover strong{color:var(--accent)}.transaction-history-player>button small{color:var(--muted);font-size:.62rem}
+.transaction-history-player>span{display:flex;align-items:center;justify-content:flex-end;gap:8px}.transaction-history-player>span>i{color:var(--accent);font-style:normal}
+.transaction-history-player--empty{display:flex;align-items:center;justify-content:space-between}.transaction-history-player--empty small{color:var(--muted)}
+.transaction-team-chip{display:flex;align-items:center;gap:6px;min-width:0}.transaction-team-chip .mini-team{width:25px;height:25px}.transaction-team-chip>span{font-size:.66rem;font-weight:850}.transaction-team-chip--fa b{display:grid;place-items:center;width:25px;height:25px;border-radius:8px;background:rgba(var(--accent-rgb),.13);color:var(--accent);font-size:.58rem}
+.transaction-history-card>footer{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface-2)}.transaction-history-card>footer>span{color:var(--muted);font-size:.61rem}
+
+.transaction-detail-page{display:grid;gap:16px}.transaction-detail-page>.page-heading{align-items:flex-end;padding:18px 20px;border:1px solid var(--border);border-radius:16px;background:linear-gradient(145deg,#13233a,#0b1726)}
+.transaction-detail-page>.page-heading h1{margin:6px 0 2px}.transaction-detail-page>.page-heading p{margin:0;color:var(--muted)}
+.transaction-detail-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:hidden;border:1px solid var(--border);border-radius:14px;background:var(--surface-1)}
+.transaction-detail-summary>div{display:grid;gap:5px;padding:14px 16px;border-left:1px solid var(--border)}.transaction-detail-summary>div:first-child{border-left:0}.transaction-detail-summary small{color:var(--muted);font-size:.57rem;font-weight:850;letter-spacing:.07em;text-transform:uppercase}.transaction-detail-summary strong{font-size:.82rem}
+.transaction-detail-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,330px);gap:16px;align-items:start}.transaction-detail-grid>main,.transaction-detail-grid>aside{display:grid;gap:16px;min-width:0}
+.transaction-detail-assets{padding:0;overflow:hidden}.transaction-detail-assets>.card-header,.transaction-evidence-card>.card-header,.transaction-correction-history-card>.card-header{padding:16px 18px;border-bottom:1px solid var(--border)}.transaction-detail-assets>.card-header h2,.transaction-evidence-card>.card-header h2{margin:3px 0;font-size:1rem}.transaction-detail-assets>.card-header p{margin:0;color:var(--muted);font-size:.68rem}
+.transaction-detail-player{display:grid;grid-template-columns:minmax(150px,.65fr) minmax(280px,1.35fr);align-items:center;gap:14px;padding:13px 18px;border-top:1px solid var(--border)}.transaction-detail-player:first-of-type{border-top:0}.transaction-detail-player>button{display:grid;gap:3px;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.transaction-detail-player>button:hover strong{color:var(--accent)}.transaction-detail-player>button small{color:var(--muted);font-size:.66rem}.transaction-detail-player>div{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}.transaction-detail-player>div>span{display:grid;gap:4px;padding:8px 10px;border:1px solid var(--line-soft);border-radius:10px;background:var(--canvas-2)}.transaction-detail-player>div>span>small{color:var(--muted);font-size:.51rem;font-weight:850;letter-spacing:.06em;text-transform:uppercase}.transaction-detail-player>div>i{color:var(--accent);font-style:normal}
+.transaction-evidence-card,.transaction-correction-history-card{padding:0;overflow:hidden}.transaction-evidence-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px;padding:12px 14px;border-top:1px solid var(--border)}.transaction-evidence-row:first-of-type{border-top:0}.transaction-evidence-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:rgba(var(--accent-rgb),.12);color:var(--accent)}.transaction-evidence-icon svg{width:15px;height:15px}.transaction-evidence-row>div{display:grid;gap:2px}.transaction-evidence-row strong{font-size:.7rem}.transaction-evidence-row small{color:var(--muted);font-size:.56rem}.transaction-evidence-row>b{font-size:.59rem;color:var(--muted)}
+.transaction-correction-panel{padding:0;overflow:hidden}.transaction-correction-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;cursor:pointer}.transaction-correction-panel>summary::marker{content:""}.transaction-correction-panel>summary>span:first-child{display:grid;gap:2px}.transaction-correction-panel>summary small{color:var(--accent);font-size:.56rem;font-weight:850;letter-spacing:.07em;text-transform:uppercase}.transaction-correction-panel>summary>span:last-child{color:var(--muted);font-size:.63rem}
+.transaction-correction-panel>form{display:grid;gap:13px;padding:16px 18px;border-top:1px solid var(--border)}.transaction-correction-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.transaction-correction-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:10px;background:rgba(var(--accent-rgb),.08);font-size:.63rem}.transaction-correction-note span{color:var(--muted)}.transaction-correction-panel>form>.button{justify-self:start}
+.transaction-correction-history{display:grid;gap:4px;padding:11px 14px;border-top:1px solid var(--border)}.transaction-correction-history:first-of-type{border-top:0}.transaction-correction-history strong{font-size:.66rem}.transaction-correction-history span{font-size:.64rem;line-height:1.4}.transaction-correction-history small{color:var(--muted);font-size:.55rem}
+
+@media(max-width:980px){
+  .transaction-detail-grid{grid-template-columns:1fr}.transaction-detail-grid>aside{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .transaction-history-card{grid-template-columns:1fr}.transaction-history-card>header{border-right:0;border-bottom:1px solid var(--border)}
+  .transaction-correction-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:680px){
+  .league-transaction-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.league-transaction-filters>.field--grow{grid-column:1/-1}.league-transaction-filters .field{min-width:0;width:100%}.league-transaction-filters .result-count{grid-column:1/-1}
+  .transaction-history-player{grid-template-columns:1fr}.transaction-history-player>span{justify-content:flex-start;overflow-x:auto}.transaction-history-card>footer{align-items:flex-start;flex-direction:column}
+  .transaction-detail-page>.page-heading{align-items:stretch;flex-direction:column;padding:15px}.transaction-detail-page>.page-heading .heading-actions{display:grid;grid-template-columns:1fr}.transaction-detail-page>.page-heading .button{width:100%}
+  .transaction-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.transaction-detail-summary>div:nth-child(3){border-left:0;border-top:1px solid var(--border)}.transaction-detail-summary>div:nth-child(4){border-top:1px solid var(--border)}
+  .transaction-detail-player{grid-template-columns:1fr}.transaction-detail-player>div{grid-template-columns:1fr auto 1fr}.transaction-detail-grid>aside{grid-template-columns:1fr}.transaction-correction-grid{grid-template-columns:1fr}.transaction-correction-note{flex-direction:column}
+}

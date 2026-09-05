@@ -15,6 +15,10 @@ import {
   configuredDraftPickBaseline,
   ensureDraftPickHorizon
 } from '../../../_lib/draft-pick-baselines.js';
+import {
+  attachProjectedPickSlots,
+  projectDraftOrder
+} from '../../../_lib/draft-pick-projections.js';
 
 const jsonParse = (value, fallback = null) => {
   try { return JSON.parse(value || 'null') ?? fallback; }
@@ -67,6 +71,16 @@ async function currentSeason(db, leagueId) {
 async function activeSnapshotId(db, leagueId) {
   const row = await db.prepare(`SELECT snapshot_id AS snapshotId FROM league_active_snapshots WHERE league_id=?`).bind(leagueId).first();
   return row?.snapshotId || null;
+}
+
+async function activeStandingsProjection(db, leagueId, teams) {
+  const standingRows = await resultRows(db, `SELECT records.external_id AS externalId,records.data_json AS dataJson
+    FROM league_active_snapshots active
+    JOIN league_snapshot_records records
+      ON records.league_id=active.league_id AND records.snapshot_id=active.snapshot_id
+    WHERE active.league_id=? AND records.domain='standings'
+    ORDER BY records.external_id`, leagueId);
+  return projectDraftOrder(standingRows, teams);
 }
 
 async function leagueSettings(db, leagueId) {
@@ -181,11 +195,13 @@ async function publicState(c) {
     const item = await publicWorkflow(c.db,c.league.id,row,c.session);
     if (item) workflows.push(item);
   }
-  const picks = season ? await resultRows(c.db, `SELECT id,draft_class AS draftClass,round,
+  const rawPicks = season ? await resultRows(c.db, `SELECT id,draft_class AS draftClass,round,
       original_team_key AS originalTeamKey,current_team_key AS currentTeamKey,source_authority AS sourceAuthority,
       revision,updated_at AS updatedAt FROM league_draft_picks
     WHERE league_id=? AND draft_class BETWEEN ? AND ? AND continuity_key IS NOT NULL
     ORDER BY draft_class,round,original_team_key`,c.league.id,Number(season.seasonYear)+1,Number(season.seasonYear)+3) : [];
+  const standingsProjection = await activeStandingsProjection(c.db,c.league.id,c.teams);
+  const picks = attachProjectedPickSlots(rawPicks,standingsProjection);
   const listings = await resultRows(c.db, `SELECT listing.id,listing.team_key AS teamKey,listing.asset_type AS assetType,
       listing.player_identity_id AS playerIdentityId,identity.public_id AS playerPublicId,identity.display_name AS playerName,
       listing.draft_pick_id AS draftPickId,listing.requested_return AS requestedReturn,
@@ -203,7 +219,7 @@ async function publicState(c) {
     league:{id:c.league.id,slug:c.league.slug,name:c.league.name},
     session:{userId:c.session.user.id,role:c.session.membership.role,teamKey:memberTeam(c.session)},
     season:season || null,settings:{revision:settings.revision,updatedAt:settings.updatedAt,...settings.tradeCenter},
-    teams:publicLeagueTeams(c.teams,assignments),picks,pickBaseline,workflows,
+    teams:publicLeagueTeams(c.teams,assignments),picks,pickBaseline,standingsProjection,workflows,
     listings:listings.map(item => ({...item,needs:jsonParse(item.needsJson,{})})),
     teamNeeds:teamNeeds.map(item=>({...item,needs:jsonParse(item.needsJson,[])})),notifications
   };
@@ -429,6 +445,7 @@ async function review(c, row, participants, decision, reason, freeTrade) {
   }
   const snapshotId=await activeSnapshotId(c.db,c.league.id);
   if (!snapshotId) throw Object.assign(new Error('An active Madden snapshot is required.'),{status:409});
+  const season=await currentSeason(c.db,c.league.id);
   const assets=await resultRows(c.db,`SELECT * FROM trade_workflow_assets WHERE trade_id=? AND league_id=? AND revision=? ORDER BY ordinal`,row.id,c.league.id,row.revision);
   for (const asset of assets) {
     if (asset.asset_type==='player') await playerAsset(c,asset.source_player_id,canonicalTeamKey(asset.from_team_key));
@@ -463,18 +480,34 @@ async function review(c, row, participants, decision, reason, freeTrade) {
     }
   }
   const transactionId=`canonical_transaction_${crypto.randomUUID()}`;
+  const playerAssets=assets.filter(item=>item.asset_type==='player');
+  const playerIds=playerAssets.map(item=>item.source_player_id);
+  const teamIds=participants.map(item=>item.team_key);
+  const movements=playerAssets.map(item=>({
+    playerId:item.source_player_id,
+    fromTeamId:item.from_team_key,
+    toTeamId:item.to_team_key
+  }));
+  const transactionDetails={tradeId:row.id,revision:Number(row.revision),freeTrade:designateFree};
   statements.push(c.db.prepare(`INSERT INTO canonical_transactions
     (id,league_id,event_type,status,authority,execution_status,team_ids_json,player_ids_json,workflow_trade_id,
-     first_snapshot_id,last_snapshot_id,confidence,details_json,created_at,updated_at)
-    VALUES (?,?,'trade','recorded','trade-center','pending-madden-execution',?,?,?,?,?,'confirmed',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+     first_snapshot_id,last_snapshot_id,confidence,details_json,season,created_at,updated_at)
+    VALUES (?,?,'trade','recorded','franchisehq-workflow','pending-madden-execution',?,?,?,?,?,'confirmed',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO NOTHING`).bind(transactionId,c.league.id,JSON.stringify(participants.map(item=>item.team_key)),
-      JSON.stringify(assets.filter(item=>item.asset_type==='player').map(item=>item.source_player_id)),row.id,snapshotId,snapshotId,
-      JSON.stringify({tradeId:row.id,revision:Number(row.revision),freeTrade:designateFree})));
+      JSON.stringify(playerIds),row.id,snapshotId,snapshotId,JSON.stringify(transactionDetails),season?.seasonYear??null));
+  statements.push(c.db.prepare(`INSERT INTO league_transaction_history
+    (id,league_id,event_type,status,authority,execution_status,season,team_ids_json,player_ids_json,workflow_trade_id,
+     confidence,details_json,participants_json,movements_json,source_types_json,source_count,created_at,updated_at)
+    VALUES (?,?,'trade','recorded','franchisehq-workflow','pending-madden-execution',?,?,?,?,? ,?, ?,?,'["franchisehq-workflow"]',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING`).bind(
+      transactionId,c.league.id,season?.seasonYear??null,JSON.stringify(teamIds),JSON.stringify(playerIds),row.id,
+      'confirmed',JSON.stringify(transactionDetails),JSON.stringify(playerIds.map(id=>({id:String(id),name:`Player ${id}`}))),JSON.stringify(movements)
+    ));
   statements.push(c.db.prepare(`INSERT INTO canonical_transaction_evidence
     (id,league_id,transaction_id,source_type,source_key,snapshot_id,evidence_json,created_at)
-    VALUES (?,? ,?,'trade-workflow',?,?,?,CURRENT_TIMESTAMP)`)
-    .bind(`canonical_evidence_${crypto.randomUUID()}`,c.league.id,transactionId,`trade-workflow:${row.id}:revision:${row.revision}`,snapshotId,
-      JSON.stringify({tradeId:row.id,revision:Number(row.revision),assetCount:assets.length})));
+    VALUES (?,? ,?,'franchisehq-workflow',?,?,?,CURRENT_TIMESTAMP)`)
+    .bind(`canonical_evidence_${crypto.randomUUID()}`,c.league.id,transactionId,`franchisehq-workflow:${row.id}:revision:${row.revision}`,snapshotId,
+      JSON.stringify({...transactionDetails,eventType:'trade',season:season?.seasonYear??null,teamIds,playerIds,moves:movements,assetCount:assets.length})));
   statements.push(...await notificationStatements(c.db,c.league.id,row.id,participantUsers,'approved','Trade approved','The approved players and picks now appear with their receiving teams. Madden will remain authoritative on the next import.'));
   await c.db.batch(statements);
 }

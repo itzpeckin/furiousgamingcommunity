@@ -1,9 +1,10 @@
 /* FHQ_BUILD: 5.9.11.0 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
-import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireActiveMembership, requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
+import { createTenantAuditContext, tenantAuditStatement } from '../../../../_lib/tenant-context.js';
 
-const RELEASE='5.9.11.0';
+const RELEASE='7.4.1';
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
 const now=()=>new Date().toISOString();
@@ -20,10 +21,10 @@ async function ensureSchema(db){
   return requireDatabaseSchema(db);
 }
 
-async function requestState(context){
+async function requestState(context,{commissioner=false}={}){
   const slug=normalizeLeagueSlug(context);
   if(!validLeagueSlug(slug))return{response:json({ok:false,error:'Invalid league slug.'},400)};
-  const auth=await requireCommissioner(context);
+  const auth=await (commissioner?requireCommissioner(context):requireActiveMembership(context));
   if(!auth.authorized)return{response:auth.response};
   const db=database(context.env),league=await resolveLeague(context.env,slug);
   if(!db||!league||auth.session.membership?.leagueId!==league.id){
@@ -33,43 +34,122 @@ async function requestState(context){
   return{db,league,slug,auth};
 }
 
-function publicTransaction(row,evidence=[]){
+function publicEvidence(item){
+  const raw=parse(item.evidence_json,{})||{};
+  const moves=(Array.isArray(raw.moves)?raw.moves:[]).map(move=>({
+    playerId:clean(move?.playerId),
+    playerName:clean(move?.playerName),
+    position:clean(move?.position),
+    overall:Number.isFinite(Number(move?.overall))?Number(move.overall):null,
+    fromTeamId:clean(move?.fromTeamId),
+    toTeamId:clean(move?.toTeamId),
+    oldStatus:clean(move?.oldStatus),
+    newStatus:clean(move?.newStatus)
+  }));
+  return {
+    sourceType:item.source_type,
+    snapshotId:item.snapshot_id||null,
+    evidence:{
+      eventType:clean(raw.eventType),
+      season:Number.isFinite(Number(raw.season))?Number(raw.season):null,
+      week:Number.isFinite(Number(raw.week))?Number(raw.week):null,
+      summary:clean(raw.summary),
+      moves
+    },
+    createdAt:item.created_at
+  };
+}
+
+function publicTransaction(row,evidence=[],correctionHistory=[],slug=''){
   if(!row)return null;
-  return{
-    id:row.id,
+  const correction=correctionHistory[0]||null;
+  const retainedParticipants=parse(row.participants_json,[])||[];
+  const retainedMoves=parse(row.movements_json,[])||[];
+  const retainedSourceTypes=parse(row.source_types_json,[])||[];
+  const publicEvidenceRows=evidence.length?evidence:(retainedSourceTypes.length
+    ?retainedSourceTypes.map((sourceType,index)=>({
+      source_type:sourceType,snapshot_id:null,created_at:row.updated_at,
+      evidence_json:JSON.stringify({summary:'Retained History Books source',moves:index===0?retainedMoves:[]})
+    }))
+    :(retainedMoves.length?[{
+      source_type:'history-summary',snapshot_id:null,created_at:row.updated_at,
+      evidence_json:JSON.stringify({summary:'Retained History Books summary',moves:retainedMoves})
+    }]:[]));
+  const original={
     eventType:row.event_type,
-    status:row.status,
-    authority:row.authority,
-    executionStatus:row.execution_status,
     season:row.season==null?null:Number(row.season),
     week:row.week==null?null:Number(row.week),
     occurredAt:row.occurred_at||null,
     teamIds:parse(row.team_ids_json,[])||[],
-    playerIds:parse(row.player_ids_json,[])||[],
+    playerIds:parse(row.player_ids_json,[])||[]
+  };
+  const corrected=Boolean(correction);
+  const eventType=correction?.event_type||original.eventType;
+  const season=correction?correction.season:original.season;
+  const week=correction?correction.week:original.week;
+  const occurredAt=correction?correction.occurred_at:original.occurredAt;
+  const teamIds=correction?(parse(correction.team_ids_json,[])||[]):original.teamIds;
+  const playerIds=correction?(parse(correction.player_ids_json,[])||[]):original.playerIds;
+  const participantRows=[...retainedParticipants,...publicEvidenceRows
+    .flatMap(item=>(parse(item.evidence_json,{})?.moves||[]))
+    .filter(move=>move?.playerId)
+    .map(move=>({
+      id:String(move.playerId),name:move.playerName||`Player ${move.playerId}`,
+      position:move.position||null,overall:Number.isFinite(Number(move.overall))?Number(move.overall):null
+    }))];
+  const participants=[...new Map(participantRows.map(item=>[String(item.id||item.playerId),{
+    id:String(item.id||item.playerId),name:item.name||item.playerName||`Player ${item.id||item.playerId}`,
+    position:item.position||null,overall:Number.isFinite(Number(item.overall))?Number(item.overall):null
+  }])).values()];
+  return{
+    id:row.id,
+    permanentHref:`/leagues/${encodeURIComponent(slug)}#transactions/${encodeURIComponent(row.id)}`,
+    eventType,
+    status:row.status,
+    authority:row.authority,
+    executionStatus:row.execution_status,
+    season:season==null?null:Number(season),
+    week:week==null?null:Number(week),
+    occurredAt:occurredAt||null,
+    teamIds,
+    playerIds,
     workflowTradeId:row.workflow_trade_id||null,
     firstSnapshotId:row.first_snapshot_id||null,
     lastSnapshotId:row.last_snapshot_id||null,
     confidence:row.confidence,
     details:parse(row.details_json,{})||{},
-    participants:[...new Map(evidence
-      .flatMap(item=>(parse(item.evidence_json,{})?.moves||[]))
-      .filter(move=>move?.playerId)
-      .map(move=>[String(move.playerId),{
-        id:String(move.playerId),
-        name:move.playerName||`Player ${move.playerId}`,
-        position:move.position||null,
-        overall:Number.isFinite(Number(move.overall))?Number(move.overall):null
-      }])).values()],
-    evidence:evidence.map(item=>({
-      sourceType:item.source_type,
-      sourceKey:item.source_key,
-      snapshotId:item.snapshot_id||null,
-      evidence:parse(item.evidence_json,{})||{},
-      createdAt:item.created_at
+    participants,
+    evidence:publicEvidenceRows.map(publicEvidence),
+    sourceCount:Number(row.source_count??evidence.length??0),
+    sourceTypes:retainedSourceTypes.length?retainedSourceTypes:uniq(evidence.map(item=>item.source_type)),
+    corrected,
+    correction:corrected?{
+      revision:Number(correction.revision),
+      reason:correction.correction_reason,
+      correctedBy:correction.corrected_by_name||'Commissioner',
+      createdAt:correction.created_at
+    }:null,
+    correctionRevision:Number(correction?.revision||0),
+    corrections:correctionHistory.map(item=>({
+      revision:Number(item.revision),reason:item.correction_reason,
+      eventType:item.event_type,season:item.season==null?null:Number(item.season),week:item.week==null?null:Number(item.week),
+      occurredAt:item.occurred_at||null,correctedBy:item.corrected_by_name||'Commissioner',createdAt:item.created_at
     })),
+    original:corrected?original:null,
     createdAt:row.created_at,
     updatedAt:row.updated_at
   };
+}
+
+function publiclyVisibleTransaction(transaction={}){
+  const authority=String(transaction.authority||'').toLowerCase();
+  const execution=String(transaction.executionStatus||'').toLowerCase();
+  const type=String(transaction.eventType||'').toLowerCase();
+  if(type==='roster-status-change')return false;
+  const madden=authority==='madden-explicit'||authority==='franchisehq+madden'||execution==='confirmed-madden';
+  const roster=authority==='franchisehq+snapshot-confirmed'||authority==='snapshot-inferred'||execution==='confirmed-roster'||execution==='observed-roster';
+  if(type==='trade')return execution!=='pending-madden-execution'&&(madden||roster);
+  return madden||roster;
 }
 
 function evidenceFlags(evidence=[]){
@@ -126,6 +206,44 @@ async function evidenceForTransaction(db,transactionId){
   const result=await db.prepare(`SELECT * FROM canonical_transaction_evidence
     WHERE transaction_id=? ORDER BY created_at`).bind(transactionId).all();
   return result.results||[];
+}
+
+function historyProjection(row,evidence=[]){
+  const moves=evidence.flatMap(item=>parse(item.evidence_json,{})?.moves||[]).filter(Boolean);
+  const participants=[...new Map(moves.filter(move=>move?.playerId).map(move=>[String(move.playerId),{
+    id:String(move.playerId),name:move.playerName||`Player ${move.playerId}`,
+    position:move.position||null,overall:Number.isFinite(Number(move.overall))?Number(move.overall):null
+  }])).values()];
+  return{
+    participants,
+    movements:moves.map(move=>({
+      playerId:clean(move.playerId),playerName:clean(move.playerName),position:clean(move.position),
+      overall:Number.isFinite(Number(move.overall))?Number(move.overall):null,
+      fromTeamId:clean(move.fromTeamId),toTeamId:clean(move.toTeamId),
+      oldStatus:clean(move.oldStatus??move.fromStatus),newStatus:clean(move.newStatus??move.toStatus)
+    })),
+    sourceTypes:uniq(evidence.map(item=>item.source_type))
+  };
+}
+
+async function syncTransactionHistory(db,row,evidence=[]){
+  if(!row)return;
+  const projection=historyProjection(row,evidence);
+  await db.prepare(`INSERT INTO league_transaction_history
+    (id,league_id,event_type,status,authority,execution_status,season,week,occurred_at,team_ids_json,player_ids_json,
+     workflow_trade_id,confidence,details_json,participants_json,movements_json,source_types_json,source_count,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(id) DO UPDATE SET
+      event_type=excluded.event_type,status=excluded.status,authority=excluded.authority,
+      execution_status=excluded.execution_status,season=excluded.season,week=excluded.week,
+      occurred_at=excluded.occurred_at,team_ids_json=excluded.team_ids_json,player_ids_json=excluded.player_ids_json,
+      workflow_trade_id=excluded.workflow_trade_id,confidence=excluded.confidence,details_json=excluded.details_json,
+      participants_json=excluded.participants_json,movements_json=excluded.movements_json,
+      source_types_json=excluded.source_types_json,source_count=excluded.source_count,updated_at=excluded.updated_at`)
+    .bind(row.id,row.league_id,row.event_type,row.status,row.authority,row.execution_status,row.season,row.week,row.occurred_at,
+      row.team_ids_json,row.player_ids_json,row.workflow_trade_id,row.confidence,row.details_json,
+      JSON.stringify(projection.participants),JSON.stringify(projection.movements),JSON.stringify(projection.sourceTypes),evidence.length,
+      row.created_at,row.updated_at).run();
 }
 
 async function candidateTransactions(db,leagueId,event){
@@ -195,7 +313,9 @@ async function refreshCanonicalRow(db,transactionId){
     WHERE id=?`)
     .bind(eventType,authority,execution,JSON.stringify(teamIds),JSON.stringify(playerIds),transactionId).run();
 
-  return db.prepare(`SELECT * FROM canonical_transactions WHERE id=?`).bind(transactionId).first();
+  const refreshed=await db.prepare(`SELECT * FROM canonical_transactions WHERE id=?`).bind(transactionId).first();
+  await syncTransactionHistory(db,refreshed,evidence);
+  return refreshed;
 }
 
 async function mergeEvidence(db,leagueId,event,snapshotId=null){
@@ -500,12 +620,34 @@ export async function onRequestGet(context){
   const state=await requestState(context);
   if(state.response)return state.response;
 
-  const txResult=await state.db.prepare(`SELECT * FROM canonical_transactions
-    WHERE league_id=? ORDER BY COALESCE(occurred_at,created_at) DESC,created_at DESC LIMIT 250`)
-    .bind(state.league.id).all();
+  const url=new URL(context.request.url);
+  const requestedId=clean(url.searchParams.get('transactionId'));
+  const requestedLimit=Math.max(1,Math.min(1000,Number(url.searchParams.get('limit'))||500));
 
-  const transactionRows=txResult.results||[];
+  const txResult=requestedId
+    ? await state.db.prepare(`SELECT * FROM canonical_transactions WHERE league_id=? AND id=? LIMIT 1`)
+      .bind(state.league.id,requestedId).all()
+    : await state.db.prepare(`SELECT * FROM canonical_transactions
+      WHERE league_id=? ORDER BY COALESCE(occurred_at,created_at) DESC,created_at DESC LIMIT ?`)
+      .bind(state.league.id,requestedLimit).all();
+
+  const historyResult=requestedId
+    ? await state.db.prepare(`SELECT history.*,NULL AS first_snapshot_id,NULL AS last_snapshot_id,1 AS history_only
+      FROM league_transaction_history history
+      WHERE history.league_id=? AND history.id=?
+        AND NOT EXISTS (SELECT 1 FROM canonical_transactions canonical WHERE canonical.id=history.id)
+      LIMIT 1`).bind(state.league.id,requestedId).all()
+    : await state.db.prepare(`SELECT history.*,NULL AS first_snapshot_id,NULL AS last_snapshot_id,1 AS history_only
+      FROM league_transaction_history history
+      WHERE history.league_id=?
+        AND NOT EXISTS (SELECT 1 FROM canonical_transactions canonical WHERE canonical.id=history.id)
+      ORDER BY COALESCE(history.occurred_at,history.created_at) DESC,history.created_at DESC LIMIT ?`)
+      .bind(state.league.id,requestedLimit).all();
+  const transactionRows=[...(txResult.results||[]),...(historyResult.results||[])]
+    .sort((left,right)=>String(right.occurred_at||right.created_at||'').localeCompare(String(left.occurred_at||left.created_at||'')))
+    .slice(0,requestedLimit);
   const evidenceByTransaction=new Map();
+  const correctionByTransaction=new Map();
   const ids=transactionRows.map(row=>String(row.id)).filter(Boolean);
 
   for(let i=0;i<ids.length;i+=75){
@@ -513,18 +655,31 @@ export async function onRequestGet(context){
     if(!batch.length)continue;
     const marks=batch.map(()=>'?').join(',');
     const evidenceResult=await state.db.prepare(`SELECT * FROM canonical_transaction_evidence
-      WHERE transaction_id IN (${marks})
-      ORDER BY transaction_id,created_at`).bind(...batch).all();
+      WHERE league_id=? AND transaction_id IN (${marks})
+      ORDER BY transaction_id,created_at`).bind(state.league.id,...batch).all();
     for(const item of evidenceResult.results||[]){
       const key=String(item.transaction_id);
       if(!evidenceByTransaction.has(key))evidenceByTransaction.set(key,[]);
       evidenceByTransaction.get(key).push(item);
     }
+    const correctionResult=await state.db.prepare(`SELECT correction.*,user.display_name AS corrected_by_name
+      FROM canonical_transaction_corrections correction
+      LEFT JOIN users user ON user.id=correction.created_by_user_id
+      WHERE correction.league_id=? AND correction.transaction_id IN (${marks})
+      ORDER BY correction.transaction_id,correction.revision DESC`).bind(state.league.id,...batch).all();
+    for(const item of correctionResult.results||[]){
+      const key=String(item.transaction_id);
+      if(!correctionByTransaction.has(key))correctionByTransaction.set(key,[]);
+      correctionByTransaction.get(key).push(item);
+    }
   }
 
-  const transactions=transactionRows.map(row=>
-    publicTransaction(row,evidenceByTransaction.get(String(row.id))||[])
-  );
+  const transactions=transactionRows.map(row=>publicTransaction(
+    row,
+    evidenceByTransaction.get(String(row.id))||[],
+    correctionByTransaction.get(String(row.id))||[],
+    state.league.slug
+  )).filter(publiclyVisibleTransaction);
 
   // Departed players are no longer present in the active player directory.
   // Resolve their identity from the latest stored lifecycle state so transaction
@@ -574,8 +729,15 @@ export async function onRequestGet(context){
     ok:true,
     release:RELEASE,
     invariant:'one real-world trade = one canonical transaction',
+    permissions:{canCorrect:state.auth.session.membership?.role==='commissioner'},
+    availableSeasons:[...new Set(transactions.map(item=>item.season).filter(Number.isFinite))].sort((a,b)=>b-a),
     transactions,
-    rosterSnapshots:snapshots.results||[]
+    rosterSnapshots:(snapshots.results||[]).map(row=>({
+      snapshotId:row.snapshot_id,season:row.season==null?null:Number(row.season),week:row.week==null?null:Number(row.week),
+      capturedAt:row.captured_at,playerCount:Number(row.player_count||0)
+    })),
+    requestedTransactionId:requestedId||null,
+    readOnly:true
   });
 }
 
@@ -2172,13 +2334,87 @@ async function finalizeCaptureLifecycle(db,leagueId,sessionIds=[]){
   };
 }
 
+const correctionNumber=(value,label,{minimum=null,maximum=null}={})=>{
+  if(value===null||value===undefined||value==='')return null;
+  const parsed=Number(value);
+  if(!Number.isInteger(parsed)||(minimum!==null&&parsed<minimum)||(maximum!==null&&parsed>maximum)){
+    throw Object.assign(new Error(`${label} is invalid.`),{status:400});
+  }
+  return parsed;
+};
+
+async function correctCanonicalTransaction(context,state,body){
+  const transactionId=clean(body.transactionId);
+  const reason=clean(body.reason);
+  if(!transactionId)return json({ok:false,release:RELEASE,error:'transactionId is required.'},400);
+  if(!reason||reason.length<5)return json({ok:false,release:RELEASE,error:'A correction reason of at least five characters is required.'},400);
+  if(reason.length>500)return json({ok:false,release:RELEASE,error:'The correction reason exceeds 500 characters.'},400);
+
+  const transaction=await state.db.prepare(`SELECT * FROM canonical_transactions WHERE league_id=? AND id=? LIMIT 1`)
+    .bind(state.league.id,transactionId).first()
+    || await state.db.prepare(`SELECT * FROM league_transaction_history WHERE league_id=? AND id=? LIMIT 1`)
+      .bind(state.league.id,transactionId).first();
+  if(!transaction)return json({ok:false,release:RELEASE,error:'Transaction not found.'},404);
+  const retained=await state.db.prepare(`SELECT id FROM league_transaction_history WHERE league_id=? AND id=? LIMIT 1`)
+    .bind(state.league.id,transactionId).first();
+  if(!retained){
+    const evidence=await evidenceForTransaction(state.db,transactionId);
+    await syncTransactionHistory(state.db,transaction,evidence);
+  }
+  const latest=await state.db.prepare(`SELECT * FROM canonical_transaction_corrections
+    WHERE league_id=? AND transaction_id=? ORDER BY revision DESC LIMIT 1`).bind(state.league.id,transactionId).first();
+  const currentRevision=Number(latest?.revision||0);
+  const expectedRevision=Number(body.correctionRevision);
+  if(!Number.isInteger(expectedRevision)||expectedRevision!==currentRevision){
+    return json({ok:false,release:RELEASE,error:'This transaction was corrected in another session. Refresh before saving.',currentRevision},409);
+  }
+
+  const base={
+    eventType:latest?.event_type||transaction.event_type,
+    season:latest?latest.season:transaction.season,
+    week:latest?latest.week:transaction.week,
+    occurredAt:latest?latest.occurred_at:transaction.occurred_at,
+    teamIds:parse(latest?.team_ids_json??transaction.team_ids_json,[])||[],
+    playerIds:parse(latest?.player_ids_json??transaction.player_ids_json,[])||[]
+  };
+  const eventType=clean(body.eventType??base.eventType);
+  if(!eventType||!/^[a-z][a-z0-9-]{1,63}$/i.test(eventType))return json({ok:false,release:RELEASE,error:'Transaction type is invalid.'},400);
+  let season,week;
+  try{
+    season=correctionNumber(Object.hasOwn(body,'season')?body.season:base.season,'Season',{minimum:1900,maximum:2200});
+    week=correctionNumber(Object.hasOwn(body,'week')?body.week:base.week,'Week',{minimum:0,maximum:40});
+  }catch(error){return json({ok:false,release:RELEASE,error:error.message},error.status||400)}
+  const occurredAt=Object.hasOwn(body,'occurredAt')?clean(body.occurredAt):clean(base.occurredAt);
+  if(occurredAt&&Number.isNaN(Date.parse(occurredAt)))return json({ok:false,release:RELEASE,error:'Occurred-at date is invalid.'},400);
+  const teamIds=uniq(Array.isArray(body.teamIds)?body.teamIds:base.teamIds).slice(0,8);
+  const playerIds=uniq(Array.isArray(body.playerIds)?body.playerIds:base.playerIds).slice(0,48);
+  const revision=currentRevision+1,id=`transaction_correction_${crypto.randomUUID()}`;
+  const audit=createTenantAuditContext(context,state.league,state.auth.session,'canonical-transaction.correct');
+  await state.db.batch([
+    state.db.prepare(`INSERT INTO canonical_transaction_corrections
+      (id,league_id,transaction_id,revision,event_type,season,week,occurred_at,team_ids_json,player_ids_json,
+       correction_reason,created_by_user_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+        id,state.league.id,transactionId,revision,eventType,season,week,occurredAt,
+        JSON.stringify(teamIds),JSON.stringify(playerIds),reason,state.auth.session.user.id
+      ),
+    tenantAuditStatement(state.db,audit,{
+      resourceType:'canonical_transaction',resourceId:transactionId,
+      detail:{correctionId:id,revision,eventType,season,week,teamIds,playerIds,reason}
+    })
+  ]);
+  return json({ok:true,release:RELEASE,transactionId,correctionId:id,correctionRevision:revision,
+    evidenceChanged:false,canonicalRowChanged:false,audited:true});
+}
+
 export async function onRequestPost(context){
-  const state=await requestState(context);
+  const state=await requestState(context,{commissioner:true});
   if(state.response)return state.response;
 
   let body={};
   try{body=await context.request.json()}catch{}
   const action=String(body.action||'sync').toLowerCase();
+  if(action==='correct')return correctCanonicalTransaction(context,state,body);
   const disabledStabilizationActions=new Set([
     'repair-latest-lifecycle','repair-team-change-trades','repair-free-agent-pool',
     'capture-lifecycle-plan','capture-lifecycle-session','capture-lifecycle-finalize'

@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.1",
+  "validatedOn": "2026-09-04",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": { "unregisteredFailures": 0 },
+  "checks": {
+    "fullWidthTradeReview": {
+      "passed": true,
+      "teamBranded": true,
+      "assetRowsFillWidget": true,
+      "fields": ["development", "contract", "age", "tradeValueWhenEnabled"],
+      "sameLayoutCalculatorOff": true,
+      "supportsParticipantCount": [2, 3, 4]
+    },
+    "standingsDraftProjection": {
+      "passed": true,
+      "source": "active-snapshot-standings",
+      "originalTeamAuthority": true,
+      "updatesAfterImport": true,
+      "inverseStandings": true,
+      "example": "1.01",
+      "officialTiebreakersClaimed": false,
+      "tiesMarkedApproximate": true,
+      "incompleteStandingsFabricateSlot": false,
+      "separateFromCommissionerValuationSettings": true
+    },
+    "canonicalTransactions": {
+      "passed": true,
+      "types": ["trade", "signing", "release", "movement"],
+      "repeatedEvidenceIdempotent": true,
+      "beforeAfterRosterStates": true,
+      "maddenRemainsAuthoritative": true,
+      "pendingWorkflowPublic": false,
+      "internalReconciliationLabelsPublic": false
+    },
+    "permanentHistoryBooks": {
+      "passed": true,
+      "permanentLinks": true,
+      "signedInLeagueMembersOnly": true,
+      "survivesActiveEditionRemoval": true,
+      "rawPrivatePayloadRetained": false
+    },
+    "appendOnlyCorrections": {
+      "passed": true,
+      "commissionerOnly": true,
+      "reasonRequired": true,
+      "optimisticRevisionGuard": true,
+      "audited": true,
+      "sourceEvidenceRewritten": false,
+      "canonicalSourceRowRewritten": false
+    },
+    "tenantPrivacy": {
+      "passed": true,
+      "membershipRequired": true,
+      "leagueScoped": true,
+      "crossTenantRowsVisible": false,
+      "privateSourceKeysExposed": false,
+      "rawEvidenceFieldsExposed": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 31,
+      "requiredTables": 97,
+      "foreignKeyViolations": 0,
+      "productionApplied": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 162,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "status": "passed",
+      "javascriptModules": 228,
+      "inventoryFiles": 565,
+      "routes": 69
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "draftPickBaselineApplied": false,
+    "draftPickOwnershipChanged": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": { "authorized": false, "status": "not-run", "pullRequest": null, "candidateCommit": null },
+    "hostedChecks": { "authorized": false, "status": "not-run", "pullRequestChecksPassed": 0, "mainChecksPassed": 0 },
+    "stagingDeployment": { "authorized": false, "status": "not-run" },
+    "productionDeployment": { "authorized": false, "status": "not-run", "currentRelease": "7.4.0.8" },
+    "productionMigration": { "authorized": false, "status": "not-run", "currentMigration": 30, "candidateMigration": 31 }
+  }
+}

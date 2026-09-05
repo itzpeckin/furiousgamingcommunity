@@ -5,7 +5,7 @@ import { buildGmSeasonSummaries, careerTotals } from '../../../_lib/gm-career.js
 import { currentFranchiseContext, ownershipChangeStatements } from '../../../_lib/ownership-periods.js';
 import { createTenantAuditContext, writeTenantAuditEvent } from '../../../_lib/tenant-context.js';
 
-const RELEASE='7.4.0.8';
+const RELEASE='7.4.1';
 const safeTeamKey=value=>/^[a-z0-9][a-z0-9._:-]{0,99}$/.test(String(value||'').trim().toLowerCase());
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 const text=value=>value===null||value===undefined?'':String(value).trim();

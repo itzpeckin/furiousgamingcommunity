@@ -5,7 +5,7 @@ import {
   MADDEN_27_DRAFT_PICK_SOURCE
 } from './draft-pick-source-data.js';
 
-export const DRAFT_PICK_BASELINE_RELEASE = '7.4.0.8';
+export const DRAFT_PICK_BASELINE_RELEASE = '7.4.1';
 export const DRAFT_PICK_ROUNDS = Object.freeze([1,2,3,4,5,6,7]);
 export const DRAFT_PICK_HORIZON = 3;
 

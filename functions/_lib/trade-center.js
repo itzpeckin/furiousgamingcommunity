@@ -1,7 +1,7 @@
 import { canonicalTeamKey } from './league-teams.js';
 export { stableDraftPickId } from './draft-pick-baselines.js';
 
-export const TRADE_CENTER_RELEASE = '7.4.0.8';
+export const TRADE_CENTER_RELEASE = '7.4.1';
 
 export const DEFAULT_TRADE_CENTER_SETTINGS = Object.freeze({
   seasonTradeLimitEnabled: true,
