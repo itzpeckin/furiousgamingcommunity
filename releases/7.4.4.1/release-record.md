@@ -1,8 +1,8 @@
 # FranchiseHQ 7.4.4.1 Release Record
 
-**Status:** Locally validated review candidate; publication and Production are not yet authorized
+**Status:** Production deployed; read-only verified; pending owner desktop/mobile acceptance
 
-**Production changed:** No. Production remains FranchiseHQ 7.4.4 on migration 33. No membership or assignment mutation, import, snapshot activation, URL rotation, archive, transition, reset, deletion, or other data operation ran.
+**Production changed:** Yes, code only. Exact candidate `668b13e0a4fcaef82f8a3300beef768993d145fa` was published through PR #44, merged to Main as `6cc5f29d263b4113e5e87ebe81665d81753440d4`, and deployed by Cloudflare Pages deployment `548c8453-775c-4b0c-8aac-b03acc543004`. Migration 33 remains current. No membership or assignment mutation, import, snapshot activation, URL rotation, archive, transition, reset, deletion, or other data operation ran.
 
 ## Scope
 
@@ -23,11 +23,11 @@ Madden's explicit Free Agent route remains blocked upstream. Its count stays unk
 
 ## Validation evidence
 
-The Commissioner HQ contract verifies the five-column desktop directory, the complete responsive card hierarchy, restored phone details, visible Manage action, and phone-safe assignment dialog. The consolidated strict repository gate is recorded in `validation-evidence.json`.
+The Commissioner HQ contract verifies the five-column desktop directory, the complete responsive card hierarchy, restored phone details, visible Manage action, and phone-safe assignment dialog. Exact candidate `668b13e` passed 4/4 PR checks. Main quality and deployment checks passed. Signed-in, read-only Production acceptance confirmed release 7.4.4.1, the live Teams & Owners workspace, all five directory fields in order, team-specific Manage actions, and the complete Save Assignment / Remove from Team / Revoke Access dialog without saving a mutation. The live `trade-module.js` and `styles.css` SHA-256 hashes match Main exactly. Season 2026 / Regular Season Week 13 and blocked/null Free Agent semantics remain intact. The complete evidence is recorded in `validation-evidence.json`.
 
 ## Deployment status
 
-Local implementation only on `codex/franchisehq-7.4.4.1`. GitHub publication, hosted checks, Main, Cloudflare Pages, the import Worker, D1, Production, memberships, and assignments remain unchanged.
+Published from `codex/franchisehq-7.4.4.1` through [PR #44](https://github.com/itzpeckin/furiousgamingcommunity/pull/44), merged to Main as `6cc5f29d263b4113e5e87ebe81665d81753440d4`, and deployed to Production through Cloudflare Pages deployment `548c8453-775c-4b0c-8aac-b03acc543004`. The import Worker source did not change and its Production build/version remain `b87f1bb1-71cc-4695-af0c-c3fe1415223f` / `326ee7ef-55b2-4041-8eb2-db4ee9358bd0`; exact-candidate upload build `b43db836-d8d7-4f99-a7e4-2a36002c9111` passed without receiving Production traffic. D1 remains on migration 33 and no database operation was required or run.
 
 ## Rollback
 
@@ -35,4 +35,4 @@ The immutable rollback baseline is exact Main evidence commit `00b4831192bdb6b5f
 
 ## Next gate
 
-After owner review, separately authorize exact-candidate publication, PR and hosted checks, merge to Main, code-only Production deployment, and read-only desktop/phone acceptance. No migration or league-data operation is required.
+Owner desktop/mobile acceptance of the live Teams & Owners layout is next. After acceptance, continue with the remaining 7.4.5 consistency work without changing league data unless separately authorized.

@@ -2596,7 +2596,8 @@ if (version === '7.4.4.1') {
     'freeAgentBlockedPreserved',
     'strictMigration',
     'automatedTests',
-    'strictRepositoryGate'
+    'strictRepositoryGate',
+    ...(isPostDeployment ? ['productionHttpsAcceptance'] : [])
   ]) {
     if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.4.1 evidence is incomplete: ${check}.`);
   }
@@ -2621,7 +2622,54 @@ if (version === '7.4.4.1') {
     || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
     || evidence.checks?.strictMigration?.candidateRequiresMigration !== false
   ) errors.push('7.4.4.1 must prove readable desktop ownership rows, complete phone management, and unchanged membership/source authority.');
-  if (
+  if (isPostDeployment) {
+    if (
+      manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'published-main-accepted'
+      || Number(manifest.repositoryPublication?.pullRequest) !== 44
+      || manifest.repositoryPublication?.candidateCommit !== '668b13e0a4fcaef82f8a3300beef768993d145fa'
+      || manifest.repositoryPublication?.mergeCommit !== '6cc5f29d263b4113e5e87ebe81665d81753440d4'
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.currentRelease !== '7.4.4.1'
+      || manifest.production?.currentCommit !== '6cc5f29d263b4113e5e87ebe81665d81753440d4'
+      || manifest.production?.currentPagesDeployment !== '548c8453-775c-4b0c-8aac-b03acc543004'
+      || manifest.production?.workerSourceChanged !== false
+      || Number(manifest.production?.currentMigration) !== 33
+      || Number(manifest.production?.candidateMigration) !== 33
+      || evidence.checks?.strictMigration?.productionApplied !== true
+      || evidence.checks?.strictMigration?.candidateRequiresMigration !== false
+      || evidence.checks?.productionHttpsAcceptance?.status !== 'read-only-verified'
+      || evidence.checks?.productionHttpsAcceptance?.liveReleaseMarker !== '7.4.4.1'
+      || evidence.checks?.productionHttpsAcceptance?.teamsOwnersWorkspace !== true
+      || JSON.stringify(evidence.checks?.productionHttpsAcceptance?.desktopColumns) !== JSON.stringify(['franchise','owner','role','status','manage'])
+      || evidence.checks?.productionHttpsAcceptance?.roleStatusOverlap !== false
+      || evidence.checks?.productionHttpsAcceptance?.manageTeamSpecificAccessibleNames !== true
+      || evidence.checks?.productionHttpsAcceptance?.assignmentDialogAccessible !== true
+      || evidence.checks?.productionHttpsAcceptance?.phonePresentationAssetsLive !== true
+      || evidence.checks?.productionHttpsAcceptance?.deployedAssetsMatchMain !== true
+      || evidence.checks?.productionHttpsAcceptance?.membershipMutationExecuted !== false
+      || evidence.checks?.productionHttpsAcceptance?.freeAgentCount !== null
+      || evidence.checks?.productionHttpsAcceptance?.readOnly !== true
+      || evidence.scopeBoundaries?.productionChanged !== true
+      || evidence.scopeBoundaries?.productionDataChanged !== false
+      || evidence.scopeBoundaries?.productionConfigurationChanged !== true
+      || evidence.scopeBoundaries?.protectedLeagueDataChanged !== false
+      || evidence.scopeBoundaries?.gitMainChanged !== true
+      || evidence.scopeBoundaries?.gitRemoteChanged !== true
+      || evidence.scopeBoundaries?.migrationApplied !== false
+      || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+      || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 0
+      || evidence.external?.githubPublication?.status !== 'published-main-accepted'
+      || Number(evidence.external?.hostedChecks?.pullRequestChecksPassed) !== 4
+      || Number(evidence.external?.hostedChecks?.mainChecksPassed) !== 5
+      || evidence.external?.productionMigration?.status !== 'not-required'
+      || Number(evidence.external?.productionMigration?.currentMigration) !== 33
+      || Number(evidence.external?.productionMigration?.candidateMigration) !== 33
+      || evidence.external?.productionDeployment?.currentRelease !== '7.4.4.1'
+      || evidence.external?.productionDeployment?.pagesDeployment !== '548c8453-775c-4b0c-8aac-b03acc543004'
+    ) errors.push('Deployed 7.4.4.1 evidence must record the exact code-only publication, unchanged database and membership boundaries, and read-only Production acceptance.');
+  } else if (
     manifest.status !== 'validated-review-candidate'
     || manifest.repositoryPublication?.authorized !== false
     || manifest.repositoryPublication?.status !== 'not-run'

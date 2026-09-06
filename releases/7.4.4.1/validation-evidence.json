@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.1",
   "validatedOn": "2026-09-05",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -67,17 +67,41 @@
       "javascriptModules": 234,
       "inventoryFiles": 573,
       "routes": 72
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified",
+      "signedInCommissionerUi": true,
+      "liveReleaseMarker": "7.4.4.1",
+      "teamsOwnersWorkspace": true,
+      "desktopColumns": ["franchise", "owner", "role", "status", "manage"],
+      "roleStatusOverlap": false,
+      "manageTeamSpecificAccessibleNames": true,
+      "assignmentDialogAccessible": true,
+      "assignmentActions": ["Save Assignment", "Remove from Team", "Revoke Access"],
+      "phonePresentationAssetsLive": true,
+      "activeSeason": 2026,
+      "activeSeasonType": "Regular Season",
+      "activeWeek": 13,
+      "leagueMemberships": 27,
+      "activeTeamAssignments": 27,
+      "freeAgentCount": null,
+      "tradeModuleSha256": "defb709c71d92b4f9d98fe6799122ab52f5ef2ee9ed304a576a8869a6876619f",
+      "stylesSha256": "e06b28eeddf206603c5ef79e2c4d31ec07da863752ca7bb43358ea130e1888f7",
+      "deployedAssetsMatchMain": true,
+      "membershipMutationExecuted": false,
+      "readOnly": true
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
-    "productionConfigurationChanged": false,
+    "productionConfigurationChanged": true,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "captureExecuted": false,
     "candidateImportExecuted": false,
@@ -95,12 +119,17 @@
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 44,
+      "candidateCommit": "668b13e0a4fcaef82f8a3300beef768993d145fa",
+      "mergeCommit": "6cc5f29d263b4113e5e87ebe81665d81753440d4"
     },
     "hostedChecks": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "mainChecksPassed": 5
     },
     "stagingDeployment": {
       "authorized": false,
@@ -108,15 +137,21 @@
     },
     "productionMigration": {
       "authorized": false,
-      "status": "not-run",
+      "status": "not-required",
       "currentMigration": 33,
       "candidateMigration": 33
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.4.4",
-      "currentCommit": "00b4831192bdb6b5f3dff86212ae55f22853dc1f"
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-owner-acceptance",
+      "currentRelease": "7.4.4.1",
+      "mainCommit": "6cc5f29d263b4113e5e87ebe81665d81753440d4",
+      "pagesDeployment": "548c8453-775c-4b0c-8aac-b03acc543004",
+      "workerSourceChanged": false,
+      "retainedWorkerBuild": "b87f1bb1-71cc-4695-af0c-c3fe1415223f",
+      "retainedWorkerVersion": "326ee7ef-55b2-4041-8eb2-db4ee9358bd0",
+      "candidateWorkerBuild": "b43db836-d8d7-4f99-a7e4-2a36002c9111",
+      "liveReleaseMarker": "7.4.4.1"
     }
   }
 }
