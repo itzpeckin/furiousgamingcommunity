@@ -23,11 +23,13 @@ None registered. Madden Free Agents remain blocked upstream and unknown/null; th
 
 ## Validation evidence
 
-Focused Discord tests cover the 34-command inventory, non-destructive global and guild upserts, tenant-safe commissioner bootstrap, `/week14`, active-snapshot game selection, both registered team-owner mentions, idempotent thread rows, existing Discord security and membership boundaries, and private delivery. Fresh and legacy database paths reach migration 35 with clean foreign keys. The consolidated strict repository gate is required before publication.
+Focused Discord tests cover the 34-command inventory, non-destructive global and guild upserts, tenant-safe commissioner bootstrap, `/week14`, active-snapshot game selection, both registered team-owner mentions, idempotent thread rows, existing Discord security and membership boundaries, and private delivery. Fresh and legacy database paths reach migration 35 with clean foreign keys. The consolidated strict repository gate passed 183/183 tests; PR #47 passed all four hosted candidate checks.
 
 ## Deployment status
 
-This candidate has not changed GitHub, Main, Production, Discord, credentials, league mappings, memberships, team assignments, league data, or the active snapshot. Migration 35 must be applied and verified before the application code is deployed. The first FGC connection still requires one Discord consent click by a commissioner with Manage Server permission; commissioners never copy a server ID, channel ID, token, or interaction URL.
+Exact candidate `844de4d1ab1fb722c558400cb942d2c52b7e2c62` merged through PR #47 as Main `62f0effecf77a15522d81f8731a6f9db4090ad7f`. Before merge, additive migration 35 was applied only to `franchise-hq-db-madden27` between recovery bookmarks `00000144-00000092-000050de-57be7bf9aaac090fe8699930202d1279` and `00000144-000000a4-000050de-1a26d0dd00e1abb14332fa7be428b9fe`. Both tables, four columns, three indexes, six foreign keys, an empty operational state, unchanged protected counts, and zero foreign-key violations were verified. Cloudflare Pages deployment `67c5fdbb-8f66-4bd8-96ac-f5d5f0ae2560` succeeded and the live site reports Release 7.4.4.4.
+
+The first FGC connection still requires one Discord consent click by a commissioner with Manage Server permission. That single approval lets Discord select the server and lets FranchiseHQ create/reuse `#franchisehq-schedule`, register the restored weekly commands, save the tenant mapping, and synchronize the active week. Commissioners never copy a server ID, channel ID, token, or interaction URL.
 
 No import, reset, deletion, archive, season transition, export-URL rotation, or snapshot activation is included. Madden Free Agents remain blocked and unknown/null, never zero.
 

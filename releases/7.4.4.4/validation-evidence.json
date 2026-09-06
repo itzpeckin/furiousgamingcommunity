@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.4",
   "validatedOn": "2026-09-06",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -67,8 +67,8 @@
       "newTables": 2,
       "newColumns": 4,
       "foreignKeyViolations": 0,
-      "productionApplied": false,
-      "candidateRequiresMigration": true
+      "productionApplied": true,
+      "candidateRequiresMigration": false
     },
     "automatedTests": {
       "passed": true,
@@ -83,6 +83,48 @@
       "inventoryFiles": 594,
       "routes": 76
     },
+    "productionProtectedState": {
+      "passed": true,
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "migrationVersion": 35,
+      "migrationName": "discord_schedule_threads",
+      "newInstallationColumns": 4,
+      "newScheduleTables": 2,
+      "newIndexes": 3,
+      "newForeignKeys": 6,
+      "scheduleSyncRuns": 0,
+      "scheduleThreads": 0,
+      "leagues": 1,
+      "users": 29,
+      "memberships": 29,
+      "activeTeamAssignments": 28,
+      "teams": 0,
+      "players": 0,
+      "snapshots": 14,
+      "activeSnapshotPointers": 1,
+      "draftPicks": 672,
+      "draftPickLedgerEvents": 1344,
+      "tradeWorkflows": 3,
+      "discordInstallations": 0,
+      "discordReceipts": 0,
+      "discordDeliveries": 0,
+      "twitchProfiles": 0,
+      "leagueNewsPosts": 0,
+      "foreignKeyViolations": 0,
+      "protectedCountsMatchedPreMigration": true
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified-pending-discord-guild-acceptance",
+      "liveReleaseMarker": "7.4.4.4",
+      "mainCommit": "62f0effecf77a15522d81f8731a6f9db4090ad7f",
+      "pagesDeployment": "67c5fdbb-8f66-4bd8-96ac-f5d5f0ae2560",
+      "pagesStatus": "success",
+      "discordEndpointGetStatus": 405,
+      "discordConnectUnauthenticatedStatus": 401,
+      "readOnly": true
+    },
     "freeAgentBlockedPreserved": {
       "passed": true,
       "status": "blocked",
@@ -91,15 +133,15 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
     "productionConfigurationChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
-    "migrationApplied": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
+    "migrationApplied": true,
     "discordCommandsRegistered": false,
     "discordCredentialsChanged": false,
     "discordGuildInstalled": false,
@@ -116,24 +158,54 @@
     "freeAgentInterpretedAsZero": false,
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
-    "databaseRowsWritten": 0
+    "databaseRowsWritten": 1
   },
   "external": {
-    "githubPublication": {"authorized": false, "status": "not-run"},
-    "hostedChecks": {"authorized": false, "status": "not-run"},
+    "githubPublication": {
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 47,
+      "candidateCommit": "844de4d1ab1fb722c558400cb942d2c52b7e2c62",
+      "mergeCommit": "62f0effecf77a15522d81f8731a6f9db4090ad7f"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "mainCheckSuitesPassed": 2,
+      "pullRequestQualityRun": 34062264385,
+      "mainQualityRun": 34062458694,
+      "mainPagesRun": 34062458337
+    },
     "stagingDeployment": {"authorized": false, "status": "not-run"},
     "productionMigration": {
-      "authorized": false,
-      "status": "not-run",
-      "currentMigration": 34,
-      "candidateMigration": 35
+      "authorized": true,
+      "status": "applied-and-verified",
+      "fromMigration": 34,
+      "currentMigration": 35,
+      "candidateMigration": 35,
+      "preMigrationBookmark": "00000144-00000092-000050de-57be7bf9aaac090fe8699930202d1279",
+      "postMigrationBookmark": "00000144-000000a4-000050de-1a26d0dd00e1abb14332fa7be428b9fe",
+      "newTables": 2,
+      "newColumns": 4,
+      "newIndexes": 3,
+      "foreignKeys": 6,
+      "foreignKeyViolations": 0,
+      "protectedCountsMatched": true
     },
-    "productionDeployment": {"authorized": false, "status": "not-run"},
+    "productionDeployment": {
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-discord-guild-acceptance",
+      "currentRelease": "7.4.4.4",
+      "mainCommit": "62f0effecf77a15522d81f8731a6f9db4090ad7f",
+      "pagesDeployment": "67c5fdbb-8f66-4bd8-96ac-f5d5f0ae2560",
+      "liveReleaseMarker": "7.4.4.4"
+    },
     "discordRegistration": {
-      "authorized": false,
-      "status": "not-run",
+      "authorized": true,
+      "status": "pending-commissioner-connect",
       "scope": "global-and-selected-guild"
     },
-    "discordGuildInstallation": {"authorized": false, "status": "not-run"}
+    "discordGuildInstallation": {"authorized": true, "status": "pending-commissioner-consent"}
   }
 }
