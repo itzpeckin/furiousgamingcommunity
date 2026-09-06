@@ -241,7 +241,7 @@
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 28417,
+        "bytes": 29744,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -1523,7 +1523,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.4.4",
+  "release": "7.4.4.5",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

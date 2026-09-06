@@ -7613,7 +7613,7 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
   }
 }
 
-/* FranchiseHQ 7.4.4.4 — tenant-safe Discord commissioner connection. */
+/* FranchiseHQ 7.4.4.5 — tenant-safe Discord commissioner connection. */
 .discord-installation-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px;background:linear-gradient(135deg,rgba(31,58,97,.8),rgba(15,27,47,.92))}
 .discord-installation-hero h2{margin:5px 0 8px}.discord-installation-hero p{margin:0;max-width:760px;color:var(--muted)}
 .discord-installation-card,.discord-command-summary{padding:26px}

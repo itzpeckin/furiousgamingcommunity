@@ -39,6 +39,21 @@ export function discordGuildPermissionAllowsInstall(value) {
   }
 }
 
+export async function discordAuthorizedGuild(accessToken, guildId, {fetchImpl = fetch} = {}) {
+  const token = String(accessToken || '').trim();
+  const selectedGuildId = String(guildId || '').trim();
+  if (!token || !SNOWFLAKE.test(selectedGuildId)) return null;
+  const response = await fetchImpl('https://discord.com/api/v10/users/@me/guilds?limit=200', {
+    headers:{Authorization:`Bearer ${token}`}
+  });
+  if (!response.ok) {
+    throw Object.assign(new Error('Unable to verify Discord server permissions.'), {status:502});
+  }
+  const guilds = await response.json();
+  if (!Array.isArray(guilds)) return null;
+  return guilds.find(guild => String(guild?.id || '') === selectedGuildId) || null;
+}
+
 function channelName(value) {
   return String(value || '').trim().toLowerCase();
 }
