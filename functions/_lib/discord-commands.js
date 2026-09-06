@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.4.4.4';
+export const DISCORD_COMMAND_RELEASE = '7.4.4.5';
 
 const OPTION = Object.freeze({
   SUB_COMMAND:1,

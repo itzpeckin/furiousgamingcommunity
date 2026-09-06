@@ -20,6 +20,10 @@ import {
   onRequestGet as getDiscordInstallation,
   onRequestPost as postDiscordInstallation
 } from '../../functions/api/leagues/[leagueSlug]/discord.js';
+import {
+  discordAuthorizedGuild,
+  discordGuildPermissionAllowsInstall
+} from '../../functions/_lib/discord-installation.js';
 
 async function applyMigrations(database){
   const files=(await walkFiles()).filter(file=>/^migrations\/\d+_.+\.sql$/.test(file)).sort();
@@ -143,6 +147,30 @@ test('global Discord command inventory restores legacy week commands and remains
   }
   const trade=DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='trade');
   assert.ok(trade.options.some(option=>option.name==='multi-team'));
+});
+
+test('Discord installation verifies the selected guild against the authenticated user permission list',async()=>{
+  const requests=[];
+  const guild=await discordAuthorizedGuild('oauth-user-token','100000000000000077',{
+    fetchImpl:async(url,options={})=>{
+      requests.push({url:String(url),authorization:options.headers?.Authorization});
+      return new Response(JSON.stringify([
+        {id:'100000000000000066',owner:false,permissions:'0'},
+        {id:'100000000000000077',owner:false,permissions:'32'}
+      ]),{status:200,headers:{'content-type':'application/json'}});
+    }
+  });
+  assert.equal(guild.id,'100000000000000077');
+  assert.equal(discordGuildPermissionAllowsInstall(guild.permissions),true);
+  assert.deepEqual(requests,[{
+    url:`https://discord.com/api/v10/${'users'}/@me/guilds?limit=200`,
+    authorization:'Bearer oauth-user-token'
+  }]);
+  assert.equal(discordGuildPermissionAllowsInstall('8'),true);
+  assert.equal(discordGuildPermissionAllowsInstall('0'),false);
+  assert.equal(await discordAuthorizedGuild('oauth-user-token','100000000000000088',{
+    fetchImpl:async()=>new Response('[]',{status:200,headers:{'content-type':'application/json'}})
+  }),null);
 });
 
 test('commissioners map one Discord server to one league and can disable it without deleting the relationship',async()=>{

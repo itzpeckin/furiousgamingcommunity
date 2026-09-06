@@ -22,6 +22,7 @@ import {
 import { isOwnerFallbackIdentity } from "../../../_lib/owner-fallback.js";
 import { resolveTenant, resolveTenantById } from "../../../_lib/tenant-context.js";
 import {
+  discordAuthorizedGuild,
   discordGuildPermissionAllowsInstall,
   ensureDiscordScheduleChannel,
   storeDiscordGuildInstallation,
@@ -31,7 +32,7 @@ import { ensureDiscordGlobalCommands, upsertDiscordGuildCommands } from "../../.
 import { DISCORD_GLOBAL_COMMANDS, DISCORD_SCHEDULE_THREAD_COMMANDS } from "../../../_lib/discord-commands.js";
 import { scheduleActiveDiscordSync } from "../../../_lib/discord-schedule.js";
 
-const RELEASE = "7.4.4.4";
+const RELEASE = "7.4.4.5";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -307,11 +308,13 @@ export async function onRequestGet(context) {
       if (!user || !league || !membership || !Number(membership.active) || membership.role !== 'commissioner') {
         return jsonResponse({ok:false,error:'Only an active FranchiseHQ commissioner may connect this Discord server.'},403);
       }
-      const authorizedGuild = tokenData.guild || null;
-      if (!authorizedGuild?.owner && !discordGuildPermissionAllowsInstall(authorizedGuild?.permissions)) {
+      const selectedGuildId = String(tokenData.guild?.id || url.searchParams.get('guild_id') || '');
+      const authorizedGuild = await discordAuthorizedGuild(tokenData.access_token,selectedGuildId);
+      const authorizedPermissions = authorizedGuild?.permissions ?? authorizedGuild?.permissions_new;
+      if (!authorizedGuild?.owner && !discordGuildPermissionAllowsInstall(authorizedPermissions)) {
         return jsonResponse({ok:false,error:'Discord requires Manage Server permission to connect this league.'},403);
       }
-      const guild = await verifyDiscordGuildInstallation(context.env,String(authorizedGuild?.id||''));
+      const guild = await verifyDiscordGuildInstallation(context.env,selectedGuildId);
       const scheduleChannel = await ensureDiscordScheduleChannel(context.env,guild.id);
       await storeDiscordGuildInstallation({
         db:context.env.DB,env:context.env,league,user,guild,scheduleChannel,

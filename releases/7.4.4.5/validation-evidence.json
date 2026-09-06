@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.5",
+  "validatedOn": "2026-09-06",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "discordGuildPermissionVerification": {
+      "passed": true,
+      "selectedGuildSource": "Discord OAuth install response",
+      "permissionAuthority": "Discord OAuth current-user guild list",
+      "oauthScope": "guilds",
+      "selectedGuildMatchedExactly": true,
+      "ownerAccepted": true,
+      "manageGuildAccepted": true,
+      "administratorAccepted": true,
+      "insufficientPermissionRejected": true,
+      "missingGuildRejected": true,
+      "verificationFailureFailsClosed": true
+    },
+    "discordConnectionBoundary": {
+      "passed": true,
+      "activeFranchiseHqApplicationReused": true,
+      "encryptedBotTokenUnchanged": true,
+      "commissionerMembershipStillRequired": true,
+      "guildBotVerificationRetained": true,
+      "automaticChannelAndCommandSetupRetained": true,
+      "discordConsentPerformedByOwner": false
+    },
+    "discordRegression": {
+      "passed": true,
+      "focusedDiscordTests": 15,
+      "week14Covered": true,
+      "identityDrivenScheduleCovered": true,
+      "tenantIsolationCovered": true,
+      "interactionSecurityCovered": true
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 35,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 184,
+      "failedTests": 0,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "javascriptModules": 252,
+      "inventoryFiles": 594,
+      "routes": 76
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordCredentialsChanged": false,
+    "discordGuildInstalled": false,
+    "discordLeagueConfigured": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": true,
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "not-run"
+    },
+    "stagingDeployment": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 35,
+      "candidateMigration": 35
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "not-run",
+      "currentRelease": "7.4.4.4"
+    },
+    "discordRegistration": {
+      "authorized": false,
+      "status": "not-required"
+    },
+    "discordGuildInstallation": {
+      "authorized": true,
+      "status": "pending-commissioner-retry"
+    }
+  }
+}
