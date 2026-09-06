@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4",
   "validatedOn": "2026-09-05",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -65,17 +65,36 @@
       "javascriptModules": 234,
       "inventoryFiles": 573,
       "routes": 72
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified",
+      "signedInCommissionerUi": true,
+      "liveReleaseMarker": "7.4.4",
+      "singleMaddenCompanionImportWorkspace": true,
+      "duplicateDedicatedExportWorkspacePresent": false,
+      "topActions": ["Copy URL", "Latest Export Live", "Refresh"],
+      "progressBeforeLatestSnapshot": true,
+      "activeSeason": 2026,
+      "activeSeasonType": "Regular Season",
+      "activeWeek": 13,
+      "freeAgentCount": null,
+      "tradeModuleSha256": "7fd4ccbd95d5fd018b475bcf2b2cb0864d3e74b4b8fa118407d3307a0e7198da",
+      "stylesSha256": "9cea5476d06bdf34849a4e7729f43391fecaf4923d525665ad0185a6e5323446",
+      "oneClickImportSha256": "a635e8f704eeb4bc6baec36a7006fa03b4e8d155a67085adb7dd0005ded6c09e",
+      "deployedAssetsMatchMain": true,
+      "readOnly": true
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
-    "productionConfigurationChanged": false,
+    "productionConfigurationChanged": true,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "captureExecuted": false,
     "candidateImportExecuted": false,
@@ -93,12 +112,17 @@
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 43,
+      "candidateCommit": "1b8562358de29881b08c69b5be9155b6b03e1a6b",
+      "mergeCommit": "72b61aa0d058814d8ab1e5f060c2acb053a8e142"
     },
     "hostedChecks": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "mainChecksPassed": 5
     },
     "stagingDeployment": {
       "authorized": false,
@@ -106,15 +130,22 @@
     },
     "productionMigration": {
       "authorized": false,
-      "status": "not-run",
+      "status": "not-required",
       "currentMigration": 33,
       "candidateMigration": 33
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.4.3",
-      "currentCommit": "eb1901501f8985955c004f2803e34b9a11ba6bae"
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-owner-acceptance",
+      "currentRelease": "7.4.4",
+      "mainCommit": "72b61aa0d058814d8ab1e5f060c2acb053a8e142",
+      "pagesDeployment": "a3cc2702-baa1-4d0b-aa46-9a3dd0686743",
+      "workerSourceChanged": false,
+      "retainedWorkerBuild": "b87f1bb1-71cc-4695-af0c-c3fe1415223f",
+      "retainedWorkerVersion": "326ee7ef-55b2-4041-8eb2-db4ee9358bd0",
+      "candidateWorkerBuild": "28050630-a8ff-4ccf-a339-463079912b02",
+      "candidateWorkerVersion": "1479e845-3523-4ab0-9bc3-def8bb01fd9e",
+      "liveReleaseMarker": "7.4.4"
     }
   }
 }
