@@ -11,7 +11,7 @@ import {
   withTradeCenterSettings
 } from '../../../_lib/trade-center.js';
 
-const RELEASE = '7.4.3';
+const RELEASE = '7.4.4';
 const MANAGED_FEATURES = new Map([
   ['trade_center', 'Trade Center'],
   ['trade_block', 'Trade Block'],

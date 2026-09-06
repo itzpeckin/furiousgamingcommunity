@@ -636,7 +636,10 @@ const COMMISSIONER_TABS=['overview','league-data','teams','controls','rules','au
 let commissionerHqCache=null,commissionerHqLoading=null;
 function commissionerTab(){const saved=dataStore?.getString?.('fgc-commissioner-tab','overview')||'overview';return COMMISSIONER_TABS.includes(saved)?saved:'overview'}
 function setCommissionerTab(tab){dataStore?.setString?.('fgc-commissioner-tab',tab,{source:'commissioner-navigation'})}
-function commissionerTabButton(key,label,icon,activeKey=commissionerTab()){const badge=key==='league-data'?(window.FranchiseHQ?.leagueDataFoundation?.badgeModel?.()||null):null;return`<button class="${activeKey===key?'is-active':''}" data-commissioner-tab="${key}"><svg><use href="#${icon}"></use></svg><span>${label}</span>${badge?`<small class="commissioner-tab-status pill pill--${badge.tone}" data-league-data-nav-badge>${badge.label}</small>`:''}</button>`}
+function commissionerTabButton(key,label,icon,activeKey=commissionerTab()){const badge=key==='league-data'?(window.FranchiseHQ?.leagueDataFoundation?.badgeModel?.()||null):null;return`<button class="${activeKey===key?'is-active':''}" data-commissioner-tab="${key}" ${activeKey===key?'aria-current="page"':''}><svg><use href="#${icon}"></use></svg><span>${label}</span>${badge?`<small class="commissioner-tab-status pill pill--${badge.tone}" data-league-data-nav-badge>${badge.label}</small>`:''}</button>`}
+function rememberCommissionerTabViewport(tab,nav=document.querySelector('.commissioner-tabs--command')){ui.commissionerTabViewport={tab,left:Number(nav?.scrollLeft||0)}}
+function restoreCommissionerTabViewport(tab){const nav=document.querySelector('.commissioner-tabs--command'),active=nav?.querySelector(`[data-commissioner-tab="${tab}"]`);if(!nav||!active)return;let left=Number(ui.commissionerTabViewport?.left||0);nav.scrollLeft=left;const start=active.offsetLeft-8,end=active.offsetLeft+active.offsetWidth+8;if(start<nav.scrollLeft)left=start;else if(end>nav.scrollLeft+nav.clientWidth)left=end-nav.clientWidth;nav.scrollLeft=Math.max(0,left);ui.commissionerTabViewport={tab,left:nav.scrollLeft}}
+document.addEventListener('click',event=>{const tab=event.target.closest?.('[data-commissioner-tab]');if(tab)rememberCommissionerTabViewport(tab.dataset.commissionerTab,tab.closest('.commissioner-tabs--command'))},true);
 async function loadCommissionerHq(force=false){
  if(commissionerHqCache&&!force)return commissionerHqCache;
  if(commissionerHqLoading)return commissionerHqLoading;
@@ -1045,7 +1048,7 @@ function renderArchiveSeasonPanel(){
 }
 function renderCommissionerLeagueDataV743(){
  const state=window.FranchiseHQ?.leagueData?.status?.()||{activeMode:'empty',counts:{}};
- return `<section class="league-data-page league-data-page--modern"><div class="league-data-workspace"><div class="league-data-workspace__connection">${renderPermanentLeagueExportCard()}</div><div class="league-data-workspace__import">${renderCommissionerImport()}</div></div>${renderLeagueDataSelector(state)}${renderArchiveSeasonPanel()}</section>`;
+ return `<section class="league-data-page league-data-page--modern"><div class="league-data-workspace league-data-workspace--unified"><div class="league-data-workspace__import">${renderCommissionerImport()}</div></div>${renderLeagueDataSelector(state)}${renderArchiveSeasonPanel()}</section>`;
 }
 function renderCommissionerControlsV743(){
  const tab=commissionerControlsTab();
@@ -1108,6 +1111,7 @@ function renderCommissionerV743(section){
  const sectionMeta={overview:['Command Center','League operations and the items that genuinely need your attention.'],'league-data':['League Data','Receive, import, and archive Madden league data with protected one-action workflows.'],teams:['Teams & Owners','Manage franchise assignments, roles, presence, and league access.'],controls:['League Controls','Configure detailed values and weekly competition settings.'],rules:['Rules Studio','Create and publish a rich, visual league rulebook.'],audit:['Audit & Revisions','Review authoritative commissioner actions and settings history.']}[tab];
  const body=tab==='overview'?renderCommissionerOverview():tab==='league-data'?renderCommissionerLeagueDataV743():tab==='controls'?renderCommissionerControlsV743():tab==='teams'?renderCommissionerTeamsV743():tab==='audit'?renderCommissionerAudit():renderCommissionerRulesV743();
  pageContent.innerHTML=`<div class="commissioner-hq-shell"><header class="commissioner-hq-topbar"><div><h1>${escapeHtml(sectionMeta[0])}</h1><p>${escapeHtml(sectionMeta[1])}</p></div><div class="commissioner-hq-authority"><i></i><span><small>AUTHORITY</small><strong>Commissioner</strong></span></div></header><nav class="commissioner-tabs commissioner-tabs--command" aria-label="Commissioner HQ sections">${commissionerTabButton('overview','Command Center','icon-home',tab)}${commissionerTabButton('league-data','League Data','icon-table',tab)}${commissionerTabButton('teams','Teams & Owners','icon-users',tab)}${commissionerTabButton('controls','League Controls','icon-sliders',tab)}${commissionerTabButton('rules','Rules Studio','icon-settings',tab)}${commissionerTabButton('audit','Audit','icon-activity',tab)}</nav><div class="commissioner-tab-panel">${body}</div></div>`;
+ restoreCommissionerTabViewport(tab);
  if(!commissionerHqCache&&!commissionerHqLoading)setTimeout(()=>loadCommissionerHq().then(()=>{if(['overview','controls','audit'].includes(commissionerTab()))renderCommissionerV743()}),0);if(tab==='teams'&&!commissionerMembersCache)setTimeout(()=>loadCommissionerMembers(true),0);if(tab==='rules'&&!commissionerRulesCache)setTimeout(()=>loadCommissionerRules(),0)
 }
 renderCommissioner=renderCommissionerV743;
