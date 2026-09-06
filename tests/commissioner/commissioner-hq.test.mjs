@@ -229,7 +229,7 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.4.3');
+    assert.equal(overviewPayload.release,'7.4.4');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM league_setting_revisions
@@ -328,6 +328,13 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(styles,/@media\(max-width:760px\)/);
   assert.match(styles,/\.commissioner-tabs--command\{display:flex;overflow-x:auto/);
   assert.match(styles,/\.commissioner-feature-grid\{grid-template-columns:1fr\}/);
+  assert.match(ui,/league-data-workspace--unified/);
+  assert.doesNotMatch(ui,/league-data-workspace__connection">\$\{renderPermanentLeagueExportCard\(\)\}/);
+  assert.match(ui,/restoreCommissionerTabViewport\(tab\)/);
+  assert.match(ui,/aria-current="page"/);
+  assert.match(styles,/\.commissioner-import-primary-actions\{display:grid/);
+  assert.match(styles,/\.commissioner-latest-snapshot/);
+  assert.match(styles,/@media\(max-width:460px\).*commissioner-import-summary\{grid-template-columns:1fr\}/s);
   assert.match(app,/function applyLeagueFeaturePresentation\(\)/);
   assert.match(app,/A league commissioner has turned this feature off/);
   const rulesMedia = await readFile(path.join(ROOT,'functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js'),'utf8');

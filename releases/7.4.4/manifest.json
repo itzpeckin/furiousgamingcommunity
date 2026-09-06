@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4",
+  "releaseType": "unified-import-mobile-ux",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.3",
+    "commit": "eb1901501f8985955c004f2803e34b9a11ba6bae",
+    "tree": "e8433de8296fa75863ab9f204d90636207feaa4e",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.4",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "pullRequest": null,
+    "candidateCommit": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.4.3",
+    "currentCommit": "eb1901501f8985955c004f2803e34b9a11ba6bae",
+    "currentPagesDeployment": "45989f26",
+    "currentWorkerBuild": "b87f1bb1-71cc-4695-af0c-c3fe1415223f",
+    "currentWorkerVersion": "326ee7ef-55b2-4041-8eb2-db4ee9358bd0",
+    "workerSourceChanged": false,
+    "currentMigration": 33,
+    "candidateMigration": 33
+  },
+  "requiredArtifacts": [
+    "league-engine/one-click-import.js",
+    "league-engine/permanent-export-url.js",
+    "tests/commissioner/commissioner-hq.test.mjs",
+    "tests/import/candidate-import.test.mjs",
+    "tests/import/permanent-league-export.test.mjs",
+    "trade-module.js",
+    "styles.css",
+    "docs/ROADMAP.md",
+    "releases/7.4.4/release-record.md",
+    "releases/7.4.4/validation-evidence.json"
+  ]
+}

@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.4.3 */
+/* FHQ_BUILD: 7.4.4 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.4.3';
+  const VERSION = '7.4.4';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -136,6 +136,32 @@
     })[status] || 'Loading';
   }
 
+  function renderNotices() {
+    const latest = state?.latestExport || {};
+    const sourceIssue = readinessIssue(latest.warnings || []);
+    const actionIssue = errorMessage ? readinessIssue([errorMessage]) || {
+      title:'The action could not finish',summary:errorMessage,
+      action:'Check your connection and try once more. If the same message returns, open Import Details.'
+    } : null;
+    return `${sourceIssue?`<section class="commissioner-import-recovery commissioner-import-recovery--warning"><div><h3>${esc(sourceIssue.title)}</h3><p>${esc(sourceIssue.summary)}</p><p><strong>What to do:</strong> ${esc(sourceIssue.action)}</p></div></section>`:''}
+      ${Array.isArray(latest.readinessProblems)&&latest.readinessProblems.length?`<details class="commissioner-import-source-notes" open><summary>Latest rejected export diagnostics</summary><ul>${latest.readinessProblems.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
+      ${actionIssue?`<section class="commissioner-import-recovery" role="alert"><div><h3>${esc(actionIssue.title)}</h3><p>${esc(actionIssue.summary)}</p><p><strong>What to do:</strong> ${esc(actionIssue.action)}</p></div></section>`:''}`;
+  }
+
+  function renderSecurityControls() {
+    return `<details class="commissioner-export-advanced"><summary>Export URL security</summary><p>Rotate only if the URL is exposed or league access changes. The newest ready export and active snapshot are preserved.</p><button class="button ${rotateArmed ? 'button--danger' : 'button--ghost'}" data-rotate-permanent-export ${busy ? 'disabled' : ''}>${rotateArmed ? 'Confirm Rotation — Revoke Previous URL' : 'Rotate Export URL'}</button>${rotateArmed ? '<button class="button button--ghost" data-cancel-export-rotation>Cancel</button>' : ''}</details>`;
+  }
+
+  function ensurePolling() {
+    if (pollTimer || !document.querySelector('[data-permanent-league-export-panel],[data-one-click-import-panel]')) return;
+    const status = state?.latestExport?.status;
+    const delay = !state ? 0 : status === 'receiving' ? 5_000 : 15_000;
+    pollTimer=setTimeout(()=>{
+      pollTimer=null;
+      if (document.querySelector('[data-permanent-league-export-panel],[data-one-click-import-panel]')) refresh().catch(()=>{});
+    },delay);
+  }
+
   function renderPanel() {
     if (state?.leagueSlug && state.leagueSlug !== slug()) state=null;
     const endpointState = state?.endpoint || {};
@@ -146,18 +172,7 @@
     const importDone = latest.importLive === true || latest.importStatus === 'live';
     const importDisabled = busy || status !== 'ready' || importDone;
     const tone = status === 'ready' ? 'success' : status === 'review-required' ? 'warning' : status === 'revoked' ? 'danger' : 'neutral';
-    const sourceIssue=readinessIssue(latest.warnings||[]);
-    const actionIssue=errorMessage?readinessIssue([errorMessage])||{
-      title:'The action could not finish',summary:errorMessage,
-      action:'Check your connection and try once more. If the same message returns, open Import Details.'
-    }:null;
-    if (!pollTimer) {
-      const delay = !state ? 0 : status === 'receiving' ? 5_000 : 15_000;
-      pollTimer=setTimeout(()=>{
-        pollTimer=null;
-        if (document.querySelector('[data-permanent-league-export-panel]')) refresh().catch(()=>{});
-      },delay);
-    }
+    ensurePolling();
     return `<article class="card commissioner-league-export-card" data-permanent-league-export-panel>
       <div class="card-header"><div><span class="eyebrow">Permanent league connection</span><h2>Dedicated Madden Export URL</h2><p>Use the same league URL for every Madden Companion export. FranchiseHQ automatically separates, analyzes, and retains each export revision.</p></div><span class="pill pill--${tone}">${esc(historicalBackfill?'Historical backfill ready':statusLabel(status))}</span></div>
       <div class="commissioner-import-summary">
@@ -172,20 +187,19 @@
         <div><small>Import status</small><strong>${esc(importDone ? 'Live' : latest.importStatus === 'preview-ready' ? 'Validated · ready to publish' : latest.importStatus || 'Not started')}</strong></div>
       </div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> Week ${esc(latest.capturedWeek)} games and statistics can be added while live Week ${esc(latest.activeSnapshotWeek)} teams, rosters, players, standings, and week position remain unchanged.</span></div>`:''}
-      ${sourceIssue?`<section class="commissioner-import-recovery commissioner-import-recovery--warning"><div><h3>${esc(sourceIssue.title)}</h3><p>${esc(sourceIssue.summary)}</p><p><strong>What to do:</strong> ${esc(sourceIssue.action)}</p></div></section>`:''}
-      ${Array.isArray(latest.readinessProblems)&&latest.readinessProblems.length?`<details class="commissioner-import-source-notes" open><summary>Latest rejected export diagnostics</summary><ul>${latest.readinessProblems.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
-      ${actionIssue?`<section class="commissioner-import-recovery" role="alert"><div><h3>${esc(actionIssue.title)}</h3><p>${esc(actionIssue.summary)}</p><p><strong>What to do:</strong> ${esc(actionIssue.action)}</p></div></section>`:''}
+      ${renderNotices()}
       <div class="league-import-framework-actions">
         <button class="button button--secondary" data-copy-permanent-export-url ${busy || !endpointState.exportUrl ? 'disabled' : ''}>${copied ? 'URL Copied' : 'Copy League Export URL'}</button>
         <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''}>${busy ? 'Working…' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
         <button class="button button--ghost" data-refresh-permanent-export ${busy ? 'disabled' : ''}>Refresh</button>
       </div>
-      <details class="commissioner-export-advanced"><summary>Export URL security</summary><p>Rotate only if the URL is exposed or league access changes. The newest ready export and active snapshot are preserved.</p><button class="button ${rotateArmed ? 'button--danger' : 'button--ghost'}" data-rotate-permanent-export ${busy ? 'disabled' : ''}>${rotateArmed ? 'Confirm Rotation — Revoke Previous URL' : 'Rotate Export URL'}</button>${rotateArmed ? '<button class="button button--ghost" data-cancel-export-rotation>Cancel</button>' : ''}</details>
+      ${renderSecurityControls()}
     </article>`;
   }
 
   function rerender() {
     document.querySelectorAll('[data-permanent-league-export-panel]').forEach(node=>{ node.outerHTML=renderPanel(); });
+    window.dispatchEvent(new CustomEvent('franchisehq:permanent-export-updated'));
   }
 
   document.addEventListener('click',event=>{
@@ -196,9 +210,9 @@
     if (event.target.closest('[data-cancel-export-rotation]')) { rotateArmed=false;rerender(); }
   });
 
-  const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,permanent:true,revocable:true,activationPerformed:Boolean(state?.latestExport?.importLive)});
+  const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,copied,rotateArmed,permanent:true,revocable:true,activationPerformed:Boolean(state?.latestExport?.importLive)});
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before permanent-export-url.js.');
-  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,renderPanel,diagnostics},{replace:true,alias:'leagueExportUrl'});
+  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,renderPanel,renderNotices,renderSecurityControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'permanent-league-export-url',service:'leagueExportUrl',script:'league-engine/permanent-export-url.js',version:VERSION,dependencies:['auth','leagueTenant','oneClickImport'],capabilities:['permanent-url','explicit-rotation','automatic-analysis','latest-export-readiness','one-click-import']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

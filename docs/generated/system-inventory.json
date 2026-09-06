@@ -159,15 +159,15 @@
         "file": "app.js"
       },
       {
-        "bytes": 503198,
+        "bytes": 507799,
         "file": "styles.css"
       },
       {
-        "bytes": 415667,
+        "bytes": 416614,
         "file": "trade-module.js"
       },
       {
-        "bytes": 151076,
+        "bytes": 155298,
         "file": "tools/check-release.mjs"
       },
       {
@@ -215,15 +215,15 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
+        "bytes": 36145,
+        "file": "tests/import/candidate-import.test.mjs"
+      },
+      {
         "bytes": 35946,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 35911,
-        "file": "tests/import/candidate-import.test.mjs"
-      },
-      {
-        "bytes": 29559,
+        "bytes": 32400,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -1460,7 +1460,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.3",
+  "release": "7.4.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

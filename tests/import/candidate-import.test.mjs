@@ -594,6 +594,11 @@ test('commissioner live import activates only its validated candidate and never 
   }
   assert.doesNotMatch(ui,/Create Private Destination/);
   assert.match(ui,/Import Latest Export/);
+  assert.match(ui,/Madden Companion Import/);
+  assert.match(ui,/data-copy-permanent-export-url/);
+  assert.match(ui,/data-refresh-companion-import/);
+  assert.match(ui,/Latest Snapshot/);
+  assert.match(ui,/renderSecurityControls/);
   assert.match(ui,/CURRENT STEP/);
   assert.match(ui,/Atomic safety/);
   assert.match(ui,/Import Latest Export/);

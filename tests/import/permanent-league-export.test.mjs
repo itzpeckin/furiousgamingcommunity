@@ -260,6 +260,8 @@ test('runtime wiring preserves immutable sources, atomic cohorts, snapshot isola
   assert.match(ui,/Rotate Export URL/);
   assert.match(ui,/routineWarning/);
   assert.match(ui,/counts\.freeAgentStatus\) \? count\(counts\.freeAgentCount\) : 'unknown'/);
+  assert.match(ui,/franchisehq:permanent-export-updated/);
+  assert.match(ui,/renderSecurityControls/);
   assert.match(importer,/reuseExisting:true/);
   assert.match(importer,/api\('classify','POST',\{discoverySessionId\}\)/);
   assert.doesNotMatch(importer,/api\('classify','POST',\{\}\)/);

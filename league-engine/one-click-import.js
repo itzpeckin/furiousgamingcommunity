@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.4.3 */
+/* FHQ_BUILD: 7.4.4 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.4.3';
+  const VERSION = '7.4.4';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -29,6 +29,8 @@
   const slug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || null;
   const base = () => `/api/leagues/${encodeURIComponent(slug())}/companion/`;
   const now = () => window.performance?.now?.() ?? Date.now();
+  const exportUrlService = () => HQ?.leagueExportUrl || HQ?.platform?.leagueExportUrl || HQ?.getModuleService?.('platform','leagueExportUrl');
+  const exportUrlDiagnostics = () => exportUrlService()?.diagnostics?.() || {};
 
   const phaseLabel = phase => PHASES.find(row=>row[0]===phase)?.[1] || 'Import setup';
   const routineWarning = value => /free agents?|rostered-player-only|carried forward|retained from|source snapshot/i.test(String(value||''));
@@ -125,6 +127,27 @@
     state = await api('candidate-import');
     rerender();
     return state;
+  }
+
+  async function refreshWorkspace() {
+    if (busy) return state;
+    busy = true;
+    errorMessage = '';
+    rerender();
+    try {
+      const connectionRefresh = exportUrlService()?.refresh?.();
+      await Promise.all([refresh(), connectionRefresh || Promise.resolve()]);
+      notice = 'Import readiness refreshed.';
+      return state;
+    } catch (error) {
+      errorMessage = error.message;
+      lastOutcome = failureGuidance(error,'analyze-source');
+      renderImportNotification();
+      throw error;
+    } finally {
+      busy = false;
+      rerender();
+    }
   }
 
   function currentRun() { return state?.run || null; }
@@ -419,6 +442,14 @@
   function renderPanel() {
     const run=currentRun();
     const source=state?.source;
+    const connectionService=exportUrlService();
+    setTimeout(()=>exportUrlService()?.ensurePolling?.(),0);
+    const connection=exportUrlDiagnostics();
+    const endpointState=connection.state?.endpoint||{};
+    const latestExport=connection.state?.latestExport||{};
+    const exportStatus=latestExport.status||'loading';
+    const latestExportLive=latestExport.importLive===true||latestExport.importStatus==='live';
+    const exportStatusLabel=({loading:'Loading connection','awaiting-export':'Awaiting export',receiving:'Receiving export',ready:'Ready to import','review-required':'Review required',revoked:'URL revoked'})[exportStatus]||'Loading connection';
     const resultCounts=counts();
     const faStatus=resultCounts.freeAgentStatus || source?.counts?.freeAgentStatus || 'missing';
     const faCount=['located','empty-confirmed'].includes(faStatus)
@@ -434,9 +465,9 @@
     const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
     const actionableSourceWarnings=sourceWarnings.filter(value=>!routineWarning(value));
     const sourceIsNew=source?.selectionStatus==='new-source';
-    const runDisabled=busy||!source||live;
-    const runLabel=busy?'Import Running…'
-      :live?'Latest Export Live'
+    const runDisabled=busy||connection.busy||exportStatus!=='ready'||!source||live||latestExportLive;
+    const runLabel=busy||connection.busy?'Working…'
+      :live||latestExportLive?'Latest Export Live'
         :run?.status==='failed'?'Retry Candidate Import'
           :'Import Latest Export';
     const activePhase=run?.currentPhase||(!source?'analyze-source':live?'preview-ready':'analyze-source');
@@ -444,30 +475,34 @@
     const segment=100/PHASES.length,overall=Number(run?.progress||0);
     const activeItem=run?.phaseState?.[activePhase];
     const phaseProgress=live||activeItem?.status==='complete'?100:Math.max(0,Math.min(99,Math.round((overall-activePhaseIndex*segment)/segment*100)));
-    return `<section class="card commissioner-live-import-card" data-one-click-import-panel>
-      <div class="card-header commissioner-import-header"><div><span class="eyebrow">Madden Companion import</span><h3>Import Latest Export</h3><p>Analyze, map, validate, and make the newest eligible export live with one action.</p></div><span class="pill pill--${live?'success':run?.status==='failed'?'danger':sourceIsNew?'warning':'neutral'}">${esc(live?'Live':run?.status|| (sourceIsNew?'New export':'Not started'))}</span></div>
-      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
-      ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
-      <div class="commissioner-import-summary">
-        <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
-        <div><small>Season</small><strong>${esc(source?.season?.seasonYear ?? '—')}</strong></div>
-        <div><small>Active / captured week</small><strong>${esc(state?.activeSnapshotWeek ?? '—')} / ${esc(coverage.currentWeek ?? 'unknown')}</strong></div>
-        <div><small>Week continuity</small><strong>${esc(coverage.continuityStatus||'unknown')}</strong></div>
-        <div><small>Capture analyzed</small><strong>${esc(dateLabel(source?.generatedAt))}</strong></div>
-        <div><small>Teams</small><strong>${countLabel(resultCounts.teams ?? source?.counts?.teams)}</strong></div>
-        <div><small>Rostered players</small><strong>${countLabel(resultCounts.rosteredPlayers ?? resultCounts.players ?? source?.counts?.rosteredPlayers)}</strong></div>
-        <div><small>Free Agents</small><strong>${esc(faCount)}</strong></div>
-        <div><small>Wall time</small><strong>${durationLabel(run?.durationMs)}</strong></div>
+    return `<section class="card commissioner-live-import-card commissioner-companion-workspace" data-one-click-import-panel>
+      <div class="card-header commissioner-import-header"><div><span class="eyebrow">Permanent league connection</span><h3>Madden Companion Import</h3><p>Use the same league URL every week, then analyze, validate, and make the newest eligible export live with one action.</p></div><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':sourceIsNew?'warning':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></div>
+      <div class="commissioner-import-primary-actions" aria-label="Madden Companion import actions">
+        <button class="button button--secondary" data-copy-permanent-export-url ${busy||connection.busy||!endpointState.exportUrl?'disabled':''}>${connection.copied?'URL Copied':'Copy URL'}</button>
+        <button class="button button--primary" data-import-latest-export ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
+        <button class="button button--ghost" data-refresh-companion-import ${busy||connection.busy?'disabled':''}>Refresh</button>
       </div>
       <div class="commissioner-import-progress-block commissioner-import-progress-block--modern"><div class="commissioner-import-progress-head"><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" aria-label="${esc(phaseLabel(activePhase))} ${phaseProgress}% complete"><span style="width:${phaseProgress}%"></span></div><p>${esc(notice||'Ready when the next Madden export arrives.')}</p><ol class="commissioner-import-phase-list">${phaseRows()}</ol></div>
+      <section class="commissioner-latest-snapshot" aria-labelledby="commissioner-latest-snapshot-title"><header><div><span class="eyebrow">Most recent import source</span><h4 id="commissioner-latest-snapshot-title">Latest Snapshot</h4></div><span>${endpointState.exportUrl?'Permanent URL connected':'Connection unavailable'}</span></header><div class="commissioner-import-summary">
+        <div><small>Latest export</small><strong>${esc(dateLabel(latestExport.receivedAt||source?.generatedAt))}</strong></div>
+        <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
+        <div><small>Season</small><strong>${esc(source?.season?.seasonYear ?? '—')}</strong></div>
+        <div><small>Active / captured week</small><strong>${esc(state?.activeSnapshotWeek ?? latestExport.activeSnapshotWeek ?? '—')} / ${esc(coverage.currentWeek ?? latestExport.capturedWeek ?? 'unknown')}</strong></div>
+        <div><small>Week continuity</small><strong>${esc(coverage.continuityStatus||'unknown')}</strong></div>
+        <div><small>Captured routes</small><strong>${countLabel(latestExport.captureCount)}</strong></div>
+        <div><small>Teams</small><strong>${countLabel(resultCounts.teams ?? source?.counts?.teams ?? latestExport.counts?.teams)}</strong></div>
+        <div><small>Rostered players</small><strong>${countLabel(resultCounts.rosteredPlayers ?? resultCounts.players ?? source?.counts?.rosteredPlayers ?? latestExport.counts?.rosteredPlayers)}</strong></div>
+        <div><small>Free Agents</small><strong>${esc(faCount)}</strong></div>
+        <div><small>Wall time</small><strong>${durationLabel(run?.durationMs)}</strong></div>
+      </div></section>
+      <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
+      ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
+      ${connectionService?.renderNotices?.()||''}
       ${actionableSourceWarnings.length?`<details class="commissioner-import-source-notes"><summary>${actionableSourceWarnings.length} source note${actionableSourceWarnings.length===1?'':'s'}</summary><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
       ${lastOutcome?.tone==='error'?`<section class="commissioner-import-recovery" role="alert"><div><span class="eyebrow">${esc(lastOutcome.phase)}</span><h4>${esc(lastOutcome.title)}</h4><p>${esc(lastOutcome.summary)}</p><p><strong>What to do:</strong> ${esc(lastOutcome.action)}</p><small>Your current league data is still live.</small></div><details><summary>Technical details</summary><p>${esc(lastOutcome.detail)}</p><code>Support code: ${esc(lastOutcome.supportCode)}</code></details></section>`:''}
       ${sub60?`<div class="league-import-framework-note"><svg><use href="#icon-check"></use></svg><span><strong>Performance target met:</strong> ${esc(durationLabel(run.durationMs))}, under 60 seconds.</span></div>`:''}
-      <div class="league-import-framework-actions">
-        <button class="button button--primary" data-run-candidate-import ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
-        <button class="button button--ghost" data-refresh-candidate-import ${busy?'disabled':''}>Refresh</button>
-      </div>
       <details class="commissioner-import-technical"><summary>Import identifiers</summary><p class="muted">Source fingerprint: ${esc(source?.sourceFingerprint?.slice(0,12)||'—')} · snapshot: ${esc(run?.candidateSnapshotId||'—')} · previous snapshot: ${esc(run?.activeSnapshotIdBefore||'—')}</p></details>
+      ${connectionService?.renderSecurityControls?.()||''}
     </section>`;
   }
 
@@ -480,11 +515,14 @@
     if (event.target.closest('[data-create-candidate-destination]')) createDestination();
     if (event.target.closest('[data-run-candidate-import]')) runImport({retry:['failed','running'].includes(currentRun()?.status)});
     if (event.target.closest('[data-refresh-candidate-import]')) refresh().catch(error=>{errorMessage=error.message;lastOutcome=failureGuidance(error,'analyze-source');renderImportNotification();rerender();});
+    if (event.target.closest('[data-refresh-companion-import]')) refreshWorkspace().catch(()=>{});
   });
+
+  window.addEventListener('franchisehq:permanent-export-updated',()=>rerender());
 
   const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,outcome:lastOutcome,activationPerformed:Boolean(currentRun()?.activationPerformed),activeSnapshotChanged:Boolean(currentRun()?.activeSnapshotChanged)});
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
-  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,renderPanel,renderImportNotification,failureGuidance,diagnostics},{replace:true,alias:'oneClickImport'});
+  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,refreshWorkspace,renderPanel,renderImportNotification,failureGuidance,diagnostics},{replace:true,alias:'oneClickImport'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','one-click-live-import','atomic-snapshot-activation','actionable-failure-guidance','sub-60-second-target','blocked-free-agents-unknown']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();
