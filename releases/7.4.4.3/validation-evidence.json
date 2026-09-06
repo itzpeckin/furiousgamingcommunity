@@ -3,11 +3,11 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.3",
   "validatedOn": "2026-09-06",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
-  "credentialsChanged": false,
+  "credentialsChanged": true,
   "baselineGate": {
     "unregisteredFailures": 0
   },
@@ -98,8 +98,8 @@
       "migrationVersion": 34,
       "newTables": 5,
       "foreignKeyViolations": 0,
-      "productionApplied": false,
-      "candidateRequiresMigration": true
+      "productionApplied": true,
+      "candidateRequiresMigration": false
     },
     "automatedTests": {
       "passed": true,
@@ -114,20 +114,73 @@
       "javascriptModules": 248,
       "inventoryFiles": 589,
       "routes": 75
+    },
+    "productionProtectedState": {
+      "passed": true,
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "migrationVersion": 34,
+      "migrationName": "discord_bot_foundation",
+      "leagues": 1,
+      "users": 29,
+      "memberships": 29,
+      "activeTeamAssignments": 28,
+      "activeSnapshotPointers": 1,
+      "draftPicks": 672,
+      "draftPickLedgerEvents": 1344,
+      "tradeWorkflows": 3,
+      "discordInstallations": 0,
+      "discordReceipts": 0,
+      "discordDeliveries": 0,
+      "twitchProfiles": 0,
+      "leagueNewsPosts": 0,
+      "foreignKeyViolations": 0,
+      "protectedCountsMatchedPreMigration": true
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified",
+      "liveReleaseMarker": "7.4.4.3",
+      "mainCommit": "f4aaf1d4004de7ec0a21ec0b5b377e387c2402f3",
+      "pagesDeployment": "2f978383-d4ac-4d33-a586-7be5a164e9d9",
+      "appJsSha256": "c889463975bd395f08d79eb4c7e05bfcf2324ad5582844bed275809768250e72",
+      "deployedAssetsMatchMain": true,
+      "discordEndpointGetStatus": 405,
+      "discordUnsignedPostStatus": 401,
+      "readOnly": true
+    },
+    "discordProductionAcceptance": {
+      "passed": true,
+      "applicationId": "1529715179733127219",
+      "applicationName": "Franchise HQ",
+      "existingApplicationReused": true,
+      "newApplicationCreated": false,
+      "interactionEndpoint": "https://franchisehq.app/api/discord/interactions",
+      "signedEndpointAccepted": true,
+      "publicKeyConfigured": true,
+      "botTokenReset": true,
+      "botTokenEncrypted": true,
+      "botTokenPrintedOrPersistedLocally": false,
+      "clipboardCleared": true,
+      "registrationScope": "global",
+      "globalCommandsRegistered": 16,
+      "guildInstallationPerformed": false,
+      "guildMappingCreated": false,
+      "readOnlyAcceptance": true
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
-    "productionConfigurationChanged": false,
+    "productionConfigurationChanged": true,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
-    "migrationApplied": false,
-    "discordCommandsRegistered": false,
-    "discordCredentialsChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
+    "migrationApplied": true,
+    "discordCommandsRegistered": true,
+    "discordCredentialsChanged": true,
     "discordGuildInstalled": false,
     "discordLeagueConfigured": false,
     "captureExecuted": false,
@@ -140,29 +193,59 @@
     "archiveSeasonExecuted": false,
     "exportUrlRotated": false,
     "freeAgentInterpretedAsZero": false,
-    "credentialsChanged": false,
+    "credentialsChanged": true,
     "membershipAssignmentsChanged": false,
-    "databaseRowsWritten": 0
+    "databaseRowsWritten": 1
   },
   "external": {
-    "githubPublication": {"authorized": false, "status": "not-run"},
-    "hostedChecks": {"authorized": false, "status": "not-run"},
+    "githubPublication": {
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 46,
+      "candidateCommit": "d650c97eb9a1eaca19f7ddb9ca456c0e1f0c8259",
+      "mergeCommit": "f4aaf1d4004de7ec0a21ec0b5b377e387c2402f3"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "mainChecksPassed": 5,
+      "pullRequestQualityRun": 34057277605,
+      "mainQualityRun": 34057722185
+    },
     "stagingDeployment": {"authorized": false, "status": "not-run"},
     "productionMigration": {
-      "authorized": false,
-      "status": "not-run",
-      "currentMigration": 33,
-      "candidateMigration": 34
+      "authorized": true,
+      "status": "applied-and-verified",
+      "fromMigration": 33,
+      "currentMigration": 34,
+      "candidateMigration": 34,
+      "preMigrationBookmark": "00000141-0000096a-000050de-4c9ba9913f5199401f387fef4a0215af",
+      "postMigrationBookmark": "00000141-00000982-000050de-995347861f06ab3520da3d566158b9a7",
+      "newTables": 5,
+      "newIndexes": 6,
+      "newTriggers": 1,
+      "foreignKeys": 9,
+      "foreignKeyViolations": 0,
+      "protectedCountsMatched": true
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.4.4.2"
+      "authorized": true,
+      "status": "deployed-read-only-verified-pending-owner-acceptance",
+      "currentRelease": "7.4.4.3",
+      "mainCommit": "f4aaf1d4004de7ec0a21ec0b5b377e387c2402f3",
+      "pagesDeployment": "2f978383-d4ac-4d33-a586-7be5a164e9d9",
+      "workerBuild": "eff8e5a0-a9e6-42c9-ad85-65f5efb35199",
+      "liveReleaseMarker": "7.4.4.3"
     },
     "discordRegistration": {
-      "authorized": false,
-      "status": "not-run",
-      "scope": "global"
+      "authorized": true,
+      "status": "global-registered",
+      "scope": "global",
+      "applicationId": "1529715179733127219",
+      "commandCount": 16,
+      "interactionEndpointStatus": "saved-and-discord-verified",
+      "botTokenStorage": "cloudflare-encrypted-secret"
     },
     "discordGuildInstallation": {"authorized": false, "status": "not-run"}
   }
