@@ -2783,6 +2783,114 @@ if (version === '7.4.4.2') {
     || evidence.scopeBoundaries?.credentialsChanged !== false
   ) errors.push('7.4.4.2 must preserve every excluded environment, data, snapshot, identity, export URL, and Free Agent boundary.');
 }
+if (version === '7.4.4.3') {
+  for (const check of [
+    'approvedCommandInventory',
+    'guildTenantIsolation',
+    'interactionSecurity',
+    'unassignedJoinAccess',
+    'sharedWebBotAuthority',
+    'privacyAndDelivery',
+    'newsAndTwitchAuthority',
+    'commissionerConnectionWorkspace',
+    'independentImplementation',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.4.3 evidence is incomplete: ${check}.`);
+  }
+  if (
+    Number(evidence.checks?.approvedCommandInventory?.topLevelCommands) !== 16
+    || evidence.checks?.approvedCommandInventory?.registrationScope !== 'global'
+    || JSON.stringify(evidence.checks?.approvedCommandInventory?.statisticsTargets) !== JSON.stringify(['player','team'])
+    || evidence.checks?.approvedCommandInventory?.multiTeamTradeExperience !== 'canonical-web-deep-link'
+    || evidence.checks?.guildTenantIsolation?.oneGuildPerLeague !== true
+    || evidence.checks?.guildTenantIsolation?.oneLeaguePerGuild !== true
+    || evidence.checks?.guildTenantIsolation?.twoLeagueRegression !== true
+    || evidence.checks?.guildTenantIsolation?.crossTenantAccessRejected !== true
+    || evidence.checks?.interactionSecurity?.signatureAlgorithm !== 'Ed25519'
+    || Number(evidence.checks?.interactionSecurity?.maximumTimestampSkewSeconds) !== 300
+    || evidence.checks?.interactionSecurity?.revokedMembershipFailsClosed !== true
+    || evidence.checks?.interactionSecurity?.idempotentReplayReceipt !== true
+    || evidence.checks?.unassignedJoinAccess?.membershipCreatedActive !== true
+    || evidence.checks?.unassignedJoinAccess?.teamAssignmentCreated !== false
+    || evidence.checks?.unassignedJoinAccess?.teamAndTradeActionsBlocked !== true
+    || evidence.checks?.sharedWebBotAuthority?.activeSnapshotSelectorsShared !== true
+    || evidence.checks?.sharedWebBotAuthority?.tradeExecutorShared !== true
+    || evidence.checks?.sharedWebBotAuthority?.competitionExecutorShared !== true
+    || evidence.checks?.sharedWebBotAuthority?.maddenRemainsRosterAuthority !== true
+    || evidence.checks?.sharedWebBotAuthority?.discordImportTriggerAdded !== false
+    || evidence.checks?.privacyAndDelivery?.unfinishedConfidencePicksPrivate !== true
+    || evidence.checks?.privacyAndDelivery?.tradeActionsPrivate !== true
+    || evidence.checks?.privacyAndDelivery?.otherTeamNegotiationsExposed !== false
+    || evidence.checks?.newsAndTwitchAuthority?.newsPublishedServerBacked !== true
+    || evidence.checks?.newsAndTwitchAuthority?.draftNewsPublic !== false
+    || evidence.checks?.newsAndTwitchAuthority?.twitchProfileScope !== 'global-user'
+    || evidence.checks?.newsAndTwitchAuthority?.commissionerReplacementAllowed !== false
+    || evidence.checks?.commissionerConnectionWorkspace?.guildMapping !== true
+    || evidence.checks?.commissionerConnectionWorkspace?.tradeCommitteeChannel !== true
+    || evidence.checks?.commissionerConnectionWorkspace?.auditedDisable !== true
+    || evidence.checks?.independentImplementation?.originalFranchiseHqCopyAndCode !== true
+    || Number(evidence.checks?.independentImplementation?.prohibitedThirdPartyProductReferences) !== 0
+    || evidence.checks?.independentImplementation?.automatedSourceGuard !== true
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+    || Number(evidence.checks?.strictMigration?.migrationVersion) !== 34
+    || Number(evidence.checks?.strictMigration?.newTables) !== 5
+    || evidence.checks?.strictMigration?.productionApplied !== false
+    || evidence.checks?.strictMigration?.candidateRequiresMigration !== true
+  ) errors.push('7.4.4.3 must prove the approved global command contract, tenant isolation, shared authority, private delivery, and additive migration 34 boundary.');
+  if (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.sourceBaseline?.commit !== '7e43655447abc5560bbf18efd981af707b08a4d1'
+    || manifest.implementationBranch !== 'codex/franchisehq-7.4.4.3'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.repositoryPublication?.status !== 'not-run'
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.currentRelease !== '7.4.4.2'
+    || Number(manifest.production?.currentMigration) !== 33
+    || Number(manifest.production?.candidateMigration) !== 34
+    || evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.productionConfigurationChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.gitRemoteChanged !== false
+    || evidence.scopeBoundaries?.migrationApplied !== false
+    || evidence.scopeBoundaries?.discordCommandsRegistered !== false
+    || evidence.scopeBoundaries?.discordCredentialsChanged !== false
+    || evidence.scopeBoundaries?.discordGuildInstalled !== false
+    || evidence.scopeBoundaries?.discordLeagueConfigured !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+    || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 0
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+    || evidence.external?.productionMigration?.status !== 'not-run'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 33
+    || Number(evidence.external?.productionMigration?.candidateMigration) !== 34
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+    || evidence.external?.discordRegistration?.status !== 'not-run'
+    || evidence.external?.discordRegistration?.scope !== 'global'
+    || evidence.external?.discordGuildInstallation?.status !== 'not-run'
+  ) errors.push('7.4.4.3 must remain an unpublished, unconfigured local candidate until its consolidated external acceptance cycle is separately authorized.');
+  if (
+    evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.dataDeleted !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+    || evidence.scopeBoundaries?.credentialsChanged !== false
+  ) errors.push('7.4.4.3 must preserve every excluded environment, league-data, snapshot, identity, export URL, credential, and Free Agent boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

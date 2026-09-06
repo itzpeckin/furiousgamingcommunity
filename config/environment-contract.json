@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "FranchiseHQ",
-  "release": "7.4.4.2",
+  "release": "7.4.4.3",
   "configurationAuthority": "Cloudflare dashboard export until a reviewed Wrangler configuration is adopted",
   "deploymentPolicy": {
     "productionBranch": "main",
@@ -33,6 +33,8 @@
     ],
     "secrets": [
       "DISCORD_CLIENT_SECRET",
+      "DISCORD_PUBLIC_KEY",
+      "DISCORD_BOT_TOKEN",
       "SESSION_SIGNING_SECRET",
       "COMPANION_EXPORT_TOKEN"
     ],
@@ -67,7 +69,7 @@
       },
       "variables": {
         "APP_ENV": "local",
-        "APP_VERSION": "7.4.4.2",
+        "APP_VERSION": "7.4.4.3",
         "DISCORD_CLIENT_ID": "local-discord-application",
         "DISCORD_REDIRECT_URI": "http://localhost:8788/api/auth/discord/callback",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
@@ -77,6 +79,8 @@
       },
       "secretNames": [
         "DISCORD_CLIENT_SECRET",
+        "DISCORD_PUBLIC_KEY",
+        "DISCORD_BOT_TOKEN",
         "SESSION_SIGNING_SECRET",
         "COMPANION_EXPORT_TOKEN"
       ]
@@ -96,7 +100,7 @@
       },
       "variables": {
         "APP_ENV": "staging",
-        "APP_VERSION": "7.4.4.2",
+        "APP_VERSION": "7.4.4.3",
         "DISCORD_CLIENT_ID": "staging-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-staging",
         "DISCORD_REDIRECT_URI_PUBLIC": "set-in-cloudflare-staging-public",
@@ -106,6 +110,8 @@
       },
       "secretNames": [
         "DISCORD_CLIENT_SECRET",
+        "DISCORD_PUBLIC_KEY",
+        "DISCORD_BOT_TOKEN",
         "SESSION_SIGNING_SECRET",
         "COMPANION_EXPORT_TOKEN"
       ]
@@ -125,7 +131,7 @@
       },
       "variables": {
         "APP_ENV": "production",
-        "APP_VERSION": "7.4.4.2",
+        "APP_VERSION": "7.4.4.3",
         "DISCORD_CLIENT_ID": "production-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-production",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
@@ -135,6 +141,8 @@
       },
       "secretNames": [
         "DISCORD_CLIENT_SECRET",
+        "DISCORD_PUBLIC_KEY",
+        "DISCORD_BOT_TOKEN",
         "SESSION_SIGNING_SECRET",
         "COMPANION_EXPORT_TOKEN"
       ]

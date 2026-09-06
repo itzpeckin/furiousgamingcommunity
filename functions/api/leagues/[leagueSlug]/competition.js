@@ -6,7 +6,7 @@ import {
   tenantAuditStatement
 } from '../../../_lib/tenant-context.js';
 
-const RELEASE = '7.4.4.2';
+const RELEASE = '7.4.4.3';
 const MAX_BODY_BYTES = 16 * 1024;
 const SAFE_GAME_ID = /^[A-Za-z0-9._:-]{1,180}$/;
 const SAFE_TEAM_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -186,7 +186,7 @@ function leaderboard(entryRows, pickRows, games, members) {
   })).sort((a,b) => b.totalPoints - a.totalPoints || b.correctPicks - a.correctPicks || a.name.localeCompare(b.name));
 }
 
-async function state(c) {
+export async function competitionState(c) {
   const snapshot = await activeSnapshot(c);
   const games = await activeGames(c, snapshot);
   const features = await featureState(c);
@@ -456,10 +456,22 @@ export async function onRequestGet(context) {
   try {
     const c = await requestContext(context);
     if (c.response) return c.response;
-    return jsonResponse(await state(c));
+    return jsonResponse(await competitionState(c));
   } catch (error) {
     return jsonResponse({ok:false,release:RELEASE,error:error?.message || 'League competition state could not be loaded.'}, Number(error?.status) || 500);
   }
+}
+
+export async function executeCompetitionAction(c, body = {}) {
+  if (body.action === 'set-gotw') await setGotw(c, body);
+  else if (body.action === 'open-confidence-window') await setConfidenceWindow(c, body);
+  else if (body.action === 'set-confidence-status') await setConfidenceStatus(c, body);
+  else if (body.action === 'save-confidence-pick') await savePick(c, body);
+  else if (body.action === 'clear-confidence-week') await clearEntry(c, body, false);
+  else if (body.action === 'clear-confidence-season') await clearEntry(c, body, true);
+  else if (body.action === 'submit-confidence-week') await submitEntry(c, body);
+  else throw Object.assign(new Error('Unknown competition action.'), {status:400});
+  return {...await competitionState(c),action:body.action};
 }
 
 export async function onRequestPost(context) {
@@ -469,15 +481,7 @@ export async function onRequestPost(context) {
     const parsed = await readBody(context.request);
     if (parsed.response) return parsed.response;
     const body = parsed.body;
-    if (body.action === 'set-gotw') await setGotw(c, body);
-    else if (body.action === 'open-confidence-window') await setConfidenceWindow(c, body);
-    else if (body.action === 'set-confidence-status') await setConfidenceStatus(c, body);
-    else if (body.action === 'save-confidence-pick') await savePick(c, body);
-    else if (body.action === 'clear-confidence-week') await clearEntry(c, body, false);
-    else if (body.action === 'clear-confidence-season') await clearEntry(c, body, true);
-    else if (body.action === 'submit-confidence-week') await submitEntry(c, body);
-    else return jsonResponse({ok:false,release:RELEASE,error:'Unknown competition action.'}, 400);
-    return jsonResponse({...await state(c),action:body.action});
+    return jsonResponse(await executeCompetitionAction(c,body));
   } catch (error) {
     return jsonResponse({ok:false,release:RELEASE,error:error?.message || 'League competition action failed.'}, Number(error?.status) || 500);
   }

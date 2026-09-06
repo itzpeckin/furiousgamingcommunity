@@ -19,6 +19,10 @@ import {
   attachProjectedPickSlots,
   projectDraftOrder
 } from '../../../_lib/draft-pick-projections.js';
+import {
+  queueCommitteeReviewDelivery,
+  scheduleDiscordDeliveryFlush
+} from '../../../_lib/discord-delivery.js';
 
 const jsonParse = (value, fallback = null) => {
   try { return JSON.parse(value || 'null') ?? fallback; }
@@ -186,7 +190,7 @@ async function publicWorkflow(db, leagueId, row, session) {
   };
 }
 
-async function publicState(c) {
+export async function tradeCenterState(c) {
   const season = await currentSeason(c.db,c.league.id);
   const pickBaseline=season ? await ensureDraftPickHorizon(c.db,{leagueId:c.league.id,franchiseSeasonId:season.id,
     seasonYear:season.seasonYear,gameRelease:season.gameRelease,teams:c.teams}) : null;
@@ -639,52 +643,62 @@ export async function onRequestGet(context) {
     if(!featureAvailable(c.league,'trade_center')&&!featureAvailable(c.league,'trade_block')) {
       return json({ok:false,release:TRADE_CENTER_RELEASE,error:'Trade features are disabled for this league.'},403);
     }
-    return json(await publicState(c));
+    return json(await tradeCenterState(c));
   } catch (error) {
     return json({ok:false,release:TRADE_CENTER_RELEASE,error:error?.message||'Trade Center could not be loaded.'},Number(error?.status)||500);
   }
+}
+
+export async function executeTradeCenterAction(c, body = {}) {
+  const action=cleanText(body.action,50);
+  const blockAction=action==='trade-block'||action==='trade-block-needs';
+  if(blockAction&&!featureAvailable(c.league,'trade_block'))throw Object.assign(new Error('Trade Block is disabled for this league.'),{status:403});
+  if(!blockAction&&action!=='notifications-read'&&!featureAvailable(c.league,'trade_center'))throw Object.assign(new Error('Trade Center is disabled for this league.'),{status:403});
+  let tradeId=cleanText(body.tradeId,100);
+  if(action==='propose')({tradeId}=await propose(c,body,false));
+  else if(action==='save-draft')({tradeId}=await propose(c,body,true));
+  else if(action==='settings')await updateSettings(c,body);
+  else if(action==='seed-picks')await seedPicks(c,body);
+  else if(action==='preview-pick-baseline')return {ok:true,release:TRADE_CENTER_RELEASE,
+    action,preview:await configuredPickBaseline(c,body)};
+  else if(action==='apply-pick-baseline')await applyPickBaseline(c,body);
+  else if(action==='trade-block')await updateBlock(c,body);
+  else if(action==='trade-block-needs')await updateTeamNeeds(c,body);
+  else if(action==='notifications-read')await c.db.prepare(`UPDATE league_notifications SET read_at=CURRENT_TIMESTAMP
+    WHERE league_id=? AND user_id=? AND read_at IS NULL`).bind(c.league.id,c.session.user.id).run();
+  else {
+    if(!tradeId)throw Object.assign(new Error('tradeId is required.'),{status:400});
+    const row=await workflow(c.db,c.league.id,tradeId);
+    if(!row)throw Object.assign(new Error('Trade not found.'),{status:404});
+    const participants=await workflowParticipants(c.db,c.league.id,tradeId);
+    if(['counter','accept','reject','withdraw','review'].includes(action))requireCurrentRevision(body,row);
+    if(action==='counter')await counter(c,body,row,participants);
+    else if(action==='accept')await accept(c,row,participants);
+    else if(action==='reject')await reject(c,row,participants,body.reason);
+    else if(action==='withdraw')await withdraw(c,row,participants);
+    else if(action==='review')await review(c,row,participants,String(body.decision||''),body.reason,body.freeTrade);
+    else if(action==='message'){
+      await ensureParticipantAction(c,row,participants);
+      const message=cleanText(body.message,2000);if(!message)throw Object.assign(new Error('A message is required.'),{status:400});
+      await c.db.prepare(`INSERT INTO trade_workflow_messages
+        (id,trade_id,league_id,author_user_id,event_type,message,created_at) VALUES (?,?,?,?,'message',?,CURRENT_TIMESTAMP)`)
+        .bind(`trade_message_${crypto.randomUUID()}`,tradeId,c.league.id,c.session.user.id,message).run();
+    }else throw Object.assign(new Error('Unknown Trade Center action.'),{status:400});
+  }
+  return {...await tradeCenterState(c),action,tradeId:tradeId||null};
 }
 
 export async function onRequestPost(context) {
   try {
     const c=await requestContext(context); if(c.response)return c.response;
     let body={}; try{body=await context.request.json()}catch{throw Object.assign(new Error('Request body must be valid JSON.'),{status:400})}
-    const action=cleanText(body.action,50);
-    const blockAction=action==='trade-block'||action==='trade-block-needs';
-    if(blockAction&&!featureAvailable(c.league,'trade_block'))throw Object.assign(new Error('Trade Block is disabled for this league.'),{status:403});
-    if(!blockAction&&action!=='notifications-read'&&!featureAvailable(c.league,'trade_center'))throw Object.assign(new Error('Trade Center is disabled for this league.'),{status:403});
-    let tradeId=cleanText(body.tradeId,100);
-    if(action==='propose')({tradeId}=await propose(c,body,false));
-    else if(action==='save-draft')({tradeId}=await propose(c,body,true));
-    else if(action==='settings')await updateSettings(c,body);
-    else if(action==='seed-picks')await seedPicks(c,body);
-    else if(action==='preview-pick-baseline')return json({ok:true,release:TRADE_CENTER_RELEASE,
-      action,preview:await configuredPickBaseline(c,body)});
-    else if(action==='apply-pick-baseline')await applyPickBaseline(c,body);
-    else if(action==='trade-block')await updateBlock(c,body);
-    else if(action==='trade-block-needs')await updateTeamNeeds(c,body);
-    else if(action==='notifications-read')await c.db.prepare(`UPDATE league_notifications SET read_at=CURRENT_TIMESTAMP
-      WHERE league_id=? AND user_id=? AND read_at IS NULL`).bind(c.league.id,c.session.user.id).run();
-    else {
-      if(!tradeId)throw Object.assign(new Error('tradeId is required.'),{status:400});
-      const row=await workflow(c.db,c.league.id,tradeId);
-      if(!row)throw Object.assign(new Error('Trade not found.'),{status:404});
-      const participants=await workflowParticipants(c.db,c.league.id,tradeId);
-      if(['counter','accept','reject','withdraw','review'].includes(action))requireCurrentRevision(body,row);
-      if(action==='counter')await counter(c,body,row,participants);
-      else if(action==='accept')await accept(c,row,participants);
-      else if(action==='reject')await reject(c,row,participants,body.reason);
-      else if(action==='withdraw')await withdraw(c,row,participants);
-      else if(action==='review')await review(c,row,participants,String(body.decision||''),body.reason,body.freeTrade);
-      else if(action==='message'){
-        await ensureParticipantAction(c,row,participants);
-        const message=cleanText(body.message,2000);if(!message)throw Object.assign(new Error('A message is required.'),{status:400});
-        await c.db.prepare(`INSERT INTO trade_workflow_messages
-          (id,trade_id,league_id,author_user_id,event_type,message,created_at) VALUES (?,?,?,?,'message',?,CURRENT_TIMESTAMP)`)
-          .bind(`trade_message_${crypto.randomUUID()}`,tradeId,c.league.id,c.session.user.id,message).run();
-      }else throw Object.assign(new Error('Unknown Trade Center action.'),{status:400});
+    const result=await executeTradeCenterAction(c,body);
+    if(body.action==='accept'&&result.tradeId){
+      const trade=result.workflows?.find(item=>item.id===result.tradeId);
+      if(trade?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId:result.tradeId});
     }
-    return json({...await publicState(c),action,tradeId:tradeId||null});
+    scheduleDiscordDeliveryFlush(context,c.db,c.league.id);
+    return json(result);
   } catch (error) {
     return json({ok:false,release:TRADE_CENTER_RELEASE,error:error?.message||'Trade Center action failed.'},Number(error?.status)||500);
   }
