@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.1",
+  "releaseType": "teams-owners-responsive-management",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.4",
+    "commit": "00b4831192bdb6b5f3dff86212ae55f22853dc1f",
+    "tree": "1b3c85d3f36b7d1f8826c295353f072d0002c27c",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.4.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "pullRequest": null,
+    "candidateCommit": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.4.4",
+    "currentCommit": "00b4831192bdb6b5f3dff86212ae55f22853dc1f",
+    "currentPagesDeployment": "a3cc2702-baa1-4d0b-aa46-9a3dd0686743",
+    "currentWorkerBuild": "b87f1bb1-71cc-4695-af0c-c3fe1415223f",
+    "currentWorkerVersion": "326ee7ef-55b2-4041-8eb2-db4ee9358bd0",
+    "workerSourceChanged": false,
+    "currentMigration": 33,
+    "candidateMigration": 33
+  },
+  "requiredArtifacts": [
+    "trade-module.js",
+    "styles.css",
+    "tests/commissioner/commissioner-hq.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.4.1/release-record.md",
+    "releases/7.4.4.1/validation-evidence.json"
+  ]
+}
