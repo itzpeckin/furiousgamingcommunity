@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.2",
+  "validatedOn": "2026-09-06",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "platformMobileRouteContract": {
+      "passed": true,
+      "activeRoutesCovered": 13,
+      "routes": [
+        "League Home",
+        "Teams",
+        "Team Roster",
+        "Players",
+        "Stats & Leaders",
+        "Standings",
+        "Schedule",
+        "Transactions",
+        "League News",
+        "Trade Center",
+        "Trade Block",
+        "Rules",
+        "Commissioner HQ"
+      ],
+      "wholePageHorizontalOverflow": false,
+      "localTableScrollPreserved": true,
+      "phoneLandscapeRequired": false
+    },
+    "playerCardMobileComposition": {
+      "passed": true,
+      "portraitSeparatedFromIdentity": true,
+      "overallSeparatedFromIdentity": true,
+      "metadataReflows": true,
+      "tabsTouchReachable": true,
+      "gameLogReachable": true,
+      "phoneLandscapeRequired": false
+    },
+    "teamsOwnersMobileManagement": {
+      "passed": true,
+      "legacyTabletHideOverridden": true,
+      "ownerVisible": true,
+      "roleVisible": true,
+      "statusVisible": true,
+      "manageVisible": true,
+      "manageMinimumTouchTarget": 44,
+      "smallPhoneManageTouchTarget": 46,
+      "assignmentDialogAccessible": true,
+      "assignmentActions": [
+        "Save Assignment",
+        "Remove from Team",
+        "Revoke Access"
+      ],
+      "pageHorizontalOverflow": false
+    },
+    "responsiveViewportAcceptance": {
+      "passed": true,
+      "widths": [320, 390, 834, 1440],
+      "pageHorizontalOverflow": false,
+      "playerIdentityCollision": false,
+      "manageVisibleAtEveryWidth": true,
+      "readOnly": true
+    },
+    "membershipAuthorityPreserved": {
+      "passed": true,
+      "commissionerOnly": true,
+      "serverAuthoritative": true,
+      "saveAssignmentPreserved": true,
+      "removeFromTeamPreserved": true,
+      "revokeAccessPreserved": true,
+      "membershipMutationExecuted": false
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 33,
+      "requiredTables": 105,
+      "foreignKeyViolations": 0,
+      "productionApplied": true,
+      "candidateRequiresMigration": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 169,
+      "failedTests": 0,
+      "focusedMobileTests": 9,
+      "scope": "full-consolidated-release-gate"
+    },
+    "strictRepositoryGate": {
+      "passed": true,
+      "status": "passed",
+      "javascriptModules": 235,
+      "inventoryFiles": 575,
+      "routes": 72
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": false,
+      "status": "not-run",
+      "pullRequest": null,
+      "candidateCommit": null,
+      "mergeCommit": null
+    },
+    "hostedChecks": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "stagingDeployment": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-run",
+      "currentMigration": 33,
+      "candidateMigration": 33
+    },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "not-run",
+      "currentRelease": "7.4.4.1",
+      "pagesDeployment": "548c8453-775c-4b0c-8aac-b03acc543004"
+    }
+  }
+}

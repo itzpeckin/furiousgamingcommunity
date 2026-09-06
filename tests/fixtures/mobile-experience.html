@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FranchiseHQ mobile layout acceptance</title>
+  <link rel="stylesheet" href="../../styles.css?v=7.4.4.2">
+  <style>
+    body{margin:0;padding:16px;background:#07111d;color:#eef4ff}
+    .acceptance-stack{display:grid;gap:24px;max-width:1100px;margin:auto}
+    .acceptance-stack>section{min-width:0}
+    .acceptance-stack>section>h1{font-size:18px}
+    [data-acceptance-dialog]{width:100%!important;max-width:100%!important}
+  </style>
+</head>
+<body>
+  <main class="acceptance-stack">
+    <section aria-label="Teams and Owners mobile acceptance">
+      <h1>Teams &amp; Owners</h1>
+      <div class="commissioner-directory-panel">
+        <div class="commissioner-team-table ownership-team-table">
+          <div class="commissioner-team-row ownership-team-row">
+            <span class="commissioner-team-franchise">
+              <span class="team-logo">FGC</span>
+              <span><strong>Buccaneers</strong><small>TB</small></span>
+            </span>
+            <span class="commissioner-team-owner">
+              <small class="commissioner-team-field-label">Owner</small>
+              <span><strong>Commissioner</strong><small>@commissioner</small></span>
+            </span>
+            <span class="commissioner-team-role">
+              <small class="commissioner-team-field-label">Role</small>
+              <strong>Commissioner + Team Owner</strong>
+            </span>
+            <span class="commissioner-team-status">
+              <small class="commissioner-team-field-label">Status</small>
+              <span class="presence-status is-online"><i></i><strong>Online</strong></span>
+            </span>
+            <button class="button button--ghost button--small commissioner-team-manage" aria-label="Manage Buccaneers owner assignment">Manage</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-label="Player Card mobile acceptance">
+      <h1>Player Card</h1>
+      <div class="value-card-modal is-open" style="position:relative;inset:auto;z-index:auto">
+        <div class="value-card-dialog" data-acceptance-dialog style="height:auto;max-height:none">
+          <div data-value-card-content>
+            <div class="value-card-context canonical-player-topbar"><button type="button">Back to Team Roster</button><span>Player Card</span></div>
+            <section class="canonical-player-hero canonical-player-hero--approved" style="--player-team-primary:#b31b34;--player-team-secondary:#5f1b28;background:linear-gradient(118deg,#b31b34,#5f1b28)">
+              <div class="canonical-player-hero__watermark canonical-player-hero__watermark--logo"><span class="canonical-player-watermark-fallback">TB</span></div>
+              <div class="canonical-player-hero__image"><img src="../../assets/franchisehq-public-logo.png" alt="Sample player portrait"></div>
+              <div class="canonical-player-hero__identity">
+                <button class="canonical-player-teamline"><span class="canonical-player-team-logo">TB</span><span><strong>Buccaneers</strong><span>#78 • LT</span></span></button>
+                <div class="canonical-player-nameblock"><h2>Sample Player With A Long Name</h2><p>6'5&quot; • 320 lbs • FranchiseHQ University</p></div>
+                <div class="canonical-player-bio-strip"><div><span>Age</span><strong>27</strong></div><div><span>Exp</span><strong>5 Years</strong></div><div><span>College</span><strong>FranchiseHQ University</strong></div></div>
+              </div>
+              <div class="canonical-player-hero__overall"><strong>95</strong><span>OVR</span><b>Superstar</b></div>
+            </section>
+            <div class="canonical-player-tabs canonical-player-tabs--approved"><button class="is-active">Details</button><button>Statistics</button><button>Game Logs</button><button>Transaction History</button></div>
+            <div class="canonical-player-panels canonical-player-panels--approved">
+              <section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Ratings</h3></div><div class="canonical-rating-groups"><article class="canonical-rating-group"><div class="canonical-rating-group__heading"><h4>Core</h4></div><div class="canonical-rating-list"><div><span>Awareness</span><strong>94</strong></div><div><span>Strength</span><strong>96</strong></div></div></article></div></section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

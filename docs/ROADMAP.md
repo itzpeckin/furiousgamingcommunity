@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 5, 2026
+**Updated:** September 6, 2026
 
-**Revision:** 1.92
+**Revision:** 1.94
 
-**Current production:** FranchiseHQ 7.4.4.1 is active from exact Main merge `6cc5f29`; its signed-in Teams & Owners directory, team-specific Manage actions, exact public assets, and protected live Season 2026 / Regular Season Week 13 context were read-only verified on September 5, 2026. Migration 33 remains the current Production database boundary. Memberships, assignments, the active snapshot, and protected league state remain unchanged. Blocked Madden Free Agents remain unknown/null and are not interpreted as zero.
+**Current production:** FranchiseHQ 7.4.4.1 is active from exact Main merge `6cc5f29`; its signed-in Teams & Owners directory, team-specific Manage actions, exact public assets, and protected live Season 2026 / Regular Season Week 13 context were read-only verified on September 5, 2026 and owner-accepted on September 6, 2026. Migration 33 remains the current Production database boundary. Memberships, assignments, the active snapshot, and protected league state remain unchanged. Blocked Madden Free Agents remain unknown/null and are not interpreted as zero.
 
-**Current work:** FranchiseHQ 7.4.4.1 is deployed and pending owner desktop/mobile acceptance. Teams & Owners now uses a corrected five-column desktop directory, complete responsive owner cards, team-specific Manage actions, and a phone-safe assignment dialog with full-width Save, Remove, and Revoke controls.
+**Current work:** FranchiseHQ 7.4.4.2 is a validated local review candidate. It adds an intentional phone/tablet composition across active routes, fixes the Player Card image/text collision, and restores complete Teams & Owners management on mobile. The tenant-safe Discord bot command surface remains next in 7.4.4.3.
 
-**Next gate:** Owner desktop/mobile acceptance of 7.4.4.1, then continue the remaining 7.4.5 consistency work. Do not change memberships or assignments during acceptance.
+**Next gate:** Obtain separate owner authorization before publishing exact 7.4.4.2, creating its pull request, changing Main, or deploying Production. After signed-in mobile acceptance, begin 7.4.4.3 Discord command design and implementation.
 
 ## Product decisions
 
@@ -20,6 +20,8 @@
 - FGC launches as the only enabled production tenant. League-owned data is tenant-scoped now so adding league two later is controlled activation, not a retrofit.
 - Server data is authoritative for shared league features. Browser storage is limited to temporary UI preferences.
 - Every release must work at phone and desktop widths. Mobile is an acceptance requirement, not a later port.
+- Phone layouts must be intentionally composed for the available viewport, minimize avoidable scrolling, and never shrink or overlay the desktop presentation. Wide data may use one clearly bounded horizontal scroller, but the page itself must not overflow horizontally.
+- Discord is an authenticated league interface, not a separate data authority. Bot commands must resolve the same tenant, membership capabilities, league settings, active snapshot, transactions, trades, and competition records used by the web application.
 - Madden sources feed one canonical snapshot model. Companion, approved direct-EA access, and CSV/Excel must not create separate downstream products.
 - A Madden **game year** (Madden 27, Madden 28, and so on) is independent from a franchise season year. Leagues, accounts, memberships, roles, settings, rules, and audit history persist across game years; Madden-derived data is partitioned by game year so a commissioner can archive it and remove it from the active application at the next edition transition.
 - Free Agents are a required first-class dataset. A source must provide and reconcile them or explicitly prove their absence.
@@ -77,7 +79,9 @@
 | 7.4.2 | Production deployed; owner follow-up captured | Responsive Commissioner command center, authoritative feature controls, Rules drafts/publication, and consolidated audit visibility |
 | 7.4.3 | Production deployed; pending owner UI acceptance | Commissioner HQ refinement, shared GOTW/Confidence Pool operations, Teams & Owners lifecycle controls, streamlined League Data, and rich Rules Studio |
 | 7.4.4 | Production deployed; pending owner UI acceptance | Unified Madden Companion Import workspace, top-priority actions, mobile import polish, and persistent Commissioner Audit tab positioning |
-| 7.4.4.1 | Production deployed; pending owner UI acceptance | Teams & Owners desktop alignment, complete mobile owner cards, and phone-safe assignment management |
+| 7.4.4.1 | Production; owner accepted | Teams & Owners desktop alignment, complete mobile owner cards, and phone-safe assignment management |
+| 7.4.4.2 | Local validated review candidate | Platform-wide phone/tablet composition, responsive Player Cards, complete mobile Teams & Owners management, and route-by-route viewport acceptance |
+| 7.4.4.3 | Planned | Tenant-safe Discord bot foundation, league commands, protected actions, notifications, and shared web/bot authority |
 | 7.4.5–7.4.6 | Planned | Canonical league consistency, monitoring, backups, security, and recovery |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Required before RC | Authentication and session framework |
@@ -378,6 +382,24 @@
 - Remove nested-scroll traps, oversized cards, dead renderers, duplicate modules, stale local authorities, seeded identities, and unused styles behind regressions.
 - Gate: critical journeys have no horizontal page scroll and pass automated plus manual accessibility/phone acceptance.
 
+## 7.4.4.2 — Platform-Wide Mobile Completion
+
+- Audit every active member and commissioner route at representative small-phone, modern-phone, tablet, and desktop widths. Treat each breakpoint as an intentional composition rather than a scaled desktop screen.
+- Minimize avoidable vertical scrolling through responsive information hierarchy, compact controls, progressive disclosure, sticky context where useful, and removal of repeated or decorative blocks that displace primary actions.
+- Rebuild Player Cards for phone widths so the portrait, team treatment, player identity, core attributes, contract/development information, tabs, ratings, and game logs reflow without text crossing the player image, clipped content, nested-scroll traps, or desktop-only spacing.
+- Convert dense roster, Players, Stats & Leaders, Standings, Schedule, Transactions, Trade Center, Trade Block, History Books, Rules, and Commissioner HQ layouts into readable mobile cards or deliberately bounded tables. A necessary table scroller must be local, obvious, keyboard/touch accessible, and must not create whole-page horizontal overflow.
+- Make dialogs, rails, dropdowns, filters, tabs, editors, rich media, and destructive confirmations reachable and dismissible on touch screens without losing the user's route, tab, filter, or scroll context.
+- Gate: automated viewport contracts and manual owner acceptance cover every active route; primary actions require no accidental nested scrolling; Player Card content never overlaps imagery; and no route relies on rotating the phone to landscape to become usable.
+
+## 7.4.4.3 — Discord Bot Foundation and League Commands
+
+- Register one Discord application command surface that resolves the invoking guild, FranchiseHQ league, authenticated Discord identity, active membership, assigned team, and capability before reading or changing anything. Unknown, revoked, unassigned, cross-league, and insufficient-role requests fail closed.
+- Serve league status, schedule/results, standings, team/roster, player, leaders/statistics, transactions, Trade Block, team needs, Rules, Game of the Week, Confidence Pool, and import-status commands from the same server selectors and records used by the website.
+- Support reviewed interactive actions for owners and commissioners, including Trade Block and team-needs management, eligible trade responses, Confidence Pool picks, and other explicitly approved workflows. Every write uses the existing server permission, validation, revision, notification, and tenant-audit path rather than bot-only business logic.
+- Deliver private or channel-safe Discord notifications for relevant trade, committee, competition, and operational events without exposing negotiations or commissioner-only information to unrelated teams. Messages deep-link to the canonical league/player/team/trade route when the web experience is required.
+- Keep Madden ownership and snapshot activation under their existing authorities. The first bot release may report export/import readiness, success, and failure, but it does not add a Discord import trigger unless that protected action is separately designed and authorized.
+- Gate: the owner approves the exact command/action inventory; two-league isolation, role/revoke changes, replay/idempotency, private-response visibility, web/bot consistency, mobile Discord deep links, and audit attribution pass before Production bot credentials or guild installation are authorized.
+
 ## 7.4.5 — Canonical League Consistency
 
 - Use one server season/week/snapshot and shared team/player/game selectors across all features.
@@ -507,3 +529,5 @@
 - **Revision 1.90:** Published exact 7.4.4 candidate `1b85623` through PR #43 with 4/4 candidate checks, merged it to Main as `72b61aa`, and passed Main quality and deployment checks. Cloudflare Pages deployment `a3cc2702` is live; the import Worker source was unchanged and retains Production version `326ee7ef`, while exact-candidate upload version `1479e845` passed without receiving Production traffic. Signed-in read-only acceptance confirmed the 7.4.4 marker, one unified Madden Companion Import workspace, exact top action order, progress-before-snapshot hierarchy, retained Season 2026 / Regular Season Week 13 context, and Free Agents still unknown. Exact hashes for `trade-module.js`, `styles.css`, and `league-engine/one-click-import.js` match Main. Migration 33, every league-data row, the active snapshot, permanent export URL, credentials, memberships, imports, resets, deletions, archives, transitions, and blocked/null Free Agent semantics remain unchanged. Owner UI acceptance is next.
 - **Revision 1.91:** Recorded owner acceptance of the 7.4.4 League Data workspace and began local 7.4.4.1 from exact Main evidence commit `00b4831`. The acceptance defect came from legacy eight-column ownership rules overriding the five-field Teams & Owners markup, which compressed Role into Status and displaced Manage; the phone breakpoint then intentionally hid Owner, Role, and Status. The candidate scopes the wide directory to five aligned columns, bounds long owner/role content, right-aligns Manage, and converts tablet/phone rows into complete labeled management cards. Every phone card retains its Owner, Role, presence, and a 44-pixel team-specific Manage action; the assignment dialog becomes a bounded bottom sheet with full-width Save, Remove from Team, and Revoke controls. The server-authoritative commissioner membership workflow is unchanged. Production, Main, GitHub, migration 33, memberships, assignments, all league data, the active snapshot, import/export operations, permanent export URL, and blocked/null Free Agent semantics remain unchanged and unauthorized during this local cycle.
 - **Revision 1.92:** Published exact 7.4.4.1 candidate `668b13e` through PR #44 with 4/4 candidate checks, merged it to Main as `6cc5f29`, and passed Main quality, build, and Cloudflare deployment checks. Cloudflare Pages deployment `548c8453` is live; the import Worker source was unchanged and retains Production build/version `b87f1bb1` / `326ee7ef`, while exact-candidate upload build `b43db836` passed without receiving Production traffic. Signed-in read-only acceptance confirmed the 7.4.4.1 marker, the five-field Teams & Owners directory, team-specific Manage actions, and the complete Save Assignment / Remove from Team / Revoke Access dialog. Exact `trade-module.js` and `styles.css` hashes match Main. Migration 33, memberships, assignments, every league-data row, the active snapshot, import/export operations, permanent export URL, credentials, and blocked/null Free Agent semantics remain unchanged. Owner desktop/mobile acceptance is next.
+- **Revision 1.93:** Recorded owner acceptance of 7.4.4.1 and inserted two explicit gates before canonical consistency and operational hardening: platform-wide phone/tablet completion in 7.4.4.2 and a tenant-safe Discord command surface in 7.4.4.3. Mobile completion covers every active member and commissioner route, requires deliberate portrait layouts with no landscape dependency, and begins with the reported Player Card collision. Discord remains a shared interface over the same tenant, membership, settings, snapshot, transaction, trade, competition, permission, and audit authorities as the website.
+- **Revision 1.94:** Completed the owner-authorized local 7.4.4.2 implementation from exact evidence baseline `abd6b8b`. The root Teams & Owners defect was a legacy tablet declaration that hid every row button below 1,000 pixels; the candidate now keeps a team-specific Manage action visible at every width, uses a 44-pixel tablet/desktop and 46-pixel small-phone target, and retains Owner, Role, Status, Save Assignment, Remove from Team, and Revoke Access. Player Cards use separate portrait/overall and identity rows through the 900-pixel boundary, with touch-scroll tabs and locally bounded wide data. Shared phone layout contracts cover headings, actions, filters, primary grids, and tables across 13 active surfaces. Automated source checks and read-only 320/390/834/1440 browser acceptance report no page overflow or portrait/identity collision. Production, Main, GitHub, migration 33, memberships, assignments, league data, the active snapshot, imports, resets, archives, transitions, the export URL, credentials, and blocked/null Free Agent semantics remain unchanged and unauthorized.

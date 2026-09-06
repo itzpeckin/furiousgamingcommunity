@@ -7345,3 +7345,270 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
   .ownership-member-actions{display:grid;width:100%}
   .ownership-member-actions .button{width:100%;min-height:44px}
 }
+
+/* FranchiseHQ 7.4.4.2 — intentional phone/tablet composition */
+.commissioner-directory-panel .ownership-team-row>.commissioner-team-manage{
+  display:inline-flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  min-height:44px!important;
+  pointer-events:auto;
+  touch-action:manipulation;
+}
+
+@media(max-width:900px){
+  html,
+  body,
+  .app-shell,
+  .main-content,
+  .page-content{
+    max-width:100%;
+    overflow-x:clip;
+  }
+
+  .page-heading{
+    align-items:stretch;
+    flex-direction:column;
+    gap:14px;
+    margin-bottom:18px;
+  }
+  .page-heading .heading-actions{
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    width:100%;
+  }
+  .page-heading .heading-actions>.button,
+  .page-heading .heading-actions>button{
+    width:100%;
+    min-height:44px;
+  }
+  .filter-bar{
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    align-items:stretch;
+  }
+  .filter-bar>.field,
+  .filter-bar>.field--grow,
+  .filter-bar input,
+  .filter-bar select{
+    width:100%;
+    min-width:0;
+  }
+  .table-wrap,
+  .live-leaderboard-wrap,
+  .season-team-stat-table-wrap,
+  .canonical-flat-table-wrap,
+  .canonical-history-game-log-wrap{
+    width:100%;
+    max-width:100%;
+    overflow-x:auto!important;
+    overscroll-behavior-inline:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  .leader-grid,
+  .schedule-grid,
+  .division-grid,
+  .playoff-grid,
+  .content-grid,
+  .content-grid--equal,
+  .news-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+
+  /* The legacy tablet rule hid every row button. Management must remain a
+     first-class touch action for each imported franchise. */
+  .commissioner-directory-panel .ownership-team-row>.commissioner-team-manage{
+    display:inline-flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:relative;
+    z-index:2;
+    pointer-events:auto;
+  }
+
+  /* Player Cards become a real phone composition. The portrait and rating
+     occupy their own row; identity and metadata flow below, never over it. */
+  .value-card-modal.is-open{
+    display:flex;
+    align-items:stretch;
+    justify-content:stretch;
+  }
+  [data-value-card-modal] .value-card-dialog{
+    width:100vw!important;
+    max-width:100vw!important;
+    height:100dvh;
+    max-height:100dvh;
+    margin:0!important;
+    overflow-x:clip!important;
+    overflow-y:auto;
+    border-radius:0!important;
+  }
+  [data-value-card-content]{
+    min-width:0;
+    overflow-x:clip;
+  }
+  .canonical-player-topbar{
+    position:sticky;
+    top:0;
+    z-index:8;
+  }
+  .canonical-player-hero--approved{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) auto!important;
+    grid-template-areas:"portrait overall" "identity identity"!important;
+    align-items:end!important;
+    gap:12px 14px!important;
+    min-height:0!important;
+    padding:14px 16px 18px!important;
+    border-radius:0!important;
+  }
+  .canonical-player-hero--approved .canonical-player-hero__image{
+    grid-area:portrait;
+    position:relative!important;
+    inset:auto!important;
+    justify-self:start;
+    width:min(47vw,184px)!important;
+    height:156px!important;
+    opacity:1!important;
+  }
+  .canonical-player-hero--approved .canonical-player-hero__identity{
+    grid-area:identity;
+    position:relative!important;
+    width:100%;
+    max-width:none!important;
+    min-width:0;
+    padding:0!important;
+    gap:10px;
+  }
+  .canonical-player-hero--approved .canonical-player-hero__overall{
+    grid-area:overall;
+    position:relative!important;
+    inset:auto!important;
+    align-self:start;
+    justify-self:end;
+    min-width:72px;
+    padding:10px 0 0!important;
+  }
+  .canonical-player-hero--approved .canonical-player-hero__overall strong{
+    font-size:clamp(58px,18vw,78px)!important;
+    line-height:.78;
+  }
+  .canonical-player-hero--approved .canonical-player-hero__overall span{
+    margin-top:9px;
+    font-size:11px;
+  }
+  .canonical-player-hero--approved .canonical-player-hero__overall b{
+    font-size:10px;
+  }
+  .canonical-player-hero--approved .canonical-player-teamline{
+    width:100%;
+    min-width:0;
+  }
+  .canonical-player-hero--approved .canonical-player-team-logo{
+    width:42px;
+    height:42px;
+    flex-basis:42px;
+  }
+  .canonical-player-hero--approved .canonical-player-nameblock h2{
+    margin:0 0 5px;
+    max-width:100%;
+    overflow-wrap:anywhere;
+    font-size:clamp(28px,9.5vw,42px);
+  }
+  .canonical-player-hero--approved .canonical-player-nameblock p{
+    font-size:12px;
+    line-height:1.45;
+  }
+  .canonical-player-bio-strip{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    width:100%;
+    max-width:none;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:10px;
+    background:rgba(4,10,18,.2);
+  }
+  .canonical-player-bio-strip>div{
+    min-width:0;
+    padding:9px 10px!important;
+    border-right:1px solid rgba(255,255,255,.12)!important;
+  }
+  .canonical-player-bio-strip>div:last-child{border-right:0!important}
+  .canonical-player-bio-strip strong{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .canonical-player-hero__watermark--logo{
+    left:-24px!important;
+    bottom:-14px!important;
+    width:220px!important;
+    height:220px!important;
+  }
+  .canonical-player-tabs--approved{
+    position:sticky;
+    top:42px;
+    z-index:7;
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+    overscroll-behavior-inline:contain;
+    scrollbar-width:none;
+  }
+  .canonical-player-tabs--approved::-webkit-scrollbar{display:none}
+  .canonical-player-tabs--approved button{
+    min-width:max-content;
+    min-height:44px;
+    padding:12px 16px!important;
+  }
+  .canonical-player-panels--approved{padding:10px!important}
+  .canonical-player-dashboard,
+  .canonical-dashboard-card--ratings .canonical-rating-groups{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .canonical-game-log-tab [data-player-game-log-content],
+  .canonical-game-log-table,
+  .canonical-history-game-log-wrap{
+    max-height:none!important;
+    overflow-y:visible!important;
+  }
+  .canonical-game-log-table table,
+  .canonical-flat-table{
+    width:max-content;
+    min-width:100%;
+  }
+  .canonical-player-trade-breakdown{
+    margin:10px!important;
+  }
+  .canonical-player-trade-breakdown .breakdown-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
+
+@media(max-width:520px){
+  .commissioner-directory-panel .ownership-team-row{
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-areas:"franchise" "owner" "role" "status" "manage"!important;
+    gap:11px!important;
+  }
+  .commissioner-directory-panel .commissioner-team-status{
+    justify-items:start;
+  }
+  .commissioner-directory-panel .commissioner-team-status .commissioner-team-field-label{
+    text-align:left;
+  }
+  .commissioner-directory-panel .ownership-team-row>.commissioner-team-manage{
+    justify-self:stretch;
+    width:100%;
+    min-height:46px!important;
+  }
+  .canonical-player-bio-strip{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .canonical-player-bio-strip>div:nth-child(2){border-right:0!important}
+  .canonical-player-bio-strip>div:nth-child(3){grid-column:1/-1;border-top:1px solid rgba(255,255,255,.12)}
+  .canonical-player-trade-breakdown .breakdown-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+}

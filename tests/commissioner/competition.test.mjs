@@ -118,7 +118,7 @@ test('Game of the Week and Confidence Pool are tenant-scoped, shared, and commis
     const initial = await getCompetition(context(db,'owner-token'));
     const initialPayload = await initial.json();
     assert.equal(initial.status,200,JSON.stringify(initialPayload));
-    assert.equal(initialPayload.release,'7.4.4.1');
+    assert.equal(initialPayload.release,'7.4.4.2');
     assert.equal(initialPayload.games.length,2);
 
     const forbidden = await postCompetition(context(db,'owner-token','POST',{
