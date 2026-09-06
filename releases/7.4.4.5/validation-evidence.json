@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.5",
   "validatedOn": "2026-09-06",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -61,6 +61,17 @@
       "inventoryFiles": 594,
       "routes": 76
     },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified-pending-discord-guild-acceptance",
+      "liveReleaseMarker": "7.4.4.5",
+      "mainCommit": "6c5cc23bace756f269247974089b8a4086e69192",
+      "pagesDeployment": "9ba113bd-cd34-44be-8709-cced8318d83e",
+      "pagesStatus": "success",
+      "discordEndpointGetStatus": 405,
+      "discordConnectUnauthenticatedStatus": 401,
+      "readOnly": true
+    },
     "freeAgentBlockedPreserved": {
       "passed": true,
       "status": "blocked",
@@ -69,14 +80,14 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
     "productionConfigurationChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "discordCommandsRegistered": false,
     "discordCredentialsChanged": false,
@@ -99,11 +110,21 @@
   "external": {
     "githubPublication": {
       "authorized": true,
-      "status": "not-run"
+      "status": "published-main-accepted",
+      "pullRequest": 48,
+      "candidateCommit": "0eab911ff4737704535a3c75a04ec9c6f4fc15e7",
+      "mergeCommit": "6c5cc23bace756f269247974089b8a4086e69192"
     },
     "hostedChecks": {
       "authorized": true,
-      "status": "not-run"
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "mainChecksPassed": 5,
+      "pullRequestQualityRun": 34065988100,
+      "mainQualityRun": 34066048314,
+      "mainPagesRun": 34066047944,
+      "candidatePagesDeployment": "af26ac51-0d5a-4240-af2c-6c810cb90670",
+      "candidateWorkerBuild": "f5cfe68e-5642-4008-ba81-ee89541dca88"
     },
     "stagingDeployment": {
       "authorized": false,
@@ -117,8 +138,11 @@
     },
     "productionDeployment": {
       "authorized": true,
-      "status": "not-run",
-      "currentRelease": "7.4.4.4"
+      "status": "deployed-read-only-verified-pending-discord-guild-acceptance",
+      "currentRelease": "7.4.4.5",
+      "mainCommit": "6c5cc23bace756f269247974089b8a4086e69192",
+      "pagesDeployment": "9ba113bd-cd34-44be-8709-cced8318d83e",
+      "liveReleaseMarker": "7.4.4.5"
     },
     "discordRegistration": {
       "authorized": false,

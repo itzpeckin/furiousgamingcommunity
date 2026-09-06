@@ -22,9 +22,11 @@ The focused Discord suite passes all 15 tests, including the corrected permissio
 
 ## Deployment status
 
-The exact 7.4.4.5 candidate is authorized for branch publication, pull request, hosted checks, merge to Main, and code-only Production deployment under the owner's standing consolidated publication direction. Production remains on 7.4.4.4 until the candidate passes the full gate and hosted checks. No Discord consent is performed on the commissioner's behalf; the commissioner will retry **Connect Discord** after deployment and select the FGC server.
+Exact 7.4.4.5 candidate `0eab911ff4737704535a3c75a04ec9c6f4fc15e7` passed all four PR checks in PR #48 and merged as Main `6c5cc23bace756f269247974089b8a4086e69192`. All five Main quality/build/deployment checks passed. Cloudflare Pages Production deployment `9ba113bd-cd34-44be-8709-cced8318d83e` succeeded, the live application asset reports 7.4.4.5, the interaction endpoint rejects GET with 405, and the unauthenticated connection endpoint rejects access with 401.
 
-No import, snapshot change, reset, deletion, archive, season transition, export-URL rotation, credential change, membership/team-assignment change, Discord guild installation, or data write is included. Madden Free Agents remain blocked and unknown/null, never zero.
+No Discord consent was performed on the commissioner's behalf. The commissioner can now retry **Connect Discord**, select the FGC server, and complete the first guild mapping and schedule-command acceptance.
+
+No import, snapshot change, reset, deletion, archive, season transition, export-URL rotation, credential change, membership/team-assignment change, Discord guild installation, migration, or data write was performed. Madden Free Agents remain blocked and unknown/null, never zero.
 
 ## Rollback
 

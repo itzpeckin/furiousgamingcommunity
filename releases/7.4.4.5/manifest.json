@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.5",
   "releaseType": "discord-guild-permission-verification-remediation",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.4.4.4",
@@ -19,7 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-not-run"
+    "status": "published-main-accepted",
+    "pullRequest": 48,
+    "candidateCommit": "0eab911ff4737704535a3c75a04ec9c6f4fc15e7",
+    "mergeCommit": "6c5cc23bace756f269247974089b8a4086e69192"
   },
   "staging": {
     "authorized": false,
@@ -28,11 +31,11 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.4.4.4",
-    "currentCommit": "62f0effecf77a15522d81f8731a6f9db4090ad7f",
-    "currentPagesDeployment": "67c5fdbb-8f66-4bd8-96ac-f5d5f0ae2560",
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
+    "currentRelease": "7.4.4.5",
+    "currentCommit": "6c5cc23bace756f269247974089b8a4086e69192",
+    "currentPagesDeployment": "9ba113bd-cd34-44be-8709-cced8318d83e",
     "currentMigration": 35,
     "candidateMigration": 35
   },
