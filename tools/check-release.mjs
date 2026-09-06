@@ -2707,6 +2707,82 @@ if (version === '7.4.4.1') {
     || evidence.scopeBoundaries?.credentialsChanged !== false
   ) errors.push('7.4.4.1 must preserve every excluded environment, data, snapshot, identity, export URL, and Free Agent boundary.');
 }
+if (version === '7.4.4.2') {
+  for (const check of [
+    'platformMobileRouteContract',
+    'playerCardMobileComposition',
+    'teamsOwnersMobileManagement',
+    'responsiveViewportAcceptance',
+    'membershipAuthorityPreserved',
+    'freeAgentBlockedPreserved',
+    'strictMigration',
+    'automatedTests',
+    'strictRepositoryGate'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) errors.push(`7.4.4.2 evidence is incomplete: ${check}.`);
+  }
+  if (
+    Number(evidence.checks?.platformMobileRouteContract?.activeRoutesCovered) < 12
+    || evidence.checks?.platformMobileRouteContract?.wholePageHorizontalOverflow !== false
+    || evidence.checks?.platformMobileRouteContract?.localTableScrollPreserved !== true
+    || evidence.checks?.playerCardMobileComposition?.portraitSeparatedFromIdentity !== true
+    || evidence.checks?.playerCardMobileComposition?.phoneLandscapeRequired !== false
+    || evidence.checks?.playerCardMobileComposition?.gameLogReachable !== true
+    || evidence.checks?.teamsOwnersMobileManagement?.manageVisible !== true
+    || Number(evidence.checks?.teamsOwnersMobileManagement?.manageMinimumTouchTarget) < 44
+    || evidence.checks?.teamsOwnersMobileManagement?.ownerVisible !== true
+    || evidence.checks?.teamsOwnersMobileManagement?.roleVisible !== true
+    || evidence.checks?.teamsOwnersMobileManagement?.statusVisible !== true
+    || evidence.checks?.teamsOwnersMobileManagement?.assignmentDialogAccessible !== true
+    || JSON.stringify(evidence.checks?.teamsOwnersMobileManagement?.assignmentActions) !== JSON.stringify(['Save Assignment','Remove from Team','Revoke Access'])
+    || JSON.stringify(evidence.checks?.responsiveViewportAcceptance?.widths) !== JSON.stringify([320,390,834,1440])
+    || evidence.checks?.responsiveViewportAcceptance?.pageHorizontalOverflow !== false
+    || evidence.checks?.responsiveViewportAcceptance?.playerIdentityCollision !== false
+    || evidence.checks?.membershipAuthorityPreserved?.commissionerOnly !== true
+    || evidence.checks?.membershipAuthorityPreserved?.serverAuthoritative !== true
+    || evidence.checks?.membershipAuthorityPreserved?.membershipMutationExecuted !== false
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+    || evidence.checks?.strictMigration?.candidateRequiresMigration !== false
+  ) errors.push('7.4.4.2 must prove intentional phone/tablet composition, complete mobile owner management, and unchanged server/data authority.');
+  if (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.repositoryPublication?.status !== 'not-run'
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.currentRelease !== '7.4.4.1'
+    || Number(manifest.production?.currentMigration) !== 33
+    || Number(manifest.production?.candidateMigration) !== 33
+    || evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.productionConfigurationChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.gitRemoteChanged !== false
+    || evidence.scopeBoundaries?.migrationApplied !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+    || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 0
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+    || evidence.external?.productionMigration?.status !== 'not-run'
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+  ) errors.push('7.4.4.2 must remain an unpublished, code-only review candidate until separately authorized.');
+  if (
+    evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.dataDeleted !== false
+    || evidence.scopeBoundaries?.historyPermanentlyDeleted !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+    || evidence.scopeBoundaries?.credentialsChanged !== false
+  ) errors.push('7.4.4.2 must preserve every excluded environment, data, snapshot, identity, export URL, and Free Agent boundary.');
+}
 
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {

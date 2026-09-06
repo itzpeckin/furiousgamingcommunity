@@ -141,12 +141,12 @@
     "byExtension": {
       ".css": 9,
       ".example": 1,
-      ".html": 2,
+      ".html": 3,
       ".js": 196,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 38,
+      ".mjs": 39,
       ".png": 3,
       ".sql": 35,
       ".txt": 1,
@@ -159,7 +159,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 512605,
+        "bytes": 519955,
         "file": "styles.css"
       },
       {
@@ -167,7 +167,7 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 166576,
+        "bytes": 171425,
         "file": "tools/check-release.mjs"
       },
       {
@@ -235,7 +235,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       }
     ],
-    "total": 573
+    "total": 575
   },
   "frontend": {
     "assets": [
@@ -1460,7 +1460,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.4.1",
+  "release": "7.4.4.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
