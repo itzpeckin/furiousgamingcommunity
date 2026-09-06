@@ -8,6 +8,8 @@ export const DISCORD_EPHEMERAL_FLAG=64;
 const MAX_BODY_BYTES=128*1024;
 const MAX_TIMESTAMP_SKEW_SECONDS=5*60;
 const SNOWFLAKE=/^[0-9]{17,20}$/;
+const MANAGE_GUILD=1n<<5n;
+const ADMINISTRATOR=1n<<3n;
 
 function hexBytes(value){
   const hex=String(value||'').trim().toLowerCase();
@@ -60,23 +62,83 @@ export function discordErrorResponse(message='This action could not be completed
   });
 }
 
-export async function resolveDiscordContext(env,interaction,{membershipRequired=true}={}){
+function canManageInteractionGuild(interaction){
+  try{
+    const permissions=BigInt(String(interaction?.member?.permissions||'0'));
+    return Boolean((permissions&MANAGE_GUILD)||(permissions&ADMINISTRATOR));
+  }catch{return false}
+}
+
+async function bootstrapCommissionerGuild(db,env,interaction,identity){
+  const guildId=String(interaction?.guild_id||'').trim();
+  const channelId=String(interaction?.channel_id||'').trim();
+  const applicationId=String(interaction?.application_id||'').trim();
+  if(!canManageInteractionGuild(interaction)||!SNOWFLAKE.test(channelId)
+    ||applicationId!==String(env?.DISCORD_CLIENT_ID||'').trim())return null;
+  const memberships=await db.prepare(`SELECT user.id AS userId,membership.league_id AS leagueId,
+      membership.id AS membershipId,membership.role,membership.team_id AS teamId
+    FROM users user
+    JOIN league_memberships membership ON membership.user_id=user.id
+    WHERE user.discord_user_id=? AND membership.active=1 AND membership.role='commissioner'`)
+    .bind(String(identity?.id||'')).all();
+  const candidates=memberships.results||[];
+  if(candidates.length!==1)return null;
+  const candidate=candidates[0];
+  const conflicting=await db.prepare(`SELECT league_id AS leagueId FROM discord_league_installations
+    WHERE discord_guild_id=? AND league_id<>? LIMIT 1`).bind(guildId,candidate.leagueId).first();
+  const leagueConflict=await db.prepare(`SELECT discord_guild_id AS guildId FROM discord_league_installations
+    WHERE league_id=? AND discord_guild_id<>? AND status='active' LIMIT 1`).bind(candidate.leagueId,guildId).first();
+  if(conflicting||leagueConflict)return null;
+  const league=await resolveTenantById(env,candidate.leagueId);
+  if(!league)return null;
+  const session={user:{id:candidate.userId},membership:{
+    id:candidate.membershipId,leagueId:candidate.leagueId,role:candidate.role,teamId:candidate.teamId,active:true
+  }};
+  const request=new Request('https://franchisehq.app/api/discord/interactions',{method:'POST',headers:{
+    'x-request-id':`discord_bootstrap_${String(interaction.id||crypto.randomUUID()).slice(0,80)}`
+  }});
+  const audit=createTenantAuditContext({request},league,session,'discord_installation_command_bootstrap');
+  await db.batch([
+    db.prepare(`INSERT INTO discord_league_installations
+      (id,league_id,discord_guild_id,application_id,schedule_channel_id,status,connection_source,
+       connected_at,installed_by_user_id,installed_at,updated_at)
+      VALUES (?,?,?,?,?,'active','signed-command-bootstrap',CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+      ON CONFLICT(league_id) DO UPDATE SET discord_guild_id=excluded.discord_guild_id,
+        application_id=excluded.application_id,schedule_channel_id=excluded.schedule_channel_id,status='active',
+        connection_source='signed-command-bootstrap',connected_at=CURRENT_TIMESTAMP,
+        installed_by_user_id=excluded.installed_by_user_id,updated_at=CURRENT_TIMESTAMP`)
+      .bind(`discord_installation_${crypto.randomUUID()}`,candidate.leagueId,guildId,applicationId,channelId,candidate.userId),
+    db.prepare(`UPDATE leagues SET discord_guild_id=?,discord_connected=1,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+      .bind(guildId,candidate.leagueId),
+    tenantAuditStatement(db,audit,{resourceType:'discord_league_installation',resourceId:guildId,
+      detail:{source:'signed-command-bootstrap',scheduleChannelId:channelId,registeredCommissionerIdentity:true}})
+  ]);
+  return db.prepare(`SELECT id,league_id AS leagueId,discord_guild_id AS guildId,
+      application_id AS applicationId,trade_committee_channel_id AS tradeCommitteeChannelId,
+      notification_channel_id AS notificationChannelId,schedule_channel_id AS scheduleChannelId,status
+    FROM discord_league_installations WHERE league_id=? LIMIT 1`).bind(candidate.leagueId).first();
+}
+
+export async function resolveDiscordContext(env,interaction,{membershipRequired=true,allowCommissionerBootstrap=false}={}){
   const db=tenantDatabase(env);
   if(!db)throw Object.assign(new Error('FranchiseHQ data is temporarily unavailable.'),{status:503,code:'database-unavailable'});
   const guildId=String(interaction?.guild_id||'').trim();
   if(!SNOWFLAKE.test(guildId))throw Object.assign(new Error('Use this command inside a connected league Discord server.'),{status:403,code:'guild-required'});
-  const installation=await db.prepare(`SELECT id,league_id AS leagueId,discord_guild_id AS guildId,
+  let installation=await db.prepare(`SELECT id,league_id AS leagueId,discord_guild_id AS guildId,
       application_id AS applicationId,trade_committee_channel_id AS tradeCommitteeChannelId,
-      notification_channel_id AS notificationChannelId,status
+      notification_channel_id AS notificationChannelId,schedule_channel_id AS scheduleChannelId,status
     FROM discord_league_installations
     WHERE discord_guild_id=? AND status='active' LIMIT 1`).bind(guildId).first();
+  const identity=discordUser(interaction);
+  if(!installation&&allowCommissionerBootstrap){
+    installation=await bootstrapCommissionerGuild(db,env,interaction,identity);
+  }
   if(!installation)throw Object.assign(new Error('This Discord server is not connected to a FranchiseHQ league.'),{status:404,code:'guild-unmapped'});
   if(installation.applicationId&&String(interaction.application_id||'')!==String(installation.applicationId)){
     throw Object.assign(new Error('This Discord application is not authorized for the connected league.'),{status:403,code:'application-mismatch'});
   }
   const league=await resolveTenantById(env,installation.leagueId);
   if(!league)throw Object.assign(new Error('The connected FranchiseHQ league is unavailable.'),{status:404,code:'league-unavailable'});
-  const identity=discordUser(interaction);
   const discordUserId=String(identity?.id||'');
   if(!SNOWFLAKE.test(discordUserId))throw Object.assign(new Error('Discord identity could not be verified.'),{status:401,code:'identity-missing'});
   const actor=await db.prepare(`SELECT user.id,user.discord_user_id AS discordUserId,
@@ -97,7 +159,7 @@ export async function resolveDiscordContext(env,interaction,{membershipRequired=
     id:actor.id,discordUserId:actor.discordUserId,discordUsername:actor.discordUsername,
     discordGlobalName:actor.discordGlobalName,displayName:actor.displayName,avatarUrl:actor.avatarUrl
   }:null;
-  return {db,league,installation,discordIdentity:identity,user,membership,session:user?{user,membership}:null,interaction};
+  return {db,env,league,installation,discordIdentity:identity,user,membership,session:user?{user,membership}:null,interaction};
 }
 
 export function requireDiscordTeam(c){

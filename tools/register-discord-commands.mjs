@@ -19,15 +19,19 @@ if(!/^[0-9]{17,20}$/.test(clientId)||!token){
   process.exit(1);
 }
 
-const response=await fetch(`https://discord.com/api/v10/applications/${encodeURIComponent(clientId)}/commands`,{
-  method:'PUT',
-  headers:{Authorization:`Bot ${token}`,'content-type':'application/json'},
-  body:JSON.stringify(DISCORD_GLOBAL_COMMANDS)
-});
-if(!response.ok){
-  const detail=await response.text();
-  console.error(`Global Discord command registration failed (${response.status}): ${detail.slice(0,500)}`);
-  process.exit(1);
+let registered=0;
+for(const command of DISCORD_GLOBAL_COMMANDS){
+  const response=await fetch(`https://discord.com/api/v10/applications/${encodeURIComponent(clientId)}/commands`,{
+    method:'POST',
+    headers:{Authorization:`Bot ${token}`,'content-type':'application/json'},
+    body:JSON.stringify(command)
+  });
+  if(!response.ok){
+    const detail=await response.text();
+    console.error(`Discord command ${command.name} registration failed (${response.status}): ${detail.slice(0,500)}`);
+    process.exit(1);
+  }
+  await response.json();
+  registered+=1;
 }
-const registered=await response.json();
-console.log(`Registered ${registered.length} global FranchiseHQ command(s) for release ${DISCORD_COMMAND_RELEASE}.`);
+console.log(`Upserted ${registered} global FranchiseHQ command(s) for release ${DISCORD_COMMAND_RELEASE} without deleting unowned commands.`);

@@ -229,7 +229,7 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.4.4.3');
+    assert.equal(overviewPayload.release,'7.4.4.4');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM league_setting_revisions
@@ -331,6 +331,9 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(ui,/league-data-workspace--unified/);
   assert.doesNotMatch(ui,/league-data-workspace__connection">\$\{renderPermanentLeagueExportCard\(\)\}/);
   assert.match(ui,/restoreCommissionerTabViewport\(tab\)/);
+  assert.match(ui,/Connect Discord/);
+  assert.match(ui,/No IDs or manual mapping/);
+  assert.doesNotMatch(ui,/data-discord-guild-id/);
   assert.match(ui,/aria-current="page"/);
   assert.match(styles,/\.commissioner-import-primary-actions\{display:grid/);
   assert.match(styles,/\.commissioner-latest-snapshot/);

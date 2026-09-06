@@ -1,4 +1,4 @@
-import { discordCommandName, discordCommandOptions } from './discord-commands.js';
+import { discordCommandName, discordCommandOptions, discordScheduleThreadWeek } from './discord-commands.js';
 import {
   confidenceViewCommand,
   gmHistoryCommand,
@@ -23,6 +23,7 @@ import { createTenantAuditContext, tenantAuditStatement } from './tenant-context
 import { competitionState, executeCompetitionAction } from '../api/leagues/[leagueSlug]/competition.js';
 import { executeTradeCenterAction } from '../api/leagues/[leagueSlug]/trade-center.js';
 import { queueCommitteeReviewDelivery } from './discord-delivery.js';
+import { syncDiscordScheduleThreads } from './discord-schedule.js';
 
 const TWITCH_HANDLE=/^[A-Za-z0-9_]{3,25}$/;
 const clean=(value,max=500)=>String(value??'').trim().slice(0,max);
@@ -181,6 +182,20 @@ async function confidenceAction(c,subcommand,values){
 export async function executeDiscordCommand(c){
   const command=discordCommandName(c.interaction);
   const {subcommand,values}=discordCommandOptions(c.interaction);
+  const legacyWeek=discordScheduleThreadWeek(command);
+  if(legacyWeek){
+    requireDiscordRole(c,'commissioner');
+    const channelId=String(c.interaction?.channel_id||'').trim();
+    const result=await syncDiscordScheduleThreads(c.env,c.db,{
+      league:c.league,week:legacyWeek,channelId,source:'discord-command',requestedByUserId:c.user.id
+    });
+    if(result.skipped)throw Object.assign(new Error(
+      result.reason==='no-games-for-week'
+        ?`The active FranchiseHQ schedule does not contain Regular Season Week ${legacyWeek}.`
+        :'FranchiseHQ could not prepare schedule threads in this channel.'
+    ),{status:409,code:result.reason});
+    return `Week ${legacyWeek} schedule synchronized: **${result.threads} matchup thread${result.threads===1?'':'s'}** in this channel using ${result.registeredOwners} registered owner identit${result.registeredOwners===1?'y':'ies'}.`;
+  }
   if(command==='join'){
     await joinDiscordLeague(c,requestForAudit(c.interaction));
     return `Welcome to **${c.league.name}**. Your FranchiseHQ access is active but unassigned. A commissioner must assign a team before team and trade actions are available.\nhttps://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}`;

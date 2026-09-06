@@ -20,6 +20,7 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
+import { scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 
 const RELEASE = '7.4.1';
 const text = value => String(value ?? '').trim();
@@ -647,7 +648,14 @@ export async function onRequestPost(context) {
   if (action === 'finalize') {
     const result = await finalize(current,body);
     if (result.response) return result.response;
-    return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run),tradeReconciliation:result.tradeReconciliation||null });
+    const discordScheduleSync = await scheduleActiveDiscordSync(context,{
+      db:current.db,
+      league:current.league,
+      snapshotId:result.run.active_snapshot_id_after||result.run.candidate_snapshot_id||null,
+      requestedByUserId:current.authorization.session.user.id,
+      source:'candidate-import'
+    });
+    return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run),tradeReconciliation:result.tradeReconciliation||null,discordScheduleSync });
   }
   return json({ ok:false,error:`Unsupported action: ${action || 'none'}.`,release:RELEASE }, 400);
 }

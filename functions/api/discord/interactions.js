@@ -12,6 +12,7 @@ import {
 } from '../../_lib/discord-security.js';
 import {
   discordCommandName,
+  discordScheduleThreadWeek,
   discordInteractionIsPrivate,
   DISCORD_COMMAND_RELEASE
 } from '../../_lib/discord-commands.js';
@@ -62,7 +63,10 @@ export async function onRequestPost(context){
   const command=discordCommandName(interaction);
   let c;
   try{
-    c=await resolveDiscordContext(context.env,interaction,{membershipRequired:command!=='join'});
+    c=await resolveDiscordContext(context.env,interaction,{
+      membershipRequired:command!=='join',
+      allowCommissionerBootstrap:Boolean(discordScheduleThreadWeek(command))
+    });
   }catch(error){
     return discordErrorResponse(safeCommandError(error));
   }

@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.4.4.3';
+export const DISCORD_COMMAND_RELEASE = '7.4.4.4';
 
 const OPTION = Object.freeze({
   SUB_COMMAND:1,
@@ -14,6 +14,13 @@ const privateOption = {
   name:'private',
   description:'Show the result only to you instead of the current channel.'
 };
+
+export const DISCORD_SCHEDULE_THREAD_COMMANDS = Object.freeze(
+  Array.from({length:18},(_,index)=>({
+    name:`week${index+1}`,
+    description:`Create or reconcile Week ${index+1} matchup threads from the active FranchiseHQ schedule.`
+  }))
+);
 
 export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   {
@@ -168,8 +175,17 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
         {type:OPTION.BOOLEAN,name:'free-trade',description:'Approve as a Free Trade when league settings allow it.'}
       ]}
     ]
-  }
+  },
+  ...DISCORD_SCHEDULE_THREAD_COMMANDS
 ]);
+
+export function discordScheduleThreadWeek(commandOrInteraction = '') {
+  const command = typeof commandOrInteraction === 'string'
+    ? commandOrInteraction
+    : discordCommandName(commandOrInteraction);
+  const match = String(command || '').trim().toLowerCase().match(/^week(1[0-8]|[1-9])$/);
+  return match ? Number(match[1]) : null;
+}
 
 export function discordCommandName(interaction = {}) {
   return String(interaction?.data?.name || '').trim().toLowerCase();
@@ -191,6 +207,7 @@ export function discordInteractionIsPrivate(interaction = {}) {
   const {subcommand, values} = discordCommandOptions(interaction);
   if (values.private === true) return true;
   if (['join','confidence','trade'].includes(command)) return true;
+  if (discordScheduleThreadWeek(command)) return true;
   if (command === 'twitch' && subcommand === 'set') return true;
   return false;
 }

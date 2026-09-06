@@ -82,7 +82,7 @@ export async function activeTeamAssignments(db, leagueId, teams = null) {
   const result = await db.prepare(`
     SELECT lm.id AS membershipId, lm.user_id AS userId, lm.role, lm.team_id AS storedTeamId,
       u.display_name AS displayName, u.discord_global_name AS discordGlobalName,
-      u.discord_username AS discordUsername
+      u.discord_username AS discordUsername, u.discord_user_id AS discordUserId
     FROM league_memberships lm
     JOIN users u ON u.id=lm.user_id
     WHERE lm.league_id=? AND lm.active=1 AND lm.team_id IS NOT NULL
@@ -97,6 +97,7 @@ export async function activeTeamAssignments(db, leagueId, teams = null) {
       userId: row.userId,
       role: row.role,
       teamId: team.teamKey,
+      discordUserId: row.discordUserId || null,
       displayName: row.displayName || row.discordGlobalName || row.discordUsername || 'League Member'
     });
   }

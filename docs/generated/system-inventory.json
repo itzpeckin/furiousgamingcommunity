@@ -69,15 +69,22 @@
       "functions/leagues/index.js"
     ],
     "DISCORD_BOT_TOKEN": [
-      "functions/_lib/discord-delivery.js"
+      "functions/_lib/discord-api.js",
+      "functions/_lib/discord-delivery.js",
+      "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
     "DISCORD_CLIENT_ID": [
+      "functions/_lib/discord-api.js",
+      "functions/_lib/discord-installation.js",
+      "functions/_lib/discord-security.js",
       "functions/api/auth/discord/callback.js",
       "functions/api/auth/discord/login.js",
-      "functions/api/leagues/[leagueSlug]/discord.js"
+      "functions/api/leagues/[leagueSlug]/discord.js",
+      "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
     "DISCORD_CLIENT_SECRET": [
-      "functions/api/auth/discord/callback.js"
+      "functions/api/auth/discord/callback.js",
+      "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
     "DISCORD_PUBLIC_KEY": [
       "functions/api/discord/interactions.js"
@@ -149,13 +156,13 @@
       ".css": 9,
       ".example": 1,
       ".html": 3,
-      ".js": 206,
+      ".js": 210,
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
       ".mjs": 42,
       ".png": 3,
-      ".sql": 36,
+      ".sql": 37,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
@@ -166,11 +173,11 @@
         "file": "app.js"
       },
       {
-        "bytes": 521316,
+        "bytes": 521663,
         "file": "styles.css"
       },
       {
-        "bytes": 424698,
+        "bytes": 425065,
         "file": "trade-module.js"
       },
       {
@@ -202,16 +209,16 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
+        "bytes": 39129,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
+      },
+      {
         "bytes": 39003,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
         "bytes": 38943,
         "file": "tests/import/madden-discovery.test.mjs"
-      },
-      {
-        "bytes": 38706,
-        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
         "bytes": 37673,
@@ -234,15 +241,15 @@
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 27564,
-        "file": "functions/api/leagues/[leagueSlug]/competition.js"
+        "bytes": 28417,
+        "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 27168,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
+        "bytes": 27564,
+        "file": "functions/api/leagues/[leagueSlug]/competition.js"
       }
     ],
-    "total": 589
+    "total": 594
   },
   "frontend": {
     "assets": [
@@ -732,7 +739,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 75,
+    "routeCount": 76,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1069,6 +1076,13 @@
           "onRequestPost"
         ],
         "route": "/api/leagues/:leagueSlug/discord"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/discord/connect.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/discord/connect"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/ea-direct/auth-status.js",
@@ -1500,10 +1514,16 @@
       "recordsLedger": true,
       "sha256": "3cefae8a8668bd54ed7f8ef097a6d21801e648d4ab95f40ad0e16d5e5446a5c4",
       "version": "0034"
+    },
+    {
+      "file": "migrations/0035_discord_schedule_threads.sql",
+      "recordsLedger": true,
+      "sha256": "f9eb91639ac836a115ee7d59fb350d5a29811a5136b8ad832395e193276b505c",
+      "version": "0035"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.4.3",
+  "release": "7.4.4.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

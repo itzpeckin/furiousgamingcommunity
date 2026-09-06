@@ -1,23 +1,8 @@
-const DISCORD_API='https://discord.com/api/v10';
+import { discordBotRequest } from './discord-api.js';
+
 const MAX_ATTEMPTS=5;
 const rows=async(db,sql,...values)=>(await db.prepare(sql).bind(...values).all()).results||[];
 const cleanError=value=>String(value?.message||value||'Discord delivery failed.').replace(/Bot\s+[A-Za-z0-9._-]+/g,'Bot [redacted]').slice(0,500);
-
-async function discordRequest(env,path,{method='GET',body=null,fetchImpl=fetch}={}){
-  const token=String(env.DISCORD_BOT_TOKEN||'').trim();
-  if(!token)throw new Error('Discord delivery is not configured.');
-  const response=await fetchImpl(`${DISCORD_API}${path}`,{
-    method,
-    headers:{Authorization:`Bot ${token}`,...(body?{'content-type':'application/json'}:{})},
-    ...(body?{body:JSON.stringify(body)}:{})
-  });
-  if(!response.ok){
-    const detail=await response.text().catch(()=>String(response.status));
-    throw new Error(`Discord API ${response.status}: ${detail.slice(0,200)}`);
-  }
-  if(response.status===204)return null;
-  return response.json();
-}
 
 function deliveryMessage(row){
   let payload={};try{payload=JSON.parse(row.payloadJson||'{}')}catch{}
@@ -40,13 +25,13 @@ function deliveryMessage(row){
 async function sendDelivery(env,row,fetchImpl){
   let channelId=row.channelId;
   if(row.visibility==='direct-message'){
-    const dm=await discordRequest(env,'/users/@me/channels',{
+    const dm=await discordBotRequest(env,'/users/@me/channels',{
       method:'POST',body:{recipient_id:row.discordUserId},fetchImpl
     });
     channelId=dm?.id;
   }
   if(!channelId)throw new Error('Discord delivery channel could not be resolved.');
-  await discordRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
+  await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
     method:'POST',body:deliveryMessage(row),fetchImpl
   });
 }
