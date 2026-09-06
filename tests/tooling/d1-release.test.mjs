@@ -44,11 +44,11 @@ test('only missing canonical migrations are planned', () => {
   assert.deepEqual(pendingMigrations(ledger, migrations).map(item => item.version), [19, 20]);
 });
 
-test('canonical migration loading includes the Discord bot foundation', async () => {
+test('canonical migration loading includes automatic Discord schedule threads', async () => {
   const { contract, migrations } = await loadCanonicalMigrations();
-  assert.equal(contract.currentVersion, 34);
-  assert.equal(migrations.at(-1)?.version, 34);
-  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0034_discord_bot_foundation.sql');
+  assert.equal(contract.currentVersion, 35);
+  assert.equal(migrations.at(-1)?.version, 35);
+  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0035_discord_schedule_threads.sql');
   const tenantMigration = migrations.find(item => item.version === 21);
   assert.equal(
     tenantMigration?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,

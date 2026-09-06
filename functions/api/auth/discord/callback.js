@@ -21,8 +21,17 @@ import {
 } from "../../../_lib/origin.js";
 import { isOwnerFallbackIdentity } from "../../../_lib/owner-fallback.js";
 import { resolveTenant, resolveTenantById } from "../../../_lib/tenant-context.js";
+import {
+  discordGuildPermissionAllowsInstall,
+  ensureDiscordScheduleChannel,
+  storeDiscordGuildInstallation,
+  verifyDiscordGuildInstallation
+} from "../../../_lib/discord-installation.js";
+import { ensureDiscordGlobalCommands, upsertDiscordGuildCommands } from "../../../_lib/discord-api.js";
+import { DISCORD_GLOBAL_COMMANDS, DISCORD_SCHEDULE_THREAD_COMMANDS } from "../../../_lib/discord-commands.js";
+import { scheduleActiveDiscordSync } from "../../../_lib/discord-schedule.js";
 
-const RELEASE = "7.3.0";
+const RELEASE = "7.4.4.4";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -165,9 +174,25 @@ export async function onRequestGet(context) {
     let joinLeagueId = null;
     let joinLeagueSlug = null;
     let oauthReturnTo = null;
+    let discordInstallContext = null;
     let loginOrigin = new URL(context.request.url).origin;
     let redirectUri = String(context.env.DISCORD_REDIRECT_URI || "").trim();
-    if (String(storedState.id || "").startsWith("oauthctx.")) {
+    if (String(storedState.id || "").startsWith("discordinstall.")) {
+      const encoded = String(storedState.id).split(".")[1] || "";
+      discordInstallContext = decodeOpaqueContext(encoded);
+      if (!discordInstallContext || discordInstallContext.kind !== "discord-install") {
+        return jsonResponse({ok:false,error:"The Discord connection request is invalid."},400);
+      }
+      oauthReturnTo = safeDestination(discordInstallContext.returnTo);
+      if (/^https:\/\//i.test(String(discordInstallContext.origin || ""))) {
+        loginOrigin = canonicalAuthenticationOrigin(String(discordInstallContext.origin));
+      }
+      const expectedRedirectUri = discordRedirectUriForOrigin(context.env, loginOrigin);
+      if (String(discordInstallContext.redirectUri || "") !== expectedRedirectUri) {
+        return jsonResponse({ok:false,error:"The Discord connection return address is invalid."},400);
+      }
+      redirectUri = expectedRedirectUri;
+    } else if (String(storedState.id || "").startsWith("oauthctx.")) {
       const encoded = String(storedState.id).split(".")[1] || "";
       const oauthContext = decodeOpaqueContext(encoded);
       if (oauthContext) {
@@ -269,6 +294,51 @@ export async function onRequestGet(context) {
     }
 
     const discordUser = await userResponse.json();
+
+    if (discordInstallContext) {
+      const user = await context.env.DB.prepare(`SELECT id,discord_user_id AS discordUserId,
+          display_name AS displayName FROM users WHERE id=? AND discord_user_id=? LIMIT 1`)
+        .bind(discordInstallContext.userId,String(discordUser.id||''))
+        .first();
+      const league = await resolveTenantById(context.env,discordInstallContext.leagueId);
+      const membership = user&&league ? await context.env.DB.prepare(`SELECT id,role,active
+          FROM league_memberships WHERE league_id=? AND user_id=? LIMIT 1`)
+        .bind(league.id,user.id).first() : null;
+      if (!user || !league || !membership || !Number(membership.active) || membership.role !== 'commissioner') {
+        return jsonResponse({ok:false,error:'Only an active FranchiseHQ commissioner may connect this Discord server.'},403);
+      }
+      const authorizedGuild = tokenData.guild || null;
+      if (!authorizedGuild?.owner && !discordGuildPermissionAllowsInstall(authorizedGuild?.permissions)) {
+        return jsonResponse({ok:false,error:'Discord requires Manage Server permission to connect this league.'},403);
+      }
+      const guild = await verifyDiscordGuildInstallation(context.env,String(authorizedGuild?.id||''));
+      const scheduleChannel = await ensureDiscordScheduleChannel(context.env,guild.id);
+      await storeDiscordGuildInstallation({
+        db:context.env.DB,env:context.env,league,user,guild,scheduleChannel,
+        request:context.request,source:'oauth-connect'
+      });
+      const stateConsumption = await context.env.DB.prepare(`UPDATE oauth_states SET used_at=CURRENT_TIMESTAMP
+        WHERE id=? AND used_at IS NULL AND expires_at>CURRENT_TIMESTAMP`).bind(storedState.id).run();
+      if (Number(stateConsumption?.meta?.changes || 0) !== 1) {
+        return jsonResponse({ok:false,error:'The Discord connection request expired or was already used.'},400);
+      }
+      const commandRegistration = Promise.all([
+        ensureDiscordGlobalCommands(context.env,DISCORD_GLOBAL_COMMANDS),
+        upsertDiscordGuildCommands(context.env,guild.id,DISCORD_SCHEDULE_THREAD_COMMANDS)
+      ])
+        .catch(error=>console.error('Discord command repair failed:',String(error?.message||error).slice(0,500)));
+      const scheduleSync = scheduleActiveDiscordSync(context,{
+        db:context.env.DB,league,requestedByUserId:user.id,source:'oauth-connect'
+      });
+      const waitUntil = context.waitUntil || context.executionContext?.waitUntil;
+      if (typeof waitUntil === 'function') {
+        waitUntil.call(context.executionContext || context,commandRegistration);
+      } else {
+        await commandRegistration;
+      }
+      await scheduleSync;
+      return createDirectSession(context,user.id,oauthReturnTo || `/leagues/${league.slug}?discord=connected#commissioner`);
+    }
 
     const displayName =
       discordUser.global_name ||

@@ -1,6 +1,6 @@
 import { createTenantAuditContext, tenantAuditStatement } from './tenant-context.js';
 
-export const LEAGUE_NEWS_RELEASE = '7.4.4.3';
+export const LEAGUE_NEWS_RELEASE = '7.4.4.4';
 
 const clean = (value, max) => String(value ?? '').trim().slice(0, max);
 const rows = async (db, sql, ...values) => (

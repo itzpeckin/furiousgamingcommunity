@@ -6,7 +6,7 @@ import {
   tenantAuditStatement
 } from '../../../../_lib/tenant-context.js';
 
-const RELEASE = '7.4.4.3';
+const RELEASE = '7.4.4.4';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const SAFE_MEDIA_ID = /^rule_media_[A-Za-z0-9-]{1,96}$/;
 const IMAGE_TYPES = new Set(['image/jpeg','image/png','image/webp','image/gif']);

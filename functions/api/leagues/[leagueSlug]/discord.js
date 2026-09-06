@@ -2,6 +2,7 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireCommissioner } from '../../../_lib/permissions.js';
 import { createTenantAuditContext, tenantAuditStatement } from '../../../_lib/tenant-context.js';
 import { DISCORD_COMMAND_RELEASE } from '../../../_lib/discord-commands.js';
+import { latestDiscordScheduleSync } from '../../../_lib/discord-schedule.js';
 
 const SNOWFLAKE=/^[0-9]{17,20}$/;
 const cleanSnowflake=(value,required=false)=>{
@@ -26,17 +27,18 @@ async function requestContext(context){
 async function state(c){
   const row=await c.db.prepare(`SELECT discord_guild_id AS guildId,application_id AS applicationId,
       trade_committee_channel_id AS tradeCommitteeChannelId,notification_channel_id AS notificationChannelId,
-      status,installed_at AS installedAt,updated_at AS updatedAt
+      guild_name AS guildName,schedule_channel_id AS scheduleChannelId,connection_source AS connectionSource,
+      connected_at AS connectedAt,status,installed_at AS installedAt,updated_at AS updatedAt
     FROM discord_league_installations WHERE league_id=? LIMIT 1`).bind(c.league.id).first();
-  const clientId=String(c.env.DISCORD_CLIENT_ID||'').trim();
+  const origin=new URL(c.request.url).origin;
   return {
     ok:true,release:DISCORD_COMMAND_RELEASE,
     league:{id:c.league.id,slug:c.league.slug,name:c.league.name},
     installation:row||null,
+    scheduleSync:await latestDiscordScheduleSync(c.db,c.league.id),
     globalCommands:true,
-    installUrl:SNOWFLAKE.test(clientId)
-      ?`https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&scope=bot%20applications.commands&permissions=19456`
-      :null,
+    automaticConnection:true,
+    connectUrl:`${origin}/api/leagues/${encodeURIComponent(c.league.slug)}/discord/connect`,
     endpoint:`${new URL(c.request.url).origin}/api/discord/interactions`
   };
 }
