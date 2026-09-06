@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.3",
+  "releaseType": "global-multi-tenant-discord-bot",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.4.2",
+    "commit": "7e43655447abc5560bbf18efd981af707b08a4d1",
+    "tree": "ed4eb061b854814ce95a9886e99721db5daf241d",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.4.3",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "pullRequest": null,
+    "candidateCommit": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.4.4.2",
+    "currentCommit": "7e43655447abc5560bbf18efd981af707b08a4d1",
+    "currentPagesDeployment": null,
+    "workerSourceChanged": false,
+    "currentMigration": 33,
+    "candidateMigration": 34
+  },
+  "requiredArtifacts": [
+    "functions/api/discord/interactions.js",
+    "functions/api/leagues/[leagueSlug]/discord.js",
+    "functions/api/leagues/[leagueSlug]/news.js",
+    "functions/_lib/discord-bot.js",
+    "functions/_lib/discord-commands.js",
+    "functions/_lib/discord-delivery.js",
+    "functions/_lib/discord-read-model.js",
+    "functions/_lib/discord-security.js",
+    "functions/_lib/league-news.js",
+    "league-engine/news.js",
+    "migrations/0034_discord_bot_foundation.sql",
+    "tools/register-discord-commands.mjs",
+    "tools/check-independent-implementation.mjs",
+    "tests/discord/discord-bot.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.4.3/release-record.md",
+    "releases/7.4.4.3/validation-evidence.json"
+  ]
+}

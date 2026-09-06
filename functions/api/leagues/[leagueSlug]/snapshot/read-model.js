@@ -178,7 +178,7 @@ export function normalizeGame(raw = {}) {
   return {id,season,stage,week,homeTeamId,awayTeamId,homeScore,awayScore,status,scheduledAt,source:approved};
 }
 
-function normalizeStatistic(raw = {}) {
+export function normalizeStatistic(raw = {}) {
   raw = sourceRecord(raw);
   return {
     id: String(raw.external_key ?? raw.external_id ?? raw.id ?? ''),
@@ -263,7 +263,7 @@ function normalize(domain, raw) {
   return raw;
 }
 
-async function activeSnapshot(db, leagueId) {
+export async function activeSnapshotRecord(db, leagueId) {
   return db.prepare(`
     SELECT s.*
     FROM league_active_snapshots a
@@ -285,7 +285,7 @@ function validationIntegrity(active) {
   };
 }
 
-async function domainRows(db, leagueId, snapshotId, domain, cursor = null, limit = 150, compact = false) {
+export async function activeSnapshotDomainPage(db, leagueId, snapshotId, domain, cursor = null, limit = 150, compact = false) {
   const safeLimit = Math.max(25, Math.min(500, Number(limit) || 150));
   let result;
   if (cursor) {
@@ -347,7 +347,7 @@ export async function onRequestGet(context) {
     return json({ok:false,error:'Not found.'},404);
   }
 
-  const active = await activeSnapshot(db, league.id);
+  const active = await activeSnapshotRecord(db, league.id);
   if (!active) {
     return json({
       ok:true,
@@ -414,7 +414,7 @@ export async function onRequestGet(context) {
     const cursor = String(url.searchParams.get('cursor') || '').trim() || null;
     const limit = Number(url.searchParams.get('limit') || 150);
     const compact = domain === 'statistics' && String(url.searchParams.get('compact') || '') === '1';
-    const page = await domainRows(db,league.id,active.id,domain,cursor,limit,compact);
+    const page = await activeSnapshotDomainPage(db,league.id,active.id,domain,cursor,limit,compact);
     if (domain === 'teams') {
       const canonicalTeams = await activeLeagueTeams(db, league.id);
       const assignments = await activeTeamAssignments(db, league.id, canonicalTeams);
@@ -438,7 +438,7 @@ export async function onRequestGet(context) {
   }
 
   if (ALLOWED_DOMAINS.has(sample)) {
-    const page = await domainRows(db,league.id,active.id,sample,null,1);
+    const page = await activeSnapshotDomainPage(db,league.id,active.id,sample,null,1);
     let record = page.records[0] || null;
     if (sample === 'teams' && record) {
       const canonicalTeams = await activeLeagueTeams(db, league.id);

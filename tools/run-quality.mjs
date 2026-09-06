@@ -5,6 +5,7 @@ const strict = process.argv.includes('--strict');
 const packageJson = await readJson('package.json');
 const checks = [
   ['Repository lint', 'tools/check-repository.mjs', []],
+  ['Independent implementation', 'tools/check-independent-implementation.mjs', []],
   ['JavaScript syntax', 'tools/check-syntax.mjs', []],
   ['HTML asset references', 'tools/check-html-assets.mjs', []],
   ['Secret scan', 'tools/check-secrets.mjs', []],
@@ -19,6 +20,7 @@ const checks = [
     'tests/database/migrations.test.mjs',
     'tests/commissioner/commissioner-hq.test.mjs',
     'tests/commissioner/competition.test.mjs',
+    'tests/discord/discord-bot.test.mjs',
     'tests/import/madden-discovery.test.mjs',
     'tests/import/permanent-identity.test.mjs',
     'tests/import/candidate-import.test.mjs',

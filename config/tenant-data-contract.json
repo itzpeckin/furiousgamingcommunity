@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "7.3.0",
+  "release": "7.4.4.3",
   "resolution": {
     "source": "server",
     "requiresExplicitSlug": true,
@@ -17,6 +17,7 @@
     "oauth_states",
     "schema_migrations",
     "sessions",
+    "user_stream_profiles",
     "users"
   ],
   "featurePolicy": {

@@ -1,0 +1,188 @@
+import { createId } from './auth.js';
+import { resolveTenantById, tenantDatabase, createTenantAuditContext, tenantAuditStatement } from './tenant-context.js';
+import { sha256Hex } from './cloud-platform.js';
+
+export const DISCORD_INTERACTION_TYPES=Object.freeze({PING:1,APPLICATION_COMMAND:2});
+export const DISCORD_RESPONSE_TYPES=Object.freeze({PONG:1,CHANNEL_MESSAGE:4,DEFERRED_CHANNEL_MESSAGE:5});
+export const DISCORD_EPHEMERAL_FLAG=64;
+const MAX_BODY_BYTES=128*1024;
+const MAX_TIMESTAMP_SKEW_SECONDS=5*60;
+const SNOWFLAKE=/^[0-9]{17,20}$/;
+
+function hexBytes(value){
+  const hex=String(value||'').trim().toLowerCase();
+  if(!/^[0-9a-f]+$/.test(hex)||hex.length%2!==0)return null;
+  return Uint8Array.from(hex.match(/.{2}/g)||[],part=>Number.parseInt(part,16));
+}
+
+function discordUser(interaction={}){
+  return interaction?.member?.user||interaction?.user||null;
+}
+
+export async function verifyDiscordInteractionRequest(request,publicKey,{now=Date.now()}={}){
+  const signature=request.headers.get('x-signature-ed25519');
+  const timestamp=request.headers.get('x-signature-timestamp');
+  const keyBytes=hexBytes(publicKey),signatureBytes=hexBytes(signature);
+  if(!keyBytes||keyBytes.length!==32||!signatureBytes||signatureBytes.length!==64||!/^\d{10,13}$/.test(String(timestamp||''))){
+    return {verified:false,status:401,error:'Invalid Discord request signature.'};
+  }
+  const timestampSeconds=Number(timestamp)>1e12?Number(timestamp)/1000:Number(timestamp);
+  if(!Number.isFinite(timestampSeconds)||Math.abs(now/1000-timestampSeconds)>MAX_TIMESTAMP_SKEW_SECONDS){
+    return {verified:false,status:401,error:'Expired Discord request signature.'};
+  }
+  const rawBody=await request.text();
+  if(new TextEncoder().encode(rawBody).byteLength>MAX_BODY_BYTES){
+    return {verified:false,status:413,error:'Discord interaction is too large.'};
+  }
+  try{
+    const key=await crypto.subtle.importKey('raw',keyBytes,{name:'Ed25519'},false,['verify']);
+    const data=new TextEncoder().encode(`${timestamp}${rawBody}`);
+    const verified=await crypto.subtle.verify({name:'Ed25519'},key,signatureBytes,data);
+    if(!verified)return {verified:false,status:401,error:'Invalid Discord request signature.'};
+    const interaction=JSON.parse(rawBody);
+    if(!interaction||typeof interaction!=='object')throw new Error('invalid');
+    return {verified:true,rawBody,interaction};
+  }catch(error){
+    return {verified:false,status:400,error:'Discord interaction body is invalid.'};
+  }
+}
+
+export function discordInteractionResponse(type,data=null){
+  return new Response(JSON.stringify(data?{type,data}:{type}),{
+    status:200,
+    headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
+  });
+}
+
+export function discordErrorResponse(message='This action could not be completed.'){
+  return discordInteractionResponse(DISCORD_RESPONSE_TYPES.CHANNEL_MESSAGE,{
+    content:String(message).slice(0,1900),flags:DISCORD_EPHEMERAL_FLAG,allowed_mentions:{parse:[]}
+  });
+}
+
+export async function resolveDiscordContext(env,interaction,{membershipRequired=true}={}){
+  const db=tenantDatabase(env);
+  if(!db)throw Object.assign(new Error('FranchiseHQ data is temporarily unavailable.'),{status:503,code:'database-unavailable'});
+  const guildId=String(interaction?.guild_id||'').trim();
+  if(!SNOWFLAKE.test(guildId))throw Object.assign(new Error('Use this command inside a connected league Discord server.'),{status:403,code:'guild-required'});
+  const installation=await db.prepare(`SELECT id,league_id AS leagueId,discord_guild_id AS guildId,
+      application_id AS applicationId,trade_committee_channel_id AS tradeCommitteeChannelId,
+      notification_channel_id AS notificationChannelId,status
+    FROM discord_league_installations
+    WHERE discord_guild_id=? AND status='active' LIMIT 1`).bind(guildId).first();
+  if(!installation)throw Object.assign(new Error('This Discord server is not connected to a FranchiseHQ league.'),{status:404,code:'guild-unmapped'});
+  if(installation.applicationId&&String(interaction.application_id||'')!==String(installation.applicationId)){
+    throw Object.assign(new Error('This Discord application is not authorized for the connected league.'),{status:403,code:'application-mismatch'});
+  }
+  const league=await resolveTenantById(env,installation.leagueId);
+  if(!league)throw Object.assign(new Error('The connected FranchiseHQ league is unavailable.'),{status:404,code:'league-unavailable'});
+  const identity=discordUser(interaction);
+  const discordUserId=String(identity?.id||'');
+  if(!SNOWFLAKE.test(discordUserId))throw Object.assign(new Error('Discord identity could not be verified.'),{status:401,code:'identity-missing'});
+  const actor=await db.prepare(`SELECT user.id,user.discord_user_id AS discordUserId,
+      user.discord_username AS discordUsername,user.discord_global_name AS discordGlobalName,
+      user.display_name AS displayName,user.avatar_url AS avatarUrl,
+      membership.id AS membershipId,membership.role,membership.team_id AS teamId,membership.active
+    FROM users user
+    LEFT JOIN league_memberships membership ON membership.user_id=user.id AND membership.league_id=?
+    WHERE user.discord_user_id=? LIMIT 1`).bind(league.id,discordUserId).first();
+  const membership=actor?.membershipId?{
+    id:actor.membershipId,leagueId:league.id,leagueSlug:league.slug,leagueName:league.name,
+    role:actor.role,teamId:actor.teamId,active:Boolean(actor.active)
+  }:null;
+  if(membershipRequired&&(!membership||!membership.active)){
+    throw Object.assign(new Error('Join this league first with `/join`, or contact a commissioner if access was revoked.'),{status:403,code:'membership-required'});
+  }
+  const user=actor?{
+    id:actor.id,discordUserId:actor.discordUserId,discordUsername:actor.discordUsername,
+    discordGlobalName:actor.discordGlobalName,displayName:actor.displayName,avatarUrl:actor.avatarUrl
+  }:null;
+  return {db,league,installation,discordIdentity:identity,user,membership,session:user?{user,membership}:null,interaction};
+}
+
+export function requireDiscordTeam(c){
+  if(!c.membership?.active||!c.membership?.teamId){
+    throw Object.assign(new Error('A commissioner must assign you to a team before you can use team or trade actions.'),{status:403,code:'team-assignment-required'});
+  }
+  return c.membership.teamId;
+}
+
+export function requireDiscordRole(c,roles){
+  const allowed=Array.isArray(roles)?roles:[roles];
+  if(!c.membership?.active||!allowed.includes(c.membership.role)){
+    throw Object.assign(new Error('You do not have permission to use this command.'),{status:403,code:'role-required'});
+  }
+}
+
+function avatarUrl(identity){
+  if(!identity?.avatar)return null;
+  const extension=String(identity.avatar).startsWith('a_')?'gif':'png';
+  return `https://cdn.discordapp.com/avatars/${identity.id}/${identity.avatar}.${extension}?size=128`;
+}
+
+export async function joinDiscordLeague(c,request){
+  if(c.membership&&!c.membership.active){
+    throw Object.assign(new Error('Your league access was revoked. A commissioner must restore it.'),{status:403,code:'membership-revoked'});
+  }
+  const identity=c.discordIdentity;
+  const username=String(identity.username||'league-member').slice(0,80);
+  const globalName=String(identity.global_name||'').trim().slice(0,100)||null;
+  const displayName=globalName||username;
+  const userId=c.user?.id||createId('user');
+  const membershipId=c.membership?.id||createId('membership');
+  const membership=c.membership||{id:membershipId,leagueId:c.league.id,leagueSlug:c.league.slug,
+    leagueName:c.league.name,role:'team_owner',teamId:null,active:true};
+  const session={user:{id:userId},membership};
+  const audit=createTenantAuditContext({request},c.league,session,c.membership?'discord_member_refreshed':'discord_member_joined');
+  await c.db.batch([
+    c.db.prepare(`INSERT INTO users
+      (id,discord_user_id,discord_username,discord_global_name,display_name,avatar_hash,avatar_url,created_at,updated_at,last_login_at)
+      VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+      ON CONFLICT(discord_user_id) DO UPDATE SET discord_username=excluded.discord_username,
+        discord_global_name=excluded.discord_global_name,display_name=excluded.display_name,
+        avatar_hash=excluded.avatar_hash,avatar_url=excluded.avatar_url,updated_at=CURRENT_TIMESTAMP`)
+      .bind(userId,String(identity.id),username,globalName,displayName,identity.avatar||null,avatarUrl(identity)),
+    c.db.prepare(`INSERT OR IGNORE INTO league_memberships
+      (id,league_id,user_id,role,team_id,active,created_at,updated_at)
+      VALUES (?,?,?,'team_owner',NULL,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
+      .bind(membershipId,c.league.id,userId),
+    tenantAuditStatement(c.db,audit,{resourceType:'league_membership',resourceId:membershipId,
+      detail:{source:'discord-command',assignedTeam:false,immediateUnassignedAccess:true}})
+  ]);
+  return {
+    user:{id:userId,discordUserId:String(identity.id),discordUsername:username,discordGlobalName:globalName,displayName,avatarUrl:avatarUrl(identity)},
+    membership
+  };
+}
+
+export async function createInteractionReceipt(db,interaction,{leagueId=null,visibility='private'}={}){
+  const user=discordUser(interaction);
+  const command=String(interaction?.data?.name||interaction?.type||'unknown').slice(0,100);
+  const result=await db.prepare(`INSERT INTO discord_interaction_receipts
+    (interaction_id,application_id,discord_guild_id,league_id,discord_user_id,command_name,interaction_type,visibility,status,created_at,expires_at)
+    VALUES (?,?,?,?,?,?,?,?,? ,CURRENT_TIMESTAMP,datetime('now','+1 day'))
+    ON CONFLICT(interaction_id) DO NOTHING`).bind(
+      String(interaction.id),String(interaction.application_id||''),interaction.guild_id||null,leagueId,
+      user?.id||null,command,Number(interaction.type||0),visibility,'processing'
+    ).run();
+  return Number(result?.meta?.changes||0)===1;
+}
+
+export async function completeInteractionReceipt(db,interactionId,{status='completed',response=null,errorCode=null}={}){
+  const digest=response==null?null:await sha256Hex(typeof response==='string'?response:JSON.stringify(response));
+  await db.prepare(`UPDATE discord_interaction_receipts SET status=?,response_digest=?,error_code=?,
+    completed_at=CURRENT_TIMESTAMP WHERE interaction_id=?`).bind(status,digest,errorCode,String(interactionId)).run();
+}
+
+export async function editDiscordOriginalResponse(interaction,message,{fetchImpl=fetch}={}){
+  const applicationId=String(interaction.application_id||'');
+  const token=String(interaction.token||'');
+  if(!SNOWFLAKE.test(applicationId)||!token)throw new Error('Discord response token is unavailable.');
+  const response=await fetchImpl(`https://discord.com/api/v10/webhooks/${encodeURIComponent(applicationId)}/${encodeURIComponent(token)}/messages/@original`,{
+    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({
+      content:String(message||'Done.').slice(0,2000),allowed_mentions:{parse:[]}
+    })
+  });
+  if(!response.ok)throw new Error(`Discord response update failed with ${response.status}.`);
+  return true;
+}
