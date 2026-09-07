@@ -154,7 +154,6 @@
   "files": {
     "byExtension": {
       ".css": 9,
-      ".db": 1,
       ".example": 1,
       ".html": 3,
       ".js": 211,
@@ -165,7 +164,6 @@
       ".png": 3,
       ".sql": 37,
       ".txt": 1,
-      ".yaml": 1,
       ".yml": 1,
       "[none]": 2
     },
@@ -251,7 +249,7 @@
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 597
+    "total": 595
   },
   "frontend": {
     "assets": [

@@ -14,7 +14,7 @@
   "strictRepositoryGate": {
     "passed": true,
     "javascriptModules": 253,
-    "inventoryEntries": 597,
+    "inventoryEntries": 595,
     "routes": 76,
     "passedTests": 201,
     "failedTests": 0
