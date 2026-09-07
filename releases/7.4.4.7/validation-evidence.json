@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.7",
   "validatedOn": "2026-09-06",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -79,15 +79,56 @@
     "failedVerificationField": "week",
     "productionRowsWritten": 0
   },
+  "productionProtectedState": {
+    "verifiedReadOnlyAfterReanalysis": true,
+    "database": "franchise-hq-db-madden27",
+    "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+    "migrationVersion": 35,
+    "leagues": 1,
+    "users": 30,
+    "memberships": 30,
+    "activeTeamAssignments": 28,
+    "snapshots": 14,
+    "activeSnapshotRows": 1,
+    "activeSnapshotId": "31b52bdc-ce62-479e-83c3-36a75eeb2b12",
+    "previousSnapshotId": "ee1d3679-563d-4e6a-a2ef-4eb44b91af24",
+    "activeSnapshotActivatedAt": "2026-09-06 00:48:44",
+    "activeSeasonYear": 2026,
+    "activeWeek": 13,
+    "activeTeams": 32,
+    "activeRosteredPlayers": 2036,
+    "activeGames": 241,
+    "activeStatistics": 9724,
+    "activeStandings": 32,
+    "candidateImportRunsForRetainedSession": 0,
+    "foreignKeyViolations": 0
+  },
+  "productionHttpsAcceptance": {
+    "passed": true,
+    "release": "7.4.4.7",
+    "mergeCommit": "cbaf0ea51dada3614f8eed2c86ab21b994be42be",
+    "pagesDeployment": "aa809a9e-8249-4c83-80b8-b85be5b27d43",
+    "productionAlias": "franchisehq.app",
+    "authenticatedCommissionerContext": true,
+    "latestExportStatus": "ready",
+    "importLatestExportEnabled": true,
+    "capturedRoutes": 51,
+    "teams": 32,
+    "rosteredPlayers": 2036,
+    "freeAgentStatus": "blocked",
+    "freeAgentCount": null,
+    "activeSnapshotUnchanged": true,
+    "importExecuted": false
+  },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
     "productionConfigurationChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "discordCommandsRegistered": false,
     "discordCredentialsChanged": false,
@@ -103,16 +144,26 @@
     "freeAgentInterpretedAsZero": false,
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
-    "databaseRowsWritten": 0
+    "databaseRowsWritten": 3
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 50,
+      "candidateCommit": "b6db44250b973b1c7988ebe4989e3092bbd2a7bb",
+      "mergeCommit": "cbaf0ea51dada3614f8eed2c86ab21b994be42be"
     },
     "hostedChecks": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed",
+      "candidateChecksPassed": 4,
+      "candidateChecksTotal": 4,
+      "mainChecksPassed": 5,
+      "mainChecksTotal": 5,
+      "candidateQualityRun": 34073882866,
+      "mainQualityRun": 34073973245,
+      "mainDeploymentRun": 34073972059
     },
     "stagingDeployment": {
       "authorized": false,
@@ -125,13 +176,37 @@
       "candidateMigration": 35
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.4.4.6"
+      "authorized": true,
+      "status": "deployed-readiness-verified-pending-commissioner-import",
+      "currentRelease": "7.4.4.7",
+      "mergeCommit": "cbaf0ea51dada3614f8eed2c86ab21b994be42be",
+      "pagesDeployment": "aa809a9e-8249-4c83-80b8-b85be5b27d43",
+      "productionAlias": "franchisehq.app",
+      "workerCandidateBuild": "5fc04676-f061-4c43-bbf8-64868da01abd",
+      "workerCandidateVersion": "fa088c99-0417-425d-be3d-3faf3db4e96b",
+      "workerPublicRoutesEnabled": false
     },
     "retainedReportReanalysis": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed-latest-ready",
+      "sessionId": "m27_auto_39a85602e04bd654a9c2da4a581076e3",
+      "reportId": "m27_report_70298e54-beb9-4277-ae79-252801a743b3",
+      "analysisPolicy": "same-season-complete-periods-v1",
+      "analyzedAt": "2026-09-07T01:44:38.037Z",
+      "completePeriods": [
+        "regular-season:13",
+        "regular-season:11"
+      ],
+      "sourceVerificationPassed": true,
+      "sessionStatus": "passed",
+      "latestReadyReportId": "m27_report_70298e54-beb9-4277-ae79-252801a743b3",
+      "endpointTokenVersion": 1,
+      "endpointRotatedAt": null,
+      "activeSnapshotChanged": false,
+      "candidateImportExecuted": false,
+      "freeAgentStatus": "blocked",
+      "freeAgentCount": null,
+      "freeAgentInterpretedAsZero": false
     }
   }
 }

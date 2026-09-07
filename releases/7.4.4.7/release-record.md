@@ -26,15 +26,15 @@ Focused import, permanent-export, route, and Commissioner tests pass. Coverage i
 
 ## Deployment status
 
-This is a local validated review candidate. GitHub publication, pull request, Main merge, Production deployment, and the retained 51-route report reanalysis are not yet authorized. No migration is required.
+Exact candidate `b6db44250b973b1c7988ebe4989e3092bbd2a7bb` was published through PR #50 after all four candidate checks passed. PR #50 merged to Main as `cbaf0ea51dada3614f8eed2c86ab21b994be42be`; all five Main quality, build, and deployment checks passed. Cloudflare Pages Production deployment `aa809a9e-8249-4c83-80b8-b85be5b27d43` is live at `franchisehq.app`, and the exact-candidate import Worker build `5fc04676-f061-4c43-bbf8-64868da01abd` produced version `fa088c99-0417-425d-be3d-3faf3db4e96b` without enabling a public Worker route. No migration was required; migration 35 remains current.
 
-## Required Production acceptance after explicit authorization
+The authorized one-time reanalysis reused retained session `m27_auto_39a85602e04bd654a9c2da4a581076e3` and report `m27_report_70298e54-beb9-4277-ae79-252801a743b3`. The report now uses `same-season-complete-periods-v1`, recognizes complete Regular Season Week 13 and Week 11 schedule/statistic authority, and is the endpoint's latest-ready report. The authenticated Production UI reports **Ready to import**, exposes an enabled **Import Latest Export** action, and continues to display Free Agents as unknown.
 
-1. Deploy the exact candidate after hosted checks and Main merge.
-2. Reanalyze retained session `m27_auto_39a85602e04bd654a9c2da4a581076e3` once under the new policy.
-3. Verify the same retained report is latest-ready and **Import Latest Export** is enabled.
-4. Verify the active snapshot is still `31b52bdc-ce62-479e-83c3-36a75eeb2b12` at Regular Season Week 13.
-5. Leave the actual import/atomic activation for the commissioner's explicit button click.
+Read-only Production verification confirms the active snapshot remains `31b52bdc-ce62-479e-83c3-36a75eeb2b12` at Season 2026, Regular Season Week 13. No candidate-import run exists for the retained session. The permanent endpoint remains active at token version 1 with no rotation timestamp, all 14 snapshots remain retained, and foreign-key violations remain zero. The commissioner has not imported or activated the retained export.
+
+## Commissioner next action
+
+Open **Commish HQ → League Data** and select **Import Latest Export** when ready to validate and atomically make this retained export live. That commissioner click remains a separate data operation and was not performed during this release cycle.
 
 ## Rollback
 
