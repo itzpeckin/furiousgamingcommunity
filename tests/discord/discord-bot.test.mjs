@@ -128,6 +128,35 @@ function seedSnapshotRecord(database,{snapshotId,leagueId,domain,externalId,data
     .run(snapshotId,leagueId,domain,externalId,JSON.stringify(data));
 }
 
+function seedNflStandingsFixture(database,{leagueId='league-a',week=14}={}){
+  const snapshotId=seedActiveWeek(database,{leagueId,week});
+  const teams=[
+    ['TB','Tampa Bay Buccaneers','NFC','South'],['SF','San Francisco 49ers','NFC','West'],
+    ['DAL','Dallas Cowboys','NFC','East'],['NYG','New York Giants','NFC','East'],['PHI','Philadelphia Eagles','NFC','East'],['WAS','Washington Commanders','NFC','East'],
+    ['CHI','Chicago Bears','NFC','North'],['DET','Detroit Lions','NFC','North'],['GB','Green Bay Packers','NFC','North'],['MIN','Minnesota Vikings','NFC','North'],
+    ['ATL','Atlanta Falcons','NFC','South'],['CAR','Carolina Panthers','NFC','South'],['NO','New Orleans Saints','NFC','South'],
+    ['ARI','Arizona Cardinals','NFC','West'],['LAR','Los Angeles Rams','NFC','West'],['SEA','Seattle Seahawks','NFC','West'],
+    ['BUF','Buffalo Bills','AFC','East'],['MIA','Miami Dolphins','AFC','East'],['NE','New England Patriots','AFC','East'],['NYJ','New York Jets','AFC','East'],
+    ['BAL','Baltimore Ravens','AFC','North'],['CIN','Cincinnati Bengals','AFC','North'],['CLE','Cleveland Browns','AFC','North'],['PIT','Pittsburgh Steelers','AFC','North'],
+    ['HOU','Houston Texans','AFC','South'],['IND','Indianapolis Colts','AFC','South'],['JAX','Jacksonville Jaguars','AFC','South'],['TEN','Tennessee Titans','AFC','South'],
+    ['DEN','Denver Broncos','AFC','West'],['KC','Kansas City Chiefs','AFC','West'],['LV','Las Vegas Raiders','AFC','West'],['LAC','Los Angeles Chargers','AFC','West']
+  ];
+  database.prepare(`DELETE FROM league_snapshot_records WHERE snapshot_id=? AND domain='teams'`).run(snapshotId);
+  let nfcSeed=0,afcSeed=0;
+  teams.forEach(([abbreviation,displayName,conference,division],index)=>{
+    const externalId=String(1001+index),seed=conference==='NFC'?++nfcSeed:++afcSeed;
+    seedSnapshotRecord(database,{snapshotId,leagueId,domain:'teams',externalId,data:{
+      external_id:externalId,display_name:displayName,abbreviation,conference_name:conference,division_name:`${conference} ${division}`
+    }});
+    seedSnapshotRecord(database,{snapshotId,leagueId,domain:'standings',externalId,data:{
+      external_id:externalId,teamId:externalId,teamName:displayName,totalWins:17-seed,totalLosses:seed-1,
+      conferenceName:conference,divisionName:`${conference} ${division}`,rank:seed,seed,weekIndex:week
+    }});
+  });
+  database.prepare(`UPDATE league_snapshots SET team_count=32,standing_count=32 WHERE id=?`).run(snapshotId);
+  return snapshotId;
+}
+
 function seedDiscordStatFixture(database,{leagueId='league-a',week=13}={}){
   const snapshotId=seedActiveWeek(database,{leagueId,week});
   const players=[
@@ -148,6 +177,7 @@ function seedDiscordStatFixture(database,{leagueId='league-a',week=13}={}){
     ['chase-rec-w1',{category:'receiving',player_external_id:'chase-rb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({recCatches:4,recYds:38,recTDs:1,recYdsPerGame:38,recCatchPct:80,recToPct:25,recDrops:0,recYdsAfterCatch:25,recLongest:18})}],
     ['chase-defense-w1',{category:'defense',player_external_id:'chase-edge',team_external_id:'1002',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({defTotalTackles:7,defSacks:2,defInts:1,defForcedFum:1,defFumRec:1,defTDs:1,defDeflections:2,defIntReturnYds:21,defSafeties:0})}],
     ['tb-team-w1',{category:'team-game',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({offTotalYdsGained:350,offPassYds:250,offPassTDs:3,offRushYds:100,offRushTDs:1,off1stDowns:20,off3rdDownConv:5,off3rdDownAtt:10,offRedZones:4,offRedZoneTDs:3,offRedZoneFGs:1,offIntsLost:1,offFumLost:0,tOGiveaways:1,defTotalYds:280,defPassYds:200,defRushYds:80,defSacks:3,defIntsRec:2,defForcedFum:1,defFumRec:1,defRedZones:5,defRedZoneTDs:2,defRedZoneFGs:1,tOTakeaways:3,penalties:5,penaltyYds:45})}],
+    ['tb-team-w2',{category:'team-game',team_external_id:'1001',season_year:null,stage:'regular-season',week_index:2,metrics_json:JSON.stringify({offTotalYdsGained:225,offPassYds:150,offPassTDs:2,offRushYds:75,offRushTDs:1,off1stDowns:15,off3rdDownConv:4,off3rdDownAtt:8,offRedZones:2,offRedZoneTDs:1,offRedZoneFGs:0,offIntsLost:1,offFumLost:0,tOGiveaways:1,defTotalYds:210,defPassYds:140,defRushYds:70,defSacks:2,defIntsRec:1,defForcedFum:0,defFumRec:0,defRedZones:2,defRedZoneTDs:1,defRedZoneFGs:0,tOTakeaways:1,penalties:4,penaltyYds:30})}],
     ['tb-pre',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'preseason',week_index:1,metrics_json:JSON.stringify({passYds:5000,passTDs:50,passComp:50,passAtt:50})}]
   ];
   stats.forEach(([externalId,data])=>seedSnapshotRecord(database,{snapshotId,leagueId,domain:'statistics',externalId,data:{external_key:externalId,...data}}));
@@ -171,10 +201,10 @@ function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000
 }
 
 test('global Discord command inventory restores legacy week commands and remains multi-league capable',()=>{
-  assert.equal(DISCORD_GLOBAL_COMMANDS.length,35);
-  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,35);
+  assert.equal(DISCORD_GLOBAL_COMMANDS.length,36);
+  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,36);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.map(command=>command.name),[
-    'standings','schedule','games','leaders','player','team','trade-block','trade-history','news',
+    'standings','playoffs','schedule','games','leaders','player','team','trade-block','trade-history','news',
     'gotw','league-site','twitch','join','gm-history','confidence','rules','trade',
     ...Array.from({length:18},(_,index)=>`week${index+1}`)
   ]);
@@ -186,6 +216,40 @@ test('global Discord command inventory restores legacy week commands and remains
   }
   const trade=DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='trade');
   assert.ok(trade.options.some(option=>option.name==='multi-team'));
+});
+
+test('/standings distinguishes all divisions, all conferences, one team, and one named division while /playoffs returns each conference top 10',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedNflStandingsFixture(database,{leagueId:'league-a'});
+    const db=d1(database),key=await signingKey();
+    const run=async(id,name,options=[])=>{
+      const response=await discordInteractions(await signedContext({db,key,interaction:interaction({id,name,options})}));
+      return response.json();
+    };
+    const divisions=await run('100000000000000071','standings',[{type:3,name:'view',value:'Division'}]);
+    assert.equal(divisions.data.embeds[0].fields.length,8);
+    assert.equal(divisions.data.embeds[0].fields.reduce((count,field)=>count+field.value.split('\n').length,0),32);
+    const conferences=await run('100000000000000072','standings',[{type:3,name:'view',value:'Conference'}]);
+    assert.equal(conferences.data.embeds[0].fields.length,2);
+    assert.equal(conferences.data.embeds[0].fields.reduce((count,field)=>count+field.value.split('\n').length,0),32);
+    const buccaneers=await run('100000000000000073','standings',[{type:3,name:'view',value:'Buccaneers'}]);
+    assert.match(buccaneers.data.content,/Tampa Bay Buccaneers.*16-0/s);
+    assert.doesNotMatch(buccaneers.data.content,/San Francisco/);
+    const nfcEast=await run('100000000000000074','standings',[{type:3,name:'view',value:'Division NFC East'}]);
+    assert.equal((nfcEast.data.content.match(/\*\*/g)||[]).length,10);
+    assert.match(nfcEast.data.content,/Dallas Cowboys/);
+    assert.doesNotMatch(nfcEast.data.content,/Tampa Bay Buccaneers/);
+    const playoffs=await run('100000000000000075','playoffs');
+    assert.equal(playoffs.data.embeds[0].fields.length,2);
+    for(const field of playoffs.data.embeds[0].fields){
+      assert.equal(field.value.split('\n').length,10);
+      assert.equal((field.value.match(/In the Hunt/g)||[]).length,3);
+    }
+  }finally{database.close()}
 });
 
 test('Discord installation verifies the selected guild against the authenticated user permission list',async()=>{
@@ -310,7 +374,7 @@ test('global command registration upserts by name without bulk replacement',asyn
   assert.equal(requests.length,3);
   assert.ok(requests.every(item=>item.method==='POST'));
   assert.ok(requests.every(item=>/\/applications\/100000000000000009\/commands$/.test(item.url)));
-  assert.deepEqual(requests.map(item=>item.body.name),['standings','schedule','games']);
+  assert.deepEqual(requests.map(item=>item.body.name),['standings','playoffs','schedule']);
 
   requests.length=0;
   await upsertDiscordGuildCommands({
@@ -331,7 +395,7 @@ test('global command registration upserts by name without bulk replacement',asyn
     DISCORD_CLIENT_ID:'100000000000000009',DISCORD_BOT_TOKEN:'secret'
   },DISCORD_GLOBAL_COMMANDS.slice(0,3),{fetchImpl:ensureFetch});
   assert.deepEqual(requests.map(item=>[item.method,item.body?.name||null]),[
-    ['POST','standings'],['POST','schedule'],['POST','games']
+    ['POST','standings'],['POST','playoffs'],['POST','schedule']
   ]);
 });
 
@@ -430,12 +494,12 @@ test('/games separates played and unplayed matchups for the active scheduled wee
     seedMember(database,{leagueId:'league-a'});
     const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:13});
     database.prepare(`UPDATE league_snapshot_records SET data_json=? WHERE snapshot_id=? AND domain='games'`).run(JSON.stringify({
-      external_id:'game-final',season_year:2026,stage:'regular-season',week_index:13,
+      external_id:'game-final',season_year:null,stage:'regular-season',week_index:13,
       away_team_external_id:'1002',home_team_external_id:'1001',status:'final',away_score:17,home_score:24
     }),snapshotId);
     seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'games',externalId:'game-open',data:{
-      external_id:'game-open',season_year:2026,stage:'regular-season',week_index:13,
-      away_team_external_id:'1001',home_team_external_id:'1002',status:'scheduled'
+      external_id:'game-open',season_year:null,stage:'regular-season',week_index:13,
+      away_team_external_id:'1001',home_team_external_id:'1002',status:'1',away_score:0,home_score:0
     }});
     const db=d1(database),key=await signingKey();
     const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
@@ -476,6 +540,55 @@ test('/trade create resolves the selected registered Discord owner to the author
     assert.match(payload.data.content,/sent to San Francisco 49ers/i);
     assert.deepEqual(database.prepare(`SELECT team_key AS teamKey FROM trade_workflow_participants ORDER BY team_key`).all().map(row=>row.teamKey),['sf','tb']);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_assets`).get().count,2);
+    assert.deepEqual(database.prepare(`SELECT notification_type AS type,user_id AS userId FROM league_notifications ORDER BY type`).all().map(row=>({...row})),[
+      {type:'received',userId:'owner-sf'},{type:'sent',userId:'user-a'}
+    ]);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM discord_delivery_events`).get().count,2);
+  }finally{database.close()}
+});
+
+test('/trade-block add and remove are private, roster-authorized, and use player autocomplete',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedDiscordStatFixture(database,{leagueId:'league-a'});
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name)
+      VALUES ('identity-chase','league-a','chase-runner','Chase Runner')`).run();
+    database.prepare(`INSERT INTO player_source_aliases
+      (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id)
+      VALUES ('league-a','madden-companion','franchise-a','chase-rb','identity-chase','season-a','season-a')`).run();
+    const db=d1(database),key=await signingKey();
+    const autocomplete=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000076',name:'trade-block',type:4,options:[{type:1,name:'add',options:[
+        {type:3,name:'player',value:'Chase',focused:true}
+      ]}]
+    })}));
+    assert.deepEqual((await autocomplete.json()).data.choices,[{
+      name:'Chase Runner · HB · 87 OVR',value:'chase-rb'
+    }]);
+    const added=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000077',name:'trade-block',options:[{type:1,name:'add',options:[
+        {type:3,name:'player',value:'chase-rb'},{type:3,name:'looking-for',value:'Young corner or a pick'}
+      ]}]
+    })}));
+    const addedPayload=await added.json();
+    assert.equal(addedPayload.data.flags,64);
+    assert.match(addedPayload.data.content,/added to the Trade Block/);
+    assert.deepEqual({...database.prepare(`SELECT active,requested_return AS requestedReturn FROM trade_block_listings`).get()}, {
+      active:1,requestedReturn:'Young corner or a pick'
+    });
+    const removed=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000078',name:'trade-block',options:[{type:1,name:'remove',options:[
+        {type:3,name:'player',value:'chase-rb'}
+      ]}]
+    })}));
+    assert.equal((await removed.json()).data.flags,64);
+    assert.equal(database.prepare(`SELECT active FROM trade_block_listings`).get().active,0);
   }finally{database.close()}
 });
 
@@ -493,11 +606,11 @@ test('Discord statistics are season-cumulative, team-scoped, and expose every po
     const teamPayload=await teamResponse.json();
     assert.equal(teamPayload.data.embeds[0].title,'Tampa Bay Buccaneers Team Statistics');
     const teamFields=teamPayload.data.embeds[0].fields.map(field=>field.value).join(' ');
-    assert.match(teamFields,/Pass Yds:\*\* 250/);
-    assert.match(teamFields,/Pass TDs:\*\* 3/);
+    assert.match(teamFields,/Pass Yds:\*\* 400/);
+    assert.match(teamFields,/Pass TDs:\*\* 5/);
     assert.match(teamFields,/3rd Down %:\*\* 50/);
-    assert.match(teamFields,/INTs:\*\* 2/);
-    assert.match(teamFields,/Red Zone Score % Allowed:\*\* 60%/);
+    assert.match(teamFields,/INTs:\*\* 3/);
+    assert.match(teamFields,/Red Zone Score % Allowed:\*\* 57\.1%/);
     assert.doesNotMatch(teamFields,/999/);
 
     const leaders=await discordInteractions(await signedContext({db,key,interaction:interaction({
@@ -651,6 +764,51 @@ test('a live import creates the complete new schedule before removing prior Fran
       WHERE league_id='league-a' ORDER BY week_index`).all().map(row=>({...row})),[
       {week:13,status:'archived'},{week:14,status:'active'}
     ]);
+  }finally{database.close()}
+});
+
+test('a repeated same-week import reuses the matchup thread even when Madden changes the external game id',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a',userId:'commissioner-a',discordId:'100000000000000011',teamId:'tb',role:'commissioner'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    database.prepare(`UPDATE discord_league_installations SET schedule_channel_id='100000000000000055' WHERE league_id='league-a'`).run();
+    const db=d1(database),requests=[],league={id:'league-a',slug:'alpha',name:'Alpha League'};
+    let messageId=87;
+    const fetchImpl=async(url,options={})=>{
+      requests.push({url:String(url),method:options.method||'GET'});
+      if(/\/messages$/.test(String(url))){messageId+=1;return new Response(JSON.stringify({id:`1000000000000000${messageId}`}),{status:200,headers:{'content-type':'application/json'}})}
+      return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    const original=seedActiveWeek(database,{leagueId:'league-a',week:14});
+    assert.equal((await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:original,source:'candidate-import',fetchImpl
+    })).created,1);
+
+    const replacement='snapshot-league-a-14-replacement';
+    database.prepare(`INSERT INTO league_snapshots
+      (id,league_id,status,season_year,week_index,team_count,game_count,manifest_json,validation_status)
+      VALUES (?,'league-a','active',2026,14,2,1,'{}','ready')`).run(replacement);
+    database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json)
+      SELECT ?,league_id,domain,external_id,data_json FROM league_snapshot_records
+      WHERE snapshot_id=? AND domain='teams'`).run(replacement,original);
+    seedSnapshotRecord(database,{snapshotId:replacement,leagueId:'league-a',domain:'games',externalId:'madden-renumbered-game',data:{
+      external_id:'madden-renumbered-game',season_year:2026,stage:'regular-season',week_index:14,
+      away_team_external_id:'1002',home_team_external_id:'1001',status:'scheduled'
+    }});
+    database.prepare(`UPDATE league_active_snapshots SET snapshot_id=? WHERE league_id='league-a'`).run(replacement);
+    const repeated=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:replacement,source:'candidate-import',fetchImpl
+    });
+    assert.equal(repeated.ok,true);
+    assert.equal(repeated.created,0);
+    assert.equal(requests.filter(request=>/\/messages$/.test(request.url)).length,1);
+    assert.deepEqual({...database.prepare(`SELECT COUNT(*) AS count,game_external_id AS gameId,snapshot_id AS snapshotId,status
+      FROM discord_schedule_threads WHERE league_id='league-a' AND week_index=14`).get()}, {
+      count:1,gameId:'madden-renumbered-game',snapshotId:replacement,status:'active'
+    });
   }finally{database.close()}
 });
 
@@ -908,5 +1066,66 @@ test('durable trade delivery opens a DM and includes the private response comman
     assert.match(requests[1].body.content,/\/trade accept trade:trade-a/);
     assert.match(requests[1].body.content,/\/leagues\/alpha#trade-center\/trade-a/);
     assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE idempotency_key='league-notification:notice-delivery'`).get().status,'sent');
+  }finally{database.close()}
+});
+
+test('trade delivery sends both owners linked player details and an explicitly estimated cap impact',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:14});
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    const players=[
+      ['identity-tb','public-tb','source-tb','Tristan Example','1001','LT',95,27,'Superstar',12500],
+      ['identity-sf','public-sf','source-sf','George Example','1002','TE',97,29,'X-Factor',14750]
+    ];
+    players.forEach(([identityId,publicId,sourceId,name,teamId,position,overall,age,development,capHit])=>{
+      database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,'league-a',?,?)`).run(identityId,publicId,name);
+      database.prepare(`INSERT INTO player_source_aliases
+        (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id)
+        VALUES ('league-a','madden-companion','franchise-a',?,?, 'season-a','season-a')`).run(sourceId,identityId);
+      seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'players',externalId:sourceId,data:{
+        external_id:sourceId,team_external_id:teamId,display_name:name,position,overall,age,development_trait:development,capHit
+      }});
+    });
+    database.prepare(`INSERT INTO trade_workflows
+      (id,league_id,franchise_season_id,status,revision,mutation_token,proposer_user_id,proposer_team_key,review_threshold)
+      VALUES ('trade-rich','league-a','season-a','negotiating',1,'token','user-a','tb',3)`).run();
+    database.prepare(`INSERT INTO trade_workflow_participants (trade_id,league_id,team_key) VALUES ('trade-rich','league-a','tb')`).run();
+    database.prepare(`INSERT INTO trade_workflow_participants (trade_id,league_id,team_key) VALUES ('trade-rich','league-a','sf')`).run();
+    database.prepare(`INSERT INTO trade_workflow_assets
+      (id,trade_id,league_id,revision,asset_type,player_identity_id,source_player_id,from_team_key,to_team_key,ordinal)
+      VALUES ('asset-tb','trade-rich','league-a',1,'player','identity-tb','source-tb','tb','sf',0)`).run();
+    database.prepare(`INSERT INTO trade_workflow_assets
+      (id,trade_id,league_id,revision,asset_type,player_identity_id,source_player_id,from_team_key,to_team_key,ordinal)
+      VALUES ('asset-sf','trade-rich','league-a',1,'player','identity-sf','source-sf','sf','tb',1)`).run();
+    database.prepare(`INSERT INTO league_notifications
+      (id,league_id,user_id,trade_id,notification_type,title,message) VALUES
+      ('notice-sent','league-a','user-a','trade-rich','sent','Trade sent','Your offer was sent.')`).run();
+    database.prepare(`INSERT INTO league_notifications
+      (id,league_id,user_id,trade_id,notification_type,title,message) VALUES
+      ('notice-received','league-a','owner-sf','trade-rich','received','Trade received','You received an offer.')`).run();
+    const requests=[];
+    const fetchImpl=async(url,options={})=>{
+      const body=options.body?JSON.parse(options.body):null;requests.push({url:String(url),method:options.method,body});
+      if(String(url).endsWith(['','users','@me','channels'].join('/')))return new Response(`{"id":"${body.recipient_id}88"}`,{status:200,headers:{'content-type':'application/json'}});
+      return new Response('{"id":"message-a"}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    const result=await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},d1(database),{leagueId:'league-a',limit:10,fetchImpl});
+    assert.deepEqual(result,{sent:2,failed:0,skipped:false});
+    const messages=requests.filter(request=>/\/messages$/.test(request.url));
+    assert.equal(messages.length,2);
+    for(const request of messages){
+      const details=request.body.embeds[0].fields.map(field=>field.value).join('\n');
+      assert.match(details,/\[Tristan Example\].*LT.*95 OVR.*Age 27.*Superstar Dev.*\$12,500,000/s);
+      assert.match(details,/\[George Example\].*TE.*97 OVR.*Age 29.*X-Factor Dev.*\$14,750,000/s);
+      assert.match(details,/Estimate excludes Madden dead-cap and bonus acceleration effects/);
+      assert.doesNotMatch(request.body.content,/^https:\/\//m);
+    }
   }finally{database.close()}
 });

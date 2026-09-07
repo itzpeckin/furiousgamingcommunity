@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.9",
+  "validatedOn": "2026-09-07",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "strictRepositoryGate": {
+    "passed": true,
+    "javascriptModules": 253,
+    "inventoryEntries": 595,
+    "routes": 76,
+    "passedTests": 201,
+    "failedTests": 0
+  },
+  "completeRepositorySuite": {
+    "passed": true,
+    "passedTests": 204,
+    "failedTests": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 35,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "discordCommandInventory": {
+      "passed": true,
+      "commandCount": 36,
+      "experienceCommands": 18,
+      "weeklyCommands": 18,
+      "playoffsCommandAdded": true,
+      "legacyCommandsRetiredByExactNameOnly": true
+    },
+    "standingsAndPlayoffs": {
+      "passed": true,
+      "divisionAllTeamCount": 32,
+      "conferenceAllTeamCount": 32,
+      "specificTeamCount": 1,
+      "specificDivisionTeamCount": 4,
+      "playoffTeamsPerConference": 10,
+      "seededTeamsPerConference": 7,
+      "inTheHuntTeamsPerConference": 3
+    },
+    "productionShapeGameAndStatisticHandling": {
+      "passed": true,
+      "nullSeasonPreserved": true,
+      "nullSeasonRowsEligibleForActiveContext": true,
+      "scheduledZeroScoreIsUnplayed": true,
+      "explicitFinalStatusAuthoritative": true,
+      "websiteTeamGameRowsAggregated": true,
+      "derivedRatesNotSummed": true,
+      "preseasonExcluded": true,
+      "crossTeamMixingPrevented": true
+    },
+    "scheduleThreadLifecycle": {
+      "passed": true,
+      "sameWeekStableGameIdReused": true,
+      "sameWeekChangedGameIdMatchupReused": true,
+      "nextWeekCreatedBeforePriorWeekRemoval": true,
+      "failedReplacementPreservesPriorWeek": true
+    },
+    "discordLinks": {
+      "passed": true,
+      "canonicalNamedLinks": true,
+      "rawFranchiseHqUrlsRemovedFromMemberResults": true
+    },
+    "tradeMessaging": {
+      "passed": true,
+      "senderNotified": true,
+      "recipientNotified": true,
+      "privateDirectMessages": true,
+      "linkedPlayerDetails": true,
+      "projectedDraftPickSupported": true,
+      "capEstimateLabeled": true,
+      "deadCapPrecisionClaimed": false
+    },
+    "tradeBlockCommands": {
+      "passed": true,
+      "viewPublicByDefault": true,
+      "addAndRemovePrivate": true,
+      "activeRosterAuthority": true,
+      "listedPlayerRemovalScope": true,
+      "lookingForOptional": true
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "productionProtectedState": {
+    "observedReadOnly": true,
+    "database": "franchise-hq-db-madden27",
+    "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+    "migrationVersion": 35,
+    "leagues": 1,
+    "users": 30,
+    "memberships": 30,
+    "activeTeamAssignments": 28,
+    "activeSnapshotRows": 1,
+    "activeSnapshotId": "23dd264d-d8e9-4643-9c41-e37f039ab27d",
+    "activeSeasonYear": 2026,
+    "activeWeek": 14,
+    "activeTeams": 32,
+    "activeRosteredPlayers": 2036,
+    "activeGames": 256,
+    "activeStatistics": 10828,
+    "activeStandings": 32,
+    "retainedSnapshots": 16,
+    "activeDiscordInstallations": 1,
+    "activeScheduleThreads": 15,
+    "productionRowsWritten": 0
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordCredentialsChanged": false,
+    "discordGuildInstalled": false,
+    "discordLeagueConfigured": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 35,
+      "candidateMigration": 35
+    },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "not-run",
+      "currentRelease": "7.4.4.8"
+    },
+    "discordRegistration": {
+      "authorized": false,
+      "status": "not-run",
+      "scope": "global",
+      "commandsPrepared": 36
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { resolveMaddenPeriod } from './madden-period.js';
 
 export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'same-season-complete-periods-v1';
-export const MADDEN_DISCOVERY_RELEASE = '7.4.4.8';
+export const MADDEN_DISCOVERY_RELEASE = '7.4.4.9';
 
 const DATASET_ORDER = Object.freeze([
   'league-info',

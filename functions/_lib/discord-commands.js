@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.4.4.8';
+export const DISCORD_COMMAND_RELEASE = '7.4.4.9';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -47,6 +47,13 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
     ]
   },
   {
+    name:'playoffs',description:'View the top 10 teams in each conference by current playoff seed.',
+    options:[
+      autocompleteString('conference','All conferences, AFC, or NFC.'),
+      privateOption
+    ]
+  },
+  {
     name:'schedule',description:'View the schedule for a week or team.',
     options:[
       autocompleteString('view','Team or week, such as Buccaneers or Week 12.'),
@@ -85,11 +92,20 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
     ]
   },
   {
-    name:'trade-block',description:'View the current league Trade Block and team needs.',
+    name:'trade-block',description:'View or manage your league Trade Block.',
     options:[
-      autocompleteString('team','Optional team name or abbreviation.'),
-      {type:OPTION.STRING,name:'position',description:'Optional player position.'},
-      privateOption
+      {type:OPTION.SUB_COMMAND,name:'view',description:'View current Trade Block listings and team needs.',options:[
+        autocompleteString('team','Optional team name or abbreviation.'),
+        {type:OPTION.STRING,name:'position',description:'Optional player position.'},
+        privateOption
+      ]},
+      {type:OPTION.SUB_COMMAND,name:'add',description:'Add one player from your roster to the Trade Block.',options:[
+        autocompleteString('player','Player on your active FranchiseHQ roster.',{required:true}),
+        {type:OPTION.STRING,name:'looking-for',description:'Optional note describing the return you want.'}
+      ]},
+      {type:OPTION.SUB_COMMAND,name:'remove',description:'Remove one of your players from the Trade Block.',options:[
+        autocompleteString('player','Player currently listed by your team.',{required:true})
+      ]}
     ]
   },
   {
@@ -229,6 +245,7 @@ export function discordInteractionIsPrivate(interaction = {}) {
   const {subcommand, values} = discordCommandOptions(interaction);
   if (values.private === true) return true;
   if (['join','confidence','trade'].includes(command)) return true;
+  if (command === 'trade-block' && subcommand !== 'view') return true;
   if (discordScheduleThreadWeek(command)) return true;
   if (command === 'twitch' && subcommand === 'set') return true;
   return false;

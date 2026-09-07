@@ -78,6 +78,28 @@ async function playerChoices(c,query,{teamKey=null}={}){
   }));
 }
 
+async function tradeBlockPlayerChoices(c,query,{listedOnly=false}={}){
+  const teams=await teamsFor(c),own=resolveTeam(teams,c.membership?.teamId)?.teamKey;
+  if(!own)return[];
+  const model=await discordLeagueReadModel(c,{domains:['teams','players']});
+  let allowed=null;
+  if(listedOnly){
+    const result=(await c.db.prepare(`SELECT identity.public_id AS publicId
+      FROM trade_block_listings listing
+      JOIN player_identities identity ON identity.id=listing.player_identity_id AND identity.league_id=listing.league_id
+      WHERE listing.league_id=? AND listing.team_key=? AND listing.asset_type='player' AND listing.active=1
+      ORDER BY lower(identity.display_name)`).bind(c.league.id,own).all()).results||[];
+    allowed=new Set(result.map(item=>String(item.publicId||'')));
+  }
+  return uniqueChoices(model.players.filter(player=>{
+    const team=resolveTeam(model.teams,player.teamId);
+    return team?.teamKey===own&&(!allowed||allowed.has(String(player.publicId||'')))
+      &&matches(`${player.displayName} ${player.position}`,query);
+  }).sort((a,b)=>lower(a.displayName).localeCompare(lower(b.displayName))).map(player=>
+    choice(`${player.displayName} · ${player.position||'—'} · ${player.overall??'—'} OVR`,player.publicId||player.id)
+  ));
+}
+
 async function assetChoices(c,query,{teamKey}={}){
   if(!canonicalTeamKey(teamKey))return[];
   const players=await playerChoices(c,query,{teamKey});
@@ -103,6 +125,15 @@ async function standingsChoices(c,query){
     ...teams.map(team=>choice(`Team · ${team.displayName}${team.abbreviation?` (${team.abbreviation})`:''}`,`team:${team.teamKey}`))
   ];
   return uniqueChoices(candidates.filter(item=>matches(`${item.name} ${item.value}`,query)));
+}
+
+async function playoffChoices(c,query){
+  const teams=await teamsFor(c);
+  const conferences=[...new Set(teams.map(team=>clean(team.conferenceName)).filter(Boolean))].sort();
+  return uniqueChoices([
+    choice('All conferences · top 10 each','all'),
+    ...conferences.map(name=>choice(`${name} · top 10`,name))
+  ].filter(item=>matches(`${item.name} ${item.value}`,query)));
 }
 
 async function scheduleChoices(c,query){
@@ -163,6 +194,7 @@ export async function discordAutocompleteChoices(c){
   if(!focused)return [];
   const query=lower(focused.value),name=focused.name;
   if(command==='standings'&&name==='view')return standingsChoices(c,query);
+  if(command==='playoffs'&&name==='conference')return playoffChoices(c,query);
   if(command==='schedule'&&name==='view')return scheduleChoices(c,query);
   if(command==='player'&&name==='name')return playerChoices(c,query);
   if(command==='team'&&name==='name')return teamChoices(c,query);
@@ -171,7 +203,10 @@ export async function discordAutocompleteChoices(c){
   if(command==='stats'&&name==='name')return lower(values.target)==='team'?teamChoices(c,query):playerChoices(c,query);
   if(command==='leaders'&&name==='metric')return uniqueChoices((METRICS[lower(values.category)||'passing']||[])
     .filter(([label,value])=>matches(`${label} ${value}`,query)).map(([label,value])=>choice(label,value)));
-  if(command==='trade-block'&&name==='team')return teamChoices(c,query);
+  if(command==='trade-block'&&subcommand==='view'&&name==='team')return teamChoices(c,query);
+  if(command==='trade-block'&&['add','remove'].includes(subcommand)&&name==='player'){
+    return tradeBlockPlayerChoices(c,query,{listedOnly:subcommand==='remove'});
+  }
   if(command==='gm-history'&&name==='name')return gmChoices(c,query);
   if(command==='rules'&&name==='query')return ruleChoices(c,query);
   if(command==='trade'&&subcommand==='create'&&['owner','opponent'].includes(name))return ownerChoices(c,query);

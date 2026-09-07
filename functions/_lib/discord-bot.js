@@ -8,6 +8,7 @@ import {
   newsCommand,
   playerCommand,
   playerStatsCommand,
+  playoffsCommand,
   rulesCommand,
   scheduleCommand,
   standingsCommand,
@@ -61,7 +62,7 @@ async function setTwitch(c,value){
     tenantAuditStatement(c.db,audit,{resourceType:'user_stream_profile',resourceId:c.user.id,
       detail:{source:'discord-command',selfService:true}})
   ]);
-  return `Your Twitch channel is now **https://www.twitch.tv/${normalized}**.`;
+  return `Your Twitch channel is now **[@${normalized} on Twitch](https://www.twitch.tv/${normalized})**.`;
 }
 
 async function clearTwitch(c,discordUserId){
@@ -139,7 +140,24 @@ async function createTrade(c,values){
   const result=await executeTradeCenterAction({...c,request:requestForAudit(c.interaction)},{
     action:'propose',transfers,note:clean(values.note,2000)
   });
-  return `Trade **${result.tradeId}** was sent to ${opponent.displayName}.\nhttps://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-center/${encodeURIComponent(result.tradeId)}`;
+  return `Trade **${result.tradeId}** was sent to ${opponent.displayName}.\n[Review or revise this trade in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-center/${encodeURIComponent(result.tradeId)})`;
+}
+
+async function tradeBlockAction(c,subcommand,values){
+  if(!subcommand||subcommand==='view')return tradeBlockCommand(c,values);
+  requireDiscordTeam(c);
+  c.teams=await activeLeagueTeams(c.db,c.league.id);
+  if(!['add','remove'].includes(subcommand))throw Object.assign(new Error('Choose View, Add, or Remove.'),{status:400});
+  const player=clean(values.player,160);
+  if(!player)throw Object.assign(new Error('Choose a player from your active roster.'),{status:400});
+  await executeTradeCenterAction({...c,request:requestForAudit(c.interaction)}, {
+    action:'trade-block',assetType:'player',assetId:player,active:subcommand==='add',
+    requestedReturn:clean(values['looking-for'],1000)
+  });
+  const href=`https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#players/${encodeURIComponent(player)}`;
+  return subcommand==='add'
+    ?`**[Player added to the Trade Block](${href})**${values['looking-for']?`\nLooking for: ${clean(values['looking-for'],1000)}`:''}`
+    :`**[Player removed from the Trade Block](${href})**`;
 }
 
 async function currentTradeMutation(c,tradeId){
@@ -215,9 +233,10 @@ export async function executeDiscordCommand(c){
   }
   if(command==='join'){
     await joinDiscordLeague(c,requestForAudit(c.interaction));
-    return `Welcome to **${c.league.name}**. Your FranchiseHQ access is active but unassigned. A commissioner must assign a team before team and trade actions are available.\nhttps://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}`;
+    return `Welcome to **${c.league.name}**. Your FranchiseHQ access is active but unassigned. A commissioner must assign a team before team and trade actions are available.\n[Open ${c.league.name} in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)})`;
   }
   if(command==='standings')return standingsCommand(c,values);
+  if(command==='playoffs')return playoffsCommand(c,values);
   if(command==='schedule')return scheduleCommand(c,values);
   if(command==='games')return gamesCommand(c,values);
   if(command==='stats')return statsCommand(c,values);
@@ -226,11 +245,11 @@ export async function executeDiscordCommand(c){
   if(command==='leaders')return leadersCommand(c,values);
   if(command==='player')return playerCommand(c,values);
   if(command==='team')return teamStatsCommand(c,{...values,team:values.name});
-  if(command==='trade-block')return tradeBlockCommand(c,values);
+  if(command==='trade-block')return tradeBlockAction(c,subcommand,values);
   if(command==='trade-history')return tradeHistoryCommand(c);
   if(command==='news')return newsCommand(c);
   if(command==='gotw')return gotwCommand(c,values);
-  if(command==='league-site')return `**${c.league.name}**\nhttps://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}`;
+  if(command==='league-site')return `**[Open ${c.league.name} in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)})**`;
   if(command==='gm-history')return gmHistoryCommand(c,values);
   if(command==='rules')return rulesCommand(c,values);
   if(command==='twitch'){
@@ -240,7 +259,7 @@ export async function executeDiscordCommand(c){
   }
   if(command==='confidence')return confidenceAction(c,subcommand,values);
   if(command==='trade'){
-    if(subcommand==='multi-team')return `Open the private FranchiseHQ multi-team composer for **${c.league.name}**:\nhttps://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-center/multi-new`;
+    if(subcommand==='multi-team')return `Open the private [${c.league.name} multi-team trade composer](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-center/multi-new).`;
     if(subcommand==='create')return createTrade(c,values);
     if(['accept','reject'].includes(subcommand))return respondToTrade(c,subcommand,values);
     if(subcommand==='review')return reviewTrade(c,values);

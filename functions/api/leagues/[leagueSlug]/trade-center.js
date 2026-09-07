@@ -312,8 +312,9 @@ async function propose(c, body, draft = false) {
     (id,trade_id,league_id,author_user_id,event_type,message,created_at) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)`)
     .bind(`trade_message_${crypto.randomUUID()}`,tradeId,c.league.id,c.session.user.id,draft?'draft-saved':'proposed',cleanText(body.note) || (draft?'Trade draft saved.':'Trade proposed.')));
   if(!draft){
-    const users=await participantUserIds(c.db,c.league.id,prepared.participants.filter(team=>team!==ownTeam));
-    statements.push(...await notificationStatements(c.db,c.league.id,tradeId,users,'received','Trade offer received',`${ownTeam.toUpperCase()} sent your team a trade offer.`));
+    const recipients=await participantUserIds(c.db,c.league.id,prepared.participants.filter(team=>team!==ownTeam));
+    statements.push(...await notificationStatements(c.db,c.league.id,tradeId,recipients,'received','Trade offer received',`${ownTeam.toUpperCase()} sent your team a trade offer.`));
+    statements.push(...await notificationStatements(c.db,c.league.id,tradeId,[c.session.user.id],'sent','Trade offer sent',`Your trade offer was sent for negotiation.`));
   }
   const audit=createTenantAuditContext({request:c.request},c.league,c.session,draft?'trade_draft_saved':'trade_proposed');
   statements.push(tenantAuditStatement(c.db,audit,{resourceType:'trade_workflow',resourceId:tradeId,detail:{draft,participants:prepared.participants,assetCount:prepared.assets.length}}));
@@ -355,7 +356,10 @@ async function counter(c, body, row, participants) {
   const results=await c.db.batch(statements);
   if(Number(results?.[0]?.meta?.changes||0)!==1)throw Object.assign(new Error('This trade changed in another session. Refresh before revising it.'),{status:409});
   const users=await participantUserIds(c.db,c.league.id,prepared.participants.filter(team=>team!==ownTeam));
-  const notifications=await notificationStatements(c.db,c.league.id,row.id,users,'received','Revised trade offer',`${ownTeam.toUpperCase()} revised the trade offer.`);
+  const notifications=[
+    ...await notificationStatements(c.db,c.league.id,row.id,users,'received','Revised trade offer',`${ownTeam.toUpperCase()} revised the trade offer.`),
+    ...await notificationStatements(c.db,c.league.id,row.id,[c.session.user.id],'sent','Revised trade sent','Your revised trade offer was sent for negotiation.')
+  ];
   if(notifications.length)await c.db.batch(notifications);
 }
 
