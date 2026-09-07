@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.10",
+  "validatedOn": "2026-09-07",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {"unregisteredFailures": 0},
+  "strictRepositoryGate": {
+    "passed": true,
+    "javascriptModules": 253,
+    "inventoryEntries": 595,
+    "routes": 76,
+    "passedTests": 201,
+    "failedTests": 0
+  },
+  "completeRepositorySuite": {"passed": true,"passedTests": 204,"failedTests": 0},
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 35,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "tradeBlockPlayerCards": {
+      "passed": true,
+      "sharedPlayerCardAdapter": true,
+      "individualPlayerEmbeds": true,
+      "canonicalNamedLinks": true,
+      "teamAndPositionShown": true,
+      "overallShown": true,
+      "ageShown": true,
+      "developmentShown": true,
+      "positionStatisticsShown": true,
+      "lookingForPreserved": true,
+      "identityAliasFallback": true,
+      "discordEmbedLimitHonored": true,
+      "completeWebTradeBlockLinked": true
+    },
+    "discordCommandSchema": {"passed": true,"changed": false,"globalRegistrationRequired": false},
+    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false}
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordCredentialsChanged": false,
+    "discordGuildInstalled": false,
+    "discordLeagueConfigured": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {"authorized": false,"status": "not-run"},
+    "hostedChecks": {"authorized": false,"status": "not-run"},
+    "productionMigration": {"authorized": false,"status": "not-required","currentMigration": 35,"candidateMigration": 35},
+    "productionDeployment": {"authorized": false,"status": "not-run","currentRelease": "7.4.4.9"},
+    "discordRegistration": {"authorized": false,"status": "not-required","commandSchemaChanged": false}
+  }
+}

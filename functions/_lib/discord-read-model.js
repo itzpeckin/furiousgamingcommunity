@@ -628,21 +628,51 @@ export async function tradeBlockCommand(c,values){
     const team=resolveTeam(state.teams,item.teamKey);
     return [item.teamKey,team?.displayName,team?.abbreviation].some(value=>lower(value).includes(teamQuery));
   });
-  const model=await discordLeagueReadModel(c,{domains:['players']});
-  const playerByPublicId=new Map(model.players.map(player=>[String(player.publicId||''),player]));
-  if(position)listings=listings.filter(item=>lower(playerByPublicId.get(String(item.playerPublicId||''))?.position).includes(position));
+  const model=await discordLeagueReadModel(c,{domains:['teams','players','statistics']});
+  const playerByKey=new Map();
+  for(const player of model.players){
+    for(const key of [player.publicId,player.id,player.sourcePlayerId]){
+      if(key!==null&&key!==undefined&&String(key))playerByKey.set(String(key),player);
+    }
+  }
+  const aliases=await rows(c.db,`SELECT player_identity_id AS playerIdentityId,source_player_id AS sourcePlayerId
+    FROM player_source_aliases WHERE league_id=? ORDER BY updated_at DESC`,c.league.id);
+  const sourceByIdentity=new Map();
+  for(const alias of aliases){
+    const identityId=String(alias.playerIdentityId||'');
+    if(identityId&&!sourceByIdentity.has(identityId))sourceByIdentity.set(identityId,String(alias.sourcePlayerId||''));
+  }
+  const listedPlayer=item=>playerByKey.get(String(item.playerPublicId||''))
+    ||playerByKey.get(sourceByIdentity.get(String(item.playerIdentityId||'')))
+    ||playerByKey.get(String(item.playerIdentityId||''));
+  if(position)listings=listings.filter(item=>lower(listedPlayer(item)?.position).includes(position));
   const needs=new Map(state.teamNeeds.map(item=>[item.teamKey,item.needs]));
   if(!listings.length)return lines(`${c.league.name} · Trade Block`,[],'No matching players are currently listed.');
-  const fields=listings.slice(0,25).map(item=>{
-    const player=playerByPublicId.get(String(item.playerPublicId||''));
-    const href=player?`https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#players/${encodeURIComponent(player.publicId||player.id)}`:null;
+  const shown=listings.slice(0,10);
+  const embeds=shown.map(item=>{
+    const player=listedPlayer(item);
     const looking=item.requestedReturn||needs.get(item.teamKey)?.join(', ')||'Open to offers';
-    return {name:href?`[${item.playerName||'Trade asset'}](${href})`:item.playerName||item.draftPickId||'Trade asset',
-      value:[teamName(state.teams,item.teamKey),player?.position,player?.overall!=null?`${player.overall} OVR`:null,player?.age!=null?`Age ${player.age}`:null,player?.devTrait?`${player.devTrait} Dev`:null,`Looking for: ${looking}`].filter(Boolean).join(' · '),inline:false};
+    if(player){
+      const embed=playerStatEmbed(c,model,player);
+      return {...embed,fields:[
+        ...embed.fields.slice(0,3),
+        {name:'Looking For',value:truncate(looking,1000),inline:false},
+        ...embed.fields.slice(3)
+      ].slice(0,25)};
+    }
+    const team=resolveTeam(model.teams,item.teamKey)||resolveTeam(state.teams,item.teamKey);
+    return {
+      title:item.playerName||item.draftPickId||'Trade asset',
+      color:embedColor(team?.primaryColor),
+      description:team?.displayName||teamName(state.teams,item.teamKey),
+      fields:[{name:'Looking For',value:truncate(looking,1000),inline:false}],
+      footer:{text:`${c.league.name} · Trade Block`}
+    };
   });
-  return {content:`**${c.league.name} · Trade Block** · ${listings.length} listed${listings.length>25?' · first 25 shown':''} · [Open Trade Block](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-block)`,embeds:[{
-    title:'League Trade Block',color:0x4f8cff,fields,footer:{text:'Player names open the canonical FranchiseHQ Player Card.'}
-  }]};
+  return {
+    content:`**${c.league.name} · Trade Block** · ${listings.length} listed${listings.length>shown.length?` · first ${shown.length} shown`:''} · [Open Trade Block](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-block)`,
+    embeds
+  };
 }
 
 export async function tradeHistoryCommand(c){
