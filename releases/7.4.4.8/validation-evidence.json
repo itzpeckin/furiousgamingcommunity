@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.8",
   "validatedOn": "2026-09-06",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -128,8 +128,16 @@
   },
   "productionProtectedState": {
     "observedReadOnly": true,
+    "verifiedReadOnlyAfterDeployment": true,
     "database": "franchise-hq-db-madden27",
     "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+    "migrationVersion": 35,
+    "leagues": 1,
+    "users": 30,
+    "memberships": 30,
+    "activeTeamAssignments": 28,
+    "legacySnapshots": 0,
+    "activeSnapshotRows": 1,
     "activeSnapshotId": "23dd264d-d8e9-4643-9c41-e37f039ab27d",
     "previousSnapshotId": "3f04ee6e-dbeb-4f27-a581-15b913ea85f3",
     "activeSnapshotActivatedAt": "2026-09-07 02:12:00",
@@ -141,22 +149,26 @@
     "activeStatistics": 10828,
     "activeStandings": 32,
     "validationStatus": "ready",
-    "validationWarnings": 2,
+    "validationWarnings": 3,
     "retainedSnapshots": 16,
+    "activeDiscordInstallations": 1,
+    "activeScheduleThreads": 15,
+    "exportTokenVersion": 1,
+    "exportRotatedAt": null,
     "foreignKeyViolations": 0,
     "productionRowsWritten": 0
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
-    "productionConfigurationChanged": false,
+    "productionConfigurationChanged": true,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
-    "discordCommandsRegistered": false,
+    "discordCommandsRegistered": true,
     "discordCredentialsChanged": false,
     "discordGuildInstalled": false,
     "discordLeagueConfigured": false,
@@ -176,15 +188,23 @@
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
-      "status": "not-run",
-      "pullRequest": null,
-      "candidateCommit": null,
-      "mergeCommit": null
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 51,
+      "candidateCommit": "32ec52d3f1b419def572dd755b4340a06ff7bda4",
+      "mergeCommit": "7b3437cbd6a7e32de18848ebb30b8b5a24ed3062"
     },
     "hostedChecks": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed",
+      "candidateChecksPassed": 4,
+      "candidateChecksTotal": 4,
+      "mainChecksPassed": 5,
+      "mainChecksTotal": 5,
+      "candidatePushQualityRun": 34080580004,
+      "candidateQualityRun": 34080626919,
+      "mainQualityRun": 34080736470,
+      "mainDeploymentRun": 34080735981
     },
     "stagingDeployment": {
       "authorized": false,
@@ -197,14 +217,56 @@
       "candidateMigration": 35
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.4.4.7"
+      "authorized": true,
+      "status": "deployed-command-reconciled-pending-owner-discord-acceptance",
+      "currentRelease": "7.4.4.8",
+      "mergeCommit": "7b3437cbd6a7e32de18848ebb30b8b5a24ed3062",
+      "initialPagesDeployment": "973b3766-f43d-4e7c-8ed2-6cfcd6cc0685",
+      "rateLimitedPagesAttempt": "6de308c8-bc2c-4c45-be5e-83e333ace697",
+      "pagesDeployment": "61657d1c-6e61-477d-b1c8-742b23d6dfa0",
+      "productionAlias": "franchisehq.app",
+      "workerCandidateBuild": "b9c6c6f6-5394-4c04-8ffd-f78a3afd8d15",
+      "workerPublicRoutesEnabled": false
     },
     "discordRegistration": {
-      "authorized": false,
-      "status": "not-run",
-      "scope": "global"
+      "authorized": true,
+      "status": "passed",
+      "scope": "global",
+      "applicationId": "1529715179733127219",
+      "commandsUpserted": 35,
+      "experienceCommands": 17,
+      "weeklyCommandsPreserved": 18,
+      "legacyCommandsRetired": [
+        "stats",
+        "player-stats",
+        "team-stats"
+      ],
+      "unownedCommandsPreserved": true,
+      "rateLimitRetried": true,
+      "encryptedTokenUsed": true,
+      "tokenReadOrChanged": false,
+      "guildInstallationChanged": false,
+      "leagueRoutingChanged": false
+    },
+    "productionConfiguration": {
+      "authorized": true,
+      "status": "one-time-command-hook-removed",
+      "temporaryPurpose": "global-discord-command-reconciliation",
+      "currentBuildCommand": "exit 0",
+      "futureDiscordReconciliationEnabled": false,
+      "credentialsChanged": false
     }
+  },
+  "productionHttpsAcceptance": {
+    "passed": true,
+    "release": "7.4.4.8",
+    "mergeCommit": "7b3437cbd6a7e32de18848ebb30b8b5a24ed3062",
+    "pagesDeployment": "61657d1c-6e61-477d-b1c8-742b23d6dfa0",
+    "productionAlias": "franchisehq.app",
+    "authenticatedCommissionerContext": true,
+    "activeSeasonYear": 2026,
+    "activeWeek": 14,
+    "activeSnapshotUnchanged": true,
+    "productionRowsWritten": 0
   }
 }

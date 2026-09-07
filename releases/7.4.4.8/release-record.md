@@ -2,7 +2,7 @@
 
 ## Scope
 
-Refine the global FranchiseHQ Discord experience around three direct actions: current-week game status, complete player/team statistics, and registered-owner trade creation. This is a code-only local candidate. It does not register commands, deploy an application, or mutate league data.
+Refine the global FranchiseHQ Discord experience around three direct actions: current-week game status, complete player/team statistics, and registered-owner trade creation. This is a code-only application release with an authorized global command reconciliation; it does not migrate or mutate league data.
 
 ## Added during delivery
 
@@ -23,10 +23,16 @@ Focused Discord tests cover the 35-command manifest, safe exact-name retirement,
 
 ## Deployment status
 
-Local implementation and validation only. GitHub publication, pull request, hosted checks, merge to Main, Production deployment, and global Discord command reconciliation have not been authorized or run. Migration 35 remains current and no candidate migration is required.
+Exact candidate `32ec52d3f1b419def572dd755b4340a06ff7bda4` was published through PR #51 after all four candidate checks passed. PR #51 merged to Main as `7b3437cbd6a7e32de18848ebb30b8b5a24ed3062`; all Main quality, build, and deployment checks passed. Initial Cloudflare Pages Production deployment `973b3766-f43d-4e7c-8ed2-6cfcd6cc0685` succeeded.
 
-Read-only verification against `franchise-hq-db-madden27` observed the commissioner-completed import at active snapshot `23dd264d-d8e9-4643-9c41-e37f039ab27d`, Season 2026 / Regular Season Week 14, with 32 teams, 2,036 rostered players, 256 games, 10,828 statistic records, 32 standings, 16 retained snapshots, and zero foreign-key violations. That import preceded and is outside this release's local changes; the verification wrote zero rows.
+The authorized global command reconciliation used the existing encrypted Production `DISCORD_BOT_TOKEN` without reading or changing it. Its first isolated Pages build attempt `6de308c8-bc2c-4c45-be5e-83e333ace697` received Discord HTTP 429 and stopped safely without replacing the live deployment. The bounded rate-limit retry succeeded in Pages deployment `61657d1c-6e61-477d-b1c8-742b23d6dfa0`: 35 current global FranchiseHQ commands were upserted, `/stats`, `/player-stats`, and `/team-stats` were retired by exact name, all 18 `/week1`–`/week18` commands were preserved, and no unowned command was bulk-deleted. The temporary registration build hook was removed; the Production build command is the documented no-op `exit 0`, so future deployments do not repeat command reconciliation.
+
+Authenticated live acceptance at `franchisehq.app` confirmed FranchiseHQ 7.4.4.8 in the existing FGC commissioner context at Season 2026 / Regular Season Week 14. Read-only verification against `franchise-hq-db-madden27` confirmed migration 35, one league, 30 users, 30 memberships, 28 active team assignments, one active pointer, 16 retained snapshots, and zero foreign-key violations. Active snapshot `23dd264d-d8e9-4643-9c41-e37f039ab27d` remains unchanged with 32 teams, 2,036 rostered players, 256 games, 10,828 statistic records, 32 standings, validation-ready status, and three retained warnings. The Discord installation, 15 active schedule threads, and token-version-1 permanent export endpoint also remain unchanged. Verification wrote zero database rows.
+
+## Owner acceptance
+
+Independent Discord behavior remains for the owner to confirm using `/games`, a partial search such as `/player Chase`, an exact team query such as `/team Buccaneers`, and `/trade create`. Those commands read the existing league state; this release did not invoke commands in the league server or create a trade.
 
 ## Rollback
 
-Return the code to exact source baseline `3b64d02b47853e9470bbe88185196a5a47588532`. Migration 35 remains current. Preserve the active snapshot, all retained snapshots and audits, the permanent export URL, memberships and assignments, Discord configuration, and blocked/null Free Agent evidence.
+Return the application code to exact source baseline `3b64d02b47853e9470bbe88185196a5a47588532`. If a Discord schema rollback is separately authorized, upsert the exact 7.4.4.7 owned-command definitions without bulk-deleting weekly or unowned commands. Migration 35 remains current. Preserve the active snapshot, all retained snapshots and audits, the permanent export URL, memberships and assignments, Discord configuration, and blocked/null Free Agent evidence.
