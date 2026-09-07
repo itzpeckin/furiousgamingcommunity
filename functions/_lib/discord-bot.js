@@ -3,12 +3,15 @@ import {
   confidenceViewCommand,
   gmHistoryCommand,
   gotwCommand,
+  leadersCommand,
   newsCommand,
   playerCommand,
+  playerStatsCommand,
   rulesCommand,
   scheduleCommand,
   standingsCommand,
   statsCommand,
+  teamStatsCommand,
   tradeBlockCommand,
   tradeHistoryCommand,
   twitchViewCommand
@@ -79,6 +82,11 @@ function splitAssets(value){
   return clean(value,1200).split(',').map(item=>item.trim()).filter(Boolean);
 }
 
+function selectedAssets(values,prefix,legacy){
+  const selected=Array.from({length:6},(_,index)=>clean(values[`${prefix}-${index+1}`],200)).filter(Boolean);
+  return selected.length?selected:splitAssets(values[legacy]);
+}
+
 async function resolveTradeAsset(c,token){
   const match=token.match(/^(player|pick)\s*:\s*(.+)$/i);
   if(!match)throw Object.assign(new Error(`Use player: or pick: before “${token}”.`),{status:400});
@@ -112,8 +120,8 @@ async function createTrade(c,values){
   const opponent=resolveTeam(c.teams,values.opponent);
   if(!own||!opponent)throw Object.assign(new Error('Choose a valid assigned team and opponent.'),{status:400});
   if(own.teamKey===opponent.teamKey)throw Object.assign(new Error('A trade requires another team.'),{status:400});
-  const outgoing=await Promise.all(splitAssets(values.send).map(token=>resolveTradeAsset(c,token)));
-  const incoming=await Promise.all(splitAssets(values.receive).map(token=>resolveTradeAsset(c,token)));
+  const outgoing=await Promise.all(selectedAssets(values,'send','send').map(token=>resolveTradeAsset(c,token)));
+  const incoming=await Promise.all(selectedAssets(values,'receive','receive').map(token=>resolveTradeAsset(c,token)));
   if(!outgoing.length||!incoming.length)throw Object.assign(new Error('Both teams must send at least one player or pick.'),{status:400});
   const transfers=[
     ...outgoing.map((asset,index)=>({...asset,fromTeamKey:own.teamKey,toTeamKey:opponent.teamKey,ordinal:index})),
@@ -185,7 +193,7 @@ export async function executeDiscordCommand(c){
   const legacyWeek=discordScheduleThreadWeek(command);
   if(legacyWeek){
     requireDiscordRole(c,'commissioner');
-    const channelId=String(c.interaction?.channel_id||'').trim();
+    const channelId=String(c.installation?.scheduleChannelId||c.interaction?.channel_id||'').trim();
     const result=await syncDiscordScheduleThreads(c.env,c.db,{
       league:c.league,week:legacyWeek,channelId,source:'discord-command',requestedByUserId:c.user.id
     });
@@ -194,7 +202,7 @@ export async function executeDiscordCommand(c){
         ?`The active FranchiseHQ schedule does not contain Regular Season Week ${legacyWeek}.`
         :'FranchiseHQ could not prepare schedule threads in this channel.'
     ),{status:409,code:result.reason});
-    return `Week ${legacyWeek} schedule synchronized: **${result.threads} matchup thread${result.threads===1?'':'s'}** in this channel using ${result.registeredOwners} registered owner identit${result.registeredOwners===1?'y':'ies'}.`;
+    return `Week ${legacyWeek} schedule synchronized: **${result.threads} matchup thread${result.threads===1?'':'s'}** in the configured schedule channel using ${result.registeredOwners} registered owner identit${result.registeredOwners===1?'y':'ies'}.`;
   }
   if(command==='join'){
     await joinDiscordLeague(c,requestForAudit(c.interaction));
@@ -203,7 +211,9 @@ export async function executeDiscordCommand(c){
   if(command==='standings')return standingsCommand(c,values);
   if(command==='schedule')return scheduleCommand(c,values);
   if(command==='stats')return statsCommand(c,values);
-  if(command==='leaders')return statsCommand(c,values,{leaders:true});
+  if(command==='player-stats')return playerStatsCommand(c,values);
+  if(command==='team-stats')return teamStatsCommand(c,values);
+  if(command==='leaders')return leadersCommand(c,values);
   if(command==='player')return playerCommand(c,values);
   if(command==='trade-block')return tradeBlockCommand(c,values);
   if(command==='trade-history')return tradeHistoryCommand(c);

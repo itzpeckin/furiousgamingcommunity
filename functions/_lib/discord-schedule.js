@@ -134,6 +134,43 @@ async function createMatchupThread(env,db,{run,league,model,game,assignments,pha
   return {created:true,record:{...record,discord_thread_id:starterId,status:'active'},owners:message.ids};
 }
 
+async function removeSupersededScheduleThreads(env,db,{
+  leagueId,seasonYear,phase,week,guildId,fetchImpl
+}) {
+  const prior = await rows(db,`SELECT id,discord_thread_id AS discordThreadId,season_year AS seasonYear,
+      phase,week_index AS weekIndex
+    FROM discord_schedule_threads
+    WHERE league_id=? AND discord_guild_id=? AND status='active'
+      AND NOT (season_year=? AND phase=? AND week_index=?)
+    ORDER BY created_at`,leagueId,guildId,seasonYear,phase,week);
+  let removed=0;
+  const errors=[];
+  for (const item of prior) {
+    const threadId=clean(item.discordThreadId);
+    if (!SNOWFLAKE.test(threadId)) {
+      errors.push(`A prior FranchiseHQ schedule thread for ${item.phase} Week ${item.weekIndex} has no valid Discord thread ID.`);
+      continue;
+    }
+    try {
+      await discordBotRequest(env,`/channels/${encodeURIComponent(threadId)}`,{method:'DELETE',fetchImpl});
+      await db.prepare(`UPDATE discord_schedule_threads SET status='archived',updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND league_id=? AND status='active'`).bind(item.id,leagueId).run();
+      removed+=1;
+    } catch (error) {
+      // A missing Discord thread is already removed. Retain its database row as
+      // the authoritative audit record while closing its active lifecycle.
+      if (Number(error?.status)===404) {
+        await db.prepare(`UPDATE discord_schedule_threads SET status='archived',updated_at=CURRENT_TIMESTAMP
+          WHERE id=? AND league_id=? AND status='active'`).bind(item.id,leagueId).run();
+        removed+=1;
+      } else {
+        errors.push(`${item.phase} Week ${item.weekIndex}: ${discordErrorText(error)}`);
+      }
+    }
+  }
+  return {removed,errors};
+}
+
 export async function syncDiscordScheduleThreads(env,db,{
   league,
   snapshotId = null,
@@ -167,7 +204,18 @@ export async function syncDiscordScheduleThreads(env,db,{
     leagueId:league.id,snapshotId:active.id,guildId:installation.guildId,channelId:targetChannel,
     seasonYear:active.seasonYear,phase:targetPhase,week:targetWeek,source,requestedByUserId
   });
-  if (reused) return {ok:true,reused:true,week:targetWeek,phase:targetPhase,games:Number(run.game_count||0),threads:Number(run.thread_count||0)};
+  const replacesActiveSchedule=source==='candidate-import'
+    &&targetWeek===Number(active.weekIndex)
+    &&String(active.id)===String(model.snapshot.id);
+  if (reused) {
+    const cleanup=replacesActiveSchedule
+      ?await removeSupersededScheduleThreads(env,db,{leagueId:league.id,seasonYear:active.seasonYear,
+        phase:targetPhase,week:targetWeek,guildId:installation.guildId,fetchImpl})
+      :{removed:0,errors:[]};
+    return {ok:cleanup.errors.length===0,reused:true,week:targetWeek,phase:targetPhase,
+      games:Number(run.game_count||0),threads:Number(run.thread_count||0),removedPriorThreads:cleanup.removed,
+      errors:cleanup.errors};
+  }
   const assignments = await activeTeamAssignments(db,league.id);
   let created = 0;
   const owners = new Set();
@@ -184,13 +232,20 @@ export async function syncDiscordScheduleThreads(env,db,{
   const existingCount = Number((await db.prepare(`SELECT COUNT(*) AS count FROM discord_schedule_threads
     WHERE league_id=? AND season_year=? AND phase=? AND week_index=? AND status='active'`)
     .bind(league.id,active.seasonYear,targetPhase,targetWeek).first())?.count || 0);
+  let removedPriorThreads=0;
+  if (!errors.length&&existingCount===games.length&&replacesActiveSchedule) {
+    const cleanup=await removeSupersededScheduleThreads(env,db,{leagueId:league.id,seasonYear:active.seasonYear,
+      phase:targetPhase,week:targetWeek,guildId:installation.guildId,fetchImpl});
+    removedPriorThreads=cleanup.removed;
+    errors.push(...cleanup.errors);
+  }
   const status = errors.length ? (existingCount ? 'partial' : 'failed') : 'completed';
   await db.prepare(`UPDATE discord_schedule_sync_runs SET status=?,game_count=?,thread_count=?,registered_owner_count=?,
     error_count=?,last_error=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(
       status,games.length,existingCount,owners.size,errors.length,errors[0]||null,run.id
     ).run();
   return {ok:status==='completed',status,reused:false,week:targetWeek,phase:targetPhase,
-    games:games.length,threads:existingCount,created,registeredOwners:owners.size,errors};
+    games:games.length,threads:existingCount,created,removedPriorThreads,registeredOwners:owners.size,errors};
 }
 
 export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,week,requestedByUserId,source='candidate-import'}={}) {

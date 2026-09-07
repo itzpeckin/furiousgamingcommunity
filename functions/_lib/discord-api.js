@@ -55,11 +55,10 @@ export async function upsertDiscordGlobalCommands(env, commands, options = {}) {
 export async function ensureDiscordGlobalCommands(env, commands, {fetchImpl = fetch} = {}) {
   const applicationId = String(env?.DISCORD_CLIENT_ID || '').trim();
   if (!/^[0-9]{17,20}$/.test(applicationId)) throw new Error('Discord application ID is not configured.');
-  const existing = await discordBotRequest(env,
-    `/applications/${encodeURIComponent(applicationId)}/commands`,{fetchImpl});
-  const names = new Set((Array.isArray(existing) ? existing : []).map(command=>String(command?.name || '').toLowerCase()));
-  const missing = commands.filter(command=>!names.has(String(command?.name || '').toLowerCase()));
-  return upsertDiscordGlobalCommands(env,missing,{fetchImpl});
+  // POST is an idempotent name-based upsert. Reconcile every definition so a
+  // changed option schema is repaired as well as a missing command, without
+  // using bulk replacement (which could delete legacy scheduler commands).
+  return upsertDiscordGlobalCommands(env,commands,{fetchImpl});
 }
 
 export async function upsertDiscordGuildCommands(env, guildId, commands, options = {}) {

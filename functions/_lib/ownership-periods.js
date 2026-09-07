@@ -16,12 +16,20 @@ export async function currentFranchiseContext(db, leagueId) {
          ELSE 0 END DESC,
          CAST(COALESCE(json_extract(record.data_json,'$.week_index'),json_extract(record.data_json,'$.weekIndex'),0) AS INTEGER) DESC
        LIMIT 1) current_stage,
-      (SELECT destination.franchise_season_id
-       FROM companion_candidate_import_runs run
-       JOIN companion_import_destinations destination
-         ON destination.id=run.destination_id AND destination.league_id=run.league_id
-       WHERE run.league_id=active.league_id AND run.candidate_snapshot_id=active.snapshot_id
-       ORDER BY run.created_at DESC LIMIT 1) franchise_season_id
+      COALESCE(
+        (SELECT destination.franchise_season_id
+         FROM companion_candidate_import_runs run
+         JOIN companion_import_destinations destination
+           ON destination.id=run.destination_id AND destination.league_id=run.league_id
+         WHERE run.league_id=active.league_id AND run.candidate_snapshot_id=active.snapshot_id
+         ORDER BY run.created_at DESC LIMIT 1),
+        (SELECT season.id FROM franchise_seasons season
+         WHERE season.league_id=active.league_id AND season.status='active'
+         ORDER BY season.season_year DESC,season.created_at DESC LIMIT 1),
+        (SELECT season.id FROM franchise_seasons season
+         WHERE season.league_id=active.league_id AND season.status='preview'
+         ORDER BY season.season_year DESC,season.created_at DESC LIMIT 1)
+      ) franchise_season_id
     FROM league_active_snapshots active
     JOIN league_snapshots snapshot ON snapshot.id=active.snapshot_id AND snapshot.league_id=active.league_id
     WHERE active.league_id=? LIMIT 1`).bind(leagueId).first();

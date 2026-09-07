@@ -58,11 +58,18 @@ function channelName(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-export async function ensureDiscordScheduleChannel(env, guildId, {fetchImpl = fetch} = {}) {
+export async function discordGuildTextChannels(env, guildId, {fetchImpl = fetch} = {}) {
+  if (!SNOWFLAKE.test(String(guildId || ''))) return [];
   const channels = await discordBotRequest(env, `/guilds/${encodeURIComponent(guildId)}/channels`, {fetchImpl});
-  const reusable = Array.isArray(channels) ? channels.find(channel =>
-    Number(channel?.type) === 0 && channelName(channel?.name) === 'franchisehq-schedule'
-  ) : null;
+  return (Array.isArray(channels) ? channels : [])
+    .filter(channel => Number(channel?.type) === 0 && SNOWFLAKE.test(String(channel?.id || '')))
+    .map(channel => ({id:String(channel.id),name:String(channel.name || 'unnamed-channel').slice(0,100),position:Number(channel.position || 0)}))
+    .sort((left,right)=>left.position-right.position||left.name.localeCompare(right.name));
+}
+
+export async function ensureDiscordScheduleChannel(env, guildId, {fetchImpl = fetch} = {}) {
+  const channels = await discordGuildTextChannels(env,guildId,{fetchImpl});
+  const reusable = channels.find(channel => channelName(channel?.name) === 'franchisehq-schedule');
   if (SNOWFLAKE.test(String(reusable?.id || ''))) return reusable;
   const created = await discordBotRequest(env, `/guilds/${encodeURIComponent(guildId)}/channels`, {
     method:'POST',

@@ -24,6 +24,7 @@ import {
   discordAuthorizedGuild,
   discordGuildPermissionAllowsInstall
 } from '../../functions/_lib/discord-installation.js';
+import { syncDiscordScheduleThreads } from '../../functions/_lib/discord-schedule.js';
 
 async function applyMigrations(database){
   const files=(await walkFiles()).filter(file=>/^migrations\/\d+_.+\.sql$/.test(file)).sort();
@@ -69,9 +70,9 @@ async function signedContext({db,key,interaction,env={}}){
   };
 }
 
-function interaction({id='100000000000000099',guild='100000000000000001',channel='100000000000000055',user='100000000000000011',name='league-site',options=[],permissions=null}={}){
+function interaction({id='100000000000000099',guild='100000000000000001',channel='100000000000000055',user='100000000000000011',name='league-site',options=[],permissions=null,type=2}={}){
   return {
-    id,application_id:'100000000000000009',token:`token-${id}`,type:2,guild_id:guild,channel_id:channel,
+    id,application_id:'100000000000000009',token:`token-${id}`,type,guild_id:guild,channel_id:channel,
     member:{...(permissions===null?{}:{permissions:String(permissions)}),user:{id:user,username:`member-${user.slice(-2)}`,global_name:`Member ${user.slice(-2)}`,avatar:null}},
     data:{id:`command-${id}`,name,type:1,options}
   };
@@ -100,7 +101,8 @@ function seedActiveWeek(database,{leagueId,week=14}={}){
   database.prepare(`INSERT INTO league_snapshots
     (id,league_id,status,season_year,week_index,team_count,game_count,manifest_json,validation_status)
     VALUES (?,?,'active',2026,?,2,1,'{}','ready')`).run(snapshotId,leagueId,week);
-  database.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id) VALUES (?,?)`).run(leagueId,snapshotId);
+  database.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id) VALUES (?,?)
+    ON CONFLICT(league_id) DO UPDATE SET snapshot_id=excluded.snapshot_id`).run(leagueId,snapshotId);
   const records=[
     ['teams','1001',{external_id:'1001',display_name:'Tampa Bay Buccaneers',abbreviation:'TB'}],
     ['teams','1002',{external_id:'1002',display_name:'San Francisco 49ers',abbreviation:'SF'}],
@@ -117,14 +119,41 @@ function seedActiveWeek(database,{leagueId,week=14}={}){
   return snapshotId;
 }
 
+function seedSnapshotRecord(database,{snapshotId,leagueId,domain,externalId,data}){
+  database.prepare(`INSERT INTO league_snapshot_records
+    (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`)
+    .run(snapshotId,leagueId,domain,externalId,JSON.stringify(data));
+}
+
+function seedDiscordStatFixture(database,{leagueId='league-a',week=13}={}){
+  const snapshotId=seedActiveWeek(database,{leagueId,week});
+  const players=[
+    {external_id:'player-tb',team_external_id:'1001',display_name:'Baker Example',position:'QB',overall:91,age:30,development_trait:'Star'},
+    {external_id:'player-sf',team_external_id:'1002',display_name:'Brock Example',position:'QB',overall:89,age:26,development_trait:'Normal'},
+    {external_id:'receiver-tb',team_external_id:'1001',display_name:'Mike Example',position:'WR',overall:88,age:27,development_trait:'Star'}
+  ];
+  players.forEach(player=>seedSnapshotRecord(database,{snapshotId,leagueId,domain:'players',externalId:player.external_id,data:player}));
+  const stats=[
+    ['tb-pass-w1',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({passYds:100,passTDs:1,passComp:6,passAtt:10,passCompPct:60,passerRating:95})}],
+    ['tb-pass-w2',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:2,metrics_json:JSON.stringify({passYds:150,passTDs:2,passComp:9,passAtt:15,passCompPct:60,passerRating:110})}],
+    ['sf-pass-w1',{category:'passing',player_external_id:'player-sf',team_external_id:'1002',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({passYds:999,passTDs:9,passComp:30,passAtt:40,passCompPct:75,passerRating:140})}],
+    ['tb-rec-w1',{category:'receiving',player_external_id:'receiver-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({recYds:80,recTDs:1,recCatches:7})}],
+    ['tb-rec-w2',{category:'receiving',player_external_id:'receiver-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:2,metrics_json:JSON.stringify({recYds:120,recTDs:2,recCatches:8})}],
+    ['tb-pre',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'preseason',week_index:1,metrics_json:JSON.stringify({passYds:5000,passTDs:50,passComp:50,passAtt:50})}]
+  ];
+  stats.forEach(([externalId,data])=>seedSnapshotRecord(database,{snapshotId,leagueId,domain:'statistics',externalId,data:{external_key:externalId,...data}}));
+  database.prepare(`UPDATE league_snapshots SET player_count=?,statistic_count=? WHERE id=?`).run(players.length,stats.length,snapshotId);
+  return snapshotId;
+}
+
 async function seedSession(database,{userId,token}){
   database.prepare(`INSERT INTO sessions
     (id,user_id,session_token_hash,expires_at) VALUES (?,?,?,'2099-01-01T00:00:00.000Z')`)
     .run(`session-${userId}`,userId,await hashToken(token));
 }
 
-function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000000000000009'}){
-  return {params:{leagueSlug:slug},env:{DB:db,DISCORD_CLIENT_ID:clientId},request:new Request(
+function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000000000000009',env={}}){
+  return {params:{leagueSlug:slug},env:{DB:db,DISCORD_CLIENT_ID:clientId,...env},request:new Request(
     `https://franchisehq.app/api/leagues/${encodeURIComponent(slug)}/discord`,{
       method,headers:{Cookie:`${AUTH_CONSTANTS.SESSION_COOKIE_NAME}=${token}`,...(body?{'content-type':'application/json'}:{})},
       ...(body?{body:JSON.stringify(body)}:{})
@@ -133,10 +162,10 @@ function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000
 }
 
 test('global Discord command inventory restores legacy week commands and remains multi-league capable',()=>{
-  assert.equal(DISCORD_GLOBAL_COMMANDS.length,34);
-  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,34);
+  assert.equal(DISCORD_GLOBAL_COMMANDS.length,36);
+  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,36);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.map(command=>command.name),[
-    'standings','schedule','stats','leaders','player','trade-block','trade-history','news',
+    'standings','schedule','stats','player-stats','team-stats','leaders','player','trade-block','trade-history','news',
     'gotw','league-site','twitch','join','gm-history','confidence','rules','trade',
     ...Array.from({length:18},(_,index)=>`week${index+1}`)
   ]);
@@ -211,6 +240,51 @@ test('commissioners map one Discord server to one league and can disable it with
   }finally{database.close()}
 });
 
+test('commissioners select verified existing Discord channels and refresh command definitions',async()=>{
+  const database=new DatabaseSync(':memory:');
+  const originalFetch=globalThis.fetch;
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a',userId:'commissioner-a',discordId:'100000000000000021',role:'commissioner'});
+    await seedSession(database,{userId:'commissioner-a',token:'token-a'});
+    const channelIds=['100000000000000051','100000000000000052','100000000000000053'];
+    const requests=[];
+    globalThis.fetch=async(url,options={})=>{
+      requests.push({url:String(url),method:options.method||'GET',body:options.body?JSON.parse(options.body):null});
+      if(/\/guilds\/100000000000000001\/channels$/.test(String(url))){
+        return new Response(JSON.stringify(channelIds.map((id,index)=>({id,type:0,name:['scheduling','trade-committee','league-news'][index],position:index}))),{
+          status:200,headers:{'content-type':'application/json'}
+        });
+      }
+      return new Response('{"id":"command-upserted"}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    const response=await postDiscordInstallation(leagueApiContext(d1(database),{
+      slug:'alpha',token:'token-a',method:'POST',env:{DISCORD_BOT_TOKEN:'test-token'},body:{
+        action:'configure-channels',scheduleChannelId:channelIds[0],tradeCommitteeChannelId:channelIds[1],notificationChannelId:channelIds[2]
+      }
+    }));
+    const payload=await response.json();
+    assert.equal(response.status,200,JSON.stringify(payload));
+    assert.deepEqual({
+      schedule:payload.installation.scheduleChannelId,
+      committee:payload.installation.tradeCommitteeChannelId,
+      notifications:payload.installation.notificationChannelId
+    },{schedule:channelIds[0],committee:channelIds[1],notifications:channelIds[2]});
+    assert.equal(requests.filter(request=>/\/applications\/100000000000000009\/commands$/.test(request.url)&&request.method==='POST').length,DISCORD_GLOBAL_COMMANDS.length);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM tenant_audit_events
+      WHERE league_id='league-a' AND action='discord_installation_configure-channels'`).get().count,1);
+
+    const invalid=await postDiscordInstallation(leagueApiContext(d1(database),{
+      slug:'alpha',token:'token-a',method:'POST',env:{DISCORD_BOT_TOKEN:'test-token'},body:{
+        action:'configure-channels',scheduleChannelId:'100000000000000099'
+      }
+    }));
+    assert.equal(invalid.status,400);
+    assert.match((await invalid.json()).error,/connected Discord server/i);
+  }finally{globalThis.fetch=originalFetch;database.close()}
+});
+
 test('global command registration upserts by name without bulk replacement',async()=>{
   const requests=[];
   const fetchImpl=async(url,options={})=>{
@@ -246,7 +320,109 @@ test('global command registration upserts by name without bulk replacement',asyn
   await ensureDiscordGlobalCommands({
     DISCORD_CLIENT_ID:'100000000000000009',DISCORD_BOT_TOKEN:'secret'
   },DISCORD_GLOBAL_COMMANDS.slice(0,3),{fetchImpl:ensureFetch});
-  assert.deepEqual(requests.map(item=>[item.method,item.body?.name||null]),[['GET',null],['POST','stats']]);
+  assert.deepEqual(requests.map(item=>[item.method,item.body?.name||null]),[
+    ['POST','standings'],['POST','schedule'],['POST','stats']
+  ]);
+});
+
+test('signed autocomplete returns tenant teams without creating command receipts',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedActiveWeek(database,{leagueId:'league-a',week:13});
+    const db=d1(database),key=await signingKey();
+    const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000087',name:'standings',type:4,options:[
+        {type:3,name:'view',value:'bucc',focused:true}
+      ]
+    })}));
+    const payload=await response.json();
+    assert.equal(payload.type,8);
+    assert.deepEqual(payload.data.choices,[{name:'Team · Tampa Bay Buccaneers (TB)',value:'team:tb'}]);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM discord_interaction_receipts`).get().count,0);
+  }finally{database.close()}
+});
+
+test('Discord statistics are season-cumulative, team-scoped, and expose rich player previews',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedDiscordStatFixture(database,{leagueId:'league-a'});
+    const db=d1(database),key=await signingKey();
+    const teamResponse=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000086',name:'team-stats',options:[
+        {type:3,name:'team',value:'tb'},{type:3,name:'category',value:'passing'}
+      ]
+    })}));
+    const teamPayload=await teamResponse.json();
+    assert.match(teamPayload.data.content,/Tampa Bay Buccaneers/);
+    assert.match(teamPayload.data.content,/Pass Yds 250/);
+    assert.match(teamPayload.data.content,/Pass TDs 3/);
+    assert.match(teamPayload.data.content,/Comp % 60/);
+    assert.doesNotMatch(teamPayload.data.content,/1,249|5,250|999/);
+
+    const playerStats=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000085',name:'player-stats',options:[
+        {type:3,name:'player',value:'player-tb'},{type:3,name:'category',value:'passing'}
+      ]
+    })}));
+    const playerStatsPayload=await playerStats.json();
+    assert.match(playerStatsPayload.data.content,/Baker Example Franchise Career/);
+    assert.match(playerStatsPayload.data.content,/2026 · Passing/);
+    assert.match(playerStatsPayload.data.content,/Pass Yds 250/);
+    assert.doesNotMatch(playerStatsPayload.data.content,/W1|W2|5,250/);
+
+    const leaders=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000084',name:'leaders',options:[
+        {type:3,name:'category',value:'receiving'},{type:3,name:'metric',value:'recTDs'}
+      ]
+    })}));
+    assert.match((await leaders.json()).data.content,/Mike Example.*3/s);
+
+    const player=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000083',name:'player',options:[{type:3,name:'name',value:'player-tb'}]
+    })}));
+    const playerPayload=await player.json();
+    assert.equal(playerPayload.data.embeds[0].title,'Baker Example');
+    assert.equal(playerPayload.data.embeds[0].fields.find(field=>field.name==='Overall').value,'91');
+    assert.equal(playerPayload.data.embeds[0].fields.find(field=>field.name==='Age').value,'30');
+    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/Pass Yds: 250/);
+    assert.match(playerPayload.data.content,/\/leagues\/alpha#players\/player-tb/);
+  }finally{database.close()}
+});
+
+test('GM History includes current-season results before the season is archived',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:13});
+    database.prepare(`UPDATE league_snapshot_records SET data_json=?
+      WHERE snapshot_id=? AND league_id='league-a' AND domain='games'`).run(JSON.stringify({
+        external_id:'game-13',season_year:2026,stage:'regular-season',week_index:13,
+        away_team_external_id:'1002',home_team_external_id:'1001',status:'final',away_score:17,home_score:24
+      }),snapshotId);
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-2026','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    database.prepare(`INSERT INTO gm_identities
+      (id,league_id,user_id,public_id,display_name) VALUES ('gm-a','league-a','user-a','gm-public-a','Member user-a')`).run();
+    database.prepare(`INSERT INTO team_ownership_periods
+      (id,league_id,gm_identity_id,team_key,franchise_season_id,started_at,started_stage,started_week)
+      VALUES ('period-a','league-a','gm-a','tb','season-2026',CURRENT_TIMESTAMP,'preseason',1)`).run();
+    const db=d1(database),key=await signingKey();
+    const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000082',name:'gm-history',options:[{type:3,name:'name',value:'user-a'}]
+    })}));
+    const payload=await response.json();
+    assert.match(payload.data.content,/Member user-a/);
+    assert.match(payload.data.content,/1-0/);
+  }finally{database.close()}
 });
 
 test('/week14 bootstraps one commissioner league and creates identity-driven matchup threads',async()=>{
@@ -294,6 +470,83 @@ test('/week14 bootstraps one commissioner league and creates identity-driven mat
       status:'active',home_discord_user_id:'100000000000000011',away_discord_user_id:'100000000000000012'
     });
   }finally{globalThis.fetch=originalFetch;database.close()}
+});
+
+test('a live import creates the complete new schedule before removing prior FranchiseHQ threads',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a',userId:'commissioner-a',discordId:'100000000000000011',teamId:'tb',role:'commissioner'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    database.prepare(`UPDATE discord_league_installations SET schedule_channel_id='100000000000000055'
+      WHERE league_id='league-a'`).run();
+    const db=d1(database),requests=[];
+    let starter=87;
+    const fetchImpl=async(url,options={})=>{
+      const request={url:String(url),method:options.method||'GET'};requests.push(request);
+      if(request.method==='DELETE')return new Response(null,{status:204});
+      if(/\/messages$/.test(request.url)){
+        starter+=1;
+        return new Response(JSON.stringify({id:`1000000000000000${starter}`}),{status:200,headers:{'content-type':'application/json'}});
+      }
+      return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    const league={id:'league-a',slug:'alpha',name:'Alpha League'};
+    const week13=seedActiveWeek(database,{leagueId:'league-a',week:13});
+    const first=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:week13,source:'candidate-import',fetchImpl
+    });
+    assert.equal(first.ok,true);
+    assert.equal(first.removedPriorThreads,0);
+
+    const week14=seedActiveWeek(database,{leagueId:'league-a',week:14});
+    const second=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:week14,source:'candidate-import',fetchImpl
+    });
+    assert.equal(second.ok,true);
+    assert.equal(second.created,1);
+    assert.equal(second.removedPriorThreads,1);
+    assert.equal(requests.filter(request=>request.method==='DELETE').length,1);
+    assert.deepEqual(database.prepare(`SELECT week_index AS week,status FROM discord_schedule_threads
+      WHERE league_id='league-a' ORDER BY week_index`).all().map(row=>({...row})),[
+      {week:13,status:'archived'},{week:14,status:'active'}
+    ]);
+  }finally{database.close()}
+});
+
+test('a failed replacement schedule leaves the prior active threads untouched',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a',userId:'commissioner-a',discordId:'100000000000000011',teamId:'tb',role:'commissioner'});
+    database.prepare(`UPDATE discord_league_installations SET schedule_channel_id='100000000000000055'
+      WHERE league_id='league-a'`).run();
+    const db=d1(database),league={id:'league-a',slug:'alpha',name:'Alpha League'};
+    const workingFetch=async(url,options={})=>{
+      if(/\/messages$/.test(String(url)))return new Response('{"id":"100000000000000088"}',{status:200,headers:{'content-type':'application/json'}});
+      return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    const week13=seedActiveWeek(database,{leagueId:'league-a',week:13});
+    assert.equal((await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:week13,source:'candidate-import',fetchImpl:workingFetch
+    })).ok,true);
+
+    const week14=seedActiveWeek(database,{leagueId:'league-a',week:14});
+    const requests=[];
+    const failingFetch=async(url,options={})=>{
+      requests.push({url:String(url),method:options.method||'GET'});
+      return new Response('{"message":"temporary failure"}',{status:500,headers:{'content-type':'application/json'}});
+    };
+    const failed=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:week14,source:'candidate-import',fetchImpl:failingFetch
+    });
+    assert.equal(failed.ok,false);
+    assert.equal(requests.some(request=>request.method==='DELETE'),false);
+    assert.deepEqual({...database.prepare(`SELECT week_index AS week,status FROM discord_schedule_threads
+      WHERE league_id='league-a' AND week_index=13`).get()},{week:13,status:'active'});
+  }finally{database.close()}
 });
 
 test('signed Discord commands resolve guild to one tenant and reject cross-tenant access',async()=>{

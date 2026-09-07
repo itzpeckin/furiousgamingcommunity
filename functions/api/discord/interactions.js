@@ -6,6 +6,7 @@ import {
   createInteractionReceipt,
   discordErrorResponse,
   discordInteractionResponse,
+  discordMessageData,
   editDiscordOriginalResponse,
   resolveDiscordContext,
   verifyDiscordInteractionRequest
@@ -17,6 +18,7 @@ import {
   DISCORD_COMMAND_RELEASE
 } from '../../_lib/discord-commands.js';
 import { executeDiscordCommand } from '../../_lib/discord-bot.js';
+import { discordAutocompleteChoices } from '../../_lib/discord-autocomplete.js';
 import { flushDiscordDeliveries } from '../../_lib/discord-delivery.js';
 
 function httpJson(body,status){
@@ -57,7 +59,8 @@ export async function onRequestPost(context){
   if(Number(interaction.type)===DISCORD_INTERACTION_TYPES.PING){
     return discordInteractionResponse(DISCORD_RESPONSE_TYPES.PONG);
   }
-  if(Number(interaction.type)!==DISCORD_INTERACTION_TYPES.APPLICATION_COMMAND){
+  const autocomplete=Number(interaction.type)===DISCORD_INTERACTION_TYPES.APPLICATION_COMMAND_AUTOCOMPLETE;
+  if(Number(interaction.type)!==DISCORD_INTERACTION_TYPES.APPLICATION_COMMAND&&!autocomplete){
     return discordErrorResponse('That Discord interaction is not supported.');
   }
   const command=discordCommandName(interaction);
@@ -68,7 +71,18 @@ export async function onRequestPost(context){
       allowCommissionerBootstrap:Boolean(discordScheduleThreadWeek(command))
     });
   }catch(error){
-    return discordErrorResponse(safeCommandError(error));
+    return autocomplete
+      ?discordInteractionResponse(DISCORD_RESPONSE_TYPES.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,{choices:[]})
+      :discordErrorResponse(safeCommandError(error));
+  }
+  if(autocomplete){
+    try{
+      const choices=await discordAutocompleteChoices(c);
+      return discordInteractionResponse(DISCORD_RESPONSE_TYPES.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,{choices});
+    }catch(error){
+      console.error('Discord autocomplete failed:',safeCommandError(error));
+      return discordInteractionResponse(DISCORD_RESPONSE_TYPES.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,{choices:[]});
+    }
   }
   const visibility=discordInteractionIsPrivate(interaction)?'private':'public';
   let accepted;
@@ -87,7 +101,7 @@ export async function onRequestPost(context){
   }
   const content=await runCommand(context,c,interaction);
   return discordInteractionResponse(DISCORD_RESPONSE_TYPES.CHANNEL_MESSAGE,{
-    content,flags:visibility==='private'?DISCORD_EPHEMERAL_FLAG:0,allowed_mentions:{parse:[]}
+    ...discordMessageData(content),flags:visibility==='private'?DISCORD_EPHEMERAL_FLAG:0
   });
 }
 

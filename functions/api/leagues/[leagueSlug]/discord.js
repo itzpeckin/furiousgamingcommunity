@@ -1,8 +1,10 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../_lib/permissions.js';
 import { createTenantAuditContext, tenantAuditStatement } from '../../../_lib/tenant-context.js';
-import { DISCORD_COMMAND_RELEASE } from '../../../_lib/discord-commands.js';
+import { DISCORD_COMMAND_RELEASE, DISCORD_GLOBAL_COMMANDS } from '../../../_lib/discord-commands.js';
 import { latestDiscordScheduleSync } from '../../../_lib/discord-schedule.js';
+import { discordGuildTextChannels } from '../../../_lib/discord-installation.js';
+import { upsertDiscordGlobalCommands } from '../../../_lib/discord-api.js';
 
 const SNOWFLAKE=/^[0-9]{17,20}$/;
 const cleanSnowflake=(value,required=false)=>{
@@ -31,10 +33,16 @@ async function state(c){
       connected_at AS connectedAt,status,installed_at AS installedAt,updated_at AS updatedAt
     FROM discord_league_installations WHERE league_id=? LIMIT 1`).bind(c.league.id).first();
   const origin=new URL(c.request.url).origin;
+  let channels=[],channelError=null;
+  if(row?.status==='active'&&row?.guildId){
+    try{channels=await discordGuildTextChannels(c.env,row.guildId)}
+    catch(error){channelError='FranchiseHQ could not refresh the server channel list. Existing routing remains unchanged.';console.error('Discord channel list failed:',error?.message||error)}
+  }
   return {
     ok:true,release:DISCORD_COMMAND_RELEASE,
     league:{id:c.league.id,slug:c.league.slug,name:c.league.name},
     installation:row||null,
+    channels,channelError,
     scheduleSync:await latestDiscordScheduleSync(c.db,c.league.id),
     globalCommands:true,
     automaticConnection:true,
@@ -73,6 +81,30 @@ export async function onRequestPost(context){
         tenantAuditStatement(c.db,audit,{resourceType:'discord_league_installation',resourceId:guildId,
           detail:{action,committeeChannelConfigured:Boolean(committee),notificationChannelConfigured:Boolean(notifications)}})
       ]);
+    }else if(action==='configure-channels'){
+      const installation=await c.db.prepare(`SELECT discord_guild_id AS guildId FROM discord_league_installations
+        WHERE league_id=? AND status='active' LIMIT 1`).bind(c.league.id).first();
+      if(!installation?.guildId)throw Object.assign(new Error('Connect this league to Discord before choosing channels.'),{status:409});
+      const channels=await discordGuildTextChannels(c.env,installation.guildId);
+      const allowed=new Set(channels.map(channel=>channel.id));
+      const schedule=cleanSnowflake(body.scheduleChannelId,true);
+      const committee=cleanSnowflake(body.tradeCommitteeChannelId,false);
+      const notifications=cleanSnowflake(body.notificationChannelId,false);
+      if(!allowed.has(schedule)||committee&&!allowed.has(committee)||notifications&&!allowed.has(notifications)){
+        throw Object.assign(new Error('Choose channels that belong to the connected Discord server.'),{status:400});
+      }
+      await c.db.batch([
+        c.db.prepare(`UPDATE discord_league_installations SET schedule_channel_id=?,trade_committee_channel_id=?,
+          notification_channel_id=?,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND status='active'`)
+          .bind(schedule,committee,notifications,c.league.id),
+        tenantAuditStatement(c.db,audit,{resourceType:'discord_league_installation',resourceId:installation.guildId,
+          detail:{action,scheduleChannelId:schedule,committeeChannelConfigured:Boolean(committee),notificationChannelConfigured:Boolean(notifications),selectedFromVerifiedGuildChannels:true}})
+      ]);
+      const reconcile=upsertDiscordGlobalCommands(c.env,DISCORD_GLOBAL_COMMANDS).catch(error=>
+        console.error('Discord global command reconciliation failed:',String(error?.message||error).slice(0,500)));
+      const waitUntil=context.waitUntil||context.executionContext?.waitUntil;
+      if(typeof waitUntil==='function')waitUntil.call(context.executionContext||context,reconcile);
+      else await reconcile;
     }else if(action==='disable'){
       await c.db.batch([
         c.db.prepare(`UPDATE discord_league_installations SET status='disabled',updated_at=CURRENT_TIMESTAMP WHERE league_id=?`)
