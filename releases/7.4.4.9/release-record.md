@@ -25,7 +25,11 @@ Focused Discord coverage passes 29 tests for exact standings modes, both-confere
 
 ## Deployment status
 
-Local candidate only. Branch publication, pull request creation, hosted checks, global Discord command reconciliation, Main merge, and Production deployment have not been authorized or run. Migration 35 remains current and 7.4.4.9 adds no migration. No command was invoked in the live FGC Discord server and no Production row was written.
+Exact candidate `e373cbfca3f7daf2b46f66871c7e9c4ef380cdf6` was published through PR #52 with the hosted quality gate passing, then merged to Main as `41b256a8525a3e81fb5d57879c40a703e0586511`. The Main quality gate passed and Production Pages deployment `184d4f4f-c4db-44dc-bcb0-9d85b6f757e4` succeeded.
+
+Discord rate-limited three attempted 36-command burst reconciliations before any build could deploy. Because 7.4.4.8 had already reconciled the unchanged 35-command surface, the authorized operation was completed safely by name-upserting only the two definitions changed in this release: new `/playoffs` and revised `/trade-block`. Both targeted registrations and their Production deployments succeeded; final accepted deployment `4b928c9b-d353-43f7-8c93-04cb8d52b430` serves the exact Main merge. The temporary registration hook was removed and the Production build command is restored to `exit 0`.
+
+Authenticated live acceptance reports Current Release 7.4.4.9. Read-only D1 acceptance on `franchise-hq-db-madden27` confirms migration 35, one league, 30 users, 30 memberships, 28 active team assignments, 16 retained snapshots, one Discord installation, 15 active schedule threads, zero foreign-key violations, and unchanged active snapshot `23dd264d-d8e9-4643-9c41-e37f039ab27d` at Season 2026 / Week 14 with 32 teams, 2,036 rostered players, 256 games, 10,828 statistics, and 32 standings. Free Agents remain blocked with a null count. No migration, import, reset, snapshot change, archive, transition, export URL rotation, credential change, membership/assignment change, or Production database write occurred.
 
 ## Rollback
 

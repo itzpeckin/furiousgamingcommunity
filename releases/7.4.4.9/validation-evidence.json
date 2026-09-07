@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.9",
   "validatedOn": "2026-09-07",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -119,19 +119,21 @@
     "retainedSnapshots": 16,
     "activeDiscordInstallations": 1,
     "activeScheduleThreads": 15,
+    "foreignKeyViolations": 0,
     "productionRowsWritten": 0
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
-    "productionConfigurationChanged": false,
+    "productionConfigurationChanged": true,
+    "productionConfigurationRestored": true,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
-    "discordCommandsRegistered": false,
+    "discordCommandsRegistered": true,
     "discordCredentialsChanged": false,
     "discordGuildInstalled": false,
     "discordLeagueConfigured": false,
@@ -151,12 +153,19 @@
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "merged",
+      "pullRequest": 52,
+      "candidateCommit": "e373cbfca3f7daf2b46f66871c7e9c4ef380cdf6",
+      "mergeCommit": "41b256a8525a3e81fb5d57879c40a703e0586511"
     },
     "hostedChecks": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed",
+      "candidateWorkflowRun": 34091213032,
+      "mainWorkflowRun": 34091343598,
+      "previewPagesDeployment": "37dc9419-2f45-40c6-a9ae-02c0bc339cc9",
+      "importWorkerBuild": "a2c255c6-099f-4993-adbe-056872f37fda"
     },
     "productionMigration": {
       "authorized": false,
@@ -165,15 +174,33 @@
       "candidateMigration": 35
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.4.4.8"
+      "authorized": true,
+      "status": "succeeded",
+      "currentRelease": "7.4.4.9",
+      "mergeDeployment": "184d4f4f-c4db-44dc-bcb0-9d85b6f757e4",
+      "acceptedDeployment": "4b928c9b-d353-43f7-8c93-04cb8d52b430",
+      "liveCommit": "41b256a8525a3e81fb5d57879c40a703e0586511"
     },
     "discordRegistration": {
-      "authorized": false,
-      "status": "not-run",
+      "authorized": true,
+      "status": "completed-by-changed-definition-upsert",
       "scope": "global",
-      "commandsPrepared": 36
+      "commandsPrepared": 36,
+      "ownedCommandsCurrent": 36,
+      "changedDefinitionsRegistered": [
+        "playoffs",
+        "trade-block"
+      ],
+      "unchangedDefinitionsRetainedFromRelease": "7.4.4.8",
+      "weeklyCommandsPreserved": 18,
+      "retiredLegacyCommandsPreserved": [
+        "stats",
+        "player-stats",
+        "team-stats"
+      ],
+      "burstAttemptsRateLimited": 3,
+      "targetedRegistrationsSucceeded": 2,
+      "temporaryBuildCommandRestored": "exit 0"
     }
   }
 }
