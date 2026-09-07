@@ -1,6 +1,7 @@
 import { discordCommandName, discordCommandOptions, discordScheduleThreadWeek } from './discord-commands.js';
 import {
   confidenceViewCommand,
+  gamesCommand,
   gmHistoryCommand,
   gotwCommand,
   leadersCommand,
@@ -21,7 +22,7 @@ import {
   requireDiscordRole,
   requireDiscordTeam
 } from './discord-security.js';
-import { activeLeagueTeams, canonicalTeamKey, resolveTeam } from './league-teams.js';
+import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-teams.js';
 import { createTenantAuditContext, tenantAuditStatement } from './tenant-context.js';
 import { competitionState, executeCompetitionAction } from '../api/leagues/[leagueSlug]/competition.js';
 import { executeTradeCenterAction } from '../api/leagues/[leagueSlug]/trade-center.js';
@@ -117,7 +118,15 @@ async function createTrade(c,values){
   requireDiscordTeam(c);
   c.teams=await activeLeagueTeams(c.db,c.league.id);
   const own=resolveTeam(c.teams,c.membership.teamId);
-  const opponent=resolveTeam(c.teams,values.opponent);
+  const selectedOwner=clean(values.owner||values.opponent,120);
+  const discordOwnerId=selectedOwner.match(/^owner:(\d{17,20})$/)?.[1]||null;
+  let opponent=null;
+  if(discordOwnerId){
+    const assignments=await activeTeamAssignments(c.db,c.league.id,c.teams);
+    for(const [teamKey,assignment] of assignments){
+      if(String(assignment.discordUserId||'')===discordOwnerId){opponent=resolveTeam(c.teams,teamKey);break}
+    }
+  }else opponent=resolveTeam(c.teams,selectedOwner);
   if(!own||!opponent)throw Object.assign(new Error('Choose a valid assigned team and opponent.'),{status:400});
   if(own.teamKey===opponent.teamKey)throw Object.assign(new Error('A trade requires another team.'),{status:400});
   const outgoing=await Promise.all(selectedAssets(values,'send','send').map(token=>resolveTradeAsset(c,token)));
@@ -210,11 +219,13 @@ export async function executeDiscordCommand(c){
   }
   if(command==='standings')return standingsCommand(c,values);
   if(command==='schedule')return scheduleCommand(c,values);
+  if(command==='games')return gamesCommand(c,values);
   if(command==='stats')return statsCommand(c,values);
   if(command==='player-stats')return playerStatsCommand(c,values);
   if(command==='team-stats')return teamStatsCommand(c,values);
   if(command==='leaders')return leadersCommand(c,values);
   if(command==='player')return playerCommand(c,values);
+  if(command==='team')return teamStatsCommand(c,{...values,team:values.name});
   if(command==='trade-block')return tradeBlockCommand(c,values);
   if(command==='trade-history')return tradeHistoryCommand(c);
   if(command==='news')return newsCommand(c);

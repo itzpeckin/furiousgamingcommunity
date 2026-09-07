@@ -98,6 +98,8 @@ export async function activeTeamAssignments(db, leagueId, teams = null) {
       role: row.role,
       teamId: team.teamKey,
       discordUserId: row.discordUserId || null,
+      discordUsername: row.discordUsername || null,
+      discordGlobalName: row.discordGlobalName || null,
       displayName: row.displayName || row.discordGlobalName || row.discordUsername || 'League Member'
     });
   }

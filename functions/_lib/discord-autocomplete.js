@@ -38,6 +38,35 @@ async function teamChoices(c,query,{excludeOwn=false}={}){
     .map(team=>teamChoice(team,{ownerName:assignments.get(team.teamKey)?.displayName})));
 }
 
+async function ownerChoices(c,query){
+  const teams=await teamsFor(c),assignments=await activeTeamAssignments(c.db,c.league.id,teams);
+  const own=resolveTeam(teams,c.membership?.teamId)?.teamKey;
+  const candidates=[];
+  for(const [teamKey,assignment] of assignments){
+    const team=resolveTeam(teams,teamKey);
+    if(!team||team.teamKey===own||!assignment.discordUserId)continue;
+    const username=assignment.discordUsername?`@${assignment.discordUsername}`:assignment.discordGlobalName||assignment.displayName;
+    const label=[team.displayName,team.abbreviation?`(${team.abbreviation})`:null,`Discord ${assignment.discordUserId}`,username].filter(Boolean).join(' · ');
+    if(matches(`${label} ${assignment.displayName} ${team.nickname||''}`,query)){
+      candidates.push(choice(label,`owner:${assignment.discordUserId}`));
+    }
+  }
+  return uniqueChoices(candidates);
+}
+
+async function selectedOpponentTeamKey(c,value){
+  const teams=await teamsFor(c),selected=clean(value);
+  const ownerId=selected.match(/^owner:(\d{17,20})$/)?.[1];
+  if(ownerId){
+    const assignments=await activeTeamAssignments(c.db,c.league.id,teams);
+    for(const [teamKey,assignment] of assignments){
+      if(String(assignment.discordUserId||'')===ownerId)return teamKey;
+    }
+    return null;
+  }
+  return resolveTeam(teams,selected)?.teamKey||null;
+}
+
 async function playerChoices(c,query,{teamKey=null}={}){
   const model=await discordLeagueReadModel(c,{domains:['teams','players']});
   return uniqueChoices(model.players.filter(player=>{
@@ -50,6 +79,7 @@ async function playerChoices(c,query,{teamKey=null}={}){
 }
 
 async function assetChoices(c,query,{teamKey}={}){
+  if(!canonicalTeamKey(teamKey))return[];
   const players=await playerChoices(c,query,{teamKey});
   const picks=(await c.db.prepare(`SELECT id,draft_class AS draftClass,round,original_team_key AS originalTeamKey
     FROM league_draft_picks WHERE league_id=? AND current_team_key=?
@@ -135,6 +165,7 @@ export async function discordAutocompleteChoices(c){
   if(command==='standings'&&name==='view')return standingsChoices(c,query);
   if(command==='schedule'&&name==='view')return scheduleChoices(c,query);
   if(command==='player'&&name==='name')return playerChoices(c,query);
+  if(command==='team'&&name==='name')return teamChoices(c,query);
   if(command==='player-stats'&&name==='player')return playerChoices(c,query);
   if(command==='team-stats'&&name==='team')return teamChoices(c,query);
   if(command==='stats'&&name==='name')return lower(values.target)==='team'?teamChoices(c,query):playerChoices(c,query);
@@ -143,14 +174,13 @@ export async function discordAutocompleteChoices(c){
   if(command==='trade-block'&&name==='team')return teamChoices(c,query);
   if(command==='gm-history'&&name==='name')return gmChoices(c,query);
   if(command==='rules'&&name==='query')return ruleChoices(c,query);
-  if(command==='trade'&&subcommand==='create'&&name==='opponent')return teamChoices(c,query,{excludeOwn:true});
+  if(command==='trade'&&subcommand==='create'&&['owner','opponent'].includes(name))return ownerChoices(c,query);
   if(command==='trade'&&subcommand==='create'&&/^send-[1-6]$/.test(name)){
     const teams=await teamsFor(c);return assetChoices(c,query,{teamKey:resolveTeam(teams,c.membership?.teamId)?.teamKey});
   }
   if(command==='trade'&&subcommand==='create'&&/^receive-[1-6]$/.test(name)){
-    const teams=await teamsFor(c);return assetChoices(c,query,{teamKey:resolveTeam(teams,values.opponent)?.teamKey});
+    return assetChoices(c,query,{teamKey:await selectedOpponentTeamKey(c,values.owner||values.opponent)});
   }
   if(command==='trade'&&name==='trade')return tradeChoices(c,query,{review:subcommand==='review'});
   return [];
 }
-
