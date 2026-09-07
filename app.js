@@ -7258,26 +7258,73 @@ function canonicalPlayerDashboardStats(playerId='') {
       return Boolean(rowTeamId(row));
     });
 
-    // Madden team records are season-to-date snapshots. Select the newest
-    // available snapshot per team rather than summing weekly cumulative rows.
-    const latest=new Map();
+    const additiveFields=new Set([
+      'offTotalYds','offTotalYdsGained','offPassYds','offPassTDs','offRushYds','offRushTDs','off1stDowns','offSacks',
+      'off3rdDownAtt','off3rdDownConv','off4thDownAtt','off4thDownConv','offRedZones','offRedZoneTDs','offRedZoneFGs',
+      'off2PtAtt','off2PtConv','defTotalYds','defPassYds','defRushYds','defSacks','defIntsRec','defForcedFum','defFumRec',
+      'defRedZones','defRedZoneTDs','defRedZoneFGs','offFumLost','offIntsLost','tOGiveaways','tOTakeaways','penalties','penaltyYds'
+    ]);
+    const aggregate=new Map();
     rows.forEach(row=>{
       const teamId=rowTeamId(row);
+      const team=matchupTeam(teamId);
+      const canonicalId=String(team?.id||teamId);
       const raw=statisticRaw(row);
       const stage=canonicalNormalizeStage(row.stage||raw.stage||raw.seasonStage);
       const week=Number(row.week??row.weekIndex??raw.week??raw.weekIndex)||0;
-      const current=latest.get(teamId);
-      if(!current||week>current.week){
-        latest.set(teamId,{row,week,stage});
+      const current=aggregate.get(canonicalId)||{teamId:canonicalId,team,raw:{},week:0,stage,rows:0};
+      additiveFields.forEach(field=>{
+        const value=Number(raw[field]);
+        if(Number.isFinite(value))current.raw[field]=Number(current.raw[field]||0)+value;
+      });
+      current.week=Math.max(current.week,week);
+      current.stage=stage;
+      current.rows+=1;
+      aggregate.set(canonicalId,current);
+    });
+
+    const ratio=(made,attempted)=>Number(attempted)>0?Number(made||0)/Number(attempted)*100:null;
+    aggregate.forEach(entry=>{
+      const raw=entry.raw;
+      raw.offTotalYds=raw.offTotalYds??raw.offTotalYdsGained;
+      raw.off3rdDownConvPct=ratio(raw.off3rdDownConv,raw.off3rdDownAtt);
+      raw.off4thDownConvPct=ratio(raw.off4thDownConv,raw.off4thDownAtt);
+      raw.off2PtConvPct=ratio(raw.off2PtConv,raw.off2PtAtt);
+      raw.offRedZonePct=ratio(Number(raw.offRedZoneTDs||0)+Number(raw.offRedZoneFGs||0),raw.offRedZones);
+      raw.defRedZonePct=ratio(Number(raw.defRedZoneTDs||0)+Number(raw.defRedZoneFGs||0),raw.defRedZones);
+      if(raw.tOGiveaways===undefined&&(raw.offIntsLost!==undefined||raw.offFumLost!==undefined)){
+        raw.tOGiveaways=Number(raw.offIntsLost||0)+Number(raw.offFumLost||0);
+      }
+      if(raw.tOTakeaways===undefined&&(raw.defIntsRec!==undefined||raw.defFumRec!==undefined)){
+        raw.tOTakeaways=Number(raw.defIntsRec||0)+Number(raw.defFumRec||0);
+      }
+      if(raw.tOGiveaways!==undefined||raw.tOTakeaways!==undefined)raw.tODiff=Number(raw.tOTakeaways||0)-Number(raw.tOGiveaways||0);
+
+      const aliases=canonicalTeamIdAliases(entry.teamId);
+      const completed=(liveTeamDirectory?.games||[]).filter(game=>{
+        const source=game.source||{},year=Number(game.seasonYear??game.season??source.seasonYear??source.calendarYear);
+        const stage=canonicalNormalizeStage(game.stage||source.stage||source.seasonStage);
+        const status=String(game.status||resolvedGameStatus(game,window.FranchiseHQ?.currentSeasonContext||null)||'').toLowerCase();
+        const scheduled=/scheduled|pregame|not.?started|unplayed|pending/.test(status)||status==='1';
+        const homeScore=Number(game.homeScore??source.homeScore),awayScore=Number(game.awayScore??source.awayScore);
+        const finished=!scheduled&&(/final|complete|played/.test(status)||(Number.isFinite(homeScore)&&Number.isFinite(awayScore)&&(homeScore!==0||awayScore!==0)));
+        const involved=[game.homeTeamId,game.homeId,game.awayTeamId,game.awayId].some(value=>aliases.has(String(value??'').toLowerCase()));
+        return finished&&stage!=='preseason'&&involved&&(!Number.isFinite(currentYear)||!Number.isFinite(year)||year===currentYear);
+      });
+      if(completed.length){
+        let pointsFor=0,pointsAgainst=0;
+        completed.forEach(game=>{
+          const source=game.source||{};
+          const home=[game.homeTeamId,game.homeId].some(value=>aliases.has(String(value??'').toLowerCase()));
+          pointsFor+=Number(home?(game.homeScore??source.homeScore):(game.awayScore??source.awayScore))||0;
+          pointsAgainst+=Number(home?(game.awayScore??source.awayScore):(game.homeScore??source.homeScore))||0;
+        });
+        raw.offPtsPerGame=pointsFor/completed.length;
+        raw.defPtsPerGame=pointsAgainst/completed.length;
       }
     });
 
-    return [...latest.entries()].map(([teamId,item])=>{
-      const row=item.row;
-      const raw={...(row.source||{}),...(row.metrics||{}),...row};
-      const team=matchupTeam(teamId);
-      return {teamId,team,raw,week:item.week,stage:item.stage};
-    });
+    return [...aggregate.values()];
   }
 
   function seasonTeamStatValue(raw={},field=''){
@@ -9915,7 +9962,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.4.4.8';
+  const VISIBLE_RELEASE = '7.4.4.9';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

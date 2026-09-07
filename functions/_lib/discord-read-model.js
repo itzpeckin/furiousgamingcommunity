@@ -11,7 +11,7 @@ import { currentFranchiseContext } from './ownership-periods.js';
 
 const clean=value=>String(value??'').trim();
 const lower=value=>clean(value).toLowerCase();
-const number=value=>Number.isFinite(Number(value))?Number(value):null;
+const number=value=>value===null||value===undefined||value===''?null:Number.isFinite(Number(value))?Number(value):null;
 const rows=async(db,sql,...values)=>(await db.prepare(sql).bind(...values).all()).results||[];
 const record=(wins=0,losses=0,ties=0)=>`${Number(wins||0)}-${Number(losses||0)}${Number(ties||0)?`-${Number(ties)}`:''}`;
 const truncate=(value,max=1900)=>{
@@ -57,9 +57,20 @@ export async function discordLeagueReadModel(c,{domains=[]}={}){
 }
 
 function standingTeam(model,item){return resolveTeam(model.teams,item.teamId)||resolveTeam(model.teams,item.teamName)}
+function standingsTeamSearch(teams,value){
+  const direct=resolveTeam(teams,value),wanted=lower(value);
+  if(direct||!wanted)return direct;
+  return teams.find(team=>[team.displayName,team.nickname,team.abbreviation]
+    .some(candidate=>lower(candidate).includes(wanted)))||null;
+}
 function standingConference(model,item){return clean(item.conference||standingTeam(model,item)?.conferenceName)}
 function standingDivision(model,item){return clean(item.division||standingTeam(model,item)?.divisionName)}
-function sortStandings(items){return items.sort((a,b)=>(number(a.rank)??999)-(number(b.rank)??999)||(b.wins||0)-(a.wins||0)||(a.losses||0)-(b.losses||0))}
+function playoffSeed(item){const value=number(item?.seed);return value!==null&&value>0?value:null}
+function sortStandings(items,{preferSeed=false}={}){return items.sort((a,b)=>
+  (preferSeed?(playoffSeed(a)??999)-(playoffSeed(b)??999):0)
+  ||(number(a.rank)??999)-(number(b.rank)??999)
+  ||(b.wins||0)-(a.wins||0)||(a.losses||0)-(b.losses||0)
+  ||clean(a.teamName||a.teamId).localeCompare(clean(b.teamName||b.teamId)))}
 function standingLine(model,item,index){
   const team=standingTeam(model,item);
   return `${item.rank||index+1}. **${team?.displayName||item.teamName||item.teamId}** (${team?.abbreviation||'—'}) · ${record(item.wins,item.losses,item.ties)}${item.seed?` · Seed ${item.seed}`:''}`;
@@ -74,6 +85,12 @@ export async function standingsCommand(c,values){
   let view=clean(values.view);
   if(!view&&values.scope)view=`${lower(values.scope)}:${clean(values.name)||'all'}`;
   view=view||'league';
+  const typedView=lower(view).replace(/\s+/g,' ').trim();
+  if(['division','divisions','division:all'].includes(typedView))view='division:all';
+  else if(['conference','conferences','conference:all'].includes(typedView))view='conference:all';
+  else if(/^division(?:\s+|:)(.+)$/i.test(view))view=`division:${clean(view.match(/^division(?:\s+|:)(.+)$/i)?.[1])}`;
+  else if(/^conference(?:\s+|:)(.+)$/i.test(view))view=`conference:${clean(view.match(/^conference(?:\s+|:)(.+)$/i)?.[1])}`;
+  else if(/^team(?:\s+|:)(.+)$/i.test(view))view=`team:${clean(view.match(/^team(?:\s+|:)(.+)$/i)?.[1])}`;
   let title='League Standings',groupBy=null;
   if(view==='conference:all'||view==='conference')groupBy=item=>standingConference(model,item);
   else if(view==='division:all'||view==='division')groupBy=item=>standingDivision(model,item);
@@ -90,7 +107,7 @@ export async function standingsCommand(c,values){
     standings=team?standings.filter(item=>standingTeam(model,item)?.teamKey===team.teamKey):[];
     title=`${team?.displayName||view.slice('team:'.length)} Standings`;
   }else if(view!=='league'){
-    const typed=lower(view),team=resolveTeam(model.teams,typed);
+    const typed=lower(view),team=standingsTeamSearch(model.teams,typed);
     if(team){standings=standings.filter(item=>standingTeam(model,item)?.teamKey===team.teamKey);title=`${team.displayName} Standings`;}
     else{
       const division=standings.find(item=>lower(standingDivision(model,item))===typed)?.division;
@@ -102,15 +119,59 @@ export async function standingsCommand(c,values){
   if(groupBy){
     const groups=new Map();
     for(const item of standings){const key=groupBy(item)||'Unassigned';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item)}
-    const grouped=[];
-    for(const key of [...groups.keys()].sort()){grouped.push(`__${key}__`);grouped.push(...sortStandings(groups.get(key)).map((item,index)=>standingLine(model,item,index)))}
-    return lines(`${c.league.name} · ${view.startsWith('division')?'Division':'Conference'} Standings`,grouped);
+    const title=`${c.league.name} · ${view.startsWith('division')?'Division':'Conference'} Standings`;
+    return {content:`**${title}**`,embeds:[{
+      title:view.startsWith('division')?'All 32 teams by division':'All 32 teams by conference',
+      color:0x4f8cff,
+      fields:[...groups.keys()].sort().map(key=>({
+        name:key,
+        value:sortStandings(groups.get(key)).map((item,index)=>standingLine(model,item,index)).join('\n'),
+        inline:view.startsWith('division')
+      }))
+    }]};
   }
   return lines(`${c.league.name} · ${title}`,sortStandings(standings).slice(0,32).map((item,index)=>standingLine(model,item,index)));
 }
 
+function playoffLine(model,item,index){
+  const team=standingTeam(model,item),seed=playoffSeed(item)??index+1;
+  const status=seed<=7?'Playoff Seed':'In the Hunt';
+  return `${seed}. **${team?.displayName||item.teamName||item.teamId}** (${team?.abbreviation||'—'}) · ${record(item.wins,item.losses,item.ties)} · ${status}`;
+}
+
+export async function playoffsCommand(c,values={}){
+  const model=await discordLeagueReadModel(c,{domains:['teams','standings']});
+  let standings=model.standings.length?model.standings:model.teams.map(team=>({
+    teamId:team.id,teamName:team.displayName,wins:team.record?.wins,losses:team.record?.losses,
+    ties:team.record?.ties,conference:team.conferenceName,division:team.divisionName,rank:null,seed:null
+  }));
+  const requested=lower(values.conference).replace(/^conference(?:\s+|:)/,'').trim();
+  const groups=new Map();
+  for(const item of standings){
+    const conference=standingConference(model,item)||'Unassigned';
+    if(requested&&requested!=='all'&&lower(conference)!==requested)continue;
+    if(!groups.has(conference))groups.set(conference,[]);
+    groups.get(conference).push(item);
+  }
+  const fields=[...groups.keys()].sort().map(conference=>({
+    name:`${conference} Playoff Hunt`,
+    value:sortStandings(groups.get(conference),{preferSeed:true}).slice(0,10)
+      .map((item,index)=>playoffLine(model,item,index)).join('\n')||'No standings are available.',
+    inline:false
+  }));
+  return {
+    content:`**${c.league.name} · Playoff Hunt**`,
+    embeds:[{title:requested&&requested!=='all'?`${[...groups.keys()][0]||clean(values.conference)} Top 10`:'Top 10 by conference',
+      description:'Seeds 1–7 are currently in the playoff field. Seeds 8–10 are In the Hunt.',color:0x4f8cff,fields}]
+  };
+}
+
 function gamePlayed(game){
-  return /final|complete|played/i.test(clean(game.status))||game.homeScore!==null&&game.awayScore!==null;
+  const status=lower(game.status);
+  if(/scheduled|pregame|not.?started|unplayed|pending/.test(status)||status==='1')return false;
+  if(/final|complete|played/.test(status))return true;
+  return number(game.homeScore)!==null&&number(game.awayScore)!==null
+    &&(number(game.homeScore)!==0||number(game.awayScore)!==0);
 }
 
 function canonicalGameStage(value){
@@ -154,7 +215,7 @@ export async function scheduleCommand(c,values){
     });
     return lines(`${c.league.name} · Season Schedule`,[
       ...weekRows,
-      `Full schedule: https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#schedule`
+      `Full schedule: [Open ${c.league.name} Schedule](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#schedule)`
     ]);
   }
   const selectedTeam=requestedTeam?resolveTeam(model.teams,requestedTeam):null;
@@ -528,7 +589,7 @@ export async function teamStatsCommand(c,values){
   const standing=model.standings.find(item=>standingTeam(model,item)?.teamKey===team.teamKey);
   const fields=teamMetricFields(totals);
   if(!fields.length)fields.push({name:'Statistics',value:'No completed-game team statistics are available.',inline:false});
-  return {content:href,embeds:[{
+  return {content:`[Open ${team.displayName} in FranchiseHQ](${href})`,embeds:[{
     title:`${team.displayName} Team Statistics`,url:href,color:embedColor(team.primaryColor),
     description:[`${model.snapshot.season_year||'Current'} Franchise season`,standing?record(standing.wins,standing.losses,standing.ties):null].filter(Boolean).join(' · '),
     fields,footer:{text:`${c.league.name} · Source-backed team-game totals and derived rates`}
@@ -579,7 +640,7 @@ export async function tradeBlockCommand(c,values){
     return {name:href?`[${item.playerName||'Trade asset'}](${href})`:item.playerName||item.draftPickId||'Trade asset',
       value:[teamName(state.teams,item.teamKey),player?.position,player?.overall!=null?`${player.overall} OVR`:null,player?.age!=null?`Age ${player.age}`:null,player?.devTrait?`${player.devTrait} Dev`:null,`Looking for: ${looking}`].filter(Boolean).join(' · '),inline:false};
   });
-  return {content:`**${c.league.name} · Trade Block** · ${listings.length} listed${listings.length>25?' · first 25 shown':''}\nhttps://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-block`,embeds:[{
+  return {content:`**${c.league.name} · Trade Block** · ${listings.length} listed${listings.length>25?' · first 25 shown':''} · [Open Trade Block](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-block)`,embeds:[{
     title:'League Trade Block',color:0x4f8cff,fields,footer:{text:'Player names open the canonical FranchiseHQ Player Card.'}
   }]};
 }
@@ -593,7 +654,7 @@ export async function tradeHistoryCommand(c){
     GROUP BY workflow.id,workflow.approved_at
     ORDER BY workflow.approved_at DESC,workflow.updated_at DESC LIMIT 20`,c.league.id);
   return lines(`${c.league.name} · Approved Trade History`,result.map(item=>
-    `**${item.teams||'League trade'}** · ${item.approvedAt||'Approved'}\nhttps://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-center/${encodeURIComponent(item.id)}`
+    `**[${item.teams||'League trade'}](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-center/${encodeURIComponent(item.id)})** · ${item.approvedAt||'Approved'}`
   ));
 }
 
@@ -683,7 +744,7 @@ export async function twitchViewCommand(c,values,interaction){
     LEFT JOIN user_stream_profiles profile ON profile.user_id=user.id
     WHERE user.discord_user_id=? LIMIT 1`).bind(c.league.id,requested).first();
   if(!row)throw Object.assign(new Error('That Discord member is not active in this league.'),{status:404});
-  return lines(`${c.league.name} · Twitch`,[],row.twitchUrl?`**${row.displayName}**\n${row.twitchUrl}`:`${row.displayName} has not added a Twitch channel.`);
+  return lines(`${c.league.name} · Twitch`,[],row.twitchUrl?`**[${row.displayName} on Twitch](${row.twitchUrl})**`:`${row.displayName} has not added a Twitch channel.`);
 }
 
 export async function confidenceViewCommand(c){

@@ -154,6 +154,7 @@
   "files": {
     "byExtension": {
       ".css": 9,
+      ".db": 1,
       ".example": 1,
       ".html": 3,
       ".js": 211,
@@ -164,12 +165,13 @@
       ".png": 3,
       ".sql": 37,
       ".txt": 1,
+      ".yaml": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 636648,
+        "bytes": 640070,
         "file": "app.js"
       },
       {
@@ -177,7 +179,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 428042,
+        "bytes": 428052,
         "file": "trade-module.js"
       },
       {
@@ -205,20 +207,20 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 56041,
+        "bytes": 72440,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 48739,
+        "bytes": 49096,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
+      },
+      {
+        "bytes": 45124,
+        "file": "functions/_lib/discord-read-model.js"
       },
       {
         "bytes": 42351,
         "file": "tests/import/madden-discovery.test.mjs"
-      },
-      {
-        "bytes": 41633,
-        "file": "functions/_lib/discord-read-model.js"
       },
       {
         "bytes": 39129,
@@ -249,7 +251,7 @@
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 595
+    "total": 597
   },
   "frontend": {
     "assets": [
@@ -1523,7 +1525,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.4.8",
+  "release": "7.4.4.9",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

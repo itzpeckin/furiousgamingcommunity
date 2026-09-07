@@ -129,6 +129,9 @@ test('Production player-card and Trade Center adapters preserve ratings and cont
   assert.match(appSource, /salary:tradeCalculatorMillions\(player\.salary\)/);
   assert.match(appSource, /capHit:tradeCalculatorMillions\(player\.capHit\)/);
   assert.match(appSource, /franchisehq:trade-live-cache:v2/);
+  assert.match(appSource, /function seasonTeamStatRows\(\)[\s\S]*const additiveFields=new Set\(/);
+  assert.match(appSource, /current\.raw\[field\]=Number\(current\.raw\[field\]\|\|0\)\+value/);
+  assert.doesNotMatch(appSource, /Madden team records are season-to-date snapshots/);
 });
 
 test('global league shell is hydrated from league data without platform implementation callouts', async () => {

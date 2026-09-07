@@ -47,7 +47,7 @@ function gameMessage({league,model,game,assignments,phase,week}) {
       `**${teams.away.displayName} at ${teams.home.displayName}**`,
       `${ownerMention(awayOwner)} vs ${ownerMention(homeOwner)}`,
       game.scheduledAt ? `Scheduled: ${game.scheduledAt}` : null,
-      site
+      `[Open the league schedule](${site})`
     ].filter(Boolean).join('\n').slice(0,2000),
     allowedMentions:{parse:[],users:ids},
     teams,
@@ -92,11 +92,28 @@ async function existingThread(db,{leagueId,seasonYear,phase,week,gameId}) {
     .bind(leagueId,seasonYear,phase,week,gameId).first();
 }
 
+async function existingMatchupThread(db,{leagueId,seasonYear,phase,week,homeTeamKey,awayTeamKey}) {
+  return db.prepare(`SELECT * FROM discord_schedule_threads
+    WHERE league_id=? AND season_year=? AND phase=? AND week_index=?
+      AND home_team_key=? AND away_team_key=?
+    ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'creating' THEN 1 ELSE 2 END,created_at DESC
+    LIMIT 1`).bind(leagueId,seasonYear,phase,week,homeTeamKey,awayTeamKey).first();
+}
+
 async function createMatchupThread(env,db,{run,league,model,game,assignments,phase,week,fetchImpl}) {
   const message = gameMessage({league,model,game,assignments,phase,week});
   if (!message) throw new Error(`Schedule game ${game.id || 'unknown'} does not resolve to two league teams.`);
+  const homeTeamKey=scheduleTeamKey(message.teams.home),awayTeamKey=scheduleTeamKey(message.teams.away);
   let record = await existingThread(db,{leagueId:league.id,seasonYear:model.snapshot.season_year,phase,week,gameId:game.id});
-  if (record?.status === 'active' && SNOWFLAKE.test(clean(record.discord_thread_id))) return {created:false,record,owners:message.ids};
+  if(!record)record=await existingMatchupThread(db,{leagueId:league.id,seasonYear:model.snapshot.season_year,
+    phase,week,homeTeamKey,awayTeamKey});
+  if (record?.status === 'active' && SNOWFLAKE.test(clean(record.discord_thread_id))) {
+    await db.prepare(`UPDATE discord_schedule_threads SET snapshot_id=?,sync_run_id=?,game_external_id=?,
+      home_discord_user_id=?,away_discord_user_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(
+        model.snapshot.id,run.id,game.id,message.homeOwner?.discordUserId||null,message.awayOwner?.discordUserId||null,record.id
+      ).run();
+    return {created:false,record:{...record,game_external_id:game.id},owners:message.ids};
+  }
   if (!record) {
     const id = `discord_schedule_thread_${crypto.randomUUID()}`;
     await db.prepare(`INSERT OR IGNORE INTO discord_schedule_threads
@@ -104,7 +121,7 @@ async function createMatchupThread(env,db,{run,league,model,game,assignments,pha
        season_year,phase,week_index,home_team_key,away_team_key,home_discord_user_id,away_discord_user_id,status)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'creating')`).bind(
         id,league.id,model.snapshot.id,run.id,run.discord_guild_id,run.schedule_channel_id,game.id,
-        model.snapshot.season_year,phase,week,scheduleTeamKey(message.teams.home),scheduleTeamKey(message.teams.away),
+        model.snapshot.season_year,phase,week,homeTeamKey,awayTeamKey,
         message.homeOwner?.discordUserId||null,message.awayOwner?.discordUserId||null
       ).run();
     record = await existingThread(db,{leagueId:league.id,seasonYear:model.snapshot.season_year,phase,week,gameId:game.id});
