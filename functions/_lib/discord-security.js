@@ -2,8 +2,8 @@ import { createId } from './auth.js';
 import { resolveTenantById, tenantDatabase, createTenantAuditContext, tenantAuditStatement } from './tenant-context.js';
 import { sha256Hex } from './cloud-platform.js';
 
-export const DISCORD_INTERACTION_TYPES=Object.freeze({PING:1,APPLICATION_COMMAND:2});
-export const DISCORD_RESPONSE_TYPES=Object.freeze({PONG:1,CHANNEL_MESSAGE:4,DEFERRED_CHANNEL_MESSAGE:5});
+export const DISCORD_INTERACTION_TYPES=Object.freeze({PING:1,APPLICATION_COMMAND:2,APPLICATION_COMMAND_AUTOCOMPLETE:4});
+export const DISCORD_RESPONSE_TYPES=Object.freeze({PONG:1,CHANNEL_MESSAGE:4,DEFERRED_CHANNEL_MESSAGE:5,APPLICATION_COMMAND_AUTOCOMPLETE_RESULT:8});
 export const DISCORD_EPHEMERAL_FLAG=64;
 const MAX_BODY_BYTES=128*1024;
 const MAX_TIMESTAMP_SKEW_SECONDS=5*60;
@@ -60,6 +60,24 @@ export function discordErrorResponse(message='This action could not be completed
   return discordInteractionResponse(DISCORD_RESPONSE_TYPES.CHANNEL_MESSAGE,{
     content:String(message).slice(0,1900),flags:DISCORD_EPHEMERAL_FLAG,allowed_mentions:{parse:[]}
   });
+}
+
+export function discordMessageData(message){
+  const source=message&&typeof message==='object'&&!Array.isArray(message)?message:{content:message};
+  const content=source.content===null||source.content===undefined?'':String(source.content).slice(0,2000);
+  const embeds=Array.isArray(source.embeds)?source.embeds.slice(0,10).map(embed=>({
+    ...embed,
+    ...(embed?.title?{title:String(embed.title).slice(0,256)}:{}),
+    ...(embed?.description?{description:String(embed.description).slice(0,4096)}:{}),
+    ...(Array.isArray(embed?.fields)?{fields:embed.fields.slice(0,25).map(field=>({
+      name:String(field?.name||'Details').slice(0,256),value:String(field?.value||'—').slice(0,1024),inline:Boolean(field?.inline)
+    }))}:{})
+  })):[];
+  return {
+    ...(content?{content}:{}),
+    ...(embeds.length?{embeds}:{}),
+    allowed_mentions:{parse:[]}
+  };
 }
 
 function canManageInteractionGuild(interaction){
@@ -241,9 +259,7 @@ export async function editDiscordOriginalResponse(interaction,message,{fetchImpl
   const token=String(interaction.token||'');
   if(!SNOWFLAKE.test(applicationId)||!token)throw new Error('Discord response token is unavailable.');
   const response=await fetchImpl(`https://discord.com/api/v10/webhooks/${encodeURIComponent(applicationId)}/${encodeURIComponent(token)}/messages/@original`,{
-    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({
-      content:String(message||'Done.').slice(0,2000),allowed_mentions:{parse:[]}
-    })
+    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(discordMessageData(message||'Done.'))
   });
   if(!response.ok)throw new Error(`Discord response update failed with ${response.status}.`);
   return true;
