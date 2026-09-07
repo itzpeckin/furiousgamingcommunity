@@ -1,5 +1,8 @@
 import { sha256Hex } from './cloud-platform.js';
-import { buildMaddenDiscoveryReport } from './madden-discovery.js';
+import {
+  buildMaddenDiscoveryReport,
+  MADDEN_DISCOVERY_ANALYSIS_POLICY
+} from './madden-discovery.js';
 import { reportImportReadiness } from './permanent-league-export.js';
 
 const MAX_CAPTURE_COUNT = 250;
@@ -37,6 +40,10 @@ export function publicMaddenDiscoveryReport(row) {
     activationPerformed:false,
     activeSnapshotChanged:false
   };
+}
+
+export function maddenDiscoveryReportUsesCurrentPolicy(row) {
+  return parse(row?.sanitized_fixture_json, {}).analysisPolicy === MADDEN_DISCOVERY_ANALYSIS_POLICY;
 }
 
 export async function latestMaddenDiscoveryReport(db, leagueId) {
@@ -393,6 +400,7 @@ export async function generateMaddenDiscoveryReport({
   if (retained
     && Number(retained.capture_count || 0) === rows.length
     && Number(retained.total_bytes || 0) === totalBytes
+    && maddenDiscoveryReportUsesCurrentPolicy(retained)
     && (Date.parse(retained.generated_at || '') || 0) >= newestObservedAt) {
     const retainedPublic = publicMaddenDiscoveryReport(retained);
     const retainedReadiness = reportImportReadiness(retainedPublic);

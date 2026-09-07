@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.7",
+  "validatedOn": "2026-09-06",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "strictRepositoryGate": {
+    "passed": true,
+    "javascriptModules": 253,
+    "inventoryEntries": 595,
+    "routes": 76,
+    "passedTests": 193,
+    "failedTests": 0
+  },
+  "checks": {
+    "multiPeriodSourceReadiness": {
+      "passed": true,
+      "completePeriodsRequired": true,
+      "scheduleAndStatisticsRequiredPerPeriod": true,
+      "incompleteMixturesRejected": true,
+      "downstreamMultiPeriodCompositionPreserved": true
+    },
+    "retainedReportPolicy": {
+      "passed": true,
+      "versioned": true,
+      "oldPolicyReanalyzedOnce": true,
+      "currentPolicyReused": true,
+      "newExportRequired": false
+    },
+    "productionShapedRoster": {
+      "passed": true,
+      "teams": 32,
+      "rosteredPlayers": 2044,
+      "importReady": true
+    },
+    "activeSnapshotIsolation": {
+      "passed": true,
+      "activeSnapshotWritesPresent": false,
+      "importExecuted": false,
+      "activationPerformed": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 35,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedTests": 193,
+      "failedTests": 0,
+      "scope": "full-strict-local-suite"
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "productionDiagnosis": {
+    "readOnly": true,
+    "database": "franchise-hq-db-madden27",
+    "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+    "latestSessionId": "m27_auto_39a85602e04bd654a9c2da4a581076e3",
+    "latestReportId": "m27_report_70298e54-beb9-4277-ae79-252801a743b3",
+    "routeCount": 51,
+    "captureCount": 51,
+    "requiredDatasetsLocated": true,
+    "observedRegularSeasonWeeks": [11, 13],
+    "failedVerificationField": "week",
+    "productionRowsWritten": 0
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordCredentialsChanged": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "stagingDeployment": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 35,
+      "candidateMigration": 35
+    },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "not-run",
+      "currentRelease": "7.4.4.6"
+    },
+    "retainedReportReanalysis": {
+      "authorized": false,
+      "status": "not-run"
+    }
+  }
+}

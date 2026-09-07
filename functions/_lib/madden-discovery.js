@@ -1,5 +1,8 @@
 import { resolveMaddenPeriod } from './madden-period.js';
 
+export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'same-season-complete-periods-v1';
+export const MADDEN_DISCOVERY_RELEASE = '7.4.4.7';
+
 const DATASET_ORDER = Object.freeze([
   'league-info',
   'teams',
@@ -291,6 +294,30 @@ function mergeMarkers(analyses, expected = {}) {
   return output;
 }
 
+function completePeriodCoverage(analyses) {
+  const periods = new Map();
+  for (const analysis of analyses) {
+    if (!['schedule', 'statistics'].includes(analysis.datasetType) || analysis.period?.playable !== true) continue;
+    const key = analysis.period.key || `${analysis.period.stage}:${analysis.period.week}`;
+    const domains = periods.get(key) || new Set();
+    domains.add(analysis.datasetType);
+    periods.set(key, domains);
+  }
+  return [...periods.entries()]
+    .filter(([, domains]) => domains.has('schedule') && domains.has('statistics'))
+    .map(([key]) => key);
+}
+
+function acceptsCompleteMultiPeriodWeeks(analyses, weekMarker) {
+  const completePeriods = completePeriodCoverage(analyses);
+  if (completePeriods.length < 2) return null;
+  const completeWeeks = new Set(completePeriods.map(period => Number.parseInt(period.split(':').at(-1), 10)));
+  const observedWeeks = (weekMarker?.observed || []).map(value => Number.parseInt(String(value), 10));
+  if (!observedWeeks.length || observedWeeks.some(week => !Number.isInteger(week) || week < 0 || week > 40)) return null;
+  if (!observedWeeks.every(week => completeWeeks.has(week))) return null;
+  return completePeriods;
+}
+
 function markerMatches(marker, observedValue, expectedValue) {
   const observed = text(observedValue).toLowerCase();
   const expected = text(expectedValue).toLowerCase();
@@ -419,7 +446,7 @@ function buildPlayerImportReadiness(captures, requirements) {
 }
 
 function sourceGate(markers) {
-  const acceptable = new Set(['matched', 'observed']);
+  const acceptable = new Set(['matched', 'observed', 'multi-period']);
   const gameRelease = markers.gameRelease?.status === 'matched'
     || markers.gameRelease?.status === 'commissioner-confirmed-only';
   const league = acceptable.has(markers.sourceLeagueId?.status)
@@ -453,7 +480,8 @@ function fixtureFor(analyses, requirements, markers, playerImportReadiness) {
   return {
     schemaVersion: 1,
     product: 'FranchiseHQ',
-    release: '7.4.1',
+    release: MADDEN_DISCOVERY_RELEASE,
+    analysisPolicy: MADDEN_DISCOVERY_ANALYSIS_POLICY,
     rawValuesIncluded: false,
     sourceMarkerStatuses: Object.fromEntries(Object.entries(markers).map(([key, item]) => [key, item.status])),
     requirements: Object.fromEntries(Object.entries(requirements).map(([key, item]) => [key, { status: item.status, recordCount: item.recordCount }])),
@@ -483,6 +511,13 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
   const playerImportReadiness = buildPlayerImportReadiness(captures, requirements);
   requirements.players.assignmentEvidence = playerImportReadiness;
   const markers = mergeMarkers(analyses, options.expected || {});
+  if (markers.week?.status === 'ambiguous') {
+    const completePeriods = acceptsCompleteMultiPeriodWeeks(analyses, markers.week);
+    if (completePeriods) {
+      markers.week.status = 'multi-period';
+      markers.week.completePeriods = completePeriods;
+    }
+  }
   const sourceVerification = sourceGate(markers);
   const datasetsPassed = REQUIRED_DATASETS.every(type => {
     const status = requirements[type]?.status;
@@ -522,7 +557,7 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
   return {
     schemaVersion: 1,
     product: 'FranchiseHQ',
-    release: '7.4.1',
+    release: MADDEN_DISCOVERY_RELEASE,
     discoverySessionId: options.discoverySessionId || null,
     status: datasetsPassed && sourceVerification.passed ? 'passed' : 'review_required',
     routeCount: new Set(analyses.map(item => item.routePath)).size,

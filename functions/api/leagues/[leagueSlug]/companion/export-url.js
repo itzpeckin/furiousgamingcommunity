@@ -14,13 +14,14 @@ import {
 import { candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
 import {
   generateMaddenDiscoveryReport,
+  maddenDiscoveryReportUsesCurrentPolicy,
   publicMaddenDiscoveryReport,
   recoverMaddenDiscoveryCohort,
   stitchRecentPartialMaddenCohort
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.4.1';
+const RELEASE = '7.4.4.7';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();
@@ -68,8 +69,13 @@ async function candidateFor(db, leagueId, discoverySessionId) {
 
 async function maybeAnalyzeIdleExport(current, endpoint) {
   const session = await sessionFor(current.db,current.league.id,endpoint?.latest_session_id);
+  const latestReport = await reportFor(current.db,current.league.id,endpoint?.latest_report_id);
   const idleMs = session?.last_capture_at ? Date.now()-(Date.parse(session.last_capture_at) || Date.now()) : 0;
-  if (session?.status !== 'open' || Number(session.capture_count || 0) < 1 || idleMs < AUTO_ANALYZE_IDLE_MS) return null;
+  const stalePolicyReport = session?.status === 'review_required'
+    && latestReport?.session_id === session.id
+    && !maddenDiscoveryReportUsesCurrentPolicy(latestReport);
+  const idleOpenSession = session?.status === 'open' && idleMs >= AUTO_ANALYZE_IDLE_MS;
+  if ((!idleOpenSession && !stalePolicyReport) || Number(session?.capture_count || 0) < 1) return null;
   const claimAge = endpoint?.analysis_requested_at
     ? Date.now()-(Date.parse(endpoint.analysis_requested_at) || Date.now())
     : Number.POSITIVE_INFINITY;
@@ -117,7 +123,7 @@ function readinessProblems(report) {
   if (!located('statistics') && !explicitEmptyStatistics) problems.push('The current-week Weekly Stats routes were not received.');
   if (report.sourceVerification?.passed !== true) {
     const weekStatus = String(report.sourceMarkers?.week?.status || '').toLowerCase();
-    if (!['matched','observed'].includes(weekStatus)) problems.push('The export does not contain an authoritative current-week marker.');
+    if (!['matched','observed','multi-period'].includes(weekStatus)) problems.push('The export does not contain authoritative complete-period week markers.');
     else problems.push('The export source identity did not pass verification.');
   }
   return [...new Set(problems)];
