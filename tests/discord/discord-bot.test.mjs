@@ -582,6 +582,24 @@ test('/trade-block add and remove are private, roster-authorized, and use player
     assert.deepEqual({...database.prepare(`SELECT active,requested_return AS requestedReturn FROM trade_block_listings`).get()}, {
       active:1,requestedReturn:'Young corner or a pick'
     });
+    const viewed=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000079',name:'trade-block',options:[{type:1,name:'view'}]
+    })}));
+    const viewedPayload=await viewed.json();
+    const playerCard=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000080',name:'player',options:[{type:3,name:'name',value:'Chase Runner'}]
+    })}));
+    const playerCardEmbed=(await playerCard.json()).data.embeds[0];
+    const tradeBlockEmbed=viewedPayload.data.embeds[0];
+    assert.equal(viewedPayload.data.embeds.length,1);
+    for(const key of ['title','description','url','color','footer'])assert.deepEqual(tradeBlockEmbed[key],playerCardEmbed[key]);
+    assert.deepEqual(tradeBlockEmbed.fields.filter(field=>field.name!=='Looking For'),playerCardEmbed.fields);
+    assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Overall').value,'87');
+    assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Age').value,'24');
+    assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Development').value,'Superstar');
+    assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Looking For').value,'Young corner or a pick');
+    assert.match(tradeBlockEmbed.fields.map(field=>field.value).join(' '),/Rush Yds:\*\* 96.*Rushing TDs:\*\* 1/s);
+    assert.match(tradeBlockEmbed.url,/\/leagues\/alpha#players\//);
     const removed=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000078',name:'trade-block',options:[{type:1,name:'remove',options:[
         {type:3,name:'player',value:'chase-rb'}
