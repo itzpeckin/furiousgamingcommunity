@@ -1,4 +1,11 @@
-export const DISCORD_COMMAND_RELEASE = '7.4.4.7';
+export const DISCORD_COMMAND_RELEASE = '7.4.4.8';
+
+// These names belong to FranchiseHQ and are replaced by the direct /player and
+// /team experiences. Registration removes only these exact legacy names after
+// every current command has been upserted successfully.
+export const DISCORD_RETIRED_GLOBAL_COMMANDS = Object.freeze([
+  'stats','player-stats','team-stats'
+]);
 
 const OPTION = Object.freeze({
   SUB_COMMAND:1,
@@ -43,37 +50,15 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
     name:'schedule',description:'View the schedule for a week or team.',
     options:[
       autocompleteString('view','Team or week, such as Buccaneers or Week 12.'),
-      {type:OPTION.STRING,name:'status',description:'Filter games.',choices:[
-        choice('All','all'),choice('Played','played'),choice('Unplayed','unplayed')
+      privateOption
+    ]
+  },
+  {
+    name:'games',description:'View played and unplayed games in the current scheduled week.',
+    options:[
+      {type:OPTION.STRING,name:'status',description:'Show both groups or only one game status.',choices:[
+        choice('Played and unplayed','all'),choice('Played','played'),choice('Unplayed','unplayed')
       ]},
-      privateOption
-    ]
-  },
-  {
-    name:'stats',description:'Look up player or team statistics.',
-    options:[
-      {type:OPTION.STRING,name:'target',description:'Choose player or team statistics.',required:true,choices:[
-        choice('Player','player'),choice('Team','team')
-      ]},
-      autocompleteString('name','Player or team name.',{required:true}),
-      categoryOption,
-      {type:OPTION.INTEGER,name:'week',description:'Optional franchise week.'},
-      privateOption
-    ]
-  },
-  {
-    name:'player-stats',description:'View a player’s cumulative Franchise career statistics by season.',
-    options:[
-      autocompleteString('player','Player name.',{required:true}),
-      categoryOption,
-      privateOption
-    ]
-  },
-  {
-    name:'team-stats',description:'View cumulative team statistics for the current Franchise season.',
-    options:[
-      autocompleteString('team','Team name or abbreviation.',{required:true}),
-      categoryOption,
       privateOption
     ]
   },
@@ -86,9 +71,16 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
     ]
   },
   {
-    name:'player',description:'Find a player and open the canonical FranchiseHQ Player Card.',
+    name:'player',description:'Find players and view all available position-specific Franchise statistics.',
     options:[
-      autocompleteString('name','Player name or public player ID.',{required:true}),
+      autocompleteString('name','Full or partial player name, or public Player ID.',{required:true}),
+      privateOption
+    ]
+  },
+  {
+    name:'team',description:'Find a team and view all available current-season team statistics.',
+    options:[
+      autocompleteString('name','Team name or abbreviation.',{required:true}),
       privateOption
     ]
   },
@@ -168,7 +160,7 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
     name:'trade',description:'Create or respond to a FranchiseHQ trade.',
     options:[
       {type:OPTION.SUB_COMMAND,name:'create',description:'Create a native two-team trade offer.',options:[
-        autocompleteString('opponent','Other team or owner.',{required:true}),
+        autocompleteString('owner','Registered FranchiseHQ owner and team.',{required:true}),
         autocompleteString('send-1','First player or pick your team sends.',{required:true}),
         autocompleteString('receive-1','First player or pick your team receives.',{required:true}),
         ...Array.from({length:5},(_,index)=>autocompleteString(`send-${index+2}`,`Additional player or pick your team sends.`)),

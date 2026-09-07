@@ -113,6 +113,21 @@ function gamePlayed(game){
   return /final|complete|played/i.test(clean(game.status))||game.homeScore!==null&&game.awayScore!==null;
 }
 
+function canonicalGameStage(value){
+  const stage=lower(value);
+  if(stage.includes('pre'))return'preseason';
+  if(stage.includes('post')||stage.includes('play')||stage.includes('pro'))return'playoffs';
+  return'regular-season';
+}
+
+function gameLine(teams,game,{includeWeek=false}={}){
+  const away=teamName(teams,game.awayTeamId),home=teamName(teams,game.homeTeamId);
+  const prefix=includeWeek?`W${game.week} · `:'';
+  return gamePlayed(game)
+    ?`${prefix}**${away} ${game.awayScore??'—'} @ ${home} ${game.homeScore??'—'}**`
+    :`${prefix}**${away} @ ${home}**${game.scheduledAt?` · ${game.scheduledAt}`:''}`;
+}
+
 export async function scheduleCommand(c,values){
   const model=await discordLeagueReadModel(c,{domains:['teams','games']});
   const currentWeek=number(model.snapshot.week_index)??number(c.league.current_week)??1;
@@ -124,10 +139,7 @@ export async function scheduleCommand(c,values){
   else if(/^week\s*\d+$/i.test(view))week=number(view.match(/\d+/)?.[0]);
   else if(view.startsWith('team:'))requestedTeam=view.slice('team:'.length);
   else if(view!=='season')requestedTeam=view;
-  const status=lower(values.status)||'all';
   let games=model.games.filter(game=>week===null||number(game.week)===week);
-  if(status==='played')games=games.filter(gamePlayed);
-  if(status==='unplayed')games=games.filter(game=>!gamePlayed(game));
   if(requestedTeam){
     const team=resolveTeam(model.teams,requestedTeam);
     if(!team)throw Object.assign(new Error('That team was not found in the active league.'),{status:404});
@@ -146,51 +158,90 @@ export async function scheduleCommand(c,values){
     ]);
   }
   const selectedTeam=requestedTeam?resolveTeam(model.teams,requestedTeam):null;
-  return lines(`${c.league.name} · ${selectedTeam?`${selectedTeam.displayName} Schedule`:week===null?'Season Schedule':`Week ${week}`}`,games.slice(0,40).map(game=>{
-    const away=teamName(model.teams,game.awayTeamId),home=teamName(model.teams,game.homeTeamId);
-    return gamePlayed(game)
-      ?`W${game.week} · **${away} ${game.awayScore??'—'} @ ${home} ${game.homeScore??'—'}**`
-      :`W${game.week} · **${away} @ ${home}**${game.scheduledAt?` · ${game.scheduledAt}`:''}`;
-  }));
+  return lines(`${c.league.name} · ${selectedTeam?`${selectedTeam.displayName} Schedule`:week===null?'Season Schedule':`Week ${week}`}`,
+    games.slice(0,40).map(game=>gameLine(model.teams,game,{includeWeek:true})));
+}
+
+export async function gamesCommand(c,values){
+  const model=await discordLeagueReadModel(c,{domains:['teams','games']});
+  const context=await currentFranchiseContext(c.db,c.league.id);
+  const status=lower(values.status)||'all';
+  const currentPeriod=model.games.filter(game=>{
+    const sameSeason=number(game.season)===null||number(context.seasonYear)===null||number(game.season)===number(context.seasonYear);
+    return sameSeason&&number(game.week)===number(context.week);
+  });
+  const stageRank={preseason:1,'regular-season':2,playoffs:3};
+  const activeStage=currentPeriod.map(game=>canonicalGameStage(game.stage)).sort((a,b)=>stageRank[b]-stageRank[a])[0]||context.stage;
+  const games=currentPeriod.filter(game=>canonicalGameStage(game.stage)===activeStage)
+    .sort((a,b)=>clean(a.scheduledAt).localeCompare(clean(b.scheduledAt))||clean(a.id).localeCompare(clean(b.id)));
+  const played=games.filter(gamePlayed),unplayed=games.filter(game=>!gamePlayed(game));
+  const items=[];
+  if(status!=='unplayed'){
+    items.push(`__Played (${played.length})__`);
+    items.push(...(played.length?played.map(game=>`✅ ${gameLine(model.teams,game)}`):['No games have finished yet.']));
+  }
+  if(status!=='played'){
+    items.push(`__Unplayed (${unplayed.length})__`);
+    items.push(...(unplayed.length?unplayed.map(game=>`⏳ ${gameLine(model.teams,game)}`):['Every scheduled game is complete.']));
+  }
+  const stage=activeStage==='preseason'?'Preseason':activeStage==='playoffs'?'Postseason':'Regular Season';
+  return lines(`${c.league.name} · ${stage} Week ${context.week} Games`,items,'No games are scheduled for the active week.');
 }
 
 function embedColor(value){const hex=clean(value).replace(/^#/,'');return /^[0-9a-f]{6}$/i.test(hex)?Number.parseInt(hex,16):0x4f8cff}
 
 export async function playerCommand(c,values){
   const model=await discordLeagueReadModel(c,{domains:['teams','players','statistics']});
-  const query=lower(values.name);
-  const matches=model.players.filter(player=>[
-    player.displayName,player.publicId,player.id
-  ].some(value=>lower(value)===query)||lower(player.displayName).includes(query)).slice(0,8);
+  const query=clean(values.name),allMatches=playerSearchMatches(model,query),matches=allMatches.slice(0,6);
   if(!matches.length)return lines(`${c.league.name} · Player Search`,[]);
-  const player=matches[0],team=resolveTeam(model.teams,player.teamId);
-  const href=`https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#players/${encodeURIComponent(player.publicId||player.id)}`;
-  const seasonRows=meaningfulStats(model.statistics.filter(stat=>String(stat.playerId)===String(player.id)),model.snapshot);
-  const highlights=[];
-  for(const category of ['passing','rushing','receiving','defense']){
-    const totals=aggregateCategory(seasonRows.filter(stat=>lower(stat.category)===category),category);
-    const entry=displayMetricEntries(totals,category).find(([,value])=>Number(value)>0);
-    if(entry)highlights.push(`${metricLabel(entry[0])}: ${formatMetric(entry[1])}`);
-  }
-  return {content:`${href}`,embeds:[{
-    title:player.displayName,url:href,color:embedColor(team?.primaryColor),
-    description:`${team?.displayName||'Team unavailable'} · ${player.position||'Position unavailable'}`,
-    fields:[
-      {name:'Overall',value:String(player.overall??'—'),inline:true},
-      {name:'Age',value:String(player.age??'—'),inline:true},
-      {name:'Development',value:clean(player.devTrait)||'Normal',inline:true},
-      {name:`${model.snapshot.season_year||'Current'} season`,value:highlights.join(' · ')||'No completed-game statistics yet.',inline:false}
-    ],footer:{text:`${c.league.name} · FranchiseHQ Player Card`}
-  }]};
+  const exact=matches.length===1&&playerIsExact(matches[0],query);
+  const shown=exact?matches.slice(0,1):matches;
+  return {
+    content:`**${c.league.name} · Player Search** · ${allMatches.length} match${allMatches.length===1?'':'es'}${allMatches.length>shown.length?` · first ${shown.length} shown`:''}`,
+    embeds:shown.map(player=>playerStatEmbed(c,model,player))
+  };
 }
 
 const METRIC_DEFINITIONS={
-  passing:[['passYds','Pass Yds','sum'],['passTDs','Pass TDs','sum'],['passComp','Completions','sum'],['passAtt','Attempts','sum'],['passCompPct','Comp %','derived'],['passInts','INTs','sum'],['passerRating','Passer Rating','derived'],['passSacks','Sacks Taken','sum'],['passLongest','Long','max']],
-  rushing:[['rushYds','Rush Yds','sum'],['rushTDs','Rush TDs','sum'],['rushAtt','Carries','sum'],['rushYdsPerAtt','Yds / Carry','derived'],['rushFum','Fumbles','sum'],['rushBrokenTackles','Broken Tackles','sum'],['rushLongest','Long','max']],
-  receiving:[['recYds','Rec Yds','sum'],['recTDs','Rec TDs','sum'],['recCatches','Receptions','sum'],['recYdsPerCatch','Yds / Catch','derived'],['recDrops','Drops','sum'],['recYdsAfterCatch','YAC','sum'],['recLongest','Long','max']],
-  defense:[['defTotalTackles','Tackles','sum'],['defSacks','Sacks','sum'],['defInts','INTs','sum'],['defForcedFum','Forced Fumbles','sum'],['defFumRec','Fumble Recoveries','sum'],['defTDs','Defensive TDs','sum'],['defDeflections','Pass Deflections','sum']],
-  kicking:[['kickPts','Kicking Points','sum'],['fGMade','FG Made','sum'],['fGAtt','FG Attempts','sum'],['fGCompPct','FG %','derived'],['fG50PlusMade','50+ Made','sum'],['xPMade','XP Made','sum'],['xPAtt','XP Attempts','sum']],
-  punting:[['puntYds','Punt Yds','sum'],['puntNetYds','Net Punt Yds','sum'],['puntAtt','Punts','sum'],['puntYdsPerAtt','Yds / Punt','derived'],['puntsIn20','Inside 20','sum'],['puntLongest','Long','max']]
+  passing:[
+    ['passYds','Pass Yds','sum'],['passTDs','Pass TDs','sum'],['passInts','INTs','sum'],
+    ['passComp','Completions','sum'],['passAtt','Attempts','sum'],['passCompPct','Comp %','derived'],
+    ['passYdsPerAtt','Yds / Attempt','derived'],['passYdsPerGame','Pass Yds / Game','derived'],['passerRating','Passer Rating','derived'],
+    ['passSacks','Sacks Taken','sum'],['passLongest','Long','max'],['passPts','Fantasy Pts','sum']
+  ],
+  rushing:[
+    ['rushYds','Rush Yds','sum'],['rushTDs','Rushing TDs','sum'],['rushFum','Fumbles','sum'],
+    ['rushAtt','Carries','sum'],['rushYdsPerAtt','Yds / Carry','derived'],['rushYdsPerGame','Rush Yds / Game','derived'],
+    ['rushToPct','Rush Share %','average'],['rush20PlusYds','20+ Runs','sum'],
+    ['rushBrokenTackles','Broken Tackles','sum'],['rushYdsAfterContact','Yds After Contact','sum'],
+    ['rushLongest','Long','max'],['rushPts','Fantasy Pts','sum']
+  ],
+  receiving:[
+    ['recCatches','Receptions','sum'],['recYds','Rec Yds','sum'],['recTDs','Rec TDs','sum'],
+    ['recYdsPerCatch','Yds / Catch','derived'],['recYdsPerGame','Rec Yds / Game','derived'],
+    ['recCatchPct','Catch %','average'],['recToPct','Target Share %','average'],
+    ['recDrops','Drops','sum'],['recYdsAfterCatch','YAC','sum'],
+    ['recYacPerCatch','YAC / Catch','derived'],['recLongest','Long','max'],['recPts','Fantasy Pts','sum']
+  ],
+  defense:[
+    ['defTotalTackles','Tackles','sum'],['defSacks','Sacks','sum'],['defInts','INTs','sum'],
+    ['defForcedFum','Forced Fumbles','sum'],['defFumRec','Fumble Recoveries','sum'],
+    ['defTDs','Defensive TDs','sum'],['defDeflections','Pass Deflections','sum'],
+    ['defIntReturnYds','INT Return Yds','sum'],['defSafeties','Safeties','sum'],
+    ['defCatchAllowed','Catches Allowed','sum'],['defPts','Fantasy Pts','sum']
+  ],
+  kicking:[
+    ['kickPts','Kicking Points','sum'],['fGMade','FG Made','sum'],['fGAtt','FG Attempts','sum'],
+    ['fGCompPct','FG %','derived'],['fG50PlusMade','50+ Made','sum'],['fG50PlusAtt','50+ Attempts','sum'],
+    ['fGLongest','FG Long','max'],['xPMade','XP Made','sum'],['xPAtt','XP Attempts','sum'],
+    ['xPCompPct','XP %','derived'],['kickoffAtt','Kickoffs','sum'],['kickoffTBs','Touchbacks','sum']
+  ],
+  punting:[
+    ['puntAtt','Punts','sum'],['puntYds','Punt Yds','sum'],['puntYdsPerAtt','Yds / Punt','derived'],
+    ['puntNetYds','Net Punt Yds','sum'],['puntNetYdsPerAtt','Net Yds / Punt','derived'],
+    ['puntsIn20','Inside 20','sum'],['puntTBs','Touchbacks','sum'],['puntsBlocked','Blocked','sum'],
+    ['puntLongest','Long','max']
+  ]
 };
 const METRIC_LABELS=new Map(Object.values(METRIC_DEFINITIONS).flat().map(([key,label])=>[key,label]));
 
@@ -210,21 +261,37 @@ function passerRating(totals){
 
 function aggregateCategory(stats,category){
   const definitions=METRIC_DEFINITIONS[category]||[];
-  const totals={};
+  const totals={},averageCounts={};
   for(const stat of stats){
     const metrics=stat?.metrics&&typeof stat.metrics==='object'?stat.metrics:{};
     for(const [key,,mode] of definitions){
-      if(!['sum','max'].includes(mode)||!Number.isFinite(Number(metrics[key])))continue;
+      if(!['sum','max','average'].includes(mode)||!Number.isFinite(Number(metrics[key])))continue;
       totals[key]=mode==='max'?Math.max(Number(totals[key]||0),Number(metrics[key])):Number(totals[key]||0)+Number(metrics[key]);
+      if(mode==='average')averageCounts[key]=Number(averageCounts[key]||0)+1;
     }
   }
+  for(const [key,count] of Object.entries(averageCounts))totals[key]=totals[key]/count;
+  const metricRows=key=>stats.filter(stat=>Number.isFinite(Number(stat?.metrics?.[key]))).length;
   if(category==='passing'){
     totals.passCompPct=totals.passAtt?totals.passComp/totals.passAtt*100:null;
+    totals.passYdsPerAtt=totals.passAtt?totals.passYds/totals.passAtt:null;
+    totals.passYdsPerGame=metricRows('passYds')?totals.passYds/metricRows('passYds'):null;
     totals.passerRating=passerRating(totals);
-  }else if(category==='rushing')totals.rushYdsPerAtt=totals.rushAtt?totals.rushYds/totals.rushAtt:null;
-  else if(category==='receiving')totals.recYdsPerCatch=totals.recCatches?totals.recYds/totals.recCatches:null;
-  else if(category==='kicking')totals.fGCompPct=totals.fGAtt?totals.fGMade/totals.fGAtt*100:null;
-  else if(category==='punting')totals.puntYdsPerAtt=totals.puntAtt?totals.puntYds/totals.puntAtt:null;
+  }else if(category==='rushing'){
+    totals.rushYdsPerAtt=totals.rushAtt?totals.rushYds/totals.rushAtt:null;
+    totals.rushYdsPerGame=metricRows('rushYds')?totals.rushYds/metricRows('rushYds'):null;
+  }
+  else if(category==='receiving'){
+    totals.recYdsPerCatch=totals.recCatches?totals.recYds/totals.recCatches:null;
+    totals.recYdsPerGame=metricRows('recYds')?totals.recYds/metricRows('recYds'):null;
+    totals.recYacPerCatch=totals.recCatches?totals.recYdsAfterCatch/totals.recCatches:null;
+  }else if(category==='kicking'){
+    totals.fGCompPct=totals.fGAtt?totals.fGMade/totals.fGAtt*100:null;
+    totals.xPCompPct=totals.xPAtt?totals.xPMade/totals.xPAtt*100:null;
+  }else if(category==='punting'){
+    totals.puntYdsPerAtt=totals.puntAtt?totals.puntYds/totals.puntAtt:null;
+    totals.puntNetYdsPerAtt=totals.puntAtt?totals.puntNetYds/totals.puntAtt:null;
+  }
   return totals;
 }
 
@@ -238,6 +305,11 @@ function formatMetric(value){
   return Number.isInteger(numeric)?numeric.toLocaleString('en-US'):numeric.toFixed(1);
 }
 
+function formatLabeledMetric(label,value){
+  const formatted=formatMetric(value);
+  return label.includes('%')?`${formatted}%`:formatted;
+}
+
 function meaningfulStats(stats,snapshot){
   return stats.filter(stat=>{
     const provenance=lower(`${stat.stage||''} ${stat.source?.routePath||''}`);
@@ -245,6 +317,75 @@ function meaningfulStats(stats,snapshot){
   }).map(stat=>({
     ...stat,season:Number(stat.season??stat.seasonYear??snapshot?.season_year)||Number(snapshot?.season_year)||null
   }));
+}
+
+function playerIsExact(player,query){
+  const wanted=lower(query);
+  return [player?.displayName,player?.publicId,player?.id].some(value=>lower(value)===wanted);
+}
+
+function playerSearchMatches(model,query){
+  const wanted=lower(query);
+  if(!wanted)return[];
+  return model.players.filter(player=>[
+    player.displayName,player.publicId,player.id
+  ].some(value=>lower(value).includes(wanted))).sort((a,b)=>{
+    const exactDifference=Number(playerIsExact(b,query))-Number(playerIsExact(a,query));
+    if(exactDifference)return exactDifference;
+    const prefixDifference=Number(lower(b.displayName).startsWith(wanted))-Number(lower(a.displayName).startsWith(wanted));
+    return prefixDifference||lower(a.displayName).localeCompare(lower(b.displayName));
+  });
+}
+
+const POSITION_CATEGORIES=Object.freeze({
+  QB:['passing','rushing'],HB:['rushing','receiving'],RB:['rushing','receiving'],FB:['rushing','receiving'],
+  WR:['receiving','rushing'],TE:['receiving'],K:['kicking'],P:['punting']
+});
+const DEFENSE_POSITIONS=new Set(['REDGE','LEDGE','EDGE','DE','DT','NT','SAM','MIKE','WILL','LB','CB','FS','SS','S']);
+const CATEGORY_ORDER=['passing','rushing','receiving','defense','kicking','punting'];
+
+function playerStatCategories(player,stats){
+  const position=clean(player?.position).toUpperCase();
+  const preferred=DEFENSE_POSITIONS.has(position)?['defense']:(POSITION_CATEGORIES[position]||[]);
+  const present=new Set(stats.map(stat=>lower(stat.category)).filter(category=>CATEGORY_ORDER.includes(category)));
+  return [...new Set([...preferred,...CATEGORY_ORDER])].filter(category=>present.has(category));
+}
+
+function playerHref(c,player){
+  return `https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#players/${encodeURIComponent(player.publicId||player.id)}`;
+}
+
+function playerStatEmbed(c,model,player){
+  const team=resolveTeam(model.teams,player.teamId),href=playerHref(c,player);
+  const stats=meaningfulStats(model.statistics.filter(stat=>String(stat.playerId)===String(player.id)),model.snapshot);
+  const seasons=[...new Set(stats.map(stat=>stat.season).filter(Boolean))].sort((a,b)=>a-b);
+  const fields=[
+    {name:'Overall',value:String(player.overall??'—'),inline:true},
+    {name:'Age',value:String(player.age??'—'),inline:true},
+    {name:'Development',value:clean(player.devTrait)||'Normal',inline:true}
+  ];
+  for(const season of seasons){
+    const seasonStats=stats.filter(stat=>stat.season===season);
+    for(const category of playerStatCategories(player,seasonStats)){
+      const totals=aggregateCategory(seasonStats.filter(stat=>lower(stat.category)===category),category);
+      const entries=displayMetricEntries(totals,category);
+      if(!entries.length)continue;
+      fields.push({
+        name:`${season} · ${metricLabel(category)}`,
+        value:entries.map(([key,value])=>{
+          const label=metricLabel(key);return `**${label}:** ${formatLabeledMetric(label,value)}`;
+        }).join(' · '),
+        inline:false
+      });
+    }
+  }
+  if(fields.length===3)fields.push({name:`${model.snapshot.season_year||'Current'} Statistics`,value:'No completed-game statistics are available.',inline:false});
+  return {
+    title:player.displayName,url:href,color:embedColor(team?.primaryColor),
+    description:`${team?.displayName||'Team unavailable'} · ${player.position||'Position unavailable'}`,
+    fields:fields.slice(0,25),
+    footer:{text:`${c.league.name} · All available position-specific Franchise statistics`}
+  };
 }
 
 function exactPlayer(model,query){
@@ -280,18 +421,118 @@ export async function playerStatsCommand(c,values){
   return lines(`${c.league.name} · ${player.displayName} Franchise Career`,items,'No completed-game career statistics are available for this player.');
 }
 
+const TEAM_SUM_METRICS=Object.freeze([
+  'off1stDowns','off2PtAtt','off2PtConv','off3rdDownAtt','off3rdDownConv','off4thDownAtt','off4thDownConv',
+  'offFumLost','offIntsLost','offPassTDs','offPassYds','offRedZoneFGs','offRedZoneTDs','offRedZones',
+  'offRushTDs','offRushYds','offSacks','offTotalYds','offTotalYdsGained','penalties','penaltyYds',
+  'defForcedFum','defFumRec','defIntsRec','defPassYds','defRedZoneFGs','defRedZoneTDs','defRedZones',
+  'defRushYds','defSacks','defTotalYds','tOGiveaways','tOTakeaways'
+]);
+
+const TEAM_METRIC_GROUPS=Object.freeze([
+  ['Scoring',[
+    ['gamesPlayed','Games'],['pointsFor','Points For'],['pointsAgainst','Points Against'],
+    ['pointsPerGame','Points / Game'],['pointsAllowedPerGame','Allowed / Game']
+  ]],
+  ['Offense',[
+    ['totalOffense','Total Yds'],['offPassYds','Pass Yds'],['offPassTDs','Pass TDs'],
+    ['offRushYds','Rush Yds'],['offRushTDs','Rush TDs'],['off1stDowns','First Downs'],['offSacks','Sacks Allowed']
+  ]],
+  ['Downs & Red Zone',[
+    ['off3rdDownConv','3rd Down Made'],['off3rdDownAtt','3rd Down Att'],['off3rdDownPct','3rd Down %'],
+    ['off4thDownConv','4th Down Made'],['off4thDownAtt','4th Down Att'],['off4thDownPct','4th Down %'],
+    ['offRedZones','Red Zone Trips'],['offRedZoneTDs','Red Zone TDs'],['offRedZoneFGs','Red Zone FGs'],
+    ['offRedZonePct','Red Zone Score %'],['off2PtConv','2PT Made'],['off2PtAtt','2PT Att'],['off2PtConvPct','2PT %']
+  ]],
+  ['Defense',[
+    ['defTotalYds','Yds Allowed'],['defPassYds','Pass Yds Allowed'],['defRushYds','Rush Yds Allowed'],
+    ['defSacks','Sacks'],['defIntsRec','INTs'],['defForcedFum','Forced Fumbles'],['defFumRec','Fumble Recoveries'],
+    ['defRedZones','Red Zone Trips Allowed'],['defRedZoneTDs','Red Zone TDs Allowed'],['defRedZoneFGs','Red Zone FGs Allowed'],
+    ['defRedZonePct','Red Zone Score % Allowed']
+  ]],
+  ['Possession & Discipline',[
+    ['tOGiveaways','Giveaways'],['offIntsLost','INTs Thrown'],['offFumLost','Fumbles Lost'],
+    ['tOTakeaways','Takeaways'],['turnoverDifferential','Turnover Differential'],
+    ['penalties','Penalties'],['penaltyYds','Penalty Yds']
+  ]]
+]);
+
+function ratio(numerator,denominator,multiplier=100){
+  return Number(denominator)>0?Number(numerator||0)/Number(denominator)*multiplier:null;
+}
+
+function aggregateTeamMetrics(stats,games,team,teams,activeSeason=null){
+  const totals={};
+  for(const stat of stats){
+    const metrics=stat?.metrics&&typeof stat.metrics==='object'?stat.metrics:{};
+    for(const key of TEAM_SUM_METRICS){
+      if(!Object.prototype.hasOwnProperty.call(metrics,key)||!Number.isFinite(Number(metrics[key])))continue;
+      totals[key]=Number(totals[key]||0)+Number(metrics[key]);
+    }
+  }
+  if(Object.prototype.hasOwnProperty.call(totals,'offTotalYdsGained')||Object.prototype.hasOwnProperty.call(totals,'offTotalYds')){
+    totals.totalOffense=totals.offTotalYdsGained??totals.offTotalYds;
+  }
+  const completed=games.filter(game=>gamePlayed(game)&&canonicalGameStage(game.stage)!=='preseason'
+    &&(number(game.season)===null||activeSeason===null||number(game.season)===activeSeason)
+    &&[game.homeTeamId,game.awayTeamId].some(id=>resolveTeam(teams,id)?.teamKey===team.teamKey));
+  if(completed.length){
+    totals.gamesPlayed=completed.length;totals.pointsFor=0;totals.pointsAgainst=0;
+    for(const game of completed){
+      const home=resolveTeam(teams,game.homeTeamId)?.teamKey===team.teamKey;
+      totals.pointsFor+=Number(home?game.homeScore:game.awayScore)||0;
+      totals.pointsAgainst+=Number(home?game.awayScore:game.homeScore)||0;
+    }
+    totals.pointsPerGame=totals.pointsFor/completed.length;
+    totals.pointsAllowedPerGame=totals.pointsAgainst/completed.length;
+  }
+  const derived=[
+    ['off3rdDownPct','off3rdDownConv','off3rdDownAtt'],['off4thDownPct','off4thDownConv','off4thDownAtt'],
+    ['off2PtConvPct','off2PtConv','off2PtAtt']
+  ];
+  for(const [target,numerator,denominator] of derived){
+    const value=ratio(totals[numerator],totals[denominator]);if(value!==null)totals[target]=value;
+  }
+  const redZonePct=ratio(Number(totals.offRedZoneTDs||0)+Number(totals.offRedZoneFGs||0),totals.offRedZones);
+  if(redZonePct!==null)totals.offRedZonePct=redZonePct;
+  const defensiveRedZonePct=ratio(Number(totals.defRedZoneTDs||0)+Number(totals.defRedZoneFGs||0),totals.defRedZones);
+  if(defensiveRedZonePct!==null)totals.defRedZonePct=defensiveRedZonePct;
+  if(!Object.prototype.hasOwnProperty.call(totals,'tOGiveaways')&&(totals.offIntsLost!==undefined||totals.offFumLost!==undefined)){
+    totals.tOGiveaways=Number(totals.offIntsLost||0)+Number(totals.offFumLost||0);
+  }
+  if(!Object.prototype.hasOwnProperty.call(totals,'tOTakeaways')&&(totals.defIntsRec!==undefined||totals.defFumRec!==undefined)){
+    totals.tOTakeaways=Number(totals.defIntsRec||0)+Number(totals.defFumRec||0);
+  }
+  if(totals.tOGiveaways!==undefined||totals.tOTakeaways!==undefined){
+    totals.turnoverDifferential=Number(totals.tOTakeaways||0)-Number(totals.tOGiveaways||0);
+  }
+  return totals;
+}
+
+function teamMetricFields(totals){
+  return TEAM_METRIC_GROUPS.map(([name,definitions])=>{
+    const entries=definitions.filter(([key])=>totals[key]!==undefined&&totals[key]!==null&&Number.isFinite(Number(totals[key])));
+    return entries.length?{name,value:entries.map(([key,label])=>`**${label}:** ${formatLabeledMetric(label,totals[key])}`).join(' · '),inline:false}:null;
+  }).filter(Boolean);
+}
+
 export async function teamStatsCommand(c,values){
-  const model=await discordLeagueReadModel(c,{domains:['teams','statistics']});
+  const model=await discordLeagueReadModel(c,{domains:['teams','statistics','games','standings']});
   const team=resolveTeam(model.teams,values.team||values.name);
   if(!team)throw Object.assign(new Error('That team was not found in the active league.'),{status:404});
-  const selected=lower(values.category),stats=meaningfulStats(model.statistics.filter(stat=>resolveTeam(model.teams,stat.teamId)?.teamKey===team.teamKey),model.snapshot);
-  const categories=selected?[selected]:['passing','rushing','receiving','defense','kicking','punting'];
-  const items=categories.map(category=>{
-    const totals=aggregateCategory(stats.filter(stat=>lower(stat.category)===category),category);
-    const summary=displayMetricEntries(totals,category).slice(0,8).map(([key,value])=>`${metricLabel(key)} ${formatMetric(value)}`).join(' · ');
-    return summary?`**${metricLabel(category)}**\n${summary}`:null;
-  }).filter(Boolean);
-  return lines(`${c.league.name} · ${team.displayName} · ${model.snapshot.season_year||'Current'} Team Stats`,items,'No completed-game team statistics are available.');
+  const activeSeason=number(model.snapshot.season_year);
+  const stats=meaningfulStats(model.statistics.filter(stat=>lower(stat.category)==='team-game'
+    &&resolveTeam(model.teams,stat.teamId)?.teamKey===team.teamKey
+    &&(number(stat.season)===null||activeSeason===null||number(stat.season)===activeSeason)),model.snapshot);
+  const totals=aggregateTeamMetrics(stats,model.games,team,model.teams,activeSeason),href=`https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#teams/${encodeURIComponent(team.teamKey)}`;
+  const standing=model.standings.find(item=>standingTeam(model,item)?.teamKey===team.teamKey);
+  const fields=teamMetricFields(totals);
+  if(!fields.length)fields.push({name:'Statistics',value:'No completed-game team statistics are available.',inline:false});
+  return {content:href,embeds:[{
+    title:`${team.displayName} Team Statistics`,url:href,color:embedColor(team.primaryColor),
+    description:[`${model.snapshot.season_year||'Current'} Franchise season`,standing?record(standing.wins,standing.losses,standing.ties):null].filter(Boolean).join(' · '),
+    fields,footer:{text:`${c.league.name} · Source-backed team-game totals and derived rates`}
+  }]};
 }
 
 export async function leadersCommand(c,values){

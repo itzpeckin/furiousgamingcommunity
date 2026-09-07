@@ -52,6 +52,25 @@ export async function upsertDiscordGlobalCommands(env, commands, options = {}) {
     applicationId=>`/applications/${encodeURIComponent(applicationId)}/commands`,options);
 }
 
+export async function reconcileDiscordGlobalCommands(env,commands,{retiredNames=[],fetchImpl=fetch}={}){
+  const applicationId=String(env?.DISCORD_CLIENT_ID||'').trim();
+  if(!/^[0-9]{17,20}$/.test(applicationId))throw new Error('Discord application ID is not configured.');
+  const registered=await upsertDiscordGlobalCommands(env,commands,{fetchImpl});
+  const retiredSet=new Set(retiredNames.map(name=>String(name||'').trim().toLowerCase()).filter(Boolean));
+  if(!retiredSet.size)return{registered,retired:[]};
+  const existing=await discordBotRequest(env,`/applications/${encodeURIComponent(applicationId)}/commands`,{fetchImpl});
+  const currentNames=new Set(commands.map(command=>String(command?.name||'').toLowerCase()));
+  const retired=(Array.isArray(existing)?existing:[]).filter(command=>
+    command?.id&&retiredSet.has(String(command.name||'').toLowerCase())&&!currentNames.has(String(command.name||'').toLowerCase())
+  );
+  for(const command of retired){
+    await discordBotRequest(env,`/applications/${encodeURIComponent(applicationId)}/commands/${encodeURIComponent(command.id)}`,{
+      method:'DELETE',fetchImpl
+    });
+  }
+  return{registered,retired:retired.map(command=>({id:command.id,name:command.name}))};
+}
+
 export async function ensureDiscordGlobalCommands(env, commands, {fetchImpl = fetch} = {}) {
   const applicationId = String(env?.DISCORD_CLIENT_ID || '').trim();
   if (!/^[0-9]{17,20}$/.test(applicationId)) throw new Error('Discord application ID is not configured.');
