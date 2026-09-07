@@ -213,16 +213,16 @@
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
+        "bytes": 42351,
+        "file": "tests/import/madden-discovery.test.mjs"
+      },
+      {
         "bytes": 39129,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
         "bytes": 39003,
         "file": "tests/import/game-year-transition.test.mjs"
-      },
-      {
-        "bytes": 38943,
-        "file": "tests/import/madden-discovery.test.mjs"
       },
       {
         "bytes": 37673,
@@ -1523,7 +1523,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.4.6",
+  "release": "7.4.4.7",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

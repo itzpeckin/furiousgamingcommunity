@@ -13,9 +13,13 @@ import {
   captureBelongsToRosterCohort
 } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { hashToken } from '../../functions/_lib/auth.js';
-import { deriveLeagueExportToken } from '../../functions/_lib/permanent-league-export.js';
+import {
+  deriveLeagueExportToken,
+  reportImportReadiness
+} from '../../functions/_lib/permanent-league-export.js';
 import {
   generateMaddenDiscoveryReport,
+  maddenDiscoveryReportUsesCurrentPolicy,
   recoverMaddenDiscoveryCohort,
   stitchRecentPartialMaddenCohort
 } from '../../functions/_lib/madden-discovery-report.js';
@@ -237,6 +241,80 @@ test('All Weeks aggregate route markers and inventory use the non-empty payload 
   const empty=report.datasetInventory.find(item=>item.routePath.endsWith('/kicking'));
   assert.equal(empty.placeholder,true);
   assert.equal(empty.canonicalWeek,null);
+});
+
+test('accepts a complete same-season multi-week export as authoritative source evidence', () => {
+  const captures=completeCaptureSet();
+  captures[5].routePath='xbsx/fr-1/week/reg/3/schedules';
+  captures.push(
+    capture('xbsx/fr-1/week/reg/2/schedules',{
+      gameScheduleInfoList:[{gameId:'game-2',homeTeamId:'team-1',awayTeamId:'team-2',week:2}]
+    },14_000),
+    capture('xbsx/fr-1/week/reg/2/passing',{
+      playerPassingStatInfoList:[{playerId:'player-1',teamId:'team-1',passingYards:225}]
+    },16_000)
+  );
+  const report=buildMaddenDiscoveryReport(captures,{
+    expected:{...expected,week:undefined}
+  });
+  assert.deepEqual(new Set(report.sourceMarkers.week.observed),new Set(['3','2']));
+  assert.equal(report.sourceMarkers.week.status,'multi-period');
+  assert.deepEqual(report.sourceMarkers.week.completePeriods,[
+    'regular-season:3','regular-season:2'
+  ]);
+  assert.equal(report.sourceVerification.week,true);
+  assert.equal(report.sourceVerification.passed,true);
+  assert.equal(report.status,'passed');
+  assert.equal(maddenDiscoveryReportUsesCurrentPolicy({
+    sanitized_fixture_json:JSON.stringify(report.sanitizedFixture)
+  }),true);
+  assert.equal(maddenDiscoveryReportUsesCurrentPolicy({
+    sanitized_fixture_json:JSON.stringify({release:'7.4.4.6'})
+  }),false);
+});
+
+test('keeps an incomplete multi-week export stopped for commissioner review', () => {
+  const captures=completeCaptureSet();
+  captures[5].routePath='xbsx/fr-1/week/reg/3/schedules';
+  captures.push(capture('xbsx/fr-1/week/reg/2/schedules',{
+    gameScheduleInfoList:[{gameId:'game-2',homeTeamId:'team-1',awayTeamId:'team-2',week:2}]
+  },14_000));
+  const report=buildMaddenDiscoveryReport(captures,{
+    expected:{...expected,week:undefined}
+  });
+  assert.equal(report.sourceMarkers.week.status,'ambiguous');
+  assert.equal(report.sourceVerification.week,false);
+  assert.equal(report.sourceVerification.passed,false);
+  assert.equal(report.status,'review_required');
+});
+
+test('makes a complete 32-team blocked-Free-Agent multi-week export import-ready', () => {
+  const captures=liveLikeRosterCaptureSet();
+  captures[0].payload.week=13;
+  const schedule=captures.find(item=>item.routePath.endsWith('/schedules'));
+  schedule.routePath='xbsx/742482/week/reg/13/schedules';
+  schedule.payload.gameScheduleInfoList[0].week=13;
+  const statistics=captures.find(item=>item.routePath.endsWith('/passing'));
+  statistics.routePath='xbsx/742482/week/reg/13/passing';
+  captures.push(
+    capture('xbsx/742482/week/reg/11/schedules',{
+      gameScheduleInfoList:[{gameId:'game-11',homeTeamId:'team-1',awayTeamId:'team-2',week:11}]
+    },4_000),
+    capture('xbsx/742482/week/reg/11/passing',{
+      playerPassingStatInfoList:[{playerId:'player-1',teamId:'team-1',passingYards:250}]
+    },4_100)
+  );
+  const report=buildMaddenDiscoveryReport(captures,{
+    expected:{...expected,week:undefined}
+  });
+  const readiness=reportImportReadiness(report);
+  assert.equal(report.sourceMarkers.week.status,'multi-period');
+  assert.equal(report.sourceVerification.passed,true);
+  assert.equal(report.playerImportReadiness.recordCount,2_044);
+  assert.equal(readiness.ready,true);
+  assert.equal(readiness.completeness,'rostered-players-only');
+  assert.equal(readiness.freeAgentStatus,'blocked');
+  assert.equal(readiness.freeAgentCount,null);
 });
 
 test('builds a passing structural source-lock report without exposing player or team values', () => {

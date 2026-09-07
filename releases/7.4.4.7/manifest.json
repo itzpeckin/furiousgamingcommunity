@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.7",
+  "releaseType": "madden-multi-period-source-readiness-remediation",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.4.6",
+    "commit": "bdc1a4607c555ca67d855f68e13c9b7dbed3a9ea",
+    "tree": "a476f9ae3a9ce6e52c1bcdd1133393e9cd46135c",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.4.7",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-published",
+    "pullRequest": null,
+    "candidateCommit": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.4.4.6",
+    "currentCommit": "e2f596dd9cbc8f0f5f3086e65c6f1cb15aeb6d91",
+    "currentPagesDeployment": "06c0ba8d-18ec-42e6-b544-b950e5fc5e42",
+    "currentMigration": 35,
+    "candidateMigration": 35
+  },
+  "requiredArtifacts": [
+    "functions/_lib/madden-discovery.js",
+    "functions/_lib/madden-discovery-report.js",
+    "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+    "tests/import/madden-discovery.test.mjs",
+    "tests/import/permanent-league-export.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.4.7/release-record.md",
+    "releases/7.4.4.7/validation-evidence.json"
+  ]
+}
