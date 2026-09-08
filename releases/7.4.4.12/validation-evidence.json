@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.12",
+  "validatedOn": "2026-09-08",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {"unregisteredFailures": 0},
+  "strictRepositoryGate": {
+    "passed": true,
+    "javascriptModules": 253,
+    "inventoryEntries": 595,
+    "routes": 76,
+    "passedTests": 202,
+    "failedTests": 0
+  },
+  "completeRepositorySuite": {"passed": true,"passedTests": 205,"failedTests": 0},
+  "checks": {
+    "focusedDiscord": {"passed": true,"passedTests": 30,"failedTests": 0},
+    "compactPlayerCards": {
+      "passed": true,
+      "discordOnly": true,
+      "quarterbackMetrics": ["completionPercentage","yards","touchdowns","interceptions"],
+      "runningBackMetrics": ["attempts","yards","touchdowns","fumbles"],
+      "receiverMetrics": ["receptions","yards","touchdowns"],
+      "defenseMetrics": ["tackles","sacks","interceptions"],
+      "kickerMetrics": ["fieldGoalsAttempted","fieldGoalsMade"],
+      "secondaryStatisticsHidden": true,
+      "canonicalPortraitWhenAvailable": true,
+      "webPlayerCardChanged": false
+    },
+    "schedulePlayoffState": {
+      "passed": true,
+      "matchupBoldRemoved": true,
+      "clinchedIndicator": "green",
+      "eliminatedIndicator": "red",
+      "aliveIndicator": "white",
+      "crossDeviceSemanticIndicators": true,
+      "recordOnlyClinch": true,
+      "recordOnlyElimination": true,
+      "tiedCeilingRemainsAlive": true,
+      "officialTiebreakersClaimed": false,
+      "automaticLeagueAction": false,
+      "gamesCommandChanged": false,
+      "scheduleThreadLifecycleChanged": false
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 35,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "discordCommandSchema": {
+      "passed": true,
+      "changed": true,
+      "globalRegistrationRequired": true,
+      "currentCommandCount": 37,
+      "candidateCommandCount": 37,
+      "exactNameUpserts": ["player"],
+      "bulkReplacementAllowed": false
+    },
+    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false}
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordCredentialsChanged": false,
+    "discordGuildInstalled": false,
+    "discordLeagueConfigured": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {"authorized": false,"status": "not-run"},
+    "hostedChecks": {"authorized": false,"status": "not-run"},
+    "productionMigration": {"authorized": false,"status": "not-required","currentMigration": 35,"candidateMigration": 35},
+    "productionDeployment": {"authorized": false,"status": "not-run","currentRelease": "7.4.4.11"},
+    "discordRegistration": {"authorized": false,"status": "not-run","commandSchemaChanged": true,"exactNameUpserts": ["player"]}
+  }
+}

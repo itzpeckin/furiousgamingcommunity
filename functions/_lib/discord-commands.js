@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.4.4.11';
+export const DISCORD_COMMAND_RELEASE = '7.4.4.12';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -82,7 +82,7 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
     ]
   },
   {
-    name:'player',description:'Find players and view all available position-specific Franchise statistics.',
+    name:'player',description:'Find players and view their major position-specific Franchise statistics.',
     options:[
       autocompleteString('name','Full or partial player name, or public Player ID.',{required:true}),
       privateOption
