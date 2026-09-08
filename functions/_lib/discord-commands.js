@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.4.4.10';
+export const DISCORD_COMMAND_RELEASE = '7.4.4.11';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -52,6 +52,10 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
       autocompleteString('conference','All conferences, AFC, or NFC.'),
       privateOption
     ]
+  },
+  {
+    name:'eliminated',description:'View teams mathematically eliminated from the playoffs by record.',
+    options:[privateOption]
   },
   {
     name:'schedule',description:'View the schedule for a week or team.',

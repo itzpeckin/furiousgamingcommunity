@@ -177,7 +177,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 428053,
+        "bytes": 428130,
         "file": "trade-module.js"
       },
       {
@@ -197,6 +197,10 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
+        "bytes": 76298,
+        "file": "tests/discord/discord-bot.test.mjs"
+      },
+      {
         "bytes": 75127,
         "file": "index.html"
       },
@@ -205,16 +209,12 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 73870,
-        "file": "tests/discord/discord-bot.test.mjs"
+        "bytes": 50622,
+        "file": "functions/_lib/discord-read-model.js"
       },
       {
         "bytes": 49096,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
-      },
-      {
-        "bytes": 45942,
-        "file": "functions/_lib/discord-read-model.js"
       },
       {
         "bytes": 42351,
@@ -1523,7 +1523,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.4.10",
+  "release": "7.4.4.11",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

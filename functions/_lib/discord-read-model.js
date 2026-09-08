@@ -181,8 +181,23 @@ function canonicalGameStage(value){
   return'regular-season';
 }
 
-function gameLine(teams,game,{includeWeek=false}={}){
-  const away=teamName(teams,game.awayTeamId),home=teamName(teams,game.homeTeamId);
+function standingRecords(model){
+  const records=new Map();
+  for(const item of model.standings||[]){
+    const team=standingTeam(model,item);
+    if(team)records.set(team.teamKey,record(item.wins,item.losses,item.ties));
+  }
+  return records;
+}
+
+function scheduledTeamLabel(teams,teamId,records){
+  const team=resolveTeam(teams,teamId),name=team?.abbreviation||team?.displayName||clean(teamId)||'Unknown';
+  const current=team&&records?.get(team.teamKey);
+  return current?`${name} (${current})`:name;
+}
+
+function gameLine(teams,game,{includeWeek=false,records=null}={}){
+  const away=scheduledTeamLabel(teams,game.awayTeamId,records),home=scheduledTeamLabel(teams,game.homeTeamId,records);
   const prefix=includeWeek?`W${game.week} · `:'';
   return gamePlayed(game)
     ?`${prefix}**${away} ${game.awayScore??'—'} @ ${home} ${game.homeScore??'—'}**`
@@ -190,7 +205,8 @@ function gameLine(teams,game,{includeWeek=false}={}){
 }
 
 export async function scheduleCommand(c,values){
-  const model=await discordLeagueReadModel(c,{domains:['teams','games']});
+  const model=await discordLeagueReadModel(c,{domains:['teams','games','standings']});
+  const records=standingRecords(model);
   const currentWeek=number(model.snapshot.week_index)??number(c.league.current_week)??1;
   let view=clean(values.view);
   if(!view&&values.scope)view=lower(values.scope)==='week'?`week:${number(values.week)??currentWeek}`:'season';
@@ -220,7 +236,7 @@ export async function scheduleCommand(c,values){
   }
   const selectedTeam=requestedTeam?resolveTeam(model.teams,requestedTeam):null;
   return lines(`${c.league.name} · ${selectedTeam?`${selectedTeam.displayName} Schedule`:week===null?'Season Schedule':`Week ${week}`}`,
-    games.slice(0,40).map(game=>gameLine(model.teams,game,{includeWeek:true})));
+    games.slice(0,40).map(game=>gameLine(model.teams,game,{includeWeek:true,records})));
 }
 
 export async function gamesCommand(c,values){
@@ -247,6 +263,63 @@ export async function gamesCommand(c,values){
   }
   const stage=activeStage==='preseason'?'Preseason':activeStage==='playoffs'?'Postseason':'Regular Season';
   return lines(`${c.league.name} · ${stage} Week ${context.week} Games`,items,'No games are scheduled for the active week.');
+}
+
+const REGULAR_SEASON_GAME_COUNT=17;
+
+function eliminationRows(model){
+  const rows=(model.standings||[]).map(standing=>{
+    const team=standingTeam(model,standing);
+    if(!team)return null;
+    const wins=number(standing.wins)??number(team.record?.wins)??0;
+    const losses=number(standing.losses)??number(team.record?.losses)??0;
+    const ties=number(standing.ties)??number(team.record?.ties)??0;
+    const gamesPlayed=Math.max(0,wins+losses+ties);
+    const remaining=Math.max(0,REGULAR_SEASON_GAME_COUNT-gamesPlayed);
+    const maxWins=wins+remaining;
+    return {
+      team,wins,losses,ties,maxWins,
+      currentPoints:wins+(ties*.5),
+      maxPoints:maxWins+(ties*.5),
+      conference:clean(standingConference(model,standing)||team.conferenceName),
+      division:clean(standingDivision(model,standing)||team.divisionName)
+    };
+  }).filter(Boolean);
+
+  return rows.filter(row=>{
+    if(!row.conference||!row.division)return false;
+    const conferenceRows=rows.filter(other=>other.conference===row.conference&&other!==row);
+    const divisionRows=conferenceRows.filter(other=>other.division===row.division);
+    const divisionPathOpen=!divisionRows.some(other=>other.currentPoints>row.maxPoints);
+    const teamsAlreadyAboveCeiling=conferenceRows.filter(other=>other.currentPoints>row.maxPoints);
+    const possibleDivisionWinners=new Set(teamsAlreadyAboveCeiling.map(other=>other.division).filter(Boolean)).size;
+    const unavoidableWildCardTeams=Math.max(0,teamsAlreadyAboveCeiling.length-possibleDivisionWinners);
+    const wildCardPathOpen=unavoidableWildCardTeams<3;
+    return !divisionPathOpen&&!wildCardPathOpen;
+  }).sort((a,b)=>a.conference.localeCompare(b.conference)||a.maxPoints-b.maxPoints||a.team.displayName.localeCompare(b.team.displayName));
+}
+
+export async function eliminatedCommand(c){
+  const model=await discordLeagueReadModel(c,{domains:['teams','standings']});
+  const eliminated=eliminationRows(model);
+  if(!eliminated.length)return lines(`${c.league.name} · Mathematically Eliminated`,[],
+    'No teams are mathematically eliminated by record yet.');
+  const conferences=[...new Set(eliminated.map(item=>item.conference))];
+  return {
+    content:`**${c.league.name} · Mathematically Eliminated (${eliminated.length})**`,
+    embeds:[{
+      title:'Eliminated from Playoff Contention',color:0xef4444,
+      description:'A team appears only when its best possible 17-game record can no longer reach either its division title or one of the three Wild Card positions. A tied record ceiling remains alive because FranchiseHQ does not infer unavailable Madden tiebreakers.',
+      fields:conferences.map(conference=>({
+        name:conference,
+        value:eliminated.filter(item=>item.conference===conference).map(item=>
+          `**${item.team.displayName} (${item.team.abbreviation||'—'})** · ${record(item.wins,item.losses,item.ties)} · best ${record(item.maxWins,item.losses,item.ties)}`
+        ).join('\n'),
+        inline:false
+      })),
+      footer:{text:'Record-only mathematical elimination · 17-game regular season'}
+    }]
+  };
 }
 
 function embedColor(value){const hex=clean(value).replace(/^#/,'');return /^[0-9a-f]{6}$/i.test(hex)?Number.parseInt(hex,16):0x4f8cff}
@@ -414,6 +487,17 @@ function playerStatCategories(player,stats){
 
 function playerHref(c,player){
   return `https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#players/${encodeURIComponent(player.publicId||player.id)}`;
+}
+
+function playerPortraitUrl(player={}){
+  const source=player.source||{};
+  const candidates=[player.imageUrl,source.imageUrl,source.headshotUrl,source.portraitUrl,player.portraitId,source.portraitId]
+    .map(clean).filter(Boolean);
+  for(const candidate of candidates){
+    if(/^https:\/\//i.test(candidate))return candidate;
+    if(/^\d+$/.test(candidate))return `https://ratings-images-prod.pulse.ea.com/madden-nfl-26/portraits/${candidate}.png`;
+  }
+  return null;
 }
 
 function playerStatEmbed(c,model,player){
@@ -628,7 +712,7 @@ export async function tradeBlockCommand(c,values){
     const team=resolveTeam(state.teams,item.teamKey);
     return [item.teamKey,team?.displayName,team?.abbreviation].some(value=>lower(value).includes(teamQuery));
   });
-  const model=await discordLeagueReadModel(c,{domains:['teams','players','statistics']});
+  const model=await discordLeagueReadModel(c,{domains:['teams','players']});
   const playerByKey=new Map();
   for(const player of model.players){
     for(const key of [player.publicId,player.id,player.sourcePlayerId]){
@@ -653,12 +737,19 @@ export async function tradeBlockCommand(c,values){
     const player=listedPlayer(item);
     const looking=item.requestedReturn||needs.get(item.teamKey)?.join(', ')||'Open to offers';
     if(player){
-      const embed=playerStatEmbed(c,model,player);
-      return {...embed,fields:[
-        ...embed.fields.slice(0,3),
-        {name:'Looking For',value:truncate(looking,1000),inline:false},
-        ...embed.fields.slice(3)
-      ].slice(0,25)};
+      const team=resolveTeam(model.teams,player.teamId),portrait=playerPortraitUrl(player);
+      return {
+        title:player.displayName,url:playerHref(c,player),color:embedColor(team?.primaryColor),
+        description:`${team?.displayName||'Team unavailable'} · ${player.position||'Position unavailable'}`,
+        ...(portrait?{thumbnail:{url:portrait}}:{}),
+        fields:[
+          {name:'Overall',value:String(player.overall??'—'),inline:true},
+          {name:'Age',value:String(player.age??'—'),inline:true},
+          {name:'Development',value:clean(player.devTrait)||'Normal',inline:true},
+          {name:'Looking For',value:truncate(looking,1000),inline:false}
+        ],
+        footer:{text:`${c.league.name} · Trade Block`}
+      };
     }
     const team=resolveTeam(model.teams,item.teamKey)||resolveTeam(state.teams,item.teamKey);
     return {
