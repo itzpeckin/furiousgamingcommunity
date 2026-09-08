@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "product": "FranchiseHQ",
   "version": "7.4.4.11",
-  "validatedOn": "2026-09-07",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "validatedOn": "2026-09-08",
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -62,25 +62,62 @@
     "discordCommandSchema": {
       "passed": true,
       "changed": true,
-      "globalRegistrationRequired": true,
-      "currentCommandCount": 36,
+      "globalRegistrationRequired": false,
+      "previousCommandCount": 36,
+      "currentCommandCount": 37,
       "candidateCommandCount": 37,
       "exactNameUpserts": ["eliminated"],
-      "bulkReplacementAllowed": false
+      "bulkReplacementAllowed": false,
+      "registered": true
     },
-    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false}
+    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false},
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified",
+      "liveReleaseMarker": "7.4.4.11",
+      "deployedAssetsMatchMain": true,
+      "readOnly": true
+    }
+  },
+  "productionProtectedState": {
+    "observedReadOnly": true,
+    "database": "franchise-hq-db-madden27",
+    "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+    "migrationVersion": 35,
+    "leagues": 1,
+    "users": 31,
+    "memberships": 31,
+    "activeTeamAssignments": 30,
+    "activeSnapshotRows": 1,
+    "activeSnapshotId": "31068679-df14-414a-a7bd-7b712b2ee43c",
+    "activeSeasonYear": 2026,
+    "activeWeek": 15,
+    "activeTeams": 32,
+    "activeRosteredPlayers": 2036,
+    "activeGames": 272,
+    "activeStatistics": 11298,
+    "activeStandings": 32,
+    "activeValidationStatus": "ready",
+    "retainedSnapshots": 17,
+    "activeDiscordInstallations": 1,
+    "activeScheduleThreads": 16,
+    "foreignKeyViolations": 0,
+    "freeAgentStatus": "blocked",
+    "freeAgentCount": null,
+    "productionRowsWritten": 0,
+    "observedLeagueActivityIndependentOfRelease": true
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
     "productionConfigurationChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
-    "discordCommandsRegistered": false,
+    "discordCommandsRegistered": true,
     "discordCredentialsChanged": false,
     "discordGuildInstalled": false,
     "discordLeagueConfigured": false,
@@ -99,10 +136,38 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": {"authorized": false,"status": "not-run"},
-    "hostedChecks": {"authorized": false,"status": "not-run"},
+    "githubPublication": {
+      "authorized": true,
+      "status": "merged",
+      "pullRequest": 54,
+      "candidateCommit": "f7512d6b642d26df08e1d5a902a673e240def5cf",
+      "mergeCommit": "5a06f1c8aaf54e9f4dc6ac1475fce2048a438f5f"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "candidateWorkflowRun": 34189204939,
+      "mainWorkflowRun": 34189378367,
+      "mainPagesWorkflowRun": 34189377637
+    },
     "productionMigration": {"authorized": false,"status": "not-required","currentMigration": 35,"candidateMigration": 35},
-    "productionDeployment": {"authorized": false,"status": "not-run","currentRelease": "7.4.4.10"},
-    "discordRegistration": {"authorized": false,"status": "not-run","commandSchemaChanged": true,"exactNameUpserts": ["eliminated"]}
+    "productionDeployment": {
+      "authorized": true,
+      "status": "succeeded",
+      "currentRelease": "7.4.4.11",
+      "initialPagesDeployment": "dcd8fa68-92ff-48e9-b793-6539565553c7",
+      "pagesDeployment": "d2f7dfc5-53b5-499e-9a84-febeec24f724",
+      "liveCommit": "5a06f1c8aaf54e9f4dc6ac1475fce2048a438f5f"
+    },
+    "discordRegistration": {
+      "authorized": true,
+      "status": "complete",
+      "commandSchemaChanged": true,
+      "method": "non-destructive-name-upsert",
+      "exactNameUpserts": ["eliminated"],
+      "registeredCount": 1,
+      "bulkReplacementUsed": false,
+      "temporaryBuildCommandRestored": "exit 0"
+    }
   }
 }
