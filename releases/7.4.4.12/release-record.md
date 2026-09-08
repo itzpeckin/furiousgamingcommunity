@@ -23,7 +23,11 @@ Focused Discord tests cover all requested position groups, headline-only statist
 
 ## Deployment status
 
-Local implementation only. GitHub publication, pull request, hosted checks, Main, Cloudflare Production, and the exact revised `/player` global definition upsert remain unauthorized. Production remains FranchiseHQ 7.4.4.11 on migration 35.
+Published exact candidate `4aa7bdc00764435044ef1cb963ebeb55bfbb181d` through PR #55 after candidate quality run `34232024746` passed, then merged it to Main as `d2d24152174826f9ecce035e4690dd7b1e387fc2`. Main quality run `34232188639` and Pages workflow `34232187539` passed. Initial code-only Pages deployment `6d64747c-98dc-44b9-be7f-780e65a1bebc` succeeded.
+
+The revised `/player` definition was then registered through one exact non-destructive global name upsert during accepted Pages deployment `4f78cfc1-ebb8-40cc-87c1-c421ec2eb82f`. The build log confirms exactly one `/player` definition was upserted, no bulk replacement ran, and the temporary registration command was immediately restored to `exit 0`. Live HTTPS acceptance reports FranchiseHQ 7.4.4.12.
+
+Read-only Production D1 acceptance on `franchise-hq-db-madden27` confirms migration 35, one league, 31 users, 31 memberships, 30 active team assignments, 18 retained snapshots, one Discord installation, 16 active schedule threads, zero foreign-key violations, and active snapshot `405d9a42-e749-43ae-aefa-61a392285cdd` at Season 2026 / Regular Season Week 15 with 32 teams, 2,036 rostered players, 272 games, 11,714 statistics, 32 standings, and ready validation status. Free Agents remain blocked with a null count. The newer snapshot and statistic counts predated and were independent of this code-only release; this release wrote zero database rows. No migration, import, reset, release-driven snapshot change, archive, transition, export URL rotation, credential/membership/assignment change, Discord guild/routing change, or Free Agent reinterpretation occurred.
 
 ## Rollback
 

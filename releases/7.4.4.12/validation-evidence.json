@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.12",
   "validatedOn": "2026-09-08",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -63,19 +63,54 @@
       "exactNameUpserts": ["player"],
       "bulkReplacementAllowed": false
     },
-    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false}
+    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false},
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified",
+      "liveReleaseMarker": "7.4.4.12",
+      "deployedAssetsMatchMain": true,
+      "readOnly": true
+    }
+  },
+  "productionProtectedState": {
+    "observedReadOnly": true,
+    "database": "franchise-hq-db-madden27",
+    "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+    "migrationVersion": 35,
+    "leagues": 1,
+    "users": 31,
+    "memberships": 31,
+    "activeTeamAssignments": 30,
+    "activeSnapshotRows": 1,
+    "activeSnapshotId": "405d9a42-e749-43ae-aefa-61a392285cdd",
+    "activeSeasonYear": 2026,
+    "activeWeek": 15,
+    "activeTeams": 32,
+    "activeRosteredPlayers": 2036,
+    "activeGames": 272,
+    "activeStatistics": 11714,
+    "activeStandings": 32,
+    "activeValidationStatus": "ready",
+    "retainedSnapshots": 18,
+    "activeDiscordInstallations": 1,
+    "activeScheduleThreads": 16,
+    "foreignKeyViolations": 0,
+    "freeAgentStatus": "blocked",
+    "freeAgentCount": null,
+    "productionRowsWritten": 0,
+    "observedLeagueActivityIndependentOfRelease": true
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
     "productionConfigurationChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
-    "discordCommandsRegistered": false,
+    "discordCommandsRegistered": true,
     "discordCredentialsChanged": false,
     "discordGuildInstalled": false,
     "discordLeagueConfigured": false,
@@ -94,10 +129,38 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": {"authorized": false,"status": "not-run"},
-    "hostedChecks": {"authorized": false,"status": "not-run"},
+    "githubPublication": {
+      "authorized": true,
+      "status": "merged",
+      "pullRequest": 55,
+      "candidateCommit": "4aa7bdc00764435044ef1cb963ebeb55bfbb181d",
+      "mergeCommit": "d2d24152174826f9ecce035e4690dd7b1e387fc2"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "candidateWorkflowRun": 34232024746,
+      "mainWorkflowRun": 34232188639,
+      "mainPagesWorkflowRun": 34232187539
+    },
     "productionMigration": {"authorized": false,"status": "not-required","currentMigration": 35,"candidateMigration": 35},
-    "productionDeployment": {"authorized": false,"status": "not-run","currentRelease": "7.4.4.11"},
-    "discordRegistration": {"authorized": false,"status": "not-run","commandSchemaChanged": true,"exactNameUpserts": ["player"]}
+    "productionDeployment": {
+      "authorized": true,
+      "status": "succeeded",
+      "currentRelease": "7.4.4.12",
+      "initialPagesDeployment": "6d64747c-98dc-44b9-be7f-780e65a1bebc",
+      "pagesDeployment": "4f78cfc1-ebb8-40cc-87c1-c421ec2eb82f",
+      "liveCommit": "d2d24152174826f9ecce035e4690dd7b1e387fc2"
+    },
+    "discordRegistration": {
+      "authorized": true,
+      "status": "complete",
+      "commandSchemaChanged": true,
+      "method": "non-destructive-name-upsert",
+      "exactNameUpserts": ["player"],
+      "registeredCount": 1,
+      "bulkReplacementUsed": false,
+      "temporaryBuildCommandRestored": "exit 0"
+    }
   }
 }
