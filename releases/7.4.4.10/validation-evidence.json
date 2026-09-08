@@ -3,8 +3,8 @@
   "product": "FranchiseHQ",
   "version": "7.4.4.10",
   "validatedOn": "2026-09-07",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -42,17 +42,50 @@
       "completeWebTradeBlockLinked": true
     },
     "discordCommandSchema": {"passed": true,"changed": false,"globalRegistrationRequired": false},
-    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false}
+    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false},
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "status": "read-only-verified",
+      "liveReleaseMarker": "7.4.4.10",
+      "deployedAssetsMatchMain": true,
+      "readOnly": true
+    }
+  },
+  "productionProtectedState": {
+    "observedReadOnly": true,
+    "database": "franchise-hq-db-madden27",
+    "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+    "migrationVersion": 35,
+    "leagues": 1,
+    "users": 31,
+    "memberships": 31,
+    "activeTeamAssignments": 30,
+    "activeSnapshotRows": 1,
+    "activeSnapshotId": "23dd264d-d8e9-4643-9c41-e37f039ab27d",
+    "activeSeasonYear": 2026,
+    "activeWeek": 14,
+    "activeTeams": 32,
+    "activeRosteredPlayers": 2036,
+    "activeGames": 256,
+    "activeStatistics": 10828,
+    "activeStandings": 32,
+    "retainedSnapshots": 16,
+    "activeDiscordInstallations": 1,
+    "activeScheduleThreads": 15,
+    "foreignKeyViolations": 0,
+    "freeAgentStatus": "blocked",
+    "freeAgentCount": null,
+    "productionRowsWritten": 0
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
     "protectedLeagueDataChanged": false,
     "productionConfigurationChanged": false,
     "stagingChanged": false,
     "activeSnapshotChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "discordCommandsRegistered": false,
     "discordCredentialsChanged": false,
@@ -73,10 +106,28 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": {"authorized": false,"status": "not-run"},
-    "hostedChecks": {"authorized": false,"status": "not-run"},
+    "githubPublication": {
+      "authorized": true,
+      "status": "merged",
+      "pullRequest": 53,
+      "candidateCommit": "a2d24983b648100841b9fc7dc6efbf98ec5fe0a0",
+      "mergeCommit": "4669ba75c3a9eb4aac8eeed6540497ba37aeca6d"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "candidateWorkflowRun": 34171542106,
+      "mainWorkflowRun": 34171616830,
+      "previewPagesDeployment": "3382be4b-6f98-4741-a09b-e4c0888da2e2"
+    },
     "productionMigration": {"authorized": false,"status": "not-required","currentMigration": 35,"candidateMigration": 35},
-    "productionDeployment": {"authorized": false,"status": "not-run","currentRelease": "7.4.4.9"},
+    "productionDeployment": {
+      "authorized": true,
+      "status": "succeeded",
+      "currentRelease": "7.4.4.10",
+      "pagesDeployment": "e65a00a0-af35-464b-950b-8cdc284a181f",
+      "liveCommit": "4669ba75c3a9eb4aac8eeed6540497ba37aeca6d"
+    },
     "discordRegistration": {"authorized": false,"status": "not-required","commandSchemaChanged": false}
   }
 }

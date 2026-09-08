@@ -22,7 +22,9 @@ Focused Discord validation proves that `/trade-block view` and `/player` produce
 
 ## Deployment status
 
-Local implementation is complete on `codex/franchisehq-7.4.4.10` from exact Production evidence baseline `e9918cab0ed56057873ddecd70eb453642c83225`. Publication, pull request, hosted checks, Main, Production, and Discord command registration have not been authorized or run. No command-schema change or migration is required.
+Exact candidate `a2d24983b648100841b9fc7dc6efbf98ec5fe0a0` was published through PR #53 after its hosted quality gate passed, then merged to Main as `4669ba75c3a9eb4aac8eeed6540497ba37aeca6d`. Main quality run `34171616830` and Cloudflare Pages Production deployment `e65a00a0-af35-464b-950b-8cdc284a181f` succeeded. The live HTTPS response reports FranchiseHQ 7.4.4.10.
+
+Read-only Production D1 acceptance confirms migration 35, one league, 31 users, 31 memberships, 30 active team assignments, 16 retained snapshots, one Discord installation, 15 active schedule threads, zero foreign-key violations, and unchanged active snapshot `23dd264d-d8e9-4643-9c41-e37f039ab27d` at Season 2026 / Week 14 with 32 teams, 2,036 rostered players, 256 games, 10,828 statistics, and 32 standings. Free Agents remain blocked with a null count. The query wrote zero rows. No migration, command registration, import, reset, snapshot change, archive, transition, export URL rotation, credential change, membership/assignment change, or league-data write occurred during this deployment.
 
 ## Rollback
 
