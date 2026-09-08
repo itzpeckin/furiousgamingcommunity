@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.4.4.11",
+  "releaseType": "discord-elimination-schedule-record-and-trade-block-portrait-remediation",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.4.4.10",
+    "commit": "fd6e6c834b70b6737258825c69cac4e2f5151311",
+    "tree": "7da972f7486ebebf0ff73b7db00f8d2a7c915fc6",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.4.4.11",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-published",
+    "pullRequest": null,
+    "candidateCommit": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "unchanged",
+    "currentRelease": "7.4.4.10",
+    "currentCommit": "fd6e6c834b70b6737258825c69cac4e2f5151311",
+    "currentPagesDeployment": "21fb9c7d-69f2-4a6f-bca3-a55e8ea53fe8",
+    "currentMigration": 35,
+    "candidateMigration": 35
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-commands.js",
+    "functions/_lib/discord-bot.js",
+    "functions/_lib/discord-read-model.js",
+    "tests/discord/discord-bot.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.4.4.11/release-record.md",
+    "releases/7.4.4.11/validation-evidence.json"
+  ]
+}

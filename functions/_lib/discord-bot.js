@@ -1,6 +1,7 @@
 import { discordCommandName, discordCommandOptions, discordScheduleThreadWeek } from './discord-commands.js';
 import {
   confidenceViewCommand,
+  eliminatedCommand,
   gamesCommand,
   gmHistoryCommand,
   gotwCommand,
@@ -237,6 +238,7 @@ export async function executeDiscordCommand(c){
   }
   if(command==='standings')return standingsCommand(c,values);
   if(command==='playoffs')return playoffsCommand(c,values);
+  if(command==='eliminated')return eliminatedCommand(c,values);
   if(command==='schedule')return scheduleCommand(c,values);
   if(command==='games')return gamesCommand(c,values);
   if(command==='stats')return statsCommand(c,values);

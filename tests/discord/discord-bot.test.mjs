@@ -163,7 +163,7 @@ function seedDiscordStatFixture(database,{leagueId='league-a',week=13}={}){
     {external_id:'player-tb',team_external_id:'1001',display_name:'Baker Example',position:'QB',overall:91,age:30,development_trait:'Star'},
     {external_id:'player-sf',team_external_id:'1002',display_name:'Brock Example',position:'QB',overall:89,age:26,development_trait:'Normal'},
     {external_id:'receiver-tb',team_external_id:'1001',display_name:'Mike Example',position:'WR',overall:88,age:27,development_trait:'Star'},
-    {external_id:'chase-rb',team_external_id:'1001',display_name:'Chase Runner',position:'HB',overall:87,age:24,development_trait:'Superstar'},
+    {external_id:'chase-rb',team_external_id:'1001',display_name:'Chase Runner',position:'HB',overall:87,age:24,development_trait:'Superstar',portrait_id:'123456'},
     {external_id:'chase-edge',team_external_id:'1002',display_name:'Chase Defender',position:'REDGE',overall:90,age:25,development_trait:'Star'}
   ];
   players.forEach(player=>seedSnapshotRecord(database,{snapshotId,leagueId,domain:'players',externalId:player.external_id,data:player}));
@@ -201,10 +201,10 @@ function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000
 }
 
 test('global Discord command inventory restores legacy week commands and remains multi-league capable',()=>{
-  assert.equal(DISCORD_GLOBAL_COMMANDS.length,36);
-  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,36);
+  assert.equal(DISCORD_GLOBAL_COMMANDS.length,37);
+  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,37);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.map(command=>command.name),[
-    'standings','playoffs','schedule','games','leaders','player','team','trade-block','trade-history','news',
+    'standings','playoffs','eliminated','schedule','games','leaders','player','team','trade-block','trade-history','news',
     'gotw','league-site','twitch','join','gm-history','confidence','rules','trade',
     ...Array.from({length:18},(_,index)=>`week${index+1}`)
   ]);
@@ -249,6 +249,41 @@ test('/standings distinguishes all divisions, all conferences, one team, and one
       assert.equal(field.value.split('\n').length,10);
       assert.equal((field.value.match(/In the Hunt/g)||[]).length,3);
     }
+    const schedule=await run('100000000000000076','schedule',[{type:3,name:'view',value:'week:14'}]);
+    assert.match(schedule.data.content,/SF \(15-1\) @ TB \(16-0\)/);
+  }finally{database.close()}
+});
+
+test('/eliminated lists only teams with no division or Wild Card path through a 17-game record ceiling',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    const snapshotId=seedNflStandingsFixture(database,{leagueId:'league-a',week:14});
+    const nfcWins=[12,10,9,9,8,7,7,7,6,6,5,5,4,4,3,2];
+    nfcWins.forEach((wins,index)=>{
+      const externalId=String(1001+index);
+      const row=database.prepare(`SELECT data_json AS dataJson FROM league_snapshot_records
+        WHERE snapshot_id=? AND domain='standings' AND external_id=?`).get(snapshotId,externalId);
+      const data=JSON.parse(row.dataJson);
+      database.prepare(`UPDATE league_snapshot_records SET data_json=?
+        WHERE snapshot_id=? AND domain='standings' AND external_id=?`).run(JSON.stringify({
+          ...data,totalWins:wins,totalLosses:14-wins,totalTies:0,rank:index+1,seed:index+1
+        }),snapshotId,externalId);
+    });
+    const db=d1(database),key=await signingKey();
+    const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000096',name:'eliminated'
+    })}));
+    const payload=await response.json(),embed=payload.data.embeds[0];
+    assert.equal(embed.title,'Eliminated from Playoff Contention');
+    assert.match(embed.description,/best possible 17-game record/);
+    assert.match(embed.description,/tied record ceiling remains alive/);
+    assert.match(embed.fields.find(field=>field.name==='NFC').value,/Seattle Seahawks \(SEA\).*2-12.*best 5-12/s);
+    assert.doesNotMatch(embed.fields.map(field=>field.value).join('\n'),/Tampa Bay Buccaneers/);
+    assert.doesNotMatch(embed.fields.map(field=>field.value).join('\n'),/Arizona Cardinals/);
+    assert.match(embed.footer.text,/Record-only mathematical elimination/);
   }finally{database.close()}
 });
 
@@ -374,7 +409,7 @@ test('global command registration upserts by name without bulk replacement',asyn
   assert.equal(requests.length,3);
   assert.ok(requests.every(item=>item.method==='POST'));
   assert.ok(requests.every(item=>/\/applications\/100000000000000009\/commands$/.test(item.url)));
-  assert.deepEqual(requests.map(item=>item.body.name),['standings','playoffs','schedule']);
+  assert.deepEqual(requests.map(item=>item.body.name),['standings','playoffs','eliminated']);
 
   requests.length=0;
   await upsertDiscordGuildCommands({
@@ -395,7 +430,7 @@ test('global command registration upserts by name without bulk replacement',asyn
     DISCORD_CLIENT_ID:'100000000000000009',DISCORD_BOT_TOKEN:'secret'
   },DISCORD_GLOBAL_COMMANDS.slice(0,3),{fetchImpl:ensureFetch});
   assert.deepEqual(requests.map(item=>[item.method,item.body?.name||null]),[
-    ['POST','standings'],['POST','playoffs'],['POST','schedule']
+    ['POST','standings'],['POST','playoffs'],['POST','eliminated']
   ]);
 });
 
@@ -592,13 +627,15 @@ test('/trade-block add and remove are private, roster-authorized, and use player
     const playerCardEmbed=(await playerCard.json()).data.embeds[0];
     const tradeBlockEmbed=viewedPayload.data.embeds[0];
     assert.equal(viewedPayload.data.embeds.length,1);
-    for(const key of ['title','description','url','color','footer'])assert.deepEqual(tradeBlockEmbed[key],playerCardEmbed[key]);
-    assert.deepEqual(tradeBlockEmbed.fields.filter(field=>field.name!=='Looking For'),playerCardEmbed.fields);
+    for(const key of ['title','description','url','color'])assert.deepEqual(tradeBlockEmbed[key],playerCardEmbed[key]);
+    assert.deepEqual(tradeBlockEmbed.fields.map(field=>field.name),['Overall','Age','Development','Looking For']);
     assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Overall').value,'87');
     assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Age').value,'24');
     assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Development').value,'Superstar');
     assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Looking For').value,'Young corner or a pick');
-    assert.match(tradeBlockEmbed.fields.map(field=>field.value).join(' '),/Rush Yds:\*\* 96.*Rushing TDs:\*\* 1/s);
+    assert.doesNotMatch(tradeBlockEmbed.fields.map(field=>field.value).join(' '),/Rush Yds|Rushing TDs/);
+    assert.equal(tradeBlockEmbed.thumbnail.url,'https://ratings-images-prod.pulse.ea.com/madden-nfl-26/portraits/123456.png');
+    assert.equal(tradeBlockEmbed.footer.text,'alpha League · Trade Block');
     assert.match(tradeBlockEmbed.url,/\/leagues\/alpha#players\//);
     const removed=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000078',name:'trade-block',options:[{type:1,name:'remove',options:[
