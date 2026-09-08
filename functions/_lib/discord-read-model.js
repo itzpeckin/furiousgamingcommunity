@@ -190,23 +190,27 @@ function standingRecords(model){
   return records;
 }
 
-function scheduledTeamLabel(teams,teamId,records){
+function scheduledTeamLabel(teams,teamId,records,statuses){
   const team=resolveTeam(teams,teamId),name=team?.abbreviation||team?.displayName||clean(teamId)||'Unknown';
   const current=team&&records?.get(team.teamKey);
-  return current?`${name} (${current})`:name;
+  if(!statuses)return current?`${name} (${current})`:name;
+  const status=team&&statuses?.get(team.teamKey)||'alive';
+  const indicator=status==='clinched'?'🟢':status==='eliminated'?'🔴':'⚪';
+  return `${indicator} ${current?`${name} (${current})`:name}`;
 }
 
-function gameLine(teams,game,{includeWeek=false,records=null}={}){
-  const away=scheduledTeamLabel(teams,game.awayTeamId,records),home=scheduledTeamLabel(teams,game.homeTeamId,records);
+function gameLine(teams,game,{includeWeek=false,records=null,statuses=null,plain=false}={}){
+  const away=scheduledTeamLabel(teams,game.awayTeamId,records,statuses),home=scheduledTeamLabel(teams,game.homeTeamId,records,statuses);
   const prefix=includeWeek?`W${game.week} · `:'';
-  return gamePlayed(game)
-    ?`${prefix}**${away} ${game.awayScore??'—'} @ ${home} ${game.homeScore??'—'}**`
-    :`${prefix}**${away} @ ${home}**${game.scheduledAt?` · ${game.scheduledAt}`:''}`;
+  const matchup=gamePlayed(game)
+    ?`${away} ${game.awayScore??'—'} @ ${home} ${game.homeScore??'—'}`
+    :`${away} @ ${home}${game.scheduledAt?` · ${game.scheduledAt}`:''}`;
+  return `${prefix}${plain?matchup:`**${matchup}**`}`;
 }
 
 export async function scheduleCommand(c,values){
   const model=await discordLeagueReadModel(c,{domains:['teams','games','standings']});
-  const records=standingRecords(model);
+  const records=standingRecords(model),statuses=playoffStatusByTeam(model);
   const currentWeek=number(model.snapshot.week_index)??number(c.league.current_week)??1;
   let view=clean(values.view);
   if(!view&&values.scope)view=lower(values.scope)==='week'?`week:${number(values.week)??currentWeek}`:'season';
@@ -227,7 +231,7 @@ export async function scheduleCommand(c,values){
     const weekRows=[...new Set(games.map(game=>number(game.week)).filter(value=>value!==null))].sort((a,b)=>a-b).map(value=>{
       const weekGames=games.filter(game=>number(game.week)===value);
       const played=weekGames.filter(gamePlayed).length;
-      return `**Week ${value}** · ${weekGames.length} games · ${played} played · ${weekGames.length-played} unplayed`;
+      return `Week ${value} · ${weekGames.length} games · ${played} played · ${weekGames.length-played} unplayed`;
     });
     return lines(`${c.league.name} · Season Schedule`,[
       ...weekRows,
@@ -235,8 +239,10 @@ export async function scheduleCommand(c,values){
     ]);
   }
   const selectedTeam=requestedTeam?resolveTeam(model.teams,requestedTeam):null;
-  return lines(`${c.league.name} · ${selectedTeam?`${selectedTeam.displayName} Schedule`:week===null?'Season Schedule':`Week ${week}`}`,
-    games.slice(0,40).map(game=>gameLine(model.teams,game,{includeWeek:true,records})));
+  const heading=`${c.league.name} · ${selectedTeam?`${selectedTeam.displayName} Schedule`:week===null?'Season Schedule':`Week ${week}`}`;
+  return truncate([heading,...(games.length?games.slice(0,40).map(game=>gameLine(model.teams,game,{includeWeek:true,records,statuses,plain:true})):[
+    'No matching records were found.'
+  ])].join('\n'));
 }
 
 export async function gamesCommand(c,values){
@@ -267,8 +273,8 @@ export async function gamesCommand(c,values){
 
 const REGULAR_SEASON_GAME_COUNT=17;
 
-function eliminationRows(model){
-  const rows=(model.standings||[]).map(standing=>{
+function playoffRecordRows(model){
+  return (model.standings||[]).map(standing=>{
     const team=standingTeam(model,standing);
     if(!team)return null;
     const wins=number(standing.wins)??number(team.record?.wins)??0;
@@ -285,7 +291,10 @@ function eliminationRows(model){
       division:clean(standingDivision(model,standing)||team.divisionName)
     };
   }).filter(Boolean);
+}
 
+function eliminationRows(model){
+  const rows=playoffRecordRows(model);
   return rows.filter(row=>{
     if(!row.conference||!row.division)return false;
     const conferenceRows=rows.filter(other=>other.conference===row.conference&&other!==row);
@@ -297,6 +306,27 @@ function eliminationRows(model){
     const wildCardPathOpen=unavoidableWildCardTeams<3;
     return !divisionPathOpen&&!wildCardPathOpen;
   }).sort((a,b)=>a.conference.localeCompare(b.conference)||a.maxPoints-b.maxPoints||a.team.displayName.localeCompare(b.team.displayName));
+}
+
+function clinchedRows(model){
+  const rows=playoffRecordRows(model);
+  return rows.filter(row=>{
+    if(!row.conference||!row.division)return false;
+    const conferenceRows=rows.filter(other=>other.conference===row.conference&&other!==row);
+    const divisionRows=conferenceRows.filter(other=>other.division===row.division);
+    const divisionTitleClinched=divisionRows.every(other=>other.maxPoints<row.currentPoints);
+    const possibleRecordThreats=conferenceRows.filter(other=>other.maxPoints>=row.currentPoints);
+    const possibleDivisionWinners=new Set(possibleRecordThreats.map(other=>other.division).filter(Boolean)).size;
+    const possibleWildCardThreats=Math.max(0,possibleRecordThreats.length-possibleDivisionWinners);
+    return divisionTitleClinched||possibleWildCardThreats<3;
+  });
+}
+
+function playoffStatusByTeam(model){
+  const statuses=new Map();
+  for(const row of eliminationRows(model))statuses.set(row.team.teamKey,'eliminated');
+  for(const row of clinchedRows(model))statuses.set(row.team.teamKey,'clinched');
+  return statuses;
 }
 
 export async function eliminatedCommand(c){
@@ -471,18 +501,34 @@ function playerSearchMatches(model,query){
   });
 }
 
-const POSITION_CATEGORIES=Object.freeze({
-  QB:['passing','rushing'],HB:['rushing','receiving'],RB:['rushing','receiving'],FB:['rushing','receiving'],
-  WR:['receiving','rushing'],TE:['receiving'],K:['kicking'],P:['punting']
-});
 const DEFENSE_POSITIONS=new Set(['REDGE','LEDGE','EDGE','DE','DT','NT','SAM','MIKE','WILL','LB','CB','FS','SS','S']);
-const CATEGORY_ORDER=['passing','rushing','receiving','defense','kicking','punting'];
 
-function playerStatCategories(player,stats){
+const PLAYER_CARD_METRICS=Object.freeze({
+  QB:{category:'passing',metrics:[
+    ['passCompPct','Completion Percentage','percent'],['passYds','Yards'],['passTDs','TDs'],['passInts','INTs']
+  ]},
+  RB:{category:'rushing',metrics:[
+    ['rushAtt','Attempts'],['rushYds','Yards'],['rushTDs','TDs'],['rushFum','Fumbles']
+  ]},
+  RECEIVER:{category:'receiving',metrics:[
+    ['recCatches','Receptions'],['recYds','Yards'],['recTDs','TDs']
+  ]},
+  DEFENSE:{category:'defense',metrics:[
+    ['defTotalTackles','Tackles'],['defSacks','Sacks'],['defInts','INTs']
+  ]},
+  K:{category:'kicking',metrics:[
+    ['fGAtt','FG Attempted'],['fGMade','FG Made']
+  ]}
+});
+
+function playerCardMetricDefinition(player){
   const position=clean(player?.position).toUpperCase();
-  const preferred=DEFENSE_POSITIONS.has(position)?['defense']:(POSITION_CATEGORIES[position]||[]);
-  const present=new Set(stats.map(stat=>lower(stat.category)).filter(category=>CATEGORY_ORDER.includes(category)));
-  return [...new Set([...preferred,...CATEGORY_ORDER])].filter(category=>present.has(category));
+  if(position==='QB')return PLAYER_CARD_METRICS.QB;
+  if(['HB','RB','FB'].includes(position))return PLAYER_CARD_METRICS.RB;
+  if(['WR','TE'].includes(position))return PLAYER_CARD_METRICS.RECEIVER;
+  if(DEFENSE_POSITIONS.has(position))return PLAYER_CARD_METRICS.DEFENSE;
+  if(position==='K')return PLAYER_CARD_METRICS.K;
+  return null;
 }
 
 function playerHref(c,player){
@@ -501,35 +547,33 @@ function playerPortraitUrl(player={}){
 }
 
 function playerStatEmbed(c,model,player){
-  const team=resolveTeam(model.teams,player.teamId),href=playerHref(c,player);
+  const team=resolveTeam(model.teams,player.teamId),href=playerHref(c,player),portrait=playerPortraitUrl(player);
   const stats=meaningfulStats(model.statistics.filter(stat=>String(stat.playerId)===String(player.id)),model.snapshot);
   const seasons=[...new Set(stats.map(stat=>stat.season).filter(Boolean))].sort((a,b)=>a-b);
+  const definition=playerCardMetricDefinition(player);
   const fields=[
     {name:'Overall',value:String(player.overall??'—'),inline:true},
     {name:'Age',value:String(player.age??'—'),inline:true},
     {name:'Development',value:clean(player.devTrait)||'Normal',inline:true}
   ];
   for(const season of seasons){
-    const seasonStats=stats.filter(stat=>stat.season===season);
-    for(const category of playerStatCategories(player,seasonStats)){
-      const totals=aggregateCategory(seasonStats.filter(stat=>lower(stat.category)===category),category);
-      const entries=displayMetricEntries(totals,category);
-      if(!entries.length)continue;
-      fields.push({
-        name:`${season} · ${metricLabel(category)}`,
-        value:entries.map(([key,value])=>{
-          const label=metricLabel(key);return `**${label}:** ${formatLabeledMetric(label,value)}`;
-        }).join(' · '),
-        inline:false
-      });
-    }
+    if(!definition)break;
+    const totals=aggregateCategory(stats.filter(stat=>stat.season===season&&lower(stat.category)===definition.category),definition.category);
+    const entries=definition.metrics.filter(([key])=>totals[key]!==null&&totals[key]!==undefined&&Number.isFinite(Number(totals[key])));
+    if(!entries.length)continue;
+    fields.push({
+      name:`${season} · Major Statistics`,
+      value:entries.map(([key,label,mode])=>`**${label}:** ${mode==='percent'?`${formatMetric(totals[key])}%`:formatMetric(totals[key])}`).join(' · '),
+      inline:false
+    });
   }
-  if(fields.length===3)fields.push({name:`${model.snapshot.season_year||'Current'} Statistics`,value:'No completed-game statistics are available.',inline:false});
+  if(fields.length===3)fields.push({name:`${model.snapshot.season_year||'Current'} Statistics`,value:'No major position statistics are available.',inline:false});
   return {
     title:player.displayName,url:href,color:embedColor(team?.primaryColor),
     description:`${team?.displayName||'Team unavailable'} · ${player.position||'Position unavailable'}`,
+    ...(portrait?{thumbnail:{url:portrait}}:{}),
     fields:fields.slice(0,25),
-    footer:{text:`${c.league.name} · All available position-specific Franchise statistics`}
+    footer:{text:`${c.league.name} · Major position statistics`}
   };
 }
 

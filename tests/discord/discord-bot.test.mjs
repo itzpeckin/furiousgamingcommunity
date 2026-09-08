@@ -160,22 +160,24 @@ function seedNflStandingsFixture(database,{leagueId='league-a',week=14}={}){
 function seedDiscordStatFixture(database,{leagueId='league-a',week=13}={}){
   const snapshotId=seedActiveWeek(database,{leagueId,week});
   const players=[
-    {external_id:'player-tb',team_external_id:'1001',display_name:'Baker Example',position:'QB',overall:91,age:30,development_trait:'Star'},
+    {external_id:'player-tb',team_external_id:'1001',display_name:'Baker Example',position:'QB',overall:91,age:30,development_trait:'Star',portrait_id:'654321'},
     {external_id:'player-sf',team_external_id:'1002',display_name:'Brock Example',position:'QB',overall:89,age:26,development_trait:'Normal'},
     {external_id:'receiver-tb',team_external_id:'1001',display_name:'Mike Example',position:'WR',overall:88,age:27,development_trait:'Star'},
     {external_id:'chase-rb',team_external_id:'1001',display_name:'Chase Runner',position:'HB',overall:87,age:24,development_trait:'Superstar',portrait_id:'123456'},
-    {external_id:'chase-edge',team_external_id:'1002',display_name:'Chase Defender',position:'REDGE',overall:90,age:25,development_trait:'Star'}
+    {external_id:'chase-edge',team_external_id:'1002',display_name:'Chase Defender',position:'REDGE',overall:90,age:25,development_trait:'Star'},
+    {external_id:'kicker-tb',team_external_id:'1001',display_name:'Casey Kicker',position:'K',overall:82,age:28,development_trait:'Normal',portrait_id:'654322'}
   ];
   players.forEach(player=>seedSnapshotRecord(database,{snapshotId,leagueId,domain:'players',externalId:player.external_id,data:player}));
   const stats=[
-    ['tb-pass-w1',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({passYds:100,passTDs:1,passComp:6,passAtt:10,passCompPct:60,passerRating:95})}],
-    ['tb-pass-w2',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:2,metrics_json:JSON.stringify({passYds:150,passTDs:2,passComp:9,passAtt:15,passCompPct:60,passerRating:110})}],
+    ['tb-pass-w1',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({passYds:100,passTDs:1,passInts:0,passComp:6,passAtt:10,passCompPct:60,passerRating:95})}],
+    ['tb-pass-w2',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:2,metrics_json:JSON.stringify({passYds:150,passTDs:2,passInts:1,passComp:9,passAtt:15,passCompPct:60,passerRating:110})}],
     ['sf-pass-w1',{category:'passing',player_external_id:'player-sf',team_external_id:'1002',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({passYds:999,passTDs:9,passComp:30,passAtt:40,passCompPct:75,passerRating:140})}],
     ['tb-rec-w1',{category:'receiving',player_external_id:'receiver-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({recYds:80,recTDs:1,recCatches:7})}],
     ['tb-rec-w2',{category:'receiving',player_external_id:'receiver-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:2,metrics_json:JSON.stringify({recYds:120,recTDs:2,recCatches:8})}],
     ['chase-rush-w1',{category:'rushing',player_external_id:'chase-rb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({rushYds:96,rushTDs:1,rushFum:1,rushAtt:18,rushYdsPerGame:96,rushToPct:60,rush20PlusYds:2,rushBrokenTackles:4,rushYdsAfterContact:42,rushLongest:31})}],
     ['chase-rec-w1',{category:'receiving',player_external_id:'chase-rb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({recCatches:4,recYds:38,recTDs:1,recYdsPerGame:38,recCatchPct:80,recToPct:25,recDrops:0,recYdsAfterCatch:25,recLongest:18})}],
     ['chase-defense-w1',{category:'defense',player_external_id:'chase-edge',team_external_id:'1002',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({defTotalTackles:7,defSacks:2,defInts:1,defForcedFum:1,defFumRec:1,defTDs:1,defDeflections:2,defIntReturnYds:21,defSafeties:0})}],
+    ['kicker-w1',{category:'kicking',player_external_id:'kicker-tb',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({fGAtt:4,fGMade:3,fG50PlusMade:1,xPMade:4,xPAtt:4})}],
     ['tb-team-w1',{category:'team-game',team_external_id:'1001',season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({offTotalYdsGained:350,offPassYds:250,offPassTDs:3,offRushYds:100,offRushTDs:1,off1stDowns:20,off3rdDownConv:5,off3rdDownAtt:10,offRedZones:4,offRedZoneTDs:3,offRedZoneFGs:1,offIntsLost:1,offFumLost:0,tOGiveaways:1,defTotalYds:280,defPassYds:200,defRushYds:80,defSacks:3,defIntsRec:2,defForcedFum:1,defFumRec:1,defRedZones:5,defRedZoneTDs:2,defRedZoneFGs:1,tOTakeaways:3,penalties:5,penaltyYds:45})}],
     ['tb-team-w2',{category:'team-game',team_external_id:'1001',season_year:null,stage:'regular-season',week_index:2,metrics_json:JSON.stringify({offTotalYdsGained:225,offPassYds:150,offPassTDs:2,offRushYds:75,offRushTDs:1,off1stDowns:15,off3rdDownConv:4,off3rdDownAtt:8,offRedZones:2,offRedZoneTDs:1,offRedZoneFGs:0,offIntsLost:1,offFumLost:0,tOGiveaways:1,defTotalYds:210,defPassYds:140,defRushYds:70,defSacks:2,defIntsRec:1,defForcedFum:0,defFumRec:0,defRedZones:2,defRedZoneTDs:1,defRedZoneFGs:0,tOTakeaways:1,penalties:4,penaltyYds:30})}],
     ['tb-pre',{category:'passing',player_external_id:'player-tb',team_external_id:'1001',season_year:2026,stage:'preseason',week_index:1,metrics_json:JSON.stringify({passYds:5000,passTDs:50,passComp:50,passAtt:50})}]
@@ -250,7 +252,8 @@ test('/standings distinguishes all divisions, all conferences, one team, and one
       assert.equal((field.value.match(/In the Hunt/g)||[]).length,3);
     }
     const schedule=await run('100000000000000076','schedule',[{type:3,name:'view',value:'week:14'}]);
-    assert.match(schedule.data.content,/SF \(15-1\) @ TB \(16-0\)/);
+    assert.match(schedule.data.content,/🟢 SF \(15-1\) @ 🟢 TB \(16-0\)/);
+    assert.doesNotMatch(schedule.data.content,/\*\*/);
   }finally{database.close()}
 });
 
@@ -270,8 +273,12 @@ test('/eliminated lists only teams with no division or Wild Card path through a 
       database.prepare(`UPDATE league_snapshot_records SET data_json=?
         WHERE snapshot_id=? AND domain='standings' AND external_id=?`).run(JSON.stringify({
           ...data,totalWins:wins,totalLosses:14-wins,totalTies:0,rank:index+1,seed:index+1
-        }),snapshotId,externalId);
+      }),snapshotId,externalId);
     });
+    seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'games',externalId:'game-eliminated',data:{
+      external_id:'game-eliminated',season_year:2026,stage:'regular-season',week_index:14,
+      away_team_external_id:'1016',home_team_external_id:'1014',status:'scheduled'
+    }});
     const db=d1(database),key=await signingKey();
     const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000096',name:'eliminated'
@@ -284,6 +291,13 @@ test('/eliminated lists only teams with no division or Wild Card path through a 
     assert.doesNotMatch(embed.fields.map(field=>field.value).join('\n'),/Tampa Bay Buccaneers/);
     assert.doesNotMatch(embed.fields.map(field=>field.value).join('\n'),/Arizona Cardinals/);
     assert.match(embed.footer.text,/Record-only mathematical elimination/);
+    const scheduleResponse=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000097',name:'schedule',options:[{type:3,name:'view',value:'week:14'}]
+    })}));
+    const schedule=(await scheduleResponse.json()).data.content;
+    assert.match(schedule,/🟢 SF \(10-4\) @ 🟢 TB \(12-2\)/);
+    assert.match(schedule,/🔴 SEA \(2-12\) @ ⚪ ARI \(4-10\)/);
+    assert.doesNotMatch(schedule,/\*\*/);
   }finally{database.close()}
 });
 
@@ -647,7 +661,7 @@ test('/trade-block add and remove are private, roster-authorized, and use player
   }finally{database.close()}
 });
 
-test('Discord statistics are season-cumulative, team-scoped, and expose every position-specific metric',async()=>{
+test('Discord Player Cards use compact position statistics and portraits while team statistics remain complete',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -682,10 +696,22 @@ test('Discord statistics are season-cumulative, team-scoped, and expose every po
     assert.equal(playerPayload.data.embeds[0].title,'Baker Example');
     assert.equal(playerPayload.data.embeds[0].fields.find(field=>field.name==='Overall').value,'91');
     assert.equal(playerPayload.data.embeds[0].fields.find(field=>field.name==='Age').value,'30');
-    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/Pass Yds:\*\* 250/);
-    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/Pass TDs:\*\* 3/);
-    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/Attempts:\*\* 25/);
+    assert.equal(playerPayload.data.embeds[0].fields.at(-1).name,'2026 · Major Statistics');
+    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/Completion Percentage:\*\* 60%/);
+    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/Yards:\*\* 250/);
+    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/TDs:\*\* 3/);
+    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/INTs:\*\* 1/);
+    assert.doesNotMatch(playerPayload.data.embeds[0].fields.at(-1).value,/Attempts|Passer Rating|Sacks Taken/);
+    assert.equal(playerPayload.data.embeds[0].thumbnail.url,'https://ratings-images-prod.pulse.ea.com/madden-nfl-26/portraits/654321.png');
+    assert.equal(playerPayload.data.embeds[0].footer.text,'alpha League · Major position statistics');
     assert.match(playerPayload.data.embeds[0].url,/\/leagues\/alpha#players\/player-tb/);
+
+    const receiver=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000089',name:'player',options:[{type:3,name:'name',value:'Mike Example'}]
+    })}));
+    const receiverStats=(await receiver.json()).data.embeds[0].fields.at(-1).value;
+    assert.match(receiverStats,/Receptions:\*\* 15.*Yards:\*\* 200.*TDs:\*\* 3/s);
+    assert.doesNotMatch(receiverStats,/Catch %|Target Share|Drops|YAC/);
 
     const chases=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000091',name:'player',options:[{type:3,name:'name',value:'Chase'}]
@@ -694,11 +720,18 @@ test('Discord statistics are season-cumulative, team-scoped, and expose every po
     assert.equal(chasePayload.data.embeds.length,2);
     const runner=chasePayload.data.embeds.find(embed=>embed.title==='Chase Runner');
     const defender=chasePayload.data.embeds.find(embed=>embed.title==='Chase Defender');
-    assert.match(runner.fields.map(field=>field.value).join(' '),/Rush Yds:\*\* 96.*Rushing TDs:\*\* 1.*Fumbles:\*\* 1.*Carries:\*\* 18/s);
-    assert.match(runner.fields.map(field=>field.value).join(' '),/Rush Yds \/ Game:\*\* 96.*Rush Share %:\*\* 60%/s);
-    assert.match(runner.fields.map(field=>field.value).join(' '),/Receptions:\*\* 4.*Rec Yds:\*\* 38.*Rec TDs:\*\* 1/s);
-    assert.match(runner.fields.map(field=>field.value).join(' '),/Rec Yds \/ Game:\*\* 38.*Catch %:\*\* 80%.*Target Share %:\*\* 25%/s);
-    assert.match(defender.fields.map(field=>field.value).join(' '),/Tackles:\*\* 7.*Sacks:\*\* 2.*INTs:\*\* 1.*Forced Fumbles:\*\* 1.*Fumble Recoveries:\*\* 1.*Defensive TDs:\*\* 1/s);
+    assert.match(runner.fields.map(field=>field.value).join(' '),/Attempts:\*\* 18.*Yards:\*\* 96.*TDs:\*\* 1.*Fumbles:\*\* 1/s);
+    assert.doesNotMatch(runner.fields.map(field=>field.value).join(' '),/Rush Yds \/ Game|Rush Share|Receptions|Rec Yds/);
+    assert.match(defender.fields.map(field=>field.value).join(' '),/Tackles:\*\* 7.*Sacks:\*\* 2.*INTs:\*\* 1/s);
+    assert.doesNotMatch(defender.fields.map(field=>field.value).join(' '),/Forced Fumbles|Fumble Recoveries|Defensive TDs/);
+
+    const kicker=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000098',name:'player',options:[{type:3,name:'name',value:'Casey Kicker'}]
+    })}));
+    const kickerEmbed=(await kicker.json()).data.embeds[0];
+    assert.match(kickerEmbed.fields.at(-1).value,/FG Attempted:\*\* 4.*FG Made:\*\* 3/s);
+    assert.doesNotMatch(kickerEmbed.fields.at(-1).value,/50\+|XP/);
+    assert.equal(kickerEmbed.thumbnail.url,'https://ratings-images-prod.pulse.ea.com/madden-nfl-26/portraits/654322.png');
   }finally{database.close()}
 });
 
