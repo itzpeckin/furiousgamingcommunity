@@ -229,7 +229,7 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.4.4.12');
+    assert.equal(overviewPayload.release,'7.5.0');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM league_setting_revisions
@@ -266,6 +266,9 @@ test('Teams & Owners unassigns a member before league-scoped removal and preserv
     assert.equal(unassigned.status,200,JSON.stringify(await unassigned.clone().json()));
     assert.deepEqual({...database.prepare(`SELECT active,team_id AS teamId FROM league_memberships
       WHERE league_id='league-command' AND user_id='owner'`).get()},{active:1,teamId:null});
+    assert.ok(database.prepare(`SELECT revoked_at AS revokedAt FROM sessions WHERE user_id='owner'`).get().revokedAt);
+    assert.equal(database.prepare(`SELECT event_type AS eventType FROM session_security_events
+      WHERE user_id='owner' ORDER BY created_at DESC,rowid DESC LIMIT 1`).get().eventType,'membership_revoked');
 
     const removed = await deleteMembership(requestContext(db,'commissioner-token','memberships','DELETE',{
       action:'remove',userId:'owner'
@@ -276,6 +279,8 @@ test('Teams & Owners unassigns a member before league-scoped removal and preserv
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM users WHERE id='owner'`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM league_membership_audit
       WHERE league_id='league-command' AND subject_user_id='owner'`).get().count,2);
+    assert.equal(database.prepare(`SELECT authorization_version AS version FROM league_memberships
+      WHERE league_id='league-command' AND user_id='owner'`).get().version,3);
 
     const listing = await getMemberships(requestContext(db,'commissioner-token','memberships'));
     const payload = await listing.json();

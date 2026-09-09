@@ -14,6 +14,12 @@
   const MAX_HISTORY = 100;
   let requestSequence = 0;
 
+  function csrfToken() {
+    const match = document.cookie.split(';').map((entry) => entry.trim())
+      .find((entry) => entry.startsWith('franchise_hq_csrf='));
+    return match ? decodeURIComponent(match.slice('franchise_hq_csrf='.length)) : null;
+  }
+
   class ApiError extends (HQ.errors?.FranchiseHQError || Error) {
     constructor(message, details = {}) {
       super(message || 'Franchise HQ API request failed.', {
@@ -152,6 +158,10 @@
     const headers = new Headers(options.headers || {});
     headers.set('Accept', headers.get('Accept') || 'application/json');
     headers.set('X-FranchiseHQ-Request-ID', requestId);
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !headers.has('X-FranchiseHQ-CSRF')) {
+      const token = csrfToken();
+      if (token) headers.set('X-FranchiseHQ-CSRF', token);
+    }
 
     let body = options.body;
     const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;

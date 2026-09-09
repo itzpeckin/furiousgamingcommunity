@@ -1,14 +1,15 @@
 import {
   AUTH_CONSTANTS,
   addSecondsToNow,
+  appendBrowserSessionCookies,
   clearSecureCookie,
   createId,
   createRandomToken,
-  createSecureCookie,
   decodeOpaqueContext,
   encodeOpaqueContext,
   getCookie,
   hashToken,
+  issueBrowserSession,
   jsonResponse,
   redirectResponse
 } from "../../../_lib/auth.js";
@@ -32,7 +33,7 @@ import { ensureDiscordGlobalCommands, upsertDiscordGuildCommands } from "../../.
 import { DISCORD_GLOBAL_COMMANDS, DISCORD_SCHEDULE_THREAD_COMMANDS } from "../../../_lib/discord-commands.js";
 import { scheduleActiveDiscordSync } from "../../../_lib/discord-schedule.js";
 
-const RELEASE = "7.4.4.12";
+const RELEASE = "7.5.0";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -50,45 +51,24 @@ function safeDestination(value) {
     : "/leagues";
 }
 
-function appendSessionCookies(headers, rawSessionToken) {
-  headers.append("Set-Cookie", createSecureCookie(
-    AUTH_CONSTANTS.SESSION_COOKIE_NAME,
-    rawSessionToken,
-    AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-    "/"
-  ));
-  headers.append("Set-Cookie", createSecureCookie(
-    AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME,
-    rawSessionToken,
-    AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-    "/"
-  ));
-}
-
 function appendClearedStateCookies(headers) {
   headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME, "/"));
   headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME, "/api/auth/discord"));
 }
 
-export async function createDirectSession(context, userId, destination) {
-  const rawSessionToken = createRandomToken(48);
-  const sessionTokenHash = await hashToken(rawSessionToken);
-  const expiresAt = addSecondsToNow(AUTH_CONSTANTS.SESSION_DURATION_SECONDS);
-  const result = await context.env.DB.prepare(`
-    INSERT INTO sessions (id, user_id, session_token_hash, expires_at)
-    VALUES (?, ?, ?, ?)
-  `).bind(createId("session"), userId, sessionTokenHash, expiresAt).run();
-  if (Number(result?.meta?.changes || 0) !== 1) {
-    throw new Error("The authenticated session could not be stored.");
-  }
-
+export async function createDirectSession(context, userId, destination, options = {}) {
+  const session = await issueBrowserSession(context, userId, {
+    recoveryMode:options.recoveryMode || "standard",
+    leagueId:options.leagueId || null,
+    reason:options.reason || "discord-oauth"
+  });
   const headers = new Headers({
     Location: safeDestination(destination),
     "Cache-Control": "no-store",
     "x-franchisehq-release": RELEASE,
     "x-franchisehq-session-establishment": "same-origin"
   });
-  appendSessionCookies(headers, rawSessionToken);
+  appendBrowserSessionCookies(headers, session);
   appendClearedStateCookies(headers);
   return new Response(null, { status:303, headers });
 }
@@ -176,6 +156,7 @@ export async function onRequestGet(context) {
     let joinLeagueSlug = null;
     let oauthReturnTo = null;
     let discordInstallContext = null;
+    let sessionRecoveryMode = "standard";
     let loginOrigin = new URL(context.request.url).origin;
     let redirectUri = String(context.env.DISCORD_REDIRECT_URI || "").trim();
     if (String(storedState.id || "").startsWith("discordinstall.")) {
@@ -490,10 +471,10 @@ export async function onRequestGet(context) {
       }
     }
 
-    // franchise-hq.pages.dev is a deliberate owner fallback for environments
-    // that block the custom domain. Only an active commissioner receives a
-    // durable session on that hostname; every other account is handed to the
-    // public custom domain.
+    // The pages.dev host is an identity-verified owner recovery entrance, not
+    // a second session domain. A qualifying owner is returned to the public
+    // domain through the one-time POST claim; everybody else also returns to
+    // the public domain without gaining recovery authority.
     if (new URL(loginOrigin).origin === OWNER_FALLBACK_ORIGIN) {
       const fallbackAccess = isOwnerFallbackIdentity(context.env, discordUser.id)
         ? await context.env.DB.prepare(`
@@ -503,11 +484,15 @@ export async function onRequestGet(context) {
         LIMIT 1
       `).bind(user.id).first()
         : null;
-      if (!fallbackAccess?.allowed) loginOrigin = CANONICAL_APP_ORIGIN;
+      if (fallbackAccess?.allowed) sessionRecoveryMode = "owner-recovery";
+      loginOrigin = CANONICAL_APP_ORIGIN;
     }
 
     if (callbackOrigin === new URL(loginOrigin).origin && stateCookieMatched) {
-      return createDirectSession(context, user.id, destination);
+      return createDirectSession(context, user.id, destination, {
+        recoveryMode:sessionRecoveryMode,
+        leagueId:joinLeagueId || null
+      });
     }
 
     // OAuth may complete on pages.dev while the user entered through the custom
@@ -518,7 +503,11 @@ export async function onRequestGet(context) {
     const handoffContext = encodeOpaqueContext({
       userId: user.id,
       destination,
-      audience: new URL(loginOrigin).origin
+      audience: new URL(loginOrigin).origin,
+      recoveryMode:sessionRecoveryMode === "owner-recovery"
+        ? "owner-recovery"
+        : stateCookieMatched ? "standard" : "mobile-handoff",
+      leagueId:joinLeagueId || null
     });
     const handoffId = `handoff.${handoffContext}.${crypto.randomUUID()}`;
     await context.env.DB.prepare(`

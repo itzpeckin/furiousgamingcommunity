@@ -93,11 +93,23 @@ export async function requireLeagueRole(
   return membershipCheck;
 }
 
+export async function requireCapability(context, capability) {
+  const membershipCheck = await requireActiveMembership(context);
+  if (!membershipCheck.authorized) return membershipCheck;
+  if (!membershipCheck.session.capabilities?.includes(String(capability || ""))) {
+    return {
+      authorized:false,
+      response:jsonResponse({
+        ok:false,
+        error:"You do not have permission to perform this action."
+      },403)
+    };
+  }
+  return membershipCheck;
+}
+
 export async function requireCommissioner(context) {
-  return requireLeagueRole(
-    context,
-    LEAGUE_ROLES.COMMISSIONER
-  );
+  return requireCapability(context, "league:manage");
 }
 
 export async function requirePlatformOwner(context) {
@@ -143,18 +155,11 @@ export async function requirePlatformOwner(context) {
 export async function requireTradeCommitteeAccess(
   context
 ) {
-  return requireLeagueRole(context, [
-    LEAGUE_ROLES.COMMISSIONER,
-    LEAGUE_ROLES.TRADE_COMMITTEE
-  ]);
+  return requireCapability(context, "trade:review");
 }
 
 export async function requireTeamOwnerAccess(context) {
-  const access = await requireLeagueRole(context, [
-    LEAGUE_ROLES.COMMISSIONER,
-    LEAGUE_ROLES.TRADE_COMMITTEE,
-    LEAGUE_ROLES.TEAM_OWNER
-  ]);
+  const access = await requireCapability(context, "trade:create");
   if (!access.authorized) return access;
   if (!access.session.membership?.teamId) {
     return {

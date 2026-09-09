@@ -38,7 +38,17 @@ const MIGRATIONS = [
   '../../migrations/0023_permanent_identity_preview.sql',
   '../../migrations/0024_commissioner_candidate_import.sql',
   '../../migrations/0025_safe_game_year_transition.sql',
-  '../../migrations/0026_permanent_league_export_url.sql'
+  '../../migrations/0026_permanent_league_export_url.sql',
+  '../../migrations/0027_gm_career_history.sql',
+  '../../migrations/0028_full_trade_center.sql',
+  '../../migrations/0029_draft_pick_baselines.sql',
+  '../../migrations/0030_trade_block_team_profiles.sql',
+  '../../migrations/0031_canonical_transaction_corrections.sql',
+  '../../migrations/0032_commissioner_hq_rules.sql',
+  '../../migrations/0033_commissioner_operations.sql',
+  '../../migrations/0034_discord_bot_foundation.sql',
+  '../../migrations/0035_discord_schedule_threads.sql',
+  '../../migrations/0036_authentication_session_framework.sql'
 ];
 
 function d1(database) {

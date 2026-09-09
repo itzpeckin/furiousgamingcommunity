@@ -1,12 +1,12 @@
 import {
   AUTH_CONSTANTS,
-  clearSecureCookie,
+  appendClearedBrowserSessionCookies,
   getCookie,
-  hashToken,
-  jsonResponse
+  jsonResponse,
+  revokeBrowserSessions
 } from "../../_lib/auth.js";
 
-const RELEASE = "7.3.0";
+const RELEASE = "7.5.0";
 
 async function revokeSession(context) {
   const candidates = [
@@ -14,23 +14,16 @@ async function revokeSession(context) {
     getCookie(context.request, AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME)
   ].filter(Boolean);
 
-  for (const rawToken of [...new Set(candidates)]) {
-    try {
-      const tokenHash = await hashToken(rawToken);
-      await context.env.DB.prepare(`
-        UPDATE sessions
-        SET revoked_at = CURRENT_TIMESTAMP
-        WHERE session_token_hash = ? AND revoked_at IS NULL
-      `).bind(tokenHash).run();
-    } catch (error) {
-      console.warn("Session revocation warning:", error?.message || error);
-    }
+  try {
+    return await revokeBrowserSessions(context, {
+      rawTokens:candidates,
+      eventType:"logged_out",
+      reason:"user-logout"
+    });
+  } catch (error) {
+    console.warn("Session revocation warning:", error?.message || error);
+    return 0;
   }
-}
-
-function clearCookieHeaders(headers) {
-  headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.SESSION_COOKIE_NAME, "/"));
-  headers.append("Set-Cookie", clearSecureCookie(AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME, "/"));
 }
 
 export async function onRequestGet(context) {
@@ -41,12 +34,12 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestPost(context) {
-  await revokeSession(context);
+  const revokedSessions = await revokeSession(context);
   const wantsHtml = String(context.request.headers.get("accept") || "").includes("text/html");
   const headers = new Headers({
     "Cache-Control": "no-store"
   });
-  clearCookieHeaders(headers);
+  appendClearedBrowserSessionCookies(headers);
   if (wantsHtml) {
     headers.set("Location", "/?logout=success");
     return new Response(null, { status: 303, headers });
@@ -55,6 +48,7 @@ export async function onRequestPost(context) {
   return new Response(JSON.stringify({
     ok: true,
     authenticated: false,
+    revokedSessions,
     release: RELEASE
   }), { status: 200, headers });
 }

@@ -1,4 +1,5 @@
 import { canonicalDocumentRedirect } from "./_lib/origin.js";
+import { AUTH_CONSTANTS, getCookie, hashToken, verifyMutationCsrf } from "./_lib/auth.js";
 
 const CSP_REPORT_ONLY = [
   "default-src 'self'",
@@ -13,7 +14,6 @@ const CSP_REPORT_ONLY = [
   "connect-src 'self' https://discord.com https://*.discord.com"
 ].join("; ");
 
-const rateBuckets = new Map();
 const AUTH_RATE_POLICIES = Object.freeze({
   "/api/auth/discord/login": { limit: 30, windowMs: 10 * 60 * 1000 },
   "/api/auth/session/claim": { limit: 30, windowMs: 10 * 60 * 1000 }
@@ -57,31 +57,59 @@ function safeApiFailure(id, status = 500) {
   });
 }
 
-function crossOriginMutation(request, pathname) {
-  if (["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) return false;
-  if (pathname === "/api/auth/session/claim") return false;
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  return origin !== new URL(request.url).origin;
+function mutationOriginStatus(request, pathname) {
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) return { mutation:false, valid:true };
+  if (pathname === "/api/auth/session/claim") return { mutation:true, valid:true, handoff:true };
+  const expectedOrigin = new URL(request.url).origin;
+  const origin = String(request.headers.get("origin") || "").trim();
+  let refererOrigin = "";
+  try {
+    const referer = request.headers.get("referer");
+    if (referer) refererOrigin = new URL(referer).origin;
+  } catch {}
+  if (origin && origin !== expectedOrigin) return { mutation:true, valid:false, reason:"cross-origin" };
+  if (!origin && refererOrigin && refererOrigin !== expectedOrigin) return { mutation:true, valid:false, reason:"cross-origin" };
+
+  const hasBrowserSession = Boolean(
+    getCookie(request, AUTH_CONSTANTS.SESSION_COOKIE_NAME)
+    || getCookie(request, AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME)
+  );
+  if (!hasBrowserSession) return { mutation:true, valid:true };
+  const fetchSite = String(request.headers.get("sec-fetch-site") || "").toLowerCase();
+  if (fetchSite === "cross-site" || fetchSite === "same-site") {
+    return { mutation:true, valid:false, reason:"cross-origin" };
+  }
+  if (!origin && !refererOrigin) return { mutation:true, valid:false, reason:"missing-origin" };
+  return { mutation:true, valid:true, browserSession:true };
 }
 
-function rateLimit(request, pathname) {
+async function rateLimit(context, pathname) {
   const policy = AUTH_RATE_POLICIES[pathname];
   if (!policy) return null;
-  const client = String(request.headers.get("cf-connecting-ip") || "unidentified");
-  const key = `${pathname}:${client}`;
-  const now = Date.now();
-  let bucket = rateBuckets.get(key);
-  if (!bucket || bucket.resetAt <= now) bucket = { count: 0, resetAt: now + policy.windowMs };
-  bucket.count += 1;
-  rateBuckets.set(key, bucket);
-  if (rateBuckets.size > 2_000) {
-    for (const [entryKey, entry] of rateBuckets) {
-      if (entry.resetAt <= now) rateBuckets.delete(entryKey);
-    }
+  const client = String(context.request.headers.get("cf-connecting-ip") || "unidentified");
+  const key = await hashToken(`${pathname}:${client}`);
+  if (context.env?.AUTH_RATE_LIMITER?.limit) {
+    const outcome = await context.env.AUTH_RATE_LIMITER.limit({ key });
+    return outcome?.success === false ? Math.ceil(policy.windowMs / 1000) : null;
   }
-  if (bucket.count <= policy.limit) return null;
-  return Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+  if (!context.env?.DB) return null;
+  const seconds = Math.ceil(policy.windowMs / 1000);
+  try {
+    const row = await context.env.DB.prepare(`INSERT INTO authentication_rate_limits
+      (bucket_key,request_count,expires_at,updated_at)
+      VALUES (?,1,datetime('now',?),CURRENT_TIMESTAMP)
+      ON CONFLICT(bucket_key) DO UPDATE SET
+        request_count=CASE WHEN expires_at<=CURRENT_TIMESTAMP THEN 1 ELSE request_count+1 END,
+        expires_at=CASE WHEN expires_at<=CURRENT_TIMESTAMP THEN datetime('now',?) ELSE expires_at END,
+        updated_at=CURRENT_TIMESTAMP
+      RETURNING request_count AS requestCount,
+        MAX(1,CAST((julianday(expires_at)-julianday('now'))*86400 AS INTEGER)) AS retryAfter`)
+      .bind(key,`+${seconds} seconds`,`+${seconds} seconds`).first();
+    return Number(row?.requestCount || 0) > policy.limit ? Number(row?.retryAfter || seconds) : null;
+  } catch (error) {
+    console.error("FranchiseHQ authentication rate limit unavailable", { pathname, error });
+    return null;
+  }
 }
 
 export async function onRequest(context) {
@@ -100,7 +128,7 @@ export async function onRequest(context) {
     });
     return applySecurityHeaders(response, id, context.request);
   }
-  const retryAfter = rateLimit(context.request, pathname);
+  const retryAfter = await rateLimit(context, pathname);
   if (retryAfter) {
     response = new Response(JSON.stringify({
       ok: false,
@@ -116,10 +144,12 @@ export async function onRequest(context) {
     });
     return applySecurityHeaders(response, id, context.request);
   }
-  if (crossOriginMutation(context.request, pathname)) {
+  const mutationOrigin = mutationOriginStatus(context.request, pathname);
+  if (!mutationOrigin.valid) {
     response = new Response(JSON.stringify({
       ok: false,
       error: "Cross-origin state changes are not allowed.",
+      code:"MUTATION_ORIGIN_REJECTED",
       requestId: id
     }), {
       status: 403,
@@ -129,6 +159,27 @@ export async function onRequest(context) {
       }
     });
     return applySecurityHeaders(response, id, context.request);
+  }
+  if (mutationOrigin.browserSession) {
+    const csrf = await verifyMutationCsrf(context).catch((error) => {
+      console.error("FranchiseHQ CSRF validation failed", { requestId:id, pathname, error });
+      return { browserSession:true, valid:false, reason:"validation-error" };
+    });
+    if (!csrf.valid) {
+      response = new Response(JSON.stringify({
+        ok:false,
+        error:"Your secure session changed. Refresh this page and try again.",
+        code:"CSRF_VALIDATION_FAILED",
+        requestId:id
+      }), {
+        status:403,
+        headers:{
+          "content-type":"application/json; charset=utf-8",
+          "cache-control":"no-store"
+        }
+      });
+      return applySecurityHeaders(response, id, context.request);
+    }
   }
   try {
     response = await context.next();

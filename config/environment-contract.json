@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "FranchiseHQ",
-  "release": "7.4.4.12",
+  "release": "7.5.0",
   "configurationAuthority": "Cloudflare dashboard export until a reviewed Wrangler configuration is adopted",
   "deploymentPolicy": {
     "productionBranch": "main",
@@ -19,6 +19,7 @@
       { "name": "COMPANION_EXPORT_META", "kind": "kv", "logicalResource": "companionMetadata", "required": true },
       { "name": "LEAGUE_CONFIG", "kind": "kv", "logicalResource": "leagueConfiguration", "required": true },
       { "name": "FRANCHISE_IMPORT_WORKER", "kind": "service", "logicalResource": "importWorker", "required": false },
+      { "name": "AUTH_RATE_LIMITER", "kind": "rate-limit", "logicalResource": "authenticationRateLimit", "required": false },
       { "name": "ASSETS", "kind": "pages-assets", "logicalResource": "staticAssets", "required": true, "platformManaged": true }
     ],
     "variables": [
@@ -69,7 +70,7 @@
       },
       "variables": {
         "APP_ENV": "local",
-        "APP_VERSION": "7.4.4.12",
+        "APP_VERSION": "7.5.0",
         "DISCORD_CLIENT_ID": "local-discord-application",
         "DISCORD_REDIRECT_URI": "http://localhost:8788/api/auth/discord/callback",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
@@ -100,7 +101,7 @@
       },
       "variables": {
         "APP_ENV": "staging",
-        "APP_VERSION": "7.4.4.12",
+        "APP_VERSION": "7.5.0",
         "DISCORD_CLIENT_ID": "staging-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-staging",
         "DISCORD_REDIRECT_URI_PUBLIC": "set-in-cloudflare-staging-public",
@@ -131,7 +132,7 @@
       },
       "variables": {
         "APP_ENV": "production",
-        "APP_VERSION": "7.4.4.12",
+        "APP_VERSION": "7.5.0",
         "DISCORD_CLIENT_ID": "production-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-production",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
