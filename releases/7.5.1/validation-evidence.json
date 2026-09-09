@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.1",
+  "validatedOn": "2026-09-09",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {"unregisteredFailures": 0},
+  "strictRepositoryGate": {
+    "passed": true,
+    "javascriptModules": 255,
+    "inventoryEntries": 599,
+    "routes": 76,
+    "passedTests": 204,
+    "failedTests": 0
+  },
+  "completeRepositorySuite": {"passed": true,"passedTests": 213,"failedTests": 0},
+  "checks": {
+    "focusedDiscordAndCap": {"passed": true,"passedTests": 42,"failedTests": 0},
+    "capProvenance": {
+      "passed": true,
+      "maddenCapHitPreserved": true,
+      "releaseNetSavingsUsedForAcquiringEstimate": true,
+      "releasePenaltyPreservedSeparately": true,
+      "currentTeamCapRoomAvailableInRetainedProductionSource": false,
+      "fabricatedCapSpace": false
+    },
+    "unequalPackages": {"passed": true,"twoForOne": true,"independentSendReceiveSlots": true},
+    "privateTradeThread": {"passed": true,"bothRegisteredOwnersAdded": true,"decisionButtons": true,"moderatorVisibilityDisclosed": true},
+    "directMessageFallback": {"passed": true,"decisionButtons": true,"guildContextRequired": false},
+    "buttonAuthorization": {
+      "passed": true,
+      "signedInteraction": true,
+      "tenantScoped": true,
+      "activeMembershipRequired": true,
+      "teamParticipationRequired": true,
+      "exactRevisionRequired": true,
+      "proposerSelfRejectBlocked": true
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 37,
+      "candidateRequiresMigration": true,
+      "productionApplied": false,
+      "migrationSha256": "5aac3428c44b1863e00da2f144583cf32ed98f7d28dc09e11b7178a9928d9fb8"
+    },
+    "discordCommandSchema": {
+      "passed": true,
+      "changed": true,
+      "globalRegistrationRequired": true,
+      "exactNameUpserts": ["trade"],
+      "bulkReplacementAllowed": false
+    },
+    "freeAgentBlockedPreserved": {"passed": true,"status": "blocked","count": null,"interpretedAsZero": false}
+  },
+  "productionBaselineReference": {
+    "sourceRelease": "7.5.0",
+    "sourceEvidenceCommit": "aac13741ea732623327341f407dc81cdd98e7950",
+    "migrationVersion": 36,
+    "activeSnapshotAtSourceEvidence": "f469399a-d4b1-446f-9264-75c17486d438"
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordCredentialsChanged": false,
+    "discordGuildInstalled": false,
+    "discordLeagueConfigured": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {"authorized": false,"status": "not-run"},
+    "hostedChecks": {"authorized": false,"status": "not-run"},
+    "productionMigration": {"authorized": false,"status": "not-run","currentMigration": 36,"candidateMigration": 37},
+    "productionDeployment": {"authorized": false,"status": "not-run","currentRelease": "7.5.0"},
+    "discordRegistration": {"authorized": false,"status": "not-run","exactNameUpserts": ["trade"],"bulkReplacementAllowed": false},
+    "discordPermissionRefresh": {"authorized": false,"status": "not-run","requiredPermission": "Create Private Threads","fallback": "direct-message-buttons"}
+  }
+}

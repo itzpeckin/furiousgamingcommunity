@@ -73,11 +73,12 @@ async function signedContext({db,key,interaction,env={}}){
   };
 }
 
-function interaction({id='100000000000000099',guild='100000000000000001',channel='100000000000000055',user='100000000000000011',name='league-site',options=[],permissions=null,type=2}={}){
+function interaction({id='100000000000000099',guild='100000000000000001',channel='100000000000000055',user='100000000000000011',name='league-site',options=[],permissions=null,type=2,data=null}={}){
+  const identity={id:user,username:`member-${user.slice(-2)}`,global_name:`Member ${user.slice(-2)}`,avatar:null};
   return {
-    id,application_id:'100000000000000009',token:`token-${id}`,type,guild_id:guild,channel_id:channel,
-    member:{...(permissions===null?{}:{permissions:String(permissions)}),user:{id:user,username:`member-${user.slice(-2)}`,global_name:`Member ${user.slice(-2)}`,avatar:null}},
-    data:{id:`command-${id}`,name,type:1,options}
+    id,application_id:'100000000000000009',token:`token-${id}`,type,channel_id:channel,
+    ...(guild?{guild_id:guild,member:{...(permissions===null?{}:{permissions:String(permissions)}),user:identity}}:{user:identity}),
+    data:data||{id:`command-${id}`,name,type:1,options}
   };
 }
 
@@ -218,6 +219,9 @@ test('global Discord command inventory restores legacy week commands and remains
   }
   const trade=DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='trade');
   assert.ok(trade.options.some(option=>option.name==='multi-team'));
+  const create=trade.options.find(option=>option.name==='create');
+  assert.match(create.options.find(option=>option.name==='send-1').description,/counts may differ/);
+  assert.match(create.options.find(option=>option.name==='receive-2').description,/independent of send slots/);
 });
 
 test('/standings distinguishes all divisions, all conferences, one team, and one named division while /playoffs returns each conference top 10',async()=>{
@@ -581,6 +585,7 @@ test('/trade create resolves the selected registered Discord owner to the author
       id:'100000000000000092',name:'trade',options:[{type:1,name:'create',options:[
         {type:3,name:'owner',value:'owner:100000000000000012'},
         {type:3,name:'send-1',value:'pick:pick:league-a:2027:1:tb'},
+        {type:3,name:'send-2',value:'pick:pick:league-a:2027:2:tb'},
         {type:3,name:'receive-1',value:'pick:pick:league-a:2027:1:sf'}
       ]}]
     })}));
@@ -588,12 +593,127 @@ test('/trade create resolves the selected registered Discord owner to the author
     assert.equal(payload.data.flags,64);
     assert.match(payload.data.content,/sent to San Francisco 49ers/i);
     assert.deepEqual(database.prepare(`SELECT team_key AS teamKey FROM trade_workflow_participants ORDER BY team_key`).all().map(row=>row.teamKey),['sf','tb']);
-    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_assets`).get().count,2);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_assets`).get().count,3);
     assert.deepEqual(database.prepare(`SELECT notification_type AS type,user_id AS userId FROM league_notifications ORDER BY type`).all().map(row=>({...row})),[
       {type:'received',userId:'owner-sf'},{type:'sent',userId:'user-a'}
     ]);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM discord_delivery_events`).get().count,2);
   }finally{database.close()}
+});
+
+test('/trade create opens one private owner thread and its buttons record the receiving team decision',async()=>{
+  const database=new DatabaseSync(':memory:'),originalFetch=globalThis.fetch;
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    seedActiveWeek(database,{leagueId:'league-a',week:13});
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    const db=d1(database);
+    await ensureDraftPickHorizon(db,{leagueId:'league-a',franchiseSeasonId:'season-a',seasonYear:2026,
+      gameRelease:'Madden NFL 27',teams:[{teamKey:'tb'},{teamKey:'sf'}]});
+    const requests=[];
+    globalThis.fetch=async(url,options={})=>{
+      const body=options.body?JSON.parse(options.body):null;
+      requests.push({url:String(url),method:options.method,body});
+      if(String(url).endsWith('/threads'))return new Response('{"id":"100000000000000077"}',{status:200,headers:{'content-type':'application/json'}});
+      if(String(url).includes('/thread-members/'))return new Response(null,{status:204});
+      return new Response('{"id":"100000000000000078"}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    const key=await signingKey(),env={DISCORD_BOT_TOKEN:'test-bot-token'};
+    const created=await discordInteractions(await signedContext({db,key,env,interaction:interaction({
+      id:'100000000000000061',name:'trade',options:[{type:1,name:'create',options:[
+        {type:3,name:'owner',value:'owner:100000000000000012'},
+        {type:3,name:'send-1',value:'pick:pick:league-a:2027:1:tb'},
+        {type:3,name:'send-2',value:'pick:pick:league-a:2027:2:tb'},
+        {type:3,name:'receive-1',value:'pick:pick:league-a:2027:1:sf'}
+      ]}]
+    })}));
+    const createdPayload=await created.json();
+    assert.match(createdPayload.data.content,/private negotiation thread was opened/i);
+    const room={...database.prepare(`SELECT trade_id AS tradeId,revision,discord_thread_id AS threadId,status FROM discord_trade_rooms`).get()};
+    assert.equal(room.revision,1);
+    assert.equal(room.threadId,'100000000000000077');
+    assert.equal(room.status,'active');
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_assets WHERE trade_id=?`).get(room.tradeId).count,3);
+    const threadCreate=requests.find(request=>request.url.endsWith('/threads'));
+    assert.equal(threadCreate.body.type,12);
+    assert.equal(threadCreate.body.invitable,false);
+    assert.equal(requests.filter(request=>request.url.includes('/thread-members/')).length,2);
+    const threadMessage=requests.find(request=>request.url.endsWith('/100000000000000077/messages'));
+    assert.equal(threadMessage.body.components[0].components.length,2);
+    const acceptId=threadMessage.body.components[0].components.find(button=>button.label==='Accept Trade').custom_id;
+    const rejectId=threadMessage.body.components[0].components.find(button=>button.label==='Reject Trade').custom_id;
+    const proposerReject=await discordInteractions(await signedContext({db,key,env,interaction:interaction({
+      id:'100000000000000065',guild:'100000000000000001',channel:'100000000000000077',user:'100000000000000011',type:3,
+      data:{custom_id:rejectId,component_type:2}
+    })}));
+    const proposerRejectPayload=await proposerReject.json();
+    assert.equal(proposerRejectPayload.type,4);
+    assert.match(proposerRejectPayload.data.content,/cannot reject its own offer/);
+    assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(room.tradeId).status,'negotiating');
+    const accepted=await discordInteractions(await signedContext({db,key,env,interaction:interaction({
+      id:'100000000000000062',guild:'100000000000000001',channel:'100000000000000077',user:'100000000000000012',type:3,
+      data:{custom_id:acceptId,component_type:2}
+    })}));
+    const acceptedPayload=await accepted.json();
+    assert.equal(acceptedPayload.type,7);
+    assert.match(acceptedPayload.data.content,/awaiting Trade Committee review/);
+    assert.equal(acceptedPayload.data.components,undefined);
+    assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(room.tradeId).status,'committee');
+    assert.equal(database.prepare(`SELECT status FROM discord_trade_rooms WHERE trade_id=?`).get(room.tradeId).status,'committee');
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM discord_delivery_events WHERE resource_id=? AND visibility='direct-message' AND status<>'suppressed'`).get(room.tradeId).count,0);
+  }finally{globalThis.fetch=originalFetch;database.close()}
+});
+
+test('a receiving owner can accept from the fallback Bot DM when private threads are unavailable',async()=>{
+  const database=new DatabaseSync(':memory:'),originalFetch=globalThis.fetch;
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    seedActiveWeek(database,{leagueId:'league-a',week:13});
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    const db=d1(database);
+    await ensureDraftPickHorizon(db,{leagueId:'league-a',franchiseSeasonId:'season-a',seasonYear:2026,
+      gameRelease:'Madden NFL 27',teams:[{teamKey:'tb'},{teamKey:'sf'}]});
+    const key=await signingKey();
+    await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000063',name:'trade',options:[{type:1,name:'create',options:[
+        {type:3,name:'owner',value:'owner:100000000000000012'},
+        {type:3,name:'send-1',value:'pick:pick:league-a:2027:1:tb'},
+        {type:3,name:'receive-1',value:'pick:pick:league-a:2027:1:sf'}
+      ]}]
+    })}));
+    const tradeId=database.prepare(`SELECT id FROM trade_workflows`).get().id,requests=[];
+    const fetchImpl=async(url,options={})=>{
+      const body=options.body?JSON.parse(options.body):null;
+      requests.push({url:String(url),method:options.method,body});
+      if(String(url).endsWith(['','users','@me','channels'].join('/')))return new Response(`{"id":"${body.recipient_id}88"}`,{status:200,headers:{'content-type':'application/json'}});
+      return new Response('{"id":"100000000000000079"}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},db,{leagueId:'league-a',fetchImpl});
+    const received=requests.find(request=>request.url.includes('10000000000000001288/messages'));
+    assert.equal(received.body.components[0].components.length,2);
+    const acceptId=received.body.components[0].components.find(button=>button.label==='Accept Trade').custom_id;
+    globalThis.fetch=fetchImpl;
+    const context=await signedContext({db,key,env:{DISCORD_BOT_TOKEN:'test-bot-token'},interaction:interaction({
+      id:'100000000000000064',guild:null,channel:'10000000000000001288',user:'100000000000000012',type:3,
+      data:{custom_id:acceptId,component_type:2}
+    })});
+    const pending=[];context.waitUntil=promise=>pending.push(promise);
+    const accepted=await discordInteractions(context),payload=await accepted.json();
+    assert.equal(payload.type,7);
+    assert.match(payload.data.content,/awaiting Trade Committee review/);
+    await Promise.all(pending);
+    assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(tradeId).status,'committee');
+  }finally{globalThis.fetch=originalFetch;database.close()}
 });
 
 test('/trade-block add and remove are private, roster-authorized, and use player autocomplete',async()=>{
@@ -1132,7 +1252,7 @@ test('in-app trade notifications create durable private Discord delivery intents
   }finally{database.close()}
 });
 
-test('durable trade delivery opens a DM and includes the private response command',async()=>{
+test('durable legacy trade delivery opens a DM and preserves the FranchiseHQ fallback link',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -1151,7 +1271,8 @@ test('durable trade delivery opens a DM and includes the private response comman
     const result=await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},d1(database),{leagueId:'league-a',fetchImpl});
     assert.deepEqual(result,{sent:1,failed:0,skipped:false});
     assert.equal(requests.length,2);
-    assert.match(requests[1].body.content,/\/trade accept trade:trade-a/);
+    assert.match(requests[1].body.content,/Use the buttons below/);
+    assert.equal(requests[1].body.components,undefined);
     assert.match(requests[1].body.content,/\/leagues\/alpha#trade-center\/trade-a/);
     assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE idempotency_key='league-notification:notice-delivery'`).get().status,'sent');
   }finally{database.close()}
@@ -1169,16 +1290,17 @@ test('trade delivery sends both owners linked player details and an explicitly e
       (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
       VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
     const players=[
-      ['identity-tb','public-tb','source-tb','Tristan Example','1001','LT',95,27,'Superstar',12500],
-      ['identity-sf','public-sf','source-sf','George Example','1002','TE',97,29,'X-Factor',14750]
+      ['identity-tb','public-tb','source-tb','Tristan Example','1001','LT',95,27,'Superstar',3997,10000000,10651],
+      ['identity-sf','public-sf','source-sf','George Example','1002','TE',97,29,'X-Factor',566,0,4696]
     ];
-    players.forEach(([identityId,publicId,sourceId,name,teamId,position,overall,age,development,capHit])=>{
+    players.forEach(([identityId,publicId,sourceId,name,teamId,position,overall,age,development,capHit,capReleaseNetSavings,capReleasePenalty])=>{
       database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,'league-a',?,?)`).run(identityId,publicId,name);
       database.prepare(`INSERT INTO player_source_aliases
         (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id)
         VALUES ('league-a','madden-companion','franchise-a',?,?, 'season-a','season-a')`).run(sourceId,identityId);
       seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'players',externalId:sourceId,data:{
-        external_id:sourceId,team_external_id:teamId,display_name:name,position,overall,age,development_trait:development,capHit
+        external_id:sourceId,team_external_id:teamId,display_name:name,position,overall,age,development_trait:development,
+        capHit,capReleaseNetSavings,capReleasePenalty
       }});
     });
     database.prepare(`INSERT INTO trade_workflows
@@ -1210,9 +1332,10 @@ test('trade delivery sends both owners linked player details and an explicitly e
     assert.equal(messages.length,2);
     for(const request of messages){
       const details=request.body.embeds[0].fields.map(field=>field.value).join('\n');
-      assert.match(details,/\[Tristan Example\].*LT.*95 OVR.*Age 27.*Superstar Dev.*\$12,500,000/s);
-      assert.match(details,/\[George Example\].*TE.*97 OVR.*Age 29.*X-Factor Dev.*\$14,750,000/s);
-      assert.match(details,/Estimate excludes Madden dead-cap and bonus acceleration effects/);
+      assert.match(details,/\[Tristan Example\].*LT.*95 OVR.*Age 27.*Superstar Dev.*Madden cap hit \$3,997,000.*Acquiring estimate \$10,000,000.*release penalty \$10,651,000/s);
+      assert.match(details,/\[George Example\].*TE.*97 OVR.*Age 29.*X-Factor Dev.*Madden cap hit \$566,000.*Acquiring estimate \$0.*release penalty \$4,696,000/s);
+      assert.match(details,/outgoing relief.*\$10,651,000 retained release penalty/s);
+      assert.match(details,/Current\/projected team space appears only when the export supplies current cap room/);
       assert.doesNotMatch(request.body.content,/^https:\/\//m);
     }
   }finally{database.close()}

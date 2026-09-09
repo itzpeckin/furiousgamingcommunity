@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.1",
+  "releaseType": "discord-trade-decision-and-cap-provenance-remediation",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.0",
+    "commit": "aac13741ea732623327341f407dc81cdd98e7950",
+    "tree": "c0cca6573248ac81ab210170905acc6d39c0a61f",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-run",
+    "pullRequest": null,
+    "candidateCommit": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.5.0",
+    "currentCommit": "aac13741ea732623327341f407dc81cdd98e7950",
+    "currentMigration": 36,
+    "candidateMigration": 37
+  },
+  "requiredArtifacts": [
+    "migrations/0037_discord_trade_rooms.sql",
+    "functions/_lib/discord-trade-components.js",
+    "functions/_lib/discord-security.js",
+    "functions/_lib/discord-delivery.js",
+    "functions/_lib/discord-bot.js",
+    "functions/api/discord/interactions.js",
+    "tests/discord/discord-bot.test.mjs",
+    "tests/import/live-data-experience.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.5.1/release-record.md",
+    "releases/7.5.1/validation-evidence.json"
+  ]
+}

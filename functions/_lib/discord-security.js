@@ -1,9 +1,10 @@
 import { createId } from './auth.js';
 import { resolveTenantById, tenantDatabase, createTenantAuditContext, tenantAuditStatement } from './tenant-context.js';
 import { sha256Hex } from './cloud-platform.js';
+import { activeLeagueTeams, resolveTeam } from './league-teams.js';
 
-export const DISCORD_INTERACTION_TYPES=Object.freeze({PING:1,APPLICATION_COMMAND:2,APPLICATION_COMMAND_AUTOCOMPLETE:4});
-export const DISCORD_RESPONSE_TYPES=Object.freeze({PONG:1,CHANNEL_MESSAGE:4,DEFERRED_CHANNEL_MESSAGE:5,APPLICATION_COMMAND_AUTOCOMPLETE_RESULT:8});
+export const DISCORD_INTERACTION_TYPES=Object.freeze({PING:1,APPLICATION_COMMAND:2,MESSAGE_COMPONENT:3,APPLICATION_COMMAND_AUTOCOMPLETE:4});
+export const DISCORD_RESPONSE_TYPES=Object.freeze({PONG:1,CHANNEL_MESSAGE:4,DEFERRED_CHANNEL_MESSAGE:5,DEFERRED_UPDATE_MESSAGE:6,UPDATE_MESSAGE:7,APPLICATION_COMMAND_AUTOCOMPLETE_RESULT:8});
 export const DISCORD_EPHEMERAL_FLAG=64;
 const MAX_BODY_BYTES=128*1024;
 const MAX_TIMESTAMP_SKEW_SECONDS=5*60;
@@ -73,9 +74,20 @@ export function discordMessageData(message){
       name:String(field?.name||'Details').slice(0,256),value:String(field?.value||'—').slice(0,1024),inline:Boolean(field?.inline)
     }))}:{})
   })):[];
+  const components=Array.isArray(source.components)?source.components.slice(0,5).map(row=>({
+    type:1,
+    components:(Array.isArray(row?.components)?row.components:[]).slice(0,5).map(component=>({
+      type:2,
+      style:Math.min(4,Math.max(1,Number(component?.style)||2)),
+      label:String(component?.label||'Action').slice(0,80),
+      custom_id:String(component?.custom_id||'').slice(0,100),
+      disabled:Boolean(component?.disabled)
+    })).filter(component=>component.custom_id)
+  })).filter(row=>row.components.length):[];
   return {
     ...(content?{content}:{}),
     ...(embeds.length?{embeds}:{}),
+    ...(components.length?{components}:{}),
     allowed_mentions:{parse:[]}
   };
 }
@@ -178,6 +190,56 @@ export async function resolveDiscordContext(env,interaction,{membershipRequired=
     discordGlobalName:actor.discordGlobalName,displayName:actor.displayName,avatarUrl:actor.avatarUrl
   }:null;
   return {db,env,league,installation,discordIdentity:identity,user,membership,session:user?{user,membership}:null,interaction};
+}
+
+export async function resolveDiscordTradeComponentContext(env,interaction,{tradeId}={}){
+  const db=tenantDatabase(env);
+  if(!db)throw Object.assign(new Error('FranchiseHQ data is temporarily unavailable.'),{status:503,code:'database-unavailable'});
+  const target=await db.prepare(`SELECT workflow.league_id AS leagueId,
+      installation.discord_guild_id AS guildId,installation.application_id AS applicationId,
+      installation.trade_committee_channel_id AS tradeCommitteeChannelId,
+      installation.notification_channel_id AS notificationChannelId,
+      installation.schedule_channel_id AS scheduleChannelId,installation.status AS installationStatus
+    FROM trade_workflows workflow
+    LEFT JOIN discord_league_installations installation ON installation.league_id=workflow.league_id
+    WHERE workflow.id=? LIMIT 1`).bind(String(tradeId||'')).first();
+  if(!target)throw Object.assign(new Error('This trade is no longer available.'),{status:404,code:'trade-unavailable'});
+  if(target.installationStatus!=='active')throw Object.assign(new Error('This league’s Discord connection is not active.'),{status:409,code:'installation-inactive'});
+  if(target.applicationId&&String(interaction.application_id||'')!==String(target.applicationId)){
+    throw Object.assign(new Error('This Discord application is not authorized for the trade.'),{status:403,code:'application-mismatch'});
+  }
+  const guildId=String(interaction?.guild_id||'').trim();
+  if(guildId&&guildId!==String(target.guildId||'')){
+    throw Object.assign(new Error('This trade belongs to another connected Discord server.'),{status:403,code:'guild-mismatch'});
+  }
+  const league=await resolveTenantById(env,target.leagueId);
+  if(!league)throw Object.assign(new Error('The connected FranchiseHQ league is unavailable.'),{status:404,code:'league-unavailable'});
+  const identity=discordUser(interaction),discordUserId=String(identity?.id||'');
+  if(!SNOWFLAKE.test(discordUserId))throw Object.assign(new Error('Discord identity could not be verified.'),{status:401,code:'identity-missing'});
+  const actor=await db.prepare(`SELECT user.id,user.discord_user_id AS discordUserId,
+      user.discord_username AS discordUsername,user.discord_global_name AS discordGlobalName,
+      user.display_name AS displayName,user.avatar_url AS avatarUrl,
+      membership.id AS membershipId,membership.role,membership.team_id AS teamId,membership.active
+    FROM users user JOIN league_memberships membership ON membership.user_id=user.id AND membership.league_id=?
+    WHERE user.discord_user_id=? LIMIT 1`).bind(league.id,discordUserId).first();
+  if(!actor?.membershipId||!Boolean(actor.active)){
+    throw Object.assign(new Error('Your active FranchiseHQ league membership is required.'),{status:403,code:'membership-required'});
+  }
+  const teams=await activeLeagueTeams(db,league.id),team=resolveTeam(teams,actor.teamId);
+  const teamKey=team?.teamKey||String(actor.teamId||'').trim().toLowerCase();
+  const participant=teamKey?await db.prepare(`SELECT 1 AS allowed FROM trade_workflow_participants
+    WHERE trade_id=? AND league_id=? AND team_key=? LIMIT 1`).bind(String(tradeId),league.id,teamKey).first():null;
+  if(!participant?.allowed){
+    throw Object.assign(new Error('Only an owner whose team is involved may respond to this trade.'),{status:403,code:'trade-participant-required'});
+  }
+  const installation={leagueId:league.id,guildId:target.guildId,applicationId:target.applicationId,
+    tradeCommitteeChannelId:target.tradeCommitteeChannelId,notificationChannelId:target.notificationChannelId,
+    scheduleChannelId:target.scheduleChannelId,status:target.installationStatus};
+  const membership={id:actor.membershipId,leagueId:league.id,leagueSlug:league.slug,leagueName:league.name,
+    role:actor.role,teamId:actor.teamId,teamKey,active:true};
+  const user={id:actor.id,discordUserId:actor.discordUserId,discordUsername:actor.discordUsername,
+    discordGlobalName:actor.discordGlobalName,displayName:actor.displayName,avatarUrl:actor.avatarUrl};
+  return {db,env,league,installation,discordIdentity:identity,user,membership,session:{user,membership},interaction,teams};
 }
 
 export function requireDiscordTeam(c){

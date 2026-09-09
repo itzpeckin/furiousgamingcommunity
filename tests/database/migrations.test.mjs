@@ -127,7 +127,7 @@ test('the production-like legacy upgrade preserves identities and relationships'
       VALUES (?,?,?,?)`).run('league-future-test','Future League','FranchiseHQ','future-league');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints
       WHERE league_id='league-future-test'`).get().count,1);
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 36);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 37);
     const upgradedSession = database.prepare(`SELECT absolute_expires_at,last_rotated_at,recovery_mode
       FROM sessions WHERE id='session-upgrade-test'`).get();
     assert.ok(upgradedSession.absolute_expires_at);
@@ -275,7 +275,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 36', async () => {
+test('runtime schema verification fails closed before version 37', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -287,12 +287,17 @@ test('runtime schema verification fails closed before version 36', async () => {
     error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 17
   );
   observedVersion = 36;
-  assert.equal((await requireDatabaseSchema(outdated)).version, 36);
+  await assert.rejects(
+    () => requireDatabaseSchema(outdated),
+    error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 36
+  );
+  observedVersion = 37;
+  assert.equal((await requireDatabaseSchema(outdated)).version, 37);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 36, name: 'authentication_session_framework' }) };
+      return { first: async () => ({ version: 37, name: 'discord_trade_rooms' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 36);
+  assert.equal((await requireDatabaseSchema(current)).version, 37);
 });

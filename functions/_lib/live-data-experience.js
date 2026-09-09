@@ -80,6 +80,18 @@ const scaledThousands = value => {
   return numeric === null ? null : numeric * 1000;
 };
 
+// Madden's roster payload is not internally consistent for the two release
+// fields. Older captures report both in thousands while the current Madden 27
+// payload reports net savings in dollars and the release penalty in thousands.
+// NFL contract values below $100,000 are not plausible here, so the magnitude
+// boundary lets both retained formats normalize to dollars without changing the
+// source record.
+const maddenCurrency = value => {
+  const numeric = number(value);
+  if (numeric === null) return null;
+  return Math.abs(numeric) >= 100000 ? numeric : numeric * 1000;
+};
+
 export function sourceSupportedContract(raw = {}) {
   return {
     yearsRemaining:number(raw.contract_years_remaining ?? raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.yearsRemaining),
@@ -89,9 +101,9 @@ export function sourceSupportedContract(raw = {}) {
     currentYearBonus:null,
     totalSalary:number(raw.contractSalary ?? raw.totalSalary ?? raw.contractTotalSalary),
     totalBonus:number(raw.contractBonus ?? raw.totalBonus ?? raw.signingBonus),
-    releaseNetSavings:scaledThousands(raw.capReleaseNetSavings ?? raw.releaseNetSavings ?? raw.capSavings),
-    releasePenalty:scaledThousands(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney),
-    sourceUnits:{capHit:'madden-thousands',releaseNetSavings:'madden-thousands',releasePenalty:'madden-thousands',salary:'dollars',bonus:'dollars'}
+    releaseNetSavings:maddenCurrency(raw.capReleaseNetSavings ?? raw.releaseNetSavings ?? raw.capSavings),
+    releasePenalty:maddenCurrency(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney),
+    sourceUnits:{capHit:'madden-thousands',releaseNetSavings:'madden-variable-normalized',releasePenalty:'madden-variable-normalized',salary:'dollars',bonus:'dollars'}
   };
 }
 

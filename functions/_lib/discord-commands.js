@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.4.4.12';
+export const DISCORD_COMMAND_RELEASE = '7.5.1';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -181,10 +181,10 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
     options:[
       {type:OPTION.SUB_COMMAND,name:'create',description:'Create a native two-team trade offer.',options:[
         autocompleteString('owner','Registered FranchiseHQ owner and team.',{required:true}),
-        autocompleteString('send-1','First player or pick your team sends.',{required:true}),
-        autocompleteString('receive-1','First player or pick your team receives.',{required:true}),
-        ...Array.from({length:5},(_,index)=>autocompleteString(`send-${index+2}`,`Additional player or pick your team sends.`)),
-        ...Array.from({length:5},(_,index)=>autocompleteString(`receive-${index+2}`,`Additional player or pick your team receives.`)),
+        autocompleteString('send-1','First asset your team sends; send and receive counts may differ.',{required:true}),
+        autocompleteString('receive-1','First asset your team receives; send and receive counts may differ.',{required:true}),
+        ...Array.from({length:5},(_,index)=>autocompleteString(`send-${index+2}`,`Optional additional asset sent; independent of receive slots.`)),
+        ...Array.from({length:5},(_,index)=>autocompleteString(`receive-${index+2}`,`Optional additional asset received; independent of send slots.`)),
         {type:OPTION.STRING,name:'note',description:'Optional trade message.'}
       ]},
       {type:OPTION.SUB_COMMAND,name:'multi-team',description:'Open the web composer for a three- or four-team trade.'},
