@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "7.5.0",
+  "release": "7.5.1",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 36,
+  "currentVersion": 37,
   "requiredTables": [
     "canonical_capture_lifecycle_sessions",
     "canonical_free_agents",
@@ -55,6 +55,7 @@
     "discord_delivery_events",
     "discord_schedule_sync_runs",
     "discord_schedule_threads",
+    "discord_trade_rooms",
     "user_stream_profiles",
     "league_news_posts",
     "league_rule_media",
@@ -145,6 +146,7 @@
     "discord_delivery_events": ["id", "league_id", "user_id", "discord_user_id", "channel_id", "event_type", "resource_type", "resource_id", "visibility", "payload_json", "idempotency_key", "status", "attempts", "available_at", "sent_at", "last_error", "created_at", "updated_at"],
     "discord_schedule_sync_runs": ["id", "league_id", "snapshot_id", "discord_guild_id", "schedule_channel_id", "season_year", "phase", "week_index", "source", "requested_by_user_id", "status", "game_count", "thread_count", "registered_owner_count", "error_count", "last_error", "created_at", "started_at", "completed_at", "updated_at"],
     "discord_schedule_threads": ["id", "league_id", "snapshot_id", "sync_run_id", "discord_guild_id", "parent_channel_id", "starter_message_id", "discord_thread_id", "game_external_id", "season_year", "phase", "week_index", "home_team_key", "away_team_key", "home_discord_user_id", "away_discord_user_id", "status", "created_at", "updated_at"],
+    "discord_trade_rooms": ["id", "league_id", "trade_id", "revision", "discord_guild_id", "parent_channel_id", "discord_thread_id", "message_id", "status", "last_error", "created_at", "updated_at"],
     "user_stream_profiles": ["user_id", "twitch_handle", "twitch_url", "updated_by_user_id", "created_at", "updated_at"],
     "league_news_posts": ["id", "league_id", "category", "title", "summary", "body", "status", "author_user_id", "published_at", "created_at", "updated_at"],
     "league_snapshots": ["id", "league_id", "status", "manifest_json", "validation_status", "validation_score", "created_at", "updated_at"],

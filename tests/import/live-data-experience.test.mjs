@@ -42,6 +42,10 @@ test('contract DTO uses documented Madden units and does not manufacture current
   assert.equal(contract.releasePenalty,9200000);
   assert.equal(contract.currentYearSalary,null);
   assert.equal(contract.currentYearBonus,null);
+  const retainedMadden27=sourceSupportedContract({sourceCapHit:3997,capReleaseNetSavings:10000000,capReleasePenalty:10651});
+  assert.equal(retainedMadden27.capHit,3997000);
+  assert.equal(retainedMadden27.releaseNetSavings,10000000);
+  assert.equal(retainedMadden27.releasePenalty,10651000);
 });
 
 test('roster state is source-derived for active, injured reserve, practice squad, and Free Agents', () => {

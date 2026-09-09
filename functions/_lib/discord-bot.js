@@ -28,7 +28,7 @@ import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-
 import { createTenantAuditContext, tenantAuditStatement } from './tenant-context.js';
 import { competitionState, executeCompetitionAction } from '../api/leagues/[leagueSlug]/competition.js';
 import { executeTradeCenterAction } from '../api/leagues/[leagueSlug]/trade-center.js';
-import { queueCommitteeReviewDelivery } from './discord-delivery.js';
+import { ensureDiscordTradeRoom, queueCommitteeReviewDelivery, tradeConversationMessage } from './discord-delivery.js';
 import { syncDiscordScheduleThreads } from './discord-schedule.js';
 
 const TWITCH_HANDLE=/^[A-Za-z0-9_]{3,25}$/;
@@ -141,7 +141,10 @@ async function createTrade(c,values){
   const result=await executeTradeCenterAction({...c,request:requestForAudit(c.interaction)},{
     action:'propose',transfers,note:clean(values.note,2000)
   });
-  return `Trade **${result.tradeId}** was sent to ${opponent.displayName}.\n[Review or revise this trade in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-center/${encodeURIComponent(result.tradeId)})`;
+  const room=await ensureDiscordTradeRoom(c.env,c.db,{
+    league:c.league,installation:c.installation,interaction:c.interaction,tradeId:result.tradeId
+  }).catch(()=>({opened:false,fallback:'direct-message'}));
+  return `Trade **${result.tradeId}** was sent to ${opponent.displayName}.\n${room.opened?'A private negotiation thread was opened for both registered owners.':'Private owner DMs were queued because a shared private thread was unavailable.'}\n[Review or revise this trade in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-center/${encodeURIComponent(result.tradeId)})`;
 }
 
 async function tradeBlockAction(c,subcommand,values){
@@ -180,6 +183,53 @@ async function respondToTrade(c,subcommand,values){
     if(trade?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId});
   }
   return `Trade **${tradeId}** was ${subcommand==='accept'?'accepted':'rejected'} successfully.`;
+}
+
+export async function executeDiscordTradeComponent(c,{action,tradeId,revision}){
+  c.teams=c.teams||await activeLeagueTeams(c.db,c.league.id);
+  const current=await c.db.prepare(`SELECT revision,mutation_token AS mutationToken,status,
+      proposer_team_key AS proposerTeamKey FROM trade_workflows WHERE id=? AND league_id=? LIMIT 1`)
+    .bind(clean(tradeId,120),c.league.id).first();
+  if(!current)throw Object.assign(new Error('This trade is no longer available.'),{status:404,code:'trade-unavailable'});
+  if(current.status!=='negotiating')throw Object.assign(new Error('This trade is no longer open for an owner decision.'),{status:409,code:'trade-closed'});
+  if(Number(current.revision)!==Number(revision))throw Object.assign(new Error('This offer was revised. Open the newest trade message before responding.'),{status:409,code:'trade-revision-changed'});
+  const own=resolveTeam(c.teams,c.membership?.teamKey||c.membership?.teamId);
+  const ownTeam=own?.teamKey||clean(c.membership?.teamKey||c.membership?.teamId,120).toLowerCase();
+  const participant=await c.db.prepare(`SELECT accepted_revision AS acceptedRevision FROM trade_workflow_participants
+    WHERE trade_id=? AND league_id=? AND team_key=? LIMIT 1`).bind(tradeId,c.league.id,ownTeam).first();
+  if(!participant)throw Object.assign(new Error('Only an owner whose team is involved may respond to this trade.'),{status:403,code:'trade-participant-required'});
+  if(action==='accept'&&Number(participant.acceptedRevision)===Number(revision)){
+    throw Object.assign(new Error('Your team already accepted this revision.'),{status:409,code:'trade-already-accepted'});
+  }
+  if(action==='reject'&&String(current.proposerTeamKey||'').toLowerCase()===ownTeam){
+    throw Object.assign(new Error('The proposing team can revise or cancel this offer in FranchiseHQ, but cannot reject its own offer.'),{status:403,code:'proposer-reject-blocked'});
+  }
+  const result=await executeTradeCenterAction({...c,request:requestForAudit(c.interaction)},{
+    action,tradeId,revision:Number(current.revision),mutationToken:current.mutationToken
+  });
+  const updated=result.workflows?.find(item=>item.id===tradeId)
+    ||await c.db.prepare(`SELECT status,revision FROM trade_workflows WHERE id=? AND league_id=?`).bind(tradeId,c.league.id).first();
+  if(action==='accept'&&updated?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId});
+  const roomStatus=updated?.status==='committee'?'committee':updated?.status==='rejected'?'rejected':'active';
+  const room=await c.db.prepare(`SELECT id,discord_thread_id AS threadId FROM discord_trade_rooms
+    WHERE league_id=? AND trade_id=? LIMIT 1`).bind(c.league.id,tradeId).first();
+  if(room?.id){
+    await c.db.batch([
+      c.db.prepare(`UPDATE discord_trade_rooms SET revision=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+        .bind(Number(updated?.revision||revision),roomStatus,room.id),
+      c.db.prepare(`UPDATE discord_delivery_events SET status='suppressed',last_error='Delivered in private trade thread',updated_at=CURRENT_TIMESTAMP
+        WHERE league_id=? AND resource_id=? AND visibility='direct-message' AND status IN ('pending','failed')`)
+        .bind(c.league.id,tradeId)
+    ]);
+  }
+  const statusMessage=updated?.status==='committee'
+    ?`Accepted by ${own?.displayName||ownTeam.toUpperCase()}. The offer is now awaiting Trade Committee review.`
+    :`Rejected by ${own?.displayName||ownTeam.toUpperCase()}. Both owners can see this final decision.`;
+  return tradeConversationMessage(c.db,{
+    leagueId:c.league.id,eventType:'received',resourceId:tradeId,
+    payloadJson:JSON.stringify({title:updated?.status==='committee'?'Trade accepted':'Trade rejected',
+      message:'The FranchiseHQ trade workflow was updated atomically.',tradeId,leagueSlug:c.league.slug})
+  },{disabled:true,statusMessage});
 }
 
 async function reviewTrade(c,values){

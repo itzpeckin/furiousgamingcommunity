@@ -9,6 +9,7 @@ import {
   discordMessageData,
   editDiscordOriginalResponse,
   resolveDiscordContext,
+  resolveDiscordTradeComponentContext,
   verifyDiscordInteractionRequest
 } from '../../_lib/discord-security.js';
 import {
@@ -17,9 +18,10 @@ import {
   discordInteractionIsPrivate,
   DISCORD_COMMAND_RELEASE
 } from '../../_lib/discord-commands.js';
-import { executeDiscordCommand } from '../../_lib/discord-bot.js';
+import { executeDiscordCommand, executeDiscordTradeComponent } from '../../_lib/discord-bot.js';
 import { discordAutocompleteChoices } from '../../_lib/discord-autocomplete.js';
 import { flushDiscordDeliveries } from '../../_lib/discord-delivery.js';
+import { parseTradeDecisionCustomId } from '../../_lib/discord-trade-components.js';
 
 function httpJson(body,status){
   return new Response(JSON.stringify(body),{
@@ -50,6 +52,32 @@ async function runCommand(context,c,interaction){
   }
 }
 
+async function runTradeComponent(context,interaction,decision){
+  let c;
+  try{c=await resolveDiscordTradeComponentContext(context.env,interaction,{tradeId:decision.tradeId});}
+  catch(error){return discordErrorResponse(safeCommandError(error));}
+  let accepted;
+  try{accepted=await createInteractionReceipt(c.db,interaction,{leagueId:c.league.id,visibility:'private'});}
+  catch{return discordErrorResponse('FranchiseHQ trade buttons require database migration 37 before they can be enabled.');}
+  if(!accepted)return discordErrorResponse('This trade decision was already received. Its first result remains authoritative.');
+  try{
+    const message=await executeDiscordTradeComponent(c,decision);
+    await completeInteractionReceipt(c.db,interaction.id,{status:'completed',response:message});
+    const work=flushDiscordDeliveries(context.env,c.db,{leagueId:c.league.id,limit:10}).catch(()=>{});
+    const waitUntil=context.waitUntil||context.executionContext?.waitUntil;
+    if(typeof waitUntil==='function')waitUntil.call(context.executionContext||context,work);
+    else work.catch(()=>{});
+    return discordInteractionResponse(DISCORD_RESPONSE_TYPES.UPDATE_MESSAGE,discordMessageData(message));
+  }catch(error){
+    const message=safeCommandError(error);
+    await completeInteractionReceipt(c.db,interaction.id,{
+      status:Number(error?.status)>=400&&Number(error?.status)<500?'rejected':'failed',
+      response:message,errorCode:error?.code||`http-${Number(error?.status)||500}`
+    }).catch(()=>{});
+    return discordErrorResponse(message);
+  }
+}
+
 export async function onRequestPost(context){
   const publicKey=String(context.env?.DISCORD_PUBLIC_KEY||'').trim();
   if(!publicKey)return httpJson({ok:false,release:DISCORD_COMMAND_RELEASE,error:'Discord interactions are not configured.'},503);
@@ -58,6 +86,11 @@ export async function onRequestPost(context){
   const interaction=verified.interaction;
   if(Number(interaction.type)===DISCORD_INTERACTION_TYPES.PING){
     return discordInteractionResponse(DISCORD_RESPONSE_TYPES.PONG);
+  }
+  if(Number(interaction.type)===DISCORD_INTERACTION_TYPES.MESSAGE_COMPONENT){
+    const decision=parseTradeDecisionCustomId(interaction?.data?.custom_id);
+    if(!decision)return discordErrorResponse('That FranchiseHQ trade action is no longer supported.');
+    return runTradeComponent(context,interaction,decision);
   }
   const autocomplete=Number(interaction.type)===DISCORD_INTERACTION_TYPES.APPLICATION_COMMAND_AUTOCOMPLETE;
   if(Number(interaction.type)!==DISCORD_INTERACTION_TYPES.APPLICATION_COMMAND&&!autocomplete){

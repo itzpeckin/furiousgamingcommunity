@@ -44,11 +44,11 @@ test('only missing canonical migrations are planned', () => {
   assert.deepEqual(pendingMigrations(ledger, migrations).map(item => item.version), [19, 20]);
 });
 
-test('canonical migration loading includes the authentication session framework', async () => {
+test('canonical migration loading includes durable Discord trade rooms', async () => {
   const { contract, migrations } = await loadCanonicalMigrations();
-  assert.equal(contract.currentVersion, 36);
-  assert.equal(migrations.at(-1)?.version, 36);
-  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0036_authentication_session_framework.sql');
+  assert.equal(contract.currentVersion, 37);
+  assert.equal(migrations.at(-1)?.version, 37);
+  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0037_discord_trade_rooms.sql');
   const tenantMigration = migrations.find(item => item.version === 21);
   assert.equal(
     tenantMigration?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,

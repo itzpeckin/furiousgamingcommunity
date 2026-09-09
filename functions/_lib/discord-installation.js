@@ -2,10 +2,11 @@ import { discordBotRequest } from './discord-api.js';
 import { createTenantAuditContext, tenantAuditStatement } from './tenant-context.js';
 
 // View Channel, Send Messages, Embed Links, Read Message History,
-// Manage Channels, Manage Threads, Create Public Threads, and Send Messages
-// in Threads. The channel permission is needed so onboarding can create one
-// predictable schedule workspace without asking commissioners for raw IDs.
-export const DISCORD_INSTALL_PERMISSIONS = '326417599504';
+// Manage Channels, Manage Threads, Create Public Threads, Create Private
+// Threads, and Send Messages in Threads. The channel permissions let
+// onboarding create the schedule workspace and owner-only trade rooms without
+// asking commissioners for raw IDs.
+export const DISCORD_INSTALL_PERMISSIONS = '395137076240';
 const SNOWFLAKE = /^[0-9]{17,20}$/;
 const MANAGE_GUILD = 1n << 5n;
 const ADMINISTRATOR = 1n << 3n;

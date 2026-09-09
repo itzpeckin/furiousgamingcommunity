@@ -137,7 +137,8 @@ export async function loadCanonicalMigrations() {
       33: 'commissioner_operations',
       34: 'discord_bot_foundation',
       35: 'discord_schedule_threads',
-      36: 'authentication_session_framework'
+      36: 'authentication_session_framework',
+      37: 'discord_trade_rooms'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);
