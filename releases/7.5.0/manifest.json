@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.0",
   "releaseType": "authentication-session-framework",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.4.4.12",
@@ -18,11 +18,11 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-run",
-    "pullRequest": null,
-    "candidateCommit": null,
-    "mergeCommit": null
+    "authorized": true,
+    "status": "published-main-accepted",
+    "pullRequest": 56,
+    "candidateCommit": "1a9d5a2e627e89b9b0a6ea9c78449a771101a357",
+    "mergeCommit": "43774ea365ee81d1727914242f906d7537195b8d"
   },
   "staging": {
     "authorized": false,
@@ -30,14 +30,14 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "7.4.4.12",
-    "currentCommit": "d2d24152174826f9ecce035e4690dd7b1e387fc2",
+    "authorized": true,
+    "deployed": true,
+    "status": "deployed-read-only-accepted",
+    "currentRelease": "7.5.0",
+    "currentCommit": "43774ea365ee81d1727914242f906d7537195b8d",
     "currentSourceEvidenceCommit": "639c896eaa041241111ca612761978310f2c19ec",
-    "currentPagesDeployment": "4f78cfc1-ebb8-40cc-87c1-c421ec2eb82f",
-    "currentMigration": 35,
+    "currentPagesDeployment": "6b0f9729-c174-4b81-9ec5-ba2eb5d92c1e",
+    "currentMigration": 36,
     "candidateMigration": 36
   },
   "requiredArtifacts": [

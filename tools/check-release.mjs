@@ -2973,25 +2973,17 @@ if (version === '7.5.0') {
     'securityEvents',
     'strictMigration',
     'fullRepositorySuite',
-    'freeAgentBlockedPreserved'
+    'freeAgentBlockedPreserved',
+    ...(isPostDeployment ? ['productionProtectedState', 'productionHttpsAcceptance', 'deviceAcceptance'] : [])
   ]) {
     if (evidence.checks?.[check]?.passed !== true) {
       errors.push(`7.5.0 authentication/session evidence is incomplete: ${check}.`);
     }
   }
   if (
-    manifest.status !== 'validated-review-candidate'
-    || manifest.sourceBaseline?.commit !== '639c896eaa041241111ca612761978310f2c19ec'
+    manifest.sourceBaseline?.commit !== '639c896eaa041241111ca612761978310f2c19ec'
     || manifest.implementationBranch !== 'codex/franchisehq-7.5.0'
-    || manifest.repositoryPublication?.authorized !== false
-    || manifest.repositoryPublication?.status !== 'not-run'
-    || manifest.production?.authorized !== false
-    || manifest.production?.deployed !== false
-    || manifest.production?.status !== 'not-run'
-    || manifest.production?.currentRelease !== '7.4.4.12'
-    || Number(manifest.production?.currentMigration) !== 35
     || Number(manifest.production?.candidateMigration) !== 36
-    || evidence.productionChanged !== false
     || evidence.dataChanged !== false
     || evidence.productionDataChanged !== false
     || evidence.credentialsChanged !== false
@@ -3010,21 +3002,15 @@ if (version === '7.5.0') {
     || evidence.checks?.securityEvents?.rawTokensStored !== false
     || evidence.checks?.securityEvents?.rawUserAgentStored !== false
     || Number(evidence.checks?.strictMigration?.migrationVersion) !== 36
-    || evidence.checks?.strictMigration?.candidateRequiresMigration !== true
-    || evidence.checks?.strictMigration?.productionApplied !== false
     || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
     || evidence.checks?.freeAgentBlockedPreserved?.count !== null
     || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
     || evidence.scopeBoundaries?.authenticationChangedLocally !== true
-    || evidence.scopeBoundaries?.productionChanged !== false
     || evidence.scopeBoundaries?.productionDataChanged !== false
     || evidence.scopeBoundaries?.protectedLeagueDataChanged !== false
     || evidence.scopeBoundaries?.productionConfigurationChanged !== false
     || evidence.scopeBoundaries?.stagingChanged !== false
     || evidence.scopeBoundaries?.activeSnapshotChanged !== false
-    || evidence.scopeBoundaries?.gitMainChanged !== false
-    || evidence.scopeBoundaries?.gitRemoteChanged !== false
-    || evidence.scopeBoundaries?.migrationApplied !== false
     || evidence.scopeBoundaries?.discordCommandsRegistered !== false
     || evidence.scopeBoundaries?.discordCredentialsChanged !== false
     || evidence.scopeBoundaries?.captureExecuted !== false
@@ -3038,6 +3024,63 @@ if (version === '7.5.0') {
     || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
     || evidence.scopeBoundaries?.credentialsChanged !== false
     || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+  ) {
+    errors.push('7.5.0 must prove the centralized authentication/session contract while preserving every excluded league-data and external-system boundary.');
+  }
+  if (isPostDeployment) {
+    if (
+      manifest.status !== 'production-deployed-pending-owner-acceptance'
+      || manifest.repositoryPublication?.authorized !== true
+      || manifest.repositoryPublication?.status !== 'published-main-accepted'
+      || Number(manifest.repositoryPublication?.pullRequest) !== 56
+      || manifest.repositoryPublication?.candidateCommit !== '1a9d5a2e627e89b9b0a6ea9c78449a771101a357'
+      || manifest.repositoryPublication?.mergeCommit !== '43774ea365ee81d1727914242f906d7537195b8d'
+      || manifest.production?.authorized !== true
+      || manifest.production?.deployed !== true
+      || manifest.production?.status !== 'deployed-read-only-accepted'
+      || manifest.production?.currentRelease !== '7.5.0'
+      || manifest.production?.currentCommit !== '43774ea365ee81d1727914242f906d7537195b8d'
+      || manifest.production?.currentPagesDeployment !== '6b0f9729-c174-4b81-9ec5-ba2eb5d92c1e'
+      || Number(manifest.production?.currentMigration) !== 36
+      || evidence.productionChanged !== true
+      || evidence.checks?.strictMigration?.candidateRequiresMigration !== false
+      || evidence.checks?.strictMigration?.productionApplied !== true
+      || evidence.scopeBoundaries?.productionChanged !== true
+      || evidence.scopeBoundaries?.gitMainChanged !== true
+      || evidence.scopeBoundaries?.gitRemoteChanged !== true
+      || evidence.scopeBoundaries?.migrationApplied !== true
+      || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 8
+      || evidence.external?.githubPublication?.status !== 'published-main-accepted'
+      || evidence.external?.hostedChecks?.status !== 'passed'
+      || evidence.external?.productionMigration?.status !== 'applied-and-verified'
+      || Number(evidence.external?.productionMigration?.currentMigration) !== 36
+      || Number(evidence.external?.productionMigration?.candidateMigration) !== 36
+      || evidence.external?.productionDeployment?.status !== 'deployed-read-only-accepted'
+      || evidence.external?.productionDeployment?.currentRelease !== '7.5.0'
+      || evidence.external?.deviceAcceptance?.status !== 'passed'
+      || evidence.checks?.productionProtectedState?.activeSnapshotId !== 'f469399a-d4b1-446f-9264-75c17486d438'
+      || Number(evidence.checks?.productionProtectedState?.foreignKeyViolations) !== 0
+      || evidence.checks?.productionHttpsAcceptance?.liveReleaseMarker !== '7.5.0'
+      || evidence.checks?.productionHttpsAcceptance?.exactRoutePreserved !== true
+      || evidence.checks?.deviceAcceptance?.desktopRefreshPassed !== true
+      || evidence.checks?.deviceAcceptance?.mobileRefreshPassed !== true
+    ) errors.push('Deployed 7.5.0 evidence must record exact publication, migration 36, protected-state preservation, and authenticated device acceptance.');
+  } else if (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.repositoryPublication?.status !== 'not-run'
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'not-run'
+    || manifest.production?.currentRelease !== '7.4.4.12'
+    || Number(manifest.production?.currentMigration) !== 35
+    || evidence.productionChanged !== false
+    || evidence.checks?.strictMigration?.candidateRequiresMigration !== true
+    || evidence.checks?.strictMigration?.productionApplied !== false
+    || evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.gitRemoteChanged !== false
+    || evidence.scopeBoundaries?.migrationApplied !== false
     || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 0
     || evidence.external?.githubPublication?.status !== 'not-run'
     || evidence.external?.hostedChecks?.status !== 'not-run'
