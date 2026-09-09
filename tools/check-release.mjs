@@ -2954,6 +2954,103 @@ if (version === '7.4.4.3') {
   ) errors.push('7.4.4.3 must preserve every excluded environment, league-data, snapshot, identity, export URL, credential, and Free Agent boundary.');
 }
 
+if (version === '7.5.0') {
+  for (const check of [
+    'publicDomainSession',
+    'discordOauth',
+    'sessionIssueRotationExpiryRevocation',
+    'logout',
+    'csrf',
+    'capabilities',
+    'directRouteRefresh',
+    'oauthHandoffReplay',
+    'membershipRevocation',
+    'crossLeague',
+    'mobileDiscord',
+    'mobileBrowser',
+    'desktop',
+    'durableRateLimit',
+    'securityEvents',
+    'strictMigration',
+    'fullRepositorySuite',
+    'freeAgentBlockedPreserved'
+  ]) {
+    if (evidence.checks?.[check]?.passed !== true) {
+      errors.push(`7.5.0 authentication/session evidence is incomplete: ${check}.`);
+    }
+  }
+  if (
+    manifest.status !== 'validated-review-candidate'
+    || manifest.sourceBaseline?.commit !== '639c896eaa041241111ca612761978310f2c19ec'
+    || manifest.implementationBranch !== 'codex/franchisehq-7.5.0'
+    || manifest.repositoryPublication?.authorized !== false
+    || manifest.repositoryPublication?.status !== 'not-run'
+    || manifest.production?.authorized !== false
+    || manifest.production?.deployed !== false
+    || manifest.production?.status !== 'not-run'
+    || manifest.production?.currentRelease !== '7.4.4.12'
+    || Number(manifest.production?.currentMigration) !== 35
+    || Number(manifest.production?.candidateMigration) !== 36
+    || evidence.productionChanged !== false
+    || evidence.dataChanged !== false
+    || evidence.productionDataChanged !== false
+    || evidence.credentialsChanged !== false
+    || evidence.checks?.publicDomainSession?.authorityOrigin !== 'https://franchisehq.app'
+    || evidence.checks?.publicDomainSession?.secondarySessionAuthority !== false
+    || evidence.checks?.sessionIssueRotationExpiryRevocation?.tokenStorage !== 'sha-256-only'
+    || Number(evidence.checks?.sessionIssueRotationExpiryRevocation?.idleDays) !== 7
+    || Number(evidence.checks?.sessionIssueRotationExpiryRevocation?.absoluteDays) !== 30
+    || Number(evidence.checks?.sessionIssueRotationExpiryRevocation?.rotationHours) !== 24
+    || evidence.checks?.csrf?.sameOriginRequired !== true
+    || evidence.checks?.csrf?.sessionBoundToken !== true
+    || evidence.checks?.capabilities?.source !== 'current-active-membership'
+    || evidence.checks?.oauthHandoffReplay?.atomicSingleUse !== true
+    || evidence.checks?.membershipRevocation?.existingSessionsRevoked !== true
+    || evidence.checks?.durableRateLimit?.isolateMemoryUsed !== false
+    || evidence.checks?.securityEvents?.rawTokensStored !== false
+    || evidence.checks?.securityEvents?.rawUserAgentStored !== false
+    || Number(evidence.checks?.strictMigration?.migrationVersion) !== 36
+    || evidence.checks?.strictMigration?.candidateRequiresMigration !== true
+    || evidence.checks?.strictMigration?.productionApplied !== false
+    || evidence.checks?.freeAgentBlockedPreserved?.status !== 'blocked'
+    || evidence.checks?.freeAgentBlockedPreserved?.count !== null
+    || evidence.checks?.freeAgentBlockedPreserved?.interpretedAsZero !== false
+    || evidence.scopeBoundaries?.authenticationChangedLocally !== true
+    || evidence.scopeBoundaries?.productionChanged !== false
+    || evidence.scopeBoundaries?.productionDataChanged !== false
+    || evidence.scopeBoundaries?.protectedLeagueDataChanged !== false
+    || evidence.scopeBoundaries?.productionConfigurationChanged !== false
+    || evidence.scopeBoundaries?.stagingChanged !== false
+    || evidence.scopeBoundaries?.activeSnapshotChanged !== false
+    || evidence.scopeBoundaries?.gitMainChanged !== false
+    || evidence.scopeBoundaries?.gitRemoteChanged !== false
+    || evidence.scopeBoundaries?.migrationApplied !== false
+    || evidence.scopeBoundaries?.discordCommandsRegistered !== false
+    || evidence.scopeBoundaries?.discordCredentialsChanged !== false
+    || evidence.scopeBoundaries?.captureExecuted !== false
+    || evidence.scopeBoundaries?.candidateImportExecuted !== false
+    || evidence.scopeBoundaries?.activationPerformed !== false
+    || evidence.scopeBoundaries?.resetPerformed !== false
+    || evidence.scopeBoundaries?.dataDeleted !== false
+    || evidence.scopeBoundaries?.archiveSeasonExecuted !== false
+    || evidence.scopeBoundaries?.transitionOperationExecuted !== false
+    || evidence.scopeBoundaries?.exportUrlRotated !== false
+    || evidence.scopeBoundaries?.freeAgentInterpretedAsZero !== false
+    || evidence.scopeBoundaries?.credentialsChanged !== false
+    || evidence.scopeBoundaries?.membershipAssignmentsChanged !== false
+    || Number(evidence.scopeBoundaries?.databaseRowsWritten) !== 0
+    || evidence.external?.githubPublication?.status !== 'not-run'
+    || evidence.external?.hostedChecks?.status !== 'not-run'
+    || evidence.external?.productionMigration?.status !== 'not-run'
+    || Number(evidence.external?.productionMigration?.currentMigration) !== 35
+    || Number(evidence.external?.productionMigration?.candidateMigration) !== 36
+    || evidence.external?.productionDeployment?.status !== 'not-run'
+    || evidence.external?.deviceAcceptance?.status !== 'not-run'
+  ) {
+    errors.push('7.5.0 must remain an exact locally validated candidate with migration 36 and every external or league-data operation separately gated.');
+  }
+}
+
 const registered = new Set(baseline.knownIssues.map(issue => issue.id));
 for (const issue of manifest.knownInheritedIssues || []) {
   if (!registered.has(issue)) errors.push(`Manifest references unknown inherited issue ${issue}.`);

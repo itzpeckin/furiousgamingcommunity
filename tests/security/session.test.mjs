@@ -43,7 +43,12 @@ function sessionDatabase(validHash, resolvedTenant = tenantRow()) {
           if (this.values[1] !== validHash) return null;
           return {
             session_id: 'session-valid',
+            created_at: '2026-09-08T00:00:00.000Z',
             expires_at: '2099-01-01T00:00:00.000Z',
+            absolute_expires_at: '2099-01-01T00:00:00.000Z',
+            last_rotated_at: '2099-01-01T00:00:00.000Z',
+            csrf_token_hash: null,
+            recovery_mode: 'standard',
             user_id: 'user-1',
             discord_user_id: 'discord-1',
             discord_username: 'owner',
@@ -57,6 +62,7 @@ function sessionDatabase(validHash, resolvedTenant = tenantRow()) {
             role: 'commissioner',
             team_id: null,
             membership_active: 1
+            ,authorization_version: 1
           };
         },
         async all() {
@@ -155,14 +161,15 @@ function handoffDatabase({ codeHash, handoffId }) {
           }
           if (sql.includes('FROM users')) return this.values[0] === 'user-1' ? { id: 'user-1' } : null;
           return null;
-        }
+        },
+        async run() { return { meta:{ changes:1 } }; }
       };
     },
     async batch(statements) {
-      if (used) return [{ meta: { changes: 0 } }, { meta: { changes: 0 } }];
+      if (used) return statements.map(()=>({meta:{changes:0}}));
       used = true;
       sessions.push({ id: statements[0].values[0], userId: statements[0].values[1] });
-      return [{ meta: { changes: 1 } }, { meta: { changes: 1 } }];
+      return statements.map(()=>({meta:{changes:1}}));
     }
   };
 }
@@ -205,6 +212,11 @@ test('same-origin Discord completion creates a durable session without a cross-d
         bind(...values) { this.values=values; return this; },
         async run() { inserted.push({ sql, values:this.values }); return { meta:{ changes:1 } }; }
       };
+    },
+    async batch(statements) {
+      const results=[];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
     }
   };
   const response = await createDirectSession({ env:{ DB:db } }, 'user-1', '/leagues/fgc#commissioner');
@@ -212,7 +224,7 @@ test('same-origin Discord completion creates a durable session without a cross-d
   assert.equal(response.headers.get('location'), '/leagues/fgc#commissioner');
   assert.match(response.headers.get('set-cookie') || '', /franchise_hq_session/);
   assert.equal(response.headers.get('x-franchisehq-session-establishment'), 'same-origin');
-  assert.equal(inserted.length, 1);
+  assert.equal(inserted.length, 2);
   assert.equal(inserted[0].values[1], 'user-1');
 });
 

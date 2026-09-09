@@ -1,15 +1,12 @@
 import {
-  AUTH_CONSTANTS,
-  addSecondsToNow,
-  createId,
-  createRandomToken,
-  createSecureCookie,
+  appendBrowserSessionCookies,
   decodeOpaqueContext,
   hashToken,
+  issueBrowserSession,
   jsonResponse
 } from "../../../_lib/auth.js";
 
-const RELEASE = "7.3.0";
+const RELEASE = "7.5.0";
 
 export async function onRequestGet(context) {
   return jsonResponse({
@@ -62,30 +59,15 @@ export async function onRequestPost(context) {
     const user = await context.env.DB.prepare(`SELECT id FROM users WHERE id=? LIMIT 1`).bind(payload.userId).first();
     if (!user) return jsonResponse({ ok:false, error:"The authenticated Franchise HQ user no longer exists." }, 404);
 
-    const rawSessionToken = createRandomToken(48);
-    const sessionTokenHash = await hashToken(rawSessionToken);
-    const expiresAt = addSecondsToNow(AUTH_CONSTANTS.SESSION_DURATION_SECONDS);
-    const sessionId = createId("session");
-    const results = await context.env.DB.batch([
-      context.env.DB.prepare(`
-        INSERT INTO sessions (id, user_id, session_token_hash, expires_at)
-        SELECT ?, ?, ?, ?
-        WHERE EXISTS (
-          SELECT 1 FROM oauth_states
-          WHERE id = ? AND state_token_hash = ?
-            AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
-        )
-      `).bind(sessionId, user.id, sessionTokenHash, expiresAt, stored.id, codeHash),
-      context.env.DB.prepare(`
-        UPDATE oauth_states
-        SET used_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND state_token_hash = ?
-          AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
-      `).bind(stored.id, codeHash)
-    ]);
-    if (Number(results?.[0]?.meta?.changes || 0) !== 1) {
-      return jsonResponse({ ok:false, error:"The login handoff expired or was already used." }, 400);
-    }
+    const recoveryMode = ["mobile-handoff", "owner-recovery"].includes(payload.recoveryMode)
+      ? payload.recoveryMode
+      : "mobile-handoff";
+    const session = await issueBrowserSession(context, user.id, {
+      recoveryMode,
+      leagueId:payload.leagueId || null,
+      reason:"origin-bound-session-claim",
+      oneTimeState:{ id:stored.id, tokenHash:codeHash }
+    });
 
     const destination = String(payload.destination || "/leagues");
     const safeDestination = destination.startsWith("/") && !destination.startsWith("//")
@@ -96,16 +78,12 @@ export async function onRequestPost(context) {
       "Cache-Control": "no-store",
       "x-franchisehq-release": RELEASE
     });
-    headers.append("Set-Cookie", createSecureCookie(
-      AUTH_CONSTANTS.SESSION_COOKIE_NAME, rawSessionToken,
-      AUTH_CONSTANTS.SESSION_DURATION_SECONDS, "/"
-    ));
-    headers.append("Set-Cookie", createSecureCookie(
-      AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME, rawSessionToken,
-      AUTH_CONSTANTS.SESSION_DURATION_SECONDS, "/"
-    ));
+    appendBrowserSessionCookies(headers, session);
     return new Response(null, { status:303, headers });
   } catch (error) {
+    if (error?.code === "SESSION_HANDOFF_CONSUMED") {
+      return jsonResponse({ ok:false, error:"The login handoff expired or was already used." }, 400);
+    }
     console.error("Session claim failed:", error);
     return jsonResponse({ ok:false, error:"Unable to establish the Franchise HQ session." }, 500);
   }

@@ -115,11 +115,14 @@ test('edge middleware rejects cross-origin state changes', async () => {
 
 test('authentication entry points have a bounded per-client request budget', async () => {
   let finalResponse;
+  let attempts=0;
+  const AUTH_RATE_LIMITER={limit:async()=>({success:++attempts<=30})};
   for (let attempt = 0; attempt < 31; attempt += 1) {
     finalResponse = await securityMiddleware({
       request: new Request('https://franchisehq.app/api/auth/discord/login', {
         headers: { 'cf-connecting-ip': '203.0.113.7' }
       }),
+      env:{AUTH_RATE_LIMITER},
       next: async () => new Response(null, { status: 204 })
     });
   }

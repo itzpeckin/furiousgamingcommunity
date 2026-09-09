@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "7.4.4.12",
+  "release": "7.5.0",
   "resolution": {
     "source": "server",
     "requiresExplicitSlug": true,
@@ -13,9 +13,11 @@
     }
   },
   "globalTables": [
+    "authentication_rate_limits",
     "leagues",
     "oauth_states",
     "schema_migrations",
+    "session_security_events",
     "sessions",
     "user_stream_profiles",
     "users"

@@ -148,11 +148,14 @@ test('the legacy broad reset is retired without changing Madden data or membersh
     );
     CREATE TABLE league_memberships (
       id TEXT PRIMARY KEY, league_id TEXT, user_id TEXT, role TEXT, team_id TEXT,
-      active INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      active INTEGER, authorization_version INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY, user_id TEXT, session_token_hash TEXT, expires_at TEXT,
-      revoked_at TEXT, last_seen_at TEXT
+      revoked_at TEXT, last_seen_at TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      absolute_expires_at TEXT, last_rotated_at TEXT, parent_session_id TEXT,
+      csrf_token_hash TEXT, revocation_reason TEXT, recovery_mode TEXT DEFAULT 'standard'
     );
     CREATE TABLE league_snapshots (
       id TEXT PRIMARY KEY, league_id TEXT NOT NULL,
@@ -192,9 +195,9 @@ test('the legacy broad reset is retired without changing Madden data or membersh
   insertMembership.run('m-gas','league-1','gas','team_owner','gb',1);
   insertMembership.run('m-saluki','league-1','saluki','team_owner','chi',1);
   const token = 'reset-test-session';
-  database.prepare('INSERT INTO sessions VALUES (?,?,?,?,?,?)').run(
-    'session-1','justin',await hashToken(token),'2099-01-01T00:00:00.000Z',null,null
-  );
+  database.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at,absolute_expires_at)
+    VALUES (?,?,?,?,?)`).run('session-1','justin',await hashToken(token),
+      '2099-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
   database.prepare('INSERT INTO league_snapshots VALUES (?,?)').run('snapshot-1','league-1');
   database.prepare('INSERT INTO league_snapshot_records VALUES (?,?,?,?,?)').run('snapshot-1','league-1','teams','tb','{}');
   database.prepare('INSERT INTO league_active_snapshots VALUES (?,?)').run('league-1','snapshot-1');

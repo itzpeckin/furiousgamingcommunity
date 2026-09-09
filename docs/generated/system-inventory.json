@@ -18,6 +18,9 @@
     "ASSETS": [
       "functions/leagues/[[path]].js"
     ],
+    "AUTH_RATE_LIMITER": [
+      "functions/_middleware.js"
+    ],
     "COMPANION_EXPORTS": [
       "functions/_lib/cloud-platform.js",
       "functions/_lib/madden-discovery-report.js",
@@ -56,9 +59,9 @@
     "DB": [
       "functions/_lib/auth.js",
       "functions/_lib/tenant-context.js",
+      "functions/_middleware.js",
       "functions/api/auth/discord/callback.js",
       "functions/api/auth/discord/login.js",
-      "functions/api/auth/logout.js",
       "functions/api/auth/session/claim.js",
       "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
       "functions/api/leagues/[leagueSlug]/competition.js",
@@ -160,16 +163,16 @@
       ".json": 7,
       ".jsonc": 1,
       ".md": 277,
-      ".mjs": 42,
+      ".mjs": 43,
       ".png": 3,
-      ".sql": 37,
+      ".sql": 38,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 640071,
+        "bytes": 640068,
         "file": "app.js"
       },
       {
@@ -181,7 +184,7 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 183451,
+        "bytes": 188630,
         "file": "tools/check-release.mjs"
       },
       {
@@ -201,7 +204,7 @@
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 75127,
+        "bytes": 75058,
         "file": "index.html"
       },
       {
@@ -217,7 +220,7 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 42351,
+        "bytes": 42905,
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
@@ -249,7 +252,7 @@
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 595
+    "total": 597
   },
   "frontend": {
     "assets": [
@@ -1520,10 +1523,16 @@
       "recordsLedger": true,
       "sha256": "f9eb91639ac836a115ee7d59fb350d5a29811a5136b8ad832395e193276b505c",
       "version": "0035"
+    },
+    {
+      "file": "migrations/0036_authentication_session_framework.sql",
+      "recordsLedger": true,
+      "sha256": "de096b35979d7b62858e171d98eb2baec82e5d71bfb2aa00d44e1d4dd69e1a0d",
+      "version": "0036"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.4.4.12",
+  "release": "7.5.0",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -1,47 +1,51 @@
-const RELEASE = "7.3.0";
 import {
-  AUTH_CONSTANTS,
-  createSecureCookie,
+  appendBrowserSessionCookies,
+  appendClearedBrowserSessionCookies,
   getCurrentSession,
-  jsonResponse
+  jsonResponse,
+  rotateBrowserSession
 } from "../../_lib/auth.js";
+
+const RELEASE = "7.5.0";
 
 export async function onRequestGet(context) {
   try {
-    const session = await getCurrentSession(context);
+    let session = await getCurrentSession(context);
 
     if (!session) {
-      return jsonResponse({
+      const response = jsonResponse({
         ok: true,
         authenticated: false,
         user: null,
-        membership: null
+        membership: null,
+        capabilities:[],
+        release:RELEASE
       });
+      appendClearedBrowserSessionCookies(response.headers);
+      return response;
+    }
+
+    if (session.kind === "browser") {
+      session = await rotateBrowserSession(context, session);
     }
 
     const headers = new Headers({
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store"
     });
-    headers.append("Set-Cookie", createSecureCookie(
-      AUTH_CONSTANTS.SESSION_COOKIE_NAME,
-      session.rawSessionToken,
-      AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-      "/"
-    ));
-    headers.append("Set-Cookie", createSecureCookie(
-      AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME,
-      session.rawSessionToken,
-      AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-      "/"
-    ));
+    if (session.kind === "browser") appendBrowserSessionCookies(headers, session);
 
     return new Response(JSON.stringify({
       ok: true,
       authenticated: true,
       user: session.user,
       membership: session.membership,
-      session: { expiresAt: session.expiresAt },
+      capabilities:session.capabilities || [],
+      session: {
+        expiresAt: session.expiresAt,
+        absoluteExpiresAt:session.absoluteExpiresAt || null,
+        rotated:session.rotated === true
+      },
       release: RELEASE
     }, null, 2), { status: 200, headers });
   } catch (error) {

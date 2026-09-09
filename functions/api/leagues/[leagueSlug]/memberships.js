@@ -1,4 +1,4 @@
-import { createId, jsonResponse } from "../../../_lib/auth.js";
+import { createId, jsonResponse, revokeBrowserSessions } from "../../../_lib/auth.js";
 import { requireCommissioner } from "../../../_lib/permissions.js";
 import {
   createTenantAuditContext,
@@ -13,7 +13,7 @@ import {
 } from "../../../_lib/league-teams.js";
 import { ownershipChangeStatements } from "../../../_lib/ownership-periods.js";
 
-const RELEASE = "7.4.4.12";
+const RELEASE = "7.5.0";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -146,6 +146,16 @@ async function activeCommissionerCount(db, leagueId) {
   return Number(row?.count || 0);
 }
 
+async function invalidateMembershipSessions(context, league, userId, reason) {
+  return revokeBrowserSessions(context, {
+    userId,
+    leagueId:league.id,
+    eventType:"membership_revoked",
+    reason,
+    detail:{ authorizationChanged:true }
+  });
+}
+
 export async function onRequestGet(context) {
   const access = await authorizedLeague(context);
   if (access.response) return access.response;
@@ -229,7 +239,8 @@ export async function onRequestPost(context) {
       leagueId:league.id,userId,displayName:user?.display_name || null,nextTeamKey:null,expectedMembershipActive:1
     });
     const results = await context.env.DB.batch([
-      context.env.DB.prepare(`UPDATE league_memberships SET team_id=NULL,updated_at=CURRENT_TIMESTAMP
+      context.env.DB.prepare(`UPDATE league_memberships
+        SET team_id=NULL,authorization_version=authorization_version+1,updated_at=CURRENT_TIMESTAMP
         WHERE league_id=? AND user_id=? AND active=1 AND team_id IS NOT NULL`).bind(league.id,userId),
       ...ownership.statements
     ]);
@@ -239,6 +250,7 @@ export async function onRequestPost(context) {
     await audit(context,league,auth.session,userId,"membership_unassigned",{
       role:existing.role,previousTeamId:existing.teamId
     });
+    await invalidateMembershipSessions(context, league, userId, "team-assignment-removed");
     return jsonResponse({ok:true,release:RELEASE,status:"active",teamId:null});
   }
 
@@ -250,7 +262,8 @@ export async function onRequestPost(context) {
     if (Number(existing.active)) return jsonResponse({ ok:false, error:"That member already has active league access." }, 409);
     const result = await context.env.DB.prepare(`
       UPDATE league_memberships
-      SET role='team_owner', team_id=NULL, active=0, updated_at=CURRENT_TIMESTAMP
+      SET role='team_owner', team_id=NULL, active=0,
+          authorization_version=authorization_version+1, updated_at=CURRENT_TIMESTAMP
       WHERE league_id=? AND user_id=? AND active=0
     `).bind(league.id, userId).run();
     if (Number(result?.meta?.changes || 0) !== 1) return jsonResponse({ ok:false, error:"Membership state changed. Refresh and try again." }, 409);
@@ -306,7 +319,8 @@ export async function onRequestPost(context) {
   const update = teamId
     ? context.env.DB.prepare(`
         UPDATE league_memberships
-        SET role=?, team_id=?, active=1, updated_at=CURRENT_TIMESTAMP
+        SET role=?, team_id=?, active=1,
+            authorization_version=authorization_version+1, updated_at=CURRENT_TIMESTAMP
         WHERE league_id=? AND user_id=?
           AND NOT EXISTS (
             SELECT 1 FROM league_memberships occupied
@@ -315,7 +329,8 @@ export async function onRequestPost(context) {
       `).bind(input.role, teamId, league.id, user.id, league.id, teamId, user.id)
     : context.env.DB.prepare(`
         UPDATE league_memberships
-        SET role=?, team_id=NULL, active=1, updated_at=CURRENT_TIMESTAMP
+        SET role=?, team_id=NULL, active=1,
+            authorization_version=authorization_version+1, updated_at=CURRENT_TIMESTAMP
         WHERE league_id=? AND user_id=?
       `).bind(input.role, league.id, user.id);
   const ownership = await ownershipChangeStatements(context.env.DB,{
@@ -335,6 +350,9 @@ export async function onRequestPost(context) {
     previousRole:existing.role,
     previousTeamId:existing.teamId || null
   });
+  if (Number(existing.active) && (existing.role !== input.role || existing.teamId !== teamId)) {
+    await invalidateMembershipSessions(context, league, user.id, "membership-authorization-changed");
+  }
   return jsonResponse({
     ok:true,
     release:RELEASE,
@@ -367,10 +385,12 @@ export async function onRequestDelete(context) {
     leagueId:league.id,userId,displayName:null,nextTeamKey:null,expectedMembershipActive:0
   });
   const results = await context.env.DB.batch([context.env.DB.prepare(remove ? `
-    UPDATE league_memberships SET active=0,team_id=NULL,updated_at=CURRENT_TIMESTAMP
+    UPDATE league_memberships SET active=0,team_id=NULL,
+      authorization_version=authorization_version+1,updated_at=CURRENT_TIMESTAMP
     WHERE league_id=? AND user_id=?
   ` : `
-    UPDATE league_memberships SET active=0, updated_at=CURRENT_TIMESTAMP
+    UPDATE league_memberships SET active=0,
+      authorization_version=authorization_version+1,updated_at=CURRENT_TIMESTAMP
     WHERE league_id=? AND user_id=? AND active=1
   `).bind(league.id, userId),...ownership.statements]);
   if (Number(results?.[0]?.meta?.changes || 0) !== 1) return jsonResponse({ ok:false, error:"Membership state changed. Refresh and try again." }, 409);
@@ -378,5 +398,11 @@ export async function onRequestDelete(context) {
     previousRole:existing.role,
     previousTeamId:existing.teamId || null
   });
-  return jsonResponse({ ok:true, release:RELEASE, changed:1, removed:remove });
+  const revokedSessions = await invalidateMembershipSessions(
+    context,
+    league,
+    userId,
+    remove ? "membership-removed" : "membership-deactivated"
+  );
+  return jsonResponse({ ok:true, release:RELEASE, changed:1, removed:remove, revokedSessions });
 }

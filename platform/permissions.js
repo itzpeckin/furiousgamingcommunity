@@ -22,6 +22,17 @@
     POLICIES.MANAGE_TEAMS
   ]);
 
+  const CAPABILITY_BY_POLICY = Object.freeze({
+    [POLICIES.OPEN_COMMISSIONER_HQ]:'league:manage',
+    [POLICIES.IMPORT_LEAGUE]:'league:import',
+    [POLICIES.EDIT_LEAGUE_SETTINGS]:'league:settings',
+    [POLICIES.MANAGE_TEAMS]:'league:memberships',
+    [POLICIES.CREATE_TRADE]:'trade:create',
+    [POLICIES.MANAGE_TRADE_BLOCK]:'trade-block:manage',
+    [POLICIES.REVIEW_TRADES]:'trade:review',
+    [POLICIES.VOTE_ON_TRADES]:'trade:vote'
+  });
+
   function authMembership() { return HQ.auth?.getMembership?.() || null; }
   function authRole() { return HQ.auth?.getRole?.() || null; }
   function isActiveMember() {
@@ -50,7 +61,11 @@
   }
 
   function evaluate(permission, context = {}) {
-    if (PLATFORM_POLICIES.has(permission)) return isCommissioner();
+    if (isActiveMember()) {
+      const capability = CAPABILITY_BY_POLICY[permission];
+      return capability ? HQ.auth?.hasCapability?.(capability) === true : false;
+    }
+    if (PLATFORM_POLICIES.has(permission)) return false;
 
     const role = perspectiveRole(context);
     const teamId = perspectiveTeamId(context);

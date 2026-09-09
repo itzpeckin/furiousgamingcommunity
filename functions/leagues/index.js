@@ -1,13 +1,12 @@
 import {
-  AUTH_CONSTANTS,
-  createSecureCookie,
+  appendBrowserSessionCookies,
   getCurrentSession,
-  redirectResponse
+  redirectResponse,
+  rotateBrowserSession
 } from "../_lib/auth.js";
-import { CANONICAL_APP_ORIGIN, isOwnerFallbackHost } from "../_lib/origin.js";
-import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
+import { isOwnerFallbackHost } from "../_lib/origin.js";
 
-const RELEASE = "7.4.4.12";
+const RELEASE = "7.5.0";
 
 function esc(value) {
   return String(value ?? "")
@@ -34,7 +33,7 @@ function leagueCard(league) {
   </a>`;
 }
 
-function page({ user, memberships, pendingMemberships = [] }) {
+function page({ user, memberships, pendingMemberships = [], csrfToken = "" }) {
   const hasMemberships = memberships.length > 0;
   return `<!doctype html>
 <html lang="en">
@@ -79,7 +78,7 @@ function page({ user, memberships, pendingMemberships = [] }) {
         ${pendingMemberships.length ? `<div class="section-title" style="margin-top:28px"><h2>Pending Approval</h2><span>${pendingMemberships.length} waiting</span></div><div class="list">${pendingMemberships.map((l)=>`<a class="league-card" href="/leagues/${encodeURIComponent(l.slug)}"><div class="league-mark">FH</div><div class="league-copy"><div class="league-meta">Waiting for commissioner</div><h2>${esc(l.name)}</h2><p>Your Discord account is connected. Team and role assignment are still pending.</p></div><span class="role">Pending</span><span class="arrow">→</span></a>`).join("")}</div>` : ""}
       </section>
     </main>
-    <footer><span>Franchise HQ · Release ${RELEASE}</span><form method="post" action="/api/auth/logout"><button class="logout" type="submit">Log out</button></form></footer>
+    <footer><span>Franchise HQ · Release ${RELEASE}</span><form method="post" action="/api/auth/logout"><input type="hidden" name="csrfToken" value="${esc(csrfToken)}"><button class="logout" type="submit">Log out</button></form></footer>
   </div>
 </body>
 </html>`;
@@ -87,8 +86,12 @@ function page({ user, memberships, pendingMemberships = [] }) {
 
 export async function onRequestGet(context) {
   try {
-    const session = await getCurrentSession(context);
+    let session = await getCurrentSession(context);
     if (!session) return redirectResponse("/?auth=required");
+    if (isOwnerFallbackHost(new URL(context.request.url).hostname)) {
+      return redirectResponse("/api/auth/discord/login?returnTo=%2Fleagues");
+    }
+    if (session.kind === "browser") session = await rotateBrowserSession(context, session);
 
     let memberships = [];
     let pendingMemberships = [];
@@ -121,33 +124,19 @@ export async function onRequestGet(context) {
       console.error("League selector membership lookup failed:", error);
     }
 
-    if (isOwnerFallbackHost(new URL(context.request.url).hostname)
-      && (!isOwnerFallbackIdentity(context.env, session.user)
-        || !memberships.some(membership => membership.role === 'commissioner'))) {
-      return redirectResponse(`${CANONICAL_APP_ORIGIN}/leagues`);
-    }
-
     const headers = new Headers({
       "content-type": "text/html; charset=UTF-8",
       "cache-control": "no-store",
       "x-franchisehq-release": RELEASE,
       "x-franchisehq-surface": "league-selector"
     });
-    if (session.rawSessionToken) {
-      headers.append("Set-Cookie", createSecureCookie(
-        AUTH_CONSTANTS.SESSION_COOKIE_NAME,
-        session.rawSessionToken,
-        AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-        "/"
-      ));
-      headers.append("Set-Cookie", createSecureCookie(
-        AUTH_CONSTANTS.SESSION_RECOVERY_COOKIE_NAME,
-        session.rawSessionToken,
-        AUTH_CONSTANTS.SESSION_DURATION_SECONDS,
-        "/"
-      ));
-    }
-    return new Response(page({ user: session.user, memberships, pendingMemberships }), { status: 200, headers });
+    if (session.kind === "browser") appendBrowserSessionCookies(headers, session);
+    return new Response(page({
+      user:session.user,
+      memberships,
+      pendingMemberships,
+      csrfToken:session.rawCsrfToken || ""
+    }), { status: 200, headers });
   } catch (error) {
     console.error("League selector failed:", error);
     return new Response("Unable to load league selection.", { status: 500 });

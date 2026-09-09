@@ -15,11 +15,41 @@
   const LOGIN_RETURN_MAX_AGE_MS = 15 * 60 * 1000;
   const boot = window.__FHQ_AUTH_BOOTSTRAP__ && typeof window.__FHQ_AUTH_BOOTSTRAP__ === 'object' ? window.__FHQ_AUTH_BOOTSTRAP__ : null;
 
+  function getCookie(name) {
+    const prefix = `${name}=`;
+    const match = document.cookie.split(';').map((entry) => entry.trim())
+      .find((entry) => entry.startsWith(prefix));
+    return match ? decodeURIComponent(match.slice(prefix.length)) : null;
+  }
+
+  // Several established league modules still call window.fetch directly. Keep
+  // their request code stable while enforcing the same CSRF contract as the
+  // centralized API service for every same-origin browser mutation.
+  if (!window.fetch.__franchiseHqCsrf) {
+    const nativeFetch = window.fetch.bind(window);
+    const secureFetch = (input, init = {}) => {
+      const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      const target = new URL(input instanceof Request ? input.url : String(input), window.location.href);
+      if (target.origin !== window.location.origin || ['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+        return nativeFetch(input, init);
+      }
+      const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+      if (!headers.has('X-FranchiseHQ-CSRF')) {
+        const token = getCookie('franchise_hq_csrf');
+        if (token) headers.set('X-FranchiseHQ-CSRF', token);
+      }
+      return nativeFetch(input, { ...init, headers });
+    };
+    secureFetch.__franchiseHqCsrf = true;
+    window.fetch = secureFetch;
+  }
+
   const authState = {
     status: boot?.authenticated === true ? 'ready' : 'loading',
     authenticated: boot?.authenticated === true,
     user: boot?.user || null,
     membership: boot?.membership || null,
+    capabilities: Array.isArray(boot?.capabilities) ? boot.capabilities : [],
     session: boot?.session || null,
     error: null
   };
@@ -30,6 +60,7 @@
       authenticated: authState.authenticated,
       user: authState.user,
       membership: authState.membership,
+      capabilities: Object.freeze([...authState.capabilities]),
       session: authState.session,
       error: authState.error
     });
@@ -46,6 +77,7 @@
     authState.authenticated = false;
     authState.user = null;
     authState.membership = null;
+    authState.capabilities = [];
     authState.session = null;
     authState.error = null;
   }
@@ -94,6 +126,7 @@
     authState.authenticated = payload.authenticated === true;
     authState.user = payload.user || null;
     authState.membership = payload.membership || null;
+    authState.capabilities = Array.isArray(payload.capabilities) ? payload.capabilities : [];
     authState.session = payload.session || null;
     authState.error = null;
   }
@@ -192,6 +225,18 @@
     return authState.membership?.role || null;
   }
 
+  function getCapabilities() {
+    return Object.freeze([...authState.capabilities]);
+  }
+
+  function hasCapability(capability) {
+    return Boolean(authState.authenticated && authState.capabilities.includes(String(capability || '')));
+  }
+
+  function getCsrfToken() {
+    return getCookie('franchise_hq_csrf');
+  }
+
   function hasRole(...allowedRoles) {
     const role = getRole();
     return Boolean(
@@ -243,6 +288,9 @@
     getCurrentUser,
     getMembership,
     getRole,
+    getCapabilities,
+    hasCapability,
+    getCsrfToken,
     hasRole,
     isCommissioner,
     isTradeCommittee,
