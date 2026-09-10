@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.2",
   "releaseType": "active-snapshot-week-sentinel-presentation-remediation",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.1",
@@ -19,10 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "not-run",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mergeCommit": null
+    "status": "published-main-accepted",
+    "candidateCommit": "2ed0cc521a9b2a1c247be2470bb55666950c1b46",
+    "pullRequest": 58,
+    "mergeCommit": "ad8133954a2c43b8bd69cd487b2c2b148e81ab49"
   },
   "staging": {
     "authorized": false,
@@ -31,11 +31,12 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.5.0",
-    "currentCommit": "aac13741ea732623327341f407dc81cdd98e7950",
-    "currentMigration": 36,
+    "deployed": true,
+    "status": "deployed-read-only-accepted",
+    "currentRelease": "7.5.2",
+    "currentCommit": "ad8133954a2c43b8bd69cd487b2c2b148e81ab49",
+    "currentPagesDeployment": "b34fa8b8-1bfb-4fe1-bec7-15c51528be9b",
+    "currentMigration": 37,
     "candidateMigration": 37,
     "scope": "Publish the active-snapshot Week sentinel presentation correction from current Main, preserve the already-accepted All Weeks import authority, and verify Week 10 schedule, statistics, and results without reimporting or changing the active snapshot."
   },
