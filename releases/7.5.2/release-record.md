@@ -26,7 +26,7 @@ Current Main also includes the accepted 7.5.1 Discord trade implementation. Prod
 
 ## Validation evidence
 
-Focused regression coverage proves canonical Week 10 wins over `/week/reg/0/` provenance, an unresolved Week 0 remains a placeholder, nonzero route authority is preserved, and standing sentinel metadata cannot override the active snapshot. The focused Week/import regression passes 48/48 tests. The complete strict gate passes 206/206 automated tests, 255 JavaScript syntax checks, 599 inventoried files, 76 routes, migration 37 schema validation, deterministic inventory, secret scanning, environment validation, and the release contract.
+Focused regression coverage proves canonical Week 10 wins over `/week/reg/0/` provenance, an unresolved Week 0 remains a placeholder, nonzero route authority is preserved, and standing sentinel metadata cannot override the active snapshot. The focused Week/import regression passes 48/48 tests. The complete strict gate passes 207/207 automated tests, 255 JavaScript syntax checks, 599 inventoried files, 76 routes, migration 37 schema validation, deterministic inventory, secret scanning, environment validation, and the release contract. Release tooling also proves an exact `/trade`-only upsert selects one command and retires no names.
 
 ## Deployment status
 

@@ -208,6 +208,15 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   ...DISCORD_SCHEDULE_THREAD_COMMANDS
 ]);
 
+export function discordGlobalCommandsNamed(names = []) {
+  const requested = [...new Set(names.map(name => String(name || '').trim().toLowerCase()).filter(Boolean))];
+  if (!requested.length) return [...DISCORD_GLOBAL_COMMANDS];
+  const byName = new Map(DISCORD_GLOBAL_COMMANDS.map(command => [command.name, command]));
+  const missing = requested.filter(name => !byName.has(name));
+  if (missing.length) throw new Error(`Unknown Discord command name(s): ${missing.join(', ')}.`);
+  return requested.map(name => byName.get(name));
+}
+
 export function discordScheduleThreadWeek(commandOrInteraction = '') {
   const command = typeof commandOrInteraction === 'string'
     ? commandOrInteraction

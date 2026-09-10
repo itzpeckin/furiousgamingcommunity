@@ -7,7 +7,8 @@ import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import {
   DISCORD_GLOBAL_COMMANDS,
   DISCORD_RETIRED_GLOBAL_COMMANDS,
-  DISCORD_SCHEDULE_THREAD_COMMANDS
+  DISCORD_SCHEDULE_THREAD_COMMANDS,
+  discordGlobalCommandsNamed
 } from '../../functions/_lib/discord-commands.js';
 import { onRequestPost as discordInteractions } from '../../functions/api/discord/interactions.js';
 import { flushDiscordDeliveries } from '../../functions/_lib/discord-delivery.js';
@@ -450,6 +451,15 @@ test('global command registration upserts by name without bulk replacement',asyn
   assert.deepEqual(requests.map(item=>[item.method,item.body?.name||null]),[
     ['POST','standings'],['POST','playoffs'],['POST','eliminated']
   ]);
+});
+
+test('release tooling can select only the exact trade command without retiring any other name',async()=>{
+  assert.deepEqual(discordGlobalCommandsNamed(['trade']).map(command=>command.name),['trade']);
+  assert.throws(()=>discordGlobalCommandsNamed(['not-a-command']),/Unknown Discord command name/);
+  const source=await readFile(path.join(ROOT,'tools/register-discord-commands.mjs'),'utf8');
+  assert.match(source,/arg==='--name'/);
+  assert.match(source,/exactNameUpsert\?\[\]:DISCORD_RETIRED_GLOBAL_COMMANDS/);
+  assert.match(source,/reconcileDiscordGlobalCommands\([\s\S]+commands,\{retiredNames:retiredCommands\}/);
 });
 
 test('global command reconciliation retires only exact FranchiseHQ legacy statistic names',async()=>{

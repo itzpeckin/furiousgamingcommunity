@@ -14,7 +14,7 @@
     "javascriptModules": 255,
     "inventoryEntries": 599,
     "routes": 76,
-    "passedTests": 206,
+    "passedTests": 207,
     "failedTests": 0
   },
   "checks": {
@@ -39,7 +39,7 @@
       "candidateRequiresMigration": true,
       "productionApplied": false
     },
-    "automatedTests": {"passed": true, "passedTests": 206, "failedTests": 0},
+    "automatedTests": {"passed": true, "passedTests": 207, "failedTests": 0},
     "inventory": {"passed": true, "files": 599, "routes": 76}
   },
   "productionBaselineReference": {
