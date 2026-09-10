@@ -11,7 +11,8 @@ import {
   discordGlobalCommandsNamed
 } from '../../functions/_lib/discord-commands.js';
 import { onRequestPost as discordInteractions } from '../../functions/api/discord/interactions.js';
-import { flushDiscordDeliveries } from '../../functions/_lib/discord-delivery.js';
+import { flushDiscordDeliveries, queueTradeRoomUpdate, tradeConversationMessage } from '../../functions/_lib/discord-delivery.js';
+import { tradeDecisionCustomId } from '../../functions/_lib/discord-trade-components.js';
 import {
   ensureDiscordGlobalCommands,
   reconcileDiscordGlobalCommands,
@@ -29,15 +30,18 @@ import {
 } from '../../functions/_lib/discord-installation.js';
 import { syncDiscordScheduleThreads } from '../../functions/_lib/discord-schedule.js';
 import { ensureDraftPickHorizon } from '../../functions/_lib/draft-pick-baselines.js';
+import { activeLeagueTeams } from '../../functions/_lib/league-teams.js';
+import { executeTradeCenterAction } from '../../functions/api/leagues/[leagueSlug]/trade-center.js';
 
 async function applyMigrations(database){
   const files=(await walkFiles()).filter(file=>/^migrations\/\d+_.+\.sql$/.test(file)).sort();
   for(const file of files)database.exec(await readFile(path.join(ROOT,file),'utf8'));
 }
 
-function d1(database){
+function d1(database,trace=()=>{}){
   return {
     prepare(sql){
+      trace(String(sql));
       let values=[];
       const statement=database.prepare(sql);
       const api={
@@ -223,6 +227,13 @@ test('global Discord command inventory restores legacy week commands and remains
   const create=trade.options.find(option=>option.name==='create');
   assert.match(create.options.find(option=>option.name==='send-1').description,/counts may differ/);
   assert.match(create.options.find(option=>option.name==='receive-2').description,/independent of send slots/);
+  const schedule=DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='schedule');
+  assert.deepEqual(schedule.options.map(option=>option.name),['current','week','team']);
+  assert.equal(schedule.options.find(option=>option.name==='week').options.find(option=>option.name==='number').required,true);
+  assert.equal(schedule.options.find(option=>option.name==='team').options.find(option=>option.name==='name').autocomplete,true);
+  assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='games').options.map(option=>option.name),['unplayed','played','all']);
+  assert.equal(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='standings').options[0].name,'show');
+  assert.equal(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='gm-history').options[0].required,false);
 });
 
 test('/standings distinguishes all divisions, all conferences, one team, and one named division while /playoffs returns each conference top 10',async()=>{
@@ -237,16 +248,16 @@ test('/standings distinguishes all divisions, all conferences, one team, and one
       const response=await discordInteractions(await signedContext({db,key,interaction:interaction({id,name,options})}));
       return response.json();
     };
-    const divisions=await run('100000000000000071','standings',[{type:3,name:'view',value:'Division'}]);
+    const divisions=await run('100000000000000071','standings',[{type:3,name:'show',value:'division:all'}]);
     assert.equal(divisions.data.embeds[0].fields.length,8);
     assert.equal(divisions.data.embeds[0].fields.reduce((count,field)=>count+field.value.split('\n').length,0),32);
-    const conferences=await run('100000000000000072','standings',[{type:3,name:'view',value:'Conference'}]);
+    const conferences=await run('100000000000000072','standings',[{type:3,name:'show',value:'conference:all'}]);
     assert.equal(conferences.data.embeds[0].fields.length,2);
     assert.equal(conferences.data.embeds[0].fields.reduce((count,field)=>count+field.value.split('\n').length,0),32);
-    const buccaneers=await run('100000000000000073','standings',[{type:3,name:'view',value:'Buccaneers'}]);
+    const buccaneers=await run('100000000000000073','standings',[{type:3,name:'show',value:'team:tb'}]);
     assert.match(buccaneers.data.content,/Tampa Bay Buccaneers.*16-0/s);
     assert.doesNotMatch(buccaneers.data.content,/San Francisco/);
-    const nfcEast=await run('100000000000000074','standings',[{type:3,name:'view',value:'Division NFC East'}]);
+    const nfcEast=await run('100000000000000074','standings',[{type:3,name:'show',value:'division:NFC East'}]);
     assert.equal((nfcEast.data.content.match(/\*\*/g)||[]).length,10);
     assert.match(nfcEast.data.content,/Dallas Cowboys/);
     assert.doesNotMatch(nfcEast.data.content,/Tampa Bay Buccaneers/);
@@ -256,9 +267,13 @@ test('/standings distinguishes all divisions, all conferences, one team, and one
       assert.equal(field.value.split('\n').length,10);
       assert.equal((field.value.match(/In the Hunt/g)||[]).length,3);
     }
-    const schedule=await run('100000000000000076','schedule',[{type:3,name:'view',value:'week:14'}]);
+    const schedule=await run('100000000000000076','schedule',[{type:1,name:'week',options:[{type:4,name:'number',value:14}]}]);
     assert.match(schedule.data.content,/🟢 SF \(15-1\) @ 🟢 TB \(16-0\)/);
     assert.doesNotMatch(schedule.data.content,/\*\*/);
+    const current=await run('100000000000000077','schedule',[{type:1,name:'current'}]);
+    assert.match(current.data.content,/Week 14/);
+    const teamSchedule=await run('100000000000000078','schedule',[{type:1,name:'team',options:[{type:3,name:'name',value:'tb'}]}]);
+    assert.match(teamSchedule.data.content,/Tampa Bay Buccaneers Schedule/);
   }finally{database.close()}
 });
 
@@ -297,7 +312,7 @@ test('/eliminated lists only teams with no division or Wild Card path through a 
     assert.doesNotMatch(embed.fields.map(field=>field.value).join('\n'),/Arizona Cardinals/);
     assert.match(embed.footer.text,/Record-only mathematical elimination/);
     const scheduleResponse=await discordInteractions(await signedContext({db,key,interaction:interaction({
-      id:'100000000000000097',name:'schedule',options:[{type:3,name:'view',value:'week:14'}]
+      id:'100000000000000097',name:'schedule',options:[{type:1,name:'week',options:[{type:4,name:'number',value:14}]}]
     })}));
     const schedule=(await scheduleResponse.json()).data.content;
     assert.match(schedule,/🟢 SF \(10-4\) @ 🟢 TB \(12-2\)/);
@@ -376,12 +391,12 @@ test('commissioners select verified existing Discord channels and refresh comman
     seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
     seedMember(database,{leagueId:'league-a',userId:'commissioner-a',discordId:'100000000000000021',role:'commissioner'});
     await seedSession(database,{userId:'commissioner-a',token:'token-a'});
-    const channelIds=['100000000000000051','100000000000000052','100000000000000053'];
+    const channelIds=['100000000000000051','100000000000000052','100000000000000053','100000000000000054'];
     const requests=[];
     globalThis.fetch=async(url,options={})=>{
       requests.push({url:String(url),method:options.method||'GET',body:options.body?JSON.parse(options.body):null});
       if(/\/guilds\/100000000000000001\/channels$/.test(String(url))){
-        return new Response(JSON.stringify(channelIds.map((id,index)=>({id,type:0,name:['scheduling','trade-committee','league-news'][index],position:index}))),{
+        return new Response(JSON.stringify(channelIds.map((id,index)=>({id,type:0,name:['scheduling','trade-committee','league-news','private-trades'][index],position:index}))),{
           status:200,headers:{'content-type':'application/json'}
         });
       }
@@ -389,7 +404,7 @@ test('commissioners select verified existing Discord channels and refresh comman
     };
     const response=await postDiscordInstallation(leagueApiContext(d1(database),{
       slug:'alpha',token:'token-a',method:'POST',env:{DISCORD_BOT_TOKEN:'test-token'},body:{
-        action:'configure-channels',scheduleChannelId:channelIds[0],tradeCommitteeChannelId:channelIds[1],notificationChannelId:channelIds[2]
+        action:'configure-channels',scheduleChannelId:channelIds[0],tradeCommitteeChannelId:channelIds[1],notificationChannelId:channelIds[2],tradeChannelId:channelIds[3]
       }
     }));
     const payload=await response.json();
@@ -397,8 +412,9 @@ test('commissioners select verified existing Discord channels and refresh comman
     assert.deepEqual({
       schedule:payload.installation.scheduleChannelId,
       committee:payload.installation.tradeCommitteeChannelId,
-      notifications:payload.installation.notificationChannelId
-    },{schedule:channelIds[0],committee:channelIds[1],notifications:channelIds[2]});
+      notifications:payload.installation.notificationChannelId,
+      trades:payload.installation.tradeChannelId
+    },{schedule:channelIds[0],committee:channelIds[1],notifications:channelIds[2],trades:channelIds[3]});
     assert.equal(requests.filter(request=>/\/applications\/100000000000000009\/commands$/.test(request.url)&&request.method==='POST').length,DISCORD_GLOBAL_COMMANDS.length);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM tenant_audit_events
       WHERE league_id='league-a' AND action='discord_installation_configure-channels'`).get().count,1);
@@ -496,7 +512,7 @@ test('signed autocomplete returns tenant teams without creating command receipts
     const db=d1(database),key=await signingKey();
     const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000087',name:'standings',type:4,options:[
-        {type:3,name:'view',value:'bucc',focused:true}
+        {type:3,name:'show',value:'bucc',focused:true}
       ]
     })}));
     const payload=await response.json();
@@ -566,13 +582,25 @@ test('/games separates played and unplayed matchups for the active scheduled wee
     }});
     const db=d1(database),key=await signingKey();
     const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
-      id:'100000000000000090',name:'games'
+      id:'100000000000000090',name:'games',options:[{type:1,name:'all'}]
     })}));
     const content=(await response.json()).data.content;
     assert.match(content,/Regular Season Week 13 Games/);
     assert.match(content,/Played \(1\).*SF 17 @ TB 24/s);
     assert.match(content,/Unplayed \(1\).*TB @ SF/s);
     assert.doesNotMatch(content,/Week 12/);
+    const played=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000091',name:'games',options:[{type:1,name:'played'}]
+    })}));
+    const playedContent=(await played.json()).data.content;
+    assert.match(playedContent,/SF 17 @ TB 24/);
+    assert.doesNotMatch(playedContent,/TB @ SF/);
+    const unplayed=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000092',name:'games',options:[{type:1,name:'unplayed'}]
+    })}));
+    const unplayedContent=(await unplayed.json()).data.content;
+    assert.match(unplayedContent,/TB @ SF/);
+    assert.doesNotMatch(unplayedContent,/SF 17 @ TB 24/);
   }finally{database.close()}
 });
 
@@ -618,6 +646,7 @@ test('/trade create opens one private owner thread and its buttons record the re
     seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
     seedMember(database,{leagueId:'league-a'});
     seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    database.prepare(`UPDATE discord_league_installations SET trade_channel_id='100000000000000066' WHERE league_id='league-a'`).run();
     seedActiveWeek(database,{leagueId:'league-a',week:13});
     database.prepare(`INSERT INTO franchise_seasons
       (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
@@ -650,11 +679,13 @@ test('/trade create opens one private owner thread and its buttons record the re
     assert.equal(room.status,'active');
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_assets WHERE trade_id=?`).get(room.tradeId).count,3);
     const threadCreate=requests.find(request=>request.url.endsWith('/threads'));
+    assert.match(threadCreate.url,/\/channels\/100000000000000066\/threads$/);
     assert.equal(threadCreate.body.type,12);
     assert.equal(threadCreate.body.invitable,false);
     assert.equal(requests.filter(request=>request.url.includes('/thread-members/')).length,2);
     const threadMessage=requests.find(request=>request.url.endsWith('/100000000000000077/messages'));
-    assert.equal(threadMessage.body.components[0].components.length,2);
+    assert.equal(threadMessage.body.components[0].components.length,3);
+    assert.match(threadMessage.body.components[0].components.find(button=>button.label==='Counter Offer').url,/#trade-center\//);
     const acceptId=threadMessage.body.components[0].components.find(button=>button.label==='Accept Trade').custom_id;
     const rejectId=threadMessage.body.components[0].components.find(button=>button.label==='Reject Trade').custom_id;
     const proposerReject=await discordInteractions(await signedContext({db,key,env,interaction:interaction({
@@ -710,7 +741,7 @@ test('a receiving owner can accept from the fallback Bot DM when private threads
     };
     await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},db,{leagueId:'league-a',fetchImpl});
     const received=requests.find(request=>request.url.includes('10000000000000001288/messages'));
-    assert.equal(received.body.components[0].components.length,2);
+    assert.equal(received.body.components[0].components.length,3);
     const acceptId=received.body.components[0].components.find(button=>button.label==='Accept Trade').custom_id;
     globalThis.fetch=fetchImpl;
     const context=await signedContext({db,key,env:{DISCORD_BOT_TOKEN:'test-bot-token'},interaction:interaction({
@@ -723,6 +754,128 @@ test('a receiving owner can accept from the fallback Bot DM when private threads
     assert.match(payload.data.content,/awaiting Trade Committee review/);
     await Promise.all(pending);
     assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(tradeId).status,'committee');
+  }finally{globalThis.fetch=originalFetch;database.close()}
+});
+
+test('Discord player autocomplete searches the active snapshot once instead of loading every player page',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:13});
+    const insert=database.prepare(`INSERT INTO league_snapshot_records
+      (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`);
+    for(let index=0;index<650;index++)insert.run(snapshotId,'league-a','players',`player-${index}`,JSON.stringify({
+      external_id:`player-${index}`,team_external_id:index%2?'1001':'1002',display_name:index%125===0?`Needle Player ${index}`:`Roster Player ${index}`,
+      position:index%2?'HB':'WR',overall:70+(index%29)
+    }));
+    const queries=[],db=d1(database,sql=>queries.push(sql)),key=await signingKey();
+    const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000139',name:'player',type:4,options:[{type:3,name:'name',value:'Needle',focused:true}]
+    })}));
+    const choices=(await response.json()).data.choices;
+    assert.equal(choices.length,6);
+    assert.ok(choices.every(item=>item.name.includes('Needle Player')));
+    const playerQueries=queries.filter(sql=>sql.includes("record.domain='players'"));
+    assert.equal(playerQueries.length,1);
+    assert.match(playerQueries[0],/LIMIT 25/);
+    assert.doesNotMatch(playerQueries[0],/OFFSET/i);
+  }finally{database.close()}
+});
+
+test('committee denial reasons update the private thread and the same trade can be revised without losing prior votes',async()=>{
+  const database=new DatabaseSync(':memory:'),originalFetch=globalThis.fetch;
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    for(let index=1;index<=3;index++)seedMember(database,{leagueId:'league-a',userId:`reviewer-${index}`,
+      discordId:`10000000000000002${index}`,teamId:null,role:'commissioner'});
+    database.prepare(`UPDATE discord_league_installations SET trade_channel_id='100000000000000066',
+      trade_committee_channel_id='100000000000000067' WHERE league_id='league-a'`).run();
+    seedActiveWeek(database,{leagueId:'league-a',week:13});
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    const db=d1(database);
+    const teams=await activeLeagueTeams(db,'league-a');
+    await ensureDraftPickHorizon(db,{leagueId:'league-a',franchiseSeasonId:'season-a',seasonYear:2026,
+      gameRelease:'Madden NFL 27',teams});
+    let messageNumber=78;
+    globalThis.fetch=async(url)=>{
+      if(String(url).endsWith('/threads'))return new Response('{"id":"100000000000000077"}',{status:200,headers:{'content-type':'application/json'}});
+      if(String(url).includes('/thread-members/'))return new Response(null,{status:204});
+      return new Response(JSON.stringify({id:`1000000000000000${messageNumber++}`}),{status:200,headers:{'content-type':'application/json'}});
+    };
+    const key=await signingKey(),env={DISCORD_BOT_TOKEN:'test-bot-token'};
+    await discordInteractions(await signedContext({db,key,env,interaction:interaction({
+      id:'100000000000000141',name:'trade',options:[{type:1,name:'create',options:[
+        {type:3,name:'owner',value:'owner:100000000000000012'},
+        {type:3,name:'send-1',value:'pick:pick:league-a:2027:1:tb'},
+        {type:3,name:'receive-1',value:'pick:pick:league-a:2027:1:sf'}
+      ]}]
+    })}));
+    const tradeId=database.prepare(`SELECT id FROM trade_workflows`).get().id;
+    const acceptId=tradeDecisionCustomId('accept',tradeId,1);
+    await discordInteractions(await signedContext({db,key,env,interaction:interaction({
+      id:'100000000000000142',channel:'100000000000000077',user:'100000000000000012',type:3,
+      data:{custom_id:acceptId,component_type:2}
+    })}));
+    assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(tradeId).status,'committee');
+    const committeeMessage=await tradeConversationMessage(db,{leagueId:'league-a',eventType:'review-required',resourceId:tradeId,
+      payloadJson:JSON.stringify({title:'Trade review required',message:'Review this trade.',tradeId,leagueSlug:'alpha'})});
+    assert.deepEqual(committeeMessage.components[0].components.map(button=>button.label),['Approve','Deny']);
+    const denyId=tradeDecisionCustomId('review-deny',tradeId,1);
+    const denyButton=await discordInteractions(await signedContext({db,key,env,interaction:interaction({
+      id:'100000000000000143',channel:'100000000000000067',user:'100000000000000021',type:3,
+      data:{custom_id:denyId,component_type:2}
+    })}));
+    const modal=await denyButton.json();
+    assert.equal(modal.type,9);
+    assert.equal(modal.data.components[0].components[0].required,false);
+    for(let index=1;index<=3;index++){
+      const submitted=await discordInteractions(await signedContext({db,key,env,interaction:interaction({
+        id:`10000000000000015${index}`,channel:'100000000000000067',user:`10000000000000002${index}`,type:5,
+        data:{custom_id:denyId,components:[{type:1,components:[{type:4,custom_id:'reason',value:`Reason ${index}`}]}]}
+      })}));
+      assert.equal((await submitted.json()).type,7);
+      assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(tradeId).status,index<3?'committee':'rejected');
+    }
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_reviews WHERE trade_id=? AND revision=1`).get(tradeId).count,3);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_messages WHERE trade_id=? AND event_type='changes-requested'`).get(tradeId).count,1);
+    assert.equal(database.prepare(`SELECT status FROM discord_trade_rooms WHERE trade_id=?`).get(tradeId).status,'rejected');
+    const revisionMessage=await tradeConversationMessage(db,{leagueId:'league-a',eventType:'thread-update',resourceId:tradeId,
+      payloadJson:JSON.stringify({title:'Changes requested',message:'Revise and resubmit.',tradeId,leagueSlug:'alpha'})});
+    assert.deepEqual(revisionMessage.components[0].components.map(button=>button.label),['Revise Trade']);
+    const rejectedUpdate=database.prepare(`SELECT payload_json AS payloadJson FROM discord_delivery_events
+      WHERE resource_id=? AND visibility='private-channel' AND event_type='thread-update' AND payload_json LIKE '%Reason 3%' LIMIT 1`).get(tradeId);
+    assert.match(rejectedUpdate.payloadJson,/Reason 3/);
+
+    await executeTradeCenterAction({db,league:{id:'league-a',slug:'alpha',name:'Alpha League',features:{}},teams,
+      session:{user:{id:'owner-sf',displayName:'SF Owner'},membership:{role:'team_owner',teamId:'sf',teamKey:'sf'}},
+      request:new Request('https://franchisehq.app/api/leagues/alpha/trade-center',{method:'POST'})},{
+        action:'counter',tradeId,revision:1,note:'Adjusted terms',transfers:[
+          {assetType:'draft-pick',assetId:'pick:league-a:2027:1:sf',fromTeamKey:'sf',toTeamKey:'tb'},
+          {assetType:'draft-pick',assetId:'pick:league-a:2027:1:tb',fromTeamKey:'tb',toTeamKey:'sf'}
+        ]
+      });
+    await queueTradeRoomUpdate(db,{league:{id:'league-a',slug:'alpha'},tradeId,eventKey:'test-revision-2',
+      eventType:'revision-submitted',title:'Trade revision submitted',message:'Revision 2 is ready for owner acceptance.'});
+    const revised={...database.prepare(`SELECT status,revision,rejected_at AS rejectedAt FROM trade_workflows WHERE id=?`).get(tradeId)};
+    assert.deepEqual(revised,{status:'negotiating',revision:2,rejectedAt:null});
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_reviews WHERE trade_id=? AND revision=1`).get(tradeId).count,3);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_reviews WHERE trade_id=? AND revision=2`).get(tradeId).count,0);
+    assert.deepEqual(database.prepare(`SELECT team_key AS teamKey,accepted_revision AS acceptedRevision
+      FROM trade_workflow_participants WHERE trade_id=? ORDER BY team_key`).all(tradeId).map(row=>({...row})),[
+        {teamKey:'sf',acceptedRevision:2},{teamKey:'tb',acceptedRevision:null}
+      ]);
+    assert.deepEqual({...database.prepare(`SELECT discord_thread_id AS threadId,revision,status FROM discord_trade_rooms WHERE trade_id=?`).get(tradeId)},
+      {threadId:'100000000000000077',revision:2,status:'active'});
+    const revisedMessage=await tradeConversationMessage(db,{leagueId:'league-a',eventType:'revision-submitted',resourceId:tradeId,
+      payloadJson:JSON.stringify({title:'Revision submitted',message:'Review revision 2.',tradeId,leagueSlug:'alpha'})});
+    assert.deepEqual(revisedMessage.components[0].components.map(button=>button.label),['Accept Trade','Reject Trade','Counter Offer']);
   }finally{globalThis.fetch=originalFetch;database.close()}
 });
 
@@ -882,16 +1035,27 @@ test('GM History includes current-season results before the season is archived',
       VALUES ('season-2026','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
     database.prepare(`INSERT INTO gm_identities
       (id,league_id,user_id,public_id,display_name) VALUES ('gm-a','league-a','user-a','gm-public-a','Member user-a')`).run();
+    database.prepare(`INSERT INTO users (id,discord_user_id,discord_username,display_name)
+      VALUES ('user-b','100000000000000033','member-b','Second GM')`).run();
+    database.prepare(`INSERT INTO gm_identities
+      (id,league_id,user_id,public_id,display_name) VALUES ('gm-b','league-a','user-b','gm-public-b','Second GM')`).run();
     database.prepare(`INSERT INTO team_ownership_periods
       (id,league_id,gm_identity_id,team_key,franchise_season_id,started_at,started_stage,started_week)
       VALUES ('period-a','league-a','gm-a','tb','season-2026',CURRENT_TIMESTAMP,'preseason',1)`).run();
     const db=d1(database),key=await signingKey();
     const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
-      id:'100000000000000082',name:'gm-history',options:[{type:3,name:'name',value:'user-a'}]
+      id:'100000000000000082',name:'gm-history',options:[{type:3,name:'show',value:'user-a'}]
     })}));
     const payload=await response.json();
     assert.match(payload.data.content,/Member user-a/);
     assert.match(payload.data.content,/1-0/);
+    assert.doesNotMatch(payload.data.content,/Second GM/);
+    const all=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000083',name:'gm-history'
+    })}));
+    const allContent=(await all.json()).data.content;
+    assert.match(allContent,/Member user-a/);
+    assert.match(allContent,/Second GM/);
   }finally{database.close()}
 });
 

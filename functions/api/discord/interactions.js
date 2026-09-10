@@ -21,7 +21,7 @@ import {
 import { executeDiscordCommand, executeDiscordTradeComponent } from '../../_lib/discord-bot.js';
 import { discordAutocompleteChoices } from '../../_lib/discord-autocomplete.js';
 import { flushDiscordDeliveries } from '../../_lib/discord-delivery.js';
-import { parseTradeDecisionCustomId } from '../../_lib/discord-trade-components.js';
+import { parseTradeDecisionCustomId, tradeDenyModal } from '../../_lib/discord-trade-components.js';
 
 function httpJson(body,status){
   return new Response(JSON.stringify(body),{
@@ -54,7 +54,8 @@ async function runCommand(context,c,interaction){
 
 async function runTradeComponent(context,interaction,decision){
   let c;
-  try{c=await resolveDiscordTradeComponentContext(context.env,interaction,{tradeId:decision.tradeId});}
+  const reviewer=decision.action.startsWith('review-');
+  try{c=await resolveDiscordTradeComponentContext(context.env,interaction,{tradeId:decision.tradeId,access:reviewer?'reviewer':'participant'});}
   catch(error){return discordErrorResponse(safeCommandError(error));}
   let accepted;
   try{accepted=await createInteractionReceipt(c.db,interaction,{leagueId:c.league.id,visibility:'private'});}
@@ -78,6 +79,15 @@ async function runTradeComponent(context,interaction,decision){
   }
 }
 
+function modalReason(interaction){
+  for(const row of interaction?.data?.components||[]){
+    for(const component of row?.components||[]){
+      if(component?.custom_id==='reason')return String(component.value||'').trim().slice(0,2000);
+    }
+  }
+  return '';
+}
+
 export async function onRequestPost(context){
   const publicKey=String(context.env?.DISCORD_PUBLIC_KEY||'').trim();
   if(!publicKey)return httpJson({ok:false,release:DISCORD_COMMAND_RELEASE,error:'Discord interactions are not configured.'},503);
@@ -90,7 +100,18 @@ export async function onRequestPost(context){
   if(Number(interaction.type)===DISCORD_INTERACTION_TYPES.MESSAGE_COMPONENT){
     const decision=parseTradeDecisionCustomId(interaction?.data?.custom_id);
     if(!decision)return discordErrorResponse('That FranchiseHQ trade action is no longer supported.');
+    if(decision.action==='review-deny'){
+      try{await resolveDiscordTradeComponentContext(context.env,interaction,{tradeId:decision.tradeId,access:'reviewer'});}
+      catch(error){return discordErrorResponse(safeCommandError(error));}
+      const modal=tradeDenyModal(decision.tradeId,decision.revision);
+      return modal?discordInteractionResponse(DISCORD_RESPONSE_TYPES.MODAL,modal):discordErrorResponse('This trade review is no longer available.');
+    }
     return runTradeComponent(context,interaction,decision);
+  }
+  if(Number(interaction.type)===DISCORD_INTERACTION_TYPES.MODAL_SUBMIT){
+    const decision=parseTradeDecisionCustomId(interaction?.data?.custom_id);
+    if(!decision||decision.action!=='review-deny')return discordErrorResponse('That FranchiseHQ trade review is no longer supported.');
+    return runTradeComponent(context,interaction,{...decision,reason:modalReason(interaction)});
   }
   const autocomplete=Number(interaction.type)===DISCORD_INTERACTION_TYPES.APPLICATION_COMMAND_AUTOCOMPLETE;
   if(Number(interaction.type)!==DISCORD_INTERACTION_TYPES.APPLICATION_COMMAND&&!autocomplete){

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5",
+  "releaseType": "discord-trade-workflow-experience",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.4",
+    "commit": "69edb6aa5a930eebf39f22595a89f490618faecc",
+    "tree": "ca02d762478424bcd42d01ba885d842eacf2aa44",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5-discord-trades",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-pending"
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-pending",
+    "currentRelease": "7.5.4",
+    "currentCommit": "2aec1b4",
+    "currentMigration": 37,
+    "candidateMigration": 38,
+    "scope": "Simplify Discord reads, accelerate player autocomplete, add dedicated trade-thread routing and live same-thread trade review/revision, and restore halfbacks to League Home rushing leaders."
+  },
+  "requiredArtifacts": [
+    "migrations/0038_discord_trade_channel.sql",
+    "functions/_lib/discord-commands.js",
+    "functions/_lib/discord-autocomplete.js",
+    "functions/_lib/discord-delivery.js",
+    "functions/_lib/discord-trade-components.js",
+    "functions/api/discord/interactions.js",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "league-engine/trade-center-live.js",
+    "trade-module.js",
+    "app.js",
+    "tests/discord/discord-bot.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.5.5/release-record.md",
+    "releases/7.5.5/validation-evidence.json"
+  ]
+}

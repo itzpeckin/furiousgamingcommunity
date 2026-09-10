@@ -83,3 +83,8 @@ test('Teams & Owners exposes complete touch management on every phone card', asy
   const mobileShow = styles.lastIndexOf('display:inline-flex!important');
   assert.ok(mobileShow > legacyHide, 'mobile Manage visibility overrides the legacy tablet hide rule');
 });
+
+test('League Home rushing leaders include Madden halfbacks', async () => {
+  const app=await source('app.js');
+  assert.match(app,/rushing:\s*\{\s*positions:\['RB','HB','FB','QB'\]/);
+});

@@ -1,7 +1,7 @@
 import { discordBotRequest } from './discord-api.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-teams.js';
 import { attachProjectedPickSlots, projectDraftOrder } from './draft-pick-projections.js';
-import { tradeDecisionComponents } from './discord-trade-components.js';
+import { tradeDecisionComponents, tradeLinkButton, tradeReviewComponents } from './discord-trade-components.js';
 import { normalizePlayer, normalizeTeam } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
 
 const MAX_ATTEMPTS=5;
@@ -28,7 +28,8 @@ const teamLabel=(teams,key)=>{
 async function tradeDeliveryDetails(db,row,payload){
   const tradeId=String(payload.tradeId||row.resourceId||'').trim();
   if(!tradeId)return null;
-  const workflow=await db.prepare(`SELECT revision,status FROM trade_workflows WHERE id=? AND league_id=? LIMIT 1`)
+  const workflow=await db.prepare(`SELECT revision,status,review_threshold AS reviewThreshold,decision_reason AS decisionReason
+    FROM trade_workflows WHERE id=? AND league_id=? LIMIT 1`)
     .bind(tradeId,row.leagueId).first();
   if(!workflow)return null;
   const assets=await rows(db,`SELECT asset.asset_type AS assetType,asset.source_player_id AS sourcePlayerId,
@@ -121,6 +122,21 @@ async function tradeDeliveryDetails(db,row,payload){
     ].filter(Boolean).join(' · '));
   }
   if(capLines.length)fields.push({name:'Madden-supported cap estimate',value:`${capLines.join('\n')}\nUses Madden release net savings as the acquiring salary estimate and preserves Madden’s release penalty for the sending team. Current/projected team space appears only when the export supplies current cap room.`,inline:false});
+  const acceptances=await rows(db,`SELECT participant.team_key AS teamKey,participant.accepted_revision AS acceptedRevision
+    FROM trade_workflow_participants participant WHERE participant.league_id=? AND participant.trade_id=? ORDER BY participant.team_key`,row.leagueId,tradeId);
+  if(workflow.status==='negotiating')fields.push({name:`Revision ${Number(workflow.revision)} owner decisions`,value:acceptances.map(item=>
+    `${Number(item.acceptedRevision)===Number(workflow.revision)?'✅':'⏳'} ${teamLabel(teams,item.teamKey)}`
+  ).join('\n')||'Waiting for participating teams.',inline:false});
+  const reviews=await rows(db,`SELECT review.decision,review.reason,user.display_name AS reviewerName
+    FROM trade_workflow_reviews review JOIN users user ON user.id=review.reviewer_user_id
+    WHERE review.league_id=? AND review.trade_id=? AND review.revision=?
+    ORDER BY review.updated_at,review.reviewer_user_id`,row.leagueId,tradeId,Number(workflow.revision));
+  if(reviews.length||['committee','rejected','approved'].includes(workflow.status)){
+    const approvals=reviews.filter(item=>item.decision==='approve').length,rejections=reviews.filter(item=>item.decision==='reject').length;
+    const lines=reviews.map(item=>`${item.decision==='approve'?'✅':item.decision==='reject'?'❌':'➖'} **${item.reviewerName||'Commissioner'}** · ${item.decision}${item.reason?` — ${item.reason}`:''}`);
+    fields.push({name:`Committee review · ${approvals} approve / ${rejections} deny · ${Number(workflow.reviewThreshold)} required`,
+      value:(lines.join('\n')||'No committee votes recorded yet.').slice(0,1024),inline:false});
+  }
   return {fields,color:0x4f8cff,workflow};
 }
 
@@ -133,15 +149,24 @@ export async function tradeConversationMessage(db,row,{disabled=false,statusMess
   const link=slug
     ?`https://franchisehq.app/leagues/${encodeURIComponent(slug)}${tradeId?`#trade-center/${encodeURIComponent(tradeId)}`:''}`
     :null;
-  const action=row.eventType==='received'&&tradeId?'Use the buttons below to respond to the current offer.'
-    :row.eventType==='review-required'&&tradeId?`Review in the private committee channel with \`/trade review trade:${tradeId}\`.`
+  const action=['received','thread-update','revision-submitted'].includes(row.eventType)&&tradeId?'Use the buttons below to respond to the current offer.'
+    :row.eventType==='review-required'&&tradeId?'Commissioners can record their decision with the buttons below.'
     :null;
   const details=await tradeDeliveryDetails(db,row,payload).catch(()=>null);
-  const decisionReady=row.eventType==='received'&&tradeId&&details?.workflow?.status==='negotiating';
+  const decisionReady=['received','thread-update','revision-submitted'].includes(row.eventType)&&tradeId&&details?.workflow?.status==='negotiating';
+  const reviewReady=row.eventType==='review-required'&&tradeId&&details?.workflow?.status==='committee';
+  const revisionReady=['thread-update','revision-submitted'].includes(row.eventType)&&tradeId&&details?.workflow?.status==='rejected';
+  const components=decisionReady?tradeDecisionComponents(tradeId,Number(details.workflow.revision),{disabled}):reviewReady
+    ?tradeReviewComponents(tradeId,Number(details.workflow.revision),{disabled}):[];
+  const linkButton=(decisionReady||revisionReady)&&slug?tradeLinkButton(slug,tradeId,{label:revisionReady?'Revise Trade':'Counter Offer',disabled}):null;
+  if(linkButton){
+    if(components.length)components[0].components.push(linkButton);
+    else components.push({type:1,components:[linkButton]});
+  }
   return {
     content:[`**${title}**`,message,statusMessage,action,link?`[Open this trade in FranchiseHQ](${link})`:null].filter(Boolean).join('\n').slice(0,2000),
     ...(details?{embeds:[{title:'Trade details',fields:details.fields,color:details.color}]}:{}),
-    ...(decisionReady?{components:tradeDecisionComponents(tradeId,Number(details.workflow.revision),{disabled})}:{}),
+    ...(components.length?{components}:{}),
     allowed_mentions:{parse:[]}
   };
 }
@@ -159,7 +184,7 @@ async function participantDiscordIds(db,leagueId,tradeId,teams){
 
 export async function ensureDiscordTradeRoom(env,db,{league,installation,interaction,tradeId,fetchImpl=fetch}={}){
   if(!String(env?.DISCORD_BOT_TOKEN||'').trim())return {opened:false,fallback:'direct-message',reason:'bot-token-unavailable'};
-  const parentChannelId=String(installation?.notificationChannelId||installation?.scheduleChannelId||interaction?.channel_id||'').trim();
+  const parentChannelId=String(installation?.tradeChannelId||installation?.notificationChannelId||installation?.scheduleChannelId||interaction?.channel_id||'').trim();
   const guildId=String(installation?.guildId||interaction?.guild_id||'').trim();
   if(!/^\d{17,20}$/.test(parentChannelId)||!/^\d{17,20}$/.test(guildId)){
     return {opened:false,fallback:'direct-message',reason:'private-thread-channel-unavailable'};
@@ -215,6 +240,30 @@ export async function ensureDiscordTradeRoom(env,db,{league,installation,interac
   }
 }
 
+export async function queueTradeRoomUpdate(db,{league,tradeId,eventKey,eventType='thread-update',title='Trade updated',message='The trade workflow changed.'}={}){
+  const room=await db.prepare(`SELECT id,discord_thread_id AS threadId FROM discord_trade_rooms
+    WHERE league_id=? AND trade_id=? LIMIT 1`).bind(league.id,tradeId).first();
+  if(!room?.threadId)return {queued:false,reason:'trade-room-unavailable'};
+  const workflow=await db.prepare(`SELECT revision,status FROM trade_workflows WHERE league_id=? AND id=? LIMIT 1`)
+    .bind(league.id,tradeId).first();
+  if(!workflow)return {queued:false,reason:'trade-unavailable'};
+  const roomStatus=['committee','approved','rejected','withdrawn'].includes(workflow.status)?workflow.status:'active';
+  const key=String(eventKey||`${eventType}:${workflow.revision}:${workflow.status}`).slice(0,180);
+  const results=await db.batch([
+    db.prepare(`UPDATE discord_trade_rooms SET revision=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+      .bind(Number(workflow.revision),roomStatus,room.id),
+    db.prepare(`UPDATE discord_delivery_events SET status='suppressed',last_error='Delivered in private trade thread',updated_at=CURRENT_TIMESTAMP
+      WHERE league_id=? AND resource_id=? AND visibility='direct-message' AND status IN ('pending','failed')`)
+      .bind(league.id,tradeId),
+    db.prepare(`INSERT INTO discord_delivery_events
+      (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
+      VALUES (?,?,?,?,?,?,'private-channel',?,?) ON CONFLICT(idempotency_key) DO NOTHING`)
+      .bind(`discord_delivery_${crypto.randomUUID()}`,league.id,room.threadId,eventType,'trade_workflow',tradeId,
+        JSON.stringify({title,message,tradeId,leagueSlug:league.slug}),`trade-room:${league.id}:${tradeId}:${key}`)
+  ]);
+  return {queued:Number(results?.[2]?.meta?.changes||0)===1,threadId:room.threadId};
+}
+
 async function sendDelivery(env,db,row,fetchImpl){
   let channelId=row.channelId;
   if(row.visibility==='direct-message'){
@@ -263,12 +312,14 @@ export async function queueCommitteeReviewDelivery(db,{league,tradeId,title='Tra
   const installation=await db.prepare(`SELECT trade_committee_channel_id AS channelId
     FROM discord_league_installations WHERE league_id=? AND status='active' LIMIT 1`).bind(league.id).first();
   if(!installation?.channelId)return {queued:false};
+  const workflow=await db.prepare(`SELECT revision FROM trade_workflows WHERE league_id=? AND id=? LIMIT 1`).bind(league.id,tradeId).first();
+  if(!workflow)return {queued:false};
   const result=await db.prepare(`INSERT INTO discord_delivery_events
     (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
     VALUES (?,?,?,?,?,?,'private-channel',?,?) ON CONFLICT(idempotency_key) DO NOTHING`)
     .bind(`discord_delivery_${crypto.randomUUID()}`,league.id,installation.channelId,'review-required',
       'trade_workflow',tradeId,JSON.stringify({title,message,tradeId,leagueSlug:league.slug}),
-      `trade-review:${league.id}:${tradeId}`).run();
+      `trade-review:${league.id}:${tradeId}:${Number(workflow.revision)}`).run();
   return {queued:Number(result?.meta?.changes||0)===1};
 }
 

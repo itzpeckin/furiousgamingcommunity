@@ -46,9 +46,9 @@ test('only missing canonical migrations are planned', () => {
 
 test('canonical migration loading includes durable Discord trade rooms', async () => {
   const { contract, migrations } = await loadCanonicalMigrations();
-  assert.equal(contract.currentVersion, 37);
-  assert.equal(migrations.at(-1)?.version, 37);
-  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0037_discord_trade_rooms.sql');
+  assert.equal(contract.currentVersion, 38);
+  assert.equal(migrations.at(-1)?.version, 38);
+  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0038_discord_trade_channel.sql');
   const tenantMigration = migrations.find(item => item.version === 21);
   assert.equal(
     tenantMigration?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,

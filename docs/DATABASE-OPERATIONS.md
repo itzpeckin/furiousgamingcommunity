@@ -42,6 +42,13 @@ This runbook governs FranchiseHQ database changes beginning with 7.1.0. It is wr
 - Archive manifests, archive parts, recovery bookmarks, and transition events are immutable. Archive-object removal retains the manifest and an explicit tombstone.
 - Free Agents remain `blocked` or `missing` with a null count unless source evidence proves `located` or `empty-confirmed`; an unavailable route is never converted to zero.
 
+## What 7.5.5 adds
+
+- `migrations/0038_discord_trade_channel.sql` advances the required schema to version 38.
+- It adds one nullable `trade_channel_id` to each tenant-scoped Discord installation so commissioners can place newly created private trade threads independently from schedule, committee-review, and notification channels.
+- Existing installations remain valid through the prior safe routing fallback, and every existing `discord_trade_rooms` row keeps its recorded parent channel and Discord thread ID.
+- The migration does not create, revise, approve, reject, move, archive, or delete any trade; register a Discord command; change an active snapshot; run an import; rotate the export URL; or reinterpret blocked Free Agents.
+
 ## Authorization boundary
 
 Building and testing a migration does not authorize applying it to Cloudflare. Staging application and production application are separate decisions. A production migration requires a new, explicit owner authorization after the local candidate and recovery plan are reviewed.
@@ -118,6 +125,8 @@ After 7.3.1, the ledger must contain every version from 1 through 23 and the for
 After 7.3.2, the active ledger must contain every version from 1 through 24 and the foreign-key check must return no rows. Migration 24 adds `companion_import_destinations` and `companion_candidate_import_runs`; neither table authorizes or performs snapshot activation.
 
 After 7.3.3, the ledger must contain every version from 1 through 25 and the foreign-key check must return no rows. Migration 25 adds game-year links and immutable archive/recovery evidence. Applying it does not itself archive, detach, remove, restore, or activate anything. Before any later transition operation, record the exact game year, active snapshot, protected counts, typed confirmation, private R2 target, and verified archive digest.
+
+After 7.5.5, the ledger must contain every version from 1 through 38 and the foreign-key check must return no rows. Migration 38 adds only `discord_league_installations.trade_channel_id`; protected identity, membership, snapshot, import, trade-workflow, trade-room, audit, and Free Agent state must remain unchanged.
 
 ## Stop conditions
 

@@ -49,7 +49,8 @@ const MIGRATIONS = [
   '../../migrations/0034_discord_bot_foundation.sql',
   '../../migrations/0035_discord_schedule_threads.sql',
   '../../migrations/0036_authentication_session_framework.sql',
-  '../../migrations/0037_discord_trade_rooms.sql'
+  '../../migrations/0037_discord_trade_rooms.sql',
+  '../../migrations/0038_discord_trade_channel.sql'
 ];
 
 function d1(database) {
