@@ -6,6 +6,7 @@ import path from 'node:path';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
+import { selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
 import { resolveMaddenPeriod } from '../../functions/_lib/madden-period.js';
 import {
   CANDIDATE_IMPORT_PHASES,
@@ -202,6 +203,26 @@ test('non-empty All Weeks sentinel routes resolve payload Week 10 while empty pl
   assert.equal(coverage.currentWeekStatus,'covered');
   assert.equal(coverage.importMode,'forward');
   assert.deepEqual(coverage.partialPeriods,[]);
+});
+
+test('ordinary Week 10 schedule routes outrank duplicate All Weeks sentinel games regardless of arrival order', () => {
+  const sentinel={
+    externalId:'545784005',stage:'regular-season',weekIndex:10,homeScore:0,awayScore:0,status:'1',
+    sourceRoutePath:'xbsx/742482/week/reg/0/schedules'
+  };
+  const authoritative={
+    externalId:'545784005',stage:'regular-season',weekIndex:10,homeScore:24,awayScore:17,status:'completed',
+    sourceRoutePath:'xbsx/742482/week/reg/10/schedules'
+  };
+  for(const games of [[sentinel,authoritative],[authoritative,sentinel]]){
+    const warnings=[];
+    const selected=selectAuthoritativeScheduleGames(games,warnings);
+    assert.equal(selected.length,1);
+    assert.equal(selected[0].sourceRoutePath,'xbsx/742482/week/reg/10/schedules');
+    assert.equal(selected[0].homeScore,24);
+    assert.equal(selected[0].status,'completed');
+    assert.match(warnings[0],/remains authoritative|in favor of authoritative/);
+  }
 });
 
 test('malformed Week 0 snapshot rows resolve from retained payload provenance and are not carried into Week 10', () => {
@@ -548,6 +569,7 @@ test('commissioner live import activates only its validated candidate and never 
   assert.doesNotMatch(candidate,/requirePlatformOwner/);
   assert.match(candidate,/freeAgentCount:\['located','empty-confirmed'\]/);
   assert.match(candidate,/captureDigest/);
+  assert.match(candidate,/CANDIDATE_MAPPING_REVISION/);
   assert.match(candidate,/retainedPeriodBundle/);
   assert.match(candidate,/sourceCaptureIds/);
   assert.match(candidate,/payload_hash/);

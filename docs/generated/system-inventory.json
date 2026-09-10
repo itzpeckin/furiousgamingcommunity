@@ -184,7 +184,7 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 191719,
+        "bytes": 191806,
         "file": "tools/check-release.mjs"
       },
       {
@@ -224,7 +224,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 39129,
+        "bytes": 39221,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -236,12 +236,12 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 36783,
-        "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
+        "bytes": 37283,
+        "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 36145,
-        "file": "tests/import/candidate-import.test.mjs"
+        "bytes": 36783,
+        "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
         "bytes": 35946,
@@ -1538,7 +1538,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.2",
+  "release": "7.5.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
