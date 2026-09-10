@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.3",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 37,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "scheduleRouteCollision": {
+      "passed": true,
+      "normalRouteAuthority": true,
+      "sentinelFallbackRetained": true,
+      "arrivalOrderIndependent": true
+    },
+    "retainedSourceRecomposition": {
+      "passed": true,
+      "mappingRevisionAdvanced": true,
+      "newExportRequired": false
+    },
+    "productionReadOnlyDiagnosis": {
+      "passed": true,
+      "activeSnapshotId": "a07614fc-a996-467f-86c2-d87926072882",
+      "activeWeek": 17,
+      "week10Games": 14,
+      "sentinelGamesSelected": 14,
+      "completedScoresSelected": 3,
+      "ordinaryRouteDuplicatesIgnored": 14,
+      "week10TeamStatisticRows": 28,
+      "week10TeamsWithStatistics": 28,
+      "latestKnownGoodSnapshotId": "ae5cc3aa-ea39-411f-8e76-99894c355be6",
+      "latestKnownGoodCompletedWeek10Games": 14
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 208,
+      "syntaxModules": 255,
+      "trackedFiles": 599,
+      "routes": 76
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "activeSnapshotChanged": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "newExportRequested": false,
+    "discordCommandsRegistered": false,
+    "discordCredentialsChanged": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "status": "not-run"
+    },
+    "productionDeployment": {
+      "status": "not-run"
+    },
+    "retainedSourceActivation": {
+      "status": "not-run"
+    }
+  }
+}

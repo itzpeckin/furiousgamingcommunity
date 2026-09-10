@@ -22,7 +22,8 @@ import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
 import { scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 
-const RELEASE = '7.4.1';
+const RELEASE = '7.5.3';
+const CANDIDATE_MAPPING_REVISION = 'week-route-authority-v2';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -238,7 +239,7 @@ async function sourceFingerprint(db, leagueId, report, identity, destination, bu
   if (!report || !identity || !destination) return null;
   const digest = bundle?.digest || await captureDigest(db,leagueId,report.session_id);
   return sha256Hex(new TextEncoder().encode(
-    `${report.report_hash}:${digest}:${identity.preview_run_id || identity.franchise_season_id}:${destination.id}`
+    `${report.report_hash}:${digest}:${identity.preview_run_id || identity.franchise_season_id}:${destination.id}:${CANDIDATE_MAPPING_REVISION}`
   ));
 }
 
