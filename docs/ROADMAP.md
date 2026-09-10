@@ -6,13 +6,13 @@
 
 **Updated:** September 10, 2026
 
-**Revision:** 2.21
+**Revision:** 2.22
 
-**Current production:** FranchiseHQ 7.5.3 is live from Main merge `4d7400d` and Git-integrated Pages deployment `4365359f`. Migration 37 and all 27 snapshots remain intact. The active Week 17 snapshot is still `a07614fc-a996-467f-86c2-d87926072882`; its Week 10 schedule is not yet corrected because the Commissioner interface incorrectly reports the retained source as already live and suppresses the authorized recomposition.
+**Current production:** FranchiseHQ 7.5.4 is live from PR #61, Main merge `2aec1b4`, and Git-integrated Pages deployment `21c54cc3-32e4-40c0-9ce3-779ee0078394`. The owner completed and accepted the retained-source import: Week 10 is restored and its missing game results now populate. Migration 37, the malformed snapshot, all prior snapshots, and their audits remain retained; no replacement export, reset, deletion, export-URL rotation, or season transition was required.
 
-**Current work:** Owner-authorized 7.5.4 aligns candidate preview, candidate start, and latest-export status on one mapping-revision fingerprint. The prior completed run no longer blocks the corrected mapper revision; the retained 43-route source becomes eligible exactly once, then returns to idempotent **Latest Export Live** state after atomic activation.
+**Current work:** The next delivery is an owner-defined Discord Bot phase. Its exact commands and behavior will be captured before implementation. Full-season schedule loading and import-speed work are intentionally deferred to the off-season change window.
 
-**Next gate:** Pass the full 7.5.4 quality and hosted checks, merge and deploy through the Git-integrated Production path, run the now-enabled retained-source import once, and verify 14 of 14 Week 10 games use ordinary `/week/reg/10/schedules` results. Do not request another export, reset/delete or rewrite existing snapshots, rotate the export URL, archive/transition a season, or reinterpret blocked Free Agents.
+**Next gate:** Define and approve the exact 7.5.5 Discord Bot scope, exclusions, command-registration impact, and owner acceptance cases. No off-season importer or schedule/thread change begins until that later change window is explicitly opened.
 
 ## Product decisions
 
@@ -40,6 +40,7 @@
 - All 2,044 captured team-roster players have a valid team assignment and `isFreeAgent: false`; 2,031 are active and 13 are inactive. No duplicate roster identifiers or unassigned players were found.
 - Madden's explicit `xbsx/742482/freeagents/roster` response failed upstream with an empty `rosterInfoList`. This is recorded as **blocked**, not as proof of zero Free Agents. It does not block safe rostered-player preview work, but FranchiseHQ cannot claim a complete player pool until a successful or explicitly empty Free Agent response is received.
 - The owner authorized the Madden 26-to-27 Production transition. Madden 26 is no longer attached to the live application: its D1 database is retained as a detached relational archive, a private 38-table/76,712-row archive was verified, and 1,295 obsolete raw R2 objects were permanently deleted. The clean Madden 27 Production database preserves the league and account plane while clearing all eight legacy team assignments. Later owner-accepted Week 10 and Week 11 imports superseded the earlier malformed All Weeks incident; the malformed and prior snapshots remain retained for explicit recovery.
+- The 7.5.4 retained-source remediation is owner accepted. Ordinary nonzero schedule routes now win over duplicate All Weeks fallback records, the current mapping revision can be recomposed exactly once, and the importer returns to **Latest Export Live** after activation without losing retained snapshots or audits.
 
 ## Release tracker
 
@@ -95,13 +96,32 @@
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Production deployed; authenticated device acceptance passed | Central public-domain authentication/session framework, migration 36, exact-route desktop/mobile refresh, rotation, CSRF, revocation, durable throttling, and privacy-minimized security events |
 | 7.5.1 | Production through cumulative 7.5.2 release | Madden-source cap provenance, unequal two-team packages, private two-owner negotiation threads, direct decision buttons, and Bot-DM fallback |
-| 7.5.2 | Production deployed; pending owner UI acceptance | Active-snapshot Week authority over retained All Weeks sentinel provenance without a Madden import or snapshot change |
-| 7.5.3 | Production deployed; activation gate defect found | Normal schedule-route authority is live, but stale export-session status still suppresses the retained-source recomposition action |
-| 7.5.4 | Production-authorized hotfix candidate | One mapping-revision authority across import status and execution, enabling exactly one retained-source recomposition without another export |
+| 7.5.2 | Production; superseded by accepted 7.5.4 result | Active-snapshot Week authority over retained All Weeks sentinel provenance without a Madden import or snapshot change |
+| 7.5.3 | Production; completed by 7.5.4 | Normal schedule-route authority plus corrected duplicate selection; its stale export-session gate was corrected in 7.5.4 |
+| 7.5.4 | Released; owner accepted | One mapping-revision authority across import status and execution; the retained source was recomposed once and Week 10 results were restored without another export |
+| 7.5.5 | Planned next | Owner-defined Discord Bot expansion; exact commands, interactions, registration impact, and acceptance behavior will be scoped before implementation |
+| 7.5.6 | Planned for off-season | Full-season schedule horizon separated from authoritative current period, with Discord threads created only for a proven league-week advance |
+| 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
 | 8.1.0 | Planned | Multi-league administration and operations |
+
+## Roadmap through completion
+
+| Order | Window | Release | Completion outcome |
+| --- | --- | --- | --- |
+| 1 | Complete | 7.5.4 | Week 10 display, statistics, and results are restored from the retained source; the malformed and prior evidence remain recoverable. |
+| 2 | Next | 7.5.5 | Deliver the owner's next Discord Bot scope against the same FranchiseHQ data and authorization model, then complete Discord desktop/mobile acceptance. |
+| 3 | Off-season | 7.5.6 | Import the complete season schedule while the latest accepted import alone controls the current period; preloading or re-importing a week creates no future or duplicate matchup threads. |
+| 4 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
+| 5 | Pre-RC | 7.4.5–7.4.6 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
+| 6 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
+| 7 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
+| 8 | Expansion | 8.0.0 | Activate a second real league and prove tenant-isolated operation and recovery while FGC remains unchanged. |
+| 9 | Product completion | 8.1.0 | Complete multi-league administration, safe switching, lifecycle operations, quotas/billing readiness, support tooling, and custom-domain automation. |
+
+The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critical path unless the owner explicitly reopens it.
 
 ## 7.1.0 — Database Foundation
 
@@ -542,6 +562,33 @@
 - Advance browser asset keys so a deployed client cannot retain the stale week resolver in cache.
 - Gate: focused Week 10, placeholder, normal-route, discovery, candidate-import, live-data, and full strict repository validation pass. Deploy cumulatively from current Main only after migration 37 is safely applied; exact `/trade` upsert is the only Discord schema operation. No new Madden export, candidate import, snapshot activation, reset, deletion, URL rotation, archive, transition, credential, membership/assignment, or Free Agent change is part of this correction.
 
+## 7.5.5 — Next Discord Bot Phase
+
+- Treat this as the next delivery. Capture the owner's exact command, interaction, message, routing, and permission expectations before implementation; this roadmap reserves the release without inventing unrequested behavior.
+- Keep Discord as a FranchiseHQ interface over the same tenant, membership, team assignment, active snapshot, trade, competition, and audit authority used by the website. FGC-specific configuration must not become product-wide behavior.
+- Register only the exact new or changed command definitions. Preserve weekly commands and every unowned application command; do not use a bulk-delete or destructive replacement path.
+- Validate signed interactions, cross-league denial, revoked memberships, missing data, repeat actions, Discord desktop, and Discord mobile for the approved scope.
+- Gate: the owner accepts one written behavior contract and one exact candidate. Any required migration, Production command registration, data mutation, or permission expansion remains separately identified in the release authorization.
+
+## 7.5.6 — Off-Season Full-Season Schedule and Current-Period Authority
+
+- Separate the season's `schedule horizon` from its `current period`. FranchiseHQ may retain and display every known regular-season matchup without treating the highest scheduled week as the current week.
+- Derive the current period only from the latest accepted import's current-state evidence. Future schedule rows, a high schedule week, or a retained provenance route cannot advance the league shell, statistics selection, results selection, GOTW, or Confidence Pool current-week context.
+- Accept a multi-period schedule payload when Madden supplies one through non-empty `/week/reg/0/`: use each record's payload period, keep ordinary nonzero routes authoritative when both exist, and continue ignoring an empty Week 0 placeholder. Future schedule coverage must not require future player-statistic payloads.
+- Preserve future matchup rows across later weekly imports, with stable season/week/matchup identity so Confidence Pool selections are not orphaned if a Madden game identifier changes.
+- Gate Discord thread creation on a proven forward current-period transition. A full-season preload and a same-week re-import create no future or duplicate threads; Week N to Week N+1 creates only Week N+1 threads. An initial import with no prior current period, a backward move, an ambiguous period, or a skipped-period anomaly creates none and surfaces a review state. A recorded preseason-to-Week-1 transition counts as a real advance.
+- Publish an annual commissioner runbook covering season preparation, initial full-schedule import, weekly import, current-week proof, Confidence Pool availability, and recovery. It must not require new Codex tasks or manual engineering intervention.
+- Gate: a representative Weeks 1–18 fixture imports with current Week 1, every schedule week is visible to the schedule and Confidence Pool, current week remains Week 1, and no future thread exists. A same-week retry changes neither current week nor thread inventory; a Week 2 import advances only to Week 2 and creates only Week 2 threads. Historical results, future games, picks, snapshots, audits, route authority, atomic activation, and blocked/null Free Agent state remain intact.
+
+## 7.5.7 — Off-Season Import Performance and Thread Readiness
+
+- Instrument the complete commissioner path before optimizing it: source eligibility, fetch/read, parse/map, database build, validation, atomic activation, browser refresh, and post-activation Discord synchronization each receive a separate duration and outcome.
+- Establish repeatable Production-sized baselines for both the retained 43-route export and a representative full-season schedule import, then record an explicit owner-approved performance target before implementation is accepted.
+- Remove avoidable repeated work, bound concurrency and database batches safely, and reuse unchanged verified inputs where exact hashes and mapping revisions prove equivalence. Never trade speed for incomplete validation or stale mapping behavior.
+- Keep import activation and Discord synchronization independently observable. A successful import should become live as soon as its atomic activation completes; thread creation follows the 7.5.6 period-advance gate and reports its own success, retry, or review status instead of hiding delay inside a generic import state.
+- Preserve exact-source idempotency, tenant isolation, recovery bookmarks, append-only snapshots/audits, previous and malformed evidence, schedule/history continuity, and unknown/null treatment for blocked Free Agents.
+- Gate: repeated benchmark runs meet the agreed target and produce the same validated snapshot content as the correctness baseline. Acceptance records both click-to-live time and live-to-thread-ready time, proves same-week imports create no Discord work, proves a true one-week advance creates only the new week's threads, and verifies safe recovery from a failed build or failed Discord synchronization without partial activation or data loss.
+
 ## 7.6.0-rc.1 — Private FGC Release Candidate
 
 - Freeze scope except release blockers and test a representative private cohort of commissioners, committee members, and owners.
@@ -673,3 +720,4 @@
 - **Revision 2.19:** Published exact 7.5.2 candidate `2ed0cc5` through PR #58 with 4/4 hosted checks, merged it to Main as `ad81339`, and completed accepted Git-integrated Pages deployment `b34fa8b8`. Production already contained the Mac-applied continuous migration 37 and three retained trade-room rows, so the release verified them without a database write. One exact `/trade` definition was upserted with zero retired names, and the temporary registration build command was restored to `exit 0`. Read-only D1 acceptance confirms zero foreign-key violations, 26 retained snapshots, unchanged active Week 17 snapshot `ac7d4912-e298-418f-b43e-d07fc1c409fb`, and both historical Week 10 snapshots plus their validation/activation audits. Corrected Week 10 snapshot `180ef684-479e-44cc-b336-7ae6e825f070` retains 198 games and 7,736 statistics, including 14 Week 10 games and 361 Week 10 statistics. No export, import, release-driven activation, reset, deletion, archive, transition, URL rotation, credential/membership/assignment change, or Free Agent reinterpretation ran. Owner UI acceptance is next.
 - **Revision 2.20:** Diagnosed the owner-reported post-7.5.2 import without writing Production. Active Week 17 snapshot `a07614fc-a996-467f-86c2-d87926072882` retained 14 Week 10 games from `/week/reg/0/schedules`, but only 3 carried final scores; ordinary Week 10 statistic routes contain all 28 team rows and full player-stat coverage. The schedule mapping audit recorded the same 14 game IDs as ignored duplicates, proving lexicographic first-wins selection discarded the ordinary `/week/reg/10/schedules` records. Authorized 7.5.3 now ranks exact nonzero routes above sentinel fallback data and advances the mapping revision so the same retained source can be safely recomposed once without another export. No Production write, reset, deletion, URL rotation, archive/transition, credential change, or Free Agent reinterpretation occurred during diagnosis.
 - **Revision 2.21:** Published 7.5.3 through PR #60, merged it to Main as `4d7400d`, passed both Main workflows, and deployed Production as Pages deployment `4365359f`. Owner acceptance then exposed a second gate: the latest-export panel still inferred “live” from any completed candidate tied to the retained discovery session, while the candidate start path omitted the new mapping revision. Authorized 7.5.4 centralizes that revision in the shared candidate contract, includes it in both fingerprint paths and durable source counts, and filters the live-status lookup to the current revision. This makes the retained source eligible exactly once without another export and restores idempotent **Latest Export Live** after activation. Production data remains unchanged at 27 retained snapshots pending the corrected import; no reset, deletion, URL rotation, archive/transition, credential change, membership change, or Free Agent reinterpretation occurred.
+- **Revision 2.22:** Recorded completed 7.5.4 publication through PR #61, Main `2aec1b4`, and Pages deployment `21c54cc3-32e4-40c0-9ce3-779ee0078394`, plus the owner's acceptance that the retained-source import restored Week 10 results without another export. Added three explicit roadmap tracks: owner-scoped Discord Bot work next in 7.5.5; off-season full-season schedule/current-period/thread authority in 7.5.6; and off-season import and thread-readiness performance in 7.5.7. The roadmap now carries these through canonical consistency/recovery, private FGC acceptance, formal FGC completion, and multi-league operations. No application code, Production data, import, snapshot, reset, deletion, archive/transition, export URL, Discord registration, credential, membership/assignment, or Free Agent state changed in this documentation-only revision.
