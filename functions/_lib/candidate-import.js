@@ -12,6 +12,12 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
+export const CANDIDATE_MAPPING_REVISION = 'week-route-authority-v2';
+
+export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId) {
+  return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`;
+}
+
 export const parseCandidateJson = (value, fallback) => {
   try { return value ? JSON.parse(value) : fallback; }
   catch { return fallback; }

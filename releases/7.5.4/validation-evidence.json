@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.4",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 37,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "mappingRevisionAuthority": {
+      "passed": true,
+      "sharedRevision": "week-route-authority-v2",
+      "previewAndStartFingerprintAligned": true,
+      "durablyRecorded": true
+    },
+    "retainedSourceEligibility": {
+      "passed": true,
+      "priorRevisionLiveRunIgnored": true,
+      "currentRevisionEligibleOnce": true,
+      "repeatStartIdempotent": true,
+      "newExportRequired": false
+    },
+    "productionProtectedState": {
+      "passed": true,
+      "activeSnapshotId": "a07614fc-a996-467f-86c2-d87926072882",
+      "activeWeek": 17,
+      "retainedSnapshots": 27,
+      "foreignKeyViolations": 0
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 209,
+      "syntaxModules": 255,
+      "trackedFiles": 599,
+      "routes": 76
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "activeSnapshotChanged": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "newExportRequested": false,
+    "discordCommandsRegistered": false,
+    "discordCredentialsChanged": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "status": "not-run"
+    },
+    "productionDeployment": {
+      "status": "not-run"
+    },
+    "retainedSourceActivation": {
+      "status": "not-run"
+    }
+  }
+}

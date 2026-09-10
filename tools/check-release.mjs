@@ -36,6 +36,8 @@ const isAuthorizedProductionDataChange = (
   version === '7.4.0.8' && evidence.checks?.fgcDraftPickActivationPlan?.productionOperationApplied === true
 ) || (
   version === '7.5.3' && evidence.scopeBoundaries?.activationPerformed === true
+) || (
+  version === '7.5.4' && evidence.scopeBoundaries?.activationPerformed === true
 );
 const isAuthorizedCredentialChange = (
   version === '7.4.4.3' && evidence.scopeBoundaries?.discordCredentialsChanged === true

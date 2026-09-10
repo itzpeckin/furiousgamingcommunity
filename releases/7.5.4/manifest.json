@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.4",
+  "releaseType": "retained-source-remap-gate-hotfix",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.3",
+    "commit": "4d7400d2098c2e9fca84dae59659df22ef0f8dd6",
+    "tree": "436a9bd5a6ee12e04969dc001f39b7f703a47023",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.4-retained-remap",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "not-run"
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.5.3",
+    "currentCommit": "4d7400d2098c2e9fca84dae59659df22ef0f8dd6",
+    "currentPagesDeployment": "4365359f-f8f0-4780-a07d-ac719dee2f43",
+    "currentMigration": 37,
+    "candidateMigration": 37,
+    "scope": "Enable exactly one current-revision recomposition of the retained 43-route source, then atomically activate the corrected Week 10 snapshot without another Madden export."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/export-url.js",
+    "tests/import/candidate-import.test.mjs",
+    "tests/import/permanent-league-export.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.5.4/release-record.md",
+    "releases/7.5.4/validation-evidence.json"
+  ]
+}

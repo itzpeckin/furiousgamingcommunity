@@ -251,6 +251,8 @@ test('runtime wiring preserves immutable sources, atomic cohorts, snapshot isola
   assert.match(management,/expectedCaptureCount !== 43/);
   assert.match(management,/maddenDiscoveryReportUsesCurrentPolicy/);
   assert.match(management,/stalePolicyReport/);
+  assert.match(management,/CANDIDATE_MAPPING_REVISION/);
+  assert.match(management,/json_extract\(source_counts_json,'\$\.mappingRevision'\)=\?/);
   assert.doesNotMatch(management,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
   assert.match(candidate,/latest_ready_report_id/);
   assert.match(candidate,/INSERT INTO league_active_snapshots/);

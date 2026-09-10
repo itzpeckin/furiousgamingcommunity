@@ -9,10 +9,12 @@ import {
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import {
   CANDIDATE_IMPORT_PHASES,
+  CANDIDATE_MAPPING_REVISION,
   candidateComparePeriods,
   candidateCoverageWarnings,
   candidateCompleteness,
   candidateRetryGuidance,
+  candidateSourceFingerprintMaterial,
   candidateSourceCoverage,
   nextCandidatePhase,
   parseCandidateJson,
@@ -22,8 +24,7 @@ import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
 import { scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 
-const RELEASE = '7.5.3';
-const CANDIDATE_MAPPING_REVISION = 'week-route-authority-v2';
+const RELEASE = '7.5.4';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -239,7 +240,9 @@ async function sourceFingerprint(db, leagueId, report, identity, destination, bu
   if (!report || !identity || !destination) return null;
   const digest = bundle?.digest || await captureDigest(db,leagueId,report.session_id);
   return sha256Hex(new TextEncoder().encode(
-    `${report.report_hash}:${digest}:${identity.preview_run_id || identity.franchise_season_id}:${destination.id}:${CANDIDATE_MAPPING_REVISION}`
+    candidateSourceFingerprintMaterial(
+      report.report_hash,digest,identity.preview_run_id || identity.franchise_season_id,destination.id
+    )
   ));
 }
 
@@ -364,7 +367,9 @@ async function startRun(current, destination, report, identity, retry) {
   const bundle=await retainedPeriodBundle(current.db,current.league.id,report,identity,active);
   const digest = bundle.digest || await captureDigest(current.db,current.league.id,report.session_id);
   const fingerprint = await sha256Hex(new TextEncoder().encode(
-    `${report.report_hash}:${digest}:${identity.preview_run_id || identity.franchise_season_id}:${destination.id}`
+    candidateSourceFingerprintMaterial(
+      report.report_hash,digest,identity.preview_run_id || identity.franchise_season_id,destination.id
+    )
   ));
   let run = await current.db.prepare(`SELECT * FROM companion_candidate_import_runs
     WHERE league_id=? AND destination_id=? AND source_fingerprint=? LIMIT 1`)
@@ -394,7 +399,8 @@ async function startRun(current, destination, report, identity, retry) {
     },409) };
   }
   const coverageWarnings = candidateCoverageWarnings(coverage);
-  const counts = { ...sourceCounts(report,identity), sourceWeek:coverage.currentWeek,
+  const counts = { ...sourceCounts(report,identity), mappingRevision:CANDIDATE_MAPPING_REVISION,
+    sourceWeek:coverage.currentWeek,
     sourceCoverage:coverage,importMode:coverage.importMode,sourcePeriods:bundle.sourcePeriods,
     sourceCaptureIds:bundle.sourceCaptureIds,sourceNotBefore:bundle.notBefore,
     retainedRouteCount:bundle.routeCount,retainedCaptureCount:bundle.captureCount,retainedBytes:bundle.bytes };
