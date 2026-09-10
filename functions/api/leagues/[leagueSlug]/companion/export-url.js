@@ -11,7 +11,10 @@ import {
   leagueExportUrl,
   permanentExportPublicState
 } from '../../../../_lib/permanent-league-export.js';
-import { candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
+import {
+  CANDIDATE_MAPPING_REVISION,
+  candidateSourceCoverage
+} from '../../../../_lib/candidate-import.js';
 import {
   generateMaddenDiscoveryReport,
   maddenDiscoveryReportUsesCurrentPolicy,
@@ -21,7 +24,7 @@ import {
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.4.4.12';
+const RELEASE = '7.5.4';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();
@@ -64,7 +67,9 @@ async function candidateFor(db, leagueId, discoverySessionId) {
   return db.prepare(`SELECT id,status,candidate_snapshot_id,active_snapshot_id_before,
       active_snapshot_id_after,duration_ms,completed_at
     FROM companion_candidate_import_runs WHERE league_id=? AND discovery_session_id=?
-    ORDER BY created_at DESC,rowid DESC LIMIT 1`).bind(leagueId,discoverySessionId).first();
+      AND json_extract(source_counts_json,'$.mappingRevision')=?
+    ORDER BY created_at DESC,rowid DESC LIMIT 1`)
+    .bind(leagueId,discoverySessionId,CANDIDATE_MAPPING_REVISION).first();
 }
 
 async function maybeAnalyzeIdleExport(current, endpoint) {

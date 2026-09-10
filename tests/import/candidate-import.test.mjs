@@ -10,6 +10,7 @@ import { selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[l
 import { resolveMaddenPeriod } from '../../functions/_lib/madden-period.js';
 import {
   CANDIDATE_IMPORT_PHASES,
+  CANDIDATE_MAPPING_REVISION,
   candidateCoverageWarnings,
   candidateCompleteness,
   candidateHistoricalBackfill,
@@ -19,6 +20,7 @@ import {
   candidateNormalizePeriod,
   candidateProgress,
   candidateRetryGuidance,
+  candidateSourceFingerprintMaterial,
   candidateSourceCoverage,
   nextCandidatePhase
 } from '../../functions/_lib/candidate-import.js';
@@ -203,6 +205,14 @@ test('non-empty All Weeks sentinel routes resolve payload Week 10 while empty pl
   assert.equal(coverage.currentWeekStatus,'covered');
   assert.equal(coverage.importMode,'forward');
   assert.deepEqual(coverage.partialPeriods,[]);
+});
+
+test('candidate fingerprints share one mapping revision across preview and start paths', () => {
+  assert.equal(CANDIDATE_MAPPING_REVISION,'week-route-authority-v2');
+  assert.equal(
+    candidateSourceFingerprintMaterial('report','capture','identity','destination'),
+    'report:capture:identity:destination:week-route-authority-v2'
+  );
 });
 
 test('ordinary Week 10 schedule routes outrank duplicate All Weeks sentinel games regardless of arrival order', () => {
@@ -424,12 +434,21 @@ test('commissioner start accepts a fully covered older week only as an exact sam
     let payload=await response.json();
     assert.equal(payload.source.coverage.importMode,'historical-backfill');
     assert.equal(payload.run.sourceCounts.importMode,'historical-backfill');
+    assert.equal(payload.run.sourceCounts.mappingRevision,CANDIDATE_MAPPING_REVISION);
     assert.deepEqual(payload.run.sourceCounts.sourcePeriods.map(period=>period.key),[
       'preseason:1','regular-season:8'
     ]);
     assert.equal(payload.run.sourceCounts.sourceCaptureIds.includes('pre-4-schedule'),false);
     assert.equal(payload.run.sourceCounts.sourceCaptureIds.includes('pre-4-passing'),false);
     assert.equal(payload.run.activeSnapshotIdBefore,'snapshot-live-week-9');
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM companion_candidate_import_runs
+      WHERE id<>'candidate-live-week-9'`).get().count,1);
+    const revisionRunId=payload.run.id;
+    response=await invoke();
+    assert.equal(response.status,200);
+    payload=await response.json();
+    assert.equal(payload.run.id,revisionRunId);
+    assert.equal(payload.reused,true);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM companion_candidate_import_runs
       WHERE id<>'candidate-live-week-9'`).get().count,1);
 

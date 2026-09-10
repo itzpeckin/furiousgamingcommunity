@@ -605,6 +605,6 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.doesNotMatch(ui,/data-game-year-season-confirmation/);
   assert.match(ui,/renderArchivePanel/);
   assert.match(ui,/data-game-year-archive-panel/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.5\.3/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.5\.4/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });
