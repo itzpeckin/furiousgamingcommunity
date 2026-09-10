@@ -28,7 +28,7 @@ import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-
 import { createTenantAuditContext, tenantAuditStatement } from './tenant-context.js';
 import { competitionState, executeCompetitionAction } from '../api/leagues/[leagueSlug]/competition.js';
 import { executeTradeCenterAction } from '../api/leagues/[leagueSlug]/trade-center.js';
-import { ensureDiscordTradeRoom, queueCommitteeReviewDelivery, tradeConversationMessage } from './discord-delivery.js';
+import { ensureDiscordTradeRoom, queueCommitteeReviewDelivery, queueTradeRoomUpdate, tradeConversationMessage } from './discord-delivery.js';
 import { syncDiscordScheduleThreads } from './discord-schedule.js';
 
 const TWITCH_HANDLE=/^[A-Za-z0-9_]{3,25}$/;
@@ -182,17 +182,38 @@ async function respondToTrade(c,subcommand,values){
     const trade=result.workflows?.find(item=>item.id===tradeId);
     if(trade?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId});
   }
+  await queueTradeRoomUpdate(c.db,{league:c.league,tradeId,eventKey:`command:${c.interaction.id}`,
+    title:subcommand==='accept'?'Owner accepted trade':'Owner rejected trade',
+    message:`${c.user.displayName} ${subcommand==='accept'?'accepted':'rejected'} the current trade revision.`});
   return `Trade **${tradeId}** was ${subcommand==='accept'?'accepted':'rejected'} successfully.`;
 }
 
-export async function executeDiscordTradeComponent(c,{action,tradeId,revision}){
+export async function executeDiscordTradeComponent(c,{action,tradeId,revision,reason=''}){
   c.teams=c.teams||await activeLeagueTeams(c.db,c.league.id);
   const current=await c.db.prepare(`SELECT revision,mutation_token AS mutationToken,status,
       proposer_team_key AS proposerTeamKey FROM trade_workflows WHERE id=? AND league_id=? LIMIT 1`)
     .bind(clean(tradeId,120),c.league.id).first();
   if(!current)throw Object.assign(new Error('This trade is no longer available.'),{status:404,code:'trade-unavailable'});
-  if(current.status!=='negotiating')throw Object.assign(new Error('This trade is no longer open for an owner decision.'),{status:409,code:'trade-closed'});
   if(Number(current.revision)!==Number(revision))throw Object.assign(new Error('This offer was revised. Open the newest trade message before responding.'),{status:409,code:'trade-revision-changed'});
+  const reviewAction=String(action||'').startsWith('review-');
+  if(reviewAction&&current.status!=='committee')throw Object.assign(new Error('This trade is no longer awaiting committee review.'),{status:409,code:'trade-review-closed'});
+  if(!reviewAction&&current.status!=='negotiating')throw Object.assign(new Error('This trade is no longer open for an owner decision.'),{status:409,code:'trade-closed'});
+  if(reviewAction){
+    const decision=action==='review-approve'?'approve':'reject';
+    const result=await executeTradeCenterAction({...c,request:requestForAudit(c.interaction)},{
+      action:'review',tradeId,revision:Number(current.revision),mutationToken:current.mutationToken,decision,reason:clean(reason,2000)
+    });
+    const updated=result.workflows?.find(item=>item.id===tradeId)
+      ||await c.db.prepare(`SELECT status,revision FROM trade_workflows WHERE id=? AND league_id=?`).bind(tradeId,c.league.id).first();
+    await queueTradeRoomUpdate(c.db,{league:c.league,tradeId,eventKey:`review:${c.interaction.id}`,
+      title:updated?.status==='rejected'?'Trade changes requested':updated?.status==='approved'?'Trade approved':'Committee vote recorded',
+      message:`${c.user.displayName} voted to ${decision==='approve'?'approve':'deny'} revision ${revision}${reason?`: ${clean(reason,2000)}`:'.'}`});
+    return tradeConversationMessage(c.db,{
+      leagueId:c.league.id,eventType:'review-required',resourceId:tradeId,
+      payloadJson:JSON.stringify({title:updated?.status==='committee'?'Committee vote recorded':updated?.status==='approved'?'Trade approved':'Changes requested',
+        message:'The committee tally and private trade thread were updated.',tradeId,leagueSlug:c.league.slug})
+    },{disabled:updated?.status!=='committee',statusMessage:`${c.user.displayName} voted to ${decision==='approve'?'approve':'deny'}${reason?` — ${clean(reason,2000)}`:''}.`});
+  }
   const own=resolveTeam(c.teams,c.membership?.teamKey||c.membership?.teamId);
   const ownTeam=own?.teamKey||clean(c.membership?.teamKey||c.membership?.teamId,120).toLowerCase();
   const participant=await c.db.prepare(`SELECT accepted_revision AS acceptedRevision FROM trade_workflow_participants
@@ -210,18 +231,11 @@ export async function executeDiscordTradeComponent(c,{action,tradeId,revision}){
   const updated=result.workflows?.find(item=>item.id===tradeId)
     ||await c.db.prepare(`SELECT status,revision FROM trade_workflows WHERE id=? AND league_id=?`).bind(tradeId,c.league.id).first();
   if(action==='accept'&&updated?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId});
-  const roomStatus=updated?.status==='committee'?'committee':updated?.status==='rejected'?'rejected':'active';
   const room=await c.db.prepare(`SELECT id,discord_thread_id AS threadId FROM discord_trade_rooms
     WHERE league_id=? AND trade_id=? LIMIT 1`).bind(c.league.id,tradeId).first();
-  if(room?.id){
-    await c.db.batch([
-      c.db.prepare(`UPDATE discord_trade_rooms SET revision=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-        .bind(Number(updated?.revision||revision),roomStatus,room.id),
-      c.db.prepare(`UPDATE discord_delivery_events SET status='suppressed',last_error='Delivered in private trade thread',updated_at=CURRENT_TIMESTAMP
-        WHERE league_id=? AND resource_id=? AND visibility='direct-message' AND status IN ('pending','failed')`)
-        .bind(c.league.id,tradeId)
-    ]);
-  }
+  if(room?.id)await queueTradeRoomUpdate(c.db,{league:c.league,tradeId,eventKey:`owner:${c.interaction.id}`,
+    title:updated?.status==='committee'?'Trade accepted by all teams':action==='accept'?'Owner accepted trade':'Trade rejected',
+    message:`${own?.displayName||ownTeam.toUpperCase()} ${action==='accept'?'accepted':'rejected'} revision ${revision}.`});
   const statusMessage=updated?.status==='committee'
     ?`Accepted by ${own?.displayName||ownTeam.toUpperCase()}. The offer is now awaiting Trade Committee review.`
     :`Rejected by ${own?.displayName||ownTeam.toUpperCase()}. Both owners can see this final decision.`;
@@ -229,7 +243,7 @@ export async function executeDiscordTradeComponent(c,{action,tradeId,revision}){
     leagueId:c.league.id,eventType:'received',resourceId:tradeId,
     payloadJson:JSON.stringify({title:updated?.status==='committee'?'Trade accepted':'Trade rejected',
       message:'The FranchiseHQ trade workflow was updated atomically.',tradeId,leagueSlug:c.league.slug})
-  },{disabled:true,statusMessage});
+  },{disabled:updated?.status!=='negotiating',statusMessage});
 }
 
 async function reviewTrade(c,values){
@@ -286,11 +300,15 @@ export async function executeDiscordCommand(c){
     await joinDiscordLeague(c,requestForAudit(c.interaction));
     return `Welcome to **${c.league.name}**. Your FranchiseHQ access is active but unassigned. A commissioner must assign a team before team and trade actions are available.\n[Open ${c.league.name} in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)})`;
   }
-  if(command==='standings')return standingsCommand(c,values);
+  if(command==='standings')return standingsCommand(c,{...values,view:values.show});
   if(command==='playoffs')return playoffsCommand(c,values);
   if(command==='eliminated')return eliminatedCommand(c,values);
-  if(command==='schedule')return scheduleCommand(c,values);
-  if(command==='games')return gamesCommand(c,values);
+  if(command==='schedule'){
+    if(subcommand==='current')return scheduleCommand(c,values);
+    if(subcommand==='week')return scheduleCommand(c,{...values,view:`week:${Number(values.number)}`});
+    if(subcommand==='team')return scheduleCommand(c,{...values,view:`team:${values.name}`});
+  }
+  if(command==='games'&&['all','played','unplayed'].includes(subcommand))return gamesCommand(c,{...values,status:subcommand});
   if(command==='stats')return statsCommand(c,values);
   if(command==='player-stats')return playerStatsCommand(c,values);
   if(command==='team-stats')return teamStatsCommand(c,values);
@@ -302,7 +320,7 @@ export async function executeDiscordCommand(c){
   if(command==='news')return newsCommand(c);
   if(command==='gotw')return gotwCommand(c,values);
   if(command==='league-site')return `**[Open ${c.league.name} in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)})**`;
-  if(command==='gm-history')return gmHistoryCommand(c,values);
+  if(command==='gm-history')return gmHistoryCommand(c,{...values,name:values.show});
   if(command==='rules')return rulesCommand(c,values);
   if(command==='twitch'){
     if(subcommand==='view')return twitchViewCommand(c,values,c.interaction);

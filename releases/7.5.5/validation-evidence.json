@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 38,
+      "candidateRequiresMigration": true,
+      "productionApplied": false
+    },
+    "discordCommandContract": {
+      "passed": true,
+      "changedNames": ["schedule", "standings", "games", "gm-history"],
+      "bulkReplacementAllowed": false,
+      "weeklyCommandsPreserved": true
+    },
+    "boundedPlayerAutocomplete": {
+      "passed": true,
+      "activeSnapshotQueries": 1,
+      "resultLimit": 25,
+      "fullRosterPaging": false
+    },
+    "tradeThreadWorkflow": {
+      "passed": true,
+      "dedicatedParentChannel": true,
+      "websiteUpdatesSharedThread": true,
+      "ownerButtons": ["accept", "reject", "counter"],
+      "committeeButtons": ["approve", "deny"],
+      "optionalDenyReason": true,
+      "configuredThresholdPreserved": true,
+      "sameTradeIdOnRevision": true,
+      "sameDiscordThreadOnRevision": true,
+      "priorRevisionReviewsRetained": true,
+      "currentRevisionReviewsReset": true
+    },
+    "leagueHomeRushingLeaders": {
+      "passed": true,
+      "positions": ["RB", "HB", "FB", "QB"]
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 221,
+      "strictGateTests": 211,
+      "syntaxModules": 255,
+      "trackedFiles": 600,
+      "routes": 76
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "importExecuted": false,
+    "activationPerformed": false,
+    "activeSnapshotChanged": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "newExportRequested": false,
+    "discordCredentialsChanged": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {"status": "authorized-pending"},
+    "hostedChecks": {"status": "not-run"},
+    "migration38": {"status": "authorized-pending"},
+    "discordCommandRegistration": {"status": "authorized-pending"},
+    "productionDeployment": {"status": "authorized-pending"}
+  }
+}

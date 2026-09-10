@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.5.4';
+export const DISCORD_COMMAND_RELEASE = '7.5.5';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -42,7 +42,7 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   {
     name:'standings',description:'View league, conference, division, or team standings.',
     options:[
-      autocompleteString('view','League, Conference, Division, NFC East, or a team.'),
+      autocompleteString('show','League, Conference, Division, NFC East, or a team.'),
       privateOption
     ]
   },
@@ -60,17 +60,23 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   {
     name:'schedule',description:'View the schedule for a week or team.',
     options:[
-      autocompleteString('view','Team or week, such as Buccaneers or Week 12.'),
-      privateOption
+      {type:OPTION.SUB_COMMAND,name:'current',description:'View the current imported week schedule.',options:[privateOption]},
+      {type:OPTION.SUB_COMMAND,name:'week',description:'View one week of the schedule.',options:[
+        {type:OPTION.INTEGER,name:'number',description:'Regular-season week number.',required:true,min_value:1,max_value:18},
+        privateOption
+      ]},
+      {type:OPTION.SUB_COMMAND,name:'team',description:'View one team’s full schedule.',options:[
+        autocompleteString('name','Team name or abbreviation.',{required:true}),
+        privateOption
+      ]}
     ]
   },
   {
     name:'games',description:'View played and unplayed games in the current scheduled week.',
     options:[
-      {type:OPTION.STRING,name:'status',description:'Show both groups or only one game status.',choices:[
-        choice('Played and unplayed','all'),choice('Played','played'),choice('Unplayed','unplayed')
-      ]},
-      privateOption
+      {type:OPTION.SUB_COMMAND,name:'unplayed',description:'View unplayed games in the current week.',options:[privateOption]},
+      {type:OPTION.SUB_COMMAND,name:'played',description:'View completed games in the current week.',options:[privateOption]},
+      {type:OPTION.SUB_COMMAND,name:'all',description:'View played and unplayed games in the current week.',options:[privateOption]}
     ]
   },
   {
@@ -151,7 +157,7 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   {
     name:'gm-history',description:'View historical GM or owner standings.',
     options:[
-      autocompleteString('name','Optional owner, team, or Discord name.'),
+      autocompleteString('show','Optional owner, team, or Discord name. Leave blank to show every GM.'),
       privateOption
     ]
   },

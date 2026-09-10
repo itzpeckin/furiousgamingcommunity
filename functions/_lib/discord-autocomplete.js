@@ -1,6 +1,6 @@
 import { discordCommandName, discordFocusedOption } from './discord-commands.js';
 import { activeLeagueTeams, activeTeamAssignments, canonicalTeamKey, resolveTeam } from './league-teams.js';
-import { discordLeagueReadModel } from './discord-read-model.js';
+import { normalizePlayer } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
 
 const clean=value=>String(value??'').trim();
 const lower=value=>clean(value).toLowerCase();
@@ -67,21 +67,54 @@ async function selectedOpponentTeamKey(c,value){
   return resolveTeam(teams,selected)?.teamKey||null;
 }
 
-async function playerChoices(c,query,{teamKey=null}={}){
-  const model=await discordLeagueReadModel(c,{domains:['teams','players']});
-  return uniqueChoices(model.players.filter(player=>{
-    const team=resolveTeam(model.teams,player.teamId);
-    return (!teamKey||team?.teamKey===canonicalTeamKey(teamKey))&&matches(`${player.displayName} ${player.position} ${team?.displayName||''} ${team?.abbreviation||''}`,query);
-  }).sort((a,b)=>lower(a.displayName).localeCompare(lower(b.displayName))).map(player=>{
-    const team=resolveTeam(model.teams,player.teamId);
-    return choice(`${player.displayName} · ${player.position||'—'} · ${team?.abbreviation||'FA'}`,player.publicId||player.id);
+async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOverall=false}={}){
+  const teams=await teamsFor(c),team=teamKey?resolveTeam(teams,teamKey):null;
+  if(teamKey&&!team)return[];
+  const allowed=[...new Set((allowedPublicIds||[]).map(clean).filter(Boolean))].slice(0,100);
+  if(allowedPublicIds&&!allowed.length)return[];
+  const allowedSql=allowed.length?`AND COALESCE(identity.public_id,candidate.externalId) IN (${allowed.map(()=>'?').join(',')})`:'';
+  const sql=`WITH candidate AS (
+      SELECT record.external_id AS externalId,record.data_json AS dataJson,
+        COALESCE(json_extract(record.data_json,'$.display_name'),json_extract(record.data_json,'$.displayName'),
+          trim(COALESCE(json_extract(record.data_json,'$.first_name'),json_extract(record.data_json,'$.firstName'),'') || ' ' ||
+            COALESCE(json_extract(record.data_json,'$.last_name'),json_extract(record.data_json,'$.lastName'),'')),record.external_id) AS displayName,
+        COALESCE(json_extract(record.data_json,'$.team_external_id'),json_extract(record.data_json,'$.team_id'),
+          json_extract(record.data_json,'$.teamId'),json_extract(record.data_json,'$.teamID'),
+          json_extract(record.data_json,'$.rosterTeamId'),json_extract(record.data_json,'$.roster_team_id'),
+          json_extract(record.data_json,'$.currentTeamId'),'') AS teamExternalId
+      FROM league_active_snapshots active
+      JOIN league_snapshot_records record ON record.league_id=active.league_id AND record.snapshot_id=active.snapshot_id
+      WHERE active.league_id=? AND record.domain='players'
+    )
+    SELECT candidate.externalId,candidate.dataJson,MAX(identity.public_id) AS publicId,
+      candidate.displayName,candidate.teamExternalId
+    FROM candidate
+    LEFT JOIN player_source_aliases alias ON alias.league_id=? AND alias.source_player_id=candidate.externalId
+    LEFT JOIN player_identities identity ON identity.league_id=? AND identity.id=alias.player_identity_id
+    WHERE (?='' OR instr(lower(candidate.displayName),?)>0 OR instr(lower(candidate.externalId),?)>0
+      OR instr(lower(COALESCE(identity.public_id,'')),?)>0)
+      AND (? IS NULL OR candidate.teamExternalId=?)
+      ${allowedSql}
+    GROUP BY candidate.externalId,candidate.dataJson,candidate.displayName,candidate.teamExternalId
+    ORDER BY CASE
+      WHEN lower(candidate.displayName)=? OR lower(candidate.externalId)=? OR lower(COALESCE(MAX(identity.public_id),''))=? THEN 0
+      WHEN substr(lower(candidate.displayName),1,length(?))=? THEN 1 ELSE 2 END,
+      lower(candidate.displayName),candidate.externalId
+    LIMIT 25`;
+  const args=[c.league.id,c.league.id,c.league.id,query,query,query,query,team?.externalId||null,team?.externalId||null,
+    ...allowed,query,query,query,query,query];
+  const rows=(await c.db.prepare(sql).bind(...args).all()).results||[];
+  return uniqueChoices(rows.map(row=>normalizePlayer(JSON.parse(row.dataJson||'{}'),row.publicId)).map(player=>{
+    const playerTeam=resolveTeam(teams,player.teamId);
+    return choice(showOverall
+      ?`${player.displayName} · ${player.position||'—'} · ${player.overall??'—'} OVR`
+      :`${player.displayName} · ${player.position||'—'} · ${playerTeam?.abbreviation||'FA'}`,player.publicId||player.id);
   }));
 }
 
 async function tradeBlockPlayerChoices(c,query,{listedOnly=false}={}){
   const teams=await teamsFor(c),own=resolveTeam(teams,c.membership?.teamId)?.teamKey;
   if(!own)return[];
-  const model=await discordLeagueReadModel(c,{domains:['teams','players']});
   let allowed=null;
   if(listedOnly){
     const result=(await c.db.prepare(`SELECT identity.public_id AS publicId
@@ -91,13 +124,7 @@ async function tradeBlockPlayerChoices(c,query,{listedOnly=false}={}){
       ORDER BY lower(identity.display_name)`).bind(c.league.id,own).all()).results||[];
     allowed=new Set(result.map(item=>String(item.publicId||'')));
   }
-  return uniqueChoices(model.players.filter(player=>{
-    const team=resolveTeam(model.teams,player.teamId);
-    return team?.teamKey===own&&(!allowed||allowed.has(String(player.publicId||'')))
-      &&matches(`${player.displayName} ${player.position}`,query);
-  }).sort((a,b)=>lower(a.displayName).localeCompare(lower(b.displayName))).map(player=>
-    choice(`${player.displayName} · ${player.position||'—'} · ${player.overall??'—'} OVR`,player.publicId||player.id)
-  ));
+  return playerChoices(c,query,{teamKey:own,allowedPublicIds:allowed?[...allowed]:null,showOverall:true});
 }
 
 async function assetChoices(c,query,{teamKey}={}){
@@ -134,14 +161,6 @@ async function playoffChoices(c,query){
     choice('All conferences · top 10 each','all'),
     ...conferences.map(name=>choice(`${name} · top 10`,name))
   ].filter(item=>matches(`${item.name} ${item.value}`,query)));
-}
-
-async function scheduleChoices(c,query){
-  const model=await discordLeagueReadModel(c,{domains:['teams','games']});
-  const weeks=[...new Set(model.games.map(game=>Number(game.week)).filter(Number.isInteger))].sort((a,b)=>a-b);
-  const candidates=[choice('Full season','season'),...weeks.map(week=>choice(`Week ${week}`,`week:${week}`)),
-    ...model.teams.map(team=>choice(`${team.displayName}${team.abbreviation?` (${team.abbreviation})`:''}`,`team:${team.teamKey}`))];
-  return uniqueChoices(candidates.filter(item=>matches(`${item.name} ${item.value}`,query)));
 }
 
 async function gmChoices(c,query){
@@ -193,9 +212,9 @@ export async function discordAutocompleteChoices(c){
   const {subcommand,focused,values}=discordFocusedOption(c.interaction);
   if(!focused)return [];
   const query=lower(focused.value),name=focused.name;
-  if(command==='standings'&&name==='view')return standingsChoices(c,query);
+  if(command==='standings'&&name==='show')return standingsChoices(c,query);
   if(command==='playoffs'&&name==='conference')return playoffChoices(c,query);
-  if(command==='schedule'&&name==='view')return scheduleChoices(c,query);
+  if(command==='schedule'&&subcommand==='team'&&name==='name')return teamChoices(c,query);
   if(command==='player'&&name==='name')return playerChoices(c,query);
   if(command==='team'&&name==='name')return teamChoices(c,query);
   if(command==='player-stats'&&name==='player')return playerChoices(c,query);
@@ -207,7 +226,7 @@ export async function discordAutocompleteChoices(c){
   if(command==='trade-block'&&['add','remove'].includes(subcommand)&&name==='player'){
     return tradeBlockPlayerChoices(c,query,{listedOnly:subcommand==='remove'});
   }
-  if(command==='gm-history'&&name==='name')return gmChoices(c,query);
+  if(command==='gm-history'&&name==='show')return gmChoices(c,query);
   if(command==='rules'&&name==='query')return ruleChoices(c,query);
   if(command==='trade'&&subcommand==='create'&&['owner','opponent'].includes(name))return ownerChoices(c,query);
   if(command==='trade'&&subcommand==='create'&&/^send-[1-6]$/.test(name)){

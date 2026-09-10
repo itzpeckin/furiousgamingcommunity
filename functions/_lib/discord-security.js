@@ -3,8 +3,8 @@ import { resolveTenantById, tenantDatabase, createTenantAuditContext, tenantAudi
 import { sha256Hex } from './cloud-platform.js';
 import { activeLeagueTeams, resolveTeam } from './league-teams.js';
 
-export const DISCORD_INTERACTION_TYPES=Object.freeze({PING:1,APPLICATION_COMMAND:2,MESSAGE_COMPONENT:3,APPLICATION_COMMAND_AUTOCOMPLETE:4});
-export const DISCORD_RESPONSE_TYPES=Object.freeze({PONG:1,CHANNEL_MESSAGE:4,DEFERRED_CHANNEL_MESSAGE:5,DEFERRED_UPDATE_MESSAGE:6,UPDATE_MESSAGE:7,APPLICATION_COMMAND_AUTOCOMPLETE_RESULT:8});
+export const DISCORD_INTERACTION_TYPES=Object.freeze({PING:1,APPLICATION_COMMAND:2,MESSAGE_COMPONENT:3,APPLICATION_COMMAND_AUTOCOMPLETE:4,MODAL_SUBMIT:5});
+export const DISCORD_RESPONSE_TYPES=Object.freeze({PONG:1,CHANNEL_MESSAGE:4,DEFERRED_CHANNEL_MESSAGE:5,DEFERRED_UPDATE_MESSAGE:6,UPDATE_MESSAGE:7,APPLICATION_COMMAND_AUTOCOMPLETE_RESULT:8,MODAL:9});
 export const DISCORD_EPHEMERAL_FLAG=64;
 const MAX_BODY_BYTES=128*1024;
 const MAX_TIMESTAMP_SKEW_SECONDS=5*60;
@@ -76,13 +76,12 @@ export function discordMessageData(message){
   })):[];
   const components=Array.isArray(source.components)?source.components.slice(0,5).map(row=>({
     type:1,
-    components:(Array.isArray(row?.components)?row.components:[]).slice(0,5).map(component=>({
-      type:2,
-      style:Math.min(4,Math.max(1,Number(component?.style)||2)),
-      label:String(component?.label||'Action').slice(0,80),
-      custom_id:String(component?.custom_id||'').slice(0,100),
-      disabled:Boolean(component?.disabled)
-    })).filter(component=>component.custom_id)
+    components:(Array.isArray(row?.components)?row.components:[]).slice(0,5).map(component=>{
+      const style=Math.min(5,Math.max(1,Number(component?.style)||2));
+      if(style===5&&component?.url)return {type:2,style,label:String(component?.label||'Open').slice(0,80),url:String(component.url).slice(0,512)};
+      const customId=String(component?.custom_id||'').slice(0,100);
+      return customId?{type:2,style:Math.min(4,style),label:String(component?.label||'Action').slice(0,80),custom_id:customId,disabled:Boolean(component?.disabled)}:null;
+    }).filter(Boolean)
   })).filter(row=>row.components.length):[];
   return {
     ...(content?{content}:{}),
@@ -145,7 +144,8 @@ async function bootstrapCommissionerGuild(db,env,interaction,identity){
   ]);
   return db.prepare(`SELECT id,league_id AS leagueId,discord_guild_id AS guildId,
       application_id AS applicationId,trade_committee_channel_id AS tradeCommitteeChannelId,
-      notification_channel_id AS notificationChannelId,schedule_channel_id AS scheduleChannelId,status
+      notification_channel_id AS notificationChannelId,schedule_channel_id AS scheduleChannelId,
+      trade_channel_id AS tradeChannelId,status
     FROM discord_league_installations WHERE league_id=? LIMIT 1`).bind(candidate.leagueId).first();
 }
 
@@ -156,7 +156,8 @@ export async function resolveDiscordContext(env,interaction,{membershipRequired=
   if(!SNOWFLAKE.test(guildId))throw Object.assign(new Error('Use this command inside a connected league Discord server.'),{status:403,code:'guild-required'});
   let installation=await db.prepare(`SELECT id,league_id AS leagueId,discord_guild_id AS guildId,
       application_id AS applicationId,trade_committee_channel_id AS tradeCommitteeChannelId,
-      notification_channel_id AS notificationChannelId,schedule_channel_id AS scheduleChannelId,status
+      notification_channel_id AS notificationChannelId,schedule_channel_id AS scheduleChannelId,
+      trade_channel_id AS tradeChannelId,status
     FROM discord_league_installations
     WHERE discord_guild_id=? AND status='active' LIMIT 1`).bind(guildId).first();
   const identity=discordUser(interaction);
@@ -192,14 +193,15 @@ export async function resolveDiscordContext(env,interaction,{membershipRequired=
   return {db,env,league,installation,discordIdentity:identity,user,membership,session:user?{user,membership}:null,interaction};
 }
 
-export async function resolveDiscordTradeComponentContext(env,interaction,{tradeId}={}){
+export async function resolveDiscordTradeComponentContext(env,interaction,{tradeId,access='participant'}={}){
   const db=tenantDatabase(env);
   if(!db)throw Object.assign(new Error('FranchiseHQ data is temporarily unavailable.'),{status:503,code:'database-unavailable'});
   const target=await db.prepare(`SELECT workflow.league_id AS leagueId,
       installation.discord_guild_id AS guildId,installation.application_id AS applicationId,
       installation.trade_committee_channel_id AS tradeCommitteeChannelId,
       installation.notification_channel_id AS notificationChannelId,
-      installation.schedule_channel_id AS scheduleChannelId,installation.status AS installationStatus
+      installation.schedule_channel_id AS scheduleChannelId,installation.trade_channel_id AS tradeChannelId,
+      installation.status AS installationStatus
     FROM trade_workflows workflow
     LEFT JOIN discord_league_installations installation ON installation.league_id=workflow.league_id
     WHERE workflow.id=? LIMIT 1`).bind(String(tradeId||'')).first();
@@ -229,12 +231,16 @@ export async function resolveDiscordTradeComponentContext(env,interaction,{trade
   const teamKey=team?.teamKey||String(actor.teamId||'').trim().toLowerCase();
   const participant=teamKey?await db.prepare(`SELECT 1 AS allowed FROM trade_workflow_participants
     WHERE trade_id=? AND league_id=? AND team_key=? LIMIT 1`).bind(String(tradeId),league.id,teamKey).first():null;
-  if(!participant?.allowed){
+  const reviewer=['commissioner','trade_committee'].includes(String(actor.role||''));
+  if(access==='reviewer'&&(!reviewer||participant?.allowed)){
+    throw Object.assign(new Error(participant?.allowed?'Reviewers cannot vote on a trade involving their own team.':'Trade Committee access is required.'),{status:403,code:'trade-reviewer-required'});
+  }
+  if(access!=='reviewer'&&!participant?.allowed){
     throw Object.assign(new Error('Only an owner whose team is involved may respond to this trade.'),{status:403,code:'trade-participant-required'});
   }
   const installation={leagueId:league.id,guildId:target.guildId,applicationId:target.applicationId,
     tradeCommitteeChannelId:target.tradeCommitteeChannelId,notificationChannelId:target.notificationChannelId,
-    scheduleChannelId:target.scheduleChannelId,status:target.installationStatus};
+    scheduleChannelId:target.scheduleChannelId,tradeChannelId:target.tradeChannelId,status:target.installationStatus};
   const membership={id:actor.membershipId,leagueId:league.id,leagueSlug:league.slug,leagueName:league.name,
     role:actor.role,teamId:actor.teamId,teamKey,active:true};
   const user={id:actor.id,discordUserId:actor.discordUserId,discordUsername:actor.discordUsername,

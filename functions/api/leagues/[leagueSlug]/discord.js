@@ -29,7 +29,8 @@ async function requestContext(context){
 async function state(c){
   const row=await c.db.prepare(`SELECT discord_guild_id AS guildId,application_id AS applicationId,
       trade_committee_channel_id AS tradeCommitteeChannelId,notification_channel_id AS notificationChannelId,
-      guild_name AS guildName,schedule_channel_id AS scheduleChannelId,connection_source AS connectionSource,
+      guild_name AS guildName,schedule_channel_id AS scheduleChannelId,trade_channel_id AS tradeChannelId,
+      connection_source AS connectionSource,
       connected_at AS connectedAt,status,installed_at AS installedAt,updated_at AS updatedAt
     FROM discord_league_installations WHERE league_id=? LIMIT 1`).bind(c.league.id).first();
   const origin=new URL(c.request.url).origin;
@@ -88,17 +89,19 @@ export async function onRequestPost(context){
       const channels=await discordGuildTextChannels(c.env,installation.guildId);
       const allowed=new Set(channels.map(channel=>channel.id));
       const schedule=cleanSnowflake(body.scheduleChannelId,true);
+      const trade=cleanSnowflake(body.tradeChannelId,false);
       const committee=cleanSnowflake(body.tradeCommitteeChannelId,false);
       const notifications=cleanSnowflake(body.notificationChannelId,false);
-      if(!allowed.has(schedule)||committee&&!allowed.has(committee)||notifications&&!allowed.has(notifications)){
+      if(!allowed.has(schedule)||trade&&!allowed.has(trade)||committee&&!allowed.has(committee)||notifications&&!allowed.has(notifications)){
         throw Object.assign(new Error('Choose channels that belong to the connected Discord server.'),{status:400});
       }
       await c.db.batch([
-        c.db.prepare(`UPDATE discord_league_installations SET schedule_channel_id=?,trade_committee_channel_id=?,
-          notification_channel_id=?,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND status='active'`)
-          .bind(schedule,committee,notifications,c.league.id),
+        c.db.prepare(`UPDATE discord_league_installations SET schedule_channel_id=?,trade_channel_id=?,
+          trade_committee_channel_id=?,notification_channel_id=?,updated_at=CURRENT_TIMESTAMP
+          WHERE league_id=? AND status='active'`)
+          .bind(schedule,trade,committee,notifications,c.league.id),
         tenantAuditStatement(c.db,audit,{resourceType:'discord_league_installation',resourceId:installation.guildId,
-          detail:{action,scheduleChannelId:schedule,committeeChannelConfigured:Boolean(committee),notificationChannelConfigured:Boolean(notifications),selectedFromVerifiedGuildChannels:true}})
+          detail:{action,scheduleChannelId:schedule,tradeChannelConfigured:Boolean(trade),committeeChannelConfigured:Boolean(committee),notificationChannelConfigured:Boolean(notifications),selectedFromVerifiedGuildChannels:true}})
       ]);
       const reconcile=upsertDiscordGlobalCommands(c.env,DISCORD_GLOBAL_COMMANDS).catch(error=>
         console.error('Discord global command reconciliation failed:',String(error?.message||error).slice(0,500)));

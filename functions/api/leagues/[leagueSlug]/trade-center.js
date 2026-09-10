@@ -21,6 +21,7 @@ import {
 } from '../../../_lib/draft-pick-projections.js';
 import {
   queueCommitteeReviewDelivery,
+  queueTradeRoomUpdate,
   scheduleDiscordDeliveryFlush
 } from '../../../_lib/discord-delivery.js';
 
@@ -51,7 +52,7 @@ async function requestContext(context) {
     ...authorization.session,
     membership:{...authorization.session.membership,teamKey:assignedTeam?.teamKey||canonicalTeamKey(storedTeamId)}
   };
-  return {db, league, teams, session};
+  return {db, league, teams, session,request:context.request};
 }
 
 function featureAvailable(league, featureKey) {
@@ -324,14 +325,21 @@ async function propose(c, body, draft = false) {
 
 async function counter(c, body, row, participants) {
   const ownTeam=await ensureParticipantAction(c,row,participants);
-  if (!['negotiating','draft'].includes(row.status)) throw Object.assign(new Error('This trade cannot be revised.'),{status:409});
+  if (!['negotiating','draft','rejected'].includes(row.status)) throw Object.assign(new Error('This trade cannot be revised.'),{status:409});
+  if(row.status==='rejected'){
+    const priorReviews=await resultRows(c.db,`SELECT reviewer_user_id AS reviewerUserId,decision FROM trade_workflow_reviews
+      WHERE trade_id=? AND league_id=? AND revision=?`,row.id,c.league.id,row.revision);
+    if(workflowDecision(priorReviews,row.review_threshold).result!=='rejected'){
+      throw Object.assign(new Error('Only a committee-denied trade can be revised from this state.'),{status:409});
+    }
+  }
   const settings=(await leagueSettings(c.db,c.league.id)).tradeCenter;
   const prepared=await validatedTransfers(c,body.transfers,settings);
   if (!prepared.participants.includes(ownTeam)) throw Object.assign(new Error('Your team must remain in the trade.'),{status:403});
   const revision=Number(row.revision)+1;
   const mutationToken=`trade_mutation_${crypto.randomUUID()}`;
   const statements=[c.db.prepare(`UPDATE trade_workflows SET revision=?,mutation_token=?,status='negotiating',note=?,free_trade=0,
-      decision_reason=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND revision=? AND mutation_token=?`)
+      decision_reason=NULL,rejected_at=NULL,approved_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND revision=? AND mutation_token=?`)
     .bind(revision,mutationToken,cleanText(body.note),row.id,c.league.id,row.revision,row.mutation_token),
     c.db.prepare(`DELETE FROM trade_workflow_participants WHERE trade_id=? AND league_id=?
       AND EXISTS (SELECT 1 FROM trade_workflows workflow WHERE workflow.id=? AND workflow.league_id=? AND workflow.mutation_token=?)`)
@@ -438,8 +446,11 @@ async function review(c, row, participants, decision, reason, freeTrade) {
   if (result.result==='rejected') {
     await c.db.batch([
       c.db.prepare(`UPDATE trade_workflows SET status='rejected',decision_reason=?,rejected_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
-        WHERE id=? AND league_id=?`).bind(cleanText(reason)||null,row.id,c.league.id),
-      ...await notificationStatements(c.db,c.league.id,row.id,participantUsers,'rejected','Trade rejected',cleanText(reason)||'The Trade Committee rejected the trade.')
+        WHERE id=? AND league_id=? AND status='committee' AND revision=? AND mutation_token=?`).bind(cleanText(reason)||null,row.id,c.league.id,row.revision,row.mutation_token),
+      c.db.prepare(`INSERT INTO trade_workflow_messages
+        (id,trade_id,league_id,author_user_id,event_type,message,created_at) VALUES (?,?,?,?,? ,?,CURRENT_TIMESTAMP)`)
+        .bind(`trade_message_${crypto.randomUUID()}`,row.id,c.league.id,c.session.user.id,'changes-requested',cleanText(reason)||'The Trade Committee requested changes.'),
+      ...await notificationStatements(c.db,c.league.id,row.id,participantUsers,'rejected','Trade changes requested',cleanText(reason)||'The Trade Committee denied this revision. It can be revised and resubmitted.')
     ]);
     return;
   }
@@ -700,6 +711,19 @@ export async function onRequestPost(context) {
     if(body.action==='accept'&&result.tradeId){
       const trade=result.workflows?.find(item=>item.id===result.tradeId);
       if(trade?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId:result.tradeId});
+    }
+    if(result.tradeId&&['counter','accept','reject','review','message'].includes(body.action)){
+      const trade=result.workflows?.find(item=>item.id===result.tradeId)
+        ||await c.db.prepare(`SELECT status,revision FROM trade_workflows WHERE id=? AND league_id=?`).bind(result.tradeId,c.league.id).first();
+      const actor=c.session.user.displayName||'A league member';
+      const labels={counter:'Trade revision submitted',accept:'Owner acceptance updated',reject:'Trade rejected',review:'Committee review updated',message:'Trade message added'};
+      const descriptions={counter:`${actor} submitted revision ${Number(trade?.revision||0)} for owner acceptance.`,
+        accept:`${actor} accepted the current trade revision.`,reject:`${actor} rejected the current trade revision.`,
+        review:`${actor} recorded a committee ${String(body.decision||'decision')}${body.reason?`: ${cleanText(body.reason)}`:'.'}`,
+        message:`${actor}: ${cleanText(body.message)}`};
+      await queueTradeRoomUpdate(c.db,{league:c.league,tradeId:result.tradeId,
+        eventKey:`web:${context.request.headers.get('x-request-id')||crypto.randomUUID()}`,
+        eventType:body.action==='counter'?'revision-submitted':'thread-update',title:labels[body.action],message:descriptions[body.action]});
     }
     scheduleDiscordDeliveryFlush(context,c.db,c.league.id);
     return json(result);
