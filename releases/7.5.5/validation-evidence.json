@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -15,7 +15,7 @@
       "passed": true,
       "migrationVersion": 38,
       "candidateRequiresMigration": true,
-      "productionApplied": false
+      "productionApplied": true
     },
     "discordCommandContract": {
       "passed": true,
@@ -55,6 +55,73 @@
       "trackedFiles": 600,
       "routes": 76
     },
+    "productionProtectedState": {
+      "passed": true,
+      "database": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "preMigrationBookmark": "000001d1-00000194-000050e2-2f07bc13f368d9d28a0b5aa7b9b6c69b",
+      "postMigrationBookmark": "000001d1-000001b8-000050e2-4ee6a96cb1b576d5fd30a426b4242386",
+      "migrationVersion": 38,
+      "migrationName": "discord_trade_channel",
+      "migrationSha256": "D4DD7FA1A6215D794D540D9DF15B9C3E97224D73C46D7CC203C4ED264E9396FC",
+      "migrationLedgerRowsBefore": 37,
+      "migrationLedgerRowsAfter": 38,
+      "tradeChannelColumnsBefore": 0,
+      "tradeChannelColumnsAfter": 1,
+      "canonicalTablesBefore": 115,
+      "canonicalTablesAfter": 115,
+      "foreignKeyViolationsBefore": 0,
+      "foreignKeyViolationsAfter": 0,
+      "leaguesBefore": 1,
+      "leaguesAfter": 1,
+      "usersBefore": 32,
+      "usersAfter": 32,
+      "membershipsBefore": 32,
+      "membershipsAfter": 32,
+      "activeTeamAssignmentsBefore": 31,
+      "activeTeamAssignmentsAfter": 31,
+      "activeSnapshotRowsBefore": 1,
+      "activeSnapshotRowsAfter": 1,
+      "retainedSnapshotsBefore": 28,
+      "retainedSnapshotsAfter": 28,
+      "activeSnapshotBefore": "18235c81-8b40-4729-8d31-53b480ba3371",
+      "activeSnapshotAfter": "18235c81-8b40-4729-8d31-53b480ba3371",
+      "previousSnapshotBefore": "a07614fc-a996-467f-86c2-d87926072882",
+      "previousSnapshotAfter": "a07614fc-a996-467f-86c2-d87926072882",
+      "activeWeekBefore": 17,
+      "activeWeekAfter": 17,
+      "tradeWorkflowsBefore": 9,
+      "tradeWorkflowsAfter": 9,
+      "tradeReviewsBefore": 0,
+      "tradeReviewsAfter": 0,
+      "tradeMessagesBefore": 16,
+      "tradeMessagesAfter": 16,
+      "tradeRoomsBefore": 3,
+      "tradeRoomsAfter": 3
+    },
+    "productionPagesAcceptance": {
+      "passed": true,
+      "mainCommit": "0b75e9bb61222c3b1069b823d32b9cd914a4c789",
+      "initialPagesDeployment": "f4025f4f-1a1e-4896-b7a8-5f30e765a87b",
+      "acceptedPagesDeployment": "d973561f-bbec-40b7-8201-674f58419148",
+      "pagesStatus": "success",
+      "gitIntegrated": true,
+      "directUploadUsed": false,
+      "productionAliasPresent": true,
+      "publicReleaseMarker": "7.5.5",
+      "leagueRuntimeHeader": "7.5.5",
+      "readOnly": true
+    },
+    "discordProductionAcceptance": {
+      "passed": true,
+      "exactNameUpserts": ["schedule", "standings", "games", "gm-history"],
+      "commandDefinitionsUpserted": 4,
+      "legacyNamesRetired": 0,
+      "bulkReplacementUsed": false,
+      "unownedCommandsDeleted": false,
+      "registrationDeployment": "d973561f-bbec-40b7-8201-674f58419148",
+      "productionBuildCommandRestored": "exit 0"
+    },
     "freeAgentBlockedPreserved": {
       "passed": true,
       "status": "blocked",
@@ -63,13 +130,13 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "stagingChanged": false,
-    "migrationApplied": false,
-    "discordCommandsRegistered": false,
+    "migrationApplied": true,
+    "discordCommandsRegistered": true,
     "discordConfigurationChanged": false,
     "liveTradeChanged": false,
     "importExecuted": false,
@@ -85,13 +152,50 @@
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
     "freeAgentInterpretedAsZero": false,
-    "databaseRowsWritten": 0
+    "databaseRowsWritten": 1,
+    "protectedLeagueRowsWritten": 0
   },
   "external": {
-    "githubPublication": {"status": "authorized-pending"},
-    "hostedChecks": {"status": "not-run"},
-    "migration38": {"status": "authorized-pending"},
-    "discordCommandRegistration": {"status": "authorized-pending"},
-    "productionDeployment": {"status": "authorized-pending"}
+    "githubPublication": {
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 62,
+      "candidateCommit": "1dc80e232dc889b5ae464e32eed742d62b753b42",
+      "mergeCommit": "0b75e9bb61222c3b1069b823d32b9cd914a4c789"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "pullRequestChecksFailed": 0,
+      "mainChecksPassed": 5
+    },
+    "migration38": {
+      "authorized": true,
+      "status": "applied-and-verified",
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "previousMigration": 37,
+      "currentMigration": 38,
+      "candidateMigration": 38,
+      "preMigrationBookmark": "000001d1-00000194-000050e2-2f07bc13f368d9d28a0b5aa7b9b6c69b",
+      "postMigrationBookmark": "000001d1-000001b8-000050e2-4ee6a96cb1b576d5fd30a426b4242386",
+      "foreignKeyViolations": 0
+    },
+    "discordCommandRegistration": {
+      "authorized": true,
+      "status": "exact-name-upserted",
+      "exactNameUpserts": ["schedule", "standings", "games", "gm-history"],
+      "commandDefinitionsUpserted": 4,
+      "retiredNames": 0,
+      "bulkReplacementAllowed": false
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "deployed-read-only-verified",
+      "currentRelease": "7.5.5",
+      "mainCommit": "0b75e9bb61222c3b1069b823d32b9cd914a4c789",
+      "pagesDeployment": "d973561f-bbec-40b7-8201-674f58419148"
+    }
   }
 }

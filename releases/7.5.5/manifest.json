@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5",
   "releaseType": "discord-trade-workflow-experience",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.4",
@@ -19,7 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-pending"
+    "status": "published-main-accepted",
+    "candidateCommit": "1dc80e232dc889b5ae464e32eed742d62b753b42",
+    "pullRequest": 62,
+    "mergeCommit": "0b75e9bb61222c3b1069b823d32b9cd914a4c789"
   },
   "staging": {
     "authorized": false,
@@ -28,11 +31,13 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-pending",
-    "currentRelease": "7.5.4",
-    "currentCommit": "2aec1b4",
-    "currentMigration": 37,
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5",
+    "currentCommit": "0b75e9bb61222c3b1069b823d32b9cd914a4c789",
+    "initialPagesDeployment": "f4025f4f-1a1e-4896-b7a8-5f30e765a87b",
+    "currentPagesDeployment": "d973561f-bbec-40b7-8201-674f58419148",
+    "currentMigration": 38,
     "candidateMigration": 38,
     "scope": "Simplify Discord reads, accelerate player autocomplete, add dedicated trade-thread routing and live same-thread trade review/revision, and restore halfbacks to League Home rushing leaders."
   },
