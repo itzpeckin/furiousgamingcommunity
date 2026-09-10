@@ -8,11 +8,11 @@ async function resolver() {
   const source = await readFile(new URL('../../league-engine/week-context.js', import.meta.url), 'utf8');
   const context = {window:{FranchiseHQ:{}}};
   runInNewContext(source, context, {filename:'league-engine/week-context.js'});
-  return context.window.FranchiseHQ.canonicalWeekContext.resolve;
+  return context.window.FranchiseHQ.canonicalWeekContext;
 }
 
 test('canonical one-based game weeks are not incremented again for display', async () => {
-  const resolve = await resolver();
+  const {resolve} = await resolver();
   assert.equal(resolve({stage:'preseason',weekIndex:1},1,'preseason').week,1);
   assert.deepEqual(
     {...resolve({stage:'regular-season',stageIndex:null,weekIndex:9},9,'regular-season')},
@@ -21,12 +21,40 @@ test('canonical one-based game weeks are not incremented again for display', asy
 });
 
 test('route authority wins and legacy zero-based source-only weeks still normalize', async () => {
-  const resolve = await resolver();
+  const {resolve} = await resolver();
   assert.deepEqual(
     {...resolve({routePath:'xbsx/742482/week/pre/3/schedules',stageIndex:1,weekIndex:2},2,'regular-season')},
     {phase:'preseason',week:3,round:null,label:'Preseason'}
   );
   assert.equal(resolve({stageIndex:1,weekIndex:0},0,'regular-season').week,1);
+});
+
+test('All Weeks sentinel provenance cannot overwrite canonical Week 10 in the browser', async () => {
+  const {resolve,resolveSeason} = await resolver();
+  assert.deepEqual(
+    {...resolve({routePath:'xbsx/742482/week/reg/0/schedules',stageIndex:1,weekIndex:9},10,'regular-season')},
+    {phase:'regular',week:10,round:null,label:'Regular Season'}
+  );
+  assert.equal(resolve({routePath:'xbsx/742482/week/reg/0/schedules'},0,'regular-season').week,0);
+  assert.equal(resolve({routePath:'xbsx/742482/week/reg/9/schedules'},10,'regular-season').week,9);
+
+  const standings=Array.from({length:32},(_,index)=>({
+    teamId:`team-${index+1}`,
+    source:{stageIndex:1,weekIndex:0}
+  }));
+  assert.deepEqual(
+    {...resolveSeason({seasonYear:2026,weekIndex:10},standings)},
+    {
+      phase:'regular',week:10,round:null,label:'Regular Season',stage:'regular',season:2026,
+      displayLabel:'Regular Season Week 10',authority:'active-snapshot'
+    }
+  );
+});
+
+test('league pages consume the shared active-snapshot season resolver', async () => {
+  const app = await readFile(new URL('../../app.js', import.meta.url), 'utf8');
+  assert.match(app,/canonicalWeekContext\?\.resolveSeason/);
+  assert.doesNotMatch(app,/const week=weekIndex\+1/);
 });
 
 test('live read model retains only approved route provenance with canonical week', () => {

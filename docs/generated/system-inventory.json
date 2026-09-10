@@ -172,7 +172,7 @@
     },
     "largest": [
       {
-        "bytes": 640068,
+        "bytes": 639026,
         "file": "app.js"
       },
       {
@@ -1538,7 +1538,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.1",
+  "release": "7.5.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
