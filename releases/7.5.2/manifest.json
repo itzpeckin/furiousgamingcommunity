@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.2",
+  "releaseType": "active-snapshot-week-sentinel-presentation-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.1",
+    "commit": "5619b1e97edd5e75a03aaf72aa23a8a277d57e11",
+    "tree": "cedbc0641b92a7e4e705106f87668fa917f07000",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.2",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "not-run",
+    "candidateCommit": null,
+    "pullRequest": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.0",
+    "currentCommit": "aac13741ea732623327341f407dc81cdd98e7950",
+    "currentMigration": 36,
+    "candidateMigration": 37,
+    "scope": "Publish the active-snapshot Week sentinel presentation correction from current Main, preserve the already-accepted All Weeks import authority, and verify Week 10 schedule, statistics, and results without reimporting or changing the active snapshot."
+  },
+  "requiredArtifacts": [
+    "league-engine/week-context.js",
+    "app.js",
+    "tests/import/week-label-normalization.test.mjs",
+    "migrations/0037_discord_trade_rooms.sql",
+    "docs/ROADMAP.md",
+    "releases/7.5.2/release-record.md",
+    "releases/7.5.2/validation-evidence.json"
+  ]
+}

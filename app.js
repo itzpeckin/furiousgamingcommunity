@@ -812,26 +812,9 @@
   }
 
   function authoritativeSeasonContext(snapshot,standings=[],games=[]) {
-    const candidates=standings.map(row=>{
-      const source=row.source||{};
-      const stageIndex=Number(source.stageIndex);
-      const weekIndex=Number(source.weekIndex);
-      if(!Number.isFinite(stageIndex)||!Number.isFinite(weekIndex)) return null;
-      const phase=stageIndex===0?'preseason':stageIndex===1?'regular':'playoffs';
-      const week=weekIndex+1;
-      return {phase,week,label:phase==='preseason'?'Preseason':phase==='regular'?'Regular Season':'Playoffs'};
-    }).filter(Boolean);
-    if(candidates.length){
-      const keyCounts=new Map();
-      candidates.forEach(item=>{
-        const key=`${item.phase}:${item.week}`;
-        keyCounts.set(key,(keyCounts.get(key)||0)+1);
-      });
-      const [winningKey]=[...keyCounts.entries()].sort((a,b)=>b[1]-a[1])[0];
-      const selected=candidates.find(item=>`${item.phase}:${item.week}`===winningKey);
-      const round=selected.phase==='playoffs'?({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'}[selected.week]||`Playoff Week ${selected.week}`):null;
-      return {...selected,stage:selected.phase,season:snapshot?.seasonYear??'—',round,displayLabel:round||`${selected.label} Week ${selected.week}`,authority:'standings'};
-    }
+    const resolver=window.FranchiseHQ?.canonicalWeekContext?.resolveSeason;
+    const selected=typeof resolver==='function'?resolver(snapshot,standings):null;
+    if(selected)return selected;
     return publicSeasonContext(snapshot,games);
   }
 
@@ -9962,7 +9945,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.5.1';
+  const VISIBLE_RELEASE = '7.5.2';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

@@ -172,7 +172,7 @@
     },
     "largest": [
       {
-        "bytes": 640068,
+        "bytes": 639026,
         "file": "app.js"
       },
       {
@@ -196,7 +196,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 88011,
+        "bytes": 88668,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -1538,7 +1538,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.1",
+  "release": "7.5.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.5.1';
+export const DISCORD_COMMAND_RELEASE = '7.5.2';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -207,6 +207,15 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   },
   ...DISCORD_SCHEDULE_THREAD_COMMANDS
 ]);
+
+export function discordGlobalCommandsNamed(names = []) {
+  const requested = [...new Set(names.map(name => String(name || '').trim().toLowerCase()).filter(Boolean))];
+  if (!requested.length) return [...DISCORD_GLOBAL_COMMANDS];
+  const byName = new Map(DISCORD_GLOBAL_COMMANDS.map(command => [command.name, command]));
+  const missing = requested.filter(name => !byName.has(name));
+  if (missing.length) throw new Error(`Unknown Discord command name(s): ${missing.join(', ')}.`);
+  return requested.map(name => byName.get(name));
+}
 
 export function discordScheduleThreadWeek(commandOrInteraction = '') {
   const command = typeof commandOrInteraction === 'string'

@@ -24,7 +24,17 @@
     if (routeMatch) {
       const token = routeMatch[1].toLowerCase();
       const phase = token === 'pre' ? 'preseason' : token === 'reg' ? 'regular' : 'playoffs';
-      const week = Number(routeMatch[2]);
+      const routeWeek = Number(routeMatch[2]);
+      const canonicalWeek = finiteNumber(fallbackWeek);
+      // Madden's All Weeks aggregate retains /week/reg/0/ as source
+      // provenance after the server has resolved its payload to a canonical
+      // one-based week. Never let that sentinel overwrite the canonical
+      // snapshot value in the browser. With no canonical value, Week 0 stays
+      // a non-playable placeholder instead of becoming Week 1.
+      const week = phase === 'regular' && routeWeek === 0
+        && Number.isFinite(canonicalWeek) && canonicalWeek >= 1
+        ? canonicalWeek
+        : routeWeek;
       const round = phase === 'playoffs' ? playoffRound(week) : null;
       return {phase,week,round,label:phase === 'preseason' ? 'Preseason' : phase === 'regular' ? 'Regular Season' : 'Playoffs'};
     }
@@ -43,5 +53,34 @@
     return {phase,week:Math.max(1,week || 1),round,label:phase === 'preseason' ? 'Preseason' : phase === 'regular' ? 'Regular Season' : 'Playoffs'};
   }
 
-  HQ.canonicalWeekContext = Object.freeze({resolve});
+  function resolveSeason(snapshot = {}, standings = []) {
+    const canonicalWeek = finiteNumber(snapshot.weekIndex ?? snapshot.week);
+    const candidates = (Array.isArray(standings) ? standings : []).map(row => {
+      const source = row?.source || row || {};
+      const stageIndex = finiteNumber(source.stageIndex);
+      const sourceWeek = finiteNumber(source.weekIndex);
+      if (!Number.isFinite(stageIndex) && !Number.isFinite(sourceWeek)) return null;
+      return resolve(source,canonicalWeek,source.stage || source.stageName || 'regular-season');
+    }).filter(item => item && Number.isFinite(item.week) && item.week >= 1);
+    if (!candidates.length) return null;
+
+    const keyCounts = new Map();
+    candidates.forEach(item => {
+      const key = `${item.phase}:${item.week}`;
+      keyCounts.set(key,(keyCounts.get(key) || 0) + 1);
+    });
+    const [winningKey] = [...keyCounts.entries()].sort((left,right) => right[1] - left[1])[0];
+    const selected = candidates.find(item => `${item.phase}:${item.week}` === winningKey);
+    const round = selected.phase === 'playoffs' ? playoffRound(selected.week) : null;
+    return {
+      ...selected,
+      stage:selected.phase,
+      season:snapshot.seasonYear ?? snapshot.season ?? '—',
+      round,
+      displayLabel:round || `${selected.label} Week ${selected.week}`,
+      authority:Number.isFinite(canonicalWeek) && canonicalWeek >= 1 ? 'active-snapshot' : 'standings'
+    };
+  }
+
+  HQ.canonicalWeekContext = Object.freeze({resolve,resolveSeason});
 })();

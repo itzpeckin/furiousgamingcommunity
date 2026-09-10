@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.2",
+  "validatedOn": "2026-09-10",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {"passed": true, "unregisteredFailures": 0},
+  "strictRepositoryGate": {
+    "passed": true,
+    "javascriptModules": 255,
+    "inventoryEntries": 599,
+    "routes": 76,
+    "passedTests": 207,
+    "failedTests": 0
+  },
+  "checks": {
+    "weekSentinelPresentation": {
+      "passed": true,
+      "route": "/week/reg/0/",
+      "canonicalSnapshotWeek": 10,
+      "displayWeek": 10,
+      "weekOneFallbackPrevented": true
+    },
+    "normalRouteAuthority": {"passed": true, "preserved": true},
+    "emptyWeekZeroPlaceholder": {"passed": true, "playable": false, "promotedToWeekOne": false},
+    "activeSnapshotSeasonAuthority": {"passed": true, "standingsSentinelCannotOverride": true},
+    "focusedWeekAndImportRegression": {"passed": true, "passedTests": 48, "failedTests": 0},
+    "retainedAllWeeksCorrection": {"passed": true, "serverImplementationPreserved": true, "anotherExportRequired": false},
+    "snapshotRetention": {"passed": true, "snapshotChanged": false, "snapshotDeleted": false, "auditsDeleted": false},
+    "freeAgentBlockedPreserved": {"passed": true, "status": "blocked", "count": null, "interpretedAsZero": false},
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 37,
+      "candidateRequiresMigration": true,
+      "productionApplied": false
+    },
+    "automatedTests": {"passed": true, "passedTests": 207, "failedTests": 0},
+    "inventory": {"passed": true, "files": 599, "routes": 76}
+  },
+  "productionBaselineReference": {
+    "sourceRelease": "7.5.0",
+    "sourceEvidenceCommit": "aac13741ea732623327341f407dc81cdd98e7950",
+    "migrationVersion": 36,
+    "activeSnapshotAtSourceEvidence": "f469399a-d4b1-446f-9264-75c17486d438",
+    "activeSnapshotWeekAtSourceEvidence": 16
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "protectedLeagueDataChanged": false,
+    "productionConfigurationChanged": false,
+    "stagingChanged": false,
+    "activeSnapshotChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "captureExecuted": false,
+    "candidateImportExecuted": false,
+    "activationPerformed": false,
+    "anotherExportRequired": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "historyPermanentlyDeleted": false,
+    "transitionOperationExecuted": false,
+    "archiveSeasonExecuted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {"authorized": true, "status": "not-run"},
+    "hostedChecks": {"authorized": true, "status": "not-run"},
+    "productionMigration": {"authorized": true, "status": "not-run", "currentMigration": 36, "candidateMigration": 37},
+    "productionDeployment": {"authorized": true, "status": "not-run", "currentRelease": "7.5.0"},
+    "discordRegistration": {"authorized": true, "status": "not-run", "exactNameUpserts": ["trade"], "bulkReplacementAllowed": false},
+    "productionMaddenExport": {"authorized": false, "status": "not-run", "anotherExportRequired": false},
+    "productionCandidateImport": {"authorized": false, "status": "not-required"},
+    "productionSnapshotActivation": {"authorized": false, "status": "not-required"}
+  }
+}
