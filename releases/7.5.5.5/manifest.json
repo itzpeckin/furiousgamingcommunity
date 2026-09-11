@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.5",
   "releaseType": "trade-review-and-commissioner-management",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.4",
@@ -19,10 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-not-run",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mergeCommit": null
+    "status": "published-main-accepted",
+    "candidateCommit": "ac3a52045974cadeb48961e821161185531afbe4",
+    "pullRequest": 72,
+    "mergeCommit": "2fea2a6166d0bc3020fbf17eedf0b483550f671f"
   },
   "staging": {
     "authorized": false,
@@ -31,12 +31,13 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.5.5.4",
-    "currentCommit": "516f01d723d04a589b11692b94d272912d78b97f",
-    "currentMigration": 39,
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.5",
+    "currentCommit": "2fea2a6166d0bc3020fbf17eedf0b483550f671f",
+    "currentMigration": 40,
     "candidateMigration": 40,
+    "pagesDeployment": "08ed1fdf-86ee-45f3-95e7-4c8a1d67824b",
     "scope": "Exact Discord trade-card parity plus audited Trade Center allowance and visible-history management."
   },
   "requiredArtifacts": [
