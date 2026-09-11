@@ -1,8 +1,8 @@
 # FranchiseHQ 7.5.5.4 Release Record
 
-**Status:** Locally validated; publication and Production unauthorized
+**Status:** Production deployed and read-only verified; owner Discord acceptance pending
 
-**Production changed:** No. Production remains 7.5.5.3 on migration 39. No Discord command, routing, trade, league data, or account state changed.
+**Production changed:** Yes, code only. FranchiseHQ 7.5.5.4 is live from merged Main commit `118f571c486ada383423f4dbcd82c3919ad67498`; Production remains on migration 39. No Discord command, routing, live trade, league data, or account state changed.
 
 ## Scope
 
@@ -38,7 +38,9 @@ The Discord suite passes 38/38. The complete strict repository suite passes 214/
 
 ## Deployment status
 
-Local implementation and validation are complete. Branch publication, pull-request checks, Main merge, and code-only Production deployment have not been authorized or run. Production remains FranchiseHQ 7.5.5.3 on migration 39; this candidate requires no migration or Discord command registration.
+PR #70 published exact candidate `b1c1acad051f96ce01aa7a49d31129a1a7781715`. All four pull-request checks passed before merge. The PR merged to Main as `118f571c486ada383423f4dbcd82c3919ad67498`; the Main quality gate, Cloudflare Pages check, and Pages build/deployment workflow all passed.
+
+Git-integrated Cloudflare Pages deployment `f6cdce57-dfdf-4eec-9acb-80a2bb709390` published the exact Main merge. Read-only HTTPS acceptance returned `200` and `x-franchisehq-release: 7.5.5.4` from the public route, canonical FGC league route, and exact deployment URL. No direct upload, migration, Discord command registration, or live trade replay ran.
 
 ## Boundaries
 
