@@ -325,11 +325,38 @@ test('authenticated owners share proposals while commissioner-only controls stay
     const publicApproved=outsiderAfter.workflows.find(item=>item.status==='approved');
     assert.equal(publicApproved.note,'');
     assert.deepEqual(publicApproved.messages,[]);
+    const managedBefore=await (await getTradeCenter(context(tokens.commissioner))).json();
+    assert.deepEqual(managedBefore.tradeManagement.teams.find(item=>item.teamKey==='tb'),{
+      teamKey:'tb',limit:4,enabled:true,used:1,remaining:3,
+      trades:[{tradeId,approvedAt:publicApproved.approvedAt,freeTrade:false,teams:['gb','tb'],assets:publicApproved.assets}]
+    });
+    const ownerCannotReset=await postTradeCenter(context(tokens.tb,'POST',{action:'reset-season-trades'}));
+    assert.equal(ownerCannotReset.status,403);
+    const resetSeason=await postTradeCenter(context(tokens.commissioner,'POST',{action:'reset-season-trades'}));
+    const resetSeasonPayload=await resetSeason.clone().json();
+    assert.equal(resetSeason.status,200,JSON.stringify(resetSeasonPayload));
+    assert.equal(resetSeasonPayload.tradeManagement.teams.find(item=>item.teamKey==='tb').used,0);
+    assert.equal(resetSeasonPayload.tradeManagement.teams.find(item=>item.teamKey==='tb').remaining,4);
+    assert.ok(resetSeasonPayload.workflows.some(item=>item.id===tradeId),'season reset preserves approved history');
+    const hidden=await postTradeCenter(context(tokens.commissioner,'POST',{action:'hide-approved-trade',tradeId,reason:'Trade did not execute'}));
+    const hiddenPayload=await hidden.clone().json();
+    assert.equal(hidden.status,200,JSON.stringify(hiddenPayload));
+    assert.ok(!hiddenPayload.workflows.some(item=>item.id===tradeId));
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_roster_overlays WHERE trade_id=?`).get(tradeId).count,2,'Madden-facing roster evidence is preserved');
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_transaction_history WHERE workflow_trade_id=?`).get(tradeId).count,1,'canonical transaction evidence is preserved');
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_management_events WHERE trade_id=? AND event_type='trade-hidden'`).get(tradeId).count,1);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM tenant_audit_events WHERE resource_id=? AND action='approved_trade_hidden'`).get(tradeId).count,1);
     const duplicate=await postTradeCenter(context(tokens.tb,'POST',{action:'propose',note:'Duplicate player',transfers:[
       {type:'player',assetId:'player-gb',fromTeamId:'tb',toTeamId:'gb'},
       {type:'player',assetId:'player-tb',fromTeamId:'gb',toTeamId:'tb'}
     ]}));
     assert.equal(duplicate.status,409);
+    const resetAll=await postTradeCenter(context(tokens.commissioner,'POST',{action:'reset-all-trades'}));
+    const resetAllPayload=await resetAll.clone().json();
+    assert.equal(resetAll.status,200,JSON.stringify(resetAllPayload));
+    assert.equal(resetAllPayload.workflows.length,0);
+    assert.ok(database.prepare(`SELECT COUNT(*) count FROM trade_workflows`).get().count>0,'reset all retains protected workflow and relationship rows');
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_management_events WHERE event_type='all-trades-hidden'`).get().count,1);
     const commissionerSeed=await postTradeCenter(context(tokens.commissioner,'POST',{action:'seed-picks',draftClasses:[2027]}));
     assert.equal(commissionerSeed.status,200);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks`).get().count,63);

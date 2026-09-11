@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "7.5.5.4",
+  "release": "7.5.5.5",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 39,
+  "currentVersion": 40,
   "requiredTables": [
     "canonical_capture_lifecycle_sessions",
     "canonical_free_agents",
@@ -112,6 +112,7 @@
     "trade_workflow_participants",
     "trade_workflow_reviews",
     "trade_workflows",
+    "trade_management_events",
     "league_draft_picks",
     "league_draft_pick_baselines",
     "league_draft_pick_baseline_entries",
@@ -163,6 +164,7 @@
     "team_ownership_periods": ["id", "league_id", "gm_identity_id", "team_key", "franchise_season_id", "started_at", "ended_at", "started_stage", "started_week", "ended_stage", "ended_week"],
     "gm_season_summaries": ["league_id", "franchise_season_id", "gm_identity_id", "teams_json", "regular_wins", "regular_losses", "regular_ties", "playoff_wins", "playoff_losses", "playoff_ties", "playoff_appearance", "conference_championships", "super_bowl_appearances", "super_bowl_championships", "game_count", "source_snapshot_id", "frozen_at"],
     "trade_workflows": ["id", "league_id", "franchise_season_id", "status", "revision", "mutation_token", "proposer_user_id", "proposer_team_key", "free_trade", "review_threshold", "slot_released_at"],
+    "trade_management_events": ["id", "league_id", "franchise_season_id", "trade_id", "event_type", "actor_user_id", "reason", "detail_json", "created_at"],
     "trade_workflow_assets": ["id", "trade_id", "league_id", "revision", "asset_type", "player_identity_id", "draft_pick_id", "from_team_key", "to_team_key"],
     "league_draft_picks": ["id", "league_id", "franchise_season_id", "draft_class", "round", "original_team_key", "current_team_key", "source_authority", "revision", "continuity_key", "source_baseline_id"],
     "league_draft_pick_baselines": ["id", "league_id", "baseline_key", "baseline_version", "game_release", "source_type", "status", "effective_season_year"],

@@ -46,9 +46,9 @@ test('only missing canonical migrations are planned', () => {
 
 test('canonical migration loading includes Trade Committee role routing', async () => {
   const { contract, migrations } = await loadCanonicalMigrations();
-  assert.equal(contract.currentVersion, 39);
-  assert.equal(migrations.at(-1)?.version, 39);
-  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0039_discord_trade_committee_role.sql');
+  assert.equal(contract.currentVersion, 40);
+  assert.equal(migrations.at(-1)?.version, 40);
+  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0040_trade_management_events.sql');
   const tenantMigration = migrations.find(item => item.version === 21);
   assert.equal(
     tenantMigration?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,

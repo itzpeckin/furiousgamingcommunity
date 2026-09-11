@@ -937,8 +937,10 @@ test('committee denial reasons update the private thread and the same trade can 
       payloadJson:JSON.stringify({title:'Trade accepted',message:'Awaiting review.',tradeId,leagueSlug:'alpha'})});
     assert.deepEqual(committeeMessage.embeds,ownerMessage.embeds,'committee and owner rooms render the same trade package');
     assert.match(committeeMessage.content,/^<@&100000000000000068>/);
-    assert.match(committeeMessage.content,/San Francisco 49ers receives[\s\S]*2027 Round 1/);
-    assert.match(committeeMessage.content,/Tampa Bay Buccaneers receives[\s\S]*2027 Round 1/);
+    assert.deepEqual(committeeMessage.embeds.filter(embed=>/ receives$/.test(embed.title)).map(embed=>embed.title).sort(),
+      ['San Francisco 49ers receives','Tampa Bay Buccaneers receives']);
+    assert.match(committeeMessage.embeds.flatMap(embed=>embed.fields||[]).map(field=>field.value).join('\n'),/2027 — ROUND 1/);
+    assert.doesNotMatch(committeeMessage.content,/San Francisco 49ers receives|Tampa Bay Buccaneers receives/);
     assert.deepEqual(committeeMessage.allowed_mentions,{roles:['100000000000000068'],users:[],replied_user:false});
     assert.deepEqual(committeeMessage.components[0].components.map(button=>button.label),['Approve','Deny']);
     const denyId=tradeDecisionCustomId('review-deny',tradeId,1);
@@ -1639,9 +1641,9 @@ test('trade delivery sends both owners clean team cards with source-supported co
       payloadJson:JSON.stringify({title:'Trade review required',message:'Review this package.',tradeId:'trade_11111111-1111-4111-8111-111111111111',leagueSlug:'alpha'})
     });
     assert.ok(committeeMessage.content.length<=2000);
-    for(const name of ['Tristan Example','Rueben Example','George Example','Sauce Example']){
-      assert.match(committeeMessage.content,new RegExp(name));
-    }
+    assert.doesNotMatch(committeeMessage.content,/Tristan Example|Rueben Example|George Example|Sauce Example/);
+    const committeeDetails=committeeMessage.embeds.flatMap(embed=>embed.fields||[]).map(field=>field.value).join('\n');
+    for(const name of ['Tristan Example','Rueben Example','George Example','Sauce Example'])assert.match(committeeDetails,new RegExp(name));
     assert.deepEqual(committeeMessage.embeds.filter(embed=>/ receives$/.test(embed.title)),
       messages[0].body.embeds.filter(embed=>/ receives$/.test(embed.title)));
     assert.deepEqual(committeeMessage.components[0].components.map(button=>button.label),['Approve','Deny']);
@@ -1660,12 +1662,12 @@ test('trade delivery sends both owners clean team cards with source-supported co
     };
     assert.deepEqual(await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},d1(database),{
       leagueId:'league-a',limit:10,fetchImpl:strippedEmbedFetch
-    }),{sent:1,failed:0,skipped:false});
-    const fallbackText=fallbackRequests.slice(1).map(request=>request.body?.content||'').join('\n');
-    for(const name of ['Tristan Example','Rueben Example','George Example','Sauce Example']){
-      assert.match(fallbackText,new RegExp(name));
-    }
-    assert.match(fallbackText,/CONTRACT/);
-    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='committee-rich'`).get().status,'sent');
+    }),{sent:0,failed:1,skipped:false});
+    assert.deepEqual(fallbackRequests.map(request=>request.method),['POST','PATCH','DELETE']);
+    assert.equal(fallbackRequests.filter(request=>request.method==='POST').length,1,'no second text-only committee post is allowed');
+    assert.deepEqual(fallbackRequests[1].body.embeds,committeeMessage.embeds);
+    assert.deepEqual(fallbackRequests[1].body.components,committeeMessage.components);
+    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='committee-rich'`).get().status,'failed');
+    assert.match(database.prepare(`SELECT last_error AS error FROM discord_delivery_events WHERE id='committee-rich'`).get().error,/allow Embed Links/i);
   }finally{database.close()}
 });

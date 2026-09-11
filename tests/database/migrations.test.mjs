@@ -127,7 +127,7 @@ test('the production-like legacy upgrade preserves identities and relationships'
       VALUES (?,?,?,?)`).run('league-future-test','Future League','FranchiseHQ','future-league');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints
       WHERE league_id='league-future-test'`).get().count,1);
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 39);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 40);
     const upgradedSession = database.prepare(`SELECT absolute_expires_at,last_rotated_at,recovery_mode
       FROM sessions WHERE id='session-upgrade-test'`).get();
     assert.ok(upgradedSession.absolute_expires_at);
@@ -275,7 +275,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 39', async () => {
+test('runtime schema verification fails closed before version 40', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {

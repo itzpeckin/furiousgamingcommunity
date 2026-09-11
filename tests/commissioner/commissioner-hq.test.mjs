@@ -229,7 +229,7 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.5.5.4');
+    assert.equal(overviewPayload.release,'7.5.5.5');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM league_setting_revisions
@@ -347,10 +347,15 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(ui,/class="commissioner-team-role"/);
   assert.match(ui,/class="commissioner-team-status"/);
   assert.match(ui,/aria-label="Manage \$\{escapeHtml\(team\.fullName\)\} owner assignment"/);
+  assert.match(ui,/data-open-team-trades/);
+  assert.match(ui,/Trades Available/);
+  assert.match(ui,/renderCommissionerManagement/);
+  assert.match(ui,/renderTeamTradeUsage/);
   assert.match(styles,/\.commissioner-directory-panel \.ownership-table-head,\.commissioner-directory-panel \.ownership-team-row\{grid-template-columns:[^}]+minmax\(104px,auto\)/);
   assert.match(styles,/@media\(max-width:1180px\)[\s\S]*?grid-template-areas:"franchise manage" "owner owner" "role status"/);
   assert.match(styles,/\.commissioner-directory-panel \.commissioner-team-row>span:nth-child\(2\),\.commissioner-directory-panel \.commissioner-team-row>span:nth-child\(3\),\.commissioner-directory-panel \.commissioner-team-row>span:nth-child\(4\)\{display:grid\}/);
   assert.match(styles,/@media\(max-width:560px\)[\s\S]*?\.ownership-member-actions \.button\{width:100%;min-height:44px\}/);
+  assert.match(styles,/grid-template-areas:"franchise franchise" "owner owner" "role status" "trades trades" "manage manage"!important/);
   assert.match(app,/function applyLeagueFeaturePresentation\(\)/);
   assert.match(app,/A league commissioner has turned this feature off/);
   const rulesMedia = await readFile(path.join(ROOT,'functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js'),'utf8');
