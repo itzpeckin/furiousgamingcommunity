@@ -24,6 +24,10 @@ const teamLabel=(teams,key)=>{
   const team=resolveTeam(teams,key);
   return team?.displayName||team?.abbreviation||String(key||'Team').toUpperCase();
 };
+const embedColor=value=>{
+  const hex=String(value||'').trim().replace(/^#/,'');
+  return /^[0-9a-f]{6}$/i.test(hex)?Number.parseInt(hex,16):0x4f8cff;
+};
 
 async function tradeDeliveryDetails(db,row,payload){
   const tradeId=String(payload.tradeId||row.resourceId||'').trim();
@@ -70,7 +74,7 @@ async function tradeDeliveryDetails(db,row,payload){
   const groups=new Map(),capMoves=new Map();
   const capMove=teamKey=>{
     const key=String(teamKey||'');
-    if(!capMoves.has(key))capMoves.set(key,{incomingCharge:0,outgoingRelief:0,retainedPenalty:0});
+    if(!capMoves.has(key))capMoves.set(key,{netReleaseSavings:0,releasePenalty:0});
     return capMoves.get(key);
   };
   for(const asset of assets){
@@ -83,48 +87,64 @@ async function tradeDeliveryDetails(db,row,payload){
       const savings=player.contract?.releaseNetSavings!==null&&player.contract?.releaseNetSavings!==undefined&&Number.isFinite(Number(player.contract.releaseNetSavings))?Number(player.contract.releaseNetSavings):null;
       const penalty=player.contract?.releasePenalty!==null&&player.contract?.releasePenalty!==undefined&&Number.isFinite(Number(player.contract.releasePenalty))?Number(player.contract.releasePenalty):null;
       const sourceCap=player.contract?.capHit!==null&&player.contract?.capHit!==undefined&&Number.isFinite(Number(player.contract.capHit))?Number(player.contract.capHit):null;
-      const acquiringCharge=savings??sourceCap;
-      groups.get(destination).push([
-        href?`**[${name}](${href})**`:`**${name}**`,player.position||null,
+      const identity=[player.position||null,
         player.overall!==null&&player.overall!==undefined?`${player.overall} OVR`:null,
-        player.age!==null&&player.age!==undefined?`Age ${player.age}`:null,
         player.devTrait?`${player.devTrait} Dev`:null,
-        sourceCap!==null?`Madden cap hit ${money(sourceCap)}`:'Madden cap hit unavailable',
-        acquiringCharge!==null?`Acquiring estimate ${money(acquiringCharge)}`:'Acquiring estimate unavailable',
-        penalty!==null?`Sending-team release penalty ${money(penalty)}`:'Release penalty unavailable'
-      ].filter(Boolean).join(' · '));
+        player.age!==null&&player.age!==undefined?`Age ${player.age}`:null
+      ].filter(Boolean).join(' · ');
+      const contract=[
+        player.contract?.yearsRemaining!==null&&player.contract?.yearsRemaining!==undefined?`${player.contract.yearsRemaining} year${Number(player.contract.yearsRemaining)===1?'':'s'} left`:null,
+        player.contract?.totalSalary!==null&&player.contract?.totalSalary!==undefined?`${money(player.contract.totalSalary)} total salary`:null,
+        player.contract?.totalBonus!==null&&player.contract?.totalBonus!==undefined?`${money(player.contract.totalBonus)} total bonus`:null
+      ].filter(Boolean).join(' · ');
+      const cap=[
+        sourceCap!==null?`${money(sourceCap)} cap hit`:'Cap hit unavailable',
+        savings!==null?`${money(savings)} net release savings`:'Net release savings unavailable',
+        penalty!==null?`${money(penalty)} release penalty`:'Release penalty unavailable'
+      ].join(' · ');
+      groups.get(destination).push({
+        name:'Player',
+        value:[href?`**[${name}](${href})**`:`**${name}**`,identity,contract?`Contract · ${contract}`:null,`Madden cap · ${cap}`].filter(Boolean).join('\n').slice(0,1024)
+      });
       const from=String(asset.fromTeamKey||'');
-      if(acquiringCharge!==null){
-        capMove(from).outgoingRelief+=acquiringCharge;
-        capMove(destination).incomingCharge+=acquiringCharge;
-      }
-      if(penalty!==null)capMove(from).retainedPenalty+=penalty;
+      if(savings!==null)capMove(from).netReleaseSavings+=savings;
+      if(penalty!==null)capMove(from).releasePenalty+=penalty;
     }else{
       const pick=pickById.get(String(asset.draftPickId))||asset;
-      groups.get(destination).push(`**${pick.draftClass||'Future'} Round ${pick.round||'—'}** · ${String(pick.originalTeamKey||'').toUpperCase()} original${pick.projectedPick?` · Projected ${pick.projectedPick}${pick.projectionTied?' approx.':''}`:''}`);
+      groups.get(destination).push({
+        name:'Draft Pick',
+        value:[`**${pick.draftClass||'Future'} · Round ${pick.round||'—'}**`,
+          pick.projectedPick?`Projected ${pick.projectedPick}${pick.projectionTied?' (approx.)':''}`:null,
+          pick.originalTeamKey?`Original team · ${String(pick.originalTeamKey).toUpperCase()}`:null
+        ].filter(Boolean).join('\n').slice(0,1024)
+      });
     }
   }
-  const fields=[];
+  const embeds=[];
   for(const [teamKey,items] of groups){
-    fields.push({name:`${teamLabel(teams,teamKey)} receives`,value:items.join('\n').slice(0,1024),inline:false});
+    const team=resolveTeam(teams,teamKey);
+    embeds.push({
+      title:`${teamLabel(teams,teamKey)} receives`,
+      color:embedColor(team?.primaryColor),
+      fields:items.map(item=>({...item,inline:false})),
+      ...(team?.logoUrl?{thumbnail:{url:team.logoUrl}}:{})
+    });
   }
+  const statusFields=[];
   const capLines=[];
   for(const [teamKey,move] of capMoves){
-    const roomChange=move.outgoingRelief-move.incomingCharge;
-    const available=capByTeam.get(teamKey),projected=Number.isFinite(available)?available+roomChange:null;
+    const available=capByTeam.get(teamKey);
     capLines.push([
-      `**${teamLabel(teams,teamKey)}:**`,
-      move.incomingCharge?`${money(move.incomingCharge)} incoming estimate`:null,
-      move.outgoingRelief?`${money(move.outgoingRelief)} outgoing relief`:null,
-      move.retainedPenalty?`${money(move.retainedPenalty)} retained release penalty`:null,
-      `estimated room change ${roomChange>=0?'+':''}${money(roomChange)}`,
-      projected!==null?`projected available ${money(projected)}`:'current/projected space unavailable'
+      `**${teamLabel(teams,teamKey)} sends:**`,
+      move.netReleaseSavings?`${money(move.netReleaseSavings)} Madden net release savings`:null,
+      move.releasePenalty?`${money(move.releasePenalty)} Madden release penalty`:null,
+      Number.isFinite(available)?`${money(available)} current Madden cap room`:null
     ].filter(Boolean).join(' · '));
   }
-  if(capLines.length)fields.push({name:'Madden-supported cap estimate',value:`${capLines.join('\n')}\nUses Madden release net savings as the acquiring salary estimate and preserves Madden’s release penalty for the sending team. Current/projected team space appears only when the export supplies current cap room.`,inline:false});
+  if(capLines.length)statusFields.push({name:'Madden contract facts',value:`${capLines.join('\n')}\nIncoming current-year salary and projected team cap space remain unavailable because this Madden export does not supply the required annual salary and team cap-room fields.`.slice(0,1024),inline:false});
   const acceptances=await rows(db,`SELECT participant.team_key AS teamKey,participant.accepted_revision AS acceptedRevision
     FROM trade_workflow_participants participant WHERE participant.league_id=? AND participant.trade_id=? ORDER BY participant.team_key`,row.leagueId,tradeId);
-  if(workflow.status==='negotiating')fields.push({name:`Revision ${Number(workflow.revision)} owner decisions`,value:acceptances.map(item=>
+  if(workflow.status==='negotiating')statusFields.push({name:`Revision ${Number(workflow.revision)} owner decisions`,value:acceptances.map(item=>
     `${Number(item.acceptedRevision)===Number(workflow.revision)?'✅':'⏳'} ${teamLabel(teams,item.teamKey)}`
   ).join('\n')||'Waiting for participating teams.',inline:false});
   const reviews=await rows(db,`SELECT review.decision,review.reason,user.display_name AS reviewerName
@@ -134,10 +154,11 @@ async function tradeDeliveryDetails(db,row,payload){
   if(reviews.length||['committee','rejected','approved'].includes(workflow.status)){
     const approvals=reviews.filter(item=>item.decision==='approve').length,rejections=reviews.filter(item=>item.decision==='reject').length;
     const lines=reviews.map(item=>`${item.decision==='approve'?'✅':item.decision==='reject'?'❌':'➖'} **${item.reviewerName||'Commissioner'}** · ${item.decision}${item.reason?` — ${item.reason}`:''}`);
-    fields.push({name:`Committee review · ${approvals} approve / ${rejections} deny · ${Number(workflow.reviewThreshold)} required`,
+    statusFields.push({name:`Committee review · ${approvals} approve / ${rejections} deny · ${Number(workflow.reviewThreshold)} required`,
       value:(lines.join('\n')||'No committee votes recorded yet.').slice(0,1024),inline:false});
   }
-  return {fields,color:0x4f8cff,workflow};
+  if(statusFields.length)embeds.push({title:'Trade status',fields:statusFields,color:0x4f8cff});
+  return {embeds,workflow};
 }
 
 export async function tradeConversationMessage(db,row,{disabled=false,statusMessage=null}={}){
@@ -165,7 +186,7 @@ export async function tradeConversationMessage(db,row,{disabled=false,statusMess
   }
   return {
     content:[`**${title}**`,message,statusMessage,action,link?`[Open this trade in FranchiseHQ](${link})`:null].filter(Boolean).join('\n').slice(0,2000),
-    ...(details?{embeds:[{title:'Trade details',fields:details.fields,color:details.color}]}:{}),
+    ...(details?{embeds:details.embeds}:{}),
     ...(components.length?{components}:{}),
     allowed_mentions:{parse:[]}
   };

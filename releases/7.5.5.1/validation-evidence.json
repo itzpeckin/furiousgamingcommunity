@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5.1",
+  "status": "locally-validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 38,
+      "candidateRequiresMigration": false,
+      "productionApplied": false
+    },
+    "discordDirectCommandContract": {
+      "passed": true,
+      "standings": ["all", "division", "conference", "team"],
+      "gmHistory": ["all", "player"],
+      "rules": ["all", "category", "section", "rule"],
+      "leaders": {
+        "passing": ["yards", "touchdowns", "interceptions"],
+        "rushing": ["yards", "touchdowns"],
+        "receiving": ["catches", "yards", "touchdowns"],
+        "defense": ["tackles", "sacks", "interceptions"],
+        "kicking": ["field-goals-made"]
+      },
+      "showOrViewRequired": false
+    },
+    "tenantRulesDiscovery": {
+      "passed": true,
+      "publishedRulesAuthority": true,
+      "categorySectionRuleAutocomplete": true,
+      "crossLeagueIsolation": true,
+      "productWideHardcodedNames": false
+    },
+    "maddenContractProvenance": {
+      "passed": true,
+      "currentCapHitUnit": "madden-ten-thousands",
+      "currentReleasePenaltyUnit": "madden-ten-thousands",
+      "legacyThousandsPreserved": true,
+      "releaseNetSavingsIndependent": true,
+      "unsupportedIncomingSalaryInferred": false,
+      "unsupportedProjectedTeamSpaceInferred": false
+    },
+    "discordTradePresentation": {
+      "passed": true,
+      "receivingTeamCards": true,
+      "clickablePlayerNames": true,
+      "playerFacts": ["position", "overall", "development", "age"],
+      "contractFactsSourceBacked": true,
+      "draftPickProjectionPreserved": true
+    },
+    "playerCardAbilities": {
+      "passed": true,
+      "independentVerticalScroll": true,
+      "boundedDesktopHeight": true,
+      "boundedMobileHeight": true,
+      "keyboardFocusable": true,
+      "touchMomentum": true,
+      "containedOverscroll": true
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "focusedTests": 62,
+      "tests": 212,
+      "strictGateTests": 212,
+      "syntaxModules": 255,
+      "trackedFiles": 600,
+      "routes": 76
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "importExecuted": false,
+    "activationPerformed": false,
+    "activeSnapshotChanged": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "newExportRequested": false,
+    "discordCredentialsChanged": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0,
+    "protectedLeagueRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 38,
+      "candidateMigration": 38
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-run",
+      "exactNameUpserts": ["standings", "leaders", "gm-history", "rules"],
+      "bulkReplacementAllowed": false
+    },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "not-run",
+      "currentRelease": "7.5.5"
+    },
+    "productionMaddenExport": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionCandidateImport": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "archiveSeason": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "gameYearTransition": {
+      "authorized": false,
+      "status": "not-run"
+    }
+  }
+}

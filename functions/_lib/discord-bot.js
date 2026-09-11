@@ -33,6 +33,13 @@ import { syncDiscordScheduleThreads } from './discord-schedule.js';
 
 const TWITCH_HANDLE=/^[A-Za-z0-9_]{3,25}$/;
 const clean=(value,max=500)=>String(value??'').trim().slice(0,max);
+const LEADER_ROUTE_METRICS=Object.freeze({
+  passing:Object.freeze({yards:'passYds',touchdowns:'passTDs',interceptions:'passInts'}),
+  rushing:Object.freeze({yards:'rushYds',touchdowns:'rushTDs'}),
+  receiving:Object.freeze({catches:'recCatches',yards:'recYds',touchdowns:'recTDs'}),
+  defense:Object.freeze({tackles:'defTotalTackles',sacks:'defSacks',interceptions:'defInts'}),
+  kicking:Object.freeze({'field-goals-made':'fGMade'})
+});
 
 function requestForAudit(interaction){
   return new Request('https://franchisehq.app/api/discord/interactions',{
@@ -281,7 +288,7 @@ async function confidenceAction(c,subcommand,values){
 
 export async function executeDiscordCommand(c){
   const command=discordCommandName(c.interaction);
-  const {subcommand,values}=discordCommandOptions(c.interaction);
+  const {subcommandGroup,subcommand,values}=discordCommandOptions(c.interaction);
   const legacyWeek=discordScheduleThreadWeek(command);
   if(legacyWeek){
     requireDiscordRole(c,'commissioner');
@@ -300,7 +307,12 @@ export async function executeDiscordCommand(c){
     await joinDiscordLeague(c,requestForAudit(c.interaction));
     return `Welcome to **${c.league.name}**. Your FranchiseHQ access is active but unassigned. A commissioner must assign a team before team and trade actions are available.\n[Open ${c.league.name} in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)})`;
   }
-  if(command==='standings')return standingsCommand(c,{...values,view:values.show});
+  if(command==='standings'){
+    if(subcommand==='all')return standingsCommand(c,{...values,view:'league'});
+    if(subcommand==='division')return standingsCommand(c,{...values,view:values.name?`division:${values.name}`:'division:all'});
+    if(subcommand==='conference')return standingsCommand(c,{...values,view:values.name?`conference:${values.name}`:'conference:all'});
+    if(subcommand==='team')return standingsCommand(c,{...values,view:`team:${values.name}`});
+  }
   if(command==='playoffs')return playoffsCommand(c,values);
   if(command==='eliminated')return eliminatedCommand(c,values);
   if(command==='schedule'){
@@ -312,7 +324,10 @@ export async function executeDiscordCommand(c){
   if(command==='stats')return statsCommand(c,values);
   if(command==='player-stats')return playerStatsCommand(c,values);
   if(command==='team-stats')return teamStatsCommand(c,values);
-  if(command==='leaders')return leadersCommand(c,values);
+  if(command==='leaders'){
+    const metric=LEADER_ROUTE_METRICS[subcommandGroup]?.[subcommand];
+    if(metric)return leadersCommand(c,{...values,category:subcommandGroup,metric});
+  }
   if(command==='player')return playerCommand(c,values);
   if(command==='team')return teamStatsCommand(c,{...values,team:values.name});
   if(command==='trade-block')return tradeBlockAction(c,subcommand,values);
@@ -320,8 +335,14 @@ export async function executeDiscordCommand(c){
   if(command==='news')return newsCommand(c);
   if(command==='gotw')return gotwCommand(c,values);
   if(command==='league-site')return `**[Open ${c.league.name} in FranchiseHQ](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)})**`;
-  if(command==='gm-history')return gmHistoryCommand(c,{...values,name:values.show});
-  if(command==='rules')return rulesCommand(c,values);
+  if(command==='gm-history'){
+    if(subcommand==='all')return gmHistoryCommand(c,{...values,name:''});
+    if(subcommand==='player')return gmHistoryCommand(c,{...values,name:values.name});
+  }
+  if(command==='rules'){
+    if(subcommand==='all')return rulesCommand(c,{...values,query:''});
+    if(['category','section','rule'].includes(subcommand))return rulesCommand(c,{...values,query:values.name});
+  }
   if(command==='twitch'){
     if(subcommand==='view')return twitchViewCommand(c,values,c.interaction);
     if(subcommand==='set')return setTwitch(c,values.channel);

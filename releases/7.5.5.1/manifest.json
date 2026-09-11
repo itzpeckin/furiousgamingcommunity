@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.1",
+  "releaseType": "discord-direct-discovery-contract-provenance-player-card-abilities",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5",
+    "commit": "a6a29a145d2d61a2a968a598e1e3cedfb922799e",
+    "tree": "db2fb7ad6fea99336edb63d3aa25f3334b6727e2",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-authorized"
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "unchanged",
+    "currentRelease": "7.5.5",
+    "currentCommit": "0b75e9bb61222c3b1069b823d32b9cd914a4c789",
+    "currentPagesDeployment": "d973561f-bbec-40b7-8201-674f58419148",
+    "currentMigration": 38,
+    "candidateMigration": 38,
+    "scope": "Direct tenant-aware Discord discovery, Madden contract provenance, clean trade delivery cards, and a bounded accessible Player Card abilities panel."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-commands.js",
+    "functions/_lib/discord-autocomplete.js",
+    "functions/_lib/discord-bot.js",
+    "functions/_lib/discord-delivery.js",
+    "functions/_lib/live-data-experience.js",
+    "app.js",
+    "styles.css",
+    "tests/discord/discord-bot.test.mjs",
+    "tests/import/live-data-experience.test.mjs",
+    "tests/ui/mobile-experience.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/7.5.5.1/release-record.md",
+    "releases/7.5.5.1/validation-evidence.json"
+  ]
+}

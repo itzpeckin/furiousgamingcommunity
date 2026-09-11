@@ -59,6 +59,10 @@ test('Player Card phone layout separates portrait, overall, identity, tabs, and 
   assert.match(mobile, /\.canonical-player-tabs--approved\s*\{[^}]*overflow-x:auto/s);
   assert.match(mobile, /\.canonical-game-log-table table,[\s\S]*width:max-content/s);
   assert.match(mobile, /\[data-value-card-modal\] \.value-card-dialog\s*\{[^}]*height:100dvh/s);
+  assert.match(app, /canonical-dashboard-card canonical-dashboard-card--abilities/);
+  assert.match(app, /class="canonical-ability-list" role="list" tabindex="0"/);
+  assert.match(mobile, /\.canonical-dashboard-card--abilities \.canonical-ability-list\{[^}]*max-height:[^;]+;[^}]*overflow-y:auto/s);
+  assert.match(mobile, /grid-template-rows:minmax\(0,auto\) auto minmax\(0,1fr\)!important/);
 
   const marker = styles.lastIndexOf('/* FranchiseHQ 7.4.4.2 — intentional phone/tablet composition */');
   const legacyAbsolute = styles.slice(0, marker).lastIndexOf('.canonical-player-hero__image{');

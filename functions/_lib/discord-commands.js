@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.5.5';
+export const DISCORD_COMMAND_RELEASE = '7.5.5.1';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -9,6 +9,7 @@ export const DISCORD_RETIRED_GLOBAL_COMMANDS = Object.freeze([
 
 const OPTION = Object.freeze({
   SUB_COMMAND:1,
+  SUB_COMMAND_GROUP:2,
   STRING:3,
   INTEGER:4,
   BOOLEAN:5,
@@ -21,14 +22,13 @@ const privateOption = {
   name:'private',
   description:'Show the result only to you instead of the current channel.'
 };
-const categoryOption = {
-  type:OPTION.STRING,name:'category',description:'Passing, rushing, receiving, defense, kicking, or punting.',choices:[
-    choice('Passing','passing'),choice('Rushing','rushing'),choice('Receiving','receiving'),
-    choice('Defense','defense'),choice('Kicking','kicking'),choice('Punting','punting')
-  ]
-};
 const autocompleteString=(name,description,{required=false}={})=>({
   type:OPTION.STRING,name,description,required,autocomplete:true
+});
+const subcommand=(name,description,options=[privateOption])=>({type:OPTION.SUB_COMMAND,name,description,options});
+const leaderGroup=(name,description,metrics)=>({
+  type:OPTION.SUB_COMMAND_GROUP,name,description,
+  options:metrics.map(([metric,metricDescription])=>subcommand(metric,metricDescription))
 });
 
 export const DISCORD_SCHEDULE_THREAD_COMMANDS = Object.freeze(
@@ -42,8 +42,16 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   {
     name:'standings',description:'View league, conference, division, or team standings.',
     options:[
-      autocompleteString('show','League, Conference, Division, NFC East, or a team.'),
-      privateOption
+      subcommand('all','View all 32 teams in league order.'),
+      subcommand('division','View every division or one selected division.',[
+        autocompleteString('name','Optional division, such as NFC East.'),privateOption
+      ]),
+      subcommand('conference','View every conference or one selected conference.',[
+        autocompleteString('name','Optional conference, such as NFC or AFC.'),privateOption
+      ]),
+      subcommand('team','View one team’s current standing.',[
+        autocompleteString('name','Team name or abbreviation.',{required:true}),privateOption
+      ])
     ]
   },
   {
@@ -82,9 +90,24 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   {
     name:'leaders',description:'View league statistical leaders.',
     options:[
-      {...categoryOption,required:true},
-      autocompleteString('metric','Leader category, such as touchdowns, receptions, or interceptions.'),
-      privateOption
+      leaderGroup('passing','Passing leaders.',[
+        ['yards','Top 10 passing-yard leaders.'],['touchdowns','Top 10 passing-touchdown leaders.'],
+        ['interceptions','Top 10 interceptions-thrown leaders.']
+      ]),
+      leaderGroup('rushing','Rushing leaders.',[
+        ['yards','Top 10 rushing-yard leaders.'],['touchdowns','Top 10 rushing-touchdown leaders.']
+      ]),
+      leaderGroup('receiving','Receiving leaders.',[
+        ['catches','Top 10 reception leaders.'],['yards','Top 10 receiving-yard leaders.'],
+        ['touchdowns','Top 10 receiving-touchdown leaders.']
+      ]),
+      leaderGroup('defense','Defensive leaders.',[
+        ['tackles','Top 10 tackle leaders.'],['sacks','Top 10 sack leaders.'],
+        ['interceptions','Top 10 defensive-interception leaders.']
+      ]),
+      leaderGroup('kicking','Kicking leaders.',[
+        ['field-goals-made','Top 10 field-goal leaders.']
+      ])
     ]
   },
   {
@@ -157,8 +180,10 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   {
     name:'gm-history',description:'View historical GM or owner standings.',
     options:[
-      autocompleteString('show','Optional owner, team, or Discord name. Leave blank to show every GM.'),
-      privateOption
+      subcommand('all','View every GM or owner in league history.'),
+      subcommand('player','View one GM or owner’s league history.',[
+        autocompleteString('name','Owner, Discord, or team name.',{required:true}),privateOption
+      ])
     ]
   },
   {
@@ -178,8 +203,16 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
   {
     name:'rules',description:'Look up league rules by category, section, or text.',
     options:[
-      autocompleteString('query','Category, section, rule title, or rule text.'),
-      privateOption
+      subcommand('all','View all published league rules.'),
+      subcommand('category','View a commissioner-authored rules category.',[
+        autocompleteString('name','Category published by this league.',{required:true}),privateOption
+      ]),
+      subcommand('section','View a commissioner-authored rules section.',[
+        autocompleteString('name','Section published by this league.',{required:true}),privateOption
+      ]),
+      subcommand('rule','View one commissioner-authored rule.',[
+        autocompleteString('name','Rule published by this league.',{required:true}),privateOption
+      ])
     ]
   },
   {
@@ -238,9 +271,16 @@ export function discordCommandName(interaction = {}) {
 export function discordCommandOptions(interaction = {}) {
   const raw = Array.isArray(interaction?.data?.options) ? interaction.data.options : [];
   const first = raw[0];
-  const subcommand = first?.type === OPTION.SUB_COMMAND ? String(first.name || '') : null;
-  const options = subcommand ? (Array.isArray(first.options) ? first.options : []) : raw;
+  const subcommandGroup = first?.type === OPTION.SUB_COMMAND_GROUP ? String(first.name || '') : null;
+  const nested = subcommandGroup && Array.isArray(first.options) ? first.options[0] : null;
+  const subcommand = first?.type === OPTION.SUB_COMMAND
+    ? String(first.name || '')
+    : nested?.type === OPTION.SUB_COMMAND ? String(nested.name || '') : null;
+  const options = nested?.type === OPTION.SUB_COMMAND
+    ? (Array.isArray(nested.options) ? nested.options : [])
+    : subcommand ? (Array.isArray(first.options) ? first.options : []) : raw;
   return {
+    subcommandGroup,
     subcommand,
     values:Object.fromEntries(options.map(item => [String(item.name), item.value]))
   };
@@ -249,10 +289,15 @@ export function discordCommandOptions(interaction = {}) {
 export function discordFocusedOption(interaction = {}) {
   const root=Array.isArray(interaction?.data?.options)?interaction.data.options:[];
   const first=root[0];
-  const subcommand=first?.type===OPTION.SUB_COMMAND?String(first.name||''):null;
-  const options=subcommand&&Array.isArray(first.options)?first.options:root;
+  const subcommandGroup=first?.type===OPTION.SUB_COMMAND_GROUP?String(first.name||''):null;
+  const nested=subcommandGroup&&Array.isArray(first.options)?first.options[0]:null;
+  const subcommand=first?.type===OPTION.SUB_COMMAND?String(first.name||''):
+    nested?.type===OPTION.SUB_COMMAND?String(nested.name||''):null;
+  const options=nested?.type===OPTION.SUB_COMMAND?(Array.isArray(nested.options)?nested.options:[]):
+    subcommand&&Array.isArray(first.options)?first.options:root;
   const focused=options.find(item=>item?.focused===true)||null;
   return {
+    subcommandGroup,
     subcommand,
     focused:focused?{name:String(focused.name||''),value:focused.value??''}:null,
     values:Object.fromEntries(options.map(item=>[String(item.name),item.value]))
