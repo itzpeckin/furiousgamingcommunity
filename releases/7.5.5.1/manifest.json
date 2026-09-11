@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.1",
   "releaseType": "discord-direct-discovery-contract-provenance-player-card-abilities",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5",
@@ -18,8 +18,11 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-authorized"
+    "authorized": true,
+    "status": "published-main-accepted",
+    "candidateCommit": "dfc5e5296eebc34c81ba1661907f0b5316c62434",
+    "pullRequest": 64,
+    "mergeCommit": "1d9895e9a3253c6ebace7feaee12bdd65b3bb2fb"
   },
   "staging": {
     "authorized": false,
@@ -27,12 +30,13 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "unchanged",
-    "currentRelease": "7.5.5",
-    "currentCommit": "0b75e9bb61222c3b1069b823d32b9cd914a4c789",
-    "currentPagesDeployment": "d973561f-bbec-40b7-8201-674f58419148",
+    "authorized": true,
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.1",
+    "currentCommit": "1d9895e9a3253c6ebace7feaee12bdd65b3bb2fb",
+    "initialPagesDeployment": "6bae73b1-e5b9-4dcd-be80-53551d9dcee1",
+    "currentPagesDeployment": "c9ae37c4-c819-49cd-b697-ad24a7d3e481",
     "currentMigration": 38,
     "candidateMigration": 38,
     "scope": "Direct tenant-aware Discord discovery, Madden contract provenance, clean trade delivery cards, and a bounded accessible Player Card abilities panel."
