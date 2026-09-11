@@ -7669,3 +7669,74 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
 @media(max-width:850px){
   .canonical-dashboard-card--abilities .canonical-ability-list{max-height:min(34dvh,260px)}
 }
+
+/* FranchiseHQ 7.5.5.2 — ratings-bounded desktop Player Card details. */
+.canonical-player-dashboard__rail>.canonical-dashboard-stack{
+  grid-template-rows:auto auto!important;
+}
+
+@media(min-width:1181px){
+  /* Ratings is the only column that determines the row height. The other two
+     columns fill that height without allowing long tables to stretch it. */
+  .canonical-player-panels--approved .canonical-player-dashboard{
+    align-items:stretch!important;
+  }
+  .canonical-player-dashboard__ratings{
+    height:auto!important;
+    align-self:start!important;
+  }
+  .canonical-player-dashboard__ratings>.canonical-dashboard-card{
+    height:auto!important;
+  }
+  .canonical-player-dashboard__center,
+  .canonical-player-dashboard__rail{
+    position:relative;
+    height:auto!important;
+    min-height:0!important;
+    align-self:stretch!important;
+    overflow:hidden;
+  }
+  .canonical-player-dashboard__center>.canonical-dashboard-stack,
+  .canonical-player-dashboard__rail>.canonical-dashboard-stack{
+    position:absolute;
+    inset:0;
+    height:auto!important;
+    min-height:0!important;
+  }
+  .canonical-player-dashboard__center>.canonical-dashboard-stack{
+    grid-template-rows:auto minmax(0,1fr)!important;
+  }
+  .canonical-player-dashboard__rail>.canonical-dashboard-stack{
+    grid-template-rows:minmax(0,.9fr) minmax(0,1.1fr)!important;
+  }
+  .canonical-current-game-log-card,
+  .canonical-dashboard-card--abilities,
+  .canonical-dashboard-card--contract{
+    display:flex!important;
+    min-height:0!important;
+    height:100%!important;
+    flex-direction:column!important;
+    overflow:hidden;
+  }
+  .canonical-current-game-log-body,
+  .canonical-dashboard-card--abilities .canonical-ability-list,
+  .canonical-dashboard-card--contract .canonical-contract-grid--compact{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+  }
+  .canonical-details-game-log-scroll{
+    height:100%;
+    max-height:none!important;
+    overflow:auto;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+  }
+  .canonical-dashboard-card--contract .canonical-contract-grid--compact{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    align-content:start;
+  }
+}
