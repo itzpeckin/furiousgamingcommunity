@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.2",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -44,10 +44,10 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "stagingChanged": false,
     "migrationApplied": false,
     "discordCommandsRegistered": false,
@@ -71,12 +71,22 @@
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 66,
+      "candidateCommit": "8e16fdcbc99284a6a4e40816be20e8797e1856bb",
+      "mergeCommit": "6db5816181bd917fd08e33de7fa91e4b16ad6217"
     },
     "hostedChecks": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "pullRequestChecksFailed": 0,
+      "mainChecksPassed": 5,
+      "candidatePushQualityWorkflowRun": 34635331502,
+      "candidatePullRequestQualityWorkflowRun": 34635425187,
+      "mainQualityWorkflowRun": 34635664952,
+      "mainPagesWorkflowRun": 34635664277
     },
     "productionMigration": {
       "authorized": false,
@@ -89,9 +99,14 @@
       "status": "not-run"
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.5.5.1"
+      "authorized": true,
+      "status": "deployed-read-only-verified",
+      "currentRelease": "7.5.5.2",
+      "mainCommit": "6db5816181bd917fd08e33de7fa91e4b16ad6217",
+      "pagesDeployment": "665d4f04-1136-4154-90d8-a6967d221a40",
+      "publicHttpStatus": 200,
+      "leagueHttpStatus": 200,
+      "runtimeReleaseHeader": "7.5.5.2"
     },
     "productionMaddenExport": {
       "authorized": false,
