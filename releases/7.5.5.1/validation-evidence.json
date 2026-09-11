@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.1",
-  "status": "locally-validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -15,7 +15,7 @@
       "passed": true,
       "migrationVersion": 38,
       "candidateRequiresMigration": false,
-      "productionApplied": false
+      "productionApplied": true
     },
     "discordDirectCommandContract": {
       "passed": true,
@@ -74,6 +74,59 @@
       "trackedFiles": 600,
       "routes": 76
     },
+    "productionProtectedState": {
+      "passed": true,
+      "readOnly": true,
+      "database": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "migrationVersion": 38,
+      "migrationLedgerRows": 38,
+      "canonicalTables": 115,
+      "foreignKeyViolations": 0,
+      "leagues": 1,
+      "users": 32,
+      "memberships": 32,
+      "activeTeamAssignments": 31,
+      "retainedSnapshots": 32,
+      "activeSnapshotRows": 1,
+      "activeSnapshot": "2b31297b-19e1-4f28-b86d-e8ff375ceca3",
+      "previousSnapshot": "6d1fb9e1-8ace-4909-8e10-175b24db5910",
+      "activeSeasonYear": 2026,
+      "activeWeek": 19,
+      "activeValidationStatus": "ready",
+      "activeTeams": 32,
+      "activeRosteredPlayers": 2014,
+      "activeGames": 326,
+      "activeStatistics": 14816,
+      "activeStandings": 32,
+      "tradeWorkflows": 11,
+      "tradeMessages": 18,
+      "tradeRooms": 5,
+      "releaseDrivenRowsWritten": 0
+    },
+    "productionPagesAcceptance": {
+      "passed": true,
+      "mainCommit": "1d9895e9a3253c6ebace7feaee12bdd65b3bb2fb",
+      "initialPagesDeployment": "6bae73b1-e5b9-4dcd-be80-53551d9dcee1",
+      "acceptedPagesDeployment": "c9ae37c4-c819-49cd-b697-ad24a7d3e481",
+      "pagesStatus": "success",
+      "gitIntegrated": true,
+      "directUploadUsed": false,
+      "productionAliasPresent": true,
+      "publicReleaseMarker": "7.5.5.1",
+      "runtimeReleaseHeader": "7.5.5.1",
+      "readOnly": true
+    },
+    "discordProductionAcceptance": {
+      "passed": true,
+      "exactNameUpserts": ["standings", "leaders", "gm-history", "rules"],
+      "commandDefinitionsUpserted": 4,
+      "legacyNamesRetired": 0,
+      "bulkReplacementUsed": false,
+      "unownedCommandsDeleted": false,
+      "registrationDeployment": "c9ae37c4-c819-49cd-b697-ad24a7d3e481",
+      "productionBuildCommandRestored": "exit 0"
+    },
     "freeAgentBlockedPreserved": {
       "passed": true,
       "status": "blocked",
@@ -82,13 +135,13 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "stagingChanged": false,
     "migrationApplied": false,
-    "discordCommandsRegistered": false,
+    "discordCommandsRegistered": true,
     "discordConfigurationChanged": false,
     "liveTradeChanged": false,
     "importExecuted": false,
@@ -109,12 +162,20 @@
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 64,
+      "candidateCommit": "dfc5e5296eebc34c81ba1661907f0b5316c62434",
+      "mergeCommit": "1d9895e9a3253c6ebace7feaee12bdd65b3bb2fb"
     },
     "hostedChecks": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "pullRequestChecksFailed": 0,
+      "mainChecksPassed": 5,
+      "mainQualityWorkflowRun": 34628582184,
+      "mainPagesWorkflowRun": 34628581259
     },
     "productionMigration": {
       "authorized": false,
@@ -123,15 +184,21 @@
       "candidateMigration": 38
     },
     "discordCommandRegistration": {
-      "authorized": false,
-      "status": "not-run",
+      "authorized": true,
+      "status": "exact-name-upserted",
       "exactNameUpserts": ["standings", "leaders", "gm-history", "rules"],
-      "bulkReplacementAllowed": false
+      "commandDefinitionsUpserted": 4,
+      "retiredNames": 0,
+      "bulkReplacementAllowed": false,
+      "productionBuildCommandRestored": "exit 0"
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.5.5"
+      "authorized": true,
+      "status": "deployed-read-only-verified",
+      "currentRelease": "7.5.5.1",
+      "mainCommit": "1d9895e9a3253c6ebace7feaee12bdd65b3bb2fb",
+      "initialPagesDeployment": "6bae73b1-e5b9-4dcd-be80-53551d9dcee1",
+      "pagesDeployment": "c9ae37c4-c819-49cd-b697-ad24a7d3e481"
     },
     "productionMaddenExport": {
       "authorized": false,
