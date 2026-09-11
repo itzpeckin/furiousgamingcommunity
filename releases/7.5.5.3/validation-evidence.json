@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.3",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -15,7 +15,7 @@
       "passed": true,
       "migrationVersion": 39,
       "candidateRequiresMigration": true,
-      "productionApplied": false,
+      "productionApplied": true,
       "additiveColumnOnly": true
     },
     "focusedReleaseSuite": {
@@ -60,6 +60,64 @@
       "canonicalMigrations": 22,
       "requiredTables": 115
     },
+    "productionProtectedState": {
+      "passed": true,
+      "database": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "preMigrationBookmark": "000001da-00000926-000050e3-09f58c5ae20fbd53747f31e6f04a99ea",
+      "postMigrationBookmark": "000001da-00000936-000050e3-a961042fa6bd19848b856e06f3fe7cf2",
+      "migrationVersion": 39,
+      "migrationName": "discord_trade_committee_role",
+      "migrationLedgerRowsBefore": 38,
+      "migrationLedgerRowsAfter": 39,
+      "tradeCommitteeRoleColumnsBefore": 0,
+      "tradeCommitteeRoleColumnsAfter": 1,
+      "canonicalTablesBefore": 115,
+      "canonicalTablesAfter": 115,
+      "foreignKeyViolationsAfter": 0,
+      "leaguesBefore": 1,
+      "leaguesAfter": 1,
+      "usersBefore": 32,
+      "usersAfter": 32,
+      "membershipsBefore": 32,
+      "membershipsAfter": 32,
+      "activeTeamAssignmentsBefore": 31,
+      "activeTeamAssignmentsAfter": 31,
+      "teamsBefore": 0,
+      "teamsAfter": 0,
+      "playersBefore": 0,
+      "playersAfter": 0,
+      "snapshotRowsBefore": 0,
+      "snapshotRowsAfter": 0,
+      "activeSnapshotRowsBefore": 1,
+      "activeSnapshotRowsAfter": 1,
+      "retainedSnapshotsAfter": 32,
+      "activeSnapshotAfter": "2b31297b-19e1-4f28-b86d-e8ff375ceca3",
+      "previousSnapshotAfter": "6d1fb9e1-8ace-4909-8e10-175b24db5910",
+      "activeSeasonAfter": 2026,
+      "activeWeekAfter": 19,
+      "activeTeamCountAfter": 32,
+      "activeRosteredPlayersAfter": 2014,
+      "activeGamesAfter": 326,
+      "activeStatisticsAfter": 14816,
+      "activeStandingsAfter": 32,
+      "discordInstallationsAfter": 1,
+      "configuredTradeCommitteeRolesAfter": 0
+    },
+    "productionPagesAcceptance": {
+      "passed": true,
+      "mainCommit": "c7b7560deaded7f04ca7e91f3096d92cf376d6ec",
+      "pagesDeployment": "b569a8ec-cf7e-4cad-96d4-302d3031776c",
+      "pagesStatus": "success",
+      "gitIntegrated": true,
+      "directUploadUsed": false,
+      "publicHttpStatus": 200,
+      "leagueHttpStatus": 200,
+      "runtimeReleaseHeader": "7.5.5.3",
+      "currentSalaryAbsent": true,
+      "totalReleasePenaltyPresent": true,
+      "readOnly": true
+    },
     "freeAgentBlockedPreserved": {
       "passed": true,
       "status": "blocked",
@@ -68,12 +126,12 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "stagingChanged": false,
-    "migrationApplied": false,
+    "migrationApplied": true,
     "discordCommandsRegistered": false,
     "discordConfigurationChanged": false,
     "liveTradeChanged": false,
@@ -90,23 +148,39 @@
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
     "freeAgentInterpretedAsZero": false,
-    "databaseRowsWritten": 0,
+    "databaseRowsWritten": 1,
     "protectedLeagueRowsWritten": 0
   },
   "external": {
     "githubPublication": {
       "authorized": true,
-      "status": "not-run"
+      "status": "published-main-accepted",
+      "pullRequest": 68,
+      "candidateCommit": "3b6c91d5456dfc1b32b1417473bf4a587872127e",
+      "mergeCommit": "c7b7560deaded7f04ca7e91f3096d92cf376d6ec"
     },
     "hostedChecks": {
       "authorized": true,
-      "status": "not-run"
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "pullRequestChecksFailed": 0,
+      "mainChecksPassed": 5,
+      "candidatePushQualityWorkflowRun": 34644687944,
+      "candidatePullRequestQualityWorkflowRun": 34644807590,
+      "mainQualityWorkflowRun": 34645219581,
+      "mainPagesWorkflowRun": 34645218376
     },
     "productionMigration": {
       "authorized": true,
-      "status": "not-run",
-      "currentMigration": 38,
-      "candidateMigration": 39
+      "status": "applied-and-verified",
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "previousMigration": 38,
+      "currentMigration": 39,
+      "candidateMigration": 39,
+      "preMigrationBookmark": "000001da-00000926-000050e3-09f58c5ae20fbd53747f31e6f04a99ea",
+      "postMigrationBookmark": "000001da-00000936-000050e3-a961042fa6bd19848b856e06f3fe7cf2",
+      "foreignKeyViolations": 0
     },
     "discordCommandRegistration": {
       "authorized": false,
@@ -114,8 +188,10 @@
     },
     "productionDeployment": {
       "authorized": true,
-      "status": "not-run",
-      "currentRelease": "7.5.5.2"
+      "status": "deployed-read-only-verified",
+      "currentRelease": "7.5.5.3",
+      "mainCommit": "c7b7560deaded7f04ca7e91f3096d92cf376d6ec",
+      "pagesDeployment": "b569a8ec-cf7e-4cad-96d4-302d3031776c"
     }
   }
 }

@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.3",
   "releaseType": "discord-trade-completion-and-contract-cleanup",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.2",
@@ -19,7 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "authorized-not-run"
+    "status": "published-main-accepted",
+    "candidateCommit": "3b6c91d5456dfc1b32b1417473bf4a587872127e",
+    "pullRequest": 68,
+    "mergeCommit": "c7b7560deaded7f04ca7e91f3096d92cf376d6ec"
   },
   "staging": {
     "authorized": false,
@@ -28,10 +31,12 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.5.5.2",
-    "currentMigration": 38,
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.3",
+    "currentCommit": "c7b7560deaded7f04ca7e91f3096d92cf376d6ec",
+    "currentPagesDeployment": "b569a8ec-cf7e-4cad-96d4-302d3031776c",
+    "currentMigration": 39,
     "candidateMigration": 39,
     "scope": "Additive league-scoped Trade Committee role routing, shared detailed Discord trade packages, and same-thread close/revision lifecycle."
   },
