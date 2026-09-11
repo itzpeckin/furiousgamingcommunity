@@ -6,6 +6,7 @@ import { normalizePlayer, normalizeTeam } from '../api/leagues/[leagueSlug]/snap
 
 const MAX_ATTEMPTS=5;
 const SNOWFLAKE=/^\d{17,20}$/;
+const DISCORD_SUPPRESS_EMBEDS=1<<2;
 const rows=async(db,sql,...values)=>(await db.prepare(sql).bind(...values).all()).results||[];
 const cleanError=value=>String(value?.message||value||'Discord delivery failed.').replace(/Bot\s+[A-Za-z0-9._-]+/g,'Bot [redacted]').slice(0,500);
 
@@ -31,6 +32,7 @@ const embedColor=value=>{
 };
 const available=value=>value!==null&&value!==undefined&&value!=='';
 const playerFact=(label,value)=>`**${label}**: ${available(value)?value:'Unavailable'}`;
+const compactPlayerFact=value=>available(value)?String(value):'Unavailable';
 const tradeStatusLabel=(workflow,reviews=[])=>{
   const status=String(workflow?.status||'').toLowerCase();
   if(status==='negotiating')return 'Negotiating';
@@ -84,7 +86,7 @@ async function tradeDeliveryDetails(db,row,payload){
     const available=maddenMoney(source.source?.capAvailable);
     if(team&&available!==null)capByTeam.set(team.teamKey,available);
   }
-  const groups=new Map(),capMoves=new Map();
+  const groups=new Map(),summaryGroups=new Map(),capMoves=new Map();
   const capMove=teamKey=>{
     const key=String(teamKey||'');
     if(!capMoves.has(key))capMoves.set(key,{netReleaseSavings:0,releasePenalty:0});
@@ -93,6 +95,7 @@ async function tradeDeliveryDetails(db,row,payload){
   for(const asset of assets){
     const destination=String(asset.toTeamKey||'');
     if(!groups.has(destination))groups.set(destination,[]);
+    if(!summaryGroups.has(destination))summaryGroups.set(destination,[]);
     if(asset.assetType==='player'){
       const player=normalizePlayer(parse(asset.playerDataJson),asset.playerPublicId),href=payload.leagueSlug
         ?`https://franchisehq.app/leagues/${encodeURIComponent(payload.leagueSlug)}#players/${encodeURIComponent(player.publicId||player.id||asset.sourcePlayerId)}`:null;
@@ -120,6 +123,11 @@ async function tradeDeliveryDetails(db,row,payload){
         name:'👤 PLAYER',
         value:[href?`**[${name}](${href})**`:`**${name}**`,playerSection,'',contractSection].join('\n').slice(0,1024)
       });
+      summaryGroups.get(destination).push([
+        href?`• **[${name}](${href})**`:`• **${name}**`,
+        [compactPlayerFact(player.position),available(player.overall)?`${player.overall} OVR`:'OVR unavailable',
+          player.devTrait||'Development unavailable',available(player.age)?`Age ${player.age}`:'Age unavailable'].join(' · ')
+      ].join('\n'));
       const from=String(asset.fromTeamKey||'');
       if(savings!==null)capMove(from).netReleaseSavings+=savings;
       if(penalty!==null)capMove(from).releasePenalty+=penalty;
@@ -132,6 +140,7 @@ async function tradeDeliveryDetails(db,row,payload){
           pick.originalTeamKey?`Original Team: **${String(pick.originalTeamKey).toUpperCase()}**`:null
         ].filter(Boolean).join('\n').slice(0,1024)
       });
+      summaryGroups.get(destination).push(`• **${pick.draftClass||'Future'} Round ${pick.round||'—'}**${pick.projectedPick?` · Projected ${pick.projectedPick}${pick.projectionTied?' (approx.)':''}`:''}${pick.originalTeamKey?` · From ${String(pick.originalTeamKey).toUpperCase()}`:''}`);
     }
   }
   const embeds=[];
@@ -173,7 +182,68 @@ async function tradeDeliveryDetails(db,row,payload){
       value:(lines.join('\n')||'No committee votes recorded yet.').slice(0,1024),inline:false});
   }
   embeds.push({title:'Trade status',fields:statusFields,color:0x4f8cff});
-  return {embeds,workflow};
+  const assetSummary=[...summaryGroups].map(([teamKey,items])=>[
+    `**${teamLabel(teams,teamKey)} receives**`,...items
+  ].join('\n')).join('\n\n');
+  return {embeds,workflow,assetCount:assets.length,assetSummary};
+}
+
+function tradeFallbackBlocks(message){
+  const blocks=[];
+  for(const embed of message?.embeds||[]){
+    if(!embed?.title)continue;
+    blocks.push(`### ${embed.title}`);
+    for(const field of embed.fields||[]){
+      blocks.push([field.name?`**${field.name}**`:null,field.value].filter(Boolean).join('\n'));
+    }
+  }
+  return blocks;
+}
+
+function chunkDiscordContent(blocks,limit=1900){
+  const chunks=[];
+  let current='';
+  const append=value=>{
+    const next=current?`${current}\n\n${value}`:value;
+    if(next.length<=limit){current=next;return}
+    if(current){chunks.push(current);current=''}
+    if(value.length<=limit){current=value;return}
+    const lines=value.split('\n');
+    for(const line of lines){
+      if(line.length>limit){
+        if(current){chunks.push(current);current=''}
+        for(let index=0;index<line.length;index+=limit)chunks.push(line.slice(index,index+limit));
+      }else append(line);
+    }
+  };
+  for(const block of blocks)append(block);
+  if(current)chunks.push(current);
+  return chunks;
+}
+
+async function recoverSuppressedTradeEmbeds(env,channelId,posted,message,fetchImpl){
+  if(!message?.embeds?.length||!posted?.id)return {recovered:false};
+  const responseEmbeds=Array.isArray(posted.embeds)?posted.embeds:null;
+  const suppressed=Boolean(Number(posted.flags||0)&DISCORD_SUPPRESS_EMBEDS);
+  if(responseEmbeds!==null&&responseEmbeds.length===message.embeds.length&&!suppressed)return {recovered:false};
+  if(responseEmbeds===null&&!suppressed)return {recovered:false};
+
+  if(suppressed){
+    const unsuppressed=await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(posted.id)}`,{
+      method:'PATCH',body:{flags:Number(posted.flags||0)&~DISCORD_SUPPRESS_EMBEDS},fetchImpl
+    }).catch(()=>null);
+    if(Array.isArray(unsuppressed?.embeds)&&unsuppressed.embeds.length===message.embeds.length){
+      return {recovered:true,method:'unsuppressed'};
+    }
+  }
+
+  const chunks=chunkDiscordContent(tradeFallbackBlocks(message));
+  for(const content of chunks){
+    await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
+      method:'POST',body:{content,allowed_mentions:{parse:[]}},fetchImpl
+    });
+  }
+  return {recovered:Boolean(chunks.length),method:'text-fallback',messages:chunks.length};
 }
 
 export async function tradeConversationMessage(db,row,{disabled=false,statusMessage=null}={}){
@@ -188,7 +258,9 @@ export async function tradeConversationMessage(db,row,{disabled=false,statusMess
   const action=['received','thread-update','revision-submitted'].includes(row.eventType)&&tradeId?'Use the buttons below to respond to the current offer.'
     :row.eventType==='review-required'&&tradeId?'Commissioners can record their decision with the buttons below.'
     :null;
-  const details=await tradeDeliveryDetails(db,row,payload).catch(()=>null);
+  let details=null;
+  try{details=await tradeDeliveryDetails(db,row,payload)}
+  catch(error){console.error('Discord trade detail render failed:',cleanError(error))}
   const decisionReady=['received','thread-update','revision-submitted'].includes(row.eventType)&&tradeId&&details?.workflow?.status==='negotiating';
   const reviewReady=row.eventType==='review-required'&&tradeId&&details?.workflow?.status==='committee';
   const revisionReady=['thread-update','revision-submitted'].includes(row.eventType)&&tradeId&&details?.workflow?.status==='rejected';
@@ -203,7 +275,8 @@ export async function tradeConversationMessage(db,row,{disabled=false,statusMess
   }
   return {
     content:[row.eventType==='review-required'&&committeeRoleId?`<@&${committeeRoleId}>`:null,
-      `**${title}**`,message,statusMessage,action,link?`[Open this trade in FranchiseHQ](${link})`:null].filter(Boolean).join('\n').slice(0,2000),
+      `**${title}**`,message,row.eventType==='review-required'?details?.assetSummary:null,statusMessage,action,
+      link?`[Open this trade in FranchiseHQ](${link})`:null].filter(Boolean).join('\n\n').slice(0,2000),
     ...(details?{embeds:details.embeds}:{}),
     ...(components.length?{components}:{}),
     allowed_mentions:row.eventType==='review-required'&&committeeRoleId
@@ -343,9 +416,15 @@ async function sendDelivery(env,db,row,fetchImpl){
       });
     }
   }
-  await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
-    method:'POST',body:await deliveryMessage(db,row),fetchImpl
+  const message=await deliveryMessage(db,row);
+  if(row.eventType==='review-required'&&(!message.embeds?.length||!message.content?.includes(' receives**'))){
+    throw new Error('Discord committee delivery stopped because its trade asset package was incomplete.');
+  }
+  const posted=await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
+    method:'POST',body:message,fetchImpl
   });
+  const embedRecovery=row.eventType==='review-required'
+    ?await recoverSuppressedTradeEmbeds(env,channelId,posted,message,fetchImpl):null;
   if(payload.archiveThreadAfterSend&&row.visibility==='private-channel'){
     try{
       const room=await setTradeThreadState(env,db,row,payload,{archived:true,locked:true},fetchImpl);
@@ -354,7 +433,7 @@ async function sendDelivery(env,db,row,fetchImpl){
       return {archiveError:cleanError(error),payload};
     }
   }
-  return {archived:false};
+  return {archived:false,embedRecovery};
 }
 
 export async function flushDiscordDeliveries(env,db,{leagueId=null,limit=10,fetchImpl=fetch}={}){
