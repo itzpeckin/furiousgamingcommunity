@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5.2",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 38,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "playerCardDesktopLayout": {
+      "passed": true,
+      "ratingsHeightAuthority": true,
+      "gameLogContainedScroll": true,
+      "abilitiesContainedScroll": true,
+      "contractContainedScroll": true,
+      "duplicateDetailsTransactionWidgetRemoved": true,
+      "transactionHistoryTabPreserved": true,
+      "tabletAndMobileStackPreserved": true
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "focusedTests": 5,
+      "tests": 212,
+      "strictGateTests": 212,
+      "syntaxModules": 255,
+      "routes": 76
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "importExecuted": false,
+    "activationPerformed": false,
+    "activeSnapshotChanged": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "newExportRequested": false,
+    "discordCredentialsChanged": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0,
+    "protectedLeagueRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 38,
+      "candidateMigration": 38
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionDeployment": {
+      "authorized": false,
+      "status": "not-run",
+      "currentRelease": "7.5.5.1"
+    },
+    "productionMaddenExport": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionCandidateImport": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "archiveSeason": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "gameYearTransition": {
+      "authorized": false,
+      "status": "not-run"
+    }
+  }
+}

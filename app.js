@@ -4383,7 +4383,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function canonicalPlayerSideRail(player={}) {
-    return `<div class="canonical-dashboard-stack"><section class="canonical-dashboard-card canonical-dashboard-card--abilities"><div class="canonical-dashboard-card__head"><h3>Abilities</h3></div>${renderCanonicalAbilities(player)}</section><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Contract</h3></div>${canonicalContractPanel(player)}</section><section class="canonical-dashboard-card canonical-dashboard-card--transactions"><div class="canonical-dashboard-card__head"><h3>Transaction History</h3></div>${canonicalTransactionHistory(player.id)}</section></div>`;
+    return `<div class="canonical-dashboard-stack"><section class="canonical-dashboard-card canonical-dashboard-card--abilities"><div class="canonical-dashboard-card__head"><h3>Abilities</h3></div>${renderCanonicalAbilities(player)}</section><section class="canonical-dashboard-card canonical-dashboard-card--contract"><div class="canonical-dashboard-card__head"><h3>Contract</h3></div>${canonicalContractPanel(player)}</section></div>`;
   }
 
   function openCanonicalLivePlayerCard(playerId='') {
@@ -9945,7 +9945,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.5.5.1';
+  const VISIBLE_RELEASE = '7.5.5.2';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';
