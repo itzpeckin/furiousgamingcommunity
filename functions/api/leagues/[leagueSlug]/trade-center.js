@@ -136,7 +136,12 @@ async function reviewerUserIds(db, leagueId, participantTeams = []) {
 }
 
 async function workflow(db, leagueId, tradeId) {
-  return db.prepare(`SELECT * FROM trade_workflows WHERE league_id=? AND id=?`).bind(leagueId, tradeId).first();
+  return db.prepare(`SELECT workflow.* FROM trade_workflows workflow WHERE workflow.league_id=? AND workflow.id=?
+    AND NOT EXISTS (SELECT 1 FROM trade_management_events event
+      WHERE event.league_id=workflow.league_id AND event.event_type='trade-hidden' AND event.trade_id=workflow.id)
+    AND NOT EXISTS (SELECT 1 FROM trade_management_events event
+      WHERE event.league_id=workflow.league_id AND event.event_type='all-trades-hidden'
+        AND workflow.created_at<=event.created_at)`).bind(leagueId, tradeId).first();
 }
 
 async function workflowParticipants(db, leagueId, tradeId) {
@@ -181,7 +186,7 @@ async function publicWorkflow(db, leagueId, row, session) {
       WHERE review.league_id=? AND review.trade_id=? AND review.revision=? ORDER BY review.updated_at`,leagueId,row.id,row.revision)
     : [];
   return {
-    id:row.id,status:row.status,revision:Number(row.revision),proposerTeamKey:row.proposer_team_key,
+    id:row.id,franchiseSeasonId:row.franchise_season_id,status:row.status,revision:Number(row.revision),proposerTeamKey:row.proposer_team_key,
     note:privateAccess?(row.note || ''):'',freeTrade:Boolean(row.free_trade),reviewThreshold:Number(row.review_threshold),
     decisionReason:privateAccess?(row.decision_reason || null):null,approvedAt:row.approved_at || null,rejectedAt:privateAccess?(row.rejected_at || null):null,
     createdAt:row.created_at,updatedAt:row.updated_at,
@@ -197,7 +202,12 @@ export async function tradeCenterState(c) {
     seasonYear:season.seasonYear,gameRelease:season.gameRelease,teams:c.teams}) : null;
   const settings = await leagueSettings(c.db,c.league.id);
   const assignments = await activeTeamAssignments(c.db,c.league.id,c.teams);
-  const allRows = await resultRows(c.db, `SELECT * FROM trade_workflows WHERE league_id=?
+  const allRows = await resultRows(c.db, `SELECT workflow.* FROM trade_workflows workflow WHERE workflow.league_id=?
+    AND NOT EXISTS (SELECT 1 FROM trade_management_events event
+      WHERE event.league_id=workflow.league_id AND event.event_type='trade-hidden' AND event.trade_id=workflow.id)
+    AND NOT EXISTS (SELECT 1 FROM trade_management_events event
+      WHERE event.league_id=workflow.league_id AND event.event_type='all-trades-hidden'
+        AND workflow.created_at<=event.created_at)
     ORDER BY updated_at DESC LIMIT 250`,c.league.id);
   const workflows = [];
   for (const row of allRows) {
@@ -223,6 +233,25 @@ export async function tradeCenterState(c) {
     WHERE league_id=? AND user_id=? ORDER BY created_at DESC LIMIT 100`,c.league.id,c.session.user.id);
   const teamNeeds = await resultRows(c.db, `SELECT team_key AS teamKey,needs_json AS needsJson,updated_at AS updatedAt
     FROM trade_block_team_profiles WHERE league_id=? ORDER BY team_key`,c.league.id);
+  let tradeManagement=null;
+  if(isCommissioner(c.session)&&season){
+    const reset=await c.db.prepare(`SELECT MAX(created_at) AS resetAt FROM trade_management_events
+      WHERE league_id=? AND franchise_season_id=? AND event_type='season-counter-reset'`).bind(c.league.id,season.id).first();
+    const approved=workflows.filter(item=>item.status==='approved'&&item.participants.some(participant=>participant.teamKey));
+    const byTeam=new Map(c.teams.map(team=>[team.teamKey,[]]));
+    for(const item of approved){
+      if(item.franchiseSeasonId&&item.franchiseSeasonId!==season.id)continue;
+      for(const participant of item.participants){
+        const list=byTeam.get(participant.teamKey)||[];list.push({tradeId:item.id,approvedAt:item.approvedAt,
+          freeTrade:Boolean(item.freeTrade),teams:item.participants.map(value=>value.teamKey),assets:item.assets});byTeam.set(participant.teamKey,list);
+      }
+    }
+    tradeManagement={canManage:true,seasonId:season.id,seasonCounterResetAt:reset?.resetAt||null,
+      teams:[...byTeam].map(([teamKey,trades])=>{const charged=trades.filter(item=>!item.freeTrade&&(!reset?.resetAt||String(item.approvedAt||'')>String(reset.resetAt)));return{
+        teamKey,limit:settings.tradeCenter.seasonTradeLimit,enabled:settings.tradeCenter.seasonTradeLimitEnabled,
+        used:charged.length,remaining:Math.max(0,settings.tradeCenter.seasonTradeLimit-charged.length),trades
+      }})};
+  }
   return {
     ok:true,release:TRADE_CENTER_RELEASE,
     league:{id:c.league.id,slug:c.league.slug,name:c.league.name},
@@ -230,7 +259,7 @@ export async function tradeCenterState(c) {
     season:season || null,settings:{revision:settings.revision,updatedAt:settings.updatedAt,...settings.tradeCenter},
     teams:publicLeagueTeams(c.teams,assignments),picks,pickBaseline,standingsProjection,workflows,
     listings:listings.map(item => ({...item,needs:jsonParse(item.needsJson,{})})),
-    teamNeeds:teamNeeds.map(item=>({...item,needs:jsonParse(item.needsJson,[])})),notifications
+    teamNeeds:teamNeeds.map(item=>({...item,needs:jsonParse(item.needsJson,[])})),notifications,tradeManagement
   };
 }
 
@@ -460,7 +489,14 @@ async function review(c, row, participants, decision, reason, freeTrade) {
         FROM trade_workflows workflow JOIN trade_workflow_participants participant
           ON participant.trade_id=workflow.id AND participant.league_id=workflow.league_id
         WHERE workflow.league_id=? AND workflow.franchise_season_id=? AND workflow.status='approved'
-          AND workflow.free_trade=0 AND workflow.slot_released_at IS NULL AND participant.team_key=?`).bind(c.league.id,row.franchise_season_id,participant.team_key).first();
+          AND workflow.free_trade=0 AND participant.team_key=?
+          AND NOT EXISTS (SELECT 1 FROM trade_management_events event WHERE event.league_id=workflow.league_id
+            AND event.event_type='trade-hidden' AND event.trade_id=workflow.id)
+          AND NOT EXISTS (SELECT 1 FROM trade_management_events event WHERE event.league_id=workflow.league_id
+            AND event.event_type='all-trades-hidden' AND workflow.created_at<=event.created_at)
+          AND workflow.approved_at>COALESCE((SELECT MAX(event.created_at) FROM trade_management_events event
+            WHERE event.league_id=workflow.league_id AND event.franchise_season_id=workflow.franchise_season_id
+              AND event.event_type='season-counter-reset'),'0000-01-01 00:00:00')`).bind(c.league.id,row.franchise_season_id,participant.team_key).first();
       if(Number(usage?.used||0)>=settings.seasonTradeLimit){
         throw Object.assign(new Error(`${String(participant.team_key).toUpperCase()} has reached its Franchise season trade limit.`),{status:409});
       }
@@ -553,6 +589,59 @@ async function updateSettings(c, body) {
       VALUES (?,?,?,?,?,'Trade Center settings updated',CURRENT_TIMESTAMP)`)
       .bind(`setting_revision_${crypto.randomUUID()}`,c.league.id,revision,JSON.stringify(document),c.session.user.id),
     tenantAuditStatement(c.db,audit,{resourceType:'league_settings',resourceId:c.league.id,detail:{revision,scope:'tradeCenter'}})
+  ]);
+}
+
+async function manageTradeHistory(c, action, body) {
+  if (!isCommissioner(c.session)) throw Object.assign(new Error('Commissioner access is required.'),{status:403});
+  const season=await currentSeason(c.db,c.league.id);
+  if(!season)throw Object.assign(new Error('An active Franchise season is required.'),{status:409});
+  const eventId=`trade_management_${crypto.randomUUID()}`;
+  if(action==='reset-season-trades'){
+    const audit=createTenantAuditContext({request:c.request},c.league,c.session,'trade_season_counters_reset');
+    await c.db.batch([
+      c.db.prepare(`INSERT INTO trade_management_events
+        (id,league_id,franchise_season_id,event_type,actor_user_id,reason,detail_json,created_at)
+        VALUES (?,?,?,'season-counter-reset',?,?,?,CURRENT_TIMESTAMP)`)
+        .bind(eventId,c.league.id,season.id,c.session.user.id,cleanText(body.reason,500)||null,JSON.stringify({seasonYear:season.seasonYear})),
+      tenantAuditStatement(c.db,audit,{resourceType:'franchise_season',resourceId:season.id,
+        detail:{tradeCountersReset:true,tradeHistoryPreserved:true,rostersChanged:false,draftPickOwnershipChanged:false}})
+    ]);
+    return;
+  }
+  if(action==='reset-all-trades'){
+    const visible=await c.db.prepare(`SELECT COUNT(*) AS count FROM trade_workflows workflow WHERE workflow.league_id=?
+      AND NOT EXISTS (SELECT 1 FROM trade_management_events event WHERE event.league_id=workflow.league_id
+        AND event.event_type='trade-hidden' AND event.trade_id=workflow.id)
+      AND NOT EXISTS (SELECT 1 FROM trade_management_events event WHERE event.league_id=workflow.league_id
+        AND event.event_type='all-trades-hidden' AND workflow.created_at<=event.created_at)`).bind(c.league.id).first();
+    const audit=createTenantAuditContext({request:c.request},c.league,c.session,'trade_history_reset_all');
+    await c.db.batch([
+      c.db.prepare(`INSERT INTO trade_management_events
+        (id,league_id,franchise_season_id,event_type,actor_user_id,reason,detail_json,created_at)
+        VALUES (?,?,?,'all-trades-hidden',?,?,?,CURRENT_TIMESTAMP)`)
+        .bind(eventId,c.league.id,season.id,c.session.user.id,cleanText(body.reason,500)||null,
+          JSON.stringify({hiddenWorkflowCount:Number(visible?.count||0),tradeCountersReset:true,rostersChanged:false,draftPickOwnershipChanged:false})),
+      tenantAuditStatement(c.db,audit,{resourceType:'league_trade_history',resourceId:c.league.id,
+        detail:{hiddenWorkflowCount:Number(visible?.count||0),tradeCountersReset:true,rostersChanged:false,draftPickOwnershipChanged:false,
+          canonicalTransactionsPreserved:true}})
+    ]);
+    return;
+  }
+  const tradeId=cleanText(body.tradeId,100);
+  if(!tradeId)throw Object.assign(new Error('tradeId is required.'),{status:400});
+  const row=await workflow(c.db,c.league.id,tradeId);
+  if(!row||row.status!=='approved')throw Object.assign(new Error('Only a visible approved trade can be removed from Trade Center history.'),{status:409});
+  const audit=createTenantAuditContext({request:c.request},c.league,c.session,'approved_trade_hidden');
+  await c.db.batch([
+    c.db.prepare(`INSERT INTO trade_management_events
+      (id,league_id,franchise_season_id,trade_id,event_type,actor_user_id,reason,detail_json,created_at)
+      VALUES (?,?,?,?,'trade-hidden',?,?,?,CURRENT_TIMESTAMP)`)
+      .bind(eventId,c.league.id,row.franchise_season_id,row.id,c.session.user.id,cleanText(body.reason,500)||null,
+        JSON.stringify({tradeSlotRestored:true,rostersChanged:false,draftPickOwnershipChanged:false,canonicalTransactionPreserved:true})),
+    tenantAuditStatement(c.db,audit,{resourceType:'trade_workflow',resourceId:row.id,
+      detail:{removedFromVisibleHistory:true,tradeSlotRestored:true,rostersChanged:false,draftPickOwnershipChanged:false,
+        canonicalTransactionPreserved:true}})
   ]);
 }
 
@@ -679,6 +768,7 @@ export async function executeTradeCenterAction(c, body = {}) {
   else if(action==='apply-pick-baseline')await applyPickBaseline(c,body);
   else if(action==='trade-block')await updateBlock(c,body);
   else if(action==='trade-block-needs')await updateTeamNeeds(c,body);
+  else if(['hide-approved-trade','reset-season-trades','reset-all-trades'].includes(action))await manageTradeHistory(c,action,body);
   else if(action==='notifications-read')await c.db.prepare(`UPDATE league_notifications SET read_at=CURRENT_TIMESTAMP
     WHERE league_id=? AND user_id=? AND read_at IS NULL`).bind(c.league.id,c.session.user.id).run();
   else {

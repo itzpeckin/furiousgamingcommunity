@@ -222,7 +222,7 @@ test('desktop and mobile protected routes preserve the exact league URL with ser
       const html=await response.text();
       assert.match(html,/__FHQ_AUTH_BOOTSTRAP__/);
       assert.match(html,/league:manage/);
-      assert.equal(response.headers.get('x-fhq-route-fix'),'7.5.5.4');
+      assert.equal(response.headers.get('x-fhq-route-fix'),'7.5.5.5');
     } finally { database.close(); }
   }
 });

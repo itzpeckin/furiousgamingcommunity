@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.5",
+  "releaseType": "trade-review-and-commissioner-management",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.4",
+    "commit": "516f01d723d04a589b11692b94d272912d78b97f",
+    "tree": "afd746a00fb9afbb7b50d0956698c439c2c43151",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.5-trade-review-controls",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "authorized-not-run",
+    "candidateCommit": null,
+    "pullRequest": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.5.4",
+    "currentCommit": "516f01d723d04a589b11692b94d272912d78b97f",
+    "currentMigration": 39,
+    "candidateMigration": 40,
+    "scope": "Exact Discord trade-card parity plus audited Trade Center allowance and visible-history management."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-delivery.js",
+    "functions/_lib/discord-read-model.js",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "league-engine/trade-center-live.js",
+    "trade-module.js",
+    "styles.css",
+    "migrations/0040_trade_management_events.sql",
+    "tests/discord/discord-bot.test.mjs",
+    "tests/trade/full-trade-center.test.mjs",
+    "tests/commissioner/commissioner-hq.test.mjs",
+    "tests/ui/mobile-experience.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.5/release-record.md",
+    "releases/7.5.5.5/validation-evidence.json"
+  ]
+}

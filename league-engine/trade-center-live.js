@@ -2,13 +2,13 @@
   'use strict';
 
   const HQ=window.FranchiseHQ;
-  const VERSION='7.4.2';
+  const VERSION='7.5.5.5';
   const page=()=>document.querySelector('[data-page-content]');
   const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||null;
   const route=()=>String(location.hash||'#home').replace(/^#\/?/,'');
   const routePart=()=>route().split('/')[1]||'';
-  let state=null,loading=null,lastError=null,builder=null,blockLookup=new Set(),blockManagerOpen=false,blockRosterOpen=false,blockEditor=null,blockRosterSearch='',blockRemovalCandidate=null,cancelArmedTradeId=null,builderGridScrollLeft=0;
+  let state=null,loading=null,lastError=null,builder=null,blockLookup=new Set(),blockManagerOpen=false,blockRosterOpen=false,blockEditor=null,blockRosterSearch='',blockRemovalCandidate=null,cancelArmedTradeId=null,managementArmedAction=null,builderGridScrollLeft=0;
   const builderPickerScroll=new Map();
   const assetFilters=new Map(),assetSearch=new Map(),blockFilters={scope:'league',name:'',position:'All',team:'All',overall:'All',development:'All'};
 
@@ -402,6 +402,27 @@
     return [player?.id,player?.publicId].filter(Boolean).some(id=>blockLookup.has(String(id)));
   }
 
+  function teamTradeUsage(teamKey){
+    return state?.tradeManagement?.teams?.find(item=>item.teamKey===String(teamKey||'').toLowerCase())||null;
+  }
+
+  function renderTeamTradeUsage(teamKey){
+    const usage=teamTradeUsage(teamKey),visual=teamVisual(teamKey),trades=usage?.trades||[];
+    const cards=trades.map(trade=>{
+      const other=trade.teams.filter(key=>key!==teamKey).map(teamAbbr).join(' · ');
+      const received=trade.assets.filter(asset=>asset.toTeamKey===teamKey).map(asset=>assetLabel(asset));
+      const sent=trade.assets.filter(asset=>asset.fromTeamKey===teamKey).map(asset=>assetLabel(asset));
+      return `<article class="team-trade-ledger-card" style="${teamStyle(teamKey)}"><div class="team-trade-ledger-card__heading"><span class="pill pill--${trade.freeTrade?'success':'accent'}">${trade.freeTrade?'Free Trade':'Season Trade'}</span><strong>${esc(teamAbbr(teamKey))} ↔ ${esc(other||'League')}</strong><small>${esc(date(trade.approvedAt))}</small></div><div class="team-trade-ledger-card__assets"><span><small>Received</small><strong>${received.length?received.map(esc).join(' · '):'No assets'}</strong></span><span><small>Sent</small><strong>${sent.length?sent.map(esc).join(' · '):'No assets'}</strong></span></div><button class="button button--danger button--subtle button--small" data-live-hide-approved-trade="${esc(trade.tradeId)}">Remove Trade</button></article>`;
+    }).join('');
+    return `<div class="ownership-modal-header team-trade-ledger-header" style="--trade-team-primary:${visual.primary};--trade-team-secondary:${visual.secondary}">${teamMark(teamKey)}<div><span class="eyebrow">Season trade allowance</span><h2>${esc(teamName(teamKey))}</h2><p>${usage?.enabled?`${usage.remaining} of ${usage.limit} trades available`:'Trade limit is not enforced'}</p></div></div><section class="team-trade-ledger"><div class="team-trade-ledger-summary"><span><small>Available</small><strong>${usage?.enabled?usage.remaining:'Unlimited'}</strong></span><span><small>Used since reset</small><strong>${usage?.used??0}</strong></span><span><small>Approved history</small><strong>${trades.length}</strong></span></div>${cards||'<div class="empty-state"><strong>No approved trades</strong><p>This team has no visible approved Trade Center history.</p></div>'}<small class="team-trade-ledger-note">Removing an approved trade restores its allowance and hides it from Trade Center history. Madden rosters, draft-pick ownership, canonical transaction evidence, and audit history are preserved.</small></section>`;
+  }
+
+  function renderCommissionerManagement(){
+    if(!state?.tradeManagement?.canManage)return'';
+    const confirmation=managementArmedAction?`<div class="trade-management-confirm" role="alertdialog" aria-label="Confirm trade management action"><strong>${managementArmedAction==='reset-all-trades'?'Clear all Trade Center history?':'Reset every team’s season trade counter?'}</strong><p>${managementArmedAction==='reset-all-trades'?'Trades disappear from Trade Center and Teams & Owners. Madden-confirmed rosters, draft-pick ownership, canonical transactions, and audit evidence remain unchanged.':'Every team returns to the full configured allowance. Approved trade history and all roster and pick ownership remain unchanged.'}</p><div><button class="button button--danger" data-live-confirm-management="${managementArmedAction}">Confirm</button><button class="button button--ghost" data-live-cancel-management>Cancel</button></div></div>`:'';
+    return `<section class="card trade-management-zone"><div class="card-header"><div><span class="eyebrow">Commissioner maintenance</span><h3>Trade History & Allowances</h3><p>Manage Trade Center records without changing Madden-authoritative rosters or draft-pick ownership.</p></div></div><div class="trade-management-actions"><button class="button button--secondary" data-live-arm-management="reset-season-trades">Reset Season Trades</button><button class="button button--danger button--subtle" data-live-arm-management="reset-all-trades">Reset ALL Trades</button></div>${confirmation}</section>`;
+  }
+
   function startAssetTrade(assetType,assetId){
     if(!state){load().then(()=>startAssetTrade(assetType,assetId)).catch(error=>showToast('Trade Center unavailable',error.message));return}
     if(!currentTeam()){showToast('Team assignment required','An active team owner assignment is required to build a trade.');return}
@@ -611,6 +632,10 @@
     if(target=event.target.closest('[data-live-block-scope]')){event.preventDefault();blockFilters.scope=target.dataset.liveBlockScope;renderTradeBlock();return}
     if(target=event.target.closest('[data-live-open-player]')){if(event.target.closest('button'))return;event.preventDefault();openPlayerCard(target.dataset.liveOpenPlayer);return}
     if(target=event.target.closest('[data-live-save-settings]')){event.preventDefault();const settings=structuredClone(state.settings);document.querySelectorAll('[data-live-setting]').forEach(input=>{settings[input.dataset.liveSetting]=input.type==='checkbox'?input.checked:Number(input.value)});document.querySelectorAll('[data-live-value-path]').forEach(input=>setDeep(settings,input.dataset.liveValuePath,Number(input.value)));document.querySelectorAll('[data-live-projection]').forEach(input=>setDeep(settings,`valueModel.draft.teamProjections.${input.dataset.liveProjection}`,input.value));act('settings',{revision:state.settings.revision,settings},'League settings saved');return}
+    if(target=event.target.closest('[data-live-arm-management]')){event.preventDefault();managementArmedAction=target.dataset.liveArmManagement;window.FGC_TRADE?.renderCommissioner?.('controls');return}
+    if(target=event.target.closest('[data-live-cancel-management]')){event.preventDefault();managementArmedAction=null;window.FGC_TRADE?.renderCommissioner?.('controls');return}
+    if(target=event.target.closest('[data-live-confirm-management]')){event.preventDefault();const action=target.dataset.liveConfirmManagement;request(action,{}).then(()=>{managementArmedAction=null;showToast(action==='reset-all-trades'?'Trade history cleared':'Season trade counters reset',action==='reset-all-trades'?'Trade Center history is clear. Madden rosters and draft-pick ownership were preserved.':'Every team now has the full configured season allowance.');window.FGC_TRADE?.renderCommissioner?.('controls')}).catch(error=>showToast('Trade management not completed',error.message));return}
+    if(target=event.target.closest('[data-live-hide-approved-trade]')){event.preventDefault();if(!window.confirm('Remove this approved trade from Trade Center history and restore one trade to every participating team? Madden rosters and draft-pick ownership will not change.'))return;request('hide-approved-trade',{tradeId:target.dataset.liveHideApprovedTrade}).then(()=>{document.body.style.overflow='';document.querySelector('[data-ownership-modal]')?.classList.remove('is-open');showToast('Trade removed','The trade allowance was restored. Madden rosters, draft picks, and audit evidence were preserved.');window.FGC_TRADE?.renderCommissioner?.('teams')}).catch(error=>showToast('Trade not removed',error.message));return}
     if(target=event.target.closest('[data-live-notifications-read]')){event.preventDefault();act('notifications-read',{},'Notifications read');return}
     if(target=event.target.closest('[data-live-notification-trade]')){event.preventDefault();document.querySelector('[data-notification-menu]')?.classList.remove('is-open');if(target.dataset.liveNotificationTrade)setRoute(`trade-center/${target.dataset.liveNotificationTrade}`);return}
   });
@@ -632,9 +657,9 @@
   });
   window.addEventListener('franchisehq:league-tenant-changed',()=>{state=null;builder=null;blockManagerOpen=false;blockRosterOpen=false;blockEditor=null;blockRosterSearch='';blockRemovalCandidate=null;cancelArmedTradeId=null;builderGridScrollLeft=0;builderPickerScroll.clear();blockLookup.clear();assetFilters.clear();assetSearch.clear();document.body.style.overflow=''});
 
-  const service={version:VERSION,load,refresh:()=>load(true),request,renderTradeCenter,renderTradeBlock,renderCommissionerSettings,
+  const service={version:VERSION,load,refresh:()=>load(true),request,renderTradeCenter,renderTradeBlock,renderCommissionerSettings,renderCommissionerManagement,
     renderNotificationMenu,badges,startPlayerTrade,startAssetTrade,togglePlayerBlock,onBlock,calculatorEnabled,playerValuation,pickValuation,packageValuation,
-    openBlockManager:openLiveBlockManager,
+    openBlockManager:openLiveBlockManager,teamTradeUsage,renderTeamTradeUsage,
     diagnostics:()=>({version:VERSION,loaded:Boolean(state),loading:Boolean(loading),workflowCount:state?.workflows?.length||0,pickCount:state?.picks?.length||0,lastError})};
   HQ.liveTradeCenter=service;
   if(window.FGC_TRADE){

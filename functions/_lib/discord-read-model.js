@@ -816,6 +816,11 @@ export async function tradeHistoryCommand(c){
     FROM trade_workflows workflow
     INNER JOIN trade_workflow_participants participant ON participant.trade_id=workflow.id AND participant.league_id=workflow.league_id
     WHERE workflow.league_id=? AND workflow.status='approved'
+      AND NOT EXISTS (SELECT 1 FROM trade_management_events event
+        WHERE event.league_id=workflow.league_id AND event.event_type='trade-hidden' AND event.trade_id=workflow.id)
+      AND NOT EXISTS (SELECT 1 FROM trade_management_events event
+        WHERE event.league_id=workflow.league_id AND event.event_type='all-trades-hidden'
+          AND workflow.created_at<=event.created_at)
     GROUP BY workflow.id,workflow.approved_at
     ORDER BY workflow.approved_at DESC,workflow.updated_at DESC LIMIT 20`,c.league.id);
   return lines(`${c.league.name} · Approved Trade History`,result.map(item=>

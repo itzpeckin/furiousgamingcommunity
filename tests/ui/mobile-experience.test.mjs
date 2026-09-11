@@ -101,7 +101,9 @@ test('Teams & Owners exposes complete touch management on every phone card', asy
   assert.match(trade, /Remove from Team/);
   assert.match(trade, /Revoke Access/);
   assert.match(mobile, /\.commissioner-directory-panel \.ownership-team-row>\.commissioner-team-manage\s*\{[^}]*display:inline-flex!important[^}]*visibility:visible!important/s);
-  assert.match(mobile, /grid-template-areas:"franchise" "owner" "role" "status" "manage"!important/);
+  assert.match(mobile, /grid-template-areas:"franchise franchise" "owner owner" "role status" "trades trades" "manage manage"!important/);
+  assert.match(trade, /data-open-team-trades/);
+  assert.match(trade, /Trades Available/);
   assert.match(mobile, /\.commissioner-directory-panel \.ownership-team-row>\.commissioner-team-manage\s*\{[^}]*width:100%[^}]*min-height:46px/s);
 
   const legacyHide = styles.lastIndexOf('.commissioner-team-row > button { display: none; }');
