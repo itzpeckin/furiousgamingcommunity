@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.4",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -57,6 +57,21 @@
       "canonicalMigrations": 22,
       "requiredTables": 115
     },
+    "productionPagesAcceptance": {
+      "passed": true,
+      "pullRequest": 70,
+      "candidateCommit": "b1c1acad051f96ce01aa7a49d31129a1a7781715",
+      "mainCommit": "118f571c486ada383423f4dbcd82c3919ad67498",
+      "pagesDeployment": "f6cdce57-dfdf-4eec-9acb-80a2bb709390",
+      "pagesStatus": "success",
+      "gitIntegrated": true,
+      "directUploadUsed": false,
+      "publicHttpStatus": 200,
+      "leagueHttpStatus": 200,
+      "exactDeploymentHttpStatus": 200,
+      "runtimeReleaseHeader": "7.5.5.4",
+      "readOnly": true
+    },
     "freeAgentBlockedPreserved": {
       "passed": true,
       "status": "blocked",
@@ -65,10 +80,10 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "stagingChanged": false,
     "migrationApplied": false,
     "discordCommandsRegistered": false,
@@ -92,12 +107,21 @@
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 70,
+      "candidateCommit": "b1c1acad051f96ce01aa7a49d31129a1a7781715",
+      "mergeCommit": "118f571c486ada383423f4dbcd82c3919ad67498"
     },
     "hostedChecks": {
-      "authorized": false,
-      "status": "not-run"
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "pullRequestChecksFailed": 0,
+      "mainChecksPassed": 3,
+      "mainQualityWorkflowRun": 34651407164,
+      "mainPagesWorkflowRun": 34651406357,
+      "cloudflarePagesCheckRun": 103434282842
     },
     "productionMigration": {
       "authorized": false,
@@ -110,9 +134,11 @@
       "status": "not-required"
     },
     "productionDeployment": {
-      "authorized": false,
-      "status": "not-run",
-      "currentRelease": "7.5.5.3"
+      "authorized": true,
+      "status": "deployed-read-only-verified",
+      "currentRelease": "7.5.5.4",
+      "mainCommit": "118f571c486ada383423f4dbcd82c3919ad67498",
+      "pagesDeployment": "f6cdce57-dfdf-4eec-9acb-80a2bb709390"
     }
   }
 }

@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.4",
   "releaseType": "discord-trade-submit-asset-visibility",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.3",
@@ -18,11 +18,11 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-published",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mergeCommit": null
+    "authorized": true,
+    "status": "published-main-accepted",
+    "candidateCommit": "b1c1acad051f96ce01aa7a49d31129a1a7781715",
+    "pullRequest": 70,
+    "mergeCommit": "118f571c486ada383423f4dbcd82c3919ad67498"
   },
   "staging": {
     "authorized": false,
@@ -30,12 +30,12 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "7.5.5.3",
-    "currentCommit": "e54b21085d0d08ee56f0662cc37efc161834d2a3",
-    "currentPagesDeployment": "8a46b944-654d-4b25-b6b6-eab7486429f8",
+    "authorized": true,
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.4",
+    "currentCommit": "118f571c486ada383423f4dbcd82c3919ad67498",
+    "currentPagesDeployment": "f6cdce57-dfdf-4eec-9acb-80a2bb709390",
     "currentMigration": 39,
     "candidateMigration": 39,
     "scope": "Code-only Trade Submit asset visibility and rich-card suppression recovery."
