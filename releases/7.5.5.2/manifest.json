@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.2",
   "releaseType": "player-card-desktop-layout-containment",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.1",
@@ -18,8 +18,11 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-published"
+    "authorized": true,
+    "status": "published-main-accepted",
+    "candidateCommit": "8e16fdcbc99284a6a4e40816be20e8797e1856bb",
+    "pullRequest": 66,
+    "mergeCommit": "6db5816181bd917fd08e33de7fa91e4b16ad6217"
   },
   "staging": {
     "authorized": false,
@@ -27,11 +30,12 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
-    "deployed": false,
-    "status": "unchanged",
-    "currentRelease": "7.5.5.1",
-    "currentCommit": "1c5f6a9871bb7725b91b39136abdf640f2b68014",
+    "authorized": true,
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.2",
+    "currentCommit": "6db5816181bd917fd08e33de7fa91e4b16ad6217",
+    "currentPagesDeployment": "665d4f04-1136-4154-90d8-a6967d221a40",
     "currentMigration": 38,
     "candidateMigration": 38,
     "scope": "Desktop canonical Player Card Details containment with Ratings as the height authority and no duplicate embedded Transaction History panel."

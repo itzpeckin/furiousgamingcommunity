@@ -1,8 +1,8 @@
 # FranchiseHQ 7.5.5.2 Release Record
 
-**Status:** Local validated review candidate
+**Status:** Production deployed and read-only verified; owner UI acceptance pending
 
-**Production changed:** No. This local code-only candidate does not change Main, Production, Cloudflare, Discord, migration 38, or league data.
+**Production changed:** Yes, code only. The exact validated candidate is merged to Main and Production serves 7.5.5.2. Discord definitions, migration 38, and all league data remain unchanged by this release.
 
 ## Scope
 
@@ -35,7 +35,11 @@ The focused Player Card regression passes 5/5. The complete application suite an
 
 ## Deployment status
 
-Local candidate only. GitHub publication, hosted checks, Main merge, and Production deployment have not been authorized or run.
+PR #66 published exact candidate `8e16fdcbc99284a6a4e40816be20e8797e1856bb`. All four pull-request checks passed before merge. The PR merged to Main as `6db5816181bd917fd08e33de7fa91e4b16ad6217`; the Main quality gate, Pages build/deploy workflow, and Cloudflare Production check all passed.
+
+Git-integrated Cloudflare Pages deployment `665d4f04-1136-4154-90d8-a6967d221a40` deployed the exact Main merge. Read-only HTTPS acceptance returned `200` from both the public and canonical FGC league routes, and both reported `x-franchisehq-release: 7.5.5.2`.
+
+No D1 query or write, migration, Discord command registration, import, reset, snapshot activation/change, archive, transition, export-URL rotation, credential change, membership/assignment change, or live trade action ran during release delivery.
 
 ## Boundaries
 
