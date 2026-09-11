@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.3",
   "releaseType": "discord-trade-completion-and-contract-cleanup",
-  "status": "validated-review-candidate",
+  "status": "validated-production-authorized",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.2",
@@ -18,8 +18,8 @@
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
   "repositoryPublication": {
-    "authorized": false,
-    "status": "not-run"
+    "authorized": true,
+    "status": "authorized-not-run"
   },
   "staging": {
     "authorized": false,
@@ -27,9 +27,9 @@
     "status": "not-run"
   },
   "production": {
-    "authorized": false,
+    "authorized": true,
     "deployed": false,
-    "status": "not-run",
+    "status": "authorized-not-run",
     "currentRelease": "7.5.5.2",
     "currentMigration": 38,
     "candidateMigration": 39,

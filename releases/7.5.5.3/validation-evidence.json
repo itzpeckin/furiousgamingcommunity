@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.3",
-  "status": "validated-review-candidate",
+  "status": "validated-production-authorized",
   "productionChanged": false,
   "dataChanged": false,
   "productionDataChanged": false,
@@ -95,15 +95,15 @@
   },
   "external": {
     "githubPublication": {
-      "authorized": false,
+      "authorized": true,
       "status": "not-run"
     },
     "hostedChecks": {
-      "authorized": false,
+      "authorized": true,
       "status": "not-run"
     },
     "productionMigration": {
-      "authorized": false,
+      "authorized": true,
       "status": "not-run",
       "currentMigration": 38,
       "candidateMigration": 39
@@ -113,7 +113,7 @@
       "status": "not-run"
     },
     "productionDeployment": {
-      "authorized": false,
+      "authorized": true,
       "status": "not-run",
       "currentRelease": "7.5.5.2"
     }

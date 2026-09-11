@@ -1,6 +1,6 @@
 # FranchiseHQ 7.5.5.3 Release Record
 
-**Status:** Locally validated review candidate; publication and Production are not authorized
+**Status:** Locally validated Production candidate; publication, migration 39, Main merge, and code deployment are authorized but not yet run
 
 **Production changed:** No. Production remains FranchiseHQ 7.5.5.2 on migration 38.
 
@@ -42,11 +42,11 @@ The focused migration, Discord, Player Card, and release-tooling suite passes 55
 
 ## Deployment status
 
-Not run and not authorized. Production remains FranchiseHQ 7.5.5.2 on migration 38; migration 39 has been validated only in local fresh-install and upgrade fixtures.
+Authorized but not yet run. Production remains FranchiseHQ 7.5.5.2 on migration 38; migration 39 has been validated only in local fresh-install and upgrade fixtures.
 
 ## Boundaries
 
-No branch publication, pull request, hosted check, Main change, Production deployment, Production migration, Discord command registration, Discord configuration change, live trade action, import, reset, snapshot operation, archive-season operation, transition, export-URL rotation, credential change, membership/assignment change, or league-data write is authorized or performed by this local build. Blocked Madden Free Agents remain unknown/null and are never interpreted as zero.
+Branch publication, pull request, hosted checks, additive Production migration 39, Main merge, code deployment, and read-only acceptance are authorized. Discord command registration, Discord configuration change, live trade action, import, reset, snapshot operation, archive-season operation, transition, export-URL rotation, credential change, membership/assignment change, and league-data writes outside migration 39 remain unauthorized. Blocked Madden Free Agents remain unknown/null and are never interpreted as zero.
 
 ## Rollback
 
