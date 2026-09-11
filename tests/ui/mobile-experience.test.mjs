@@ -72,7 +72,7 @@ test('Player Card phone layout separates portrait, overall, identity, tabs, and 
 
 test('Player Card desktop details are bounded by Ratings with contained long-form panels', async () => {
   const [app, styles] = await Promise.all([source('app.js'), source('styles.css')]);
-  const release = styles.slice(styles.lastIndexOf('/* FranchiseHQ 7.5.5.2 — ratings-bounded desktop Player Card details. */'));
+  const release = styles.slice(styles.lastIndexOf('/* FranchiseHQ 7.5.5.3 — ratings-bounded desktop Player Card details. */'));
   const sideRail = app.slice(app.indexOf('function canonicalPlayerSideRail'), app.indexOf('function openCanonicalLivePlayerCard'));
   const tabMarkup = app.slice(app.indexOf('canonical-player-tabs canonical-player-tabs--approved'), app.indexOf('canonical-player-panels canonical-player-panels--approved'));
 
@@ -85,6 +85,10 @@ test('Player Card desktop details are bounded by Ratings with contained long-for
   assert.match(release, /\.canonical-player-dashboard__center>\.canonical-dashboard-stack,\s*\.canonical-player-dashboard__rail>\.canonical-dashboard-stack\s*\{[^}]*position:absolute[^}]*inset:0/s);
   assert.match(release, /\.canonical-details-game-log-scroll\s*\{[^}]*height:100%[^}]*overflow:auto/s);
   assert.match(release, /\.canonical-dashboard-card--contract \.canonical-contract-grid--compact\s*\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important/s);
+  const contractPanel = app.slice(app.indexOf('function canonicalContractPanel'), app.indexOf('function canonicalTransactionHistory'));
+  assert.doesNotMatch(contractPanel, /Current Salary/);
+  assert.match(contractPanel, /Total Release Penalty/);
+  assert.ok(contractPanel.indexOf('Total Release Penalty') < contractPanel.indexOf('Total Contract'), 'release penalty stays visible near Cap Hit');
 });
 
 test('Teams & Owners exposes complete touch management on every phone card', async () => {

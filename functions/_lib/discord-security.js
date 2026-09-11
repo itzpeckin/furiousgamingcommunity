@@ -83,11 +83,14 @@ export function discordMessageData(message){
       return customId?{type:2,style:Math.min(4,style),label:String(component?.label||'Action').slice(0,80),custom_id:customId,disabled:Boolean(component?.disabled)}:null;
     }).filter(Boolean)
   })).filter(row=>row.components.length):[];
+  const mentionedRoles=Array.isArray(source.allowed_mentions?.roles)
+    ?source.allowed_mentions.roles.map(value=>String(value||'')).filter(value=>SNOWFLAKE.test(value)).slice(0,100)
+    :[];
   return {
     ...(content?{content}:{}),
     ...(embeds.length?{embeds}:{}),
     ...(components.length?{components}:{}),
-    allowed_mentions:{parse:[]}
+    allowed_mentions:mentionedRoles.length?{roles:mentionedRoles,users:[],replied_user:false}:{parse:[]}
   };
 }
 
@@ -144,6 +147,7 @@ async function bootstrapCommissionerGuild(db,env,interaction,identity){
   ]);
   return db.prepare(`SELECT id,league_id AS leagueId,discord_guild_id AS guildId,
       application_id AS applicationId,trade_committee_channel_id AS tradeCommitteeChannelId,
+      trade_committee_role_id AS tradeCommitteeRoleId,
       notification_channel_id AS notificationChannelId,schedule_channel_id AS scheduleChannelId,
       trade_channel_id AS tradeChannelId,status
     FROM discord_league_installations WHERE league_id=? LIMIT 1`).bind(candidate.leagueId).first();
@@ -156,6 +160,7 @@ export async function resolveDiscordContext(env,interaction,{membershipRequired=
   if(!SNOWFLAKE.test(guildId))throw Object.assign(new Error('Use this command inside a connected league Discord server.'),{status:403,code:'guild-required'});
   let installation=await db.prepare(`SELECT id,league_id AS leagueId,discord_guild_id AS guildId,
       application_id AS applicationId,trade_committee_channel_id AS tradeCommitteeChannelId,
+      trade_committee_role_id AS tradeCommitteeRoleId,
       notification_channel_id AS notificationChannelId,schedule_channel_id AS scheduleChannelId,
       trade_channel_id AS tradeChannelId,status
     FROM discord_league_installations
@@ -199,6 +204,7 @@ export async function resolveDiscordTradeComponentContext(env,interaction,{trade
   const target=await db.prepare(`SELECT workflow.league_id AS leagueId,
       installation.discord_guild_id AS guildId,installation.application_id AS applicationId,
       installation.trade_committee_channel_id AS tradeCommitteeChannelId,
+      installation.trade_committee_role_id AS tradeCommitteeRoleId,
       installation.notification_channel_id AS notificationChannelId,
       installation.schedule_channel_id AS scheduleChannelId,installation.trade_channel_id AS tradeChannelId,
       installation.status AS installationStatus
@@ -239,7 +245,8 @@ export async function resolveDiscordTradeComponentContext(env,interaction,{trade
     throw Object.assign(new Error('Only an owner whose team is involved may respond to this trade.'),{status:403,code:'trade-participant-required'});
   }
   const installation={leagueId:league.id,guildId:target.guildId,applicationId:target.applicationId,
-    tradeCommitteeChannelId:target.tradeCommitteeChannelId,notificationChannelId:target.notificationChannelId,
+    tradeCommitteeChannelId:target.tradeCommitteeChannelId,tradeCommitteeRoleId:target.tradeCommitteeRoleId,
+    notificationChannelId:target.notificationChannelId,
     scheduleChannelId:target.scheduleChannelId,tradeChannelId:target.tradeChannelId,status:target.installationStatus};
   const membership={id:actor.membershipId,leagueId:league.id,leagueSlug:league.slug,leagueName:league.name,
     role:actor.role,teamId:actor.teamId,teamKey,active:true};

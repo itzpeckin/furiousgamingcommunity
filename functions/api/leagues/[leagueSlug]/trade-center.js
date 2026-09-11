@@ -391,7 +391,7 @@ async function accept(c, row, participants) {
 
 async function reject(c, row, participants, reason) {
   const ownTeam=await ensureParticipantAction(c,row,participants);
-  if (!['negotiating','committee'].includes(row.status)) throw Object.assign(new Error('This trade is already closed.'),{status:409});
+  if (row.status!=='negotiating') throw Object.assign(new Error('This trade is no longer open for an owner decision.'),{status:409});
   const users=await participantUserIds(c.db,c.league.id,participants.map(item=>item.team_key));
   await c.db.batch([
     c.db.prepare(`UPDATE trade_workflows SET status='rejected',decision_reason=?,rejected_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
@@ -712,18 +712,20 @@ export async function onRequestPost(context) {
       const trade=result.workflows?.find(item=>item.id===result.tradeId);
       if(trade?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId:result.tradeId});
     }
-    if(result.tradeId&&['counter','accept','reject','review','message'].includes(body.action)){
+    if(result.tradeId&&['counter','accept','reject','withdraw','review','message'].includes(body.action)){
       const trade=result.workflows?.find(item=>item.id===result.tradeId)
         ||await c.db.prepare(`SELECT status,revision FROM trade_workflows WHERE id=? AND league_id=?`).bind(result.tradeId,c.league.id).first();
       const actor=c.session.user.displayName||'A league member';
-      const labels={counter:'Trade revision submitted',accept:'Owner acceptance updated',reject:'Trade rejected',review:'Committee review updated',message:'Trade message added'};
+      const labels={counter:'Trade revision submitted',accept:'Owner acceptance updated',reject:'Trade rejected',withdraw:'Trade cancelled',review:'Committee review updated',message:'Trade message added'};
       const descriptions={counter:`${actor} submitted revision ${Number(trade?.revision||0)} for owner acceptance.`,
         accept:`${actor} accepted the current trade revision.`,reject:`${actor} rejected the current trade revision.`,
+        withdraw:`${actor} cancelled the trade proposal.`,
         review:`${actor} recorded a committee ${String(body.decision||'decision')}${body.reason?`: ${cleanText(body.reason)}`:'.'}`,
         message:`${actor}: ${cleanText(body.message)}`};
       await queueTradeRoomUpdate(c.db,{league:c.league,tradeId:result.tradeId,
         eventKey:`web:${context.request.headers.get('x-request-id')||crypto.randomUUID()}`,
-        eventType:body.action==='counter'?'revision-submitted':'thread-update',title:labels[body.action],message:descriptions[body.action]});
+        eventType:body.action==='counter'?'revision-submitted':'thread-update',title:labels[body.action],message:descriptions[body.action],
+        closeRoom:body.action==='withdraw'||body.action==='reject'||(body.action==='review'&&trade?.status==='approved')});
     }
     scheduleDiscordDeliveryFlush(context,c.db,c.league.id);
     return json(result);

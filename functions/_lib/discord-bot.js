@@ -185,13 +185,12 @@ async function respondToTrade(c,subcommand,values){
   const result=await executeTradeCenterAction({...c,request:requestForAudit(c.interaction)},{
     action:subcommand,tradeId,revision:Number(current.revision),mutationToken:current.mutationToken,reason:clean(values.reason,2000)
   });
-  if(subcommand==='accept'){
-    const trade=result.workflows?.find(item=>item.id===tradeId);
-    if(trade?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId});
-  }
+  const trade=result.workflows?.find(item=>item.id===tradeId);
+  if(subcommand==='accept'&&trade?.status==='committee')await queueCommitteeReviewDelivery(c.db,{league:c.league,tradeId});
   await queueTradeRoomUpdate(c.db,{league:c.league,tradeId,eventKey:`command:${c.interaction.id}`,
     title:subcommand==='accept'?'Owner accepted trade':'Owner rejected trade',
-    message:`${c.user.displayName} ${subcommand==='accept'?'accepted':'rejected'} the current trade revision.`});
+    message:`${c.user.displayName} ${subcommand==='accept'?'accepted':'rejected'} the current trade revision.`,
+    closeRoom:subcommand==='reject'&&trade?.status==='rejected'});
   return `Trade **${tradeId}** was ${subcommand==='accept'?'accepted':'rejected'} successfully.`;
 }
 
@@ -214,7 +213,8 @@ export async function executeDiscordTradeComponent(c,{action,tradeId,revision,re
       ||await c.db.prepare(`SELECT status,revision FROM trade_workflows WHERE id=? AND league_id=?`).bind(tradeId,c.league.id).first();
     await queueTradeRoomUpdate(c.db,{league:c.league,tradeId,eventKey:`review:${c.interaction.id}`,
       title:updated?.status==='rejected'?'Trade changes requested':updated?.status==='approved'?'Trade approved':'Committee vote recorded',
-      message:`${c.user.displayName} voted to ${decision==='approve'?'approve':'deny'} revision ${revision}${reason?`: ${clean(reason,2000)}`:'.'}`});
+      message:`${c.user.displayName} voted to ${decision==='approve'?'approve':'deny'} revision ${revision}${reason?`: ${clean(reason,2000)}`:'.'}`,
+      closeRoom:updated?.status==='approved'});
     return tradeConversationMessage(c.db,{
       leagueId:c.league.id,eventType:'review-required',resourceId:tradeId,
       payloadJson:JSON.stringify({title:updated?.status==='committee'?'Committee vote recorded':updated?.status==='approved'?'Trade approved':'Changes requested',
@@ -242,7 +242,8 @@ export async function executeDiscordTradeComponent(c,{action,tradeId,revision,re
     WHERE league_id=? AND trade_id=? LIMIT 1`).bind(c.league.id,tradeId).first();
   if(room?.id)await queueTradeRoomUpdate(c.db,{league:c.league,tradeId,eventKey:`owner:${c.interaction.id}`,
     title:updated?.status==='committee'?'Trade accepted by all teams':action==='accept'?'Owner accepted trade':'Trade rejected',
-    message:`${own?.displayName||ownTeam.toUpperCase()} ${action==='accept'?'accepted':'rejected'} revision ${revision}.`});
+    message:`${own?.displayName||ownTeam.toUpperCase()} ${action==='accept'?'accepted':'rejected'} revision ${revision}.`,
+    closeRoom:action==='reject'&&updated?.status==='rejected'});
   const statusMessage=updated?.status==='committee'
     ?`Accepted by ${own?.displayName||ownTeam.toUpperCase()}. The offer is now awaiting Trade Committee review.`
     :`Rejected by ${own?.displayName||ownTeam.toUpperCase()}. Both owners can see this final decision.`;
@@ -257,10 +258,16 @@ async function reviewTrade(c,values){
   requireDiscordRole(c,['commissioner','trade_committee']);
   c.teams=await activeLeagueTeams(c.db,c.league.id);
   const tradeId=clean(values.trade,120),current=await currentTradeMutation(c,tradeId);
-  await executeTradeCenterAction({...c,request:requestForAudit(c.interaction)},{
+  const result=await executeTradeCenterAction({...c,request:requestForAudit(c.interaction)},{
     action:'review',tradeId,revision:Number(current.revision),mutationToken:current.mutationToken,
     decision:clean(values.decision,20),reason:clean(values.reason,2000),freeTrade:values['free-trade']===true
   });
+  const updated=result.workflows?.find(item=>item.id===tradeId)
+    ||await c.db.prepare(`SELECT status,revision FROM trade_workflows WHERE id=? AND league_id=?`).bind(tradeId,c.league.id).first();
+  await queueTradeRoomUpdate(c.db,{league:c.league,tradeId,eventKey:`review-command:${c.interaction.id}`,
+    title:updated?.status==='approved'?'Trade approved':updated?.status==='rejected'?'Trade changes requested':'Committee vote recorded',
+    message:`${c.user.displayName} voted to ${clean(values.decision,20)} revision ${Number(current.revision)}${values.reason?`: ${clean(values.reason,2000)}`:'.'}`,
+    closeRoom:updated?.status==='approved'});
   return `Your **${clean(values.decision,20)}** decision was recorded for trade **${tradeId}**.`;
 }
 

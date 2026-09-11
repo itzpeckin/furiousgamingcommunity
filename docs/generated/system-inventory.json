@@ -165,22 +165,22 @@
       ".md": 277,
       ".mjs": 43,
       ".png": 3,
-      ".sql": 40,
+      ".sql": 41,
       ".txt": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 639004,
+        "bytes": 638962,
         "file": "app.js"
       },
       {
-        "bytes": 526267,
+        "bytes": 526278,
         "file": "styles.css"
       },
       {
-        "bytes": 428469,
+        "bytes": 429219,
         "file": "trade-module.js"
       },
       {
@@ -192,7 +192,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 104712,
+        "bytes": 110644,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -216,11 +216,11 @@
         "file": "functions/_lib/discord-read-model.js"
       },
       {
-        "bytes": 51428,
+        "bytes": 51646,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 43009,
+        "bytes": 43069,
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
@@ -252,7 +252,7 @@
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 600
+    "total": 601
   },
   "frontend": {
     "assets": [
@@ -1541,10 +1541,16 @@
       "recordsLedger": true,
       "sha256": "d4dd7fa1a6215d794d540d9df15b9c3e97224d73c46d7cc203c4ed264e9396fc",
       "version": "0038"
+    },
+    {
+      "file": "migrations/0039_discord_trade_committee_role.sql",
+      "recordsLedger": true,
+      "sha256": "de02b17b4852e90c09a4c47a12955c378ebbcdd990439946882d8ab37bba6318",
+      "version": "0039"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.5.2",
+  "release": "7.5.5.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
