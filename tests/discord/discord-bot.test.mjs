@@ -26,6 +26,7 @@ import {
 } from '../../functions/api/leagues/[leagueSlug]/discord.js';
 import {
   discordAuthorizedGuild,
+  discordGuildRoles,
   discordGuildPermissionAllowsInstall
 } from '../../functions/_lib/discord-installation.js';
 import { syncDiscordScheduleThreads } from '../../functions/_lib/discord-schedule.js';
@@ -396,6 +397,7 @@ test('commissioners select verified existing Discord channels and refresh comman
     seedMember(database,{leagueId:'league-a',userId:'commissioner-a',discordId:'100000000000000021',role:'commissioner'});
     await seedSession(database,{userId:'commissioner-a',token:'token-a'});
     const channelIds=['100000000000000051','100000000000000052','100000000000000053','100000000000000054'];
+    const committeeRoleId='100000000000000061';
     const requests=[];
     globalThis.fetch=async(url,options={})=>{
       requests.push({url:String(url),method:options.method||'GET',body:options.body?JSON.parse(options.body):null});
@@ -404,11 +406,19 @@ test('commissioners select verified existing Discord channels and refresh comman
           status:200,headers:{'content-type':'application/json'}
         });
       }
+      if(/\/guilds\/100000000000000001\/roles$/.test(String(url))){
+        return new Response(JSON.stringify([
+          {id:'100000000000000001',name:'@everyone',position:0,managed:false,mentionable:true},
+          {id:'100000000000000060',name:'Bot role',position:3,managed:true,mentionable:true},
+          {id:'100000000000000062',name:'Hidden committee',position:2,managed:false,mentionable:false},
+          {id:committeeRoleId,name:'Trade Committee',position:4,managed:false,mentionable:true}
+        ]),{status:200,headers:{'content-type':'application/json'}});
+      }
       return new Response('{"id":"command-upserted"}',{status:200,headers:{'content-type':'application/json'}});
     };
     const response=await postDiscordInstallation(leagueApiContext(d1(database),{
       slug:'alpha',token:'token-a',method:'POST',env:{DISCORD_BOT_TOKEN:'test-token'},body:{
-        action:'configure-channels',scheduleChannelId:channelIds[0],tradeCommitteeChannelId:channelIds[1],notificationChannelId:channelIds[2],tradeChannelId:channelIds[3]
+        action:'configure-channels',scheduleChannelId:channelIds[0],tradeCommitteeChannelId:channelIds[1],tradeCommitteeRoleId:committeeRoleId,notificationChannelId:channelIds[2],tradeChannelId:channelIds[3]
       }
     }));
     const payload=await response.json();
@@ -416,9 +426,11 @@ test('commissioners select verified existing Discord channels and refresh comman
     assert.deepEqual({
       schedule:payload.installation.scheduleChannelId,
       committee:payload.installation.tradeCommitteeChannelId,
+      committeeRole:payload.installation.tradeCommitteeRoleId,
       notifications:payload.installation.notificationChannelId,
       trades:payload.installation.tradeChannelId
-    },{schedule:channelIds[0],committee:channelIds[1],notifications:channelIds[2],trades:channelIds[3]});
+    },{schedule:channelIds[0],committee:channelIds[1],committeeRole:committeeRoleId,notifications:channelIds[2],trades:channelIds[3]});
+    assert.deepEqual(payload.roles,[{id:committeeRoleId,name:'Trade Committee',color:0,position:4,mentionable:true}]);
     assert.equal(requests.filter(request=>/\/applications\/100000000000000009\/commands$/.test(request.url)&&request.method==='POST').length,DISCORD_GLOBAL_COMMANDS.length);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM tenant_audit_events
       WHERE league_id='league-a' AND action='discord_installation_configure-channels'`).get().count,1);
@@ -431,6 +443,18 @@ test('commissioners select verified existing Discord channels and refresh comman
     assert.equal(invalid.status,400);
     assert.match((await invalid.json()).error,/connected Discord server/i);
   }finally{globalThis.fetch=originalFetch;database.close()}
+});
+
+test('Discord role discovery exposes only mentionable commissioner-selectable roles',async()=>{
+  const roles=await discordGuildRoles({DISCORD_BOT_TOKEN:'test-token'},'100000000000000001',{fetchImpl:async()=>
+    new Response(JSON.stringify([
+      {id:'100000000000000001',name:'@everyone',position:0,managed:false,mentionable:true},
+      {id:'100000000000000002',name:'Managed',position:4,managed:true,mentionable:true},
+      {id:'100000000000000003',name:'Not Mentionable',position:3,managed:false,mentionable:false},
+      {id:'100000000000000004',name:'Trade Committee',position:2,managed:false,mentionable:true}
+    ]),{status:200,headers:{'content-type':'application/json'}})
+  });
+  assert.deepEqual(roles,[{id:'100000000000000004',name:'Trade Committee',color:0,position:2,mentionable:true}]);
 });
 
 test('global command registration upserts by name without bulk replacement',async()=>{
@@ -741,6 +765,52 @@ test('/trade create opens one private owner thread and its buttons record the re
   }finally{globalThis.fetch=originalFetch;database.close()}
 });
 
+test('final trade updates archive and lock the existing room while revisions reopen that same thread',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    database.prepare(`INSERT INTO trade_workflows
+      (id,league_id,franchise_season_id,status,revision,mutation_token,proposer_user_id,proposer_team_key,review_threshold)
+      VALUES ('trade-lifecycle','league-a','season-a','approved',1,'token-1','user-a','tb',1)`).run();
+    database.prepare(`INSERT INTO discord_trade_rooms
+      (id,league_id,trade_id,revision,discord_guild_id,parent_channel_id,discord_thread_id,status)
+      VALUES ('room-a','league-a','trade-lifecycle',1,'100000000000000001','100000000000000066','100000000000000077','approved')`).run();
+    const db=d1(database),requests=[];
+    const fetchImpl=async(url,options={})=>{
+      requests.push({url:String(url),method:options.method,body:options.body?JSON.parse(options.body):null});
+      return options.method==='PATCH'?new Response(null,{status:204})
+        :new Response('{"id":"100000000000000078"}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    await queueTradeRoomUpdate(db,{league:{id:'league-a',slug:'alpha'},tradeId:'trade-lifecycle',
+      eventKey:'approved-final',title:'Trade approved',message:'The Trade Committee approved this trade.',closeRoom:true});
+    assert.deepEqual(await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-token'},db,{leagueId:'league-a',fetchImpl}),
+      {sent:1,failed:0,skipped:false});
+    assert.deepEqual(requests.map(item=>({method:item.method,body:item.body})),[
+      {method:'POST',body:requests[0].body},
+      {method:'PATCH',body:{archived:true,locked:true}}
+    ]);
+    assert.match(requests[0].body.content,/Trade approved/);
+    assert.equal(database.prepare(`SELECT status FROM discord_trade_rooms WHERE id='room-a'`).get().status,'archived');
+
+    database.prepare(`UPDATE trade_workflows SET status='negotiating',revision=2,mutation_token='token-2' WHERE id='trade-lifecycle'`).run();
+    requests.length=0;
+    await queueTradeRoomUpdate(db,{league:{id:'league-a',slug:'alpha'},tradeId:'trade-lifecycle',
+      eventKey:'revision-2',eventType:'revision-submitted',title:'Trade revision submitted',message:'Revision 2 is ready.'});
+    await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-token'},db,{leagueId:'league-a',fetchImpl});
+    assert.deepEqual(requests.map(item=>({method:item.method,body:item.body})),[
+      {method:'PATCH',body:{archived:false,locked:false}},
+      {method:'POST',body:requests[1].body}
+    ]);
+    assert.equal(database.prepare(`SELECT discord_thread_id AS threadId,status FROM discord_trade_rooms WHERE id='room-a'`).get().threadId,'100000000000000077');
+    assert.equal(database.prepare(`SELECT status FROM discord_trade_rooms WHERE id='room-a'`).get().status,'active');
+  }finally{database.close()}
+});
+
 test('a receiving owner can accept from the fallback Bot DM when private threads are unavailable',async()=>{
   const database=new DatabaseSync(':memory:'),originalFetch=globalThis.fetch;
   try{
@@ -825,7 +895,8 @@ test('committee denial reasons update the private thread and the same trade can 
     for(let index=1;index<=3;index++)seedMember(database,{leagueId:'league-a',userId:`reviewer-${index}`,
       discordId:`10000000000000002${index}`,teamId:null,role:'commissioner'});
     database.prepare(`UPDATE discord_league_installations SET trade_channel_id='100000000000000066',
-      trade_committee_channel_id='100000000000000067' WHERE league_id='league-a'`).run();
+      trade_committee_channel_id='100000000000000067',trade_committee_role_id='100000000000000068'
+      WHERE league_id='league-a'`).run();
     seedActiveWeek(database,{leagueId:'league-a',week:13});
     database.prepare(`INSERT INTO franchise_seasons
       (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
@@ -855,8 +926,18 @@ test('committee denial reasons update the private thread and the same trade can 
       data:{custom_id:acceptId,component_type:2}
     })}));
     assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(tradeId).status,'committee');
-    const committeeMessage=await tradeConversationMessage(db,{leagueId:'league-a',eventType:'review-required',resourceId:tradeId,
-      payloadJson:JSON.stringify({title:'Trade review required',message:'Review this trade.',tradeId,leagueSlug:'alpha'})});
+    const queuedCommittee={...database.prepare(`SELECT league_id AS leagueId,event_type AS eventType,
+      resource_id AS resourceId,payload_json AS payloadJson FROM discord_delivery_events
+      WHERE resource_id=? AND event_type='review-required'
+        AND visibility='private-channel'
+        AND channel_id='100000000000000067'
+      LIMIT 1`).get(tradeId)};
+    const committeeMessage=await tradeConversationMessage(db,queuedCommittee);
+    const ownerMessage=await tradeConversationMessage(db,{leagueId:'league-a',eventType:'thread-update',resourceId:tradeId,
+      payloadJson:JSON.stringify({title:'Trade accepted',message:'Awaiting review.',tradeId,leagueSlug:'alpha'})});
+    assert.deepEqual(committeeMessage.embeds,ownerMessage.embeds,'committee and owner rooms render the same trade package');
+    assert.match(committeeMessage.content,/^<@&100000000000000068>/);
+    assert.deepEqual(committeeMessage.allowed_mentions,{roles:['100000000000000068'],users:[],replied_user:false});
     assert.deepEqual(committeeMessage.components[0].components.map(button=>button.label),['Approve','Deny']);
     const denyId=tradeDecisionCustomId('review-deny',tradeId,1);
     const denyButton=await discordInteractions(await signedContext({db,key,env,interaction:interaction({
@@ -1538,8 +1619,8 @@ test('trade delivery sends both owners clean team cards with source-supported co
     for(const request of messages){
       assert.deepEqual(request.body.embeds.slice(0,2).map(embed=>embed.title).sort(),['San Francisco 49ers receives','Tampa Bay Buccaneers receives']);
       const details=request.body.embeds.flatMap(embed=>embed.fields||[]).map(field=>field.value).join('\n');
-      assert.match(details,/\[Tristan Example\].*LT.*95 OVR.*Superstar Dev.*Age 27.*\$39,970,000 cap hit.*\$10,000,000 net release savings.*\$106,510,000 release penalty/s);
-      assert.match(details,/\[George Example\].*TE.*97 OVR.*X-Factor Dev.*Age 29.*\$5,660,000 cap hit.*\$0 net release savings.*\$46,960,000 release penalty/s);
+      assert.match(details,/\[Tristan Example\].*Position.*LT.*Overall.*95.*Development.*Superstar.*Age.*27.*Cap Hit.*\$39,970,000.*Release Penalty.*\$106,510,000.*Net Release Savings.*\$10,000,000/s);
+      assert.match(details,/\[George Example\].*Position.*TE.*Overall.*97.*Development.*X-Factor.*Age.*29.*Cap Hit.*\$5,660,000.*Release Penalty.*\$46,960,000.*Net Release Savings.*\$0/s);
       assert.match(details,/Incoming current-year salary and projected team cap space remain unavailable/);
       assert.doesNotMatch(details,/Acquiring estimate|estimated room change|projected available/);
       assert.doesNotMatch(request.body.content,/^https:\/\//m);

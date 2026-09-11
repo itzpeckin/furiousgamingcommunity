@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5.3",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 39,
+      "candidateRequiresMigration": true,
+      "productionApplied": false,
+      "additiveColumnOnly": true
+    },
+    "focusedReleaseSuite": {
+      "passed": true,
+      "tests": 55
+    },
+    "playerCardContract": {
+      "passed": true,
+      "currentSalaryRemoved": true,
+      "totalReleasePenaltyVisible": true
+    },
+    "discordTradePresentation": {
+      "passed": true,
+      "ownerAndCommitteePackageParity": true,
+      "playerAndContractSectionsSeparated": true,
+      "draftPicksProminent": true,
+      "explicitWorkflowStatus": true
+    },
+    "discordCommitteeRouting": {
+      "passed": true,
+      "leagueScopedRoleSelection": true,
+      "mentionableNonManagedRoleValidation": true,
+      "exactRoleAllowedMention": true,
+      "approveDenyButtons": true
+    },
+    "discordTradeThreadLifecycle": {
+      "passed": true,
+      "approvedArchivedAndLocked": true,
+      "partnerRejectedArchivedAndLocked": true,
+      "proposerCancelledArchivedAndLocked": true,
+      "committeeDeniedRemainsOpen": true,
+      "revisionReopensSameThread": true,
+      "closeRetryIsIndependent": true
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 214,
+      "strictGateTests": 214,
+      "syntaxModules": 255,
+      "routes": 76,
+      "canonicalMigrations": 22,
+      "requiredTables": 115
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "importExecuted": false,
+    "activationPerformed": false,
+    "activeSnapshotChanged": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "newExportRequested": false,
+    "discordCredentialsChanged": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0,
+    "protectedLeagueRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": true,
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "not-run"
+    },
+    "productionMigration": {
+      "authorized": true,
+      "status": "not-run",
+      "currentMigration": 38,
+      "candidateMigration": 39
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-run"
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "not-run",
+      "currentRelease": "7.5.5.2"
+    }
+  }
+}

@@ -68,6 +68,24 @@ export async function discordGuildTextChannels(env, guildId, {fetchImpl = fetch}
     .sort((left,right)=>left.position-right.position||left.name.localeCompare(right.name));
 }
 
+export async function discordGuildRoles(env, guildId, {fetchImpl = fetch} = {}) {
+  if (!SNOWFLAKE.test(String(guildId || ''))) return [];
+  const roles = await discordBotRequest(env, `/guilds/${encodeURIComponent(guildId)}/roles`, {fetchImpl});
+  return (Array.isArray(roles) ? roles : [])
+    .filter(role => SNOWFLAKE.test(String(role?.id || ''))
+      && String(role.id) !== String(guildId)
+      && !Boolean(role?.managed)
+      && Boolean(role?.mentionable))
+    .map(role => ({
+      id:String(role.id),
+      name:String(role.name || 'unnamed-role').slice(0,100),
+      color:Number(role.color || 0),
+      position:Number(role.position || 0),
+      mentionable:true
+    }))
+    .sort((left,right)=>right.position-left.position||left.name.localeCompare(right.name));
+}
+
 export async function ensureDiscordScheduleChannel(env, guildId, {fetchImpl = fetch} = {}) {
   const channels = await discordGuildTextChannels(env,guildId,{fetchImpl});
   const reusable = channels.find(channel => channelName(channel?.name) === 'franchisehq-schedule');

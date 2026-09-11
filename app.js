@@ -3938,12 +3938,11 @@
     return `<div class="canonical-contract-grid canonical-contract-grid--compact">
       ${[
         ['Cap Hit',playerCardMoney(contract.capHit)],
-        ['Current Salary','Unavailable'],
+        ['Total Release Penalty',playerCardMoney(contract.releasePenalty)],
+        ['Net Release Savings',playerCardMoney(contract.releaseNetSavings)],
         ['Total Contract',playerCardMoney(contract.totalSalary)],
         ['Total Bonus',playerCardMoney(contract.totalBonus)],
-        ['Years Left / Length',`${text(contract.yearsRemaining)} / ${text(contract.length)}`],
-        ['Net Release Savings',playerCardMoney(contract.releaseNetSavings)],
-        ['Total Release Penalty',playerCardMoney(contract.releasePenalty)]
+        ['Years Left / Length',`${text(contract.yearsRemaining)} / ${text(contract.length)}`]
       ].map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
     </div>`;
   }
@@ -9945,7 +9944,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.5.5.2';
+  const VISIBLE_RELEASE = '7.5.5.3';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

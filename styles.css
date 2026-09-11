@@ -7629,7 +7629,7 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
 
 /* FranchiseHQ 7.4.4.6 — verified Discord channel routing. */
 .discord-channel-routing{padding:26px}
-.discord-channel-routing__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:22px 0}
+.discord-channel-routing__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin:22px 0}
 .discord-channel-routing__grid .field{display:grid;align-content:start;gap:8px;min-width:0;padding:18px;border:1px solid rgba(148,163,184,.18);border-radius:14px;background:rgba(15,23,42,.52)}
 .discord-channel-routing__grid .field>span{font-weight:800;color:var(--text)}
 .discord-channel-routing__grid .field select{width:100%;min-height:46px;border:1px solid rgba(148,163,184,.26);border-radius:10px;background:rgba(8,15,27,.9);color:var(--text);padding:0 12px}
@@ -7670,7 +7670,7 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
   .canonical-dashboard-card--abilities .canonical-ability-list{max-height:min(34dvh,260px)}
 }
 
-/* FranchiseHQ 7.5.5.2 — ratings-bounded desktop Player Card details. */
+/* FranchiseHQ 7.5.5.3 — ratings-bounded desktop Player Card details. */
 .canonical-player-dashboard__rail>.canonical-dashboard-stack{
   grid-template-rows:auto auto!important;
 }

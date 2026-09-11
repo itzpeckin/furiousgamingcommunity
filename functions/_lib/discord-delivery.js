@@ -5,6 +5,7 @@ import { tradeDecisionComponents, tradeLinkButton, tradeReviewComponents } from 
 import { normalizePlayer, normalizeTeam } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
 
 const MAX_ATTEMPTS=5;
+const SNOWFLAKE=/^\d{17,20}$/;
 const rows=async(db,sql,...values)=>(await db.prepare(sql).bind(...values).all()).results||[];
 const cleanError=value=>String(value?.message||value||'Discord delivery failed.').replace(/Bot\s+[A-Za-z0-9._-]+/g,'Bot [redacted]').slice(0,500);
 
@@ -27,6 +28,18 @@ const teamLabel=(teams,key)=>{
 const embedColor=value=>{
   const hex=String(value||'').trim().replace(/^#/,'');
   return /^[0-9a-f]{6}$/i.test(hex)?Number.parseInt(hex,16):0x4f8cff;
+};
+const available=value=>value!==null&&value!==undefined&&value!=='';
+const playerFact=(label,value)=>`**${label}**: ${available(value)?value:'Unavailable'}`;
+const tradeStatusLabel=(workflow,reviews=[])=>{
+  const status=String(workflow?.status||'').toLowerCase();
+  if(status==='negotiating')return 'Negotiating';
+  if(status==='committee')return 'Accepted by owners — awaiting Trade Committee';
+  if(status==='approved')return 'Approved by Trade Committee';
+  if(status==='withdrawn')return 'Cancelled by proposing team';
+  if(status==='rejected'&&reviews.some(item=>item.decision==='reject'))return 'Denied by Trade Committee — revision available';
+  if(status==='rejected')return 'Rejected by trade partner';
+  return status?status.replaceAll('-',' ').replace(/\b\w/g,letter=>letter.toUpperCase()):'Status unavailable';
 };
 
 async function tradeDeliveryDetails(db,row,payload){
@@ -87,24 +100,25 @@ async function tradeDeliveryDetails(db,row,payload){
       const savings=player.contract?.releaseNetSavings!==null&&player.contract?.releaseNetSavings!==undefined&&Number.isFinite(Number(player.contract.releaseNetSavings))?Number(player.contract.releaseNetSavings):null;
       const penalty=player.contract?.releasePenalty!==null&&player.contract?.releasePenalty!==undefined&&Number.isFinite(Number(player.contract.releasePenalty))?Number(player.contract.releasePenalty):null;
       const sourceCap=player.contract?.capHit!==null&&player.contract?.capHit!==undefined&&Number.isFinite(Number(player.contract.capHit))?Number(player.contract.capHit):null;
-      const identity=[player.position||null,
-        player.overall!==null&&player.overall!==undefined?`${player.overall} OVR`:null,
-        player.devTrait?`${player.devTrait} Dev`:null,
-        player.age!==null&&player.age!==undefined?`Age ${player.age}`:null
-      ].filter(Boolean).join(' · ');
-      const contract=[
-        player.contract?.yearsRemaining!==null&&player.contract?.yearsRemaining!==undefined?`${player.contract.yearsRemaining} year${Number(player.contract.yearsRemaining)===1?'':'s'} left`:null,
-        player.contract?.totalSalary!==null&&player.contract?.totalSalary!==undefined?`${money(player.contract.totalSalary)} total salary`:null,
-        player.contract?.totalBonus!==null&&player.contract?.totalBonus!==undefined?`${money(player.contract.totalBonus)} total bonus`:null
-      ].filter(Boolean).join(' · ');
-      const cap=[
-        sourceCap!==null?`${money(sourceCap)} cap hit`:'Cap hit unavailable',
-        savings!==null?`${money(savings)} net release savings`:'Net release savings unavailable',
-        penalty!==null?`${money(penalty)} release penalty`:'Release penalty unavailable'
-      ].join(' · ');
+      const playerSection=[
+        '**PLAYER**',
+        playerFact('Position',player.position?`\`${player.position}\``:null),
+        playerFact('Overall',available(player.overall)?`\`${player.overall}\``:null),
+        playerFact('Development',player.devTrait?`\`${player.devTrait}\``:null),
+        playerFact('Age',available(player.age)?`\`${player.age}\``:null)
+      ].join('\n');
+      const contractSection=[
+        '**CONTRACT**',
+        playerFact('Cap Hit',sourceCap!==null?`**${money(sourceCap)}**`:null),
+        playerFact('Release Penalty',penalty!==null?money(penalty):null),
+        playerFact('Net Release Savings',savings!==null?money(savings):null),
+        playerFact('Total Contract',available(player.contract?.totalSalary)?money(player.contract.totalSalary):null),
+        playerFact('Total Bonus',available(player.contract?.totalBonus)?money(player.contract.totalBonus):null),
+        playerFact('Years Left',available(player.contract?.yearsRemaining)?String(player.contract.yearsRemaining):null)
+      ].join('\n');
       groups.get(destination).push({
-        name:'Player',
-        value:[href?`**[${name}](${href})**`:`**${name}**`,identity,contract?`Contract · ${contract}`:null,`Madden cap · ${cap}`].filter(Boolean).join('\n').slice(0,1024)
+        name:'👤 PLAYER',
+        value:[href?`**[${name}](${href})**`:`**${name}**`,playerSection,'',contractSection].join('\n').slice(0,1024)
       });
       const from=String(asset.fromTeamKey||'');
       if(savings!==null)capMove(from).netReleaseSavings+=savings;
@@ -112,10 +126,10 @@ async function tradeDeliveryDetails(db,row,payload){
     }else{
       const pick=pickById.get(String(asset.draftPickId))||asset;
       groups.get(destination).push({
-        name:'Draft Pick',
-        value:[`**${pick.draftClass||'Future'} · Round ${pick.round||'—'}**`,
-          pick.projectedPick?`Projected ${pick.projectedPick}${pick.projectionTied?' (approx.)':''}`:null,
-          pick.originalTeamKey?`Original team · ${String(pick.originalTeamKey).toUpperCase()}`:null
+        name:'🏈 DRAFT PICK',
+        value:[`**${pick.draftClass||'Future'} — ROUND ${pick.round||'—'}**`,
+          pick.projectedPick?`**Projected Pick: ${pick.projectedPick}${pick.projectionTied?' (approx.)':''}**`:'**Projected Pick: Unavailable**',
+          pick.originalTeamKey?`Original Team: **${String(pick.originalTeamKey).toUpperCase()}**`:null
         ].filter(Boolean).join('\n').slice(0,1024)
       });
     }
@@ -151,13 +165,14 @@ async function tradeDeliveryDetails(db,row,payload){
     FROM trade_workflow_reviews review JOIN users user ON user.id=review.reviewer_user_id
     WHERE review.league_id=? AND review.trade_id=? AND review.revision=?
     ORDER BY review.updated_at,review.reviewer_user_id`,row.leagueId,tradeId,Number(workflow.revision));
+  statusFields.unshift({name:'Current status',value:`**${tradeStatusLabel(workflow,reviews)}**`,inline:false});
   if(reviews.length||['committee','rejected','approved'].includes(workflow.status)){
     const approvals=reviews.filter(item=>item.decision==='approve').length,rejections=reviews.filter(item=>item.decision==='reject').length;
     const lines=reviews.map(item=>`${item.decision==='approve'?'✅':item.decision==='reject'?'❌':'➖'} **${item.reviewerName||'Commissioner'}** · ${item.decision}${item.reason?` — ${item.reason}`:''}`);
     statusFields.push({name:`Committee review · ${approvals} approve / ${rejections} deny · ${Number(workflow.reviewThreshold)} required`,
       value:(lines.join('\n')||'No committee votes recorded yet.').slice(0,1024),inline:false});
   }
-  if(statusFields.length)embeds.push({title:'Trade status',fields:statusFields,color:0x4f8cff});
+  embeds.push({title:'Trade status',fields:statusFields,color:0x4f8cff});
   return {embeds,workflow};
 }
 
@@ -177,6 +192,8 @@ export async function tradeConversationMessage(db,row,{disabled=false,statusMess
   const decisionReady=['received','thread-update','revision-submitted'].includes(row.eventType)&&tradeId&&details?.workflow?.status==='negotiating';
   const reviewReady=row.eventType==='review-required'&&tradeId&&details?.workflow?.status==='committee';
   const revisionReady=['thread-update','revision-submitted'].includes(row.eventType)&&tradeId&&details?.workflow?.status==='rejected';
+  const committeeRoleId=SNOWFLAKE.test(String(payload.tradeCommitteeRoleId||''))
+    ?String(payload.tradeCommitteeRoleId):null;
   const components=decisionReady?tradeDecisionComponents(tradeId,Number(details.workflow.revision),{disabled}):reviewReady
     ?tradeReviewComponents(tradeId,Number(details.workflow.revision),{disabled}):[];
   const linkButton=(decisionReady||revisionReady)&&slug?tradeLinkButton(slug,tradeId,{label:revisionReady?'Revise Trade':'Counter Offer',disabled}):null;
@@ -185,10 +202,12 @@ export async function tradeConversationMessage(db,row,{disabled=false,statusMess
     else components.push({type:1,components:[linkButton]});
   }
   return {
-    content:[`**${title}**`,message,statusMessage,action,link?`[Open this trade in FranchiseHQ](${link})`:null].filter(Boolean).join('\n').slice(0,2000),
+    content:[row.eventType==='review-required'&&committeeRoleId?`<@&${committeeRoleId}>`:null,
+      `**${title}**`,message,statusMessage,action,link?`[Open this trade in FranchiseHQ](${link})`:null].filter(Boolean).join('\n').slice(0,2000),
     ...(details?{embeds:details.embeds}:{}),
     ...(components.length?{components}:{}),
-    allowed_mentions:{parse:[]}
+    allowed_mentions:row.eventType==='review-required'&&committeeRoleId
+      ?{roles:[committeeRoleId],users:[],replied_user:false}:{parse:[]}
   };
 }
 
@@ -261,7 +280,7 @@ export async function ensureDiscordTradeRoom(env,db,{league,installation,interac
   }
 }
 
-export async function queueTradeRoomUpdate(db,{league,tradeId,eventKey,eventType='thread-update',title='Trade updated',message='The trade workflow changed.'}={}){
+export async function queueTradeRoomUpdate(db,{league,tradeId,eventKey,eventType='thread-update',title='Trade updated',message='The trade workflow changed.',closeRoom=false}={}){
   const room=await db.prepare(`SELECT id,discord_thread_id AS threadId FROM discord_trade_rooms
     WHERE league_id=? AND trade_id=? LIMIT 1`).bind(league.id,tradeId).first();
   if(!room?.threadId)return {queued:false,reason:'trade-room-unavailable'};
@@ -280,13 +299,31 @@ export async function queueTradeRoomUpdate(db,{league,tradeId,eventKey,eventType
       (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
       VALUES (?,?,?,?,?,?,'private-channel',?,?) ON CONFLICT(idempotency_key) DO NOTHING`)
       .bind(`discord_delivery_${crypto.randomUUID()}`,league.id,room.threadId,eventType,'trade_workflow',tradeId,
-        JSON.stringify({title,message,tradeId,leagueSlug:league.slug}),`trade-room:${league.id}:${tradeId}:${key}`)
+        JSON.stringify({title,message,tradeId,leagueSlug:league.slug,archiveThreadAfterSend:Boolean(closeRoom)}),`trade-room:${league.id}:${tradeId}:${key}`)
   ]);
   return {queued:Number(results?.[2]?.meta?.changes||0)===1,threadId:room.threadId};
 }
 
+async function tradeRoomForDelivery(db,row,payload){
+  const tradeId=String(payload?.tradeId||row.resourceId||'').trim();
+  if(!tradeId||!SNOWFLAKE.test(String(row.channelId||'')))return null;
+  return db.prepare(`SELECT id,discord_thread_id AS threadId FROM discord_trade_rooms
+    WHERE league_id=? AND trade_id=? AND discord_thread_id=? LIMIT 1`)
+    .bind(row.leagueId,tradeId,row.channelId).first();
+}
+
+async function setTradeThreadState(env,db,row,payload,state,fetchImpl){
+  const room=await tradeRoomForDelivery(db,row,payload);
+  if(!room?.threadId)throw new Error('Discord trade thread could not be verified.');
+  await discordBotRequest(env,`/channels/${encodeURIComponent(room.threadId)}`,{
+    method:'PATCH',body:state,fetchImpl
+  });
+  return room;
+}
+
 async function sendDelivery(env,db,row,fetchImpl){
   let channelId=row.channelId;
+  const payload=parse(row.payloadJson);
   if(row.visibility==='direct-message'){
     const dm=await discordBotRequest(env,'/users/@me/channels',{
       method:'POST',body:{recipient_id:row.discordUserId},fetchImpl
@@ -294,9 +331,30 @@ async function sendDelivery(env,db,row,fetchImpl){
     channelId=dm?.id;
   }
   if(!channelId)throw new Error('Discord delivery channel could not be resolved.');
+  if(row.eventType==='thread-close'){
+    const room=await setTradeThreadState(env,db,row,payload,{archived:true,locked:true},fetchImpl);
+    return {room,archived:true};
+  }
+  if(row.eventType==='revision-submitted'&&row.visibility==='private-channel'){
+    const room=await tradeRoomForDelivery(db,row,payload);
+    if(room?.threadId){
+      await discordBotRequest(env,`/channels/${encodeURIComponent(room.threadId)}`,{
+        method:'PATCH',body:{archived:false,locked:false},fetchImpl
+      });
+    }
+  }
   await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
     method:'POST',body:await deliveryMessage(db,row),fetchImpl
   });
+  if(payload.archiveThreadAfterSend&&row.visibility==='private-channel'){
+    try{
+      const room=await setTradeThreadState(env,db,row,payload,{archived:true,locked:true},fetchImpl);
+      return {room,archived:true};
+    }catch(error){
+      return {archiveError:cleanError(error),payload};
+    }
+  }
+  return {archived:false};
 }
 
 export async function flushDiscordDeliveries(env,db,{leagueId=null,limit=10,fetchImpl=fetch}={}){
@@ -315,9 +373,28 @@ export async function flushDiscordDeliveries(env,db,{leagueId=null,limit=10,fetc
       .bind(row.id,MAX_ATTEMPTS).run();
     if(Number(claim?.meta?.changes||0)!==1)continue;
     try{
-      await sendDelivery(env,db,row,fetchImpl);
+      const outcome=await sendDelivery(env,db,row,fetchImpl);
       await db.prepare(`UPDATE discord_delivery_events SET status='sent',sent_at=CURRENT_TIMESTAMP,
         last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(row.id).run();
+      if(outcome?.room?.id&&outcome.archived){
+        await db.prepare(`UPDATE discord_trade_rooms SET status='archived',last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+          .bind(outcome.room.id).run();
+      }else if(outcome?.archiveError){
+        const payload=outcome.payload||parse(row.payloadJson),tradeId=String(payload.tradeId||row.resourceId||'').trim();
+        const room=await tradeRoomForDelivery(db,row,payload);
+        if(room?.id){
+          await db.batch([
+            db.prepare(`UPDATE discord_trade_rooms SET last_error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+              .bind(outcome.archiveError,room.id),
+            db.prepare(`INSERT INTO discord_delivery_events
+              (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
+              VALUES (?,?,?,?,?,?,'private-channel',?,?) ON CONFLICT(idempotency_key) DO NOTHING`)
+              .bind(`discord_delivery_${crypto.randomUUID()}`,row.leagueId,row.channelId,'thread-close','trade_workflow',tradeId,
+                JSON.stringify({tradeId,leagueSlug:payload.leagueSlug}),
+                `trade-room-close:${row.leagueId}:${tradeId}:${Date.now()}`)
+          ]);
+        }
+      }
       sent+=1;
     }catch(error){
       await db.prepare(`UPDATE discord_delivery_events SET status='failed',last_error=?,
@@ -330,7 +407,8 @@ export async function flushDiscordDeliveries(env,db,{leagueId=null,limit=10,fetc
 }
 
 export async function queueCommitteeReviewDelivery(db,{league,tradeId,title='Trade review required',message='An accepted trade requires a committee decision.'}){
-  const installation=await db.prepare(`SELECT trade_committee_channel_id AS channelId
+  const installation=await db.prepare(`SELECT trade_committee_channel_id AS channelId,
+      trade_committee_role_id AS tradeCommitteeRoleId
     FROM discord_league_installations WHERE league_id=? AND status='active' LIMIT 1`).bind(league.id).first();
   if(!installation?.channelId)return {queued:false};
   const workflow=await db.prepare(`SELECT revision FROM trade_workflows WHERE league_id=? AND id=? LIMIT 1`).bind(league.id,tradeId).first();
@@ -339,7 +417,8 @@ export async function queueCommitteeReviewDelivery(db,{league,tradeId,title='Tra
     (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
     VALUES (?,?,?,?,?,?,'private-channel',?,?) ON CONFLICT(idempotency_key) DO NOTHING`)
     .bind(`discord_delivery_${crypto.randomUUID()}`,league.id,installation.channelId,'review-required',
-      'trade_workflow',tradeId,JSON.stringify({title,message,tradeId,leagueSlug:league.slug}),
+      'trade_workflow',tradeId,JSON.stringify({title,message,tradeId,leagueSlug:league.slug,
+        tradeCommitteeRoleId:SNOWFLAKE.test(String(installation.tradeCommitteeRoleId||''))?String(installation.tradeCommitteeRoleId):null}),
       `trade-review:${league.id}:${tradeId}:${Number(workflow.revision)}`).run();
   return {queued:Number(result?.meta?.changes||0)===1};
 }
