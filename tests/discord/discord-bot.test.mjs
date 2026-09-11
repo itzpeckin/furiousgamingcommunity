@@ -232,8 +232,12 @@ test('global Discord command inventory restores legacy week commands and remains
   assert.equal(schedule.options.find(option=>option.name==='week').options.find(option=>option.name==='number').required,true);
   assert.equal(schedule.options.find(option=>option.name==='team').options.find(option=>option.name==='name').autocomplete,true);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='games').options.map(option=>option.name),['unplayed','played','all']);
-  assert.equal(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='standings').options[0].name,'show');
-  assert.equal(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='gm-history').options[0].required,false);
+  assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='standings').options.map(option=>option.name),['all','division','conference','team']);
+  assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='gm-history').options.map(option=>option.name),['all','player']);
+  assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='rules').options.map(option=>option.name),['all','category','section','rule']);
+  const leaders=DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='leaders');
+  assert.deepEqual(leaders.options.map(option=>option.name),['passing','rushing','receiving','defense','kicking']);
+  assert.deepEqual(leaders.options.find(option=>option.name==='receiving').options.map(option=>option.name),['catches','yards','touchdowns']);
 });
 
 test('/standings distinguishes all divisions, all conferences, one team, and one named division while /playoffs returns each conference top 10',async()=>{
@@ -248,16 +252,16 @@ test('/standings distinguishes all divisions, all conferences, one team, and one
       const response=await discordInteractions(await signedContext({db,key,interaction:interaction({id,name,options})}));
       return response.json();
     };
-    const divisions=await run('100000000000000071','standings',[{type:3,name:'show',value:'division:all'}]);
+    const divisions=await run('100000000000000071','standings',[{type:1,name:'division'}]);
     assert.equal(divisions.data.embeds[0].fields.length,8);
     assert.equal(divisions.data.embeds[0].fields.reduce((count,field)=>count+field.value.split('\n').length,0),32);
-    const conferences=await run('100000000000000072','standings',[{type:3,name:'show',value:'conference:all'}]);
+    const conferences=await run('100000000000000072','standings',[{type:1,name:'conference'}]);
     assert.equal(conferences.data.embeds[0].fields.length,2);
     assert.equal(conferences.data.embeds[0].fields.reduce((count,field)=>count+field.value.split('\n').length,0),32);
-    const buccaneers=await run('100000000000000073','standings',[{type:3,name:'show',value:'team:tb'}]);
+    const buccaneers=await run('100000000000000073','standings',[{type:1,name:'team',options:[{type:3,name:'name',value:'tb'}]}]);
     assert.match(buccaneers.data.content,/Tampa Bay Buccaneers.*16-0/s);
     assert.doesNotMatch(buccaneers.data.content,/San Francisco/);
-    const nfcEast=await run('100000000000000074','standings',[{type:3,name:'show',value:'division:NFC East'}]);
+    const nfcEast=await run('100000000000000074','standings',[{type:1,name:'division',options:[{type:3,name:'name',value:'NFC East'}]}]);
     assert.equal((nfcEast.data.content.match(/\*\*/g)||[]).length,10);
     assert.match(nfcEast.data.content,/Dallas Cowboys/);
     assert.doesNotMatch(nfcEast.data.content,/Tampa Bay Buccaneers/);
@@ -511,13 +515,13 @@ test('signed autocomplete returns tenant teams without creating command receipts
     }});
     const db=d1(database),key=await signingKey();
     const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
-      id:'100000000000000087',name:'standings',type:4,options:[
-        {type:3,name:'show',value:'bucc',focused:true}
-      ]
+      id:'100000000000000087',name:'standings',type:4,options:[{type:1,name:'team',options:[
+        {type:3,name:'name',value:'bucc',focused:true}
+      ]}]
     })}));
     const payload=await response.json();
     assert.equal(payload.type,8);
-    assert.deepEqual(payload.data.choices,[{name:'Team · Tampa Bay Buccaneers (TB)',value:'team:tb'}]);
+    assert.deepEqual(payload.data.choices,[{name:'Tampa Bay Buccaneers (TB)',value:'tb'}]);
 
     const ownerResponse=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000088',name:'trade',type:4,options:[{type:1,name:'create',options:[
@@ -542,6 +546,33 @@ test('signed autocomplete returns tenant teams without creating command receipts
       name:'Player · Christian Example · HB · SF',value:'player:sf-player'
     }]);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM discord_interaction_receipts`).get().count,0);
+  }finally{database.close()}
+});
+
+test('/rules subcommands autocomplete commissioner-authored names from only the connected league',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedLeague(database,{id:'league-b',slug:'beta',guild:'100000000000000002'});
+    seedMember(database,{leagueId:'league-b',userId:'user-b',discordId:'100000000000000022'});
+    const document=title=>JSON.stringify({categories:[{title,sections:[{title:'Game Management',rules:[{title:'Conversion Attempts',text:'Follow the published fourth-down limits.'}]}]}]});
+    database.prepare(`INSERT INTO league_rules_documents (league_id,rules_json) VALUES (?,?)`).run('league-a',document('4th Down Rules'));
+    database.prepare(`INSERT INTO league_rules_documents (league_id,rules_json) VALUES (?,?)`).run('league-b',document('Going for it on 4th'));
+    const db=d1(database),key=await signingKey();
+    const autocomplete=async({id,guild,user,value})=>discordInteractions(await signedContext({db,key,interaction:interaction({
+      id,guild,user,name:'rules',type:4,options:[{type:1,name:'category',options:[{type:3,name:'name',value,focused:true}]}]
+    })}));
+    const alpha=await (await autocomplete({id:'100000000000000094',guild:'100000000000000001',user:'100000000000000011',value:'4th'})).json();
+    const beta=await (await autocomplete({id:'100000000000000095',guild:'100000000000000002',user:'100000000000000022',value:'going'})).json();
+    assert.deepEqual(alpha.data.choices,[{name:'Category · 4th Down Rules',value:'category:0'}]);
+    assert.deepEqual(beta.data.choices,[{name:'Category · Going for it on 4th',value:'category:0'}]);
+    assert.equal(alpha.data.choices.some(item=>/Going for it/.test(item.name)),false);
+    const result=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000096',name:'rules',options:[{type:1,name:'category',options:[{type:3,name:'name',value:'category:0'}]}]
+    })}));
+    assert.match((await result.json()).data.content,/4th Down Rules.*Conversion Attempts.*published fourth-down limits/s);
   }finally{database.close()}
 });
 
@@ -966,9 +997,9 @@ test('Discord Player Cards use compact position statistics and portraits while t
     assert.doesNotMatch(teamFields,/999/);
 
     const leaders=await discordInteractions(await signedContext({db,key,interaction:interaction({
-      id:'100000000000000084',name:'leaders',options:[
-        {type:3,name:'category',value:'receiving'},{type:3,name:'metric',value:'recTDs'}
-      ]
+      id:'100000000000000084',name:'leaders',options:[{type:2,name:'receiving',options:[
+        {type:1,name:'touchdowns'}
+      ]}]
     })}));
     assert.match((await leaders.json()).data.content,/Mike Example.*3/s);
 
@@ -1044,14 +1075,14 @@ test('GM History includes current-season results before the season is archived',
       VALUES ('period-a','league-a','gm-a','tb','season-2026',CURRENT_TIMESTAMP,'preseason',1)`).run();
     const db=d1(database),key=await signingKey();
     const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
-      id:'100000000000000082',name:'gm-history',options:[{type:3,name:'show',value:'user-a'}]
+      id:'100000000000000082',name:'gm-history',options:[{type:1,name:'player',options:[{type:3,name:'name',value:'user-a'}]}]
     })}));
     const payload=await response.json();
     assert.match(payload.data.content,/Member user-a/);
     assert.match(payload.data.content,/1-0/);
     assert.doesNotMatch(payload.data.content,/Second GM/);
     const all=await discordInteractions(await signedContext({db,key,interaction:interaction({
-      id:'100000000000000083',name:'gm-history'
+      id:'100000000000000083',name:'gm-history',options:[{type:1,name:'all'}]
     })}));
     const allContent=(await all.json()).data.content;
     assert.match(allContent,/Member user-a/);
@@ -1452,7 +1483,7 @@ test('durable legacy trade delivery opens a DM and preserves the FranchiseHQ fal
   }finally{database.close()}
 });
 
-test('trade delivery sends both owners linked player details and an explicitly estimated cap impact',async()=>{
+test('trade delivery sends both owners clean team cards with source-supported contract facts only',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -1505,11 +1536,12 @@ test('trade delivery sends both owners linked player details and an explicitly e
     const messages=requests.filter(request=>/\/messages$/.test(request.url));
     assert.equal(messages.length,2);
     for(const request of messages){
-      const details=request.body.embeds[0].fields.map(field=>field.value).join('\n');
-      assert.match(details,/\[Tristan Example\].*LT.*95 OVR.*Age 27.*Superstar Dev.*Madden cap hit \$3,997,000.*Acquiring estimate \$10,000,000.*release penalty \$10,651,000/s);
-      assert.match(details,/\[George Example\].*TE.*97 OVR.*Age 29.*X-Factor Dev.*Madden cap hit \$566,000.*Acquiring estimate \$0.*release penalty \$4,696,000/s);
-      assert.match(details,/outgoing relief.*\$10,651,000 retained release penalty/s);
-      assert.match(details,/Current\/projected team space appears only when the export supplies current cap room/);
+      assert.deepEqual(request.body.embeds.slice(0,2).map(embed=>embed.title).sort(),['San Francisco 49ers receives','Tampa Bay Buccaneers receives']);
+      const details=request.body.embeds.flatMap(embed=>embed.fields||[]).map(field=>field.value).join('\n');
+      assert.match(details,/\[Tristan Example\].*LT.*95 OVR.*Superstar Dev.*Age 27.*\$39,970,000 cap hit.*\$10,000,000 net release savings.*\$106,510,000 release penalty/s);
+      assert.match(details,/\[George Example\].*TE.*97 OVR.*X-Factor Dev.*Age 29.*\$5,660,000 cap hit.*\$0 net release savings.*\$46,960,000 release penalty/s);
+      assert.match(details,/Incoming current-year salary and projected team cap space remain unavailable/);
+      assert.doesNotMatch(details,/Acquiring estimate|estimated room change|projected available/);
       assert.doesNotMatch(request.body.content,/^https:\/\//m);
     }
   }finally{database.close()}

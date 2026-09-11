@@ -3436,7 +3436,7 @@
   function renderCanonicalAbilities(player={}) {
     const abilities=Array.isArray(player.abilities)?player.abilities:[];
     if(!abilities.length) return '<div class="canonical-player-empty"><strong>No abilities supplied</strong><span>The active Madden player source does not include a public signature ability for this player.</span></div>';
-    return `<div class="canonical-ability-list">${abilities.map(ability=>`<article><div><strong>${escapeHtml(ability.title||'Ability')}</strong><span>${escapeHtml(ability.description||'No description supplied by Madden.')}</span></div><small>${ability.rank?`Rank ${escapeHtml(ability.rank)}`:'Source ability'}${ability.threshold!=null?` · ${escapeHtml(ability.threshold)} OVR`:''}${ability.unlocked?' · Unlocked':' · Locked'}</small></article>`).join('')}</div>`;
+    return `<div class="canonical-ability-list" role="list" tabindex="0" aria-label="Player abilities">${abilities.map(ability=>`<article role="listitem"><div><strong>${escapeHtml(ability.title||'Ability')}</strong><span>${escapeHtml(ability.description||'No description supplied by Madden.')}</span></div><small>${ability.rank?`Rank ${escapeHtml(ability.rank)}`:'Source ability'}${ability.threshold!=null?` · ${escapeHtml(ability.threshold)} OVR`:''}${ability.unlocked?' · Unlocked':' · Locked'}</small></article>`).join('')}</div>`;
   }
 
   function canonicalCurrentSeasonYear() {
@@ -4383,7 +4383,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function canonicalPlayerSideRail(player={}) {
-    return `<div class="canonical-dashboard-stack"><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Abilities</h3></div>${renderCanonicalAbilities(player)}</section><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Contract</h3></div>${canonicalContractPanel(player)}</section><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Transaction History</h3></div>${canonicalTransactionHistory(player.id)}</section></div>`;
+    return `<div class="canonical-dashboard-stack"><section class="canonical-dashboard-card canonical-dashboard-card--abilities"><div class="canonical-dashboard-card__head"><h3>Abilities</h3></div>${renderCanonicalAbilities(player)}</section><section class="canonical-dashboard-card"><div class="canonical-dashboard-card__head"><h3>Contract</h3></div>${canonicalContractPanel(player)}</section><section class="canonical-dashboard-card canonical-dashboard-card--transactions"><div class="canonical-dashboard-card__head"><h3>Transaction History</h3></div>${canonicalTransactionHistory(player.id)}</section></div>`;
   }
 
   function openCanonicalLivePlayerCard(playerId='') {
@@ -9945,7 +9945,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.5.5';
+  const VISIBLE_RELEASE = '7.5.5.1';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

@@ -11,15 +11,6 @@ const uniqueChoices=items=>{
   return items.filter(item=>item?.name&&item?.value&&!seen.has(String(item.value))&&seen.add(String(item.value))).slice(0,25);
 };
 
-const METRICS={
-  passing:[['Passing yards','passYds'],['Passing touchdowns','passTDs'],['Completions','passComp'],['Attempts','passAtt'],['Completion percentage','passCompPct'],['Interceptions thrown','passInts'],['Passer rating','passerRating']],
-  rushing:[['Rushing yards','rushYds'],['Rushing touchdowns','rushTDs'],['Carries','rushAtt'],['Fumbles','rushFum'],['Broken tackles','rushBrokenTackles']],
-  receiving:[['Receiving yards','recYds'],['Receiving touchdowns','recTDs'],['Receptions','recCatches'],['Drops','recDrops'],['Yards after catch','recYdsAfterCatch']],
-  defense:[['Total tackles','defTotalTackles'],['Sacks','defSacks'],['Interceptions','defInts'],['Forced fumbles','defForcedFum'],['Fumble recoveries','defFumRec'],['Defensive touchdowns','defTDs'],['Pass deflections','defDeflections']],
-  kicking:[['Kicking points','kickPts'],['Field goals made','fGMade'],['Field-goal percentage','fGCompPct'],['Extra points made','xPMade'],['50+ field goals made','fG50PlusMade']],
-  punting:[['Punt yards','puntYds'],['Net punt yards','puntNetYds'],['Punts inside 20','puntsIn20'],['Punt attempts','puntAtt'],['Longest punt','puntLongest']]
-};
-
 async function teamsFor(c){
   if(!Array.isArray(c.teams)||!c.teams.length)c.teams=await activeLeagueTeams(c.db,c.league.id);
   return c.teams;
@@ -141,16 +132,15 @@ async function assetChoices(c,query,{teamKey}={}){
   ]);
 }
 
-async function standingsChoices(c,query){
+async function standingsScopeChoices(c,query,scope){
   const teams=await teamsFor(c);
   const conferences=[...new Set(teams.map(team=>clean(team.conferenceName)).filter(Boolean))].sort();
   const divisions=[...new Set(teams.map(team=>clean(team.divisionName)).filter(Boolean))].sort();
-  const candidates=[
-    choice('League · all 32 teams','league'),choice('Conference · all conferences','conference:all'),choice('Division · all divisions','division:all'),
-    ...conferences.map(name=>choice(`Conference · ${name}`,`conference:${name}`)),
-    ...divisions.map(name=>choice(`Division · ${name}`,`division:${name}`)),
-    ...teams.map(team=>choice(`Team · ${team.displayName}${team.abbreviation?` (${team.abbreviation})`:''}`,`team:${team.teamKey}`))
-  ];
+  const candidates=scope==='conference'
+    ?conferences.map(name=>choice(name,name))
+    :scope==='division'
+      ?divisions.map(name=>choice(name,name))
+      :teams.map(team=>choice(`${team.displayName}${team.abbreviation?` (${team.abbreviation})`:''}`,team.teamKey));
   return uniqueChoices(candidates.filter(item=>matches(`${item.name} ${item.value}`,query)));
 }
 
@@ -176,7 +166,7 @@ async function gmChoices(c,query){
   return uniqueChoices(candidates.filter(item=>matches(`${item.name} ${item.value}`,query)));
 }
 
-async function ruleChoices(c,query){
+async function ruleChoices(c,query,type=null){
   const row=await c.db.prepare(`SELECT rules_json AS rulesJson FROM league_rules_documents WHERE league_id=?`).bind(c.league.id).first();
   let document={categories:[]};try{document=JSON.parse(row?.rulesJson||'{"categories":[]}')}catch{}
   const candidates=[];
@@ -190,7 +180,7 @@ async function ruleChoices(c,query){
       }
     }
   }
-  return uniqueChoices(candidates.filter(item=>matches(item.name,query)));
+  return uniqueChoices(candidates.filter(item=>(!type||item.value.startsWith(`${type}:`))&&matches(item.name,query)));
 }
 
 async function tradeChoices(c,query,{review=false}={}){
@@ -212,7 +202,9 @@ export async function discordAutocompleteChoices(c){
   const {subcommand,focused,values}=discordFocusedOption(c.interaction);
   if(!focused)return [];
   const query=lower(focused.value),name=focused.name;
-  if(command==='standings'&&name==='show')return standingsChoices(c,query);
+  if(command==='standings'&&name==='name'&&['division','conference','team'].includes(subcommand)){
+    return standingsScopeChoices(c,query,subcommand);
+  }
   if(command==='playoffs'&&name==='conference')return playoffChoices(c,query);
   if(command==='schedule'&&subcommand==='team'&&name==='name')return teamChoices(c,query);
   if(command==='player'&&name==='name')return playerChoices(c,query);
@@ -220,14 +212,12 @@ export async function discordAutocompleteChoices(c){
   if(command==='player-stats'&&name==='player')return playerChoices(c,query);
   if(command==='team-stats'&&name==='team')return teamChoices(c,query);
   if(command==='stats'&&name==='name')return lower(values.target)==='team'?teamChoices(c,query):playerChoices(c,query);
-  if(command==='leaders'&&name==='metric')return uniqueChoices((METRICS[lower(values.category)||'passing']||[])
-    .filter(([label,value])=>matches(`${label} ${value}`,query)).map(([label,value])=>choice(label,value)));
   if(command==='trade-block'&&subcommand==='view'&&name==='team')return teamChoices(c,query);
   if(command==='trade-block'&&['add','remove'].includes(subcommand)&&name==='player'){
     return tradeBlockPlayerChoices(c,query,{listedOnly:subcommand==='remove'});
   }
-  if(command==='gm-history'&&name==='show')return gmChoices(c,query);
-  if(command==='rules'&&name==='query')return ruleChoices(c,query);
+  if(command==='gm-history'&&subcommand==='player'&&name==='name')return gmChoices(c,query);
+  if(command==='rules'&&['category','section','rule'].includes(subcommand)&&name==='name')return ruleChoices(c,query,subcommand);
   if(command==='trade'&&subcommand==='create'&&['owner','opponent'].includes(name))return ownerChoices(c,query);
   if(command==='trade'&&subcommand==='create'&&/^send-[1-6]$/.test(name)){
     const teams=await teamsFor(c);return assetChoices(c,query,{teamKey:resolveTeam(teams,c.membership?.teamId)?.teamKey});

@@ -7635,3 +7635,37 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
 .discord-channel-routing__grid .field select{width:100%;min-height:46px;border:1px solid rgba(148,163,184,.26);border-radius:10px;background:rgba(8,15,27,.9);color:var(--text);padding:0 12px}
 .discord-channel-routing__grid .field small{color:var(--muted);line-height:1.5}
 @media(max-width:900px){.discord-channel-routing__grid{grid-template-columns:minmax(0,1fr)}.discord-channel-routing{padding:20px}.discord-channel-routing .card-header{align-items:flex-start;flex-direction:column}}
+
+/* FranchiseHQ 7.5.5.1 — bounded, scrollable Player Card abilities. */
+.canonical-player-dashboard__rail>.canonical-dashboard-stack{
+  grid-template-rows:minmax(0,auto) auto minmax(0,1fr)!important;
+}
+.canonical-player-dashboard__rail>.canonical-dashboard-stack>.canonical-dashboard-card:nth-child(2){
+  display:block!important;
+  height:auto!important;
+  min-height:0!important;
+}
+.canonical-player-dashboard__rail>.canonical-dashboard-stack>.canonical-dashboard-card--transactions{
+  display:flex!important;
+  flex-direction:column!important;
+  min-height:0!important;
+  height:100%!important;
+}
+.canonical-dashboard-card--abilities .canonical-ability-list{
+  max-height:clamp(190px,27dvh,300px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  -webkit-overflow-scrolling:touch;
+}
+.canonical-dashboard-card--abilities .canonical-ability-list article strong{font-size:.875rem}
+.canonical-dashboard-card--abilities .canonical-ability-list article span,
+.canonical-dashboard-card--abilities .canonical-ability-list article small{font-size:.75rem}
+.canonical-dashboard-card--abilities .canonical-ability-list:focus-visible{
+  outline:2px solid #5c8fff;
+  outline-offset:-3px;
+}
+@media(max-width:850px){
+  .canonical-dashboard-card--abilities .canonical-ability-list{max-height:min(34dvh,260px)}
+}

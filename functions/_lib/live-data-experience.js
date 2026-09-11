@@ -75,35 +75,47 @@ export function sourceRosterStatus(raw = {}, teamId = '') {
   return explicit || 'active';
 }
 
-const scaledThousands = value => {
+// Madden 27's current roster payload encodes cap hit and release penalty in
+// ten-thousands of dollars (3997 => $39.97M). Earlier retained fixtures encoded
+// cap hit in thousands. A current-format cap-hit ceiling of 5000 distinguishes
+// the two observed payload shapes without rewriting their preserved source.
+const maddenContractScale = value => {
   const numeric = number(value);
-  return numeric === null ? null : numeric * 1000;
+  return numeric !== null && Math.abs(numeric) <= 5000 ? 10000 : 1000;
+};
+const scaledMaddenCurrency = (value, scale) => {
+  const numeric = number(value);
+  return numeric === null ? null : numeric * scale;
 };
 
-// Madden's roster payload is not internally consistent for the two release
-// fields. Older captures report both in thousands while the current Madden 27
-// payload reports net savings in dollars and the release penalty in thousands.
-// NFL contract values below $100,000 are not plausible here, so the magnitude
-// boundary lets both retained formats normalize to dollars without changing the
-// source record.
-const maddenCurrency = value => {
+// Net release savings is already dollars in the current payload but was
+// thousands in older captures. Normalize it independently from cap hit and
+// release penalty because Madden does not use one shared unit for all fields.
+const maddenVariableCurrency = value => {
   const numeric = number(value);
   if (numeric === null) return null;
   return Math.abs(numeric) >= 100000 ? numeric : numeric * 1000;
 };
 
 export function sourceSupportedContract(raw = {}) {
+  const rawCapHit=raw.sourceCapHit ?? raw.cap_hit ?? raw.capHit ?? raw.salaryCapHit;
+  const contractScale=maddenContractScale(rawCapHit);
   return {
     yearsRemaining:number(raw.contract_years_remaining ?? raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.yearsRemaining),
     length:number(raw.contractLength ?? raw.contractYears ?? raw.totalContractYears),
     currentYearSalary:null,
-    capHit:scaledThousands(raw.sourceCapHit ?? raw.cap_hit ?? raw.capHit ?? raw.salaryCapHit),
+    capHit:scaledMaddenCurrency(rawCapHit,contractScale),
     currentYearBonus:null,
     totalSalary:number(raw.contractSalary ?? raw.totalSalary ?? raw.contractTotalSalary),
     totalBonus:number(raw.contractBonus ?? raw.totalBonus ?? raw.signingBonus),
-    releaseNetSavings:maddenCurrency(raw.capReleaseNetSavings ?? raw.releaseNetSavings ?? raw.capSavings),
-    releasePenalty:maddenCurrency(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney),
-    sourceUnits:{capHit:'madden-thousands',releaseNetSavings:'madden-variable-normalized',releasePenalty:'madden-variable-normalized',salary:'dollars',bonus:'dollars'}
+    releaseNetSavings:maddenVariableCurrency(raw.capReleaseNetSavings ?? raw.releaseNetSavings ?? raw.capSavings),
+    releasePenalty:scaledMaddenCurrency(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney,contractScale),
+    sourceUnits:{
+      capHit:contractScale===10000?'madden-ten-thousands':'madden-thousands',
+      releaseNetSavings:'madden-variable-normalized',
+      releasePenalty:contractScale===10000?'madden-ten-thousands':'madden-thousands',
+      salary:'dollars',bonus:'dollars'
+    }
   };
 }
 
