@@ -937,6 +937,8 @@ test('committee denial reasons update the private thread and the same trade can 
       payloadJson:JSON.stringify({title:'Trade accepted',message:'Awaiting review.',tradeId,leagueSlug:'alpha'})});
     assert.deepEqual(committeeMessage.embeds,ownerMessage.embeds,'committee and owner rooms render the same trade package');
     assert.match(committeeMessage.content,/^<@&100000000000000068>/);
+    assert.match(committeeMessage.content,/San Francisco 49ers receives[\s\S]*2027 Round 1/);
+    assert.match(committeeMessage.content,/Tampa Bay Buccaneers receives[\s\S]*2027 Round 1/);
     assert.deepEqual(committeeMessage.allowed_mentions,{roles:['100000000000000068'],users:[],replied_user:false});
     assert.deepEqual(committeeMessage.components[0].components.map(button=>button.label),['Approve','Deny']);
     const denyId=tradeDecisionCustomId('review-deny',tradeId,1);
@@ -1576,8 +1578,10 @@ test('trade delivery sends both owners clean team cards with source-supported co
       (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
       VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
     const players=[
-      ['identity-tb','public-tb','source-tb','Tristan Example','1001','LT',95,27,'Superstar',3997,10000000,10651],
-      ['identity-sf','public-sf','source-sf','George Example','1002','TE',97,29,'X-Factor',566,0,4696]
+      ['identity-tb','public-tb','source-tb','Tristan Example','1001','LT',95,27,'Superstar',3997,10000000,10651,'tb','sf'],
+      ['identity-tb-2','public-tb-2','source-tb-2','Rueben Example','1001','REDG',88,22,'Star',725,4200000,1800,'tb','sf'],
+      ['identity-sf','public-sf','source-sf','George Example','1002','TE',97,29,'X-Factor',566,0,4696,'sf','tb'],
+      ['identity-sf-2','public-sf-2','source-sf-2','Sauce Example','1002','CB',94,26,'Superstar',2500,8000000,7000,'sf','tb']
     ];
     players.forEach(([identityId,publicId,sourceId,name,teamId,position,overall,age,development,capHit,capReleaseNetSavings,capReleasePenalty])=>{
       database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,'league-a',?,?)`).run(identityId,publicId,name);
@@ -1591,21 +1595,22 @@ test('trade delivery sends both owners clean team cards with source-supported co
     });
     database.prepare(`INSERT INTO trade_workflows
       (id,league_id,franchise_season_id,status,revision,mutation_token,proposer_user_id,proposer_team_key,review_threshold)
-      VALUES ('trade-rich','league-a','season-a','negotiating',1,'token','user-a','tb',3)`).run();
-    database.prepare(`INSERT INTO trade_workflow_participants (trade_id,league_id,team_key) VALUES ('trade-rich','league-a','tb')`).run();
-    database.prepare(`INSERT INTO trade_workflow_participants (trade_id,league_id,team_key) VALUES ('trade-rich','league-a','sf')`).run();
-    database.prepare(`INSERT INTO trade_workflow_assets
-      (id,trade_id,league_id,revision,asset_type,player_identity_id,source_player_id,from_team_key,to_team_key,ordinal)
-      VALUES ('asset-tb','trade-rich','league-a',1,'player','identity-tb','source-tb','tb','sf',0)`).run();
-    database.prepare(`INSERT INTO trade_workflow_assets
-      (id,trade_id,league_id,revision,asset_type,player_identity_id,source_player_id,from_team_key,to_team_key,ordinal)
-      VALUES ('asset-sf','trade-rich','league-a',1,'player','identity-sf','source-sf','sf','tb',1)`).run();
+      VALUES ('trade_11111111-1111-4111-8111-111111111111','league-a','season-a','negotiating',1,'token','user-a','tb',3)`).run();
+    database.prepare(`INSERT INTO trade_workflow_participants (trade_id,league_id,team_key) VALUES ('trade_11111111-1111-4111-8111-111111111111','league-a','tb')`).run();
+    database.prepare(`INSERT INTO trade_workflow_participants (trade_id,league_id,team_key) VALUES ('trade_11111111-1111-4111-8111-111111111111','league-a','sf')`).run();
+    players.forEach((player,ordinal)=>{
+      const identityId=player[0],sourceId=player[2],fromTeamKey=player[12],toTeamKey=player[13];
+      database.prepare(`INSERT INTO trade_workflow_assets
+        (id,trade_id,league_id,revision,asset_type,player_identity_id,source_player_id,from_team_key,to_team_key,ordinal)
+        VALUES (?,'trade_11111111-1111-4111-8111-111111111111','league-a',1,'player',?,?,?,?,?)`)
+        .run(`asset-${ordinal}`,identityId,sourceId,fromTeamKey,toTeamKey,ordinal);
+    });
     database.prepare(`INSERT INTO league_notifications
       (id,league_id,user_id,trade_id,notification_type,title,message) VALUES
-      ('notice-sent','league-a','user-a','trade-rich','sent','Trade sent','Your offer was sent.')`).run();
+      ('notice-sent','league-a','user-a','trade_11111111-1111-4111-8111-111111111111','sent','Trade sent','Your offer was sent.')`).run();
     database.prepare(`INSERT INTO league_notifications
       (id,league_id,user_id,trade_id,notification_type,title,message) VALUES
-      ('notice-received','league-a','owner-sf','trade-rich','received','Trade received','You received an offer.')`).run();
+      ('notice-received','league-a','owner-sf','trade_11111111-1111-4111-8111-111111111111','received','Trade received','You received an offer.')`).run();
     const requests=[];
     const fetchImpl=async(url,options={})=>{
       const body=options.body?JSON.parse(options.body):null;requests.push({url:String(url),method:options.method,body});
@@ -1621,9 +1626,46 @@ test('trade delivery sends both owners clean team cards with source-supported co
       const details=request.body.embeds.flatMap(embed=>embed.fields||[]).map(field=>field.value).join('\n');
       assert.match(details,/\[Tristan Example\].*Position.*LT.*Overall.*95.*Development.*Superstar.*Age.*27.*Cap Hit.*\$39,970,000.*Release Penalty.*\$106,510,000.*Net Release Savings.*\$10,000,000/s);
       assert.match(details,/\[George Example\].*Position.*TE.*Overall.*97.*Development.*X-Factor.*Age.*29.*Cap Hit.*\$5,660,000.*Release Penalty.*\$46,960,000.*Net Release Savings.*\$0/s);
+      assert.match(details,/Rueben Example/);
+      assert.match(details,/Sauce Example/);
       assert.match(details,/Incoming current-year salary and projected team cap space remain unavailable/);
       assert.doesNotMatch(details,/Acquiring estimate|estimated room change|projected available/);
       assert.doesNotMatch(request.body.content,/^https:\/\//m);
     }
+
+    database.prepare(`UPDATE trade_workflows SET status='committee' WHERE id='trade_11111111-1111-4111-8111-111111111111'`).run();
+    const committeeMessage=await tradeConversationMessage(d1(database),{
+      leagueId:'league-a',eventType:'review-required',resourceId:'trade_11111111-1111-4111-8111-111111111111',
+      payloadJson:JSON.stringify({title:'Trade review required',message:'Review this package.',tradeId:'trade_11111111-1111-4111-8111-111111111111',leagueSlug:'alpha'})
+    });
+    assert.ok(committeeMessage.content.length<=2000);
+    for(const name of ['Tristan Example','Rueben Example','George Example','Sauce Example']){
+      assert.match(committeeMessage.content,new RegExp(name));
+    }
+    assert.deepEqual(committeeMessage.embeds.filter(embed=>/ receives$/.test(embed.title)),
+      messages[0].body.embeds.filter(embed=>/ receives$/.test(embed.title)));
+    assert.deepEqual(committeeMessage.components[0].components.map(button=>button.label),['Approve','Deny']);
+
+    database.prepare(`INSERT INTO discord_delivery_events
+      (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
+      VALUES ('committee-rich','league-a','100000000000000067','review-required','trade_workflow','trade_11111111-1111-4111-8111-111111111111','private-channel',?,?)`)
+      .run(JSON.stringify({title:'Trade review required',message:'Review this package.',tradeId:'trade_11111111-1111-4111-8111-111111111111',leagueSlug:'alpha'}),'committee-rich');
+    const fallbackRequests=[];
+    const strippedEmbedFetch=async(url,options={})=>{
+      const body=options.body?JSON.parse(options.body):null;
+      fallbackRequests.push({url:String(url),method:options.method,body});
+      return new Response(JSON.stringify({id:`message-${fallbackRequests.length}`,embeds:[],flags:0}),{
+        status:200,headers:{'content-type':'application/json'}
+      });
+    };
+    assert.deepEqual(await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},d1(database),{
+      leagueId:'league-a',limit:10,fetchImpl:strippedEmbedFetch
+    }),{sent:1,failed:0,skipped:false});
+    const fallbackText=fallbackRequests.slice(1).map(request=>request.body?.content||'').join('\n');
+    for(const name of ['Tristan Example','Rueben Example','George Example','Sauce Example']){
+      assert.match(fallbackText,new RegExp(name));
+    }
+    assert.match(fallbackText,/CONTRACT/);
+    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='committee-rich'`).get().status,'sent');
   }finally{database.close()}
 });

@@ -6,13 +6,13 @@
 
 **Updated:** September 11, 2026
 
-**Revision:** 2.31
+**Revision:** 2.32
 
 **Current production:** FranchiseHQ 7.5.5.3 is live from PR #68, Main merge `c7b7560`, and accepted Pages deployment `b569a8ec-cf7e-4cad-96d4-302d3031776c`. Additive migration 39 is current on the exact Madden 27 Production database. Protected league/account/snapshot counts and foreign-key integrity passed before/after verification; no Discord registration/configuration, import, snapshot operation, reset, archive/transition, export-URL rotation, credential change, membership/assignment change, or live trade action ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** 7.5.5.3 is deployed and read-only verified. The Player Card Contract panel removes unsupported Current Salary and promotes source-backed Total Release Penalty. Discord owner threads and the configured Trade Committee channel share one structured player/contract/draft-pick package, every trade exposes an explicit workflow status, and each league can select one mentionable Trade Committee Discord role. Final approval, partner rejection, or proposer cancellation posts the final result and archives/locks the private thread; committee denial keeps it open, and revision reopens and reuses the same thread. The focused release suite passes 55/55 and the Main strict gate passes 214/214.
+**Current work:** 7.5.5.4 is locally implemented from exact Production evidence commit `e54b210`. Trade Committee delivery now makes every player and pick visible in the review message before Approve/Deny, retains the same full receiving-team cards used in private owner threads, refuses to send a summary-only review, and recovers with complete bounded text when Discord reports that a channel suppressed the rich cards. Production remains 7.5.5.3 and unchanged.
 
-**Next gate:** Owner UI and live Discord acceptance of the 7.5.5.3 trade-review lifecycle, followed by the scheduled off-season 7.5.6 full-season schedule/current-period authority cycle. Selecting a Trade Committee role is an intentional commissioner configuration action and was not performed during deployment.
+**Next gate:** Exact 7.5.5.4 candidate publication, pull-request checks, Main merge, code-only Production deployment, and live owner acceptance require explicit authorization. No migration or Discord command registration is required. The scheduled off-season 7.5.6 full-season schedule/current-period authority cycle follows.
 
 ## Product decisions
 
@@ -103,6 +103,7 @@
 | 7.5.5.1 | Production deployed; pending owner acceptance | Direct Discord standings/GM-history/rules/leader subcommands, league-authored Rules discovery, Madden 27 contract-unit provenance, clean private trade cards, and independently scrollable Player Card abilities |
 | 7.5.5.2 | Production deployed; pending owner UI acceptance | Ratings-bounded desktop Player Card Details, contained Game Log/Abilities/Contract scrolling, and removal of the duplicate details Transaction History widget while preserving its top tab |
 | 7.5.5.3 | Production deployed; pending owner UI/Discord acceptance | Source-backed Player Card contract cleanup, shared detailed Discord trade packages, league-configured committee role routing, explicit workflow status, and clean same-thread completion/revision lifecycle |
+| 7.5.5.4 | Local candidate; publication unauthorized | Guaranteed Trade Submit asset visibility, summary-only fail-closed delivery, and rich-card suppression recovery without changing trades or Discord routing |
 | 7.5.6 | Planned for off-season | Full-season schedule horizon separated from authoritative current period, with Discord threads created only for a proven league-week advance |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
@@ -118,13 +119,14 @@
 | 2 | Production deployed; owner acceptance pending | 7.5.5.1 | Make Discord discovery direct and league-aware, correct Madden contract provenance, clean up trade cards, and contain Player Card abilities without distorting the page. |
 | 3 | Production deployed; owner acceptance pending | 7.5.5.2 | Keep the canonical desktop Player Card Details dashboard no taller than Ratings while preserving its dedicated history tab and mobile composition. |
 | 4 | Production deployed; owner acceptance pending | 7.5.5.3 | Complete Discord trade review in one shared detailed format, notify a configured committee role, and close or reopen the same private thread according to its final/revision state. |
-| 5 | Off-season | 7.5.6 | Import the complete season schedule while the latest accepted import alone controls the current period; preloading or re-importing a week creates no future or duplicate matchup threads. |
-| 6 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
-| 7 | Pre-RC | 7.4.5–7.4.6 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
-| 8 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
-| 9 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
-| 10 | Expansion | 8.0.0 | Activate a second real league and prove tenant-isolated operation and recovery while FGC remains unchanged. |
-| 11 | Product completion | 8.1.0 | Complete multi-league administration, safe switching, lifecycle operations, quotas/billing readiness, support tooling, and custom-domain automation. |
+| 5 | Current local candidate | 7.5.5.4 | Guarantee that Trade Submit displays every player and pick before committee voting, including a safe fallback when Discord suppresses rich cards. |
+| 6 | Off-season | 7.5.6 | Import the complete season schedule while the latest accepted import alone controls the current period; preloading or re-importing a week creates no future or duplicate matchup threads. |
+| 7 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
+| 8 | Pre-RC | 7.4.5–7.4.6 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
+| 9 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
+| 10 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
+| 11 | Expansion | 8.0.0 | Activate a second real league and prove tenant-isolated operation and recovery while FGC remains unchanged. |
+| 12 | Product completion | 8.1.0 | Complete multi-league administration, safe switching, lifecycle operations, quotas/billing readiness, support tooling, and custom-domain automation. |
 
 The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critical path unless the owner explicitly reopens it.
 
@@ -601,6 +603,15 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Preserve the existing stacked tablet/phone Player Card composition. This release does not alter the Discord bot, imports, snapshots, transactions, or league data.
 - Gate: focused desktop/mobile source-contract regression plus the complete strict repository suite pass in one consolidated cycle. Publication, Main, and Production require the next explicit authorization.
 
+## 7.5.5.4 — Trade Submit Asset Visibility
+
+- Show a linked, receiving-team summary of every proposed player and draft pick directly in the Trade Committee review message before Approve/Deny.
+- Retain the same complete receiving-team rich cards used by the private owner thread, including player, contract, draft-pick projection, and workflow-status facts.
+- Refuse to send a summary-only committee review when the persisted trade package cannot be rendered; the durable delivery remains retryable instead of presenting an unsafe decision surface.
+- Inspect Discord's accepted message response. If the channel suppresses the rich cards, remove an explicit suppression flag when possible and otherwise post the complete card contents as bounded text messages in the same channel.
+- Gate: production-shaped four-player and two-pick regressions prove committee/private package parity, direct asset visibility, preserved Approve/Deny controls, suppression recovery, no schema change, and no trade or league-data mutation.
+- Publication, Main, Production, and any live trade acceptance remain separately authorized. Discord command registration and database migration are not required.
+
 ## 7.5.6 — Off-Season Full-Season Schedule and Current-Period Authority
 
 - Separate the season's `schedule horizon` from its `current period`. FranchiseHQ may retain and display every known regular-season matchup without treating the highest scheduled week as the current week.
@@ -761,3 +772,4 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - **Revision 2.29:** Completed the owner-authorized local 7.5.5.3 implementation from exact Main baseline `39bb93a`. The Player Card removes unsupported Current Salary and promotes source-backed Total Release Penalty. Discord owner threads and the configured committee destination now share one structured player/contract/pick package with explicit status and exact-role notification. Additive migration 39 adds one league-scoped Trade Committee role reference. Final approval, partner rejection, and proposer cancellation post a final update before archiving and locking the private thread; committee denial remains open, while revision reopens and reuses the same thread. The focused suite passes 55/55 and the complete strict gate passes 214/214. Publication, hosted checks, Main, Production, migration 39 application, Discord registration/configuration, live trades, data, import, snapshot, reset, archive-season/transition, export URL, credentials, memberships/assignments, and blocked/null Free Agent semantics remain unchanged and unauthorized during local candidate work.
 - **Revision 2.30:** Recorded the owner's explicit authorization to publish 7.5.5.3, open and merge its protected pull request after hosted checks, apply and verify additive Production migration 39 against the exact Madden 27 D1 database with a recovery bookmark, deploy the merged Main code through Cloudflare Pages, and perform read-only acceptance. No Discord command registration/configuration, live trade action, import, reset, snapshot change, archive/transition operation, export-URL rotation, credential change, membership/assignment change, or Free Agent reinterpretation is authorized.
 - **Revision 2.31:** Published exact 7.5.5.3 candidate `3b6c91d` through PR #68 with 4/4 pull-request checks passing. After recording Production D1 bookmark `000001da-00000926-000050e3-09f58c5ae20fbd53747f31e6f04a99ea`, migration 39 added exactly one league-scoped Trade Committee role column and its ledger row; schema, 115 tables, protected counts, and foreign keys verified clean before post-migration bookmark `000001da-00000936-000050e3-a961042fa6bd19848b856e06f3fe7cf2`. The PR merged as Main `c7b7560`, all five Main checks passed, and Pages deployment `b569a8ec-cf7e-4cad-96d4-302d3031776c` now serves release 7.5.5.3 from the public and canonical FGC routes. Read-only D1 acceptance retained the existing Season 2026 / Week 19 snapshot `2b31297b`, one Discord installation, zero configured committee roles, and the blocked Free Agent warning with unknown/null public count. No Discord command registration/configuration, live trade, import, reset, snapshot move, archive/transition, export-URL rotation, credential, membership, or assignment change ran. Owner UI/Discord acceptance is next.
+- **Revision 2.32:** Diagnosed the owner-provided Trade Submit screenshot against the current Production D1 state without writing it. The accepted review event was sent once, its exact workflow remains at committee revision 1, and all four player assets, stable identities, and active-snapshot player records are present; the same exact detail join succeeds. Local 7.5.5.4 therefore makes the linked asset manifest part of every committee message, fails closed before sending if the package is missing, and recovers complete detail text when Discord reports suppressed rich cards. Focused Discord validation passes 38/38 and the complete strict gate passes 214/214. Production, Main, Discord routing/commands, live trades, database schema/data, imports, snapshots, resets, archives/transitions, export URL, credentials, memberships/assignments, and blocked/null Free Agent semantics remain unchanged and unauthorized.

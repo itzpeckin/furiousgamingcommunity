@@ -192,7 +192,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 110644,
+        "bytes": 113836,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -1550,7 +1550,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.5.3",
+  "release": "7.5.5.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

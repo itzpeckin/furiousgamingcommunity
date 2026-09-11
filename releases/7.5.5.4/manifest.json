@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.4",
+  "releaseType": "discord-trade-submit-asset-visibility",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.3",
+    "commit": "e54b21085d0d08ee56f0662cc37efc161834d2a3",
+    "tree": "9462be685e41e40c0cfeb11f920bc3d5b3afd868",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.4-trade-submit-details",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": false,
+    "status": "not-published",
+    "candidateCommit": null,
+    "pullRequest": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.5.5.3",
+    "currentCommit": "e54b21085d0d08ee56f0662cc37efc161834d2a3",
+    "currentPagesDeployment": "8a46b944-654d-4b25-b6b6-eab7486429f8",
+    "currentMigration": 39,
+    "candidateMigration": 39,
+    "scope": "Code-only Trade Submit asset visibility and rich-card suppression recovery."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-delivery.js",
+    "tests/discord/discord-bot.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.4/release-record.md",
+    "releases/7.5.5.4/validation-evidence.json"
+  ]
+}
