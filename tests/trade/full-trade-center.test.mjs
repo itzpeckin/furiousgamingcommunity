@@ -431,7 +431,7 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.match(styles,/\.trade-detail-asset/);
   assert.match(styles,/\.trade-confirm-dialog/);
   assert.match(styles,/@media\(max-width:760px\)/);
-  assert.match(styles,/FranchiseHQ 7\.5\.5\.7 — responsive Trade Review/);
+  assert.match(styles,/FranchiseHQ 7\.5\.5\.8 — responsive Trade Review/);
   assert.match(styles,/\.trade-package-matchup--review \.trade-detail-asset__metrics>span\{min-width:72px/);
   assert.match(client,/renderCommissionerQuickManagement/);
   assert.match(client,/commissioner-trade-reset-controls/);

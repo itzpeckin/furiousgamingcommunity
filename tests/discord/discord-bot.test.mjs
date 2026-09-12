@@ -1614,7 +1614,7 @@ test('durable legacy trade delivery opens a DM and preserves the FranchiseHQ fal
   }finally{database.close()}
 });
 
-test('trade delivery sends both owners spaced team cards and one clean workflow status',async()=>{
+test('trade delivery sends both owners mobile-safe divided team cards and one clean workflow status',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -1670,13 +1670,16 @@ test('trade delivery sends both owners spaced team cards and one clean workflow 
     const messages=requests.filter(request=>/\/messages$/.test(request.url));
     assert.equal(messages.length,2);
     for(const request of messages){
-      assert.deepEqual(request.body.embeds.slice(0,2).map(embed=>embed.title).sort(),['San Francisco 49ers receives','Tampa Bay Buccaneers receives']);
+      const teamEmbeds=request.body.embeds.slice(0,2);
+      assert.deepEqual(teamEmbeds.map(embed=>embed.title).sort(),['San Francisco 49ers receives','Tampa Bay Buccaneers receives']);
       const details=request.body.embeds.flatMap(embed=>embed.fields||[]).map(field=>field.value).join('\n');
       assert.match(details,/\[Tristan Example\].*Position.*LT.*Overall.*95.*Development.*Superstar.*Age.*27.*Cap Hit.*\$39,970,000.*Release Penalty.*\$106,510,000.*Net Release Savings.*\$10,000,000/s);
       assert.match(details,/\[George Example\].*Position.*TE.*Overall.*97.*Development.*X-Factor.*Age.*29.*Cap Hit.*\$5,660,000.*Release Penalty.*\$46,960,000.*Net Release Savings.*\$0/s);
       assert.match(details,/Rueben Example/);
       assert.match(details,/Sauce Example/);
-      assert.equal(request.body.embeds.slice(0,2).every(embed=>embed.fields.some(field=>field.name==='\u200b'&&field.value==='\u200b')),true);
+      assert.equal(teamEmbeds.every(embed=>embed.fields.length===2),true,'one real field is retained per asset');
+      assert.equal(teamEmbeds.every(embed=>embed.fields.every(field=>field.name!=='\u200b'&&field.value!=='\u200b')),true,'mobile-collapsible invisible fields are removed');
+      assert.equal(teamEmbeds.flatMap(embed=>embed.fields.slice(0,-1)).every(field=>field.value.endsWith('━━━━━━━━━━━━━━━━━━━━')),true,'a visible divider closes every non-final asset');
       const status=request.body.embeds.at(-1);
       assert.deepEqual(status,{title:'Trade status',description:'**Negotiating**',color:0x4f8cff});
       assert.doesNotMatch(details,/Madden contract facts|owner decisions|Committee review/);
@@ -1720,6 +1723,7 @@ test('trade delivery sends both owners spaced team cards and one clean workflow 
     assert.deepEqual(fallbackRequests[2].body.embeds,[]);
     assert.deepEqual(fallbackRequests[2].body.components,committeeMessage.components);
     for(const name of ['Tristan Example','Rueben Example','George Example','Sauce Example'])assert.match(fallbackRequests[2].body.content,new RegExp(name));
+    assert.match(fallbackRequests[2].body.content,/━━━━━━━━━━━━━━━━━━━━/,'permission-safe fallback retains the asset divider');
     assert.match(fallbackRequests[2].body.content,/TRADE STATUS.*Accepted/s);
     assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='committee-rich'`).get().status,'sent');
     assert.equal(database.prepare(`SELECT last_error AS error FROM discord_delivery_events WHERE id='committee-rich'`).get().error,null);

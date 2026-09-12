@@ -7,6 +7,7 @@ import { normalizePlayer } from '../api/leagues/[leagueSlug]/snapshot/read-model
 const MAX_ATTEMPTS=5;
 const SNOWFLAKE=/^\d{17,20}$/;
 const DISCORD_SUPPRESS_EMBEDS=1<<2;
+const ASSET_DIVIDER='━━━━━━━━━━━━━━━━━━━━';
 const rows=async(db,sql,...values)=>(await db.prepare(sql).bind(...values).all()).results||[];
 const cleanError=value=>String(value?.message||value||'Discord delivery failed.').replace(/Bot\s+[A-Za-z0-9._-]+/g,'Bot [redacted]').slice(0,500);
 
@@ -116,10 +117,10 @@ async function tradeDeliveryDetails(db,row,payload){
     embeds.push({
       title:`${teamLabel(teams,teamKey)} receives`,
       color:embedColor(team?.primaryColor),
-      fields:items.flatMap((item,index)=>[
-        ...(index?[{name:'\u200b',value:'\u200b',inline:false}]:[]),
-        {...item,inline:false}
-      ]),
+      fields:items.map((item,index)=>{
+        const suffix=index<items.length-1?`\n\n${ASSET_DIVIDER}`:'';
+        return {...item,value:`${String(item.value||'').slice(0,1024-suffix.length)}${suffix}`,inline:false};
+      }),
       ...(team?.logoUrl?{thumbnail:{url:team.logoUrl}}:{})
     });
   }

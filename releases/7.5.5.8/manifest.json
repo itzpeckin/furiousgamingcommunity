@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.8",
+  "releaseType": "discord-mobile-asset-divider-remediation",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.7",
+    "commit": "7a5429ff98ebde02351d4a0b9d3fba10a4f1c9a2",
+    "tree": "f7053a5f12fa56d321dd0c3d1d649e0693fc98f9",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.8-discord-mobile-dividers",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "candidateCommit": null,
+    "pullRequest": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending-code-only-deployment",
+    "currentRelease": "7.5.5.7",
+    "candidateRelease": "7.5.5.8",
+    "currentCommit": "7a5429ff98ebde02351d4a0b9d3fba10a4f1c9a2",
+    "currentMigration": 40,
+    "candidateMigration": 40,
+    "pagesDeployment": null,
+    "scope": "Visible mobile-safe Discord trade-asset separators shared by private and committee review packages."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-delivery.js",
+    "tests/discord/discord-bot.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.8/release-record.md",
+    "releases/7.5.5.8/validation-evidence.json"
+  ]
+}
