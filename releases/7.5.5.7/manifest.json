@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.7",
+  "releaseType": "trade-operations-and-discord-delivery-remediation",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.6",
+    "commit": "1f8f5e27081b1d0fadf9ceb11ef1205d15303f94",
+    "tree": "1dbe39d85b27ef14248d3cf5de1ed283b3ffc6f1",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.7-trade-operations",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "candidateCommit": null,
+    "pullRequest": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending-code-only-deployment",
+    "currentRelease": "7.5.5.6",
+    "candidateRelease": "7.5.5.7",
+    "currentMigration": 40,
+    "candidateMigration": 40,
+    "pagesDeployment": null,
+    "scope": "Command Center trade reset access, mobile Trade Review spacing, and permission-safe Discord committee review delivery."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-delivery.js",
+    "league-engine/trade-center-live.js",
+    "trade-module.js",
+    "styles.css",
+    "tests/discord/discord-bot.test.mjs",
+    "tests/trade/full-trade-center.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.7/release-record.md",
+    "releases/7.5.5.7/validation-evidence.json"
+  ]
+}

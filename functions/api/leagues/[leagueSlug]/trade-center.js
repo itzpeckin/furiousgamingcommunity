@@ -747,7 +747,13 @@ export async function onRequestGet(context) {
     if(!featureAvailable(c.league,'trade_center')&&!featureAvailable(c.league,'trade_block')) {
       return json({ok:false,release:TRADE_CENTER_RELEASE,error:'Trade features are disabled for this league.'},403);
     }
-    return json(await tradeCenterState(c));
+    const state=await tradeCenterState(c);
+    // A transient Discord permission or API failure must not strand an accepted
+    // trade until another workflow action occurs. Any authenticated Trade Center
+    // load safely wakes the existing outbox; the idempotent event key still
+    // prevents a duplicate committee post.
+    scheduleDiscordDeliveryFlush(context,c.db,c.league.id);
+    return json(state);
   } catch (error) {
     return json({ok:false,release:TRADE_CENTER_RELEASE,error:error?.message||'Trade Center could not be loaded.'},Number(error?.status)||500);
   }

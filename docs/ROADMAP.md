@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 11, 2026
+**Updated:** September 12, 2026
 
-**Revision:** 2.36
+**Revision:** 2.37
 
 **Current production:** FranchiseHQ 7.5.5.6 is live from PR #74, Main merge `716bb20`, and accepted Git-integrated Pages deployment `568d0b9a-994f-4f00-ba5b-0e39e9b8e98c`. Production remains on verified additive migration 40. All PR and Main checks passed, and read-only acceptance loaded the authenticated FGC application at Season 2026, Regular Season Week 19 with release 7.5.5.6. No Discord command registration/configuration, live trade action, reset/removal, import, snapshot operation, archive/transition, export-URL rotation, credential change, or membership/assignment change ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** 7.5.5.6 is Production deployed and awaiting owner Discord acceptance. It adds clear spacing between every Discord trade asset, limits Trade Status to the actual workflow state, and preserves final Approved, Rejected, and Cancelled owner DMs after private-thread cleanup. Read-only Production diagnosis proved the newest accepted FGC trade reached committee state and targeted the configured Trade Submit channel; Discord removed its rich cards because the bot lacks effective Embed Links permission in that channel, and the durable delivery remains retryable.
+**Current work:** Authorized 7.5.5.7 consolidates three owner-reported follow-ups: prominent Reset Season Trades and Reset ALL Trades controls inside the Command Center Quick Controls panel, a deliberately spaced mobile Trade Review layout using the same asset information as desktop, and a permission-safe Trade Submit fallback that retains every player/pick plus Approve/Deny controls when Discord strips rich embeds. Authenticated Trade Center loads now wake retryable outbox events without duplicating the committee post. Read-only Production diagnosis found the newest accepted trade `trade_3ff4c41a-fa75-48e6-851a-18bdd3c04ca1` correctly reached committee revision 1 and queued channel `1014771152608055336`; Discord again removed its embeds, leaving retryable delivery `discord_delivery_16facb1d-bf78-4336-9131-f4210b51283c` after one attempt. No Production rows changed during diagnosis.
 
-**Next gate:** Explicitly allow Embed Links for the FranchiseHQ bot in the configured FGC Trade Submit channel, let the retained committee event retry, and owner-validate the single detailed committee post plus final owner DMs. After acceptance, proceed to off-season 7.5.6 full-season schedule/current-period authority. Do not exercise a live trade reset/removal control unless the commissioner intentionally wants its documented effect.
+**Next gate:** Publish 7.5.5.7 through the protected pull-request path, pass hosted checks, merge Main, deploy the code-only release, and verify the retained committee event can post a functional review package even before the channel grants Embed Links. Rich colors/logos remain preferred whenever Discord permits embeds. Do not exercise a live trade reset/removal control unless the commissioner intentionally wants its documented effect.
 
 ## Product decisions
 
@@ -106,6 +106,7 @@
 | 7.5.5.4 | Production deployed; owner Discord acceptance pending | Guaranteed Trade Submit asset visibility, summary-only fail-closed delivery, and rich-card suppression recovery without changing trades or Discord routing |
 | 7.5.5.5 | Production deployed; owner Discord acceptance pending | Exact private/committee Discord trade-card parity, Trades Available and approved-trade ledger in Teams & Owners, and audited non-roster-changing commissioner trade maintenance |
 | 7.5.5.6 | Production deployed; owner Discord acceptance pending | Spaced Discord trade assets, status-only workflow cards, terminal owner DMs after thread cleanup, and fail-closed Trade Submit delivery diagnosis |
+| 7.5.5.7 | Authorized implementation | Command Center trade resets, intentionally spaced mobile Trade Review cards, and permission-safe committee posting with working decisions |
 | 7.5.6 | Planned for off-season | Full-season schedule horizon separated from authoritative current period, with Discord threads created only for a proven league-week advance |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |

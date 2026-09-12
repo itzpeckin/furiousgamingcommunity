@@ -1712,12 +1712,16 @@ test('trade delivery sends both owners spaced team cards and one clean workflow 
     };
     assert.deepEqual(await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},d1(database),{
       leagueId:'league-a',limit:10,fetchImpl:strippedEmbedFetch
-    }),{sent:0,failed:1,skipped:false});
-    assert.deepEqual(fallbackRequests.map(request=>request.method),['POST','PATCH','DELETE']);
-    assert.equal(fallbackRequests.filter(request=>request.method==='POST').length,1,'no second text-only committee post is allowed');
+    }),{sent:1,failed:0,skipped:false});
+    assert.deepEqual(fallbackRequests.map(request=>request.method),['POST','PATCH','PATCH']);
+    assert.equal(fallbackRequests.filter(request=>request.method==='POST').length,1,'the permission-safe package replaces the incomplete post');
     assert.deepEqual(fallbackRequests[1].body.embeds,committeeMessage.embeds);
     assert.deepEqual(fallbackRequests[1].body.components,committeeMessage.components);
-    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='committee-rich'`).get().status,'failed');
-    assert.match(database.prepare(`SELECT last_error AS error FROM discord_delivery_events WHERE id='committee-rich'`).get().error,/allow Embed Links/i);
+    assert.deepEqual(fallbackRequests[2].body.embeds,[]);
+    assert.deepEqual(fallbackRequests[2].body.components,committeeMessage.components);
+    for(const name of ['Tristan Example','Rueben Example','George Example','Sauce Example'])assert.match(fallbackRequests[2].body.content,new RegExp(name));
+    assert.match(fallbackRequests[2].body.content,/TRADE STATUS.*Accepted/s);
+    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='committee-rich'`).get().status,'sent');
+    assert.equal(database.prepare(`SELECT last_error AS error FROM discord_delivery_events WHERE id='committee-rich'`).get().error,null);
   }finally{database.close()}
 });
