@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.11",
   "releaseType": "trade-review-team-color-and-compact-metrics-remediation",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.10",
@@ -17,17 +17,29 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized": true, "status": "pending"},
-  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "published-main-accepted",
+    "candidateCommit": "174c44bc9ec42ce1a13e10c607049a55c5970546",
+    "pullRequest": 84,
+    "mergeCommit": "977f9d30365c9eedeba2fb4e255bdc47a1f4f6ed"
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending-hosted-checks",
-    "currentRelease": "7.5.5.10",
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.11",
     "candidateRelease": "7.5.5.11",
     "currentMigration": 40,
     "candidateMigration": 40,
-    "scope": "Platform-only Trade Review colors, confined layering, full-width cards, and removal of player Contract and pick Record metrics."
+    "scope": "Platform-only Trade Review colors, confined layering, full-width cards, and removal of player Contract and pick Record metrics.",
+    "currentCommit": "977f9d30365c9eedeba2fb4e255bdc47a1f4f6ed",
+    "pagesDeployment": "02922924-cb99-4b91-8cf4-d229d126c467"
   },
   "requiredArtifacts": [
     "league-engine/trade-center-live.js",

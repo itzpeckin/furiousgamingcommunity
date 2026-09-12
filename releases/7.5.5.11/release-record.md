@@ -1,6 +1,6 @@
 # FranchiseHQ 7.5.5.11 Release Record
 
-Status: Locally validated, owner-authorized code-only release; hosted delivery in progress.
+Status: Production deployed and authenticated read-only verified; owner visual acceptance pending.
 
 ## Scope
 
@@ -24,7 +24,9 @@ Focused Trade Center and mobile tests pass 15/15. Local browser checks at 1280px
 
 ## Deployment status
 
-Branch publication, PR, hosted checks, Main merge, and code-only Production deployment are authorized in this same cycle. Migration 40 remains current. Hosted delivery and authenticated read-only Production acceptance are pending.
+Exact candidate `174c44bc9ec42ce1a13e10c607049a55c5970546` passed all four PR #84 checks and merged into Main as `977f9d30365c9eedeba2fb4e255bdc47a1f4f6ed`. All five Main checks passed, including quality run `34717254934` and Pages workflow `34717254513`. Git-integrated Pages Production deployment `02922924-cb99-4b91-8cf4-d229d126c467` succeeded. Public runtime files and authenticated UI serve 7.5.5.11.
+
+Read-only acceptance loaded the approved NE/TB trade at Season 2026, Regular Season Week 20. At desktop 1280px and phone 390px, source-team backgrounds are visibly brighter, the old scrim is absent, Contract/Record metrics are absent, and no page/asset horizontal overflow or metric clipping is present. The existing tally remains 3 approvals and 1 rejection. Six additional authentication-framework tests pass. Migration 40 remains current; no live trade, vote, or data operation ran.
 
 ## Boundaries
 
