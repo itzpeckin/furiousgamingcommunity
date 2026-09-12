@@ -425,7 +425,7 @@ async function reject(c, row, participants, reason) {
   await c.db.batch([
     c.db.prepare(`UPDATE trade_workflows SET status='rejected',decision_reason=?,rejected_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
       WHERE id=? AND league_id=?`).bind(cleanText(reason)||null,row.id,c.league.id),
-    ...await notificationStatements(c.db,c.league.id,row.id,users.filter(id=>id!==c.session.user.id),'rejected','Trade rejected',`${ownTeam.toUpperCase()} rejected the trade.`)
+    ...await notificationStatements(c.db,c.league.id,row.id,users,'rejected','Trade rejected',`${ownTeam.toUpperCase()} rejected the trade.`)
   ]);
 }
 

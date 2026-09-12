@@ -192,7 +192,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 114552,
+        "bytes": 118720,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -212,7 +212,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 58616,
+        "bytes": 58581,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
@@ -1556,7 +1556,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.5.5",
+  "release": "7.5.5.6",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

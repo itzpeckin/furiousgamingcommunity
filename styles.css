@@ -1308,7 +1308,7 @@ body[data-density="compact"] .metric-card { min-height: 126px; padding: 14px; }
   .featured-half-hero--home .previous-result{align-items:center}
 }
 
-/* FranchiseHQ 7.5.5.5 — Trade Center allowance management */
+/* FranchiseHQ 7.5.5.6 — Trade Center allowance management */
 .commissioner-directory-panel .ownership-table-head,
 .commissioner-directory-panel .ownership-team-row{
   grid-template-columns:minmax(220px,1.1fr) minmax(210px,1fr) minmax(125px,.58fr) minmax(110px,.5fr) minmax(125px,.56fr) minmax(104px,auto);
@@ -7772,7 +7772,7 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
   }
 }
 
-/* 7.5.5.5 final cascade for the additional Teams & Owners trade column. */
+/* 7.5.5.6 final cascade for the additional Teams & Owners trade column. */
 .commissioner-directory-panel .ownership-table-head,
 .commissioner-directory-panel .ownership-team-row{grid-template-columns:minmax(220px,1.1fr) minmax(210px,1fr) minmax(125px,.58fr) minmax(110px,.5fr) minmax(125px,.56fr) minmax(104px,auto)}
 @media(max-width:1180px){.commissioner-directory-panel .ownership-team-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"franchise manage" "owner owner" "role status" "trades trades"}.commissioner-team-trades{grid-area:trades}}
