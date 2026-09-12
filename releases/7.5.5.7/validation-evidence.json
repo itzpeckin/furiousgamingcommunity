@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.7",
-  "status": "local-validation-in-progress",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -55,6 +55,28 @@
       "cause": "Discord removed rich embeds in the configured Trade Submit channel",
       "productionRowsChanged": 0
     },
+    "productionOperationalDelivery": {
+      "passed": true,
+      "tradeId": "trade_3ff4c41a-fa75-48e6-851a-18bdd3c04ca1",
+      "workflowStatus": "committee",
+      "workflowRevision": 1,
+      "committeeChannelId": "1014771152608055336",
+      "deliveryEventId": "discord_delivery_16facb1d-bf78-4336-9131-f4210b51283c",
+      "deliveryStatus": "sent",
+      "deliveryAttempts": 2,
+      "sentAt": "2026-09-12 05:27:23",
+      "liveTradeChanged": false,
+      "protectedLeagueRowsChanged": 0
+    },
+    "authenticatedProductionUi": {
+      "passed": true,
+      "runtimeRelease": "7.5.5.7",
+      "season": 2026,
+      "period": "Regular Season Week 19",
+      "commandCenterResetSeasonTradesVisible": true,
+      "commandCenterResetAllTradesVisible": true,
+      "tradeResetExecuted": false
+    },
     "fullRepositorySuite": {
       "passed": true,
       "status": "passed",
@@ -72,9 +94,10 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
-    "gitMainChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "stagingChanged": false,
     "migrationApplied": false,
     "discordCommandsRegistered": false,
@@ -89,7 +112,48 @@
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
     "freeAgentInterpretedAsZero": false,
-    "databaseRowsWritten": 0,
+    "databaseRowsWritten": 1,
+    "operationalDiscordDeliveryRowsWritten": 1,
     "protectedLeagueRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": true,
+      "status": "published-main-accepted",
+      "pullRequest": 76,
+      "candidateCommit": "2dc3d3208f3182fb5f41e0cdfe1255e629fc3a85",
+      "mainCommit": "2694e8dd57de6cb24516233e807a536b52fd905c"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "pullRequestChecksFailed": 0,
+      "mainChecksPassed": 3,
+      "mainQualityWorkflowRun": 34675550860,
+      "mainPagesWorkflowRun": 34675550497,
+      "cloudflarePagesCheckRun": 103504708007
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 40,
+      "candidateMigration": 40
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-required"
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "deployed-operational-delivery-verified",
+      "currentRelease": "7.5.5.7",
+      "mainCommit": "2694e8dd57de6cb24516233e807a536b52fd905c",
+      "pagesDeployment": "ba8fe890-af5e-4ced-bd18-581d5a6d97b8",
+      "publicHttpStatus": 200,
+      "leagueHttpStatus": 200,
+      "runtimeRelease": "7.5.5.7",
+      "authenticatedUiVerified": true
+    }
   }
 }

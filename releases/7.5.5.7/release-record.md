@@ -1,8 +1,8 @@
 # FranchiseHQ 7.5.5.7 Release Record
 
-**Status:** Authorized candidate; Production publication pending
+**Status:** Production deployed; owner mobile/Discord acceptance pending
 
-**Production changed:** No. Production remains on 7.5.5.6 and migration 40 until the candidate passes the protected release gate.
+**Production changed:** Yes. PR #76 merged to Main as `2694e8dd57de6cb24516233e807a536b52fd905c`, and Git-integrated Pages deployment `ba8fe890-af5e-4ced-bd18-581d5a6d97b8` serves release 7.5.5.7. Migration 40 remains current.
 
 ## Scope
 
@@ -26,15 +26,19 @@ The focused 48-test Trade Center and Discord suites pass. The complete strict re
 
 ## Deployment status
 
-Production remains on 7.5.5.6 until the protected 7.5.5.7 branch, pull request, hosted checks, Main merge, and Git-integrated Pages deployment complete.
+Exact candidate `2dc3d3208f3182fb5f41e0cdfe1255e629fc3a85` was published through PR #76 with all four pull-request checks passing. The PR merged as Main `2694e8dd57de6cb24516233e807a536b52fd905c`; the Main quality, Pages build/deployment, and Cloudflare Pages checks passed. Git-integrated Pages deployment `ba8fe890-af5e-4ced-bd18-581d5a6d97b8` serves release 7.5.5.7, and authenticated acceptance loaded FGC at Season 2026, Regular Season Week 19.
+
+The live Command Center exposes prominent **Reset Season Trades** and **Reset ALL Trades** controls; neither operation was clicked. Mobile review behavior is covered by the focused responsive regressions and remains pending owner device acceptance.
 
 ### Production diagnosis
 
-The newest accepted FGC trade `trade_3ff4c41a-fa75-48e6-851a-18bdd3c04ca1` is in committee revision 1. Delivery event `discord_delivery_16facb1d-bf78-4336-9131-f4210b51283c` targeted configured channel `1014771152608055336`, but Discord removed the rich cards. The event is retryable after one attempt. The read-only query wrote zero rows.
+The newest accepted FGC trade `trade_3ff4c41a-fa75-48e6-851a-18bdd3c04ca1` remains unchanged in committee revision 1. Before deployment, delivery event `discord_delivery_16facb1d-bf78-4336-9131-f4210b51283c` targeted configured channel `1014771152608055336`, but Discord removed the rich cards and left it retryable after one attempt. The initial diagnosis wrote zero rows.
+
+After deployment, one authenticated Trade Center load safely woke the retained event. It completed as `sent` on attempt 2 at `2026-09-12 05:27:23`; the workflow remained in committee revision 1. This changed only the one operational outbox row and wrote zero protected league rows. The committee package now retains every player/pick plus Approve/Deny even when Discord requires the permission-safe text fallback.
 
 ## Boundaries
 
-This release requires no migration or Discord command registration. It does not execute a trade reset, change a live trade or active snapshot, import data, archive or transition a season, rotate the export URL, change Discord routing or credentials, alter memberships, or reinterpret blocked Madden Free Agents.
+This release requires no migration or Discord command registration. It did not execute a trade reset, change a live trade or active snapshot, import data, archive or transition a season, rotate the export URL, change Discord routing or credentials, alter memberships, or reinterpret blocked Madden Free Agents. Exactly one operational Discord delivery event advanced from retryable to sent.
 
 ## Rollback
 
