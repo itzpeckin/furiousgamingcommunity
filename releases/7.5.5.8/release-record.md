@@ -1,8 +1,8 @@
 # FranchiseHQ 7.5.5.8 Release Record
 
-**Status:** Implementation authorized; Production publication in progress
+**Status:** Production deployed; owner Discord presentation acceptance pending
 
-**Production changed:** No. Production remains 7.5.5.7 on migration 40 while the exact code-only candidate completes validation and publication.
+**Production changed:** Yes. PR #78 merged to Main as `c286bc5940cc5c8ea3b99ff217d41f9a7960db63`, and Git-integrated Pages deployment `421c0b5b-a760-411c-afa4-1599d5d888f3` serves release 7.5.5.8. Migration 40 remains current and no database write ran.
 
 ## Scope
 
@@ -26,11 +26,11 @@ Madden's Free Agent route remains blocked upstream. Its count remains unknown/nu
 
 ## Validation evidence
 
-The focused Discord suite proves every non-final asset ends with the visible divider, every asset remains a real field, no zero-width spacer survives, and the permission-safe fallback retains the divider. The complete strict repository gate is required before publication.
+The focused Discord suite proves every non-final asset ends with the visible divider, every asset remains a real field, no zero-width spacer survives, and the permission-safe fallback retains the divider. The complete strict repository gate passed 215 automated tests, 255 JavaScript modules, 76 Pages routes, 23 canonical migrations, and 116 required tables.
 
 ## Deployment status
 
-Production publication is authorized and pending the exact candidate commit, pull request checks, protected Main merge, Git-integrated Pages deployment, and read-only live release verification.
+Exact candidate `0de21b45bf3b617667fbe518c2d90bf1f65ffbda` passed all four hosted pull-request checks and merged through PR #78 as Main `c286bc5940cc5c8ea3b99ff217d41f9a7960db63`. Main quality and Pages workflows passed, and Git-integrated Pages deployment `421c0b5b-a760-411c-afa4-1599d5d888f3` is the current Production deployment. Authenticated read-only acceptance loaded FGC at Season 2026, Regular Season Week 19 and displayed Current Release 7.5.5.8. A newly rendered multi-asset trade is the remaining owner Mobile/Desktop presentation check because historical Discord messages are not rewritten.
 
 ## Boundaries
 

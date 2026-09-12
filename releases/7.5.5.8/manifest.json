@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.8",
   "releaseType": "discord-mobile-asset-divider-remediation",
-  "status": "implementation-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.7",
@@ -19,10 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mergeCommit": null
+    "status": "published-main-accepted",
+    "candidateCommit": "0de21b45bf3b617667fbe518c2d90bf1f65ffbda",
+    "pullRequest": 78,
+    "mergeCommit": "c286bc5940cc5c8ea3b99ff217d41f9a7960db63"
   },
   "staging": {
     "authorized": false,
@@ -31,14 +31,14 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending-code-only-deployment",
-    "currentRelease": "7.5.5.7",
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.8",
     "candidateRelease": "7.5.5.8",
-    "currentCommit": "7a5429ff98ebde02351d4a0b9d3fba10a4f1c9a2",
+    "currentCommit": "c286bc5940cc5c8ea3b99ff217d41f9a7960db63",
     "currentMigration": 40,
     "candidateMigration": 40,
-    "pagesDeployment": null,
+    "pagesDeployment": "421c0b5b-a760-411c-afa4-1599d5d888f3",
     "scope": "Visible mobile-safe Discord trade-asset separators shared by private and committee review packages."
   },
   "requiredArtifacts": [
