@@ -6,13 +6,13 @@
 
 **Updated:** September 12, 2026
 
-**Revision:** 2.48
+**Revision:** 2.49
 
 **Current production:** FranchiseHQ 7.5.5.12 is live from PR #86, Main merge `08e5f61`, and verified Git-integrated Pages deployment `5d559699-7923-4606-b235-6d1256b10235`. All four PR and five Main checks passed. Authenticated read-only acceptance confirms the restored compact asset format: previous 72px desktop rows, original spacing/font sizing, retained brighter team gradients, and removed Contract/Record fields. Local desktop/narrow-desktop/phone comparison matches the pre-redesign sizing. FGC remains at Season 2026, Regular Season Week 20 and the existing approved trade tally is unchanged. Migration 40 and league data remain unchanged. No Discord behavior/configuration/registration, ownership, live trade/vote, import, snapshot, reset, archive/transition, export URL, credential, membership, or assignment operation ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** 7.5.5.12 is deployed and read-only accepted. It restores the previous compact Trade Review asset format after owner feedback rejected 7.5.5.11's layout/sizing changes. Only approved brighter team gradients and removal of Contract/Record fields remain. Original columns, spacing, font sizing, portraits, and responsive breakpoints are restored. No other redesign is in scope.
+**Current work:** 7.5.5.13 narrows and constrains Trade Review columns after owner feedback showed the remaining metric box still being cut off. Retain the restored compact format, typography, spacing, logos/portraits, team gradients, and Contract/Record removal. Validate detail/dashboard with the calculator on/off at desktop and phone widths, then publish through Main and Production under standing authorization. No other redesign or data change is in scope.
 
-**Next gate:** Owner visual acceptance of restored compact 7.5.5.12 assets, then planned off-season 7.5.6 schedule-horizon work.
+**Next gate:** Complete 7.5.5.13 checks and code-only Production publication, verify full asset/metric containment read-only, then planned off-season 7.5.6 schedule-horizon work.
 
 ## Product decisions
 
@@ -809,3 +809,4 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - **Revision 2.46:** Published exact candidate `174c44b` through PR #84, passed all four hosted checks, merged Main `977f9d3`, and passed all five Main checks. Pages Production deployment `02922924-cb99-4b91-8cf4-d229d126c467` serves 7.5.5.11. Authenticated read-only desktop/phone acceptance confirms brighter source-team backgrounds, no Contract/Record metrics or legacy dark scrim, and no metric clipping or horizontal overflow. Migration 40, league data, trade ownership, Discord behavior, and all protected operations remain untouched.
 - **Revision 2.47:** Owner rejected the broader 7.5.5.11 sizing/layout changes. 7.5.5.12 restores the pre-redesign Trade Review asset format and retains only approved team gradients and Contract/Record removal. Browser comparisons at desktop and narrow desktop show identical row heights, padding, gaps, and name font sizes to the previous format. No additional redesign, Discord change, or protected data operation is in scope.
 - **Revision 2.48:** Published exact compact-layout correction `af3c4ba` through PR #86, passed all four hosted checks, merged Main `08e5f61`, and passed all five Main checks. Production Pages deployment `5d559699-7923-4606-b235-6d1256b10235` serves 7.5.5.12. Authenticated read-only acceptance confirms original desktop row height/spacing/typography, normal container behavior, retained brighter team gradients, and removed Contract/Record fields. Migration 40 and all protected data operations remain untouched.
+- **Revision 2.49:** Authorized 7.5.5.13 addresses the remaining Trade Review clipping by narrowing flexible metric/asset columns without another redesign. Development and Projected Pick receive proportionate room; narrow desktop movement/calculator columns are bounded as well. Desktop/phone, detail/dashboard, and calculator on/off containment are acceptance requirements. Publication, hosted checks, Main merge, and code-only Production deploy proceed in one cycle; no data or Discord operation is in scope.

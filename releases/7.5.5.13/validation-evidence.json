@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5.13",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {"unregisteredFailures": 0},
+  "checks": {
+    "strictMigration": {"expectedFailure": false, "passed": true, "migrationVersion": 40, "candidateRequiresMigration": false},
+    "focusedTradeMobileSuite": {"passed": true, "tests": 15},
+    "columnFitBrowserMatrix": {"passed": true, "status": "passed", "widths": [1280, 1024, 900, 390], "calculatorModes": [true, false], "views": ["approved", "trade-review"], "cases": 16, "assetsMeasured": 48, "containmentFailures": 0, "wideDesktopDetailHeight": 72.109375, "fontSizesChanged": false, "rowPaddingAndGapsChanged": false},
+    "fullRepositorySuite": {"passed": true, "status": "passed", "tests": 216, "syntaxModules": 255, "routes": 76, "canonicalMigrations": 23, "requiredTables": 116},
+    "freeAgentBlockedPreserved": {"passed": true, "count": null, "interpretedAsZero": false}
+  },
+  "scopeBoundaries": {
+    "migrationApplied": false,
+    "discordBehaviorChanged": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "importExecuted": false,
+    "activeSnapshotChanged": false,
+    "tradeResetExecuted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {"authorized": true, "status": "pending-hosted-checks"},
+    "productionMigration": {"authorized": false, "status": "not-required"},
+    "discordCommandRegistration": {"authorized": false, "status": "not-required"},
+    "productionDeployment": {"authorized": true, "status": "pending-hosted-checks"}
+  }
+}
