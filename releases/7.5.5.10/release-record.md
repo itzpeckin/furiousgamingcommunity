@@ -1,8 +1,8 @@
 # FranchiseHQ 7.5.5.10 Release Record
 
-**Status:** Locally validated; owner-authorized publication and Production deployment pending
+**Status:** Production deployed and read-only verified; owner interaction acceptance pending
 
-**Production changed:** No. This candidate is prepared from exact Main baseline `f20851f4d94dfbda827c564d5d16d749b31e0390` and has not yet changed GitHub Main, Cloudflare Production, Discord command registration, or Production data.
+**Production changed:** Code only. Exact candidate `d12c5b36aaa0268e96f95b414cea87789aaacb8d` was published through PR #82, passed all four hosted checks, and merged to Main as `d10f45c344c9a07bd9a7ce83c09cfe112c4acf1a`. Production data and Discord command registration remain unchanged.
 
 ## Scope
 
@@ -33,7 +33,9 @@ Madden's Free Agent route remains blocked upstream. Its count remains unknown/nu
 
 ## Deployment status
 
-Owner-authorized GitHub publication, protected pull request, hosted checks, Main merge, and code-only Cloudflare Pages Production deployment are pending. The local candidate is complete and validated. No migration or Discord command registration is required.
+PR #82 passed all four hosted checks. Main quality run `34714873390` and Pages workflow `34714872773` passed. Git-integrated Cloudflare Pages Production deployment `bf23a8de-b2c5-45c2-9ebb-7c739253cd56` succeeded. The live application serves `VISIBLE_RELEASE = '7.5.5.10'`.
+
+Authenticated read-only acceptance loaded FGC at Season 2026, Regular Season Week 20, and verified the approved NE/TB trade's protected navy asset surfaces, team accents, and status tally of 3 approvals and 1 rejection. No live Discord command, trade, vote, or import was executed. The next owner Discord player lookup and re-trade selection are the remaining interaction acceptance checks. No migration or Discord command registration is required.
 
 ## Boundaries
 

@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.10",
   "releaseType": "live-trade-ownership-and-trade-review-contrast-remediation",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.9",
@@ -19,10 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mergeCommit": null
+    "status": "published-main-accepted",
+    "candidateCommit": "d12c5b36aaa0268e96f95b414cea87789aaacb8d",
+    "pullRequest": 82,
+    "mergeCommit": "d10f45c344c9a07bd9a7ce83c09cfe112c4acf1a"
   },
   "staging": {
     "authorized": false,
@@ -31,13 +31,14 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending",
-    "currentRelease": "7.5.5.9",
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.10",
     "candidateRelease": "7.5.5.10",
-    "currentCommit": "3d97b3f61c9e3339a0898f75647cbf1b6ea19656",
+    "currentCommit": "d10f45c344c9a07bd9a7ce83c09cfe112c4acf1a",
     "currentMigration": 40,
     "candidateMigration": 40,
+    "pagesDeployment": "bf23a8de-b2c5-45c2-9ebb-7c739253cd56",
     "scope": "Immediate server-authoritative Discord player/pick ownership after approval, safe re-trading before Madden confirmation, and contrast-safe Trade Review packages."
   },
   "requiredArtifacts": [
