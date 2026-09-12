@@ -1,8 +1,8 @@
 # FranchiseHQ 7.5.5.9 Release Record
 
-**Status:** Implementation validated and Production authorized
+**Status:** Production deployed; owner Discord interaction acceptance pending
 
-**Production changed:** No. Publication, protected pull-request merge, and a code-only Production deployment are authorized in this cycle, but this candidate record does not claim they have completed.
+**Production changed:** Yes. PR #80 merged to Main as `3d97b3f61c9e3339a0898f75647cbf1b6ea19656`, and Git-integrated Pages deployment `e909d2e5-a808-4978-a959-84f004938f0a` serves release 7.5.5.9. Migration 40 remains current and no database write ran.
 
 ## Scope
 
@@ -32,7 +32,7 @@ Focused Discord, Trade Center, and mobile suites pass 53/53. They cover zero-sta
 
 ## Deployment status
 
-Pending the authorized branch publication, protected pull request, hosted checks, Main merge, and code-only Cloudflare Pages Production deployment. Migration 40 remains current and no Discord command registration is required.
+Exact candidate `f35e6ecc8b40efdfa2759a54947483053843a1a6` passed all four hosted pull-request checks and merged through PR #80 as Main `3d97b3f61c9e3339a0898f75647cbf1b6ea19656`. Main quality and Pages workflows passed, and Git-integrated Pages deployment `e909d2e5-a808-4978-a959-84f004938f0a` is the current Production deployment. Authenticated read-only acceptance loaded FGC at Season 2026, Regular Season Week 20 with Current Release 7.5.5.9, displayed `0 approvals` and `0 rejections` on every current committee-review card, and visually confirmed the protected navy Trade Block surface. A real Discord committee vote was deliberately not exercised during acceptance; the next Approve or Deny interaction will verify the live counter update in the existing message.
 
 ## Boundaries
 

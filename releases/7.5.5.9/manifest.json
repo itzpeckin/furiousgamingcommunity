@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.9",
   "releaseType": "trade-review-tally-and-trade-block-contrast-remediation",
-  "status": "implementation-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.8",
@@ -19,10 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mergeCommit": null
+    "status": "published-main-accepted",
+    "candidateCommit": "f35e6ecc8b40efdfa2759a54947483053843a1a6",
+    "pullRequest": 80,
+    "mergeCommit": "3d97b3f61c9e3339a0898f75647cbf1b6ea19656"
   },
   "staging": {
     "authorized": false,
@@ -31,14 +31,14 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending-code-only-deployment",
-    "currentRelease": "7.5.5.8",
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.9",
     "candidateRelease": "7.5.5.9",
-    "currentCommit": "e3ad064be18ebfaeecc83e9d0a177b7e479aa814",
+    "currentCommit": "3d97b3f61c9e3339a0898f75647cbf1b6ea19656",
     "currentMigration": 40,
     "candidateMigration": 40,
-    "pagesDeployment": null,
+    "pagesDeployment": "e909d2e5-a808-4978-a959-84f004938f0a",
     "scope": "Live Discord and FranchiseHQ committee tallies plus a contrast-safe Trade Block presentation."
   },
   "requiredArtifacts": [
