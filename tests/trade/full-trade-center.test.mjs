@@ -468,10 +468,15 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.match(styles,/restore the previous compact Trade Review layout/);
   assert.match(styles,/\.trade-package-matchup--review \.trade-detail-asset::after\{content:none\}/);
   assert.doesNotMatch(styles,/@container trade-review/);
-  const correction=styles.slice(styles.indexOf('/* FranchiseHQ 7.5.5.12'));
+  const correction=styles.slice(styles.indexOf('/* FranchiseHQ 7.5.5.12'),styles.indexOf('/* FranchiseHQ 7.5.5.13'));
   assert.doesNotMatch(correction,/container-type|:has\(|gap:|padding:|font-size:|trade-center-page/);
   assert.match(correction,/repeat\(4,minmax\(54px,1fr\)\)/);
   assert.match(correction,/repeat\(3,minmax\(62px,1fr\)\)/);
+  const columnFit=styles.slice(styles.indexOf('/* FranchiseHQ 7.5.5.13'));
+  assert.match(columnFit,/min-width:0;max-width:100%;grid-template-columns:minmax\(0,\.8fr\) minmax\(0,\.8fr\) minmax\(0,1\.6fr\) minmax\(0,\.8fr\)/);
+  assert.match(columnFit,/metrics--pick\{grid-template-columns:minmax\(0,\.9fr\) minmax\(0,\.9fr\) minmax\(0,1\.6fr\)\}/);
+  assert.match(columnFit,/grid-template-columns:42px 58px minmax\(80px,\.75fr\) minmax\(0,1\.6fr\) max-content max-content/);
+  assert.doesNotMatch(columnFit,/font-size:|padding:(?!inline)|background:|gap:|@container|trade-center-page/);
   assert.doesNotMatch(client,/pending madden|madden confirmed|reconciliation status/i);
 });
 

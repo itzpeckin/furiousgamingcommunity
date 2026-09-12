@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.13",
+  "releaseType": "compact-trade-review-column-fit",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.12",
+    "commit": "1298ad11498ce2b1cc10526dfb0e0449646861ad",
+    "tree": "099e675488cff7ca4d9a721fc594e3f703099097",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.13-fit-trade-columns",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending-hosted-checks"},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending-hosted-checks",
+    "currentRelease": "7.5.5.12",
+    "candidateRelease": "7.5.5.13",
+    "currentMigration": 40,
+    "candidateMigration": 40,
+    "scope": "Narrow and constrain existing Trade Review columns; preserve compact rows, typography, gradients, and removed Contract/Record fields."
+  },
+  "requiredArtifacts": ["styles.css", "tests/trade/full-trade-center.test.mjs", "docs/ROADMAP.md", "docs/generated/system-inventory.json", "docs/generated/system-inventory.md", "releases/7.5.5.13/release-record.md", "releases/7.5.5.13/validation-evidence.json"]
+}

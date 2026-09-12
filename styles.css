@@ -7854,6 +7854,7 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
   background:linear-gradient(105deg,color-mix(in srgb,var(--trade-team-primary) 72%,#344b67) 0,color-mix(in srgb,var(--trade-team-primary) 58%,#2b415e) 48%,color-mix(in srgb,var(--trade-team-secondary) 35%,#2b415e) 100%);
   box-shadow:0 6px 16px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.16);
 }
+
 .trade-package-matchup--review .trade-detail-asset::after{content:none}
 .trade-package-matchup--review .trade-detail-asset:hover{
   border-color:color-mix(in srgb,var(--trade-team-primary) 65%,#d1dfef);
@@ -7864,4 +7865,20 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 @media(max-width:520px){
   .trade-package-matchup--review .trade-detail-asset__metrics{grid-template-columns:repeat(4,minmax(72px,1fr))}
   .trade-package-matchup--review .trade-detail-asset__metrics--pick{grid-template-columns:repeat(3,minmax(78px,1fr))}
+}
+
+/* FranchiseHQ 7.5.5.13 — fit the compact Trade Review columns within each asset row. */
+.trade-package-matchup--review .trade-detail-asset__metrics{min-width:0;max-width:100%;grid-template-columns:minmax(0,.8fr) minmax(0,.8fr) minmax(0,1.6fr) minmax(0,.8fr)}
+.trade-package-matchup--review .trade-detail-asset__metrics--pick{grid-template-columns:minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.6fr)}
+.trade-package-matchup--review .trade-detail-asset__metrics>span{min-width:0;padding-inline:3px}
+.trade-package-matchup--review .trade-detail-asset__metrics small{min-width:0;max-width:100%;overflow-wrap:anywhere;text-align:center}
+.trade-package-matchup--review .trade-detail-asset__metrics strong{min-width:0}
+@media(min-width:821px){
+  .trade-package-matchup--review .trade-detail-asset{grid-template-columns:42px 58px minmax(80px,.75fr) minmax(0,1.6fr) max-content max-content}
+}
+@media(min-width:821px) and (max-width:980px){
+  .trade-package-matchup--review .trade-detail-asset{grid-template-columns:42px 58px minmax(60px,.5fr) minmax(0,1.6fr) 60px 70px}
+  .trade-package-matchup--review .trade-detail-asset__route{white-space:normal}
+  .trade-package-matchup--review .trade-detail-asset>.trade-value-button{width:70px;min-width:0;max-width:100%;justify-content:stretch}
+  .trade-package-matchup--review .trade-detail-asset>.trade-value-button small{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 }
