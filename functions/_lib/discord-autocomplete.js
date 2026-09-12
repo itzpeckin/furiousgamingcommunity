@@ -78,13 +78,16 @@ async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOve
       WHERE active.league_id=? AND record.domain='players'
     )
     SELECT candidate.externalId,candidate.dataJson,MAX(identity.public_id) AS publicId,
-      candidate.displayName,candidate.teamExternalId
+      candidate.displayName,candidate.teamExternalId,MAX(overlay.to_team_key) AS overlayTeamKey
     FROM candidate
     LEFT JOIN player_source_aliases alias ON alias.league_id=? AND alias.source_player_id=candidate.externalId
     LEFT JOIN player_identities identity ON identity.league_id=? AND identity.id=alias.player_identity_id
+    LEFT JOIN trade_roster_overlays overlay ON overlay.league_id=? AND overlay.player_identity_id=identity.id
+      AND overlay.internal_status='active'
     WHERE (?='' OR instr(lower(candidate.displayName),?)>0 OR instr(lower(candidate.externalId),?)>0
       OR instr(lower(COALESCE(identity.public_id,'')),?)>0)
-      AND (? IS NULL OR candidate.teamExternalId=?)
+      AND (? IS NULL OR (overlay.to_team_key IS NOT NULL AND overlay.to_team_key=?)
+        OR (overlay.to_team_key IS NULL AND candidate.teamExternalId=?))
       ${allowedSql}
     GROUP BY candidate.externalId,candidate.dataJson,candidate.displayName,candidate.teamExternalId
     ORDER BY CASE
@@ -92,10 +95,14 @@ async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOve
       WHEN substr(lower(candidate.displayName),1,length(?))=? THEN 1 ELSE 2 END,
       lower(candidate.displayName),candidate.externalId
     LIMIT 25`;
-  const args=[c.league.id,c.league.id,c.league.id,query,query,query,query,team?.externalId||null,team?.externalId||null,
+  const args=[c.league.id,c.league.id,c.league.id,c.league.id,query,query,query,query,team?.teamKey||null,team?.teamKey||null,team?.externalId||null,
     ...allowed,query,query,query,query,query];
   const rows=(await c.db.prepare(sql).bind(...args).all()).results||[];
-  return uniqueChoices(rows.map(row=>normalizePlayer(JSON.parse(row.dataJson||'{}'),row.publicId)).map(player=>{
+  return uniqueChoices(rows.map(row=>{
+    const player=normalizePlayer(JSON.parse(row.dataJson||'{}'),row.publicId);
+    const overlayTeam=resolveTeam(teams,row.overlayTeamKey);
+    return overlayTeam?{...player,teamId:overlayTeam.externalId,source:{...(player.source||{}),teamId:overlayTeam.externalId}}:player;
+  }).map(player=>{
     const playerTeam=resolveTeam(teams,player.teamId);
     return choice(showOverall
       ?`${player.displayName} · ${player.position||'—'} · ${player.overall??'—'} OVR`

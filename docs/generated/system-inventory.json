@@ -172,11 +172,11 @@
     },
     "largest": [
       {
-        "bytes": 638962,
+        "bytes": 638963,
         "file": "app.js"
       },
       {
-        "bytes": 535868,
+        "bytes": 538156,
         "file": "styles.css"
       },
       {
@@ -192,11 +192,11 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 120026,
+        "bytes": 122785,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 98661,
+        "bytes": 98662,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -204,7 +204,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75104,
+        "bytes": 75127,
         "file": "index.html"
       },
       {
@@ -212,11 +212,11 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 58948,
+        "bytes": 59107,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 53043,
+        "bytes": 53592,
         "file": "functions/_lib/discord-read-model.js"
       },
       {
@@ -224,11 +224,11 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 39409,
+        "bytes": 41145,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 39315,
+        "bytes": 39316,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -1556,7 +1556,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.5.9",
+  "release": "7.5.5.10",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

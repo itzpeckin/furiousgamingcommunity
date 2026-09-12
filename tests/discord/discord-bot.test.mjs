@@ -569,7 +569,44 @@ test('signed autocomplete returns tenant teams without creating command receipts
     assert.deepEqual(assetPayload.data.choices,[{
       name:'Player · Christian Example · HB · SF',value:'player:sf-player'
     }]);
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name)
+      VALUES ('identity-sf','league-a','plr_11111111111111111111111111111111','Christian Example')`).run();
+    database.prepare(`INSERT INTO player_source_aliases
+      (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id)
+      VALUES ('league-a','madden-companion','franchise-a','sf-player','identity-sf','season-a','season-a')`).run();
+    database.prepare(`INSERT INTO trade_workflows
+      (id,league_id,franchise_season_id,status,mutation_token,proposer_user_id,proposer_team_key,approved_at)
+      VALUES ('trade-approved','league-a','season-a','approved','approved-mutation','user-a','tb',CURRENT_TIMESTAMP)`).run();
+    database.prepare(`INSERT INTO trade_roster_overlays
+      (trade_id,league_id,player_identity_id,source_player_id,from_team_key,to_team_key,source_snapshot_id)
+      VALUES ('trade-approved','league-a','identity-sf','sf-player','sf','tb',?)`).run(snapshotId);
+
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM discord_interaction_receipts`).get().count,0);
+    const movedPlayerResponse=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000097',name:'player',options:[{type:3,name:'name',value:'Christian Example'}]
+    })}));
+    const movedPlayerPayload=await movedPlayerResponse.json();
+    assert.ok(movedPlayerPayload.data.embeds,JSON.stringify(movedPlayerPayload));
+    assert.match(movedPlayerPayload.data.embeds[0].description,/Tampa Bay Buccaneers/);
+    const movedAssetResponse=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000098',name:'trade',type:4,options:[{type:1,name:'create',options:[
+        {type:3,name:'owner',value:'owner:100000000000000012'},
+        {type:3,name:'send-1',value:'Christian',focused:true}
+      ]}]
+    })}));
+    assert.deepEqual((await movedAssetResponse.json()).data.choices,[{
+      name:'Player · Christian Example · HB · TB',value:'player:plr_11111111111111111111111111111111'
+    }]);
+    const formerTeamResponse=await discordInteractions(await signedContext({db,key,interaction:interaction({
+      id:'100000000000000099',name:'trade',type:4,options:[{type:1,name:'create',options:[
+        {type:3,name:'owner',value:'owner:100000000000000012'},
+        {type:3,name:'receive-1',value:'Christian',focused:true}
+      ]}]
+    })}));
+    assert.deepEqual((await formerTeamResponse.json()).data.choices,[]);
   }finally{database.close()}
 });
 

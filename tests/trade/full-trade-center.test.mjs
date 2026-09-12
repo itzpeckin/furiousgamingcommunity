@@ -346,11 +346,25 @@ test('authenticated owners share proposals while commissioner-only controls stay
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_transaction_history WHERE workflow_trade_id=?`).get(tradeId).count,1,'canonical transaction evidence is preserved');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_management_events WHERE trade_id=? AND event_type='trade-hidden'`).get(tradeId).count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM tenant_audit_events WHERE resource_id=? AND action='approved_trade_hidden'`).get(tradeId).count,1);
-    const duplicate=await postTradeCenter(context(tokens.tb,'POST',{action:'propose',note:'Duplicate player',transfers:[
+    const retrade=await postTradeCenter(context(tokens.tb,'POST',{action:'propose',note:'Return trade',transfers:[
       {type:'player',assetId:'player-gb',fromTeamId:'tb',toTeamId:'gb'},
       {type:'player',assetId:'player-tb',fromTeamId:'gb',toTeamId:'tb'}
     ]}));
-    assert.equal(duplicate.status,409);
+    const retradePayload=await retrade.clone().json(),retradeId=retradePayload.tradeId;
+    assert.equal(retrade.status,200,JSON.stringify(retradePayload));
+    const acceptedRetrade=await postTradeCenter(context(tokens.gb,'POST',{action:'accept',tradeId:retradeId,revision:1}));
+    assert.equal(acceptedRetrade.status,200,JSON.stringify(await acceptedRetrade.clone().json()));
+    for(const token of [tokens.commissioner,tokens.reviewer2,tokens.reviewer3]){
+      const reviewed=await postTradeCenter(context(token,'POST',{action:'review',tradeId:retradeId,revision:1,decision:'approve'}));
+      assert.equal(reviewed.status,200,JSON.stringify(await reviewed.clone().json()));
+    }
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_roster_overlays WHERE trade_id=? AND internal_status='superseded'`).get(tradeId).count,2);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_roster_overlays WHERE trade_id=? AND internal_status='active'`).get(retradeId).count,2);
+    assert.deepEqual(database.prepare(`SELECT from_team_key AS fromTeamKey,to_team_key AS toTeamKey
+      FROM trade_roster_overlays WHERE trade_id=? ORDER BY source_player_id`).all(retradeId).map(row=>({...row})),[
+        {fromTeamKey:'tb',toTeamKey:'gb'},
+        {fromTeamKey:'gb',toTeamKey:'tb'}
+      ]);
     const resetAll=await postTradeCenter(context(tokens.commissioner,'POST',{action:'reset-all-trades'}));
     const resetAllPayload=await resetAll.clone().json();
     assert.equal(resetAll.status,200,JSON.stringify(resetAllPayload));
@@ -417,6 +431,8 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.doesNotMatch(client,/Requested return required/);
   assert.doesNotMatch(client,/data-live-seed-picks/);
   assert.match(endpoint,/pending-madden-execution/);
+  assert.match(endpoint,/SET internal_status='superseded',resolved_at=CURRENT_TIMESTAMP/);
+  assert.doesNotMatch(endpoint,/Player is already committed in an approved trade/);
   assert.match(endpoint,/continuity_key IS NOT NULL/);
   assert.match(endpoint,/status\)==='approved'/);
   assert.match(endpoint,/status\)==='committee' && isReviewer/);
@@ -437,6 +453,9 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.match(styles,/@media\(max-width:760px\)/);
   assert.match(styles,/FranchiseHQ 7\.5\.5\.8 — responsive Trade Review/);
   assert.match(styles,/live committee tally and protected Trade Block surfaces/);
+  assert.match(styles,/authoritative live-trade ownership and protected Trade Review color/);
+  assert.match(styles,/\.trade-package-matchup--review>\.trade-package-team::before/);
+  assert.match(styles,/\.trade-package-matchup--review \.trade-detail-asset>\*\{position:relative;z-index:1\}/);
   assert.match(styles,/\.live-block-player-row::before/);
   assert.match(styles,/\.live-block-player-row>\*\{position:relative;z-index:1\}/);
   assert.match(styles,/\.live-trade-status/);
