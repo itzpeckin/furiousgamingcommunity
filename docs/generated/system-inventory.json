@@ -167,7 +167,6 @@
       ".png": 3,
       ".sql": 42,
       ".txt": 1,
-      ".yaml": 1,
       ".yml": 1,
       "[none]": 2
     },
@@ -253,7 +252,7 @@
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 603
+    "total": 602
   },
   "frontend": {
     "assets": [
