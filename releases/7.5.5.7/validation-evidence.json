@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5.7",
+  "status": "local-validation-in-progress",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 40,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "focusedTradeSuites": {
+      "passed": true,
+      "tests": 48
+    },
+    "commandCenterTradeOperations": {
+      "passed": true,
+      "prominentControls": true,
+      "confirmationRequired": true,
+      "serverAuthorityPreserved": true
+    },
+    "mobileTradeReview": {
+      "passed": true,
+      "assetSpacing": true,
+      "readableMetricCells": true,
+      "boundedHorizontalMetricScroll": true,
+      "pageOverflowAdded": false
+    },
+    "discordCommitteeFallback": {
+      "passed": true,
+      "richCardsPreferred": true,
+      "allPlayersAndPicksRetained": true,
+      "approveDenyControlsRetained": true,
+      "incompletePostReplaced": true,
+      "partialFallbackCleanup": true,
+      "automaticRetryWakeup": true,
+      "duplicateEventPreventionPreserved": true
+    },
+    "productionReadOnlyDiagnosis": {
+      "passed": true,
+      "tradeId": "trade_3ff4c41a-fa75-48e6-851a-18bdd3c04ca1",
+      "workflowStatus": "committee",
+      "committeeChannelId": "1014771152608055336",
+      "deliveryEventId": "discord_delivery_16facb1d-bf78-4336-9131-f4210b51283c",
+      "deliveryStatus": "failed-retryable",
+      "deliveryAttempts": 1,
+      "cause": "Discord removed rich embeds in the configured Trade Submit channel",
+      "productionRowsChanged": 0
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 215,
+      "syntaxModules": 255,
+      "routes": 76,
+      "canonicalMigrations": 23,
+      "requiredTables": 116
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "tradeResetExecuted": false,
+    "importExecuted": false,
+    "activeSnapshotChanged": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0,
+    "protectedLeagueRowsWritten": 0
+  }
+}

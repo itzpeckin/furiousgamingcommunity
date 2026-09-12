@@ -141,10 +141,58 @@ async function recoverSuppressedTradeEmbeds(env,channelId,posted,message,fetchIm
   if(Array.isArray(restored?.embeds)&&restored.embeds.length===message.embeds.length){
     return {recovered:true,method:suppressed?'replaced-and-unsuppressed':'replaced'};
   }
-  await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(posted.id)}`,{
-    method:'DELETE',fetchImpl
-  }).catch(()=>null);
-  throw new Error('Discord removed the Trade Committee detail cards. The original incomplete post was removed; allow Embed Links in the configured channel and FranchiseHQ will retry safely.');
+  const cleanMarkdown=value=>String(value||'')
+    .replace(/\[([^\]]+)]\(https?:\/\/[^)]+\)/g,'$1')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
+  const chunks=[];
+  const limit=1900;
+  let current=cleanMarkdown(message.content);
+  const push=()=>{if(current){chunks.push(current);current=''}};
+  const append=value=>{
+    const next=cleanMarkdown(value);if(!next)return;
+    const candidate=current?`${current}\n\n${next}`:next;
+    if(candidate.length<=limit){current=candidate;return}
+    push();current=next.slice(0,limit);
+  };
+  for(const embed of message.embeds||[]){
+    if(embed?.title==='Trade status')continue;
+    const heading=`**${cleanMarkdown(embed?.title||'Trade package').toUpperCase()}**`;
+    let needsHeading=true;
+    for(const field of (embed?.fields||[]).filter(item=>item?.name!=='\u200b')){
+      const item=`${needsHeading?`${heading}\n`:''}${cleanMarkdown(field.name)}\n${cleanMarkdown(field.value)}`;
+      if((current?`${current}\n\n${item}`:item).length>limit){push();needsHeading=true}
+      append(`${needsHeading?`${heading}\n`:''}${cleanMarkdown(field.name)}\n${cleanMarkdown(field.value)}`);
+      needsHeading=false;
+    }
+  }
+  const status=(message.embeds||[]).find(embed=>embed?.title==='Trade status');
+  if(status)append(`**TRADE STATUS**\n${cleanMarkdown(status.description)}`);
+  push();
+  if(!chunks.length)throw new Error('Discord committee delivery could not produce a permission-safe review package.');
+
+  const fallbackIds=[String(posted.id)];
+  try{
+    await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(posted.id)}`,{
+      method:'PATCH',body:{
+        content:chunks[0],embeds:[],components:chunks.length===1?(message.components||[]):[],
+        allowed_mentions:message.allowed_mentions||{parse:[]},
+        ...(suppressed?{flags:Number(posted.flags||0)&~DISCORD_SUPPRESS_EMBEDS}:{})
+      },fetchImpl
+    });
+    for(let index=1;index<chunks.length;index+=1){
+      const extra=await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
+        method:'POST',body:{content:chunks[index],embeds:[],components:index===chunks.length-1?(message.components||[]):[],allowed_mentions:{parse:[]}},fetchImpl
+      });
+      if(extra?.id)fallbackIds.push(String(extra.id));
+    }
+    return {recovered:true,method:'permission-safe-text',messageCount:chunks.length};
+  }catch(error){
+    for(const id of fallbackIds.reverse()){
+      await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(id)}`,{method:'DELETE',fetchImpl}).catch(()=>null);
+    }
+    throw new Error(`Discord could not publish the Trade Committee fallback: ${cleanError(error)}`);
+  }
 }
 
 export async function tradeConversationMessage(db,row,{disabled=false,statusMessage=null}={}){

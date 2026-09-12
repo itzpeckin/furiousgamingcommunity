@@ -5160,7 +5160,6 @@ table td{
   .home-leader-card__header{min-height:0!important}
 }
 
-
 /* v5.8.5a — Home standings simplification and full-name leader readability */
 .home-standings-columns{
   grid-template-columns:44px minmax(0,1fr) 58px!important;
@@ -7777,3 +7776,22 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
 .commissioner-directory-panel .ownership-team-row{grid-template-columns:minmax(220px,1.1fr) minmax(210px,1fr) minmax(125px,.58fr) minmax(110px,.5fr) minmax(125px,.56fr) minmax(104px,auto)}
 @media(max-width:1180px){.commissioner-directory-panel .ownership-team-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"franchise manage" "owner owner" "role status" "trades trades"}.commissioner-team-trades{grid-area:trades}}
 @media(max-width:900px){.commissioner-directory-panel .ownership-team-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;grid-template-areas:"franchise franchise" "owner owner" "role status" "trades trades" "manage manage"!important}.commissioner-team-manage{width:100%}.commissioner-team-trades{padding-top:10px;border-top:1px solid rgba(126,166,230,.11)}}
+
+/* FranchiseHQ 7.5.5.7 — responsive Trade Review and prominent trade operations. */
+.commissioner-trade-reset-controls{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px;margin-top:14px;padding:16px;border:1px solid rgba(96,150,237,.32);border-radius:15px;background:linear-gradient(135deg,rgba(32,67,112,.42),rgba(10,22,39,.7));box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.commissioner-trade-reset-controls>div:first-child{display:grid;gap:4px}.commissioner-trade-reset-controls>div:first-child>strong{font-size:.86rem}.commissioner-trade-reset-controls>div:first-child>small{max-width:620px;color:var(--muted);font-size:.58rem;line-height:1.45}.commissioner-trade-reset-controls>div:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px}.commissioner-trade-reset-controls .button{min-height:44px;padding-inline:18px;font-weight:900}
+@media(max-width:820px){
+  .trade-package-matchup--review .trade-detail-package-team__assets{gap:13px;padding:12px}
+  .trade-package-matchup--review .trade-detail-asset{grid-template-columns:40px 54px minmax(0,1fr) auto;gap:11px;padding:12px;overflow:visible}
+  .trade-package-matchup--review .trade-detail-asset__metrics{grid-column:1/-1;grid-row:2;gap:5px;overflow-x:auto;padding:0 0 4px;border:0;background:transparent;scrollbar-width:thin;scroll-snap-type:x proximity}
+  .trade-package-matchup--review .trade-detail-asset__metrics>span{min-width:72px;padding:9px 7px;border:1px solid rgba(255,255,255,.11);border-radius:8px;background:rgba(5,10,17,.36);scroll-snap-align:start}
+  .trade-package-matchup--review .trade-detail-asset__route{grid-column:1/-1;grid-row:3;justify-items:start;width:100%;padding-top:9px;border-top:1px solid rgba(255,255,255,.1);text-align:left}
+  .trade-package-matchup--review .trade-detail-asset>.trade-value-button{grid-column:4;grid-row:1;min-width:66px}
+}
+@media(max-width:700px){.commissioner-trade-reset-controls{grid-template-columns:1fr;padding:14px}.commissioner-trade-reset-controls>div:last-child{display:grid;grid-template-columns:1fr}.commissioner-trade-reset-controls .button{width:100%}}
+@media(max-width:520px){
+  .trade-package-matchup--review .trade-detail-package-team__assets{gap:14px;padding:11px}
+  .trade-package-matchup--review .trade-detail-asset{grid-template-columns:34px 47px minmax(0,1fr) auto;gap:10px;padding:11px}
+  .trade-package-matchup--review .trade-detail-asset__metrics{grid-template-columns:repeat(5,minmax(72px,1fr))}
+  .trade-package-matchup--review .trade-detail-asset__metrics--pick{grid-template-columns:repeat(4,minmax(78px,1fr))}
+}
