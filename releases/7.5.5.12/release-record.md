@@ -1,6 +1,6 @@
 # FranchiseHQ 7.5.5.12 Release Record
 
-Status: Locally validated, standing owner-authorized compact-layout correction; hosted delivery in progress.
+Status: Production deployed and authenticated read-only verified; owner visual acceptance pending.
 
 ## Scope
 
@@ -24,7 +24,9 @@ Madden Free Agents remain blocked upstream and unknown/null, never zero.
 
 ## Deployment status
 
-Standing authorization covers this correction through publication, PR, hosted checks, Main merge, and Production. Hosted delivery and authenticated read-only acceptance are pending. Migration 40 is unchanged.
+Exact candidate `af3c4bae59742d2b051fae71f938cba90a0810f3` passed all four PR #86 checks and merged into Main as `08e5f6132a01871f0b9a05331085e84f43d8616e`. All five Main checks passed, including quality run `34718556254` and Pages workflow `34718555690`. Git-integrated Pages Production deployment `5d559699-7923-4606-b235-6d1256b10235` succeeded and serves 7.5.5.12.
+
+Authenticated read-only acceptance loaded the existing approved NE/TB trade at Season 2026, Regular Season Week 20. All four assets use the previous 72.109375px desktop height, 10px padding, 11px gaps, and 13.12px name text. The container type is normal rather than the added inline-size container. Brighter team gradients remain and the player/pick field sets exclude Contract/Record. The existing tally remains 3 approvals and 1 rejection. Migration 40 and all league data remain unchanged.
 
 ## Boundaries
 
