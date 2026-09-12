@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5.8",
+  "status": "implementation-validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 40,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "discordMobileAssetDividers": {
+      "passed": true,
+      "visibleDivider": "━━━━━━━━━━━━━━━━━━━━",
+      "oneRealFieldPerAsset": true,
+      "zeroWidthSpacerFieldsRemoved": true,
+      "privateAndCommitteeRendererShared": true,
+      "permissionSafeFallbackPreserved": true,
+      "historicalMessagesRewritten": false
+    },
+    "focusedDiscordSuite": {
+      "passed": true,
+      "tests": 39
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 215,
+      "syntaxModules": 255,
+      "routes": 76,
+      "canonicalMigrations": 23,
+      "requiredTables": 116
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "tradeResetExecuted": false,
+    "importExecuted": false,
+    "activeSnapshotChanged": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0,
+    "protectedLeagueRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": true,
+      "status": "pending",
+      "pullRequest": null,
+      "candidateCommit": null,
+      "mainCommit": null
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "pending",
+      "pullRequestChecksPassed": 0,
+      "pullRequestChecksFailed": 0,
+      "mainChecksPassed": 0
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 40,
+      "candidateMigration": 40
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-required"
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "pending-code-only-deployment",
+      "currentRelease": "7.5.5.7",
+      "candidateRelease": "7.5.5.8",
+      "mainCommit": null,
+      "pagesDeployment": null,
+      "publicHttpStatus": null,
+      "leagueHttpStatus": null,
+      "runtimeRelease": "7.5.5.7",
+      "authenticatedUiVerified": false
+    }
+  }
+}
