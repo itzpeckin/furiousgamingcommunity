@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.9",
-  "status": "implementation-validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -54,10 +54,10 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "stagingChanged": false,
     "migrationApplied": false,
     "discordCommandsRegistered": false,
@@ -78,17 +78,19 @@
   "external": {
     "githubPublication": {
       "authorized": true,
-      "status": "pending",
-      "pullRequest": null,
-      "candidateCommit": null,
-      "mainCommit": null
+      "status": "published-main-accepted",
+      "pullRequest": 80,
+      "candidateCommit": "f35e6ecc8b40efdfa2759a54947483053843a1a6",
+      "mainCommit": "3d97b3f61c9e3339a0898f75647cbf1b6ea19656"
     },
     "hostedChecks": {
       "authorized": true,
-      "status": "pending",
-      "pullRequestChecksPassed": 0,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
       "pullRequestChecksFailed": 0,
-      "mainChecksPassed": 0
+      "mainChecksPassed": 3,
+      "mainQualityWorkflowRun": 34708717496,
+      "mainPagesWorkflowRun": 34708716982
     },
     "productionMigration": {
       "authorized": false,
@@ -102,15 +104,20 @@
     },
     "productionDeployment": {
       "authorized": true,
-      "status": "pending-code-only-deployment",
-      "currentRelease": "7.5.5.8",
+      "status": "deployed-read-only-verified",
+      "currentRelease": "7.5.5.9",
       "candidateRelease": "7.5.5.9",
-      "mainCommit": null,
-      "pagesDeployment": null,
-      "publicHttpStatus": null,
-      "leagueHttpStatus": null,
-      "runtimeRelease": "7.5.5.8",
-      "authenticatedUiVerified": false
+      "mainCommit": "3d97b3f61c9e3339a0898f75647cbf1b6ea19656",
+      "pagesDeployment": "e909d2e5-a808-4978-a959-84f004938f0a",
+      "publicHttpStatus": 200,
+      "leagueHttpStatus": 200,
+      "runtimeRelease": "7.5.5.9",
+      "authenticatedUiVerified": true,
+      "season": 2026,
+      "period": "Regular Season Week 20",
+      "franchiseHqCommitteeTalliesVerified": true,
+      "tradeBlockContrastVerified": true,
+      "liveVoteExercised": false
     }
   }
 }
