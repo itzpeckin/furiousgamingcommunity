@@ -3,6 +3,7 @@ import {
   activeSnapshotRecord
 } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
 import { activeLeagueTeams, resolveTeam } from './league-teams.js';
+import { applyRosterOverlays } from './trade-center.js';
 import { tradeCenterState } from '../api/leagues/[leagueSlug]/trade-center.js';
 import { competitionState } from '../api/leagues/[leagueSlug]/competition.js';
 import { leagueNewsState } from './league-news.js';
@@ -46,12 +47,19 @@ export async function discordLeagueReadModel(c,{domains=[]}={}){
     domain,await allDomain(c.db,c.league.id,snapshot.id,domain,{compact:domain==='statistics',max:domain==='statistics'?20000:6000})
   ]));
   const model={snapshot,...Object.fromEntries(loaded)};
+  let canonical=null;
+  if(Array.isArray(model.teams)||Array.isArray(model.players))canonical=await activeLeagueTeams(c.db,c.league.id);
   if(Array.isArray(model.teams)){
-    const canonical=await activeLeagueTeams(c.db,c.league.id);
     model.teams=model.teams.map(source=>{
       const team=resolveTeam(canonical,source.id)||resolveTeam(canonical,source.abbreviation)||resolveTeam(canonical,source.displayName);
       return team?{...source,...team,record:source.record,source:{...(source.source||{}),teamKey:team.teamKey}}:source;
     });
+  }
+  if(Array.isArray(model.players)&&model.players.length){
+    const overlays=await rows(c.db,`SELECT source_player_id,to_team_key,internal_status
+      FROM trade_roster_overlays WHERE league_id=? AND internal_status='active'`,c.league.id);
+    const teamExternalIds=new Map((canonical||[]).map(team=>[team.teamKey,team.externalId]));
+    model.players=applyRosterOverlays(model.players,overlays,teamExternalIds);
   }
   return model;
 }

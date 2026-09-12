@@ -7812,3 +7812,37 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
   .live-trade-status{align-items:stretch;flex-direction:column}
   .live-trade-status dl{width:100%}
 }
+
+/* FranchiseHQ 7.5.5.10 — authoritative live-trade ownership and protected Trade Review color. */
+.trade-package-matchup--review>.trade-package-team{
+  border-color:color-mix(in srgb,var(--trade-team-primary) 58%,#39516f);
+  background:linear-gradient(180deg,#0c1a2b 0,#081522 100%);
+  box-shadow:0 15px 36px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.055);
+}
+.trade-package-matchup--review>.trade-package-team::before{
+  z-index:0;
+  pointer-events:none;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--trade-team-primary) 24%,transparent) 0,color-mix(in srgb,var(--trade-team-secondary) 10%,transparent) 28%,transparent 56%);
+}
+.trade-package-matchup--review>.trade-package-team>.trade-package-team__watermark{z-index:0;opacity:.075}
+.trade-package-matchup--review>.trade-package-team>header,
+.trade-package-matchup--review>.trade-package-team>div:not(.trade-package-team__watermark){position:relative;z-index:1}
+.trade-package-matchup--review>.trade-package-team>header{
+  border-bottom-color:color-mix(in srgb,var(--trade-team-primary) 42%,rgba(255,255,255,.1));
+  background:linear-gradient(90deg,color-mix(in srgb,var(--trade-team-primary) 30%,#0b1828),#0a1726 72%);
+}
+.trade-package-matchup--review .trade-detail-asset{
+  border-color:color-mix(in srgb,var(--trade-team-primary) 40%,#42536a);
+  background:linear-gradient(96deg,color-mix(in srgb,var(--trade-team-primary) 31%,#14263c) 0,color-mix(in srgb,var(--trade-team-secondary) 12%,#102036) 24%,#0c1b2d 52%,#091725 100%);
+  box-shadow:0 7px 20px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.07);
+}
+.trade-package-matchup--review .trade-detail-asset::after{
+  background:linear-gradient(90deg,rgba(4,10,18,.03),rgba(4,10,18,.12) 34%,rgba(4,10,18,.24));
+}
+.trade-package-matchup--review .trade-detail-asset>*{position:relative;z-index:1}
+.trade-package-matchup--review .trade-detail-asset:hover{
+  border-color:color-mix(in srgb,var(--trade-team-primary) 65%,#7891b2);
+  background:linear-gradient(96deg,color-mix(in srgb,var(--trade-team-primary) 34%,#172b45) 0,color-mix(in srgb,var(--trade-team-secondary) 14%,#12243b) 24%,#0f2135 52%,#0b1a2a 100%);
+}
+.trade-package-matchup--review .trade-detail-asset__metrics,
+.trade-package-matchup--review .trade-detail-asset>.trade-value-button{background:#081522}

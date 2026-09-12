@@ -284,7 +284,6 @@ async function playerAsset(c, assetId, fromTeamKey) {
     WHERE league_id=? AND player_identity_id=? AND internal_status='active' LIMIT 1`).bind(c.league.id,identity.playerIdentityId).first();
   const effectiveTeam = overlay?.toTeamKey ? canonicalTeamKey(overlay.toTeamKey) : sourceTeam?.teamKey;
   if (!effectiveTeam || effectiveTeam !== fromTeamKey) throw Object.assign(new Error('Player ownership changed. Refresh the Trade Center and try again.'),{status:409});
-  if (overlay) throw Object.assign(new Error('Player is already committed in an approved trade.'),{status:409});
   return identity;
 }
 
@@ -520,6 +519,10 @@ async function review(c, row, participants, decision, reason, freeTrade) {
     decision_reason=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND status='committee'`).bind(designateFree?1:0,row.id,c.league.id)];
   for (const asset of assets) {
     if (asset.asset_type==='player') {
+      statements.push(c.db.prepare(`UPDATE trade_roster_overlays
+        SET internal_status='superseded',resolved_at=CURRENT_TIMESTAMP
+        WHERE league_id=? AND player_identity_id=? AND internal_status='active'`)
+        .bind(c.league.id,asset.player_identity_id));
       statements.push(c.db.prepare(`INSERT INTO trade_roster_overlays
         (trade_id,league_id,player_identity_id,source_player_id,from_team_key,to_team_key,source_snapshot_id,internal_status,created_at)
         VALUES (?,?,?,?,?,?,?,'active',CURRENT_TIMESTAMP)`).bind(row.id,c.league.id,asset.player_identity_id,asset.source_player_id,asset.from_team_key,asset.to_team_key,snapshotId));

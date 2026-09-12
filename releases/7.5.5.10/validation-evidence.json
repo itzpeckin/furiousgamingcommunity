@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5.10",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 40,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "liveTradeOwnership": {
+      "passed": true,
+      "discordReadModelUsesActiveOverlay": true,
+      "discordAutocompleteUsesEffectiveTeam": true,
+      "formerTeamChoicesRemoved": true,
+      "receivingTeamChoicesAdded": true,
+      "approvedPlayerRetradeAllowed": true,
+      "priorOverlayAuditPreserved": true,
+      "maddenReconciliationAuthorityPreserved": true,
+      "draftPickLedgerAuthorityPreserved": true
+    },
+    "tradeReviewContrast": {
+      "passed": true,
+      "opaqueNavyFoundation": true,
+      "constrainedTeamAccents": true,
+      "contentStackingProtected": true,
+      "defaultAndHoverContrastAligned": true
+    },
+    "focusedDiscordTradeSuite": {
+      "passed": true,
+      "tests": 48
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 215,
+      "syntaxModules": 255,
+      "routes": 76,
+      "canonicalMigrations": 23,
+      "requiredTables": 116
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "tradeResetExecuted": false,
+    "importExecuted": false,
+    "activeSnapshotChanged": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0,
+    "protectedLeagueRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": true,
+      "status": "pending",
+      "pullRequest": null,
+      "candidateCommit": null,
+      "mainCommit": null
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "pending"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 40,
+      "candidateMigration": 40
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-required"
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "pending",
+      "currentRelease": "7.5.5.9",
+      "candidateRelease": "7.5.5.10"
+    }
+  }
+}

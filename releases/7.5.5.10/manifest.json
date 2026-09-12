@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.10",
+  "releaseType": "live-trade-ownership-and-trade-review-contrast-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.9",
+    "commit": "f20851f4d94dfbda827c564d5d16d749b31e0390",
+    "tree": "7b2421715f972574b09b5ab7ab5b132325f72602",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.10-live-trade-ownership",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "candidateCommit": null,
+    "pullRequest": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "7.5.5.9",
+    "candidateRelease": "7.5.5.10",
+    "currentCommit": "3d97b3f61c9e3339a0898f75647cbf1b6ea19656",
+    "currentMigration": 40,
+    "candidateMigration": 40,
+    "scope": "Immediate server-authoritative Discord player/pick ownership after approval, safe re-trading before Madden confirmation, and contrast-safe Trade Review packages."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-autocomplete.js",
+    "functions/_lib/discord-read-model.js",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "league-engine/trade-center-live.js",
+    "styles.css",
+    "tests/discord/discord-bot.test.mjs",
+    "tests/trade/full-trade-center.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.10/release-record.md",
+    "releases/7.5.5.10/validation-evidence.json"
+  ]
+}
