@@ -3,6 +3,7 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import vm from 'node:vm';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import {
   applyRosterOverlays,
@@ -416,7 +417,8 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.match(client,/trade-detail-asset__metrics/);
   assert.match(client,/<small>DEV<\/small>/);
   assert.match(client,/<small>AGE<\/small>/);
-  assert.match(client,/<small>CONTRACT<\/small>/);
+  const reviewAssetRenderer=client.slice(client.indexOf('  function assetRow(asset){'),client.indexOf('  function workflowInvolvesTeam'));
+  assert.doesNotMatch(reviewAssetRenderer,/<small>(CONTRACT|RECORD)<\/small>/);
   assert.match(client,/<small>PROJECTED<\/small>/);
   assert.match(client,/official tiebreakers are not applied/);
   assert.match(client,/filterTradeBlockByName/);
@@ -463,5 +465,37 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.match(client,/renderCommissionerQuickManagement/);
   assert.match(client,/commissioner-trade-reset-controls/);
   assert.match(styles,/\.block-add-player-drawer/);
+  assert.match(styles,/brighter team-color assets with compact, unclipped metrics/);
+  assert.match(styles,/\.trade-package-matchup--review \.trade-detail-asset::after\{content:none\}/);
+  assert.match(styles,/@container trade-review \(max-width:850px\)/);
   assert.doesNotMatch(client,/pending madden|madden confirmed|reconciliation status/i);
+});
+
+test('Trade Review renders compact player and pick fields with team colors and optional value explanations',async()=>{
+  const client=await readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8');
+  for(const calculatorEnabled of [true,false]){
+    const page={innerHTML:''};
+    const teams=[{teamKey:'tb',id:'tb',displayName:'Buccaneers',abbreviation:'TB',primaryColor:'#d50a0a',secondaryColor:'#ff7900',logoUrl:'/tb.svg'},{teamKey:'ne',id:'ne',displayName:'Patriots',abbreviation:'NE',primaryColor:'#002244',secondaryColor:'#c60c30',logoUrl:'/ne.svg'}];
+    const players=[{id:'baker',name:'Baker Mayfield',position:'QB',overall:86,dev:'Superstar',age:31,imageUrl:'/baker.png',capHit:39970000,contractYears:3}];
+    const data={ok:true,session:{teamKey:'tb',role:'commissioner'},teams,notifications:[],listings:[],settings:normalizeTradeCenterSettings({calculatorEnabled}),picks:[{id:'pick-tb',draftClass:2027,round:1,originalTeamKey:'tb',projectedPick:'1.05',projectedRecord:'2-14-1'}],workflows:[{id:'trade-review',status:'approved',proposerTeamKey:'tb',revision:1,participants:[{teamKey:'tb'},{teamKey:'ne'}],assets:[{assetType:'player',sourcePlayerId:'baker',fromTeamKey:'tb',toTeamKey:'ne'},{assetType:'draft-pick',draftPickId:'pick-tb',fromTeamKey:'tb',toTeamKey:'ne'}],messages:[],review:{approvals:3,rejections:1}}]};
+    const window={FranchiseHQ:{leagueTenant:{getCurrentLeague:()=>({slug:'fixture-league'})}},FGC_APP:{teams,players},addEventListener(){}};
+    const context=vm.createContext({window,location:{hash:'#trade-center/trade-review'},document:{querySelector:selector=>selector==='[data-page-content]'?page:null,querySelectorAll:()=>[],addEventListener(){},body:{style:{}}},fetch:async()=>({ok:true,json:async()=>data}),Intl,console});
+    vm.runInContext(client,context);
+    await window.FranchiseHQ.liveTradeCenter.load();
+    for(const view of ['trade-review','approved']){
+      window.FranchiseHQ.liveTradeCenter.renderTradeCenter(view);
+      const rows=[...page.innerHTML.matchAll(/<article class="trade-detail-asset ([\s\S]*?)<\/article>/g)].map(match=>match[0]);
+      assert.equal(rows.length,2);
+      assert.match(rows[0],/--trade-team-primary:#d50a0a/);
+      assert.match(rows[0],/src="\/baker.png"/);
+      assert.match(rows[0],/data-live-open-player-button="baker"/);
+      const metrics=row=>row.match(/<div class="trade-detail-asset__metrics[^\"]*">([\s\S]*?)<\/div>/)[1];
+      assert.deepEqual([...metrics(rows[0]).matchAll(/<small>(.*?)<\/small>/g)].map(match=>match[1]),['POS','OVR','DEV','AGE']);
+      assert.deepEqual([...metrics(rows[1]).matchAll(/<small>(.*?)<\/small>/g)].map(match=>match[1]),['CLASS','ROUND','PROJECTED']);
+      assert.match(rows[1],/1\.05/);
+      assert.doesNotMatch(rows.join(''),/CONTRACT|RECORD|39,970,000|2-14-1/);
+      assert.equal(rows.every(row=>row.includes('data-live-open-asset-value')),calculatorEnabled);
+      assert.equal(page.innerHTML.includes('Multi-Team Fairness')||page.innerHTML.includes('Package balance'),calculatorEnabled);
+    }
+  }
 });

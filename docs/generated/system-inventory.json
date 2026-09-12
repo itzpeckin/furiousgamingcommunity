@@ -176,7 +176,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 538156,
+        "bytes": 541727,
         "file": "styles.css"
       },
       {
@@ -196,7 +196,7 @@
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 98662,
+        "bytes": 98235,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -220,12 +220,12 @@
         "file": "functions/_lib/discord-read-model.js"
       },
       {
-        "bytes": 43124,
-        "file": "tests/import/madden-discovery.test.mjs"
+        "bytes": 44661,
+        "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 41145,
-        "file": "tests/trade/full-trade-center.test.mjs"
+        "bytes": 43124,
+        "file": "tests/import/madden-discovery.test.mjs"
       },
       {
         "bytes": 39316,
@@ -1556,7 +1556,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.5.10",
+  "release": "7.5.5.11",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

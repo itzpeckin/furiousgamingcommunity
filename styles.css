@@ -7846,3 +7846,52 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 }
 .trade-package-matchup--review .trade-detail-asset__metrics,
 .trade-package-matchup--review .trade-detail-asset>.trade-value-button{background:#081522}
+
+/* FranchiseHQ 7.5.5.11 — brighter team-color assets with compact, unclipped metrics. */
+.trade-center-page .live-trade-card--premium{grid-template-columns:minmax(0,1fr)}
+.trade-package-matchup--review>.trade-package-team{container-type:inline-size;container-name:trade-review}
+.trade-package-matchup--review .trade-detail-asset{
+  position:relative;
+  grid-template-columns:40px 56px minmax(130px,.85fr) minmax(220px,1.2fr) max-content;
+  gap:12px;
+  border-color:color-mix(in srgb,var(--trade-team-primary) 65%,#a5b7ce);
+  background:linear-gradient(105deg,color-mix(in srgb,var(--trade-team-primary) 72%,#344b67) 0,color-mix(in srgb,var(--trade-team-primary) 58%,#2b415e) 48%,color-mix(in srgb,var(--trade-team-secondary) 35%,#2b415e) 100%);
+  box-shadow:0 6px 16px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.16);
+}
+.trade-package-matchup--review .trade-detail-asset:has(>.trade-value-button){grid-template-columns:40px 56px minmax(130px,.85fr) minmax(220px,1.2fr) max-content max-content}
+.trade-package-matchup--review .trade-detail-asset::after{content:none}
+.trade-package-matchup--review .trade-detail-asset:hover{
+  border-color:color-mix(in srgb,var(--trade-team-primary) 65%,#d1dfef);
+  background:linear-gradient(105deg,color-mix(in srgb,var(--trade-team-primary) 72%,#3d5675) 0,color-mix(in srgb,var(--trade-team-primary) 58%,#354c6b) 48%,color-mix(in srgb,var(--trade-team-secondary) 35%,#354c6b) 100%);
+}
+.trade-package-matchup--review .trade-detail-asset__identity{min-width:0}
+.trade-package-matchup--review .trade-detail-asset__identity strong{color:#fff}
+.trade-package-matchup--review .trade-detail-asset__identity small{color:#e5eaf3}
+.trade-package-matchup--review .trade-detail-asset__metrics{
+  min-width:0;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:1px;
+  overflow:visible;
+  padding:0;
+  background:rgba(13,27,46,.72);
+}
+.trade-package-matchup--review .trade-detail-asset__metrics--pick{grid-template-columns:repeat(3,minmax(0,1fr))}
+.trade-package-matchup--review .trade-detail-asset__metrics>span{min-width:0;background:transparent}
+.trade-package-matchup--review .trade-detail-asset__metrics small,
+.trade-package-matchup--review .trade-detail-asset__route small,
+.trade-package-matchup--review .trade-detail-asset>.trade-value-button small{color:#d9e3f2}
+.trade-package-matchup--review .trade-detail-asset>.trade-value-button{background:rgba(13,27,46,.72)}
+@container trade-review (max-width:850px){
+  .trade-package-matchup--review .trade-detail-asset,
+  .trade-package-matchup--review .trade-detail-asset:has(>.trade-value-button){grid-template-columns:40px 54px minmax(0,1fr) auto;gap:11px;padding:12px}
+  .trade-package-matchup--review .trade-detail-asset__metrics{grid-column:1/-1;grid-row:2}
+  .trade-package-matchup--review .trade-detail-asset__route{grid-column:1/-1;grid-row:3;justify-items:start;width:100%;padding-top:9px;border-top:1px solid rgba(255,255,255,.18);text-align:left}
+  .trade-package-matchup--review .trade-detail-asset>.trade-value-button{grid-column:4;grid-row:1;min-width:66px}
+}
+@media(max-width:520px){
+  .trade-package-matchup--review .trade-detail-asset,
+  .trade-package-matchup--review .trade-detail-asset:has(>.trade-value-button){grid-template-columns:34px 47px minmax(0,1fr) auto;gap:10px;padding:11px}
+  .trade-package-matchup--review .trade-detail-asset__metrics>span{padding:9px 4px}
+  .trade-package-matchup--review .trade-detail-asset__metrics small{font-size:.5rem;letter-spacing:.025em}
+  .trade-package-matchup--review .trade-detail-asset__metrics strong{font-size:.6rem}
+}

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.11",
+  "releaseType": "trade-review-team-color-and-compact-metrics-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.10",
+    "commit": "48f100547a07dbb2eeca6b3e97e5602ad3c85f26",
+    "tree": "9ea9434ed519c2fefa2907435f5dd4e5ad00df3a",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.11-trade-review-colors",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending"},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending-hosted-checks",
+    "currentRelease": "7.5.5.10",
+    "candidateRelease": "7.5.5.11",
+    "currentMigration": 40,
+    "candidateMigration": 40,
+    "scope": "Platform-only Trade Review colors, confined layering, full-width cards, and removal of player Contract and pick Record metrics."
+  },
+  "requiredArtifacts": [
+    "league-engine/trade-center-live.js",
+    "styles.css",
+    "tests/trade/full-trade-center.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.11/release-record.md",
+    "releases/7.5.5.11/validation-evidence.json"
+  ]
+}
