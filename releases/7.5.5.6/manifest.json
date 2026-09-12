@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.6",
+  "releaseType": "discord-trade-delivery-lifecycle-remediation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.5",
+    "commit": "c21cc23ecd29236b45db331e5fdf997bc46a6fb6",
+    "tree": "5c1ed31a3bbc6e2c256016076ccb85927718f241",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.6-discord-trade-lifecycle",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "candidateCommit": null,
+    "pullRequest": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.5.5",
+    "currentCommit": "2fea2a6166d0bc3020fbf17eedf0b483550f671f",
+    "currentMigration": 40,
+    "candidateMigration": 40,
+    "pagesDeployment": null,
+    "scope": "Code-only Discord trade spacing, status-only cards, and durable terminal owner notifications."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-delivery.js",
+    "functions/api/leagues/[leagueSlug]/trade-center.js",
+    "tests/discord/discord-bot.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.6/release-record.md",
+    "releases/7.5.5.6/validation-evidence.json"
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "version": "7.5.5.6",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "productionDataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 40,
+      "candidateRequiresMigration": false,
+      "productionApplied": true
+    },
+    "discordTradePresentation": {
+      "passed": true,
+      "assetSpacing": true,
+      "privateCommitteeParityPreserved": true,
+      "statusOnlyCard": true,
+      "teamColorsAndLogosPreserved": true,
+      "allPlayersAndPicksPreserved": true
+    },
+    "discordTradeLifecycle": {
+      "passed": true,
+      "intermediateDuplicateDmSuppression": true,
+      "terminalDmPreservation": true,
+      "partnerRejectionNotifiesBothOwners": true,
+      "committeeApprovalNotifiesBothOwners": true
+    },
+    "productionReadOnlyDiagnosis": {
+      "passed": true,
+      "tradeId": "trade_ffbb7621-644b-4f5e-a9ea-462268e73dcc",
+      "workflowStatus": "committee",
+      "committeeChannelId": "1014771152608055336",
+      "deliveryEventId": "discord_delivery_f3b0592d-64dc-4c0b-9299-7ae624528461",
+      "deliveryStatus": "failed-retryable",
+      "deliveryAttempts": 2,
+      "cause": "Discord removed rich embeds because effective Embed Links permission is unavailable in the configured channel",
+      "productionRowsChanged": 0
+    },
+    "focusedDiscordSuite": {
+      "passed": true,
+      "tests": 39
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 215,
+      "strictGateTests": 215,
+      "syntaxModules": 255,
+      "routes": 76,
+      "canonicalMigrations": 23,
+      "requiredTables": 116
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    }
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "productionDataChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "stagingChanged": false,
+    "migrationApplied": false,
+    "discordCommandsRegistered": false,
+    "discordConfigurationChanged": false,
+    "liveTradeChanged": false,
+    "importExecuted": false,
+    "activationPerformed": false,
+    "activeSnapshotChanged": false,
+    "resetPerformed": false,
+    "dataDeleted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "newExportRequested": false,
+    "discordCredentialsChanged": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "databaseRowsWritten": 0,
+    "protectedLeagueRowsWritten": 0
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": true,
+      "status": "not-run",
+      "pullRequest": null,
+      "candidateCommit": null,
+      "mainCommit": "c21cc23ecd29236b45db331e5fdf997bc46a6fb6"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "not-run"
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 40,
+      "candidateMigration": 40
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-required"
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "not-run",
+      "currentRelease": "7.5.5.5",
+      "mainCommit": "2fea2a6166d0bc3020fbf17eedf0b483550f671f",
+      "pagesDeployment": null
+    }
+  }
+}

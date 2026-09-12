@@ -765,6 +765,43 @@ test('/trade create opens one private owner thread and its buttons record the re
   }finally{globalThis.fetch=originalFetch;database.close()}
 });
 
+test('partner rejection retains a terminal Discord DM for both team owners',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    seedActiveWeek(database,{leagueId:'league-a',week:13});
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','Season 2026',2026,'active')`).run();
+    const db=d1(database),league={id:'league-a',slug:'alpha',name:'Alpha League',features:{}},teams=await activeLeagueTeams(db,'league-a');
+    await ensureDraftPickHorizon(db,{leagueId:'league-a',franchiseSeasonId:'season-a',seasonYear:2026,
+      gameRelease:'Madden NFL 27',teams});
+    const request=new Request('https://franchisehq.app/api/leagues/alpha/trade-center',{method:'POST'});
+    const proposed=await executeTradeCenterAction({db,league,teams,request,
+      session:{user:{id:'user-a',displayName:'TB Owner'},membership:{role:'team_owner',teamId:'tb',teamKey:'tb'}}},{
+        action:'propose',transfers:[
+          {assetType:'draft-pick',assetId:'pick:league-a:2027:1:tb',fromTeamKey:'tb',toTeamKey:'sf'},
+          {assetType:'draft-pick',assetId:'pick:league-a:2027:1:sf',fromTeamKey:'sf',toTeamKey:'tb'}
+        ]
+      });
+    const current=database.prepare(`SELECT revision,mutation_token AS mutationToken FROM trade_workflows WHERE id=?`).get(proposed.tradeId);
+    await executeTradeCenterAction({db,league,teams,request,
+      session:{user:{id:'owner-sf',displayName:'SF Owner'},membership:{role:'team_owner',teamId:'sf',teamKey:'sf'}}},{
+        action:'reject',tradeId:proposed.tradeId,revision:current.revision,mutationToken:current.mutationToken
+      });
+    assert.deepEqual(database.prepare(`SELECT user_id AS userId FROM league_notifications
+      WHERE trade_id=? AND notification_type='rejected' ORDER BY user_id`).all(proposed.tradeId).map(row=>row.userId),['owner-sf','user-a']);
+    assert.deepEqual(database.prepare(`SELECT discord_user_id AS discordUserId,status FROM discord_delivery_events
+      WHERE resource_id=? AND event_type='rejected' ORDER BY discord_user_id`).all(proposed.tradeId).map(row=>({...row})),[
+        {discordUserId:'100000000000000011',status:'pending'},
+        {discordUserId:'100000000000000012',status:'pending'}
+      ]);
+  }finally{database.close()}
+});
+
 test('final trade updates archive and lock the existing room while revisions reopen that same thread',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
@@ -780,6 +817,12 @@ test('final trade updates archive and lock the existing room while revisions reo
     database.prepare(`INSERT INTO discord_trade_rooms
       (id,league_id,trade_id,revision,discord_guild_id,parent_channel_id,discord_thread_id,status)
       VALUES ('room-a','league-a','trade-lifecycle',1,'100000000000000001','100000000000000066','100000000000000077','approved')`).run();
+    database.prepare(`INSERT INTO discord_delivery_events
+      (id,league_id,user_id,discord_user_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
+      VALUES ('intermediate-dm','league-a','user-a','100000000000000011','accepted','trade_workflow','trade-lifecycle','direct-message','{}','intermediate-dm')`).run();
+    database.prepare(`INSERT INTO discord_delivery_events
+      (id,league_id,user_id,discord_user_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
+      VALUES ('terminal-dm','league-a','user-a','100000000000000011','approved','trade_workflow','trade-lifecycle','direct-message','{}','terminal-dm')`).run();
     const db=d1(database),requests=[];
     const fetchImpl=async(url,options={})=>{
       requests.push({url:String(url),method:options.method,body:options.body?JSON.parse(options.body):null});
@@ -788,6 +831,9 @@ test('final trade updates archive and lock the existing room while revisions reo
     };
     await queueTradeRoomUpdate(db,{league:{id:'league-a',slug:'alpha'},tradeId:'trade-lifecycle',
       eventKey:'approved-final',title:'Trade approved',message:'The Trade Committee approved this trade.',closeRoom:true});
+    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='intermediate-dm'`).get().status,'suppressed');
+    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='terminal-dm'`).get().status,'pending');
+    database.prepare(`DELETE FROM discord_delivery_events WHERE id='terminal-dm'`).run();
     assert.deepEqual(await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-token'},db,{leagueId:'league-a',fetchImpl}),
       {sent:1,failed:0,skipped:false});
     assert.deepEqual(requests.map(item=>({method:item.method,body:item.body})),[
@@ -1568,7 +1614,7 @@ test('durable legacy trade delivery opens a DM and preserves the FranchiseHQ fal
   }finally{database.close()}
 });
 
-test('trade delivery sends both owners clean team cards with source-supported contract facts only',async()=>{
+test('trade delivery sends both owners spaced team cards and one clean workflow status',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -1630,7 +1676,10 @@ test('trade delivery sends both owners clean team cards with source-supported co
       assert.match(details,/\[George Example\].*Position.*TE.*Overall.*97.*Development.*X-Factor.*Age.*29.*Cap Hit.*\$5,660,000.*Release Penalty.*\$46,960,000.*Net Release Savings.*\$0/s);
       assert.match(details,/Rueben Example/);
       assert.match(details,/Sauce Example/);
-      assert.match(details,/Incoming current-year salary and projected team cap space remain unavailable/);
+      assert.equal(request.body.embeds.slice(0,2).every(embed=>embed.fields.some(field=>field.name==='\u200b'&&field.value==='\u200b')),true);
+      const status=request.body.embeds.at(-1);
+      assert.deepEqual(status,{title:'Trade status',description:'**Negotiating**',color:0x4f8cff});
+      assert.doesNotMatch(details,/Madden contract facts|owner decisions|Committee review/);
       assert.doesNotMatch(details,/Acquiring estimate|estimated room change|projected available/);
       assert.doesNotMatch(request.body.content,/^https:\/\//m);
     }
@@ -1647,6 +1696,7 @@ test('trade delivery sends both owners clean team cards with source-supported co
     assert.deepEqual(committeeMessage.embeds.filter(embed=>/ receives$/.test(embed.title)),
       messages[0].body.embeds.filter(embed=>/ receives$/.test(embed.title)));
     assert.deepEqual(committeeMessage.components[0].components.map(button=>button.label),['Approve','Deny']);
+    assert.deepEqual(committeeMessage.embeds.at(-1),{title:'Trade status',description:'**Accepted**',color:0x4f8cff});
 
     database.prepare(`INSERT INTO discord_delivery_events
       (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)

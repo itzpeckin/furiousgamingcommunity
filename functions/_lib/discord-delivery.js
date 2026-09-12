@@ -2,7 +2,7 @@ import { discordBotRequest } from './discord-api.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-teams.js';
 import { attachProjectedPickSlots, projectDraftOrder } from './draft-pick-projections.js';
 import { tradeDecisionComponents, tradeLinkButton, tradeReviewComponents } from './discord-trade-components.js';
-import { normalizePlayer, normalizeTeam } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
+import { normalizePlayer } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
 
 const MAX_ATTEMPTS=5;
 const SNOWFLAKE=/^\d{17,20}$/;
@@ -16,12 +16,6 @@ const money=value=>{
   if(!Number.isFinite(amount))return null;
   return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(amount);
 };
-const maddenMoney=value=>{
-  if(value===null||value===undefined||value==='')return null;
-  const amount=Number(value);
-  if(!Number.isFinite(amount))return null;
-  return Math.abs(amount)>=100000?amount:amount*1000;
-};
 const teamLabel=(teams,key)=>{
   const team=resolveTeam(teams,key);
   return team?.displayName||team?.abbreviation||String(key||'Team').toUpperCase();
@@ -32,21 +26,20 @@ const embedColor=value=>{
 };
 const available=value=>value!==null&&value!==undefined&&value!=='';
 const playerFact=(label,value)=>`**${label}**: ${available(value)?value:'Unavailable'}`;
-const tradeStatusLabel=(workflow,reviews=[])=>{
+const tradeStatusLabel=workflow=>{
   const status=String(workflow?.status||'').toLowerCase();
   if(status==='negotiating')return 'Negotiating';
-  if(status==='committee')return 'Accepted by owners — awaiting Trade Committee';
-  if(status==='approved')return 'Approved by Trade Committee';
-  if(status==='withdrawn')return 'Cancelled by proposing team';
-  if(status==='rejected'&&reviews.some(item=>item.decision==='reject'))return 'Denied by Trade Committee — revision available';
-  if(status==='rejected')return 'Rejected by trade partner';
+  if(status==='committee')return 'Accepted';
+  if(status==='approved')return 'Approved';
+  if(status==='withdrawn')return 'Cancelled';
+  if(status==='rejected')return 'Rejected';
   return status?status.replaceAll('-',' ').replace(/\b\w/g,letter=>letter.toUpperCase()):'Status unavailable';
 };
 
 async function tradeDeliveryDetails(db,row,payload){
   const tradeId=String(payload.tradeId||row.resourceId||'').trim();
   if(!tradeId)return null;
-  const workflow=await db.prepare(`SELECT revision,status,review_threshold AS reviewThreshold,decision_reason AS decisionReason
+  const workflow=await db.prepare(`SELECT revision,status
     FROM trade_workflows WHERE id=? AND league_id=? LIMIT 1`)
     .bind(tradeId,row.leagueId).first();
   if(!workflow)return null;
@@ -75,22 +68,7 @@ async function tradeDeliveryDetails(db,row,payload){
     ...item,id:item.draftPickId,draftClass:item.draftClass,round:item.round,originalTeamKey:item.originalTeamKey
   })),projection);
   const pickById=new Map(picks.map(item=>[String(item.draftPickId||item.id),item]));
-  const teamRows=await rows(db,`SELECT record.external_id AS externalId,record.data_json AS dataJson
-    FROM league_active_snapshots active JOIN league_snapshot_records record
-      ON record.league_id=active.league_id AND record.snapshot_id=active.snapshot_id
-    WHERE active.league_id=? AND record.domain='teams'`,row.leagueId);
-  const capByTeam=new Map();
-  for(const item of teamRows){
-    const source=normalizeTeam(parse(item.dataJson)),team=resolveTeam(teams,source.id)||resolveTeam(teams,source.abbreviation);
-    const available=maddenMoney(source.source?.capAvailable);
-    if(team&&available!==null)capByTeam.set(team.teamKey,available);
-  }
-  const groups=new Map(),capMoves=new Map();
-  const capMove=teamKey=>{
-    const key=String(teamKey||'');
-    if(!capMoves.has(key))capMoves.set(key,{netReleaseSavings:0,releasePenalty:0});
-    return capMoves.get(key);
-  };
+  const groups=new Map();
   for(const asset of assets){
     const destination=String(asset.toTeamKey||'');
     if(!groups.has(destination))groups.set(destination,[]);
@@ -121,9 +99,6 @@ async function tradeDeliveryDetails(db,row,payload){
         name:'👤 PLAYER',
         value:[href?`**[${name}](${href})**`:`**${name}**`,playerSection,'',contractSection].join('\n').slice(0,1024)
       });
-      const from=String(asset.fromTeamKey||'');
-      if(savings!==null)capMove(from).netReleaseSavings+=savings;
-      if(penalty!==null)capMove(from).releasePenalty+=penalty;
     }else{
       const pick=pickById.get(String(asset.draftPickId))||asset;
       groups.get(destination).push({
@@ -141,39 +116,14 @@ async function tradeDeliveryDetails(db,row,payload){
     embeds.push({
       title:`${teamLabel(teams,teamKey)} receives`,
       color:embedColor(team?.primaryColor),
-      fields:items.map(item=>({...item,inline:false})),
+      fields:items.flatMap((item,index)=>[
+        ...(index?[{name:'\u200b',value:'\u200b',inline:false}]:[]),
+        {...item,inline:false}
+      ]),
       ...(team?.logoUrl?{thumbnail:{url:team.logoUrl}}:{})
     });
   }
-  const statusFields=[];
-  const capLines=[];
-  for(const [teamKey,move] of capMoves){
-    const available=capByTeam.get(teamKey);
-    capLines.push([
-      `**${teamLabel(teams,teamKey)} sends:**`,
-      move.netReleaseSavings?`${money(move.netReleaseSavings)} Madden net release savings`:null,
-      move.releasePenalty?`${money(move.releasePenalty)} Madden release penalty`:null,
-      Number.isFinite(available)?`${money(available)} current Madden cap room`:null
-    ].filter(Boolean).join(' · '));
-  }
-  if(capLines.length)statusFields.push({name:'Madden contract facts',value:`${capLines.join('\n')}\nIncoming current-year salary and projected team cap space remain unavailable because this Madden export does not supply the required annual salary and team cap-room fields.`.slice(0,1024),inline:false});
-  const acceptances=await rows(db,`SELECT participant.team_key AS teamKey,participant.accepted_revision AS acceptedRevision
-    FROM trade_workflow_participants participant WHERE participant.league_id=? AND participant.trade_id=? ORDER BY participant.team_key`,row.leagueId,tradeId);
-  if(workflow.status==='negotiating')statusFields.push({name:`Revision ${Number(workflow.revision)} owner decisions`,value:acceptances.map(item=>
-    `${Number(item.acceptedRevision)===Number(workflow.revision)?'✅':'⏳'} ${teamLabel(teams,item.teamKey)}`
-  ).join('\n')||'Waiting for participating teams.',inline:false});
-  const reviews=await rows(db,`SELECT review.decision,review.reason,user.display_name AS reviewerName
-    FROM trade_workflow_reviews review JOIN users user ON user.id=review.reviewer_user_id
-    WHERE review.league_id=? AND review.trade_id=? AND review.revision=?
-    ORDER BY review.updated_at,review.reviewer_user_id`,row.leagueId,tradeId,Number(workflow.revision));
-  statusFields.unshift({name:'Current status',value:`**${tradeStatusLabel(workflow,reviews)}**`,inline:false});
-  if(reviews.length||['committee','rejected','approved'].includes(workflow.status)){
-    const approvals=reviews.filter(item=>item.decision==='approve').length,rejections=reviews.filter(item=>item.decision==='reject').length;
-    const lines=reviews.map(item=>`${item.decision==='approve'?'✅':item.decision==='reject'?'❌':'➖'} **${item.reviewerName||'Commissioner'}** · ${item.decision}${item.reason?` — ${item.reason}`:''}`);
-    statusFields.push({name:`Committee review · ${approvals} approve / ${rejections} deny · ${Number(workflow.reviewThreshold)} required`,
-      value:(lines.join('\n')||'No committee votes recorded yet.').slice(0,1024),inline:false});
-  }
-  embeds.push({title:'Trade status',fields:statusFields,color:0x4f8cff});
+  embeds.push({title:'Trade status',description:`**${tradeStatusLabel(workflow)}**`,color:0x4f8cff});
   return {embeds,workflow,assetCount:assets.length};
 }
 
@@ -317,7 +267,8 @@ export async function queueTradeRoomUpdate(db,{league,tradeId,eventKey,eventType
     db.prepare(`UPDATE discord_trade_rooms SET revision=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
       .bind(Number(workflow.revision),roomStatus,room.id),
     db.prepare(`UPDATE discord_delivery_events SET status='suppressed',last_error='Delivered in private trade thread',updated_at=CURRENT_TIMESTAMP
-      WHERE league_id=? AND resource_id=? AND visibility='direct-message' AND status IN ('pending','failed')`)
+      WHERE league_id=? AND resource_id=? AND visibility='direct-message'
+        AND event_type IN ('sent','received','accepted','review-required') AND status IN ('pending','failed')`)
       .bind(league.id,tradeId),
     db.prepare(`INSERT INTO discord_delivery_events
       (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)

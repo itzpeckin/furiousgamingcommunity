@@ -6,7 +6,7 @@ import {
   revokeBrowserSessions
 } from "../../_lib/auth.js";
 
-const RELEASE = "7.5.5.5";
+const RELEASE = "7.5.5.6";
 
 async function revokeSession(context) {
   const candidates = [
