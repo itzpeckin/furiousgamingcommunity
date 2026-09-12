@@ -44,6 +44,13 @@ async function tradeDeliveryDetails(db,row,payload){
     FROM trade_workflows WHERE id=? AND league_id=? LIMIT 1`)
     .bind(tradeId,row.leagueId).first();
   if(!workflow)return null;
+  const review=await db.prepare(`SELECT
+      SUM(CASE WHEN decision='approve' THEN 1 ELSE 0 END) AS approvals,
+      SUM(CASE WHEN decision='reject' THEN 1 ELSE 0 END) AS rejections
+    FROM trade_workflow_reviews
+    WHERE trade_id=? AND league_id=? AND revision=?`)
+    .bind(tradeId,row.leagueId,Number(workflow.revision)).first();
+  workflow.review={approvals:Number(review?.approvals||0),rejections:Number(review?.rejections||0)};
   const assets=await rows(db,`SELECT asset.asset_type AS assetType,asset.source_player_id AS sourcePlayerId,
       asset.player_identity_id AS playerIdentityId,asset.draft_pick_id AS draftPickId,
       asset.from_team_key AS fromTeamKey,asset.to_team_key AS toTeamKey,asset.ordinal,
@@ -124,7 +131,15 @@ async function tradeDeliveryDetails(db,row,payload){
       ...(team?.logoUrl?{thumbnail:{url:team.logoUrl}}:{})
     });
   }
-  embeds.push({title:'Trade status',description:`**${tradeStatusLabel(workflow)}**`,color:0x4f8cff});
+  embeds.push({
+    title:'Trade status',
+    description:[
+      `**${tradeStatusLabel(workflow)}**`,
+      `**Approvals:** ${workflow.review.approvals}`,
+      `**Rejections:** ${workflow.review.rejections}`
+    ].join('\n'),
+    color:0x4f8cff
+  });
   return {embeds,workflow,assetCount:assets.length};
 }
 

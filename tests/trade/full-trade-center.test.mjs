@@ -390,6 +390,10 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.match(client,/data-live-block-manager-player/);
   assert.match(client,/scrollIntoView/);
   assert.match(client,/trade-detail-asset/);
+  assert.match(client,/live-trade-vote-tally/);
+  assert.match(client,/live-trade-status/);
+  assert.match(client,/<dt>Approvals<\/dt>/);
+  assert.match(client,/<dt>Rejections<\/dt>/);
   assert.match(client,/\['received','Received'\],\['sent','Sent'\],\['drafts','Drafts'\],\['committee','Committee'\],\['approved','Approved'\],\['rejected','Rejected'\],\['history','History'\]/);
   assert.match(client,/Add participating team/);
   assert.match(client,/Multi-Team Fairness/);
@@ -432,6 +436,10 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.match(styles,/\.trade-confirm-dialog/);
   assert.match(styles,/@media\(max-width:760px\)/);
   assert.match(styles,/FranchiseHQ 7\.5\.5\.8 — responsive Trade Review/);
+  assert.match(styles,/live committee tally and protected Trade Block surfaces/);
+  assert.match(styles,/\.live-block-player-row::before/);
+  assert.match(styles,/\.live-block-player-row>\*\{position:relative;z-index:1\}/);
+  assert.match(styles,/\.live-trade-status/);
   assert.match(styles,/\.trade-package-matchup--review \.trade-detail-asset__metrics>span\{min-width:72px/);
   assert.match(client,/renderCommissionerQuickManagement/);
   assert.match(client,/commissioner-trade-reset-controls/);

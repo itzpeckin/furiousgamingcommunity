@@ -1002,7 +1002,13 @@ test('committee denial reasons update the private thread and the same trade can 
         id:`10000000000000015${index}`,channel:'100000000000000067',user:`10000000000000002${index}`,type:5,
         data:{custom_id:denyId,components:[{type:1,components:[{type:4,custom_id:'reason',value:`Reason ${index}`}]}]}
       })}));
-      assert.equal((await submitted.json()).type,7);
+      const submittedPayload=await submitted.json();
+      assert.equal(submittedPayload.type,7);
+      assert.deepEqual(submittedPayload.data.embeds.at(-1),{
+        title:'Trade status',
+        description:`**${index<3?'Accepted':'Rejected'}**\n**Approvals:** 0\n**Rejections:** ${index}`,
+        color:0x4f8cff
+      });
       assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(tradeId).status,index<3?'committee':'rejected');
     }
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_reviews WHERE trade_id=? AND revision=1`).get(tradeId).count,3);
@@ -1681,7 +1687,7 @@ test('trade delivery sends both owners mobile-safe divided team cards and one cl
       assert.equal(teamEmbeds.every(embed=>embed.fields.every(field=>field.name!=='\u200b'&&field.value!=='\u200b')),true,'mobile-collapsible invisible fields are removed');
       assert.equal(teamEmbeds.flatMap(embed=>embed.fields.slice(0,-1)).every(field=>field.value.endsWith('━━━━━━━━━━━━━━━━━━━━')),true,'a visible divider closes every non-final asset');
       const status=request.body.embeds.at(-1);
-      assert.deepEqual(status,{title:'Trade status',description:'**Negotiating**',color:0x4f8cff});
+      assert.deepEqual(status,{title:'Trade status',description:'**Negotiating**\n**Approvals:** 0\n**Rejections:** 0',color:0x4f8cff});
       assert.doesNotMatch(details,/Madden contract facts|owner decisions|Committee review/);
       assert.doesNotMatch(details,/Acquiring estimate|estimated room change|projected available/);
       assert.doesNotMatch(request.body.content,/^https:\/\//m);
@@ -1699,7 +1705,7 @@ test('trade delivery sends both owners mobile-safe divided team cards and one cl
     assert.deepEqual(committeeMessage.embeds.filter(embed=>/ receives$/.test(embed.title)),
       messages[0].body.embeds.filter(embed=>/ receives$/.test(embed.title)));
     assert.deepEqual(committeeMessage.components[0].components.map(button=>button.label),['Approve','Deny']);
-    assert.deepEqual(committeeMessage.embeds.at(-1),{title:'Trade status',description:'**Accepted**',color:0x4f8cff});
+    assert.deepEqual(committeeMessage.embeds.at(-1),{title:'Trade status',description:'**Accepted**\n**Approvals:** 0\n**Rejections:** 0',color:0x4f8cff});
 
     database.prepare(`INSERT INTO discord_delivery_events
       (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
