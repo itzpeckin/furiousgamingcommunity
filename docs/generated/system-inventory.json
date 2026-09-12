@@ -176,7 +176,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 541727,
+        "bytes": 539634,
         "file": "styles.css"
       },
       {
@@ -220,7 +220,7 @@
         "file": "functions/_lib/discord-read-model.js"
       },
       {
-        "bytes": 44661,
+        "bytes": 44938,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
@@ -1556,7 +1556,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.5.11",
+  "release": "7.5.5.12",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

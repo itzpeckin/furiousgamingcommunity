@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.12",
+  "releaseType": "compact-trade-review-layout-restoration",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.11",
+    "commit": "fec3344b8eac3d19bd2bddf7b31a52f889b5c14f",
+    "tree": "9db8e118ee6afbed2412bf6147b811aaa6d5b0a3",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.12-compact-trade-assets",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending-hosted-checks",
+    "currentRelease": "7.5.5.11",
+    "candidateRelease": "7.5.5.12",
+    "currentMigration": 40,
+    "candidateMigration": 40,
+    "scope": "Restore the pre-7.5.5.11 Trade Review asset layout. Retain only the approved brighter colors and Contract/Record removals."
+  },
+  "requiredArtifacts": [
+    "league-engine/trade-center-live.js",
+    "styles.css",
+    "tests/trade/full-trade-center.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.12/release-record.md",
+    "releases/7.5.5.12/validation-evidence.json"
+  ]
+}
