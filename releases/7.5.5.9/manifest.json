@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.9",
+  "releaseType": "trade-review-tally-and-trade-block-contrast-remediation",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.5.8",
+    "commit": "e3ad064be18ebfaeecc83e9d0a177b7e479aa814",
+    "tree": "c8eb727d0039db955c8d4f2166cba46c1beff066",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.5.9-trade-review-tally",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "candidateCommit": null,
+    "pullRequest": null,
+    "mergeCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending-code-only-deployment",
+    "currentRelease": "7.5.5.8",
+    "candidateRelease": "7.5.5.9",
+    "currentCommit": "e3ad064be18ebfaeecc83e9d0a177b7e479aa814",
+    "currentMigration": 40,
+    "candidateMigration": 40,
+    "pagesDeployment": null,
+    "scope": "Live Discord and FranchiseHQ committee tallies plus a contrast-safe Trade Block presentation."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-delivery.js",
+    "league-engine/trade-center-live.js",
+    "styles.css",
+    "tests/discord/discord-bot.test.mjs",
+    "tests/trade/full-trade-center.test.mjs",
+    "docs/ROADMAP.md",
+    "docs/generated/system-inventory.json",
+    "docs/generated/system-inventory.md",
+    "releases/7.5.5.9/release-record.md",
+    "releases/7.5.5.9/validation-evidence.json"
+  ]
+}

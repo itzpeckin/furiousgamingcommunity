@@ -7022,15 +7022,17 @@ table td{
 .trade-target__player{width:45px;height:45px;border-radius:10px;object-fit:contain;object-position:center bottom;background:linear-gradient(145deg,color-mix(in srgb,var(--trade-team-primary) 30%,#132238),#132238)}
 
 .trade-block-list{display:grid;gap:10px}
-.live-block-player-row{position:relative;isolation:isolate;display:grid;grid-template-columns:48px 62px minmax(155px,.9fr) minmax(330px,1.6fr) minmax(180px,.8fr) auto;align-items:center;gap:13px;min-width:0;overflow:hidden;padding:11px 14px;border:1px solid color-mix(in srgb,var(--trade-team-primary) 50%,var(--trade-line));border-radius:14px;background:linear-gradient(105deg,color-mix(in srgb,var(--trade-team-primary) 52%,#101c2d),color-mix(in srgb,var(--trade-team-secondary) 28%,#0e1a2a) 35%,#101d30 76%);box-shadow:0 10px 28px rgba(0,0,0,.2);cursor:pointer}
-.live-block-player-row::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,10,17,.07),rgba(5,10,17,.53) 45%,rgba(5,10,17,.78))}
+.live-block-player-row{position:relative;isolation:isolate;display:grid;grid-template-columns:48px 62px minmax(155px,.9fr) minmax(330px,1.6fr) minmax(180px,.8fr) auto;align-items:center;gap:13px;min-width:0;overflow:hidden;padding:11px 14px;border:1px solid color-mix(in srgb,var(--trade-team-primary) 42%,var(--trade-line));border-left:4px solid var(--trade-team-primary);border-radius:14px;background:#101d30;box-shadow:0 10px 28px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04);cursor:pointer}
+.live-block-player-row::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(100deg,color-mix(in srgb,var(--trade-team-primary) 46%,transparent) 0,color-mix(in srgb,var(--trade-team-secondary) 20%,transparent) 24%,transparent 46%);opacity:.72}
+.live-block-player-row::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(7,15,26,.2),rgba(8,17,29,.82) 44%,#101d30 72%)}
+.live-block-player-row>*{position:relative;z-index:1}
 .live-block-player-row:hover{border-color:color-mix(in srgb,var(--trade-team-primary) 78%,#fff);transform:translateY(-1px)}
 .live-block-player-row__brand{display:grid;place-items:center;width:44px;height:44px}.live-block-player-row__brand img{max-width:42px;max-height:42px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.58))}
 .live-block-player-row__photo{align-self:end;width:60px;height:66px;margin-bottom:-11px;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 4px 8px rgba(0,0,0,.5))}
 .live-block-player-row__photo--empty{align-self:center;display:grid;place-items:center;height:52px;margin:0;border-radius:11px;background:rgba(255,255,255,.1);font-weight:900}
 .live-block-player-row__identity{display:grid;gap:3px;min-width:0;padding:0;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer}
 .live-block-player-row__identity strong{overflow:hidden;font-size:.86rem;text-overflow:ellipsis;white-space:nowrap}.live-block-player-row__identity small{color:rgba(255,255,255,.67);font-size:.63rem}
-.live-block-player-row__metrics{display:grid;grid-template-columns:repeat(5,minmax(48px,1fr));gap:1px;overflow:hidden;border:1px solid rgba(255,255,255,.11);border-radius:9px;background:rgba(5,10,17,.38)}
+.live-block-player-row__metrics{display:grid;grid-template-columns:repeat(5,minmax(48px,1fr));gap:1px;overflow:hidden;border:1px solid rgba(149,180,226,.2);border-radius:9px;background:rgba(5,12,22,.8);box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .live-block-player-row__metrics>span{display:grid;justify-items:center;gap:1px;padding:7px 5px;border-left:1px solid rgba(255,255,255,.1)}.live-block-player-row__metrics>span:first-child{border-left:0}
 .live-block-player-row__metrics small,.live-block-player-row__market>small{color:rgba(255,255,255,.57);font-size:.51rem;font-weight:850;letter-spacing:.06em}.live-block-player-row__metrics strong{font-size:.68rem}
 .live-block-player-row__market{display:grid;gap:3px;min-width:0}.live-block-player-row__market>strong{overflow:hidden;font-size:.69rem;text-overflow:ellipsis;white-space:nowrap}.live-block-player-row__market>span{display:flex;gap:4px;overflow:hidden}.live-block-player-row__market em{padding:2px 5px;border-radius:999px;background:rgba(255,255,255,.11);font-size:.53rem;font-style:normal;white-space:nowrap}
@@ -7794,4 +7796,19 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
   .trade-package-matchup--review .trade-detail-asset{grid-template-columns:34px 47px minmax(0,1fr) auto;gap:10px;padding:11px}
   .trade-package-matchup--review .trade-detail-asset__metrics{grid-template-columns:repeat(5,minmax(72px,1fr))}
   .trade-package-matchup--review .trade-detail-asset__metrics--pick{grid-template-columns:repeat(4,minmax(78px,1fr))}
+}
+
+/* FranchiseHQ 7.5.5.9 — live committee tally and protected Trade Block surfaces. */
+.live-trade-vote-tally{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.live-trade-vote-tally b{padding:5px 8px;border:1px solid rgba(126,166,230,.2);border-radius:999px;background:#0b1727;color:#b7c8df;font-size:.55rem;font-weight:850}
+.live-trade-status{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 18px;border-color:rgba(96,150,237,.34);background:linear-gradient(135deg,#142742,#0c192a)}
+.live-trade-status>div:first-child{display:grid;gap:4px}.live-trade-status>div:first-child>strong{font-size:1rem}
+.live-trade-status dl{display:grid;grid-template-columns:repeat(2,minmax(92px,1fr));gap:8px;margin:0}
+.live-trade-status dl>div{display:grid;gap:3px;min-width:92px;padding:9px 12px;border:1px solid rgba(126,166,230,.19);border-radius:10px;background:rgba(5,12,22,.72)}
+.live-trade-status dt{color:var(--muted);font-size:.53rem;font-weight:850;letter-spacing:.06em;text-transform:uppercase}.live-trade-status dd{margin:0;font-size:.94rem;font-weight:900;font-variant-numeric:tabular-nums}
+.live-block-player-row__market,button.live-block-player-row__market{border-color:rgba(149,180,226,.2);background:rgba(5,12,22,.82);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+button.live-block-player-row__market:hover,button.live-block-player-row__market:focus-visible{background:color-mix(in srgb,var(--trade-team-primary) 14%,#07111f)}
+@media(max-width:620px){
+  .live-trade-status{align-items:stretch;flex-direction:column}
+  .live-trade-status dl{width:100%}
 }
