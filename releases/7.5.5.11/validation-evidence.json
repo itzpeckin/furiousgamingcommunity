@@ -1,18 +1,34 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.11",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
-  "baselineGate": {"unregisteredFailures": 0},
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
   "checks": {
-    "strictMigration": {"expectedFailure": false, "passed": true, "migrationVersion": 40, "candidateRequiresMigration": false},
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 40,
+      "candidateRequiresMigration": false
+    },
     "tradeReviewRendering": {
       "passed": true,
-      "playerFields": ["POS", "OVR", "DEV", "AGE"],
-      "pickFields": ["CLASS", "ROUND", "PROJECTED"],
+      "playerFields": [
+        "POS",
+        "OVR",
+        "DEV",
+        "AGE"
+      ],
+      "pickFields": [
+        "CLASS",
+        "ROUND",
+        "PROJECTED"
+      ],
       "sourceTeamColorsPreserved": true,
       "playerPortraitAndCardLinkPreserved": true,
       "calculatorOnAndOffValidated": true,
@@ -21,16 +37,39 @@
     },
     "responsiveVisualPreview": {
       "passed": true,
-      "widths": [390, 1280],
+      "widths": [
+        390,
+        1280
+      ],
       "unconfinedDarkScrimRemoved": true,
       "assetRowsFillWidget": true,
       "pageHorizontalOverflow": false,
       "assetHorizontalOverflow": false,
       "metricClipping": false
     },
-    "focusedTradeMobileSuite": {"passed": true, "tests": 15},
-    "fullRepositorySuite": {"passed": true, "status": "passed", "tests": 216, "syntaxModules": 255, "routes": 76, "canonicalMigrations": 23, "requiredTables": 116},
-    "freeAgentBlockedPreserved": {"passed": true, "status": "blocked", "count": null, "interpretedAsZero": false}
+    "focusedTradeMobileSuite": {
+      "passed": true,
+      "tests": 15
+    },
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 216,
+      "syntaxModules": 255,
+      "routes": 76,
+      "canonicalMigrations": 23,
+      "requiredTables": 116
+    },
+    "freeAgentBlockedPreserved": {
+      "passed": true,
+      "status": "blocked",
+      "count": null,
+      "interpretedAsZero": false
+    },
+    "authenticationRegression": {
+      "passed": true,
+      "tests": 6
+    }
   },
   "scopeBoundaries": {
     "productionDataChanged": false,
@@ -47,13 +86,65 @@
     "credentialsChanged": false,
     "membershipAssignmentsChanged": false,
     "freeAgentInterpretedAsZero": false,
-    "databaseRowsWritten": 0
+    "databaseRowsWritten": 0,
+    "productionChanged": true,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
+    "stagingChanged": false
   },
   "external": {
-    "githubPublication": {"authorized": true, "status": "pending"},
-    "hostedChecks": {"authorized": true, "status": "pending"},
-    "productionMigration": {"authorized": false, "status": "not-required", "currentMigration": 40, "candidateMigration": 40},
-    "discordCommandRegistration": {"authorized": false, "status": "not-required"},
-    "productionDeployment": {"authorized": true, "status": "pending", "candidateRelease": "7.5.5.11"}
+    "githubPublication": {
+      "authorized": true,
+      "status": "published-main-accepted",
+      "candidateCommit": "174c44bc9ec42ce1a13e10c607049a55c5970546",
+      "pullRequest": 84,
+      "mergeCommit": "977f9d30365c9eedeba2fb4e255bdc47a1f4f6ed",
+      "mainCommit": "977f9d30365c9eedeba2fb4e255bdc47a1f4f6ed"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "pullRequestChecksFailed": 0,
+      "pullRequestQualityWorkflowRun": 34717168604,
+      "mainChecksPassed": 5,
+      "mainQualityWorkflowRun": 34717254934,
+      "mainPagesWorkflowRun": 34717254513
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 40,
+      "candidateMigration": 40
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-required"
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "deployed-read-only-verified",
+      "currentRelease": "7.5.5.11",
+      "candidateRelease": "7.5.5.11",
+      "mainCommit": "977f9d30365c9eedeba2fb4e255bdc47a1f4f6ed",
+      "pagesDeployment": "02922924-cb99-4b91-8cf4-d229d126c467",
+      "runtimeRelease": "7.5.5.11",
+      "authenticatedUiVerified": true,
+      "season": 2026,
+      "period": "Regular Season Week 20",
+      "widths": [
+        1280,
+        390
+      ],
+      "pageHorizontalOverflow": false,
+      "assetHorizontalOverflow": false,
+      "metricClipping": false,
+      "removedFieldsPresent": false,
+      "unconfinedDarkScrimPresent": false,
+      "tradeStatus": "Approved",
+      "approvals": 3,
+      "rejections": 1,
+      "liveTradeExercised": false
+    }
   }
 }
