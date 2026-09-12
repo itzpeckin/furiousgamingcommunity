@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.7",
   "releaseType": "trade-operations-and-discord-delivery-remediation",
-  "status": "implementation-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.6",
@@ -19,10 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mergeCommit": null
+    "status": "published-main-accepted",
+    "candidateCommit": "2dc3d3208f3182fb5f41e0cdfe1255e629fc3a85",
+    "pullRequest": 76,
+    "mergeCommit": "2694e8dd57de6cb24516233e807a536b52fd905c"
   },
   "staging": {
     "authorized": false,
@@ -31,13 +31,14 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending-code-only-deployment",
-    "currentRelease": "7.5.5.6",
+    "deployed": true,
+    "status": "deployed-operational-delivery-verified",
+    "currentRelease": "7.5.5.7",
     "candidateRelease": "7.5.5.7",
+    "currentCommit": "2694e8dd57de6cb24516233e807a536b52fd905c",
     "currentMigration": 40,
     "candidateMigration": 40,
-    "pagesDeployment": null,
+    "pagesDeployment": "ba8fe890-af5e-4ced-bd18-581d5a6d97b8",
     "scope": "Command Center trade reset access, mobile Trade Review spacing, and permission-safe Discord committee review delivery."
   },
   "requiredArtifacts": [
