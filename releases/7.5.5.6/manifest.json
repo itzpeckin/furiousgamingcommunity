@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.6",
   "releaseType": "discord-trade-delivery-lifecycle-remediation",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.5",
@@ -19,10 +19,10 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mergeCommit": null
+    "status": "published-main-accepted",
+    "candidateCommit": "732a5c9df85a71ae4c4ed5733789813f6bd9652d",
+    "pullRequest": 74,
+    "mergeCommit": "716bb20fd040ebd4bf68a4c7a56ca49f59ec2a0f"
   },
   "staging": {
     "authorized": false,
@@ -31,13 +31,13 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.5.5.5",
-    "currentCommit": "2fea2a6166d0bc3020fbf17eedf0b483550f671f",
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.6",
+    "currentCommit": "716bb20fd040ebd4bf68a4c7a56ca49f59ec2a0f",
     "currentMigration": 40,
     "candidateMigration": 40,
-    "pagesDeployment": null,
+    "pagesDeployment": "568d0b9a-994f-4f00-ba5b-0e39e9b8e98c",
     "scope": "Code-only Discord trade spacing, status-only cards, and durable terminal owner notifications."
   },
   "requiredArtifacts": [

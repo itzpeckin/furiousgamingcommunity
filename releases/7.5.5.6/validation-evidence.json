@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.6",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "productionDataChanged": false,
   "credentialsChanged": false,
@@ -65,10 +65,10 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
+    "productionChanged": true,
     "productionDataChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "stagingChanged": false,
     "migrationApplied": false,
     "discordCommandsRegistered": false,
@@ -93,14 +93,20 @@
   "external": {
     "githubPublication": {
       "authorized": true,
-      "status": "not-run",
-      "pullRequest": null,
-      "candidateCommit": null,
-      "mainCommit": "c21cc23ecd29236b45db331e5fdf997bc46a6fb6"
+      "status": "published-main-accepted",
+      "pullRequest": 74,
+      "candidateCommit": "732a5c9df85a71ae4c4ed5733789813f6bd9652d",
+      "mainCommit": "716bb20fd040ebd4bf68a4c7a56ca49f59ec2a0f"
     },
     "hostedChecks": {
       "authorized": true,
-      "status": "not-run"
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "pullRequestChecksFailed": 0,
+      "mainChecksPassed": 5,
+      "mainQualityWorkflowRun": 34671662711,
+      "mainPagesWorkflowRun": 34671662329,
+      "cloudflarePagesCheckRun": 103494026994
     },
     "productionMigration": {
       "authorized": false,
@@ -114,10 +120,14 @@
     },
     "productionDeployment": {
       "authorized": true,
-      "status": "not-run",
-      "currentRelease": "7.5.5.5",
-      "mainCommit": "2fea2a6166d0bc3020fbf17eedf0b483550f671f",
-      "pagesDeployment": null
+      "status": "deployed-read-only-verified",
+      "currentRelease": "7.5.5.6",
+      "mainCommit": "716bb20fd040ebd4bf68a4c7a56ca49f59ec2a0f",
+      "pagesDeployment": "568d0b9a-994f-4f00-ba5b-0e39e9b8e98c",
+      "publicHttpStatus": 200,
+      "leagueHttpStatus": 200,
+      "runtimeRelease": "7.5.5.6",
+      "readOnly": true
     }
   }
 }
