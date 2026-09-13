@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.13",
   "releaseType": "compact-trade-review-column-fit",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.5.12",
@@ -17,17 +17,19 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized": true, "status": "pending-hosted-checks"},
+  "repositoryPublication": {"authorized": true, "status": "published-main-accepted", "candidateCommit": "922c1017bbc0c71ebc3e9159ee90557071ac3dfd", "pullRequest": 88, "mergeCommit": "0f740bbdd25baaf623ccf605d273cba92371c83d"},
   "staging": {"authorized": false, "deployed": false, "status": "not-run"},
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending-hosted-checks",
-    "currentRelease": "7.5.5.12",
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.5.13",
     "candidateRelease": "7.5.5.13",
     "currentMigration": 40,
     "candidateMigration": 40,
-    "scope": "Narrow and constrain existing Trade Review columns; preserve compact rows, typography, gradients, and removed Contract/Record fields."
+    "scope": "Narrow and constrain existing Trade Review columns; preserve compact rows, typography, gradients, and removed Contract/Record fields.",
+    "currentCommit": "0f740bbdd25baaf623ccf605d273cba92371c83d",
+    "pagesDeployment": "8a49f5dd-bffe-4574-aa81-440f6788b915"
   },
   "requiredArtifacts": ["styles.css", "tests/trade/full-trade-center.test.mjs", "docs/ROADMAP.md", "docs/generated/system-inventory.json", "docs/generated/system-inventory.md", "releases/7.5.5.13/release-record.md", "releases/7.5.5.13/validation-evidence.json"]
 }
