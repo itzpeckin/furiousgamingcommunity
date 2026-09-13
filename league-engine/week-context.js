@@ -55,6 +55,12 @@
 
   function resolveSeason(snapshot = {}, standings = []) {
     const canonicalWeek = finiteNumber(snapshot.weekIndex ?? snapshot.week);
+    const period=snapshot.currentPeriod;
+    if(period&&Number.isFinite(finiteNumber(period.week))){
+      const selected=resolve({stage:period.stage},period.week,period.stage);
+      return {...selected,stage:selected.phase,season:snapshot.seasonYear??snapshot.season??'—',
+        displayLabel:selected.round||`${selected.label} Week ${selected.week}`,authority:'active-snapshot'};
+    }
     const candidates = (Array.isArray(standings) ? standings : []).map(row => {
       const source = row?.source || row || {};
       const stageIndex = finiteNumber(source.stageIndex);
@@ -62,7 +68,12 @@
       if (!Number.isFinite(stageIndex) && !Number.isFinite(sourceWeek)) return null;
       return resolve(source,canonicalWeek,source.stage || source.stageName || 'regular-season');
     }).filter(item => item && Number.isFinite(item.week) && item.week >= 1);
-    if (!candidates.length) return null;
+    if (!candidates.length) {
+      if(!Number.isFinite(canonicalWeek)||canonicalWeek<1)return null;
+      const selected=resolve({},canonicalWeek,'regular-season');
+      return{...selected,stage:selected.phase,season:snapshot.seasonYear??snapshot.season??'—',
+        displayLabel:selected.round||`${selected.label} Week ${selected.week}`,authority:'active-snapshot'};
+    }
 
     const keyCounts = new Map();
     candidates.forEach(item => {

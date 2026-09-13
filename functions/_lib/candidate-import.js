@@ -1,4 +1,5 @@
-import { canonicalMaddenStage, periodFromInventoryItem, resolveMaddenPeriod } from './madden-period.js';
+import { canonicalMaddenStage, periodsFromInventoryItem, resolveMaddenPeriod } from './madden-period.js';
+import { canonicalSchedulePeriod, snapshotCurrentPeriod } from './schedule-integrity.js';
 
 export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'analyze-source',
@@ -12,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'week-route-authority-v2';
+export const CANDIDATE_MAPPING_REVISION = 'schedule-horizon-current-period-v3';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`;
@@ -106,7 +107,11 @@ function weekNumbers(values) {
     .sort((left, right) => left - right);
 }
 
-export function candidateSourceCoverage(report = {}, activeWeekIndex = null) {
+export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {seasonYear=null}={}) {
+  // A prepared new season starts at its own period; last season's live pointer
+  // is retained for atomic replacement, not used to classify Week 1 as backfill.
+  if(activeWeekIndex&&typeof activeWeekIndex==='object'&&seasonYear!==null
+    &&Number(activeWeekIndex.season_year??activeWeekIndex.seasonYear)!==Number(seasonYear))activeWeekIndex=null;
   const sourceMarkers = report.sourceMarkers || report.source_markers || {};
   const datasetInventory = Array.isArray(report.datasetInventory || report.dataset_inventory)
     ? (report.datasetInventory || report.dataset_inventory) : [];
@@ -117,10 +122,10 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null) {
   const routes = datasetInventory.map(item => ({
     datasetType: String(item?.datasetType || item?.dataset_type || ''),
     routePath: String(item?.routePath || item?.route_path || ''),
-    period:periodFromInventoryItem(item)
+    periods:periodsFromInventoryItem(item)
   }));
-  const schedulePeriods=uniquePeriods(routes.filter(item=>item.datasetType==='schedule').map(item=>item.period));
-  const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics').map(item=>item.period));
+  const schedulePeriods=uniquePeriods(routes.filter(item=>item.datasetType==='schedule').flatMap(item=>item.periods));
+  const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics').flatMap(item=>item.periods));
   const scheduleKeys=new Set(schedulePeriods.map(period=>period.key));
   const statisticKeys=new Set(statisticsPeriods.map(period=>period.key));
   const completePeriods=uniquePeriods(schedulePeriods.filter(period=>statisticKeys.has(period.key)));
@@ -138,11 +143,15 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null) {
     for(const week of markerWeeks)observedPeriods.push({stage:markerStage,week,key:`${markerStage}:${week}`});
   }
   observedPeriods.sort(comparePeriods);
-  const currentPeriod=observedPeriods.at(-1)||null;
-  const currentWeek = currentPeriod?.week ?? (observedWeeks.length ? observedWeeks.at(-1) : null);
-  const activeWeek = activeWeekIndex !== null && activeWeekIndex !== undefined && activeWeekIndex !== ''
-    && Number.isInteger(Number(activeWeekIndex)) ? Number(activeWeekIndex) : null;
-  const activePeriod=activeWeek===null?null:{stage:'regular-season',week:activeWeek,key:`regular-season:${activeWeek}`};
+  const currentPeriodProof=sourceMarkers.currentPeriod||{
+    status:statisticsPeriods.length?'proven':'unknown',source:'captured-statistics-period',period:statisticsPeriods.at(-1)||null
+  };
+  const currentPeriod=currentPeriodProof.status==='proven'?canonicalSchedulePeriod(currentPeriodProof.period):null;
+  const currentWeek=currentPeriod?.week??null;
+  const activePeriod=typeof activeWeekIndex==='object'&&activeWeekIndex!==null
+    ?snapshotCurrentPeriod(activeWeekIndex)
+    :canonicalSchedulePeriod({stage:'regular-season',week:activeWeekIndex});
+  const activeWeek=activePeriod?.week??null;
   const suppliedWeeks = new Set([...scheduleWeeks, ...statisticsWeeks]);
   const missingWeeks = activeWeek !== null && currentWeek !== null && currentWeek > activeWeek + 1
     ? Array.from({ length: currentWeek - activeWeek - 1 }, (_, index) => activeWeek + index + 1)
@@ -167,6 +176,9 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null) {
     activePeriod,
     currentWeek,
     currentPeriod,
+    currentPeriodProof,
+    scheduleHorizon:schedulePeriods.at(-1)||null,
+    futureSchedulePeriods:schedulePeriods.filter(period=>currentPeriod&&comparePeriods(period,currentPeriod)>0),
     observedWeeks,
     observedPeriods,
     scheduleWeeks,
@@ -198,7 +210,8 @@ export function candidateCoverageWarnings(coverage = {}) {
     const scope=periods.length>1?`${periods.length} retained periods from ${candidatePeriodLabel(periods[0])} through ${candidatePeriodLabel(periods.at(-1))}`:`Historical ${currentLabel}`;
     warnings.push(`${scope} will be backfilled while preserving the active Regular Season Week ${coverage.activeWeek} teams, players, rosters, standings, and live-week position.`);
   }
-  if(Array.isArray(coverage.partialPeriods)&&coverage.partialPeriods.length)warnings.push(`Incomplete retained periods will not be imported: ${coverage.partialPeriods.map(candidatePeriodLabel).join(', ')}.`);
+  const incomplete=(coverage.partialPeriods||[]).filter(period=>!coverage.currentPeriod||comparePeriods(period,coverage.currentPeriod)<=0);
+  if(incomplete.length)warnings.push(`Incomplete retained periods will not be imported: ${incomplete.map(candidatePeriodLabel).join(', ')}.`);
   if (Array.isArray(coverage.missingWeeks) && coverage.missingWeeks.length) {
     warnings.push(`Week coverage gap after active Week ${coverage.activeWeek}: missing ${coverage.missingWeeks.map(week => `Week ${week}`).join(', ')}.`);
   }
@@ -263,6 +276,38 @@ export function candidateHistoryCarryForward(freshRecords = [], priorRows = [], 
     retained,
     retainedWeeks: [...retainedWeeks].sort((left, right) => left - right)
   };
+}
+
+export function candidateScheduleIdentity(record){
+  const item=candidateNormalizePeriod(record),period=recordPeriod(item);
+  const home=item?.home_team_external_id??item?.homeTeamExternalId;
+  const away=item?.away_team_external_id??item?.awayTeamExternalId;
+  return period&&home&&away?`${item.season_year??item.seasonYear??'season'}:${period.key}:${away}:${home}`:null;
+}
+
+export function candidateScheduleCarryForward(freshRecords=[],priorRows=[],{seasonYear=null}={}){
+  const output=new Map(),retainedWeeks=new Set();
+  const identity=item=>candidateScheduleIdentity({...item,season_year:item?.season_year??seasonYear})||`id:${item?.external_id}`;
+  for(const row of priorRows){
+    const item=candidateNormalizePeriod(candidateRecord(row));
+    if(item)output.set(identity(item),item);
+  }
+  const freshKeys=new Set();
+  for(const row of freshRecords){
+    const item=candidateNormalizePeriod(row);
+    if(!item)continue;
+    const key=identity(item);
+    const previous=output.get(key);
+    // Keep the application's matchup ID stable for Confidence picks and GOTW.
+    output.set(key,previous?{...item,external_id:previous.external_id,source_game_external_id:item.external_id}:item);
+    freshKeys.add(key);
+  }
+  let retained=0;
+  for(const [key,item] of output)if(!freshKeys.has(key)){
+    retained+=1;
+    if(recordWeek(item)!==null)retainedWeeks.add(recordWeek(item));
+  }
+  return{records:[...output.values()],retained,retainedWeeks:[...retainedWeeks].sort((a,b)=>a-b)};
 }
 
 export function candidateHistoricalBackfill(freshRecords = [], priorRows = [], options = {}) {

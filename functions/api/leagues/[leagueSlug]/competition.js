@@ -1,12 +1,13 @@
 import { createId, jsonResponse } from '../../../_lib/auth.js';
 import { requireActiveMembership } from '../../../_lib/permissions.js';
+import { snapshotCurrentPeriod } from '../../../_lib/schedule-integrity.js';
 import {
   createTenantAuditContext,
   resolveRequestTenant,
   tenantAuditStatement
 } from '../../../_lib/tenant-context.js';
 
-const RELEASE = '7.4.4.12';
+const RELEASE = '7.5.6';
 const MAX_BODY_BYTES = 16 * 1024;
 const SAFE_GAME_ID = /^[A-Za-z0-9._:-]{1,180}$/;
 const SAFE_TEAM_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -89,7 +90,7 @@ async function readBody(request) {
 
 async function activeSnapshot(c) {
   const row = await c.db.prepare(`SELECT active.snapshot_id AS snapshotId,
-      snapshot.season_year AS seasonYear,snapshot.week_index AS currentWeek
+      snapshot.season_year AS seasonYear,snapshot.week_index AS currentWeek,snapshot.manifest_json
     FROM league_active_snapshots active
     INNER JOIN league_snapshots snapshot
       ON snapshot.id=active.snapshot_id AND snapshot.league_id=active.league_id
@@ -98,7 +99,8 @@ async function activeSnapshot(c) {
   return {
     snapshotId:String(row.snapshotId),
     seasonYear:number(row.seasonYear) ?? number(c.league.current_season) ?? 2026,
-    currentWeek:number(row.currentWeek) ?? number(c.league.current_week) ?? 1
+    currentWeek:number(row.currentWeek) ?? number(c.league.current_week) ?? 1,
+    stage:cleanStage(snapshotCurrentPeriod(row)?.stage)
   };
 }
 
@@ -221,7 +223,7 @@ export async function competitionState(c) {
     : weekRows.some(row => row.status === 'final') ? 'final' : 'locked';
   return {
     ok:true, release:RELEASE,
-    context:{...snapshot,stage:'regular'},
+    context:{...snapshot},
     features,
     games,
     gotw:Object.fromEntries(gotwRows.map(row => [`${cleanStage(row.stage)}:${Number(row.weekIndex)}`, row.gameId])),

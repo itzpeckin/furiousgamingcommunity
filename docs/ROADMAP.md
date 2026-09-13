@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 12, 2026
+**Updated:** September 13, 2026
 
-**Revision:** 2.52
+**Revision:** 2.53
 
 **Current production:** FranchiseHQ 7.5.5.15 is live from PR #92, Main `0b6d71a`, and verified Pages Production deployment `0614586b-eb61-4467-a743-c6452ca2d52c`. All four PR and five Main checks passed; strict gate 218/218, import/mobile 36/36, and trade/mobile 16/16 passed. Authenticated read-only measurements confirm the outside-column gap is now zero, with unchanged Quick Controls height, attention height, and Activity offset. Existing importer content fills the available desktop height; normal 16px inter-card and 24px Activity gaps remain. The 48-case synthetic desktop/phone matrix passed. No migration, import, snapshot, reset, archive/transition, export URL, trade/ownership, credential, membership/assignment, or Discord operation ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** 7.5.5.15 is deployed and read-only verified. Desktop Madden Import distributes its existing content within the remaining left-column height, aligning the attention card bottom with Quick Controls. Phones keep their unchanged natural compact height. No surrounding redesign or import/Discord behavior change was made.
+**Current work:** Owner accepted the 7.5.5.15 alignment and requested 7.5.6. The consolidated code-only release separates full-season schedule horizon from the current period, preserves future matchups and Confidence identity, and gates automatic Discord synchronization on a verified one-week advance. Standing authorization covers build, checks, PR, Main and Production in one cycle; no live import or snapshot activation is being performed.
 
-**Next gate:** Owner visual acceptance of 7.5.5.15 card alignment, then planned off-season 7.5.6 schedule-horizon work.
+**Next gate:** Complete the 7.5.6 strict/hosted gates and code-only Production publication, then commissioner off-season acceptance using docs/COMMISSIONER-SEASON-IMPORT-RUNBOOK.md. 7.5.7 performance work follows; canonical consistency and operations retain their scope but are renumbered 7.5.8 and 7.5.9 so future delivery no longer runs backward into 7.4.x.
 
 ## Product decisions
 
@@ -93,7 +93,7 @@
 | 7.4.4.10 | Production deployed; pending owner Discord acceptance | Trade Block results rendered as the same rich, linked Player Cards used by `/player`, with Looking For notes retained |
 | 7.4.4.11 | Production deployed; pending owner Discord acceptance | Schedule records, record-ceiling `/eliminated`, and portrait-backed Trade Block cards without player statistics |
 | 7.4.4.12 | Production deployed; pending owner Discord acceptance | Compact portrait-backed Discord Player Cards and unbolded playoff-state schedule indicators |
-| 7.4.5–7.4.6 | Planned | Canonical league consistency, monitoring, backups, security, and recovery |
+| 7.5.8–7.5.9 | Planned; formerly 7.4.5–7.4.6 | Canonical league consistency, monitoring, backups, security, and recovery |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Production deployed; authenticated device acceptance passed | Central public-domain authentication/session framework, migration 36, exact-route desktop/mobile refresh, rotation, CSRF, revocation, durable throttling, and privacy-minimized security events |
 | 7.5.1 | Production through cumulative 7.5.2 release | Madden-source cap provenance, unequal two-team packages, private two-owner negotiation threads, direct decision buttons, and Bot-DM fallback |
@@ -132,7 +132,7 @@
 | 9 | Production deployed; owner acceptance pending | 7.5.5.8 | Replace Discord's invisible asset spacers with visible character boundaries that survive Mobile rendering while preserving the exact private/committee cards. |
 | 10 | Off-season | 7.5.6 | Import the complete season schedule while the latest accepted import alone controls the current period; preloading or re-importing a week creates no future or duplicate matchup threads. |
 | 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
-| 12 | Pre-RC | 7.4.5–7.4.6 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
+| 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
 | 15 | Expansion | 8.0.0 | Activate a second real league and prove tenant-isolated operation and recovery while FGC remains unchanged. |
@@ -528,17 +528,6 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Keep `/games`, `/eliminated`, schedule threads, the website, active snapshots, and all league records unchanged. The global inventory remains 37 commands; only the revised `/player` description requires a future exact non-destructive name upsert.
 - Gate: focused Discord tests cover all requested position groups, exclusion of secondary statistics, portrait fallback, all three schedule states, unbolded schedule rendering, unchanged `/games`, conservative tie handling, tenant isolation, and the existing schedule-thread lifecycle. Migration 35 remains current; no Production/Main/Discord registration, import, snapshot, reset, archive, transition, export URL, credential, membership/assignment, Free Agent, or database operation is included in local delivery.
 
-## 7.4.5 — Canonical League Consistency
-
-- Use one server season/week/snapshot and shared team/player/game selectors across all features.
-- Standardize loading, empty, unavailable, stale, and incomplete-import states.
-- Gate: no feature silently falls back to demo/local data and all core pages report the same identities/context.
-
-## 7.4.6 — Monitoring, Backups, Security, and Recovery
-
-- Add tenant-safe logs, request/action IDs, useful alerts, retained backups, restore drills, rate limits, dependency/secret procedures, and incident communications.
-- Gate: a simulated failure is detected, contained, restored, reconciled, and documented without exposing private data.
-
 ## 7.4.7 — Additional Madden Source Adapters
 
 - Investigate policy-compliant direct-EA connectivity using documented/authorized access only.
@@ -651,6 +640,17 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Preserve exact-source idempotency, tenant isolation, recovery bookmarks, append-only snapshots/audits, previous and malformed evidence, schedule/history continuity, and unknown/null treatment for blocked Free Agents.
 - Gate: repeated benchmark runs meet the agreed target and produce the same validated snapshot content as the correctness baseline. Acceptance records both click-to-live time and live-to-thread-ready time, proves same-week imports create no Discord work, proves a true one-week advance creates only the new week's threads, and verifies safe recovery from a failed build or failed Discord synchronization without partial activation or data loss.
 
+## 7.5.8 — Canonical League Consistency (formerly 7.4.5)
+
+- Use one server season/week/snapshot and shared team/player/game selectors across all features.
+- Standardize loading, empty, unavailable, stale, and incomplete-import states.
+- Gate: no feature silently falls back to demo/local data and all core pages report the same identities/context.
+
+## 7.5.9 — Monitoring, Backups, Security, and Recovery (formerly 7.4.6)
+
+- Add tenant-safe logs, request/action IDs, useful alerts, retained backups, restore drills, rate limits, dependency/secret procedures, and incident communications.
+- Gate: a simulated failure is detected, contained, restored, reconciled, and documented without exposing private data.
+
 ## 7.6.0-rc.1 — Private FGC Release Candidate
 
 - Freeze scope except release blockers and test a representative private cohort of commissioners, committee members, and owners.
@@ -680,10 +680,12 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 3. Implement related work together; do not publish partial patch chains.
 4. Add regressions for each defect and contract tests for each new authority.
 5. Run one consolidated strict gate and update this roadmap with discoveries.
-6. Review the candidate, then request Production authorization. Staging is not used unless the owner explicitly requests it for that release.
+6. Review the candidate and honor the owner's standing one-cycle publication authorization. Do not request routine authorization again; ask only for unresolved scope choices or protected operations outside that release. Staging is not used unless the owner explicitly requests it.
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.53:** Owner accepted Command Center alignment and requested the 7.5.6 schedule-horizon/current-period release. Added multi-period schedule parsing, preserved future matchup identities, explicit current evidence and verified automatic Discord transition gates, safe command recovery, and an annual commissioner runbook. Remaining consistency/operations scope is unchanged but now numbered 7.5.8/7.5.9 after 7.5.7; historical release records remain unchanged. Publication is standing-authorized code-only; no live import, activation, migration, reset, season operation or Discord configuration is run.
 
 - **Revision 1.18:** Recorded 7.0.5 domain-specific authentication and Commissioner management work and its partial owner acceptance.
 - **Revision 1.19:** Accepted refresh/login temporarily; elevated shared settings; adopted the 7.1–8.1 sequence; deferred authentication until after core platform work; retained Free Agents, multi-source import, and mobile requirements.

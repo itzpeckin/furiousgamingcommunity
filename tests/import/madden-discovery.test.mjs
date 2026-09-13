@@ -223,6 +223,22 @@ const expected = {
   week: '3'
 };
 
+test('full-season aggregate proves current Week 1 without requiring future statistics and rejects unresolved rows',()=>{
+  const captures=liveLikeRosterCaptureSet();
+  captures[0].payload={...captures[0].payload,week:1,weekIndex:0,stageIndex:1};
+  const schedule=captures.find(c=>c.routePath.endsWith('/schedules'));
+  schedule.routePath='xbsx/742482/week/reg/0/schedules';
+  schedule.payload={gameScheduleInfoList:Array.from({length:18},(_,i)=>({gameId:`game-${i+1}`,weekIndex:i,stageIndex:1,homeTeamId:'team-1',awayTeamId:'team-2'}))};
+  const report=buildMaddenDiscoveryReport(captures,{expected:{...expected,week:undefined}});
+  assert.equal(report.sourceVerification.passed,true);
+  assert.equal(report.sourceMarkers.currentPeriod.period.key,'regular-season:1');
+  assert.equal(report.datasetInventory.find(c=>c.routePath===schedule.routePath).canonicalPeriods.length,18);
+  assert.equal(reportImportReadiness(report).ready,true);
+  assert.equal(reportImportReadiness(report).freeAgentCount,null);
+  schedule.payload.gameScheduleInfoList.push({gameId:'unresolved',homeTeamId:'team-1',awayTeamId:'team-2'});
+  assert.equal(buildMaddenDiscoveryReport(captures,{expected:{...expected,week:undefined}}).sourceVerification.passed,false);
+});
+
 test('normalizes Companion paths and recognizes explicit Madden Free Agent payloads', () => {
   assert.equal(normalizeMaddenRoute('/XBSX/fr-1/freeagents/roster/'), 'xbsx/fr-1/freeagents/roster');
   const analysis = analyzeMaddenCapture(completeCaptureSet()[3]);

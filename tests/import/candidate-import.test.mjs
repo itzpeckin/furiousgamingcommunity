@@ -47,8 +47,12 @@ test('compact and detailed import panels share readiness, progress, busy and liv
 });
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
-import { selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
-import { resolveMaddenPeriod } from '../../functions/_lib/madden-period.js';
+import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
+import { onRequestPost as buildSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js';
+import { competitionState, executeCompetitionAction } from '../../functions/api/leagues/[leagueSlug]/competition.js';
+import { onRequestPost as validateSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js';
+import { resolveMaddenPeriod, resolveMaddenSchedulePeriods } from '../../functions/_lib/madden-period.js';
+import { canonicalSchedulePeriod, currentStatePeriodEvidence, proveCurrentSchedulePeriod, scheduleAdvanceDecision } from '../../functions/_lib/schedule-integrity.js';
 import {
   CANDIDATE_IMPORT_PHASES,
   CANDIDATE_MAPPING_REVISION,
@@ -56,6 +60,7 @@ import {
   candidateCompleteness,
   candidateHistoricalBackfill,
   candidateHistoryCarryForward,
+  candidateScheduleCarryForward,
   candidateMergedPeriodCoverage,
   candidateMergedWeekCoverage,
   candidateNormalizePeriod,
@@ -116,6 +121,115 @@ async function database() {
     );
   return db;
 }
+
+test('current-period proof ignores schedule rows and requires exact forward transitions',()=>{
+  const period=(stage,week)=>canonicalSchedulePeriod({stage,week});
+  const root=currentStatePeriodEvidence({weekIndex:0,stageIndex:1,standings:[{weekIndex:17,stageIndex:1}]},'xbsx/742482/league');
+  const proof=proveCurrentSchedulePeriod([{currentPeriodEvidence:root},{datasetType:'schedule',period:{...period('reg',18),playable:true}}]);
+  assert.equal(proof.period.key,'regular-season:1');
+  assert.equal(currentStatePeriodEvidence({weekIndex:17,stageIndex:1},'xbsx/742482/week/reg/18/schedules').length,0);
+  assert.equal(proveCurrentSchedulePeriod([{datasetType:'schedule',period:{...period('reg',18),playable:true}}]).status,'unknown');
+  assert.equal(proveCurrentSchedulePeriod([{currentPeriodEvidence:[...root,...currentStatePeriodEvidence({weekIndex:1,stageIndex:1},'xbsx/742482/standings')]}]).status,'ambiguous');
+  const previous={id:'previous',season_year:2026,week_index:1,manifest_json:JSON.stringify({currentPeriod:period('reg',1)})};
+  const decision=(to,prior=previous,p=proof)=>scheduleAdvanceDecision(prior,{period:to,proof:p,seasonYear:2026});
+  assert.equal(decision(period('reg',2)).allowed,true);
+  for(const [to,reason] of [[period('reg',1),'same-week'],[period('reg',0),'backward-period'],[period('reg',3),'skipped-period']])assert.equal(decision(to).reason,reason);
+  assert.equal(decision(period('reg',1),null).reason,'initial-import');
+  assert.equal(decision(period('reg',2),previous,{status:'ambiguous'}).allowed,false);
+  assert.equal(decision(period('reg',2),{...previous,season_year:2025}).reason,'season-change');
+  const nextSeason=candidateSourceCoverage({sourceMarkers:{currentPeriod:proof},datasetInventory:[
+    {datasetType:'schedule',routePath:'xbsx/742482/week/reg/1/schedules'},
+    {datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing'}
+  ]},{...previous,week_index:18,manifest_json:'{}'},{seasonYear:2027});
+  assert.notEqual(nextSeason.importMode,'historical-backfill');assert.equal(nextSeason.activePeriod,null);
+  const preseason={...previous,week_index:3,manifest_json:JSON.stringify({currentPeriod:period('pre',3)})};
+  assert.equal(decision(period('reg',1),preseason).allowed,true);
+  assert.equal(decision(period('reg',2),preseason).allowed,false);
+  assert.equal(currentStatePeriodEvidence({weekIndex:' ',stageIndex:1},'xbsx/742482/league')[0].invalid,true);
+  const ui=vm.createContext({window:{FranchiseHQ:{}}});
+  return readFile(new URL('../../league-engine/week-context.js',import.meta.url),'utf8').then(code=>{
+    vm.runInContext(code,ui);
+    const selected=ui.window.FranchiseHQ.canonicalWeekContext.resolveSeason({weekIndex:1,seasonYear:2026,currentPeriod:proof.period},[{stageIndex:1,weekIndex:17}]);
+    assert.equal(selected.week,1);assert.equal(selected.authority,'active-snapshot');
+  });
+});
+
+test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-forward preserves Confidence identity',async()=>{
+  const sqlite=await database();
+  try{
+    sqlite.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,active) VALUES ('membership-full','league-1','commissioner-1','commissioner',1)`).run();
+    const token='full-season-fixture';
+    sqlite.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at) VALUES ('session-full','commissioner-1',?,'2099-01-01T00:00:00.000Z')`).run(await hashToken(token));
+    sqlite.exec(`INSERT INTO league_game_years (id,league_id,game_release,edition_year,display_name,status) VALUES ('year-full','league-1','Madden NFL 27',27,'Madden NFL 27','active');
+      INSERT INTO game_year_franchise_seasons (game_year_id,league_id,franchise_season_id) VALUES ('year-full','league-1','season-2026');
+      INSERT INTO companion_import_destinations (id,league_id,franchise_season_id,label,status,created_by_user_id,game_year_id) VALUES ('destination-full','league-1','season-2026','Full season','active','commissioner-1','year-full');`);
+    const objects=new Map(),addCapture=(id,route,payload)=>{
+      const key=`fixture/${id}`;objects.set(key,JSON.stringify(payload));
+      sqlite.prepare(`INSERT INTO companion_route_captures (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,r2_object_key) VALUES (?,'league-1','capture-1',?,'POST',100,?,?)`).run(id,route,id,key);
+      sqlite.prepare(`INSERT INTO madden_discovery_session_captures (session_id,league_id,capture_id,route_path) VALUES ('capture-1','league-1',?,?)`).run(id,route);
+    };
+    addCapture('teams-full','xbsx/742482/leagueteams',{});
+    addCapture('standings-full','xbsx/742482/standings',{teamStandingInfoList:Array.from({length:32},(_,i)=>({teamId:`team-${i}`,wins:0,losses:0,calendarYear:2026,weekIndex:17,stageIndex:1}))});
+    const payload=[];
+    for(let week=1;week<=18;week++){
+      const teams=Array.from({length:32},(_,i)=>i).filter(i=>!(week>=5&&week<=12&&Math.floor(i/4)===week-5));
+      for(let i=0;i<teams.length;i+=2)payload.push({gameId:`game-${week}-${i}`,weekIndex:week-1,stageIndex:1,calendarYear:2026,homeTeamId:`team-${teams[i]}`,awayTeamId:`team-${teams[i+1]}`});
+    }
+    assert.equal(payload.length,272);
+    const route='xbsx/742482/week/reg/0/schedules';
+    addCapture('schedule-full',route,{gameScheduleInfoList:payload});
+    sqlite.exec(`INSERT INTO companion_team_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path) VALUES ('teams-run','league-1','capture-1','teams-full','xbsx/742482/leagueteams');
+      INSERT INTO companion_player_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path) VALUES ('players-run','league-1','capture-1','teams-full','xbsx/742482/leagueteams');
+      INSERT INTO companion_statistics_mapping_runs (id,league_id,discovery_session_id) VALUES ('stats-run','league-1','capture-1');`);
+    for(let i=0;i<32;i++){
+      sqlite.prepare(`INSERT INTO companion_canonical_teams_preview (mapping_run_id,league_id,external_id,display_name,source_record_json) VALUES ('teams-run','league-1',?,?,'{}')`).run(`team-${i}`,`Team ${i}`);
+      sqlite.prepare(`INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,team_external_id,display_name,source_record_json) VALUES ('players-run','league-1',?,?,?,'{}')`).run(`player-${i}`,`team-${i}`,`Player ${i}`);
+    }
+    const proof={status:'proven',source:'current-state-metadata',period:canonicalSchedulePeriod({stage:'reg',week:1})};
+    const coverage=candidateSourceCoverage({sourceMarkers:{currentPeriod:proof},datasetInventory:[
+      {datasetType:'schedule',routePath:route,recordCount:272,periodSource:'payload-schedule-aggregate',canonicalPeriods:resolveMaddenSchedulePeriods(route,payload)},
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing',recordCount:0}
+    ]});
+    assert.equal(coverage.currentWeek,1);assert.equal(coverage.scheduleHorizon.week,18);
+    assert.equal(coverage.futureSchedulePeriods.length,17);assert.deepEqual(candidateCoverageWarnings(coverage),[]);
+    sqlite.prepare(`INSERT INTO companion_candidate_import_runs (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,current_phase,created_by_user_id,source_counts_json) VALUES ('candidate-full','league-1','destination-full','capture-1','fingerprint-full','running','build-candidate','commissioner-1',?)`).run(JSON.stringify({sourceCoverage:coverage}));
+    const db=d1(sqlite),env={DB:db,FRANCHISE_HQ_DB:db,COMPANION_EXPORTS:{get:async key=>({arrayBuffer:async()=>new TextEncoder().encode(objects.get(key)).buffer})}};
+    const context=body=>({request:new Request('https://franchisehq.app/api/leagues/fgc/companion/test',{method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},body:JSON.stringify(body)}),params:{leagueSlug:'fgc'},env});
+    const mapped=await mapSchedule(context({discoverySessionId:'capture-1'}));
+    assert.equal(mapped.status,200);const mapping=await mapped.json();assert.equal(mapping.mappingRun.gameCount,272);
+    const built=await buildSnapshot(context({candidateImportRunId:'candidate-full',teamMappingRunId:'teams-run',playerMappingRunId:'players-run',scheduleMappingRunId:mapping.mappingRun.id,statisticsMappingRunId:'stats-run'}));
+    const result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
+    assert.equal(result.snapshot.weekIndex,1);assert.equal(result.snapshot.counts.games,272);
+    assert.equal(result.snapshot.manifest.scheduleHorizon.week,18);assert.equal(result.snapshot.manifest.discordScheduleTransition.reason,'initial-import');
+    assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM league_active_snapshots').get().count,0);
+    const snapshotId=result.snapshot.snapshotId;
+    let validated=await (await validateSnapshot(context({action:'validate-start',snapshotId}))).json();
+    for(let i=0;i<20&&!validated.complete;i++)validated=await (await validateSnapshot(context({action:'validate-next',snapshotId,batches:4,limit:100}))).json();
+    assert.equal(validated.complete,true,JSON.stringify(validated));assert.equal(validated.report.errorCount,0);
+    sqlite.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id,activated_by) VALUES ('league-1',?,'commissioner-1')`).run(snapshotId);
+    const competitionContext={db,request:context({}).request,league:{id:'league-1',slug:'fgc'},session:{user:{id:'commissioner-1'},membership:{role:'commissioner'}}};
+    const competition=await executeCompetitionAction(competitionContext,{action:'open-confidence-window',startWeek:1,endWeek:18});
+    assert.equal(competition.context.currentWeek,1);assert.equal(competition.games.length,272);
+    assert.equal(competition.confidence.openWeeks.length,18);
+    assert.equal(new Set(competition.games.map(g=>g.weekIndex)).size,18);
+    const prior=sqlite.prepare(`SELECT * FROM league_snapshot_records WHERE snapshot_id=? AND domain='games'`).all(snapshotId);
+    const original=JSON.parse(prior.find(r=>JSON.parse(r.data_json).week_index===2).data_json);
+    const selected=competition.games.find(g=>g.id===original.external_id);
+    await executeCompetitionAction(competitionContext,{action:'save-confidence-pick',gameId:selected.id,selectedTeamId:selected.homeTeamId,confidenceValue:1});
+    const picksBefore=sqlite.prepare('SELECT * FROM confidence_pool_picks').all();
+    const refreshed={...original,external_id:'renumbered',status:'completed',home_score:21,away_score:14};
+    const history=candidateScheduleCarryForward([refreshed],prior,{seasonYear:2026});
+    assert.equal(history.records.length,272);assert.equal(history.retained,271);
+    const updated=history.records.find(g=>g.external_id===original.external_id);
+    assert.equal(updated.home_score,21);assert.equal(updated.source_game_external_id,'renumbered');
+    assert.deepEqual(sqlite.prepare('SELECT * FROM confidence_pool_picks').all(),picksBefore);
+    assert.equal(history.records.some(g=>g.external_id===picksBefore[0].game_id),true);
+    assert.equal(candidateMergedPeriodCoverage(history.records,[]).gamePeriods.at(-1).week,18);
+    assert.equal(scheduleAdvanceDecision({id:snapshotId,season_year:2026,week_index:1,manifest_json:JSON.stringify(result.snapshot.manifest)},{period:canonicalSchedulePeriod({stage:'reg',week:2}),proof,seasonYear:2026}).allowed,true);
+    assert.equal(coverage.currentPeriodProof.status,'proven');
+    assert.equal(sqlite.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{sqlite.close()}
+});
 
 test('candidate phase contract is bounded, measurable, and retryable', () => {
   assert.deepEqual(CANDIDATE_IMPORT_PHASES, [
@@ -249,10 +363,10 @@ test('non-empty All Weeks sentinel routes resolve payload Week 10 while empty pl
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'week-route-authority-v2');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'schedule-horizon-current-period-v3');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:week-route-authority-v2'
+    'report:capture:identity:destination:schedule-horizon-current-period-v3'
   );
 });
 

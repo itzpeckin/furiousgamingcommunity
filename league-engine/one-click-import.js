@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.5.15 */
+/* FHQ_BUILD: 7.5.6 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.5.5.15';
+  const VERSION = '7.5.6';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -486,6 +486,9 @@
     const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
     const actionableSourceWarnings=sourceWarnings.filter(value=>!routineWarning(value));
     const sourceIsNew=source?.selectionStatus==='new-source';
+    const threadSync=state?.discordScheduleSync;
+    const threadReview=threadSync?.reviewRequired?`Schedule threads need commissioner review (${threadSync.reason}). After verifying the current period, use /week${threadSync.weekIndex} in the connected Discord server.`
+      :['failed','partial'].includes(threadSync?.status)?`Schedule thread sync needs retry: ${threadSync.lastError||'Discord delivery failed'}. Check the configured channel permissions, then use /week${threadSync.weekIndex}.`:'';
     return `<section class="card commissioner-live-import-card commissioner-companion-workspace" data-one-click-import-panel>
       <div class="card-header commissioner-import-header"><div><span class="eyebrow">Permanent league connection</span><h3>Madden Companion Import</h3><p>Use the same league URL every week, then analyze, validate, and make the newest eligible export live with one action.</p></div><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':sourceIsNew?'warning':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></div>
       <div class="commissioner-import-primary-actions" aria-label="Madden Companion import actions">
@@ -508,6 +511,7 @@
       </div></section>
       <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
+      ${threadReview?`<p class="commissioner-import-thread-review" role="status">${esc(threadReview)}</p>`:''}
       ${connectionService?.renderNotices?.()||''}
       ${actionableSourceWarnings.length?`<details class="commissioner-import-source-notes"><summary>${actionableSourceWarnings.length} source note${actionableSourceWarnings.length===1?'':'s'}</summary><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
       ${lastOutcome?.tone==='error'?`<section class="commissioner-import-recovery" role="alert"><div><span class="eyebrow">${esc(lastOutcome.phase)}</span><h4>${esc(lastOutcome.title)}</h4><p>${esc(lastOutcome.summary)}</p><p><strong>What to do:</strong> ${esc(lastOutcome.action)}</p><small>Your current league data is still live.</small></div><details><summary>Technical details</summary><p>${esc(lastOutcome.detail)}</p><code>Support code: ${esc(lastOutcome.supportCode)}</code></details></section>`:''}

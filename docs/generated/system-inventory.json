@@ -159,10 +159,10 @@
       ".css": 9,
       ".example": 1,
       ".html": 3,
-      ".js": 212,
+      ".js": 213,
       ".json": 7,
       ".jsonc": 1,
-      ".md": 277,
+      ".md": 278,
       ".mjs": 43,
       ".png": 3,
       ".sql": 42,
@@ -172,7 +172,7 @@
     },
     "largest": [
       {
-        "bytes": 638963,
+        "bytes": 638960,
         "file": "app.js"
       },
       {
@@ -192,11 +192,11 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 122785,
+        "bytes": 127788,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 98235,
+        "bytes": 98232,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -204,7 +204,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75127,
+        "bytes": 75058,
         "file": "index.html"
       },
       {
@@ -216,23 +216,23 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 53592,
+        "bytes": 53849,
         "file": "functions/_lib/discord-read-model.js"
+      },
+      {
+        "bytes": 53380,
+        "file": "tests/import/candidate-import.test.mjs"
       },
       {
         "bytes": 45609,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 43124,
+        "bytes": 44367,
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 41214,
-        "file": "tests/import/candidate-import.test.mjs"
-      },
-      {
-        "bytes": 39316,
+        "bytes": 39888,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -248,11 +248,11 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 34460,
+        "bytes": 35064,
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 602
+    "total": 604
   },
   "frontend": {
     "assets": [
@@ -1556,7 +1556,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.5.15",
+  "release": "7.5.6",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
