@@ -6,13 +6,13 @@
 
 **Updated:** September 12, 2026
 
-**Revision:** 2.50
+**Revision:** 2.51
 
-**Current production:** FranchiseHQ 7.5.5.13 is live from PR #88, Main `0f740bb`, and verified Git-integrated Pages deployment `8a49f5dd-bffe-4574-aa81-440f6788b915`. All four PR and five Main checks passed. Authenticated read-only measurements confirm all four assets and their complete metric boxes fit inside their rows, with original 72px desktop height, retained gradients, and removed Contract/Record fields. The synthetic 16-case desktop/phone/detail/dashboard/calculator matrix also passed. Migration 40 and all league data remain unchanged. No Discord behavior/configuration/registration, ownership, live trade/vote, import, snapshot, reset, archive/transition, export URL, credential, membership, or assignment operation ran. Blocked Madden Free Agents remain unknown/null.
+**Current production:** FranchiseHQ 7.5.5.14 is live from PR #90, Main `778b8bb`, and verified Pages Production deployment `d8113810-46ff-46df-84a0-c73c808146e6`. All four PR and five Main checks passed; strict gate 218/218 and focused import/mobile 36/36 passed. The compact import panel sits above Needs Your Attention. Authenticated read-only desktop measurements confirm zero row-height increase, unchanged Quick Controls dimensions and Activity position, and enabled Copy URL/Refresh with the already-live import safely disabled. The 18-case synthetic desktop/phone matrix passed. Migration 40, Season 2026 / Week 20, and all league data remain unchanged. No import, snapshot, reset, archive/transition, export URL, trade/ownership, credential, membership, assignment, or Discord operation ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** Owner accepted Discord and Trade Center. 7.5.5.14 adds compact Copy URL, Refresh, and Import actions with current-step progress above the Command Center attention queue. It uses existing left-column space without increasing desktop row height. League Data, Quick Controls, Trade Center, and Discord behavior stay unchanged. Publication and code-only Production deployment are authorized in one cycle.
+**Current work:** 7.5.5.14 is deployed and read-only verified. Its compact Command Center importer reuses the existing League Data actions, readiness guards, polling, and atomic import service. No surrounding redesign or Discord behavior change was made.
 
-**Next gate:** Hosted checks, Main merge, Production deployment, and read-only acceptance of 7.5.5.14; then planned off-season 7.5.6 schedule-horizon work.
+**Next gate:** Owner visual acceptance of 7.5.5.14's compact Command Center import panel, then planned off-season 7.5.6 schedule-horizon work.
 
 ## Product decisions
 

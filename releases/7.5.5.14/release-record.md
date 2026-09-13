@@ -1,6 +1,6 @@
 # FranchiseHQ 7.5.5.14 Release Record
 
-Status: Validated UI candidate; authorized publication and Production deployment pending hosted checks.
+Status: Production deployed and authenticated read-only verified; owner visual acceptance pending.
 
 ## Scope
 
@@ -25,7 +25,9 @@ Blocked Madden Free Agents remain unknown/null, not zero.
 
 ## Deployment status
 
-Standing owner authorization covers branch publication, PR, hosted checks, Main merge, and Git-integrated Pages Production deployment. No migration or Discord registration is required. Live acceptance will only inspect existing data and UI; no import will run.
+Exact candidate e1ff3d58bfd95e6a727939f45660fc87f91d1c06 passed all four PR #90 checks, merged Main as 778b8bb76ef7671f771735edfe7a738a2eda403e, and passed all five Main checks. Git-integrated Pages Production deployment d8113810-46ff-46df-84a0-c73c808146e6 serves 7.5.5.14. Main quality run: 34733274468; Pages workflow: 34733274049.
+
+Authenticated read-only acceptance confirms the compact 175px panel above the queue, Copy URL and Refresh enabled, existing already-live import disabled, and current-step progress at 100%. At 1280px, Quick Controls retains exactly its previous 497.4609375px height; League Activity retains exactly its previous 1206.65625px top position; the clear attention queue retains exactly its previous 162.359375px height. No panel or page horizontal overflow. Season 2026 / Week 20 and the 8:02:04 PM activation time remain unchanged. Live app.js, styles.css, trade-module.js, and one-click-import.js SHA-256 hashes exactly match Main. Mobile acceptance is the synthetic browser matrix, not a claimed live-device test. No import or other live action was executed.
 
 ## Boundaries
 
