@@ -1,6 +1,6 @@
 # FranchiseHQ 7.5.5.13 Release Record
 
-Status: Production publication authorized under standing release authorization; hosted checks and read-only live acceptance follow local validation.
+Status: Production deployed and authenticated read-only verified; owner visual acceptance pending.
 
 ## Scope
 
@@ -24,7 +24,9 @@ Blocked Madden Free Agents remain unknown/null, not zero.
 
 ## Deployment status
 
-One consolidated branch/PR/hosted-check/Main/Production cycle is authorized. No migration or Discord registration is required. Exact publication and live-read-only results are reported with the completed release handoff.
+Exact candidate 922c1017bbc0c71ebc3e9159ee90557071ac3dfd passed all four PR #88 checks, merged into Main as 0f740bbdd25baaf623ccf605d273cba92371c83d, and passed all five Main quality/build/deployment checks. Git-integrated Pages Production deployment 8a49f5dd-bffe-4574-aa81-440f6788b915 serves 7.5.5.13. Main quality run: 34725691531; Pages workflow: 34725691030.
+
+Authenticated read-only acceptance measured all four assets in the existing approved NE/TB trade. Every asset, metric box, and child column fits inside its 924px row; each retains the original 72.109375px desktop height. Player fields are POS/OVR/DEV/AGE and pick fields are CLASS/ROUND/PROJECTED, without Contract or Record. No live trade, setting, snapshot, or data operation was exercised. Browser screenshot capture timed out after the successful DOM/style measurements; it is not claimed as separate live screenshot evidence.
 
 ## Boundaries
 

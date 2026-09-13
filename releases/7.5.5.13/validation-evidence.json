@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.13",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {"unregisteredFailures": 0},
@@ -11,6 +11,7 @@
     "focusedTradeMobileSuite": {"passed": true, "tests": 15},
     "columnFitBrowserMatrix": {"passed": true, "status": "passed", "widths": [1280, 1024, 900, 390], "calculatorModes": [true, false], "views": ["approved", "trade-review"], "cases": 16, "assetsMeasured": 48, "containmentFailures": 0, "wideDesktopDetailHeight": 72.109375, "fontSizesChanged": false, "rowPaddingAndGapsChanged": false},
     "fullRepositorySuite": {"passed": true, "status": "passed", "tests": 216, "syntaxModules": 255, "routes": 76, "canonicalMigrations": 23, "requiredTables": 116},
+    "liveReadOnlyColumnFit": {"passed": true, "runtimeRelease": "7.5.5.13", "viewport": 1280, "assetsMeasured": 4, "assetWidth": 924, "assetHeight": 72.109375, "metricsWidth": 446.375, "containmentFailures": 0, "playerFields": ["POS", "OVR", "DEV", "AGE"], "pickFields": ["CLASS", "ROUND", "PROJECTED"], "removedFieldsPresent": false},
     "freeAgentBlockedPreserved": {"passed": true, "count": null, "interpretedAsZero": false}
   },
   "scopeBoundaries": {
@@ -31,9 +32,10 @@
     "databaseRowsWritten": 0
   },
   "external": {
-    "githubPublication": {"authorized": true, "status": "pending-hosted-checks"},
+    "githubPublication": {"authorized": true, "status": "published-main-accepted", "candidateCommit": "922c1017bbc0c71ebc3e9159ee90557071ac3dfd", "pullRequest": 88, "mainCommit": "0f740bbdd25baaf623ccf605d273cba92371c83d"},
+    "hostedChecks": {"status": "passed", "pullRequestChecksPassed": 4, "mainChecksPassed": 5, "pullRequestQualityWorkflowRun": 34720118029, "mainQualityWorkflowRun": 34725691531, "mainPagesWorkflowRun": 34725691030},
     "productionMigration": {"authorized": false, "status": "not-required"},
     "discordCommandRegistration": {"authorized": false, "status": "not-required"},
-    "productionDeployment": {"authorized": true, "status": "pending-hosted-checks"}
+    "productionDeployment": {"authorized": true, "status": "deployed-read-only-verified", "runtimeRelease": "7.5.5.13", "mainCommit": "0f740bbdd25baaf623ccf605d273cba92371c83d", "pagesDeployment": "8a49f5dd-bffe-4574-aa81-440f6788b915", "authenticatedUiVerified": true}
   }
 }
