@@ -1,6 +1,6 @@
 # FranchiseHQ 7.5.6
 
-Status: standing-authorized code-only release; consolidated strict and hosted gates precede Main and Production publication.
+Status: Production deployed and public read-only acceptance passed; commissioner annual-import and Discord server acceptance remain pending.
 
 ## Scope
 
@@ -18,11 +18,11 @@ No newly registered quality failure. Full-season availability depends on Madden 
 
 ## Validation evidence
 
-Synthetic D1/R2 acceptance maps and builds 272 games over Weeks 1–18 with current Week 1, validates with no errors, opens all 18 Confidence weeks through existing controls, and preserves a saved pick's matchup identity on renumbering. Regression coverage includes exact-source atomic/idempotent activation, normal route precedence, unresolved aggregate rejection, conflicting current metadata, season-scoped initial import, preseason opening, same-week no-work, proved Week 2 only, failed replacement preservation, and commissioner-command retry. Strict gate passed 222/222 tests, 256 syntax modules, 76 routes, 23 canonical migrations and 116 required tables. Additional authentication/mobile checks passed 12/12. Exact hosted publication results are recorded after they complete.
+Synthetic D1/R2 acceptance maps and builds 272 games over Weeks 1–18 with current Week 1, validates with no errors, opens all 18 Confidence weeks through existing controls, and preserves a saved pick's matchup identity on renumbering. Regression coverage includes exact-source atomic/idempotent activation, normal route precedence, unresolved aggregate rejection, conflicting current metadata, season-scoped initial import, preseason opening, same-week no-work, proved Week 2 only, failed replacement preservation, and commissioner-command retry. Strict gate passed 222/222 tests, 256 syntax modules, 76 routes, 23 canonical migrations and 116 required tables. Additional authentication/mobile checks passed 12/12. All four PR checks and five Main checks passed. Public read-only acceptance confirms healthy Production, release 7.5.6, the exact Main public landing template, and five exact Main asset hashes. No authenticated UI reload or live import was used for this acceptance.
 
 ## Deployment status
 
-Code-only deployment is authorized as part of this release cycle. Migration remains 40. No live import, active snapshot move, reset, season archive/transition, export URL rotation, ownership edit, Discord registration/configuration, credential or membership/assignment change is included.
+Exact candidate `650ba0896cc2bbd9cab6885ed1a4c5e8c7792a96` was published through PR #94 and merged as Main `01609a6fe38e0fe080a67abadf31abec877712b3`. Production Pages deployment `67546407-9ec0-46ec-a3be-4ff40f944c0e` succeeded. Main quality workflow `34739568774` and deployment workflow `34739568125` passed. Migration remains 40. No live import, active snapshot move, reset, season archive/transition, export URL rotation, ownership edit, Discord registration/configuration, credential or membership/assignment change was performed. Real commissioner off-season acceptance follows the annual runbook; it is not claimed by this code-only release.
 
 ## Rollback
 
