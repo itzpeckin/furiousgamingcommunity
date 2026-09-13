@@ -22,9 +22,9 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
-import { scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
+import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 
-const RELEASE = '7.5.5.15';
+const RELEASE = '7.5.6';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -101,7 +101,7 @@ async function runForSource(db, leagueId, destinationId, fingerprint) {
 }
 
 async function activeSnapshot(db, leagueId) {
-  return db.prepare(`SELECT active.snapshot_id,snapshot.week_index,snapshot.season_year,snapshot.created_at,
+  return db.prepare(`SELECT active.snapshot_id,snapshot.week_index,snapshot.season_year,snapshot.created_at,snapshot.manifest_json,
       (SELECT linked.game_year_id FROM game_year_snapshots linked
         WHERE linked.league_id=active.league_id AND linked.snapshot_id=active.snapshot_id LIMIT 1) game_year_id,
       (SELECT destination.franchise_season_id
@@ -158,7 +158,7 @@ async function retainedPeriodBundle(db,leagueId,report,identity,active){
   const anchorCoverage=candidateSourceCoverage({
     sourceMarkers:parseCandidateJson(report?.source_markers_json,{}),
     datasetInventory:parseCandidateJson(report?.dataset_inventory_json,[])
-  },active?.week_index);
+  },active,{seasonYear:identity?.season_year??null});
   if(anchorCoverage.importMode!=='historical-backfill'||!anchorCoverage.currentPeriod){
     const digest=report?await captureDigest(db,leagueId,report.session_id):null;
     return{coverage:anchorCoverage,digest,sourceCaptureIds:[],sourcePeriods:anchorCoverage.completePeriods||[],routeCount:Number(report?.route_count||0),captureCount:Number(report?.capture_count||0),bytes:Number(report?.total_bytes||0),notBefore:sourceNotBefore};
@@ -193,7 +193,7 @@ async function retainedPeriodBundle(db,leagueId,report,identity,active){
     return{coverage:anchorCoverage,digest,sourceCaptureIds:[],sourcePeriods:anchorCoverage.completePeriods||[],routeCount:Number(report?.route_count||0),captureCount:Number(report?.capture_count||0),bytes:Number(report?.total_bytes||0),notBefore:sourceNotBefore};
   }
   const inventory=selected.map(row=>({datasetType:row.datasetType,routePath:row.route_path}));
-  const coverage=candidateSourceCoverage({datasetInventory:inventory},active?.week_index);
+  const coverage=candidateSourceCoverage({datasetInventory:inventory},active);
   const digest=await sha256Hex(new TextEncoder().encode(selected
     .map(row=>`${row.route_path}:${row.payload_hash}:${row.id}:${Number(row.byte_length||0)}`).sort().join('\n')));
   return{
@@ -255,9 +255,9 @@ async function publicState(current, options = {}) {
   const active = await activeSnapshot(current.db,current.league.id);
   const bundle=await retainedPeriodBundle(current.db,current.league.id,report,identity,active);
   const fingerprint = await sourceFingerprint(current.db,current.league.id,report,identity,destination,bundle);
+  const coverage=bundle.coverage;
   const run = await runForSource(current.db,current.league.id,destination?.id,fingerprint);
   const previousRun = run || await latestRun(current.db,current.league.id);
-  const coverage = bundle.coverage;
   return {
     ok:true,
     release:RELEASE,
@@ -289,6 +289,7 @@ async function publicState(current, options = {}) {
     run:publicCandidateRun(run),
     previousRun:run ? null : publicCandidateRun(previousRun),
     activeSnapshotId:active?.snapshot_id || null,
+    discordScheduleSync:await latestDiscordScheduleSync(current.db,current.league.id),
     activeSnapshotWeek:active?.week_index === null || active?.week_index === undefined ? null : Number(active.week_index),
     phases:CANDIDATE_IMPORT_PHASES,
     private:!publicCandidateRun(run)?.activationPerformed,
@@ -365,6 +366,11 @@ async function startRun(current, destination, report, identity, retry) {
   }
   const active = await activeSnapshot(current.db,current.league.id);
   const bundle=await retainedPeriodBundle(current.db,current.league.id,report,identity,active);
+  const coverage=bundle.coverage;
+  if(coverage.currentPeriodProof?.status!=='proven'||!coverage.currentPeriod
+    ||coverage.currentWeekStatus!=='covered')return{response:json({ok:false,
+      error:'The export must prove the current Madden period and requires both schedule and statistics coverage for that period. Review the current-week source evidence before importing.',
+      release:RELEASE,sourceCoverage:coverage,activeSnapshotChanged:false},409)};
   const digest = bundle.digest || await captureDigest(current.db,current.league.id,report.session_id);
   const fingerprint = await sha256Hex(new TextEncoder().encode(
     candidateSourceFingerprintMaterial(
@@ -378,7 +384,6 @@ async function startRun(current, destination, report, identity, retry) {
     return { run, reused:true, warm:run.status === 'preview-ready' };
   }
   const activeBefore = active?.snapshot_id || null;
-  const coverage = bundle.coverage;
   if (coverage.importMode === 'historical-backfill') {
     if (coverage.currentWeekStatus !== 'covered') return { response:json({
       ok:false,

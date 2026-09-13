@@ -1,7 +1,8 @@
 const WEEK_ROUTE=/(?:^|\/)week\/(pre|reg|post)\/(\d+)(?:\/|$)/i;
 
 const integer=value=>{
-  const parsed=Number.parseInt(String(value??''),10);
+  if(value===null||value===undefined||String(value).trim()==='')return null;
+  const parsed=Number(value);
   return Number.isInteger(parsed)?parsed:null;
 };
 
@@ -69,7 +70,7 @@ export function resolveMaddenPeriod(routePath,records=[]){
   }
 
   const periods=new Map(candidates.map(item=>[`${item.stage}:${item.week}`,item]));
-  if(periods.size!==1){
+  if(periods.size!==1||candidates.length!==rows.length){
     return{...route,source:periods.size?'payload-conflict':'payload-unresolved',playable:false,sentinel:true,placeholder:false};
   }
   const resolved=[...periods.values()][0];
@@ -98,4 +99,36 @@ export function periodFromInventoryItem(item){
   const source=String(item?.periodSource??item?.period_source??'');
   if(source!=='payload-sentinel'||stage!=='regular-season'||week===null||week<1)return null;
   return{stage,week,key:`${stage}:${week}`};
+}
+
+// Schedule aggregates may contain the whole season. Validate every record;
+// never guess a period for a malformed row or let an aggregate override a route.
+export function resolveMaddenSchedulePeriods(routePath,records=[]){
+  const route=maddenRoutePeriod(routePath);
+  if(!route)return null;
+  if(route.stage!=='regular-season'||route.week!==0)return [resolveMaddenPeriod(routePath,records)];
+  const rows=Array.isArray(records)?records:[records];
+  if(!rows.length)return [];
+  const periods=new Map();
+  for(const row of rows){
+    const period=resolveMaddenPeriod(routePath,[row]);
+    if(!period?.playable)return null;
+    periods.set(period.key,period);
+  }
+  return [...periods.values()].sort((a,b)=>a.week-b.week);
+}
+
+export function periodsFromInventoryItem(item){
+  const single=periodFromInventoryItem(item);
+  if(single)return [single];
+  const route=maddenRoutePeriod(item?.routePath??item?.route_path);
+  if(route?.stage!=='regular-season'||route.week!==0
+    ||String(item?.datasetType??item?.dataset_type)!=='schedule'
+    ||Number(item?.recordCount??item?.record_count??0)<=0
+    ||item?.periodSource!=='payload-schedule-aggregate')return [];
+  const periods=item.canonicalPeriods;
+  if(!Array.isArray(periods)||!periods.length)return [];
+  if(periods.some(p=>canonicalMaddenStage(p?.stage)!=='regular-season'
+    ||!Number.isInteger(p?.week)||p.week<1||p.week>40))return [];
+  return periods.map(p=>({stage:'regular-season',week:p.week,key:`regular-season:${p.week}`}));
 }

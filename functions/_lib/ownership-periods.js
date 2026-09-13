@@ -1,9 +1,10 @@
 import { canonicalOwnershipStage } from './gm-career.js';
+import { snapshotCurrentPeriod } from './schedule-integrity.js';
 
 const clean = value => value === null || value === undefined ? '' : String(value).trim();
 
 export async function currentFranchiseContext(db, leagueId) {
-  const row = await db.prepare(`SELECT active.snapshot_id,snapshot.season_year,snapshot.week_index,
+  const row = await db.prepare(`SELECT active.snapshot_id,snapshot.season_year,snapshot.week_index,snapshot.manifest_json,
       (SELECT json_extract(record.data_json,'$.stage')
        FROM league_snapshot_records record
        WHERE record.league_id=active.league_id AND record.snapshot_id=active.snapshot_id AND record.domain='games'
@@ -37,7 +38,7 @@ export async function currentFranchiseContext(db, leagueId) {
     snapshotId:row.snapshot_id,
     franchiseSeasonId:row.franchise_season_id || null,
     seasonYear:Number(row.season_year),
-    stage:canonicalOwnershipStage(row.current_stage||'regular-season'),
+    stage:canonicalOwnershipStage(snapshotCurrentPeriod(row,false)?.stage||row.current_stage||'regular-season'),
     week:Number(row.week_index) || 1
   } : {snapshotId:null,franchiseSeasonId:null,seasonYear:null,stage:'preseason',week:1};
 }

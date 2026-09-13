@@ -135,6 +135,18 @@ function seedSnapshotRecord(database,{snapshotId,leagueId,domain,externalId,data
     .run(snapshotId,leagueId,domain,externalId,JSON.stringify(data));
 }
 
+function proveScheduleAdvance(database,fromSnapshotId,toSnapshotId){
+  const from=database.prepare('SELECT week_index FROM league_snapshots WHERE id=?').get(fromSnapshotId);
+  const to=database.prepare('SELECT week_index FROM league_snapshots WHERE id=?').get(toSnapshotId);
+  const period=week=>({stage:'regular-season',week,key:`regular-season:${week}`});
+  database.prepare('UPDATE league_snapshots SET manifest_json=? WHERE id=?').run(JSON.stringify({
+    currentPeriod:period(to.week_index),currentPeriodProof:{status:'proven'},discordScheduleTransition:{
+      sourceSnapshotId:fromSnapshotId,from:period(from.week_index),to:period(to.week_index),
+      allowed:to.week_index===from.week_index+1
+    }
+  }),toSnapshotId);
+}
+
 function seedNflStandingsFixture(database,{leagueId='league-a',week=14}={}){
   const snapshotId=seedActiveWeek(database,{leagueId,week});
   const teams=[
@@ -1311,6 +1323,37 @@ test('/week14 bootstraps one commissioner league and creates identity-driven mat
   }finally{globalThis.fetch=originalFetch;database.close()}
 });
 
+test('full-season preload performs no Discord work and a proven Week 2 advance creates only Week 2',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    database.prepare(`UPDATE discord_league_installations SET schedule_channel_id='100000000000000055' WHERE league_id='league-a'`).run();
+    const db=d1(database),league={id:'league-a',slug:'alpha',name:'Alpha League'},requests=[];
+    const first=seedActiveWeek(database,{leagueId:'league-a',week:1});
+    const period=week=>({stage:'regular-season',week,key:`regular-season:${week}`});
+    database.prepare('UPDATE league_snapshots SET manifest_json=? WHERE id=?').run(JSON.stringify({currentPeriod:period(1),currentPeriodProof:{status:'proven'},discordScheduleTransition:{sourceSnapshotId:null,from:null,to:period(1),allowed:false}}),first);
+    for(let week=2;week<=18;week++)seedSnapshotRecord(database,{snapshotId:first,leagueId:'league-a',domain:'games',externalId:`future-${week}`,data:{external_id:`future-${week}`,season_year:2026,stage:'regular-season',week_index:week,away_team_external_id:'1002',home_team_external_id:'1001',status:'scheduled'}});
+    const fetchImpl=async(url,options={})=>{
+      requests.push({url:String(url),method:options.method||'GET',body:options.body?JSON.parse(options.body):null});
+      return new Response(JSON.stringify({id:'100000000000000088'}),{status:200,headers:{'content-type':'application/json'}});
+    };
+    const initial=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{league,snapshotId:first,fetchImpl});
+    assert.equal(initial.reason,'initial-import');assert.equal(initial.reviewRequired,true);
+    assert.equal(requests.length,0);assert.equal(database.prepare('SELECT COUNT(*) count FROM discord_schedule_threads').get().count,0);
+    const second=seedActiveWeek(database,{leagueId:'league-a',week:2});
+    database.prepare(`INSERT OR IGNORE INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json)
+      SELECT ?,league_id,domain,external_id,data_json FROM league_snapshot_records WHERE snapshot_id=? AND domain='games' AND json_extract(data_json,'$.week_index')>2`).run(second,first);
+    proveScheduleAdvance(database,first,second);
+    const advanced=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{league,snapshotId:second,fetchImpl});
+    assert.equal(advanced.created,1);assert.equal(advanced.week,2);
+    assert.deepEqual(database.prepare('SELECT DISTINCT week_index AS week FROM discord_schedule_threads').all().map(r=>r.week),[2]);
+    const before=requests.length;
+    assert.equal((await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{league,snapshotId:second,fetchImpl})).reused,true);
+    assert.equal(requests.length,before);
+  }finally{database.close()}
+});
+
 test('a live import creates the complete new schedule before removing prior FranchiseHQ threads',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
@@ -1334,12 +1377,13 @@ test('a live import creates the complete new schedule before removing prior Fran
     const league={id:'league-a',slug:'alpha',name:'Alpha League'};
     const week13=seedActiveWeek(database,{leagueId:'league-a',week:13});
     const first=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
-      league,snapshotId:week13,source:'candidate-import',fetchImpl
+      league,snapshotId:week13,source:'discord-command',fetchImpl
     });
     assert.equal(first.ok,true);
     assert.equal(first.removedPriorThreads,0);
 
     const week14=seedActiveWeek(database,{leagueId:'league-a',week:14});
+    proveScheduleAdvance(database,week13,week14);
     const second=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
       league,snapshotId:week14,source:'candidate-import',fetchImpl
     });
@@ -1354,7 +1398,7 @@ test('a live import creates the complete new schedule before removing prior Fran
   }finally{database.close()}
 });
 
-test('a repeated same-week import reuses the matchup thread even when Madden changes the external game id',async()=>{
+test('a same-week import does no Discord or thread-inventory work even when Madden renumbers a game',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -1371,7 +1415,7 @@ test('a repeated same-week import reuses the matchup thread even when Madden cha
     };
     const original=seedActiveWeek(database,{leagueId:'league-a',week:14});
     assert.equal((await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
-      league,snapshotId:original,source:'candidate-import',fetchImpl
+      league,snapshotId:original,source:'discord-command',fetchImpl
     })).created,1);
 
     const replacement='snapshot-league-a-14-replacement';
@@ -1386,15 +1430,23 @@ test('a repeated same-week import reuses the matchup thread even when Madden cha
       away_team_external_id:'1002',home_team_external_id:'1001',status:'scheduled'
     }});
     database.prepare(`UPDATE league_active_snapshots SET snapshot_id=? WHERE league_id='league-a'`).run(replacement);
+    proveScheduleAdvance(database,original,replacement);
+    const before=database.prepare(`SELECT * FROM discord_schedule_threads`).all();
+    const runCount=database.prepare('SELECT COUNT(*) AS count FROM discord_schedule_sync_runs').get().count;
+    const requestCount=requests.length;
     const repeated=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
       league,snapshotId:replacement,source:'candidate-import',fetchImpl
     });
     assert.equal(repeated.ok,true);
-    assert.equal(repeated.created,0);
+    assert.equal(repeated.skipped,true);
+    assert.equal(repeated.reason,'same-week');
+    assert.equal(requests.length,requestCount);
+    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM discord_schedule_sync_runs').get().count,runCount);
+    assert.deepEqual(database.prepare(`SELECT * FROM discord_schedule_threads`).all(),before);
     assert.equal(requests.filter(request=>/\/messages$/.test(request.url)).length,1);
     assert.deepEqual({...database.prepare(`SELECT COUNT(*) AS count,game_external_id AS gameId,snapshot_id AS snapshotId,status
       FROM discord_schedule_threads WHERE league_id='league-a' AND week_index=14`).get()}, {
-      count:1,gameId:'madden-renumbered-game',snapshotId:replacement,status:'active'
+      count:1,gameId:'game-14',snapshotId:original,status:'active'
     });
   }finally{database.close()}
 });
@@ -1414,10 +1466,11 @@ test('a failed replacement schedule leaves the prior active threads untouched',a
     };
     const week13=seedActiveWeek(database,{leagueId:'league-a',week:13});
     assert.equal((await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
-      league,snapshotId:week13,source:'candidate-import',fetchImpl:workingFetch
+      league,snapshotId:week13,source:'discord-command',fetchImpl:workingFetch
     })).ok,true);
 
     const week14=seedActiveWeek(database,{leagueId:'league-a',week:14});
+    proveScheduleAdvance(database,week13,week14);
     const requests=[];
     const failingFetch=async(url,options={})=>{
       requests.push({url:String(url),method:options.method||'GET'});
@@ -1430,6 +1483,17 @@ test('a failed replacement schedule leaves the prior active threads untouched',a
     assert.equal(requests.some(request=>request.method==='DELETE'),false);
     assert.deepEqual({...database.prepare(`SELECT week_index AS week,status FROM discord_schedule_threads
       WHERE league_id='league-a' AND week_index=13`).get()},{week:13,status:'active'});
+    const retryRequests=[];
+    const retryFetch=async(url,options={})=>{
+      retryRequests.push({url:String(url),method:options.method||'GET'});
+      if(options.method==='DELETE')return new Response(null,{status:204});
+      return new Response('{"id":"100000000000000089"}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    const retried=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:week14,source:'discord-command',fetchImpl:retryFetch
+    });
+    assert.equal(retried.ok,true);assert.equal(retried.removedPriorThreads,1);
+    assert.equal(retryRequests.at(-1).method,'DELETE');
   }finally{database.close()}
 });
 

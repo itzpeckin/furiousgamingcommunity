@@ -1,8 +1,9 @@
 /* FHQ_BUILD: 5.9.10.6.5.4h-p5d */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-import { candidateCoverageWarnings, candidateHistoricalBackfill, candidateHistoryCarryForward, candidateMergedPeriodCoverage, candidatePeriodLabel, candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
-const RELEASE='7.4.1';
+import { candidateCoverageWarnings, candidateHistoricalBackfill, candidateHistoryCarryForward, candidateScheduleCarryForward, candidateMergedPeriodCoverage, candidatePeriodLabel, candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
+import { scheduleAdvanceDecision, snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
+const RELEASE='7.5.6';
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 async function latest(db,table,leagueId,status=true){const where=status?" AND status='pending-preview'":'';return db.prepare(`SELECT * FROM ${table} WHERE league_id=?${where} ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();}
 async function rows(db,sql,...args){const r=await db.prepare(sql).bind(...args).all();return r.results||[];}
@@ -61,7 +62,7 @@ try{
    standings(context,league.id,candidateRun.discovery_session_id),
    db.prepare(`SELECT source_markers_json,dataset_inventory_json FROM madden_discovery_reports
      WHERE league_id=? AND session_id=? LIMIT 1`).bind(league.id,candidateRun.discovery_session_id).first(),
-   candidateRun.active_snapshot_id_before?db.prepare(`SELECT snapshot.id,snapshot.week_index,snapshot.season_year
+   candidateRun.active_snapshot_id_before?db.prepare(`SELECT snapshot.id,snapshot.week_index,snapshot.season_year,snapshot.manifest_json
      FROM league_snapshots snapshot
      JOIN game_year_snapshots linked ON linked.snapshot_id=snapshot.id AND linked.league_id=snapshot.league_id
      JOIN companion_candidate_import_runs active_run
@@ -78,7 +79,11 @@ try{
  const coverage=runSourceCounts.sourceCoverage||candidateSourceCoverage({
    sourceMarkers:parse(sourceReport?.source_markers_json)||{},
    datasetInventory:parse(sourceReport?.dataset_inventory_json)||[]
- },activeSource?.week_index);
+ },activeSource);
+ if(coverage.currentPeriodProof?.status!=='proven'||!coverage.currentPeriod
+   ||coverage.currentWeekStatus!=='covered')return json({ok:false,release:RELEASE,
+   error:'The export must prove the current Madden period with both current-period schedule and statistics routes. Future schedule coverage alone cannot advance the league.',
+   sourceCoverage:coverage,activeSnapshotChanged:false,activationPerformed:false},422);
  const historicalBackfill=coverage.importMode==='historical-backfill';
  if(historicalBackfill&&!activeSource)return json({ok:false,release:RELEASE,
    error:'Historical backfill requires the exact active Madden game year and franchise-season snapshot.',
@@ -93,7 +98,7 @@ try{
  const sourceWeeks=[...new Set(sourcePeriods.map(period=>Number(period.week)).filter(Number.isInteger))];
  const gameHistory=historicalBackfill
    ?candidateHistoricalBackfill(freshGames,priorDomain('games'),{keyName:'external_id',activeWeek:activeSource.week_index,activePeriod:coverage.activePeriod,sourceWeeks,sourcePeriods})
-   :candidateHistoryCarryForward(freshGames,priorDomain('games'),{keyName:'external_id',currentWeek});
+   :candidateScheduleCarryForward(freshGames,priorDomain('games'),{seasonYear:candidateRun.destination_season_year});
  const statisticHistory=historicalBackfill
    ?candidateHistoricalBackfill(freshStatistics,priorDomain('statistics'),{keyName:'external_key',activeWeek:activeSource.week_index,activePeriod:coverage.activePeriod,sourceWeeks,sourcePeriods})
    :candidateHistoryCarryForward(freshStatistics,priorDomain('statistics'),{keyName:'external_key',currentWeek});
@@ -113,7 +118,7 @@ try{
    warnings.push(`Historical backfill applied ${gameHistory.applied} game record(s) and ${statisticHistory.applied} statistic record(s) across ${sourcePeriods.length} retained period(s) without changing active Regular Season Week ${activeSource.week_index}.`);
    if(mergedCoverage.missingWeeks.length)warnings.push(`Historical coverage still missing through active Week ${activeSource.week_index}: ${mergedCoverage.missingWeeks.map(week=>`Week ${week}`).join(', ')}.`);
  }else{
-   if(activeSource&&gameHistory.retained)warnings.push(`${gameHistory.retained} earlier game record(s) were carried forward from active snapshot ${activeSource.id}.`);
+   if(activeSource&&gameHistory.retained)warnings.push(`${gameHistory.retained} known same-season game record(s) were carried forward from active snapshot ${activeSource.id}.`);
    if(activeSource&&statisticHistory.retained)warnings.push(`${statisticHistory.retained} earlier statistic record(s) were carried forward from active snapshot ${activeSource.id}.`);
  }
  if(candidateRun.active_snapshot_id_before&&!activeSource)warnings.push('The active snapshot was not eligible for same-season history carry-forward; no prior weekly records were merged.');
@@ -126,11 +131,15 @@ try{
  if(Number(scheduleRun.warning_count||0))warnings.push(`Schedule mapper reported ${scheduleRun.warning_count} warning(s).`);
  if(Number(statisticsRun.warning_count||0))warnings.push(`Statistics mapper reported ${statisticsRun.warning_count} warning(s).`);
  const seasonCandidates=[...games.map(x=>x.season_year),...statistics.map(x=>x.season_year),...standingRows.map(x=>x.calendarYear)].map(Number).filter(Number.isFinite);
- const weekCandidates=[...games.map(x=>x.week_index),...statistics.map(x=>x.week_index),...standingRows.map(x=>x.weekIndex)].map(Number).filter(Number.isFinite);
  const manifest={release:RELEASE,leagueId:league.id,candidateImportRunId:candidateRun.id,storageRetention:retention,sourceCoverage:coverage,importMode:coverage.importMode,historyCarryForward:{sourceSnapshotId:activeSource?.id||null,games:historicalBackfill?0:gameHistory.retained,statistics:historicalBackfill?0:statisticHistory.retained,gameWeeks:historicalBackfill?[]:gameHistory.retainedWeeks,statisticWeeks:historicalBackfill?[]:statisticHistory.retainedWeeks},historicalBackfill:historicalBackfill?{sourceSnapshotId:activeSource.id,sourceWeeks,sourcePeriods,liveWeekPreserved:Number(activeSource.week_index),gamesApplied:gameHistory.applied,statisticsApplied:statisticHistory.applied,teamsPreserved:teams.length,playersPreserved:players.length,standingsPreserved:standingRows.length,mergedCoverage}:null,sources:{teamMappingRunId:teamRun.id,playerMappingRunId:playerRun.id,scheduleMappingRunId:scheduleRun.id,statisticsMappingRunId:statisticsRun.id,standingsCaptureId:standingSource.capture?.id||null,standingsRoute:standingSource.capture?.route_path||null},pinnedMappingRuns:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},builtAt:new Date().toISOString(),immutable:true,privateCandidate:true,activationPerformed:false,activeSnapshotChanged:false};
  const snapshotId=crypto.randomUUID();
+ manifest.currentPeriod=historicalBackfill?snapshotCurrentPeriod(activeSource):coverage.currentPeriod;
+ manifest.currentPeriodProof=historicalBackfill?(parse(activeSource.manifest_json)?.currentPeriodProof||coverage.currentPeriodProof):coverage.currentPeriodProof;
+ manifest.scheduleHorizon=mergedCoverage.gamePeriods?.at(-1)||coverage.scheduleHorizon;
+ manifest.discordScheduleTransition=scheduleAdvanceDecision(activeSource,{period:manifest.currentPeriod,
+   proof:manifest.currentPeriodProof,seasonYear:candidateRun.destination_season_year});
  await db.batch([
-  db.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warning_count,warnings_json,manifest_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(snapshotId,league.id,'pending-validation',Number(candidateRun.destination_season_year)|| (seasonCandidates.length?Math.max(...seasonCandidates):null),weekCandidates.length?Math.max(...weekCandidates):null,teams.length,players.length,games.length,statistics.length,standingRows.length,warnings.length,JSON.stringify(warnings),JSON.stringify(manifest)),
+  db.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warning_count,warnings_json,manifest_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(snapshotId,league.id,'pending-validation',Number(candidateRun.destination_season_year)|| (seasonCandidates.length?Math.max(...seasonCandidates):null),manifest.currentPeriod.week,teams.length,players.length,games.length,statistics.length,standingRows.length,warnings.length,JSON.stringify(warnings),JSON.stringify(manifest)),
   db.prepare(`INSERT INTO game_year_snapshots (game_year_id,league_id,snapshot_id,snapshot_status) VALUES (?,?,?,'candidate')`).bind(candidateRun.game_year_id,league.id,snapshotId)
  ]);
  const inserts=[];const add=(domain,items,idFn)=>items.forEach((item,i)=>inserts.push(db.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`).bind(snapshotId,league.id,domain,String(idFn(item,i)),JSON.stringify(item))));

@@ -1,8 +1,15 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
-import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
+import { resolveMaddenPeriod as resolveSingleMaddenPeriod, resolveMaddenSchedulePeriods } from '../../../../_lib/madden-period.js';
+import { candidateScheduleIdentity } from '../../../../_lib/candidate-import.js';
 
-const RELEASE='7.5.5.15';
+const RELEASE='7.5.6';
+function resolveMaddenPeriod(routePath,records){
+  const single=resolveSingleMaddenPeriod(routePath,records);
+  if(!single?.sentinel)return single;
+  const periods=resolveMaddenSchedulePeriods(routePath,records);
+  return periods?.length?{...single,playable:true,periods}: {...single,playable:false};
+}
 const SCHEDULE_ROUTE=/\/week\/(pre|reg|post)\/(\d+)\/schedules\/?$/i;
 const A=Object.freeze({
   id:['gameId','scheduleId','id','eventId'],home:['homeTeamId','homeTeamID','homeId','home_team_id'],away:['awayTeamId','awayTeamID','awayId','away_team_id'],
@@ -28,12 +35,13 @@ function routeAuthority(game){
 export function selectAuthoritativeScheduleGames(games=[],warnings=[]){
   const unique=new Map();
   for(const game of games){
-    const existing=unique.get(game.externalId);
-    if(!existing){unique.set(game.externalId,game);continue;}
+    const key=candidateScheduleIdentity(game)||game.externalId;
+    const existing=unique.get(key);
+    if(!existing){unique.set(key,game);continue;}
     const existingAuthority=routeAuthority(existing),candidateAuthority=routeAuthority(game);
     if(candidateAuthority>existingAuthority){
       warnings.push(`Duplicate game ${game.externalId} from ${existing.sourceRoutePath||'an unknown route'} was ignored in favor of authoritative ${game.sourceRoutePath||'route data'}.`);
-      unique.set(game.externalId,game);
+      unique.set(key,game);
       continue;
     }
     warnings.push(`Duplicate game ${game.externalId} from ${game.sourceRoutePath||'an unknown route'} was ignored; ${existing.sourceRoutePath||'the existing route'} remains authoritative.`);
@@ -41,7 +49,10 @@ export function selectAuthoritativeScheduleGames(games=[],warnings=[]){
   return[...unique.values()];
 }
 function gameStatus(record,homeScore,awayScore){const s=text(first(record,A.status));if(bool(first(record,A.complete))||/final|complete/i.test(s||''))return'completed';if(Number.isFinite(homeScore)&&Number.isFinite(awayScore)&&(homeScore>0||awayScore>0))return'completed';return s||'scheduled';}
-function normalize(record,index,capture,validTeams,period=resolveMaddenPeriod(capture.route_path,[record])){const meta=routeMeta(capture.route_path)||{};const home=text(first(record,A.home)),away=text(first(record,A.away));const hs=int(first(record,A.homeScore)),as=int(first(record,A.awayScore));const week=period?.playable?period.week:meta.week??int(first(record,A.week));const stage=period?.playable?period.stage:stageName(meta.stage,first(record,A.stage));const year=int(first(record,A.year));const externalId=text(first(record,A.id))||`${stage}-${week??0}-${away||'away'}-${home||'home'}-${index+1}`;const warnings=[];if(!home||!validTeams.has(home))warnings.push(`Unknown home team ${home||'missing'} for ${externalId}`);if(!away||!validTeams.has(away))warnings.push(`Unknown away team ${away||'missing'} for ${externalId}`);return{externalId,seasonYear:year,stage,weekIndex:week,homeTeamExternalId:home,awayTeamExternalId:away,homeScore:hs,awayScore:as,status:gameStatus(record,hs,as),scheduledAt:text(first(record,A.date)),sourceRoutePath:capture.route_path,sourceRecord:record,warnings};}
+function normalize(record,index,capture,validTeams,period=resolveMaddenPeriod(capture.route_path,[record])){
+  if(period?.periods)period=resolveSingleMaddenPeriod(capture.route_path,[record]);
+  const meta=routeMeta(capture.route_path)||{};const home=text(first(record,A.home)),away=text(first(record,A.away));const hs=int(first(record,A.homeScore)),as=int(first(record,A.awayScore));const week=period?.playable?period.week:meta.week??int(first(record,A.week));const stage=period?.playable?period.stage:stageName(meta.stage,first(record,A.stage));const year=int(first(record,A.year));const externalId=text(first(record,A.id))||`${stage}-${week??0}-${away||'away'}-${home||'home'}-${index+1}`;const warnings=[];if(!home||!validTeams.has(home))warnings.push(`Unknown home team ${home||'missing'} for ${externalId}`);if(!away||!validTeams.has(away))warnings.push(`Unknown away team ${away||'missing'} for ${externalId}`);return{externalId,seasonYear:year,stage,weekIndex:week,homeTeamExternalId:home,awayTeamExternalId:away,homeScore:hs,awayScore:as,status:gameStatus(record,hs,as),scheduledAt:text(first(record,A.date)),sourceRoutePath:capture.route_path,sourceRecord:record,warnings};
+}
 async function teamIds(db,leagueId){const run=await db.prepare(`SELECT id FROM companion_team_mapping_runs WHERE league_id=? AND status='pending-preview' ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();if(!run)return new Set();const r=await db.prepare(`SELECT external_id FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id=?`).bind(leagueId,run.id).all();return new Set((r.results||[]).map(x=>String(x.external_id)));}
 async function captures(db,leagueId,discoverySessionId){const r=discoverySessionId?await db.prepare(`SELECT c.id capture_id,link.session_id discovery_session_id,c.route_path,c.r2_object_key,c.received_at FROM madden_discovery_session_captures link JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id WHERE link.league_id=? AND link.session_id=? AND c.route_path LIKE '%/schedules' ORDER BY link.observed_at DESC`).bind(leagueId,discoverySessionId).all():await db.prepare(`SELECT c.id capture_id,c.discovery_session_id,c.route_path,c.r2_object_key,c.received_at FROM companion_route_captures c WHERE c.league_id=? AND c.route_path LIKE '%/schedules' ORDER BY c.received_at DESC`).bind(leagueId).all();const latest=new Map();for(const row of r.results||[]){if(!SCHEDULE_ROUTE.test(row.route_path))continue;if(!latest.has(row.route_path))latest.set(row.route_path,row);}return[...latest.values()].sort((a,b)=>a.route_path.localeCompare(b.route_path));}
 async function capturesByIds(db,leagueId,captureIds=[]){const rows=[];for(let offset=0;offset<captureIds.length;offset+=75){const ids=captureIds.slice(offset,offset+75),marks=ids.map(()=>'?').join(',');const result=await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,received_at FROM companion_route_captures WHERE league_id=? AND id IN (${marks}) ORDER BY received_at DESC`).bind(leagueId,...ids).all();rows.push(...(result.results||[]));}const latest=new Map();for(const row of rows){if(!SCHEDULE_ROUTE.test(row.route_path))continue;if(!latest.has(row.route_path))latest.set(row.route_path,row);}return[...latest.values()].sort((a,b)=>a.route_path.localeCompare(b.route_path));}

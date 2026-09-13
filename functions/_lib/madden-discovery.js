@@ -1,7 +1,8 @@
-import { resolveMaddenPeriod } from './madden-period.js';
+import { maddenRoutePeriod, resolveMaddenPeriod, resolveMaddenSchedulePeriods } from './madden-period.js';
+import { compareSchedulePeriods, currentStatePeriodEvidence, proveCurrentSchedulePeriod } from './schedule-integrity.js';
 
-export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'same-season-complete-periods-v1';
-export const MADDEN_DISCOVERY_RELEASE = '7.4.4.12';
+export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'schedule-horizon-current-period-v2';
+export const MADDEN_DISCOVERY_RELEASE = '7.5.6';
 
 const DATASET_ORDER = Object.freeze([
   'league-info',
@@ -232,6 +233,8 @@ export function analyzeMaddenCapture(capture) {
   const collection = datasetType === 'free-agents' ? freeAgentCollection(payload) : primaryCollection(payload);
   const rows = collection?.values?.filter(item => item && typeof item === 'object' && !Array.isArray(item)) || [];
   const period = resolveMaddenPeriod(routePath,rows);
+  const periods=datasetType==='schedule'&&maddenRoutePeriod(routePath)?resolveMaddenSchedulePeriods(routePath,rows)
+    :period?.playable?[period]:[];
   const fields = fieldInventory(rows);
   const payloadSuccess = payload && typeof payload === 'object' && !Array.isArray(payload)
     ? payload.success ?? null
@@ -257,6 +260,9 @@ export function analyzeMaddenCapture(capture) {
     relationships: relationshipFields(fields),
     markers: markerCandidates(payload, routePath, period),
     period,
+    periods,
+    currentPeriodEvidence:['league-info','teams','team-rosters','players','standings'].includes(datasetType)
+      ?currentStatePeriodEvidence(payload,routePath):[],
     freeAgentEvidence: explicitFreeAgentRoute ? {
       explicitRoute: true,
       status: freeAgentStatus,
@@ -297,11 +303,13 @@ function mergeMarkers(analyses, expected = {}) {
 function completePeriodCoverage(analyses) {
   const periods = new Map();
   for (const analysis of analyses) {
-    if (!['schedule', 'statistics'].includes(analysis.datasetType) || analysis.period?.playable !== true) continue;
-    const key = analysis.period.key || `${analysis.period.stage}:${analysis.period.week}`;
-    const domains = periods.get(key) || new Set();
-    domains.add(analysis.datasetType);
-    periods.set(key, domains);
+    if (!['schedule', 'statistics'].includes(analysis.datasetType)) continue;
+    for(const period of analysis.periods||[]){
+      const key=period.key;
+      const domains=periods.get(key)||new Set();
+      domains.add(analysis.datasetType);
+      periods.set(key,domains);
+    }
   }
   return [...periods.entries()]
     .filter(([, domains]) => domains.has('schedule') && domains.has('statistics'))
@@ -511,6 +519,17 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
   const playerImportReadiness = buildPlayerImportReadiness(captures, requirements);
   requirements.players.assignmentEvidence = playerImportReadiness;
   const markers = mergeMarkers(analyses, options.expected || {});
+  markers.currentPeriod=proveCurrentSchedulePeriod(analyses);
+  const current=markers.currentPeriod.period;
+  const completeKeys=new Set(completePeriodCoverage(analyses));
+  const horizonValid=current&&completeKeys.has(current.key)
+    &&analyses.filter(a=>a.datasetType==='schedule').every(a=>a.periods!==null)
+    &&analyses.filter(a=>['schedule','statistics'].includes(a.datasetType))
+      .flatMap(a=>a.periods||[]).every(p=>compareSchedulePeriods(p,current)>0||completeKeys.has(p.key));
+  if(markers.currentPeriod.status==='proven'&&horizonValid&&markers.week.status!=='matched'){
+    markers.week.status='multi-period';
+    markers.week.completePeriods=[...completeKeys];
+  }
   if (markers.week?.status === 'ambiguous') {
     const completePeriods = acceptsCompleteMultiPeriodWeeks(analyses, markers.week);
     if (completePeriods) {
@@ -519,6 +538,11 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
     }
   }
   const sourceVerification = sourceGate(markers);
+  if(markers.currentPeriod.status!=='proven'
+    ||analyses.some(a=>a.datasetType==='schedule'&&a.periods===null)){
+    sourceVerification.week=false;
+    sourceVerification.passed=false;
+  }
   const datasetsPassed = REQUIRED_DATASETS.every(type => {
     const status = requirements[type]?.status;
     return status === 'located'
@@ -550,8 +574,13 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
     canonicalStage:item.period?.playable===true?item.period.stage:null,
     canonicalWeek:item.period?.playable===true?item.period.week:null,
     periodSource:item.period?.source||null,
+    canonicalPeriods:(item.periods||[]).map(p=>({stage:p.stage,week:p.week,key:p.key})),
     placeholder:item.period?.placeholder===true
   }));
+  for(let i=0;i<datasetInventory.length;i++){
+    if(analyses[i].datasetType==='schedule'&&analyses[i].periods?.length>1
+      &&analyses[i].period?.sentinel)datasetInventory[i].periodSource='payload-schedule-aggregate';
+  }
   const fieldInventory = analyses.map(item => ({ routePath: item.routePath, datasetType: item.datasetType, fields: item.fields }));
   const relationshipInventory = analyses.map(item => ({ routePath: item.routePath, datasetType: item.datasetType, relationships: item.relationships }));
   return {

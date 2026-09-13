@@ -1,6 +1,7 @@
 import { discordBotRequest, discordErrorText } from './discord-api.js';
 import { discordLeagueReadModel } from './discord-read-model.js';
 import { activeTeamAssignments, canonicalTeamKey, resolveTeam } from './league-teams.js';
+import { scheduleAdvanceDecision, snapshotCurrentPeriod } from './schedule-integrity.js';
 
 const SNOWFLAKE = /^[0-9]{17,20}$/;
 const clean = value => String(value ?? '').trim();
@@ -63,10 +64,26 @@ async function activeInstallation(db,leagueId) {
 }
 
 async function activeSnapshot(db,leagueId) {
-  return db.prepare(`SELECT snapshot.id,snapshot.season_year AS seasonYear,snapshot.week_index AS weekIndex
+  return db.prepare(`SELECT snapshot.id,snapshot.season_year AS seasonYear,snapshot.week_index AS weekIndex,snapshot.manifest_json
     FROM league_active_snapshots active
     JOIN league_snapshots snapshot ON snapshot.id=active.snapshot_id AND snapshot.league_id=active.league_id
     WHERE active.league_id=? LIMIT 1`).bind(leagueId).first();
+}
+
+async function automaticScheduleDecision(db,leagueId,active){
+  let manifest={};
+  try{manifest=JSON.parse(active.manifest_json||'{}')}catch{}
+  const recorded=manifest.discordScheduleTransition;
+  const previousId=recorded?.sourceSnapshotId;
+  const previous=previousId?await db.prepare(`SELECT id,season_year,week_index,manifest_json
+    FROM league_snapshots WHERE id=? AND league_id=? LIMIT 1`).bind(previousId,leagueId).first():null;
+  const decision=scheduleAdvanceDecision(previous,{period:snapshotCurrentPeriod(active),
+    proof:manifest.currentPeriodProof,seasonYear:active.seasonYear});
+  if(!recorded||recorded.allowed!==decision.allowed
+    ||recorded.to?.key!==decision.to?.key||recorded.from?.key!==decision.from?.key){
+    return{...decision,allowed:false,reviewRequired:true,reason:'transition-proof-unavailable'};
+  }
+  return decision;
 }
 
 async function beginRun(db,{leagueId,snapshotId,guildId,channelId,seasonYear,phase,week,source,requestedByUserId}) {
@@ -152,7 +169,7 @@ async function createMatchupThread(env,db,{run,league,model,game,assignments,pha
 }
 
 async function removeSupersededScheduleThreads(env,db,{
-  leagueId,seasonYear,phase,week,guildId,fetchImpl
+  leagueId,snapshotId,seasonYear,phase,week,guildId,fetchImpl
 }) {
   const prior = await rows(db,`SELECT id,discord_thread_id AS discordThreadId,season_year AS seasonYear,
       phase,week_index AS weekIndex
@@ -163,6 +180,10 @@ async function removeSupersededScheduleThreads(env,db,{
   let removed=0;
   const errors=[];
   for (const item of prior) {
+    if(String((await activeSnapshot(db,leagueId))?.id)!==String(snapshotId)){
+      errors.push('The active snapshot changed during schedule cleanup; remaining prior threads were preserved.');
+      break;
+    }
     const threadId=clean(item.discordThreadId);
     if (!SNOWFLAKE.test(threadId)) {
       errors.push(`A prior FranchiseHQ schedule thread for ${item.phase} Week ${item.weekIndex} has no valid Discord thread ID.`);
@@ -192,7 +213,7 @@ export async function syncDiscordScheduleThreads(env,db,{
   league,
   snapshotId = null,
   week = null,
-  phase = 'regular-season',
+  phase = null,
   channelId = null,
   source = 'candidate-import',
   requestedByUserId = null,
@@ -203,8 +224,11 @@ export async function syncDiscordScheduleThreads(env,db,{
   const active = await activeSnapshot(db,league.id);
   if (!active) return {ok:false,skipped:true,reason:'no-active-snapshot'};
   if (snapshotId && String(active.id) !== String(snapshotId)) return {ok:false,skipped:true,reason:'snapshot-superseded'};
+  const decision=await automaticScheduleDecision(db,league.id,active);
+  if(source==='candidate-import'&&!decision.allowed)return{ok:true,skipped:true,...decision};
   const targetWeek = Number(week ?? active.weekIndex);
-  const targetPhase = canonicalDiscordSchedulePhase(phase);
+  const targetPhase = canonicalDiscordSchedulePhase(phase??snapshotCurrentPeriod(active)?.stage);
+  if(source==='candidate-import'&&(targetWeek!==decision.to.week||targetPhase!==decision.to.stage))return{ok:false,skipped:true,reason:'target-period-mismatch'};
   const targetChannel = clean(channelId || installation.scheduleChannelId);
   if (!Number.isInteger(targetWeek) || targetWeek < 1 || !SNOWFLAKE.test(targetChannel)) {
     return {ok:false,skipped:true,reason:'schedule-channel-or-week-unavailable'};
@@ -221,12 +245,14 @@ export async function syncDiscordScheduleThreads(env,db,{
     leagueId:league.id,snapshotId:active.id,guildId:installation.guildId,channelId:targetChannel,
     seasonYear:active.seasonYear,phase:targetPhase,week:targetWeek,source,requestedByUserId
   });
-  const replacesActiveSchedule=source==='candidate-import'
+  const replacesActiveSchedule=decision.allowed
     &&targetWeek===Number(active.weekIndex)
+    &&targetPhase===snapshotCurrentPeriod(active)?.stage
     &&String(active.id)===String(model.snapshot.id);
   if (reused) {
-    const cleanup=replacesActiveSchedule
-      ?await removeSupersededScheduleThreads(env,db,{leagueId:league.id,seasonYear:active.seasonYear,
+    const stillActive=await activeSnapshot(db,league.id);
+    const cleanup=replacesActiveSchedule&&String(stillActive?.id)===String(active.id)
+      ?await removeSupersededScheduleThreads(env,db,{leagueId:league.id,snapshotId:active.id,seasonYear:active.seasonYear,
         phase:targetPhase,week:targetWeek,guildId:installation.guildId,fetchImpl})
       :{removed:0,errors:[]};
     return {ok:cleanup.errors.length===0,reused:true,week:targetWeek,phase:targetPhase,
@@ -251,8 +277,10 @@ export async function syncDiscordScheduleThreads(env,db,{
     .bind(league.id,active.seasonYear,targetPhase,targetWeek).first())?.count || 0);
   let removedPriorThreads=0;
   if (!errors.length&&existingCount===games.length&&replacesActiveSchedule) {
-    const cleanup=await removeSupersededScheduleThreads(env,db,{leagueId:league.id,seasonYear:active.seasonYear,
-      phase:targetPhase,week:targetWeek,guildId:installation.guildId,fetchImpl});
+    const stillActive=await activeSnapshot(db,league.id);
+    const cleanup=String(stillActive?.id)===String(active.id)?await removeSupersededScheduleThreads(env,db,{leagueId:league.id,snapshotId:active.id,seasonYear:active.seasonYear,
+      phase:targetPhase,week:targetWeek,guildId:installation.guildId,fetchImpl})
+      :{removed:0,errors:['The active snapshot changed during schedule sync; prior threads were preserved.']};
     removedPriorThreads=cleanup.removed;
     errors.push(...cleanup.errors);
   }
@@ -266,20 +294,34 @@ export async function syncDiscordScheduleThreads(env,db,{
 }
 
 export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,week,requestedByUserId,source='candidate-import'}={}) {
+  if(source==='candidate-import'){
+    const active=await activeSnapshot(db,league.id);
+    if(!active||String(active.id)!==String(snapshotId))return{scheduled:false,reason:'snapshot-superseded'};
+    const decision=await automaticScheduleDecision(db,league.id,active);
+    if(!decision.allowed)return{scheduled:false,...decision};
+  }
   const installation = await activeInstallation(db,league.id);
   if (!installation?.scheduleChannelId) return {scheduled:false,reason:'not-connected'};
   const work = syncDiscordScheduleThreads(context.env,db,{
     league,snapshotId,week,channelId:installation.scheduleChannelId,requestedByUserId,source
   });
-  const waitUntil = context.waitUntil || context.executionContext?.waitUntil;
-  if (typeof waitUntil === 'function') {
-    waitUntil.call(context.executionContext || context,work.catch(error=>console.error('Discord schedule sync failed:',discordErrorText(error))));
+  const owner=typeof context.waitUntil==='function'?context:context.executionContext;
+  if (typeof owner?.waitUntil === 'function') {
+    owner.waitUntil(work.catch(error=>console.error('Discord schedule sync failed:',discordErrorText(error))));
     return {scheduled:true};
   }
   return work;
 }
 
 export async function latestDiscordScheduleSync(db,leagueId) {
+  const active=await activeSnapshot(db,leagueId);
+  if(active){
+    const decision=await automaticScheduleDecision(db,leagueId,active);
+    if(!decision.allowed&&decision.reason!=='transition-proof-unavailable')return{
+      status:decision.reviewRequired?'review-required':'not-required',weekIndex:decision.to?.week,
+      phase:decision.to?.stage,reason:decision.reason,reviewRequired:decision.reviewRequired,transition:decision
+    };
+  }
   const row = await db.prepare(`SELECT status,season_year AS seasonYear,phase,week_index AS weekIndex,
       game_count AS gameCount,thread_count AS threadCount,registered_owner_count AS registeredOwnerCount,
       error_count AS errorCount,last_error AS lastError,completed_at AS completedAt,created_at AS createdAt

@@ -9,6 +9,7 @@ import { competitionState } from '../api/leagues/[leagueSlug]/competition.js';
 import { leagueNewsState } from './league-news.js';
 import { buildGmSeasonSummaries } from './gm-career.js';
 import { currentFranchiseContext } from './ownership-periods.js';
+import { snapshotCurrentPeriod } from './schedule-integrity.js';
 
 const clean=value=>String(value??'').trim();
 const lower=value=>clean(value).toLowerCase();
@@ -228,7 +229,9 @@ export async function scheduleCommand(c,values){
   else if(/^week\s*\d+$/i.test(view))week=number(view.match(/\d+/)?.[0]);
   else if(view.startsWith('team:'))requestedTeam=view.slice('team:'.length);
   else if(view!=='season')requestedTeam=view;
-  let games=model.games.filter(game=>week===null||number(game.week)===week);
+  const clock=snapshotCurrentPeriod(model.snapshot,false);
+  let games=model.games.filter(game=>(week===null||number(game.week)===week)
+    &&(week===null||!clock||canonicalGameStage(game.stage)===clock.stage));
   if(requestedTeam){
     const team=resolveTeam(model.teams,requestedTeam);
     if(!team)throw Object.assign(new Error('That team was not found in the active league.'),{status:404});
@@ -262,7 +265,8 @@ export async function gamesCommand(c,values){
     return sameSeason&&number(game.week)===number(context.week);
   });
   const stageRank={preseason:1,'regular-season':2,playoffs:3};
-  const activeStage=currentPeriod.map(game=>canonicalGameStage(game.stage)).sort((a,b)=>stageRank[b]-stageRank[a])[0]||context.stage;
+  const activeStage=snapshotCurrentPeriod(model.snapshot,false)?.stage
+    ||currentPeriod.map(game=>canonicalGameStage(game.stage)).sort((a,b)=>stageRank[b]-stageRank[a])[0]||context.stage;
   const games=currentPeriod.filter(game=>canonicalGameStage(game.stage)===activeStage)
     .sort((a,b)=>clean(a.scheduledAt).localeCompare(clean(b.scheduledAt))||clean(a.id).localeCompare(clean(b.id)));
   const played=games.filter(gamePlayed),unplayed=games.filter(game=>!gamePlayed(game));
