@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ=window.FranchiseHQ;
-  const VERSION='7.5.6';
+  const VERSION='7.5.6.1';
   const page=()=>document.querySelector('[data-page-content]');
   const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const slug=()=>HQ?.leagueTenant?.getCurrentLeague?.()?.slug||null;
@@ -346,7 +346,7 @@
     const action=`${workflow.status==='draft'?`<button class="button button--primary" data-live-revise="${esc(workflow.id)}">Continue Draft</button>`:''}${mayAccept?`<button class="button button--primary" data-live-accept="${esc(workflow.id)}">Accept Trade</button>`:''}${mayRevise?`<button class="button button--secondary" data-live-revise="${esc(workflow.id)}">${revisionRequested?'Revise Trade':proposer?'Revise Offer':'Revise Terms'}</button>`:''}${mayAccept?`<button class="button button--danger button--subtle" data-live-reject="${esc(workflow.id)}">Reject</button>`:''}${withdrawControls(workflow)}`;
     const privateDetails=participant||canReview()||workflow.status==='draft';
     const tally=workflow.review||{approvals:0,rejections:0,threshold:workflow.reviewThreshold||3};
-    const status=`<article class="card live-trade-status"><div><span class="eyebrow">Trade Status</span><strong>${esc(statusLabel(workflow.status))}</strong></div><dl><div><dt>Approvals</dt><dd>${Number(tally.approvals||0)}</dd></div><div><dt>Rejections</dt><dd>${Number(tally.rejections||0)}</dd></div></dl></article>`;
+    const status=`<article class="card live-trade-status" data-live-review-tally="${esc(workflow.id)}" aria-live="polite"><div><span class="eyebrow">Trade Status</span><strong data-live-tally-status>${esc(statusLabel(workflow.status))}</strong></div><dl><div><dt>Approvals</dt><dd data-live-tally-approvals>${Number(tally.approvals||0)}</dd></div><div><dt>Rejections</dt><dd data-live-tally-rejections>${Number(tally.rejections||0)}</dd></div></dl></article>`;
     const review=mayReview?`<article class="card live-trade-review"><div class="card-header"><div><span class="eyebrow">Confidential review</span><h3>Record your decision</h3><p>${tally.threshold} matching decisions are required.</p></div></div><label class="field"><span>Reason (optional)</span><textarea data-live-review-reason placeholder="Add a reason when useful…"></textarea></label>${state.settings.freeTradeDesignationEnabled?'<label class="trade-rule-toggle"><input type="checkbox" data-live-free-trade><span><strong>Designate as Free Trade if approved</strong><small>This trade will not use a seasonal trade slot.</small></span></label>':''}<div class="heading-actions"><button class="button button--primary" data-live-review="approve:${esc(workflow.id)}">Approve</button><button class="button button--danger" data-live-review="reject:${esc(workflow.id)}">Reject</button><button class="button button--ghost" data-live-review="abstain:${esc(workflow.id)}">Abstain</button></div></article>`:'';
     page().innerHTML=`<div class="trade-detail-page"><div class="page-heading trade-detail-heading"><div><button class="text-button" data-live-trade-back>← Trade Center</button><span class="eyebrow">${esc(revisionRequested?'Changes Requested':statusLabel(workflow.status))}</span><h1>${esc(workflow.participants.map(item=>teamAbbr(item.teamKey)).join(' ↔ '))}</h1>${workflow.note?`<p>${esc(workflow.note)}</p>`:''}</div><div class="heading-actions">${action}</div></div>${privateDetails?status:''}<div class="trade-package-matchup trade-package-matchup--detail trade-package-matchup--review">${workflow.participants.map(item=>{const incoming=workflow.assets.filter(asset=>asset.toTeamKey===item.teamKey);return `<section class="trade-package-team trade-detail-package-team" style="${teamStyle(item.teamKey)}"><div class="trade-package-team__watermark">${teamMark(item.teamKey)}</div><header>${teamMark(item.teamKey)}<span><strong>${esc(teamAbbr(item.teamKey))} RECEIVES</strong><small>${incoming.length} asset${incoming.length===1?'':'s'}</small></span></header><div class="trade-detail-package-team__assets">${incoming.map(assetRow).join('')||'<div class="empty-mini">No incoming assets</div>'}</div></section>`}).join('')}</div>${fairnessPanel(workflow.assets,workflow.participants.map(item=>item.teamKey))}${review}${privateDetails?`<article class="card live-trade-messages"><div class="card-header"><div><h3>Negotiation</h3><p>Shared only with participating owners and authorized reviewers.</p></div></div>${workflow.messages.map(message=>`<div class="live-trade-message"><strong>${esc(message.authorName||'System')}</strong><p>${esc(message.message)}</p><small>${esc(date(message.createdAt))}</small></div>`).join('')||'<div class="empty-mini">No messages yet.</div>'}${participant&&(!['approved','rejected','withdrawn'].includes(workflow.status)||revisionRequested)?`<div class="live-trade-message-compose"><textarea data-live-message-text placeholder="Write a message…"></textarea><button class="button button--primary" data-live-send-message="${esc(workflow.id)}">Send</button></div>`:''}</article>`:''}</div>`;
   }
@@ -666,6 +666,35 @@
     }).catch(()=>{});
   });
   window.addEventListener('franchisehq:league-tenant-changed',()=>{state=null;builder=null;blockManagerOpen=false;blockRosterOpen=false;blockEditor=null;blockRosterSearch='';blockRemovalCandidate=null;cancelArmedTradeId=null;builderGridScrollLeft=0;builderPickerScroll.clear();blockLookup.clear();assetFilters.clear();assetSearch.clear();document.body.style.overflow=''});
+
+  let tallyLoading=false;
+  async function refreshVisibleReviewTally(){
+    const panel=document.querySelector('[data-live-review-tally]'),tradeId=panel?.dataset.liveReviewTally;
+    const workflow=state?.workflows?.find(item=>item.id===tradeId),leagueSlug=slug();
+    if(tallyLoading||document.visibilityState==='hidden'||!leagueSlug||!workflow||['approved','withdrawn'].includes(workflow.status))return;
+    tallyLoading=true;
+    try{
+      const response=await fetch(`${endpoint()}?reviewTradeId=${encodeURIComponent(tradeId)}`,{
+        credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}
+      });
+      const data=await response.json();
+      if(!response.ok||data.ok===false||slug()!==leagueSlug||document.querySelector('[data-live-review-tally]')!==panel)return;
+      if(workflow.status!==data.status&&['approved','rejected','withdrawn'].includes(data.status)){
+        workflow.status=data.status;workflow.review=data.review;
+        panel.querySelector('[data-live-tally-status]').textContent=statusLabel(data.status);
+        document.querySelectorAll('[data-live-review]').forEach(button=>{button.disabled=true});
+        HQ?.liveData?.invalidateRosterAuthority?.();
+      }else if(workflow.status!==data.status||workflow.revision!==data.revision){await load(true);if(routePart()===tradeId)rerender();return}
+      workflow.review=data.review;
+      panel.querySelector('[data-live-tally-approvals]').textContent=String(data.review.approvals);
+      panel.querySelector('[data-live-tally-rejections]').textContent=String(data.review.rejections);
+    }catch{/* Keep the last server-confirmed tally during a transient outage. */}
+    finally{tallyLoading=false}
+  }
+  // Only an open, visible trade detail polls its small status response; roster,
+  // draft-pick, asset cards and in-progress reason inputs are not re-rendered.
+  window.setInterval?.(refreshVisibleReviewTally,5000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshVisibleReviewTally()});
 
   const service={version:VERSION,load,refresh:()=>load(true),request,renderTradeCenter,renderTradeBlock,renderCommissionerSettings,renderCommissionerManagement,renderCommissionerQuickManagement,
     renderNotificationMenu,badges,startPlayerTrade,startAssetTrade,togglePlayerBlock,onBlock,calculatorEnabled,playerValuation,pickValuation,packageValuation,

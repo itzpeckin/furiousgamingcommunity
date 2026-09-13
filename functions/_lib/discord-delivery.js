@@ -3,6 +3,7 @@ import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-
 import { attachProjectedPickSlots, projectDraftOrder } from './draft-pick-projections.js';
 import { tradeDecisionComponents, tradeLinkButton, tradeReviewComponents } from './discord-trade-components.js';
 import { normalizePlayer } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
+import { rememberDiscordTradeMessages, syncDiscordTradeMessages } from './discord-trade-sync.js';
 
 const MAX_ATTEMPTS=5;
 const SNOWFLAKE=/^\d{17,20}$/;
@@ -202,7 +203,7 @@ async function recoverSuppressedTradeEmbeds(env,channelId,posted,message,fetchIm
       });
       if(extra?.id)fallbackIds.push(String(extra.id));
     }
-    return {recovered:true,method:'permission-safe-text',messageCount:chunks.length};
+    return {recovered:true,method:'permission-safe-text',messageCount:chunks.length,messageIds:fallbackIds};
   }catch(error){
     for(const id of fallbackIds.reverse()){
       await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(id)}`,{method:'DELETE',fetchImpl}).catch(()=>null);
@@ -211,7 +212,7 @@ async function recoverSuppressedTradeEmbeds(env,channelId,posted,message,fetchIm
   }
 }
 
-export async function tradeConversationMessage(db,row,{disabled=false,statusMessage=null}={}){
+export async function tradeConversationMessage(db,row,{disabled=false,statusMessage=null,detailsCache=null}={}){
   let payload={};try{payload=JSON.parse(row.payloadJson||'{}')}catch{}
   const title=String(payload.title||'FranchiseHQ update');
   const message=String(payload.message||'Open FranchiseHQ for details.');
@@ -224,7 +225,11 @@ export async function tradeConversationMessage(db,row,{disabled=false,statusMess
     :row.eventType==='review-required'&&tradeId?'Commissioners can record their decision with the buttons below.'
     :null;
   let details=null;
-  try{details=await tradeDeliveryDetails(db,row,payload)}
+  try{
+    const key=`${row.leagueId}:${tradeId||row.resourceId}`;
+    if(detailsCache?.has(key))details=detailsCache.get(key);
+    else{details=await tradeDeliveryDetails(db,row,payload);detailsCache?.set(key,details)}
+  }
   catch(error){console.error('Discord trade detail render failed:',cleanError(error))}
   const decisionReady=['received','thread-update','revision-submitted'].includes(row.eventType)&&tradeId&&details?.workflow?.status==='negotiating';
   const reviewReady=row.eventType==='review-required'&&tradeId&&details?.workflow?.status==='committee';
@@ -332,7 +337,7 @@ export async function queueTradeRoomUpdate(db,{league,tradeId,eventKey,eventType
       .bind(Number(workflow.revision),roomStatus,room.id),
     db.prepare(`UPDATE discord_delivery_events SET status='suppressed',last_error='Delivered in private trade thread',updated_at=CURRENT_TIMESTAMP
       WHERE league_id=? AND resource_id=? AND visibility='direct-message'
-        AND event_type IN ('sent','received','accepted','review-required') AND status IN ('pending','failed')`)
+        AND event_type IN ('sent','received','accepted') AND status IN ('pending','failed')`)
       .bind(league.id,tradeId),
     db.prepare(`INSERT INTO discord_delivery_events
       (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
@@ -361,6 +366,9 @@ async function setTradeThreadState(env,db,row,payload,state,fetchImpl){
 }
 
 async function sendDelivery(env,db,row,fetchImpl){
+  if(row.eventType==='trade-message-sync'){
+    return syncDiscordTradeMessages(env,db,row,{render:tradeConversationMessage,fetchImpl});
+  }
   let channelId=row.channelId;
   const payload=parse(row.payloadJson);
   if(row.visibility==='direct-message'){
@@ -383,14 +391,28 @@ async function sendDelivery(env,db,row,fetchImpl){
     }
   }
   const message=await deliveryMessage(db,row);
-  if(row.eventType==='review-required'&&(!message.embeds?.length||!message.components?.length)){
+  if(row.eventType==='review-required'&&!message.embeds?.length){
     throw new Error('Discord committee delivery stopped because its trade asset package was incomplete.');
   }
-  const posted=await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
+  const retained=payload.discordMessages;
+  let posted;
+  if(retained?.messageIds?.length&&retained.textFallback){
+    await syncDiscordTradeMessages(env,db,{...row,payloadJson:JSON.stringify({...payload,tradeId:payload.tradeId||row.resourceId})},
+      {render:tradeConversationMessage,fetchImpl});
+    posted={id:retained.messageIds[0]};
+  }
+  if(retained?.messageIds?.length&&!retained.textFallback){
+    posted=await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(retained.messageIds[0])}`,{
+      method:'PATCH',body:{...message,components:message.components||[],allowed_mentions:{parse:[]}},fetchImpl
+    }).catch(error=>{if(Number(error?.status)===404)return null;throw error});
+  }
+  if(!posted)posted=await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}/messages`,{
     method:'POST',body:message,fetchImpl
   });
-  const embedRecovery=row.eventType==='review-required'
+  if(!retained?.textFallback)await rememberDiscordTradeMessages(db,row,channelId,[posted?.id||'']);
+  const embedRecovery=row.eventType==='review-required'&&!retained?.textFallback
     ?await recoverSuppressedTradeEmbeds(env,channelId,posted,message,fetchImpl):null;
+  if(embedRecovery?.messageIds?.length)await rememberDiscordTradeMessages(db,row,channelId,embedRecovery.messageIds,{textFallback:true});
   if(payload.archiveThreadAfterSend&&row.visibility==='private-channel'){
     try{
       const room=await setTradeThreadState(env,db,row,payload,{archived:true,locked:true},fetchImpl);
@@ -410,7 +432,7 @@ export async function flushDiscordDeliveries(env,db,{leagueId=null,limit=10,fetc
     FROM discord_delivery_events
     WHERE status IN ('pending','failed') AND attempts<? AND available_at<=CURRENT_TIMESTAMP
       AND (? IS NULL OR league_id=?)
-    ORDER BY created_at LIMIT ?`,MAX_ATTEMPTS,leagueId,leagueId,Math.min(25,Math.max(1,Number(limit)||10)));
+    ORDER BY CASE WHEN event_type='trade-message-sync' THEN 0 ELSE 1 END,created_at LIMIT ?`,MAX_ATTEMPTS,leagueId,leagueId,Math.min(25,Math.max(1,Number(limit)||10)));
   let sent=0,failed=0;
   for(const row of candidates){
     const claim=await db.prepare(`UPDATE discord_delivery_events SET status='sending',attempts=attempts+1,
@@ -473,8 +495,8 @@ export function scheduleDiscordDeliveryFlush(context,db,leagueId){
   const task=flushDiscordDeliveries(context.env,db,{leagueId}).catch(error=>{
     console.error('Discord delivery flush failed:',cleanError(error));
   });
-  const waitUntil=context?.waitUntil||context?.executionContext?.waitUntil;
-  if(typeof waitUntil==='function')waitUntil.call(context?.executionContext||context,task);
+  const owner=typeof context?.waitUntil==='function'?context:context?.executionContext;
+  if(typeof owner?.waitUntil==='function')owner.waitUntil(task);
   else task.catch(()=>{});
   return true;
 }

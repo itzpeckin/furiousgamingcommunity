@@ -13,7 +13,7 @@ import {
 import { applyRosterOverlays } from '../../../../_lib/trade-center.js';
 import { snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
 
-const RELEASE = '7.5.6';
+const RELEASE = '7.5.6.1';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
 

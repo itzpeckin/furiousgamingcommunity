@@ -11,7 +11,8 @@ import {
   discordGlobalCommandsNamed
 } from '../../functions/_lib/discord-commands.js';
 import { onRequestPost as discordInteractions } from '../../functions/api/discord/interactions.js';
-import { flushDiscordDeliveries, queueTradeRoomUpdate, tradeConversationMessage } from '../../functions/_lib/discord-delivery.js';
+import { flushDiscordDeliveries, queueCommitteeReviewDelivery, queueTradeRoomUpdate, tradeConversationMessage } from '../../functions/_lib/discord-delivery.js';
+import { queueDiscordTradeSync } from '../../functions/_lib/discord-trade-sync.js';
 import { tradeDecisionCustomId } from '../../functions/_lib/discord-trade-components.js';
 import {
   ensureDiscordGlobalCommands,
@@ -33,6 +34,7 @@ import { syncDiscordScheduleThreads } from '../../functions/_lib/discord-schedul
 import { ensureDraftPickHorizon } from '../../functions/_lib/draft-pick-baselines.js';
 import { activeLeagueTeams } from '../../functions/_lib/league-teams.js';
 import { executeTradeCenterAction } from '../../functions/api/leagues/[leagueSlug]/trade-center.js';
+import { onRequestGet as getTradeCenter } from '../../functions/api/leagues/[leagueSlug]/trade-center.js';
 
 async function applyMigrations(database){
   const files=(await walkFiles()).filter(file=>/^migrations\/\d+_.+\.sql$/.test(file)).sort();
@@ -105,6 +107,235 @@ function seedMember(database,{leagueId,userId='user-a',discordId='10000000000000
     (id,league_id,user_id,role,team_id,active) VALUES (?,?,?,?,?,?)`)
     .run(`membership-${leagueId}-${userId}`,leagueId,userId,role,teamId,active);
 }
+
+async function tradeSyncFixture(){
+  const database=new DatabaseSync(':memory:');
+  database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+  seedLeague(database,{id:'league-sync',slug:'sync',guild:'100000000000000001'});
+  seedMember(database,{leagueId:'league-sync'});
+  seedMember(database,{leagueId:'league-sync',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+  for(let i=1;i<=3;i++)seedMember(database,{leagueId:'league-sync',userId:`reviewer-${i}`,
+    discordId:`10000000000000002${i}`,teamId:null,role:i===2?'trade_committee':'commissioner'});
+  database.prepare(`UPDATE discord_league_installations SET trade_channel_id='100000000000000066',
+    trade_committee_channel_id='100000000000000067' WHERE league_id='league-sync'`).run();
+  seedActiveWeek(database,{leagueId:'league-sync'});
+  database.prepare(`INSERT INTO franchise_seasons
+    (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+    VALUES ('season-sync','league-sync','madden-companion','franchise-sync','2026','Madden NFL 27','2026',2026,'active')`).run();
+  const db=d1(database),teams=await activeLeagueTeams(db,'league-sync');
+  const league={id:'league-sync',slug:'sync',name:'Sync League',features:{}};
+  const context=userId=>{const member=database.prepare(`SELECT role,team_id AS teamId FROM league_memberships WHERE user_id=?`).get(userId);return{
+    db,league,teams,session:{user:{id:userId,displayName:userId},membership:{...member,teamKey:member.teamId}},
+    request:new Request('https://franchisehq.app/api/leagues/sync/trade-center',{method:'POST'})
+  }};
+  await ensureDraftPickHorizon(db,{leagueId:league.id,franchiseSeasonId:'season-sync',seasonYear:2026,gameRelease:'Madden NFL 27',teams});
+  const result=await executeTradeCenterAction(context('user-a'),{action:'propose',transfers:[
+    {assetType:'draft-pick',assetId:'pick:league-sync:2027:1:tb',fromTeamKey:'tb',toTeamKey:'sf'},
+    {assetType:'draft-pick',assetId:'pick:league-sync:2027:1:sf',fromTeamKey:'sf',toTeamKey:'tb'}
+  ]});
+  const tradeId=result.tradeId;
+  database.prepare(`INSERT INTO discord_trade_rooms
+    (id,league_id,trade_id,revision,discord_guild_id,parent_channel_id,discord_thread_id,message_id,status)
+    VALUES ('room-sync','league-sync',?,1,'100000000000000001','100000000000000066','100000000000000077','100000000000000300','active')`).run(tradeId);
+  const messages=new Map(),calls=[];let nextId=301,failure=null,duringPatch=null;
+  const clone=value=>JSON.parse(JSON.stringify(value));
+  const fetchImpl=async(url,options={})=>{
+    const address=new URL(url),parts=address.pathname.split('/').slice(3),method=options.method||'GET';
+    const body=options.body?JSON.parse(options.body):null;
+    calls.push({path:parts.join('/'),method,body});
+    const respond=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
+    if(parts.join('/')==='users/@me/channels')return respond({id:`${200+Number(body.recipient_id.slice(-2))}`.padStart(18,'1')});
+    const channelId=parts[1],messageId=parts[3];
+    if(parts[2]==='messages'){
+      const key=`${channelId}:${messageId}`;
+      if(method==='POST'){
+        const id=String(nextId++).padStart(18,'1'),message={...body,id,channel_id:channelId,author:{id:'100000000000000009'}};
+        messages.set(`${channelId}:${id}`,message);return respond(clone(message));
+      }
+      if(method==='PATCH'){
+        if(failure===key)return respond({message:'Temporary failure'},503);
+        if(!messages.has(key))return respond({message:'Unknown Message'},404);
+        messages.set(key,{...messages.get(key),...body});
+        if(duringPatch){const callback=duringPatch;duringPatch=null;await callback()}
+        return respond(clone(messages.get(key)));
+      }
+      if(messageId)return messages.has(key)?respond(clone(messages.get(key))):respond({message:'Unknown Message'},404);
+      return respond([...messages.values()].filter(message=>message.channel_id===channelId).map(clone));
+    }
+    return respond({id:channelId,...body});
+  };
+  const initial=await tradeConversationMessage(db,{leagueId:league.id,eventType:'received',resourceId:tradeId,
+    payloadJson:JSON.stringify({title:'Private trade negotiation',tradeId,leagueSlug:league.slug})});
+  messages.set('100000000000000077:100000000000000300',{...initial,id:'100000000000000300',channel_id:'100000000000000077',author:{id:'100000000000000009'}});
+  await executeTradeCenterAction(context('owner-sf'),{action:'accept',tradeId,revision:1});
+  await queueCommitteeReviewDelivery(db,{league,tradeId});
+  await queueTradeRoomUpdate(db,{league,tradeId,eventKey:'accepted',title:'Trade accepted'});
+  await flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},db,{leagueId:league.id,limit:25,fetchImpl});
+  const vote=async(userId,decision)=>executeTradeCenterAction(context(userId),{action:'review',tradeId,revision:1,decision});
+  const flush=()=>flushDiscordDeliveries({DISCORD_BOT_TOKEN:'test-bot-token'},db,{leagueId:league.id,limit:25,fetchImpl});
+  const assertTally=(approvals,rejections,status='Accepted')=>{
+    const activeKeys=new Set(['100000000000000077:100000000000000300']);
+    for(const row of database.prepare(`SELECT payload_json AS payload FROM discord_delivery_events WHERE resource_id=?
+      AND event_type IN ('review-required','received','thread-update','revision-submitted') AND status='sent'`).all(tradeId)){
+      const reference=JSON.parse(row.payload).discordMessages;
+      for(const id of reference?.messageIds||[])activeKeys.add(`${reference.channelId}:${id}`);
+    }
+    const copies=[...messages.entries()].filter(([key,message])=>activeKeys.has(key)&&message.embeds?.some(embed=>embed.title==='Trade status')).map(([,message])=>message);
+    assert.ok(copies.length>=5,'owner thread, committee channel and all three reviewer DMs must be present');
+    for(const message of copies)assert.equal(message.embeds.at(-1).description,
+      `**${status}**\n**Approvals:** ${approvals}\n**Rejections:** ${rejections}`,message.channel_id);
+  };
+  return {database,db,league,tradeId,context,messages,calls,fetchImpl,vote,flush,assertTally,
+    fail:key=>{failure=key},onPatch:callback=>{duringPatch=callback}};
+}
+
+test('site, reviewer DM and Trade Submit votes refresh every Discord card without duplicate votes or review posts',async()=>{
+  const fixture=await tradeSyncFixture(),originalFetch=globalThis.fetch;
+  const {database,db,tradeId,messages,calls,vote,flush,assertTally}=fixture;
+  try{
+    assertTally(0,0);
+    const assetCards=[...messages.values()].map(message=>message.embeds?.slice(0,-1)).filter(Boolean);
+    const postCount=calls.filter(call=>call.method==='POST'&&call.path.endsWith('/messages')).length;
+    await vote('reviewer-1','approve');await flush();assertTally(1,0);
+    await vote('reviewer-1','approve');await flush();assertTally(1,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_reviews WHERE trade_id=?`).get(tradeId).count,1);
+    globalThis.fetch=fixture.fetchImpl;
+    const key=await signingKey(),env={DISCORD_BOT_TOKEN:'test-bot-token'};
+    const dm=database.prepare(`SELECT payload_json AS payloadJson FROM discord_delivery_events
+      WHERE resource_id=? AND discord_user_id='100000000000000022' AND event_type='review-required'`).get(tradeId);
+    const dmRef=JSON.parse(dm.payloadJson).discordMessages;
+    const approveInteraction=interaction({id:'100000000000000501',guild:null,channel:dmRef.channelId,user:'100000000000000022',type:3,
+      data:{custom_id:tradeDecisionCustomId('review-approve',tradeId,1),component_type:2}});
+    approveInteraction.message=messages.get(`${dmRef.channelId}:${dmRef.messageIds[0]}`);
+    const dmResult=await discordInteractions(await signedContext({db,key,env,interaction:approveInteraction}));
+    assert.equal((await dmResult.json()).type,6,'the clicked card is updated by authoritative fan-out, not a potentially stale interaction body');
+    assertTally(2,0);
+    const channelMessage=[...messages.values()].find(message=>message.channel_id==='100000000000000067');
+    const denyInteraction=interaction({id:'100000000000000502',channel:'100000000000000067',user:'100000000000000023',type:5,
+      data:{custom_id:tradeDecisionCustomId('review-deny',tradeId,1),components:[]}});
+    denyInteraction.message=channelMessage;
+    const channelResult=await discordInteractions(await signedContext({db,key,env,interaction:denyInteraction}));
+    assert.equal((await channelResult.json()).type,6);assertTally(2,1);
+    await vote('reviewer-1','abstain');await flush();assertTally(1,1);
+    await vote('reviewer-1','approve');await flush();assertTally(2,1);
+    assert.equal(calls.filter(call=>call.method==='POST'&&call.path==='channels/100000000000000067/messages').length,1,
+      'votes edit the existing committee review instead of posting another review');
+    assert.deepEqual([...messages.values()].slice(0,assetCards.length).map(message=>message.embeds.slice(0,-1)),assetCards,
+      'team logos, colors, player/pick cards and asset separators are unchanged');
+    await vote('reviewer-3','approve');await flush();assertTally(3,0,'Approved');
+    for(const message of messages.values())if(message.embeds?.at(-1)?.title==='Trade status')assert.deepEqual(message.components||[],[],
+      'terminal cards remove stale owner and committee buttons everywhere');
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM canonical_transactions WHERE workflow_trade_id=?`).get(tradeId).count,1);
+    assert.ok(calls.filter(call=>call.method==='PATCH'&&call.path.includes('/messages/')).every(call=>
+      JSON.stringify(call.body.allowed_mentions)==='{"parse":[]}'),'tally refreshes never re-ping the committee role');
+    assert.ok(postCount>=5);
+  }finally{globalThis.fetch=originalFetch;database.close()}
+});
+
+test('one unavailable reviewer DM does not stop other copies and retry uses the latest tally without reposting',async()=>{
+  const {database,db,league,tradeId,messages,calls,vote,flush,assertTally,fail}=await tradeSyncFixture();
+  try{
+    const reference=JSON.parse(database.prepare(`SELECT payload_json AS payload FROM discord_delivery_events
+      WHERE resource_id=? AND discord_user_id='100000000000000021' AND event_type='review-required'`).get(tradeId).payload).discordMessages;
+    const failing=`${reference.channelId}:${reference.messageIds[0]}`;
+    fail(failing);await vote('reviewer-1','approve');
+    const result=await flush();assert.equal(result.failed,1);
+    for(const [key,message] of messages)if(key!==failing&&message.embeds?.at(-1)?.title==='Trade status')assert.match(message.embeds.at(-1).description,/Approvals:\*\* 1/);
+    const posts=calls.filter(call=>call.method==='POST'&&call.path.endsWith('/messages')).length;
+    fail(null);await vote('reviewer-2','reject');await flush();
+    database.prepare(`UPDATE discord_delivery_events SET available_at=CURRENT_TIMESTAMP WHERE event_type='trade-message-sync' AND status='failed'`).run();
+    await flush();assertTally(1,1);
+    assert.equal(calls.filter(call=>call.method==='POST'&&call.path.endsWith('/messages')).length,posts);
+    // A removed message is not recreated, and the remaining copies still update.
+    messages.delete(failing);await queueDiscordTradeSync(db,{league,tradeId});
+    assert.equal((await flush()).failed,0);
+    assert.equal(messages.has(failing),false);
+  }finally{database.close()}
+});
+
+test('a vote arriving during a Discord PATCH cannot leave an older tally on any copy',async()=>{
+  const {database,vote,flush,assertTally,onPatch}=await tradeSyncFixture();
+  try{
+    await vote('reviewer-1','approve');onPatch(()=>vote('reviewer-2','reject'));
+    assert.equal((await flush()).failed,0);assertTally(1,1);
+    await flush();assertTally(1,1);
+    let patches=0;
+    const lateVote=async()=>{if(++patches<5){onPatch(lateVote);return}await vote('reviewer-2','approve')};
+    onPatch(lateVote);await vote('reviewer-3','reject');
+    assert.equal((await flush()).failed,0);assertTally(2,1);
+  }finally{database.close()}
+});
+
+test('retained legacy messages are recovered only for the exact bot and trade, and old-revision counts reset',async()=>{
+  const {database,db,league,tradeId,context,messages,calls,vote,flush,assertTally}=await tradeSyncFixture();
+  try{
+    database.prepare(`UPDATE discord_delivery_events SET payload_json=json_remove(payload_json,'$.discordMessages')
+      WHERE resource_id=? AND event_type='review-required'`).run(tradeId);
+    const own=[...messages.values()].find(message=>message.channel_id==='100000000000000067');
+    const outsider={...own,id:'100000000000000601',author:{id:'100000000000000008'}};
+    const otherTrade={...own,id:'100000000000000602',content:own.content.replaceAll(tradeId,'trade_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),components:[]};
+    messages.set(`${own.channel_id}:${outsider.id}`,outsider);messages.set(`${own.channel_id}:${otherTrade.id}`,otherTrade);
+    await vote('reviewer-1','reject');await flush();
+    assert.match(own.embeds.at(-1).description,/Rejections:\*\* 0/,'the previously captured object remains a historical snapshot');
+    assert.ok(calls.some(call=>call.method==='GET'&&call.path.endsWith('/messages')));
+    assert.ok(!calls.some(call=>call.method==='PATCH'&&/600|601|602/.test(call.path)));
+    messages.delete(`${own.channel_id}:${outsider.id}`);messages.delete(`${own.channel_id}:${otherTrade.id}`);assertTally(0,1);
+    await vote('reviewer-2','reject');await vote('reviewer-3','reject');await flush();assertTally(0,3,'Rejected');
+    await executeTradeCenterAction(context('owner-sf'),{action:'counter',tradeId,revision:1,transfers:[
+      {assetType:'draft-pick',assetId:'pick:league-sync:2027:1:tb',fromTeamKey:'tb',toTeamKey:'sf'},
+      {assetType:'draft-pick',assetId:'pick:league-sync:2027:1:sf',fromTeamKey:'sf',toTeamKey:'tb'}
+    ]});
+    await flush();assertTally(0,0,'Negotiating');
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM trade_workflow_reviews WHERE trade_id=? AND revision=1`).get(tradeId).count,3);
+    await queueDiscordTradeSync(db,{league,tradeId});await flush();assertTally(0,0,'Negotiating');
+  }finally{database.close()}
+});
+
+test('permission-safe multipart review copies update their final status without losing assets or creating messages',async()=>{
+  const {database,tradeId,messages,calls,vote,flush}=await tradeSyncFixture();
+  try{
+    const row=database.prepare(`SELECT id,payload_json AS payload FROM discord_delivery_events
+      WHERE resource_id=? AND event_type='review-required' AND visibility='private-channel'`).get(tradeId);
+    const payload=JSON.parse(row.payload),reference=payload.discordMessages,firstId=reference.messageIds[0],lastId='100000000000000610';
+    const initial=messages.get(`${reference.channelId}:${firstId}`);
+    messages.set(`${reference.channelId}:${firstId}`,{...initial,content:'First asset details ━━━━━━━━━━━━━━━━━━━━',embeds:[],components:[]});
+    messages.set(`${reference.channelId}:${lastId}`,{...initial,id:lastId,content:'Second asset details\n\n**TRADE STATUS**\n**Accepted**\n**Approvals:** 0\n**Rejections:** 0',embeds:[]});
+    payload.discordMessages={...reference,messageIds:[firstId,lastId],textFallback:true};
+    database.prepare(`UPDATE discord_delivery_events SET payload_json=? WHERE id=?`).run(JSON.stringify(payload),row.id);
+    const posts=calls.filter(call=>call.method==='POST'&&call.path.endsWith('/messages')).length;
+    await vote('reviewer-1','approve');assert.equal((await flush()).failed,0);
+    assert.equal(messages.get(`${reference.channelId}:${firstId}`).content,'First asset details ━━━━━━━━━━━━━━━━━━━━');
+    const final=messages.get(`${reference.channelId}:${lastId}`);
+    assert.match(final.content,/Second asset details.*Approvals:\*\* 1.*Rejections:\*\* 0/s);
+    assert.deepEqual(final.embeds,[]);assert.equal(final.components[0].components.length,2);
+    assert.equal(calls.filter(call=>call.method==='POST'&&call.path.endsWith('/messages')).length,posts);
+  }finally{database.close()}
+});
+
+test('lightweight live review tally endpoint preserves tenant privacy and returns only current-revision totals',async()=>{
+  const {database,db,tradeId,vote}=await tradeSyncFixture();
+  try{
+    const token='trade-review-status-test-token',hashed=await hashToken(token);
+    database.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at) VALUES ('session-status','reviewer-1',?,'2099-01-01T00:00:00.000Z')`).run(hashed);
+    const request=()=>new Request(`https://franchisehq.app/api/leagues/sync/trade-center?reviewTradeId=${tradeId}`,{
+      headers:{cookie:`${AUTH_CONSTANTS.SESSION_COOKIE_NAME}=${token}`}
+    });
+    await vote('reviewer-1','approve');
+    const response=await getTradeCenter({env:{DB:db},params:{leagueSlug:'sync'},request:request()});
+    assert.equal(response.status,200);
+    const data=await response.json();assert.equal(data.review.approvals,1);assert.equal(data.review.rejections,0);
+    assert.equal(data.workflows,undefined);assert.equal(data.picks,undefined);
+    seedMember(database,{leagueId:'league-sync',userId:'outsider',discordId:'100000000000000031',teamId:null});
+    database.prepare(`UPDATE sessions SET user_id='outsider' WHERE id='session-status'`).run();
+    assert.equal((await getTradeCenter({env:{DB:db},params:{leagueSlug:'sync'},request:request()})).status,403);
+    seedLeague(database,{id:'league-other',slug:'other',guild:'100000000000000002'});
+    seedMember(database,{leagueId:'league-other',userId:'outsider',discordId:'100000000000000031',teamId:null,role:'commissioner'});
+    assert.equal((await getTradeCenter({env:{DB:db},params:{leagueSlug:'other'},request:new Request(
+      `https://franchisehq.app/api/leagues/other/trade-center?reviewTradeId=${tradeId}`,{headers:{cookie:`${AUTH_CONSTANTS.SESSION_COOKIE_NAME}=${token}`}}
+    )})).status,404);
+    assert.equal(database.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id='league-sync'`).get().snapshot_id,'snapshot-league-sync-14');
+  }finally{database.close()}
+});
 
 function seedActiveWeek(database,{leagueId,week=14}={}){
   const snapshotId=`snapshot-${leagueId}-${week}`;
@@ -807,7 +1038,7 @@ test('/trade create opens one private owner thread and its buttons record the re
     const acceptedPayload=await accepted.json();
     assert.equal(acceptedPayload.type,7);
     assert.match(acceptedPayload.data.content,/awaiting Trade Committee review/);
-    assert.equal(acceptedPayload.data.components,undefined);
+    assert.deepEqual(acceptedPayload.data.components,[]);
     assert.equal(database.prepare(`SELECT status FROM trade_workflows WHERE id=?`).get(room.tradeId).status,'committee');
     assert.equal(database.prepare(`SELECT status FROM discord_trade_rooms WHERE trade_id=?`).get(room.tradeId).status,'committee');
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM discord_delivery_events WHERE resource_id=? AND visibility='direct-message' AND status<>'suppressed'`).get(room.tradeId).count,0);
