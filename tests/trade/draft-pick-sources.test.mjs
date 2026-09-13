@@ -56,6 +56,50 @@ function owner(preview,draftClass,round,originalTeam) {
   return preview.entries.find(entry=>entry.draftClass===draftClass&&entry.round===round&&entry.originalTeamKey===originalTeamKey)?.currentTeamKey;
 }
 
+test('the exact one-pick correction is guarded, atomic, idempotent and preserves every other pick',async()=>{
+  const sql=await readFile(path.join(ROOT,'releases/7.5.6.2/pick-correction.sql'),'utf8');
+  const actor='user_f7785a5e-e399-4261-8b41-d6f4f60af8eb';
+  const pickId='pick:franchise-hq-primary:season_0edd7760-1fe3-4756-9b0a-fa0d9cb58d33:2027:1:tb';
+  for(const scenario of ['correct','stale-revision','different-owner','inactive-actor','audit-failure']){
+    const database=new DatabaseSync(':memory:');
+    try{
+      database.exec('PRAGMA foreign_keys=ON');await migrate(database);
+      database.prepare(`INSERT INTO leagues (id,name,product_name,slug) VALUES ('franchise-hq-primary','FGC','FranchiseHQ','furious-gaming-community')`).run();
+      database.prepare(`INSERT INTO users (id,discord_user_id,discord_username,display_name) VALUES (?,'100000000000000001','peckin','Peckin')`).run(actor);
+      database.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,active) VALUES ('member','franchise-hq-primary',?,'commissioner',?)`).run(actor,scenario==='inactive-actor'?0:1);
+      database.prepare(`INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,status)
+        VALUES ('season','franchise-hq-primary','madden-companion','franchise','2026','Madden NFL 27','2026','active')`).run();
+      const insert=database.prepare(`INSERT INTO league_draft_picks (id,league_id,franchise_season_id,draft_class,round,original_team_key,current_team_key,revision)
+        VALUES (?,'franchise-hq-primary','season',?,?,?,?,?)`);
+      for(let year=2027;year<=2029;year++)for(let round=1;round<=7;round++)for(const team of teams){
+        const target=year===2027&&round===1&&team.teamKey==='tb';
+        insert.run(target?pickId:`fixture:${year}:${round}:${team.teamKey}`,year,round,team.teamKey,
+          target?(scenario==='different-owner'?'sf':'ne'):team.teamKey,target?(scenario==='stale-revision'?4:2):1);
+      }
+      const before=database.prepare(`SELECT id,current_team_key,revision FROM league_draft_picks ORDER BY id`).all();
+      if(scenario==='audit-failure')database.exec(`CREATE TRIGGER fail_correction_audit BEFORE INSERT ON tenant_audit_events BEGIN SELECT RAISE(ABORT,'audit unavailable'); END`);
+      database.exec('BEGIN');
+      try{database.exec(sql);database.exec('COMMIT')}
+      catch(error){database.exec('ROLLBACK');if(scenario!=='audit-failure')throw error}
+      const after=database.prepare(`SELECT id,current_team_key,revision FROM league_draft_picks ORDER BY id`).all();
+      assert.equal(after.length,672);
+      assert.deepEqual(after.filter(row=>row.id!==pickId),before.filter(row=>row.id!==pickId));
+      if(scenario==='correct'){
+        assert.equal(after.find(row=>row.id===pickId).current_team_key,'tb');
+        assert.equal(after.find(row=>row.id===pickId).revision,3);
+        database.exec(sql);assert.deepEqual(database.prepare(`SELECT id,current_team_key,revision FROM league_draft_picks ORDER BY id`).all(),after);
+        assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM draft_pick_ledger_events`).get().n,1);
+        assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM tenant_audit_events`).get().n,1);
+      }else{
+        assert.deepEqual(after,before);
+        assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM draft_pick_ledger_events`).get().n,0);
+        assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM tenant_audit_events`).get().n,0);
+      }
+      assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
+    }finally{database.close()}
+  }
+});
+
 test('Madden 27 release source expands to a complete reusable 32-team three-year baseline',()=>{
   const preview=configuredDraftPickBaseline({gameRelease:'Madden NFL 27',seasonYear:2026,teams});
   assert.deepEqual(preview.classes,[2027,2028,2029]);

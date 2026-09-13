@@ -1,0 +1,8 @@
+{
+  "schemaVersion":1,"product":"FranchiseHQ","version":"7.5.6.2","releaseType":"discord-trade-latency-remediation","status":"validated-production-authorized",
+  "sourceBaseline":{"repository":"itzpeckin/furiousgamingcommunity","version":"7.5.6.1","commit":"4800a9254ddaba40b65e6249aabd60ab7f7a2ce8","tag":"v7.0.0"},
+  "implementationBranch":"codex/franchisehq-7.5.6.2","environmentContract":"config/environment-contract.json","databaseContract":"config/database-schema-contract.json","tenantContract":"config/tenant-data-contract.json","qualityBaseline":"config/quality-baseline.json","knownInheritedIssues":[],
+  "repositoryPublication":{"authorized":true,"status":"pending"},"staging":{"authorized":false,"deployed":false,"status":"not-run"},
+  "production":{"authorized":true,"deployed":false,"status":"pending","currentRelease":"7.5.6.1","candidateRelease":"7.5.6.2","currentMigration":40,"candidateMigration":40,"scope":"Discord latency fix and a separately guarded, explicit one-pick correction. Ownership redesign and transfer tools remain discussion only."},
+  "requiredArtifacts":["functions/_lib/discord-autocomplete.js","functions/_lib/discord-delivery.js","functions/api/discord/interactions.js","tests/discord/discord-bot.test.mjs","releases/7.5.6.2/pick-correction.sql","releases/7.5.6.2/release-record.md","releases/7.5.6.2/validation-evidence.json"]
+}

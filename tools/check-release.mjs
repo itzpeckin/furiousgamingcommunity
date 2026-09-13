@@ -38,10 +38,23 @@ const isAuthorizedProductionDataChange = (
   version === '7.5.3' && evidence.scopeBoundaries?.activationPerformed === true
 ) || (
   version === '7.5.4' && evidence.scopeBoundaries?.activationPerformed === true
+) || (
+  version === '7.5.6.2' && evidence.checks?.tampaBayPickCorrection?.productionOperationApplied === true
 );
 const isAuthorizedCredentialChange = (
   version === '7.4.4.3' && evidence.scopeBoundaries?.discordCredentialsChanged === true
 );
+
+if (version === '7.5.6.2' && evidence.checks?.tampaBayPickCorrection?.productionOperationApplied === true) {
+  const correction=evidence.checks.tampaBayPickCorrection;
+  if (correction.authorized!==true || correction.onlyOnePickChanged!==true
+    || correction.protectedRecordsVerified!==true || correction.ledgerAndAuditVerified!==true
+    || correction.expectedFromTeam!=='ne' || correction.toTeam!=='tb'
+    || correction.expectedRevision!==2 || correction.finalRevision!==3
+    || correction.protectedPickCount!==672 || !correction.recoveryBookmark) {
+    errors.push('7.5.6.2 must verify the exact authorized one-pick correction, protected records, recovery bookmark and audits.');
+  }
+}
 
 if (manifest.product !== 'FranchiseHQ') errors.push('Release product must be FranchiseHQ.');
 if (manifest.version !== version || evidence.version !== version) errors.push('Package, manifest, and evidence versions must match.');

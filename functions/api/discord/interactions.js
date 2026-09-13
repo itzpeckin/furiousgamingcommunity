@@ -20,7 +20,7 @@ import {
 } from '../../_lib/discord-commands.js';
 import { executeDiscordCommand, executeDiscordTradeComponent } from '../../_lib/discord-bot.js';
 import { discordAutocompleteChoices } from '../../_lib/discord-autocomplete.js';
-import { flushDiscordDeliveries } from '../../_lib/discord-delivery.js';
+import { flushDiscordDeliveries, scheduleDiscordDeliveryFlush } from '../../_lib/discord-delivery.js';
 import { parseTradeDecisionCustomId, tradeDenyModal } from '../../_lib/discord-trade-components.js';
 import { rememberDiscordTradeInteraction } from '../../_lib/discord-trade-sync.js';
 
@@ -41,7 +41,7 @@ async function runCommand(context,c,interaction){
   try{
     const content=await executeDiscordCommand(c);
     await completeInteractionReceipt(c.db,interaction.id,{status:'completed',response:content});
-    await flushDiscordDeliveries(context.env,c.db,{leagueId:c.league.id,limit:10}).catch(()=>{});
+    await flushAfterCommand(context,c);
     return content;
   }catch(error){
     const message=safeCommandError(error);
@@ -49,8 +49,19 @@ async function runCommand(context,c,interaction){
       status:Number(error?.status)>=400&&Number(error?.status)<500?'rejected':'failed',
       response:message,errorCode:error?.code||`http-${Number(error?.status)||500}`
     }).catch(()=>{});
-    await flushDiscordDeliveries(context.env,c.db,{leagueId:c.league.id,limit:10}).catch(()=>{});
+    await flushAfterCommand(context,c);
     return message;
+  }
+}
+
+async function flushAfterCommand(context,c){
+  const owner=typeof context.waitUntil==='function'?context:context.executionContext;
+  if(typeof owner?.waitUntil==='function'){
+    // The durable outbox can fan out many Discord edits. Never hold the slash
+    // command's result behind those unrelated network requests.
+    scheduleDiscordDeliveryFlush(context,c.db,c.league.id);
+  }else{
+    await flushDiscordDeliveries(context.env,c.db,{leagueId:c.league.id,limit:10}).catch(()=>{});
   }
 }
 
@@ -158,10 +169,10 @@ export async function onRequestPost(context){
   catch{return discordErrorResponse('FranchiseHQ Discord commands require database migration 34 before they can be enabled.');}
   if(!accepted)return discordErrorResponse('This Discord interaction was already received. Its first result remains authoritative.');
 
-  const waitUntil=context.waitUntil||context.executionContext?.waitUntil;
-  if(typeof waitUntil==='function'){
+  const owner=typeof context.waitUntil==='function'?context:context.executionContext;
+  if(typeof owner?.waitUntil==='function'){
     const work=runCommand(context,c,interaction).then(content=>editDiscordOriginalResponse(interaction,content));
-    waitUntil.call(context.executionContext||context,work.catch(error=>console.error('Discord response delivery failed:',safeCommandError(error))));
+    owner.waitUntil(work.catch(error=>console.error('Discord response delivery failed:',safeCommandError(error))));
     return discordInteractionResponse(DISCORD_RESPONSE_TYPES.DEFERRED_CHANNEL_MESSAGE,{
       ...(visibility==='private'?{flags:DISCORD_EPHEMERAL_FLAG}:{}),
       allowed_mentions:{parse:[]}

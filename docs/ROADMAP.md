@@ -6,13 +6,13 @@
 
 **Updated:** September 13, 2026
 
-**Revision:** 2.56
+**Revision:** 2.57
 
 **Current production:** FranchiseHQ 7.5.6.1 is live from exact candidate `b8581e6`, PR #96, code Main `d08eed3`, and verified Pages Production deployment `7537cc37-73f9-4399-a525-333f315b8c6d`. All four PR and five Main checks passed; strict gate 229/229 and authentication/mobile 12/12 passed. Public read-only acceptance confirms healthy Production, exact Main landing/asset bytes, and the Discord server release. Trade card design and compact Command Center sizing remain unchanged. No migration, live vote/import, snapshot activation, reset, archive/transition, export URL, ownership, credential, membership/assignment, or Discord configuration/registration operation ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** 7.5.6.1 completed its standing-authorized build/checks/PR/Main/Production cycle. Synthetic cross-surface vote/refresh, concurrency, partial failure/retry, legacy message recovery, revision reset, multipart fallback and open-site tally acceptance passed. Owner real Discord/site vote testing remains pending. Owner deferred representative new-season current-week/source acceptance until the next season; no live trade vote or protected-data operation is run for code acceptance.
+**Current work:** Standing-authorized 7.5.6.2 addresses measured Discord autocomplete/command-result latency. Separately, the owner explicitly requested returning only Tampa Bay's 2027 R1 pick from New England with ledger/audit evidence. Persistent FranchiseHQ player/pick ownership, commissioner transfers and whole-trade reversal are discussion only, not implemented by this patch. Annual current-week/source acceptance remains deferred until the next season.
 
-**Next gate:** Owner-validate live 7.5.6.1 cross-surface trade counters, then 7.5.7 measured importer performance and thread readiness. Real annual-import/current-week source proof remains deferred until the next season; full-season source with missing explicit current metadata is not claimed validated. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x.
+**Next gate:** Publish strict-validated 7.5.6.2 and verify the separately requested one-pick correction. Discuss persistent ownership and audited commissioner transfers before implementing that policy change; owner-validate live Discord latency/cross-surface counters. Then 7.5.7 measured importer performance and thread readiness. Real annual-import/current-week source proof remains deferred until the next season; full-season source with missing explicit current metadata is not claimed validated. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x.
 
 ## Product decisions
 
@@ -112,6 +112,7 @@
 | 7.5.5.9 | Production deployed; owner Discord interaction acceptance pending | Live current-revision committee approval/rejection tallies in Discord and FranchiseHQ plus contrast-safe Trade Block layering |
 | 7.5.6 | Production deployed; commissioner annual-import/Discord acceptance pending | Full-season schedule horizon separated from authoritative current period, with Discord threads created only for a proven league-week advance |
 | 7.5.6.1 | Production deployed; owner Discord/site vote acceptance pending | Current-revision approval/rejection/status synchronization across site, every reviewer DM, Trade Submit and owner trade thread |
+| 7.5.6.2 | Standing-authorized candidate | Measured Discord autocomplete/command-result latency and a separately guarded one-pick correction; ownership redesign remains discussion only |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -689,6 +690,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.57:** Strict-validated 7.5.6.2 (232/232 tests) addresses measured Discord autocomplete and slash-result latency; the same Production snapshot query improved from 1,060.83 ms to 35.24 ms. Publication and the explicitly requested guarded return of only Tampa Bay's 2027 R1 pick are pending. Persistent player/pick ownership and commissioner transfers remain discussion only; no import-authority change is claimed.
 
 - **Revision 2.56:** Completed exact 7.5.6.1 candidate `b8581e6` through PR #96, code Main `d08eed3`, all four PR/five Main checks and Pages Production `7537cc37-73f9-4399-a525-333f315b8c6d`. Strict gate 229/229, authentication/mobile 12/12 and synthetic cross-location vote/concurrency/retry/revision/card parity acceptance passed. Public landing, assets and Discord server release are verified. No live vote, import, migration, snapshot move or protected-data operation ran. Real vote acceptance remains owner-operated; annual current-week/source acceptance remains deferred.
 

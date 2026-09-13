@@ -63,8 +63,19 @@ async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOve
   if(teamKey&&!team)return[];
   const allowed=[...new Set((allowedPublicIds||[]).map(clean).filter(Boolean))].slice(0,100);
   if(allowedPublicIds&&!allowed.length)return[];
-  const allowedSql=allowed.length?`AND COALESCE(identity.public_id,candidate.externalId) IN (${allowed.map(()=>'?').join(',')})`:'';
-  const sql=`WITH candidate AS (
+  const allowedSql=allowed.length?`AND COALESCE(mapping.publicId,candidate.externalId) IN (${allowed.map(()=>'?').join(',')})`:'';
+  // Build the small league identity/ownership map once. Joining the alias table
+  // directly to every roster row otherwise rescans its franchise-scoped index
+  // for each player (millions of reads per keystroke on Production).
+  const sql=`WITH identity_map AS MATERIALIZED (
+      SELECT alias.source_player_id AS externalId,MAX(identity.public_id) AS publicId,
+        MAX(overlay.to_team_key) AS overlayTeamKey
+      FROM player_source_aliases alias
+      JOIN player_identities identity ON identity.league_id=alias.league_id AND identity.id=alias.player_identity_id
+      LEFT JOIN trade_roster_overlays overlay ON overlay.league_id=alias.league_id
+        AND overlay.player_identity_id=identity.id AND overlay.internal_status='active'
+      WHERE alias.league_id=? GROUP BY alias.source_player_id
+    ),candidate AS (
       SELECT record.external_id AS externalId,record.data_json AS dataJson,
         COALESCE(json_extract(record.data_json,'$.display_name'),json_extract(record.data_json,'$.displayName'),
           trim(COALESCE(json_extract(record.data_json,'$.first_name'),json_extract(record.data_json,'$.firstName'),'') || ' ' ||
@@ -77,25 +88,21 @@ async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOve
       JOIN league_snapshot_records record ON record.league_id=active.league_id AND record.snapshot_id=active.snapshot_id
       WHERE active.league_id=? AND record.domain='players'
     )
-    SELECT candidate.externalId,candidate.dataJson,MAX(identity.public_id) AS publicId,
-      candidate.displayName,candidate.teamExternalId,MAX(overlay.to_team_key) AS overlayTeamKey
+    SELECT candidate.externalId,candidate.dataJson,mapping.publicId,
+      candidate.displayName,candidate.teamExternalId,mapping.overlayTeamKey
     FROM candidate
-    LEFT JOIN player_source_aliases alias ON alias.league_id=? AND alias.source_player_id=candidate.externalId
-    LEFT JOIN player_identities identity ON identity.league_id=? AND identity.id=alias.player_identity_id
-    LEFT JOIN trade_roster_overlays overlay ON overlay.league_id=? AND overlay.player_identity_id=identity.id
-      AND overlay.internal_status='active'
+    LEFT JOIN identity_map mapping ON mapping.externalId=candidate.externalId
     WHERE (?='' OR instr(lower(candidate.displayName),?)>0 OR instr(lower(candidate.externalId),?)>0
-      OR instr(lower(COALESCE(identity.public_id,'')),?)>0)
-      AND (? IS NULL OR (overlay.to_team_key IS NOT NULL AND overlay.to_team_key=?)
-        OR (overlay.to_team_key IS NULL AND candidate.teamExternalId=?))
+      OR instr(lower(COALESCE(mapping.publicId,'')),?)>0)
+      AND (? IS NULL OR (mapping.overlayTeamKey IS NOT NULL AND mapping.overlayTeamKey=?)
+        OR (mapping.overlayTeamKey IS NULL AND candidate.teamExternalId=?))
       ${allowedSql}
-    GROUP BY candidate.externalId,candidate.dataJson,candidate.displayName,candidate.teamExternalId
     ORDER BY CASE
-      WHEN lower(candidate.displayName)=? OR lower(candidate.externalId)=? OR lower(COALESCE(MAX(identity.public_id),''))=? THEN 0
+      WHEN lower(candidate.displayName)=? OR lower(candidate.externalId)=? OR lower(COALESCE(mapping.publicId,''))=? THEN 0
       WHEN substr(lower(candidate.displayName),1,length(?))=? THEN 1 ELSE 2 END,
       lower(candidate.displayName),candidate.externalId
     LIMIT 25`;
-  const args=[c.league.id,c.league.id,c.league.id,c.league.id,query,query,query,query,team?.teamKey||null,team?.teamKey||null,team?.externalId||null,
+  const args=[c.league.id,c.league.id,query,query,query,query,team?.teamKey||null,team?.teamKey||null,team?.externalId||null,
     ...allowed,query,query,query,query,query];
   const rows=(await c.db.prepare(sql).bind(...args).all()).results||[];
   return uniqueChoices(rows.map(row=>{
