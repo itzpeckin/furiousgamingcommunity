@@ -189,6 +189,21 @@ async function tradeSyncFixture(){
     fail:key=>{failure=key},onPatch:callback=>{duringPatch=callback}};
 }
 
+test('queued votes synchronize each Discord card once per flush instead of replaying the entire fan-out',async()=>{
+  const {database,calls,vote,flush,assertTally}=await tradeSyncFixture();
+  try{
+    await vote('reviewer-1','approve');await vote('reviewer-1','reject');await vote('reviewer-1','approve');
+    calls.length=0;
+    const result=await flush();assertTally(1,0);
+    const patches=calls.filter(call=>call.method==='PATCH'&&call.path.includes('/messages/'));
+    assert.equal(patches.length,new Set(patches.map(call=>call.path)).size);
+    assert.ok(patches.length>=5);
+    assert.equal(result.failed,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM discord_delivery_events
+      WHERE event_type='trade-message-sync' AND status='pending'`).get().n,0);
+  }finally{database.close()}
+});
+
 test('site, reviewer DM and Trade Submit votes refresh every Discord card without duplicate votes or review posts',async()=>{
   const fixture=await tradeSyncFixture(),originalFetch=globalThis.fetch;
   const {database,db,tradeId,messages,calls,vote,flush,assertTally}=fixture;
@@ -1208,6 +1223,9 @@ test('Discord player autocomplete searches the active snapshot once instead of l
     assert.equal(playerQueries.length,1);
     assert.match(playerQueries[0],/LIMIT 25/);
     assert.doesNotMatch(playerQueries[0],/OFFSET/i);
+    assert.match(playerQueries[0],/identity_map AS MATERIALIZED/);
+    assert.match(playerQueries[0],/LEFT JOIN identity_map mapping/);
+    assert.doesNotMatch(playerQueries[0],/alias\.source_player_id=candidate\.externalId/);
   }finally{database.close()}
 });
 
@@ -1883,6 +1901,34 @@ test('published News is shared with Discord while drafts stay private to commiss
   }finally{database.close()}
 });
 
+test('slash results do not wait behind a stalled Discord notification request and the outbox remains durable',async()=>{
+  const database=new DatabaseSync(':memory:'),originalFetch=globalThis.fetch;
+  let releaseDelivery;
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});seedMember(database,{leagueId:'league-a'});
+    database.prepare(`INSERT INTO league_notifications
+      (id,league_id,user_id,notification_type,title,message) VALUES ('slow-notice','league-a','user-a','received','Trade received','Review it')`).run();
+    const stalled=new Promise(resolve=>{releaseDelivery=resolve}),pending=[],requests=[];
+    globalThis.fetch=async(url,options={})=>{
+      requests.push(String(url));
+      if(String(url).endsWith(['','users','@me','channels'].join('/'))){await stalled;return new Response('{"id":"100000000000000079"}')}
+      return new Response('{"id":"100000000000000080"}');
+    };
+    const key=await signingKey(),context=await signedContext({db:d1(database),key,
+      env:{DISCORD_BOT_TOKEN:'test-bot-token'},interaction:interaction({id:'100000000000000091'})});
+    context.executionContext={waitUntil(promise){assert.equal(this,context.executionContext);pending.push(promise)}};
+    const result=await discordInteractions(context);assert.equal((await result.json()).type,5);
+    // First tracked task completes the command and edits its original result.
+    // Notification delivery remains independently tracked and still stalled.
+    await pending[0];
+    assert.ok(requests.some(url=>url.includes('/webhooks/')));
+    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE idempotency_key='league-notification:slow-notice'`).get().status,'sending');
+    releaseDelivery();await Promise.all(pending);
+    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE idempotency_key='league-notification:slow-notice'`).get().status,'sent');
+  }finally{releaseDelivery?.();globalThis.fetch=originalFetch;database.close()}
+});
+
 test('production-style execution defers inside three seconds and edits the original response',async()=>{
   const database=new DatabaseSync(':memory:');
   const originalFetch=globalThis.fetch;
@@ -1896,7 +1942,8 @@ test('production-style execution defers inside three seconds and edits the origi
       return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
     };
     const context=await signedContext({db,key,interaction:interaction({id:'100000000000000090'})});
-    context.waitUntil=promise=>pending.push(promise);
+    context.waitUntil=function(promise){assert.equal(this,context);pending.push(promise)};
+    context.executionContext={waitUntil(){assert.fail('Pages context waitUntil takes precedence')}};
     const response=await discordInteractions(context);
     assert.deepEqual(await response.json(),{type:5,data:{allowed_mentions:{parse:[]}}});
     await Promise.all(pending);

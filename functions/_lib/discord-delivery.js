@@ -434,13 +434,20 @@ export async function flushDiscordDeliveries(env,db,{leagueId=null,limit=10,fetc
       AND (? IS NULL OR league_id=?)
     ORDER BY CASE WHEN event_type='trade-message-sync' THEN 0 ELSE 1 END,created_at LIMIT ?`,MAX_ATTEMPTS,leagueId,leagueId,Math.min(25,Math.max(1,Number(limit)||10)));
   let sent=0,failed=0;
+  const synchronizedTrades=new Set();
   for(const row of candidates){
     const claim=await db.prepare(`UPDATE discord_delivery_events SET status='sending',attempts=attempts+1,
       updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('pending','failed') AND attempts<?`)
       .bind(row.id,MAX_ATTEMPTS).run();
     if(Number(claim?.meta?.changes||0)!==1)continue;
     try{
-      const outcome=await sendDelivery(env,db,row,fetchImpl);
+      const syncKey=`${row.leagueId}:${row.resourceId}`;
+      // Every selected intent existed before this pass. A successful refresh
+      // already includes their latest votes; do not replay the entire fan-out
+      // once per queued vote. New intents arriving during work stay queued.
+      const duplicateSync=row.eventType==='trade-message-sync'&&synchronizedTrades.has(syncKey);
+      const outcome=duplicateSync?null:await sendDelivery(env,db,row,fetchImpl);
+      if(row.eventType==='trade-message-sync')synchronizedTrades.add(syncKey);
       await db.prepare(`UPDATE discord_delivery_events SET status='sent',sent_at=CURRENT_TIMESTAMP,
         last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(row.id).run();
       if(outcome?.room?.id&&outcome.archived){
