@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.5.15",
   "releaseType": "command-center-card-alignment",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {"repository": "itzpeckin/furiousgamingcommunity", "version": "7.5.5.14", "commit": "7e625b63e402a26d266cabaa1f353cf865fe88ae", "tree": "2798b92e83e897338182c6e1d2aacce4a013f04e", "tag": "v7.0.0"},
   "implementationBranch": "codex/franchisehq-7.5.5.15-command-alignment",
   "environmentContract": "config/environment-contract.json",
@@ -11,8 +11,8 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized": true, "status": "pending"},
+  "repositoryPublication": {"authorized": true, "status": "published-main-accepted", "candidateCommit": "03def64fc37d3f6e9b301245fab04b36b4a9bf66", "pullRequest": 92, "mergeCommit": "0b6d71ae0c5fabf376b0fc03fa84bfa0abd1d74b"},
   "staging": {"authorized": false, "deployed": false, "status": "not-run"},
-  "production": {"authorized": true, "deployed": false, "status": "pending", "currentRelease": "7.5.5.14", "candidateRelease": "7.5.5.15", "currentMigration": 40, "candidateMigration": 40, "scope": "Distribute existing Madden Import content within the available desktop left-column height so the attention and Quick Controls card bottoms align; retain compact natural phone height."},
+  "production": {"authorized": true, "deployed": true, "status": "deployed-read-only-verified", "currentRelease": "7.5.5.15", "candidateRelease": "7.5.5.15", "currentMigration": 40, "candidateMigration": 40, "currentCommit": "0b6d71ae0c5fabf376b0fc03fa84bfa0abd1d74b", "pagesDeployment": "0614586b-eb61-4467-a743-c6452ca2d52c", "scope": "Distribute existing Madden Import content within the available desktop left-column height so the attention and Quick Controls card bottoms align; retain compact natural phone height."},
   "requiredArtifacts": ["styles.css", "tests/ui/mobile-experience.test.mjs", "docs/ROADMAP.md", "docs/generated/system-inventory.json", "docs/generated/system-inventory.md", "releases/7.5.5.15/release-record.md", "releases/7.5.5.15/validation-evidence.json"]
 }

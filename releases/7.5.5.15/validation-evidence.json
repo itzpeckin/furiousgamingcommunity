@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.5.15",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {"unregisteredFailures": 0},
@@ -12,8 +12,9 @@
     "focusedTradeMobileSuite": {"passed": true, "tests": 16},
     "fullRepositorySuite": {"passed": true, "status": "passed", "tests": 218, "syntaxModules": 255, "routes": 76, "canonicalMigrations": 23, "requiredTables": 116},
     "commandCenterBrowserMatrix": {"passed": true, "cases": 48, "widths": [2114, 1920, 1440, 1280, 1101, 1024, 390, 320], "states": ["baseline", "aligned"], "attentionCounts": [0, 1, 12], "desktopOutsideColumnGap": 0, "desktopInterCardGap": 16, "desktopRowHeightDelta": 0, "quickControlsSizeChanged": false, "activityPositionChanged": false, "containmentFailures": 0, "minimumButtonHeight": 44, "fullQueueScrollContained": true, "phoneNaturalHeight": true},
+    "liveReadOnlyCommandCenter": {"passed": true, "runtimeRelease": "7.5.5.15", "viewport": 1280, "outsideColumnGapBefore": 144.359375, "outsideColumnGapAfter": 0, "importHeightBefore": 174.7421875, "importHeightAfter": 319.1015625, "attentionHeightBefore": 162.359375, "attentionHeightAfter": 162.359375, "quickControlsHeightBefore": 497.4609375, "quickControlsHeightAfter": 497.4609375, "activityOffsetFromRowBefore": 521.4609375, "activityOffsetFromRowAfter": 521.4609375, "interCardGap": 16, "activityGap": 24, "horizontalOverflow": false, "minimumButtonHeight": 44, "copyAndRefreshEnabled": true, "alreadyLiveImportDisabled": true, "step": "Make Import Live", "progress": 100, "seasonYear": 2026, "liveWeek": 20, "exactMainAssetsMatched": ["app.js", "styles.css", "trade-module.js", "league-engine/one-click-import.js"], "mobileAcceptance": "synthetic-browser-matrix-only"},
     "freeAgentBlockedPreserved": {"passed": true, "count": null, "interpretedAsZero": false}
   },
   "scopeBoundaries": {"migrationApplied": false, "discordBehaviorChanged": false, "discordCommandsRegistered": false, "discordConfigurationChanged": false, "liveTradeChanged": false, "importExecuted": false, "activeSnapshotChanged": false, "tradeResetExecuted": false, "archiveSeasonExecuted": false, "transitionOperationExecuted": false, "exportUrlRotated": false, "credentialsChanged": false, "membershipAssignmentsChanged": false, "freeAgentInterpretedAsZero": false, "databaseRowsWritten": 0},
-  "external": {"githubPublication": {"authorized": true, "status": "pending"}, "hostedChecks": {"status": "pending"}, "productionMigration": {"authorized": false, "status": "not-required"}, "discordCommandRegistration": {"authorized": false, "status": "not-required"}, "productionDeployment": {"authorized": true, "status": "pending"}}
+  "external": {"githubPublication": {"authorized": true, "status": "published-main-accepted", "candidateCommit": "03def64fc37d3f6e9b301245fab04b36b4a9bf66", "pullRequest": 92, "mainCommit": "0b6d71ae0c5fabf376b0fc03fa84bfa0abd1d74b"}, "hostedChecks": {"status": "passed", "pullRequestChecksPassed": 4, "mainChecksPassed": 5, "pullRequestQualityWorkflowRun": 34734241916, "mainQualityWorkflowRun": 34734286085, "mainPagesWorkflowRun": 34734285554}, "productionMigration": {"authorized": false, "status": "not-required"}, "discordCommandRegistration": {"authorized": false, "status": "not-required"}, "productionDeployment": {"authorized": true, "status": "deployed-read-only-verified", "runtimeRelease": "7.5.5.15", "mainCommit": "0b6d71ae0c5fabf376b0fc03fa84bfa0abd1d74b", "pagesDeployment": "0614586b-eb61-4467-a743-c6452ca2d52c", "authenticatedUiVerified": true}}
 }

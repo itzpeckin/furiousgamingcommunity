@@ -8,11 +8,11 @@
 
 **Revision:** 2.52
 
-**Current production:** FranchiseHQ 7.5.5.14 is live from PR #90, Main `778b8bb`, and verified Pages Production deployment `d8113810-46ff-46df-84a0-c73c808146e6`. All four PR and five Main checks passed; strict gate 218/218 and focused import/mobile 36/36 passed. The compact import panel sits above Needs Your Attention. Authenticated read-only desktop measurements confirm zero row-height increase, unchanged Quick Controls dimensions and Activity position, and enabled Copy URL/Refresh with the already-live import safely disabled. The 18-case synthetic desktop/phone matrix passed. Migration 40, Season 2026 / Week 20, and all league data remain unchanged. No import, snapshot, reset, archive/transition, export URL, trade/ownership, credential, membership, assignment, or Discord operation ran. Blocked Madden Free Agents remain unknown/null.
+**Current production:** FranchiseHQ 7.5.5.15 is live from PR #92, Main `0b6d71a`, and verified Pages Production deployment `0614586b-eb61-4467-a743-c6452ca2d52c`. All four PR and five Main checks passed; strict gate 218/218, import/mobile 36/36, and trade/mobile 16/16 passed. Authenticated read-only measurements confirm the outside-column gap is now zero, with unchanged Quick Controls height, attention height, and Activity offset. Existing importer content fills the available desktop height; normal 16px inter-card and 24px Activity gaps remain. The 48-case synthetic desktop/phone matrix passed. No migration, import, snapshot, reset, archive/transition, export URL, trade/ownership, credential, membership/assignment, or Discord operation ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** 7.5.5.15 corrects the remaining desktop gap below Needs Your Attention. The existing Madden Import content fills available left-column height so both columns end together, without increasing row height, moving Activity, or changing Quick Controls. The 48-case read-only desktop/phone comparison and focused import/mobile suite (36/36) passed. Standing authorization covers publication, PR checks, Main, and code-only Production deployment in this cycle. No import, data, snapshot, or Discord operation is included.
+**Current work:** 7.5.5.15 is deployed and read-only verified. Desktop Madden Import distributes its existing content within the remaining left-column height, aligning the attention card bottom with Quick Controls. Phones keep their unchanged natural compact height. No surrounding redesign or import/Discord behavior change was made.
 
-**Next gate:** Publish and verify 7.5.5.15 card alignment in Production, then owner visual acceptance and planned off-season 7.5.6 schedule-horizon work.
+**Next gate:** Owner visual acceptance of 7.5.5.15 card alignment, then planned off-season 7.5.6 schedule-horizon work.
 
 ## Product decisions
 
