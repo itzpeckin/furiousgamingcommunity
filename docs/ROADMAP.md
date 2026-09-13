@@ -6,13 +6,13 @@
 
 **Updated:** September 13, 2026
 
-**Revision:** 2.55
+**Revision:** 2.56
 
-**Current production:** FranchiseHQ 7.5.6 is live from exact candidate `650ba089`, PR #94, Main `01609a6`, and verified Pages Production deployment `67546407-9ec0-46ec-a3be-4ff40f944c0e`. All four PR and five Main checks passed; strict gate 222/222 and authentication/mobile 12/12 passed. The synthetic 272-game acceptance retains Weeks 1–18 with Week 1 active, all 18 Confidence weeks available, and stable saved matchup identity. Public read-only acceptance confirms the healthy live release and exact Main landing/asset bytes. Trade UI and compact Command Center sizing remain unchanged. No migration, live import, snapshot activation, reset, archive/transition, export URL, trade/ownership, credential, membership/assignment, or Discord configuration/registration operation ran. Blocked Madden Free Agents remain unknown/null.
+**Current production:** FranchiseHQ 7.5.6.1 is live from exact candidate `b8581e6`, PR #96, code Main `d08eed3`, and verified Pages Production deployment `7537cc37-73f9-4399-a525-333f315b8c6d`. All four PR and five Main checks passed; strict gate 229/229 and authentication/mobile 12/12 passed. Public read-only acceptance confirms healthy Production, exact Main landing/asset bytes, and the Discord server release. Trade card design and compact Command Center sizing remain unchanged. No migration, live vote/import, snapshot activation, reset, archive/transition, export URL, ownership, credential, membership/assignment, or Discord configuration/registration operation ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** Owner deferred representative new-season current-week/source acceptance until the next season and requested 7.5.6.1: synchronize current-revision trade status, approvals and rejections across the site, all reviewer DMs, Trade Submit and the owner thread, regardless of the voting entry point. Standing-authorized build/checks/PR/Main/Production cycle is in progress. No live trade vote or protected-data operation is run for acceptance.
+**Current work:** 7.5.6.1 completed its standing-authorized build/checks/PR/Main/Production cycle. Synthetic cross-surface vote/refresh, concurrency, partial failure/retry, legacy message recovery, revision reset, multipart fallback and open-site tally acceptance passed. Owner real Discord/site vote testing remains pending. Owner deferred representative new-season current-week/source acceptance until the next season; no live trade vote or protected-data operation is run for code acceptance.
 
-**Next gate:** Complete and owner-validate 7.5.6.1 cross-surface trade counters, then 7.5.7 measured importer performance and thread readiness. Real annual-import/current-week source proof remains deferred until the next season; full-season source with missing explicit current metadata is not claimed validated. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x.
+**Next gate:** Owner-validate live 7.5.6.1 cross-surface trade counters, then 7.5.7 measured importer performance and thread readiness. Real annual-import/current-week source proof remains deferred until the next season; full-season source with missing explicit current metadata is not claimed validated. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x.
 
 ## Product decisions
 
@@ -111,7 +111,7 @@
 | 7.5.5.8 | Production deployed; owner Discord acceptance pending | Visible character boundaries between Discord trade assets that render consistently on Mobile and Desktop without changing the trade package |
 | 7.5.5.9 | Production deployed; owner Discord interaction acceptance pending | Live current-revision committee approval/rejection tallies in Discord and FranchiseHQ plus contrast-safe Trade Block layering |
 | 7.5.6 | Production deployed; commissioner annual-import/Discord acceptance pending | Full-season schedule horizon separated from authoritative current period, with Discord threads created only for a proven league-week advance |
-| 7.5.6.1 | Implementation; standing-authorized publication | Current-revision approval/rejection/status synchronization across site, every reviewer DM, Trade Submit and owner trade thread |
+| 7.5.6.1 | Production deployed; owner Discord/site vote acceptance pending | Current-revision approval/rejection/status synchronization across site, every reviewer DM, Trade Submit and owner trade thread |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -689,6 +689,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.56:** Completed exact 7.5.6.1 candidate `b8581e6` through PR #96, code Main `d08eed3`, all four PR/five Main checks and Pages Production `7537cc37-73f9-4399-a525-333f315b8c6d`. Strict gate 229/229, authentication/mobile 12/12 and synthetic cross-location vote/concurrency/retry/revision/card parity acceptance passed. Public landing, assets and Discord server release are verified. No live vote, import, migration, snapshot move or protected-data operation ran. Real vote acceptance remains owner-operated; annual current-week/source acceptance remains deferred.
 
 - **Revision 2.55:** Owner deferred new-season current-week/source testing and requested cross-surface trade review synchronization. Added 7.5.6.1 as a patch without renumbering the remaining roadmap: atomic vote/refresh intent, existing Discord message references and legacy recovery, shared current-revision counts, all-copy edit fan-out, partial failure/concurrency protection and open-site tally refresh. Publication remains standing-authorized; no live import, vote, snapshot or protected-data operation is used for acceptance.
 
