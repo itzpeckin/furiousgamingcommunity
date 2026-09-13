@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.5.14",
+  "releaseType": "compact-command-center-import",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {"repository": "itzpeckin/furiousgamingcommunity", "version": "7.5.5.13", "commit": "e43f1604249d6a2758d5f29a29fe292426518979", "tree": "b6dbe912ee2984ddc8c83d76b91cf5e04bb28cd2", "tag": "v7.0.0"},
+  "implementationBranch": "codex/franchisehq-7.5.5.14-command-import",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending"},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {"authorized": true, "deployed": false, "status": "pending-hosted-checks", "currentRelease": "7.5.5.13", "candidateRelease": "7.5.5.14", "currentMigration": 40, "candidateMigration": 40, "scope": "Compact import actions and current-step progress above the attention queue; retain existing desktop row height and all surrounding UI."},
+  "requiredArtifacts": ["trade-module.js", "styles.css", "league-engine/one-click-import.js", "league-engine/permanent-export-url.js", "tests/import/candidate-import.test.mjs", "tests/import/permanent-league-export.test.mjs", "tests/ui/mobile-experience.test.mjs", "docs/ROADMAP.md", "docs/generated/system-inventory.json", "docs/generated/system-inventory.md", "releases/7.5.5.14/release-record.md", "releases/7.5.5.14/validation-evidence.json"]
+}

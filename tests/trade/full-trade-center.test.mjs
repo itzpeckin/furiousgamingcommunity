@@ -472,7 +472,7 @@ test('7.4.1 keeps trade reviews full-width and calculator-invariant while preser
   assert.doesNotMatch(correction,/container-type|:has\(|gap:|padding:|font-size:|trade-center-page/);
   assert.match(correction,/repeat\(4,minmax\(54px,1fr\)\)/);
   assert.match(correction,/repeat\(3,minmax\(62px,1fr\)\)/);
-  const columnFit=styles.slice(styles.indexOf('/* FranchiseHQ 7.5.5.13'));
+  const columnFit=styles.slice(styles.indexOf('/* FranchiseHQ 7.5.5.13'),styles.indexOf('/* FranchiseHQ 7.5.5.14'));
   assert.match(columnFit,/min-width:0;max-width:100%;grid-template-columns:minmax\(0,\.8fr\) minmax\(0,\.8fr\) minmax\(0,1\.6fr\) minmax\(0,\.8fr\)/);
   assert.match(columnFit,/metrics--pick\{grid-template-columns:minmax\(0,\.9fr\) minmax\(0,\.9fr\) minmax\(0,1\.6fr\)\}/);
   assert.match(columnFit,/grid-template-columns:42px 58px minmax\(80px,\.75fr\) minmax\(0,1\.6fr\) max-content max-content/);

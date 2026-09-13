@@ -3,7 +3,48 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import vm from 'node:vm';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
+
+test('compact and detailed import panels share readiness, progress, busy and live guards', async () => {
+  let payload={source:{counts:{freeAgentStatus:'blocked',freeAgentCount:null}}};
+  const connection={state:{endpoint:{exportUrl:'https://example.test/export'},latestExport:{status:'ready'}}};
+  const panels={compact:{outerHTML:''},full:{outerHTML:''}};
+  let service;
+  const listeners={};
+  const window={FranchiseHQ:{leagueTenant:{getCurrentLeague:()=>({slug:'league-two'})},leagueExportUrl:{diagnostics:()=>connection},defineModuleService:(_scope,_id,value)=>{service=value;}},addEventListener:(name,callback)=>{listeners[name]=callback;}};
+  const context=vm.createContext({window,document:{addEventListener:()=>{},querySelectorAll:selector=>selector==='[data-compact-import-panel]'?[panels.compact]:[panels.full]},setTimeout:()=>0,fetch:async()=>({ok:true,json:async()=>payload}),console});
+  vm.runInContext(await readFile(new URL('../../league-engine/one-click-import.js',import.meta.url),'utf8'),context);
+  await service.refresh();
+  const button=(html,attribute)=>html.match(new RegExp(`<button[^>]*${attribute}[^>]*>`))?.[0];
+  assert.doesNotMatch(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
+  assert.match(service.renderCompactPanel(),/data-import-in-place/);
+  assert.ok(service.renderCompactPanel().indexOf('Copy URL')<service.renderCompactPanel().indexOf('Refresh'));
+  assert.doesNotMatch(service.renderCompactPanel(),/Latest Snapshot|phase-list|security|Free Agents/);
+  assert.match(service.renderPanel(),/>unknown</);
+  for(const status of ['loading','receiving','review-required','revoked']){
+    connection.state.latestExport.status=status;
+    assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
+    assert.match(button(service.renderPanel(),'data-import-latest-export'),/disabled/);
+  }
+  connection.state.latestExport.status='ready';connection.busy=true;
+  for(const attr of ['data-copy-permanent-export-url','data-refresh-companion-import','data-import-latest-export'])assert.match(button(service.renderCompactPanel(),attr),/disabled/);
+  connection.busy=false;
+  payload.run={status:'running',currentPhase:'map-statistics',progress:100*5.5/9};
+  await service.refresh();
+  assert.match(service.renderCompactPanel(),/Map Statistics/);
+  assert.match(service.renderCompactPanel(),/aria-valuenow="50"/);
+  assert.match(service.renderPanel(),/>50%</);
+  listeners['franchisehq:permanent-export-updated']();
+  assert.match(panels.compact.outerHTML,/aria-valuenow="50"/);
+  payload.run={activationPerformed:true,status:'preview-ready'};
+  await service.refresh();
+  assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
+  assert.match(service.renderCompactPanel(),/aria-valuenow="100"/);
+  assert.match(service.renderCompactPanel(),/Latest Export Live/);
+  payload={};await service.refresh();
+  assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
+});
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';

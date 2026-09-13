@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.4.4.12 */
+/* FHQ_BUILD: 7.5.5.14 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.4.4.12';
+  const VERSION = '7.5.5.14';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -439,23 +439,44 @@
     }).join('');
   }
 
-  function renderPanel() {
-    const run=currentRun();
-    const source=state?.source;
-    const connectionService=exportUrlService();
+  function importControlsState() {
+    const run=currentRun(),source=state?.source,connection=exportUrlDiagnostics();
     setTimeout(()=>exportUrlService()?.ensurePolling?.(),0);
-    const connection=exportUrlDiagnostics();
-    const endpointState=connection.state?.endpoint||{};
-    const latestExport=connection.state?.latestExport||{};
+    const endpointState=connection.state?.endpoint||{},latestExport=connection.state?.latestExport||{};
     const exportStatus=latestExport.status||'loading';
     const latestExportLive=latestExport.importLive===true||latestExport.importStatus==='live';
     const exportStatusLabel=({loading:'Loading connection','awaiting-export':'Awaiting export',receiving:'Receiving export',ready:'Ready to import','review-required':'Review required',revoked:'URL revoked'})[exportStatus]||'Loading connection';
+    const live=Boolean(run?.activationPerformed);
+    const runDisabled=busy||connection.busy||exportStatus!=='ready'||!source||live||latestExportLive;
+    const runLabel=busy||connection.busy?'Working…':live||latestExportLive?'Latest Export Live':run?.status==='failed'?'Retry Candidate Import':'Import Latest Export';
+    const activePhase=run?.currentPhase||(!source?'analyze-source':live?'preview-ready':'analyze-source');
+    const activePhaseIndex=Math.max(0,PHASES.findIndex(([id])=>id===activePhase));
+    const segment=100/PHASES.length,overall=Number(run?.progress||0),activeItem=run?.phaseState?.[activePhase];
+    const phaseProgress=live||activeItem?.status==='complete'?100:Math.max(0,Math.min(99,Math.round((overall-activePhaseIndex*segment)/segment*100)));
+    return {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,runDisabled,runLabel,activePhase,phaseProgress};
+  }
+
+  function renderCompactPanel() {
+    const {run,connection,endpointState,exportStatus,latestExportLive,exportStatusLabel,live,runDisabled,runLabel,activePhase,phaseProgress}=importControlsState();
+    return `<section class="commissioner-command-panel commissioner-command-import" data-compact-import-panel aria-label="Madden Companion import">
+      <header><h2>Madden Import</h2><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></header>
+      <div class="commissioner-command-import__actions">
+        <button class="button button--secondary" data-copy-permanent-export-url ${busy||connection.busy||!endpointState.exportUrl?'disabled':''}>${connection.copied?'URL Copied':'Copy URL'}</button>
+        <button class="button button--ghost" data-refresh-companion-import ${busy||connection.busy?'disabled':''}>Refresh</button>
+        <button class="button button--primary" data-import-latest-export data-import-in-place ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
+      </div>
+      <div class="commissioner-command-import__progress" aria-live="polite"><div><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" role="progressbar" aria-label="${esc(phaseLabel(activePhase))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${phaseProgress}"><span style="width:${phaseProgress}%"></span></div></div>
+    </section>`;
+  }
+
+  function renderPanel() {
+    const {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,runDisabled,runLabel,activePhase,phaseProgress}=importControlsState();
+    const connectionService=exportUrlService();
     const resultCounts=counts();
     const faStatus=resultCounts.freeAgentStatus || source?.counts?.freeAgentStatus || 'missing';
     const faCount=['located','empty-confirmed'].includes(faStatus)
       ? countLabel(resultCounts.freeAgentCount ?? source?.counts?.freeAgentCount) : 'unknown';
     const ready=run?.status==='preview-ready';
-    const live=Boolean(run?.activationPerformed);
     const sub60=live && Number(run.durationMs)<60000;
     const coverage=source?.coverage||{};
     const historicalBackfill=coverage.importMode==='historical-backfill';
@@ -465,16 +486,6 @@
     const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
     const actionableSourceWarnings=sourceWarnings.filter(value=>!routineWarning(value));
     const sourceIsNew=source?.selectionStatus==='new-source';
-    const runDisabled=busy||connection.busy||exportStatus!=='ready'||!source||live||latestExportLive;
-    const runLabel=busy||connection.busy?'Working…'
-      :live||latestExportLive?'Latest Export Live'
-        :run?.status==='failed'?'Retry Candidate Import'
-          :'Import Latest Export';
-    const activePhase=run?.currentPhase||(!source?'analyze-source':live?'preview-ready':'analyze-source');
-    const activePhaseIndex=Math.max(0,PHASES.findIndex(([id])=>id===activePhase));
-    const segment=100/PHASES.length,overall=Number(run?.progress||0);
-    const activeItem=run?.phaseState?.[activePhase];
-    const phaseProgress=live||activeItem?.status==='complete'?100:Math.max(0,Math.min(99,Math.round((overall-activePhaseIndex*segment)/segment*100)));
     return `<section class="card commissioner-live-import-card commissioner-companion-workspace" data-one-click-import-panel>
       <div class="card-header commissioner-import-header"><div><span class="eyebrow">Permanent league connection</span><h3>Madden Companion Import</h3><p>Use the same league URL every week, then analyze, validate, and make the newest eligible export live with one action.</p></div><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':sourceIsNew?'warning':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></div>
       <div class="commissioner-import-primary-actions" aria-label="Madden Companion import actions">
@@ -508,6 +519,7 @@
 
   function rerender() {
     document.querySelectorAll('[data-one-click-import-panel]').forEach(node=>{ node.outerHTML=renderPanel(); });
+    document.querySelectorAll('[data-compact-import-panel]').forEach(node=>{ node.outerHTML=renderCompactPanel(); });
   }
 
   document.addEventListener('click', event=>{
@@ -522,7 +534,7 @@
 
   const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,outcome:lastOutcome,activationPerformed:Boolean(currentRun()?.activationPerformed),activeSnapshotChanged:Boolean(currentRun()?.activeSnapshotChanged)});
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
-  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,refreshWorkspace,renderPanel,renderImportNotification,failureGuidance,diagnostics},{replace:true,alias:'oneClickImport'});
+  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,refreshWorkspace,renderPanel,renderCompactPanel,renderImportNotification,failureGuidance,diagnostics},{replace:true,alias:'oneClickImport'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','one-click-live-import','atomic-snapshot-activation','actionable-failure-guidance','sub-60-second-target','blocked-free-agents-unknown']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.4.4.12 */
+/* FHQ_BUILD: 7.5.5.14 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.4.4.12';
+  const VERSION = '7.5.5.14';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -82,11 +82,12 @@
     }
   }
 
-  async function importLatest() {
+  async function importLatest({inPlace=false}={}) {
     if (busy || state?.latestExport?.status !== 'ready') return;
     busy = true;
     errorMessage = '';
-    window.dispatchEvent(new CustomEvent('franchisehq:open-candidate-import'));
+    rerender();
+    if (!inPlace) window.dispatchEvent(new CustomEvent('franchisehq:open-candidate-import'));
     try {
       const importer = HQ?.oneClickImport || HQ?.platform?.oneClickImport || HQ?.getModuleService?.('platform','oneClickImport');
       if (!importer?.importLatestExport) throw new Error('The latest-export importer is unavailable.');
@@ -153,12 +154,12 @@
   }
 
   function ensurePolling() {
-    if (pollTimer || !document.querySelector('[data-permanent-league-export-panel],[data-one-click-import-panel]')) return;
+    if (pollTimer || !document.querySelector('[data-permanent-league-export-panel],[data-one-click-import-panel],[data-compact-import-panel]')) return;
     const status = state?.latestExport?.status;
     const delay = !state ? 0 : status === 'receiving' ? 5_000 : 15_000;
     pollTimer=setTimeout(()=>{
       pollTimer=null;
-      if (document.querySelector('[data-permanent-league-export-panel],[data-one-click-import-panel]')) refresh().catch(()=>{});
+      if (document.querySelector('[data-permanent-league-export-panel],[data-one-click-import-panel],[data-compact-import-panel]')) refresh().catch(()=>{});
     },delay);
   }
 
@@ -204,7 +205,8 @@
 
   document.addEventListener('click',event=>{
     if (event.target.closest('[data-copy-permanent-export-url]')) copyUrl().catch(error=>{errorMessage=error.message;rerender();});
-    if (event.target.closest('[data-import-latest-export]')) importLatest();
+    const importButton=event.target.closest('[data-import-latest-export]');
+    if (importButton) importLatest({inPlace:importButton.hasAttribute('data-import-in-place')});
     if (event.target.closest('[data-refresh-permanent-export]')) refresh().catch(()=>{});
     if (event.target.closest('[data-rotate-permanent-export]')) rotateUrl();
     if (event.target.closest('[data-cancel-export-rotation]')) { rotateArmed=false;rerender(); }
