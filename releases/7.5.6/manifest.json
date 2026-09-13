@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.6",
   "releaseType": "schedule-horizon-current-period-authority",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {"repository": "itzpeckin/furiousgamingcommunity", "version": "7.5.5.15", "commit": "5f44b480e6581d5bab1cbe81a37b5df23590848f", "tree": "a02a408c3904c1a93da9ffbe0d10d6f05da5f950", "tag": "v7.0.0"},
   "implementationBranch": "codex/franchisehq-7.5.6",
   "environmentContract": "config/environment-contract.json",
@@ -11,8 +11,8 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized": true, "status": "pending"},
+  "repositoryPublication": {"authorized": true, "status": "published-main", "candidateCommit": "650ba0896cc2bbd9cab6885ed1a4c5e8c7792a96", "pullRequest": 94, "mainCommit": "01609a6fe38e0fe080a67abadf31abec877712b3"},
   "staging": {"authorized": false, "deployed": false, "status": "not-run"},
-  "production": {"authorized": true, "deployed": false, "currentRelease": "7.5.5.15", "candidateRelease": "7.5.6", "currentMigration": 40, "candidateMigration": 40, "scope": "Code-only current-period proof, full schedule retention, stable matchup identity and verified Discord advance gates. No live import or activation."},
+  "production": {"authorized": true, "deployed": true, "status": "success-pending-owner-acceptance", "currentRelease": "7.5.6", "candidateRelease": "7.5.6", "currentMigration": 40, "candidateMigration": 40, "pagesDeployment": "67546407-9ec0-46ec-a3be-4ff40f944c0e", "scope": "Code-only current-period proof, full schedule retention, stable matchup identity and verified Discord advance gates. No live import or activation."},
   "requiredArtifacts": ["functions/_lib/schedule-integrity.js", "functions/_lib/madden-period.js", "functions/_lib/madden-discovery.js", "functions/_lib/candidate-import.js", "functions/_lib/discord-schedule.js", "functions/api/leagues/[leagueSlug]/companion/map-schedule.js", "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js", "functions/api/leagues/[leagueSlug]/companion/candidate-import.js", "league-engine/week-context.js", "tests/import/candidate-import.test.mjs", "tests/import/madden-discovery.test.mjs", "tests/discord/discord-bot.test.mjs", "docs/COMMISSIONER-SEASON-IMPORT-RUNBOOK.md", "docs/ROADMAP.md", "docs/generated/system-inventory.json", "docs/generated/system-inventory.md", "releases/7.5.6/release-record.md", "releases/7.5.6/validation-evidence.json"]
 }
