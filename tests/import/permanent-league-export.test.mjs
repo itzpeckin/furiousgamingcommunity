@@ -1,6 +1,31 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import vm from 'node:vm';
+
+test('Command Center import stays in place and reuses the existing guarded importer', async () => {
+  let service,imports=0,finish;
+  const events=[],timers=[];
+  let latest={status:'ready'};
+  const HQ={leagueTenant:{getCurrentLeague:()=>({slug:'league-two'})},oneClickImport:{importLatestExport:()=>{imports++;return new Promise(resolve=>{finish=resolve;});}},defineModuleService:(_scope,_id,value)=>{service=value;}};
+  const context=vm.createContext({window:{FranchiseHQ:HQ,dispatchEvent:event=>events.push(event.type)},CustomEvent:class{constructor(type){this.type=type;}},document:{addEventListener:()=>{},querySelectorAll:()=>[],querySelector:selector=>selector.includes('[data-compact-import-panel]')?{}:null},setTimeout:(callback,delay)=>{timers.push({callback,delay});return timers.length;},fetch:async()=>({ok:true,json:async()=>({latestExport:latest})}),console});
+  vm.runInContext(await readFile(new URL('../../league-engine/permanent-export-url.js',import.meta.url),'utf8'),context);
+  await service.refresh();service.ensurePolling();
+  assert.equal(timers.at(-1).delay,15000);
+  events.length=0;
+  const importing=service.importLatest({inPlace:true});
+  assert.equal(service.diagnostics().busy,true);
+  await service.importLatest({inPlace:true});assert.equal(imports,1);
+  assert.ok(events.includes('franchisehq:permanent-export-updated'));
+  assert.ok(!events.includes('franchisehq:open-candidate-import'));
+  finish();await importing;assert.equal(service.diagnostics().busy,false);
+  events.length=0;
+  const detailed=service.importLatest();
+  assert.ok(events.includes('franchisehq:open-candidate-import'));
+  finish();await detailed;
+  latest={status:'receiving'};await service.refresh();
+  await service.importLatest({inPlace:true});assert.equal(imports,2);
+});
 
 import {
   deriveLeagueExportToken,
