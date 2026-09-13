@@ -7906,3 +7906,8 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 @media(min-width:1101px){.commissioner-command-column{contain:size}}
 @media(max-width:1100px){.commissioner-command-column{grid-column:1/-1}}
 @media(max-width:700px){.commissioner-command-column{gap:16px}.commissioner-command-import{padding:16px}.commissioner-command-import>header h2{font-size:.8rem}.commissioner-command-import__actions{gap:6px}}
+
+/* FranchiseHQ 7.5.5.15 — align Command Center card bottoms */
+@media(min-width:1101px){
+  .commissioner-command-column>.commissioner-command-import{flex-grow:1;display:flex;flex-direction:column;justify-content:space-between}
+}

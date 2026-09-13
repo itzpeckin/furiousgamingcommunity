@@ -19,6 +19,7 @@ test('Command Center import uses the existing left column without desktop row gr
  const [ui,css,importer]=await Promise.all([source('trade-module.js'),source('styles.css'),source('league-engine/one-click-import.js')]);
  assert.match(ui,/commissioner-command-column[\s\S]*renderCompactPanel[\s\S]*commissioner-command-panel--attention/);
  assert.match(css,/@media\(min-width:1101px\)\{\.commissioner-command-column\{contain:size\}\}/);
+ assert.match(css,/commissioner-command-column>\.commissioner-command-import\{flex-grow:1;display:flex;flex-direction:column;justify-content:space-between\}/);
  assert.match(css,/@media\(max-width:1100px\)\{\.commissioner-command-column\{grid-column:1\/-1\}\}/);
  assert.match(css,/commissioner-command-import__actions\{display:grid;grid-template-columns:minmax\(0,/);
  assert.match(css,/commissioner-command-import__actions \.button\{[^}]*min-height:44px/);

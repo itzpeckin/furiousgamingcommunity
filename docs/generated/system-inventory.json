@@ -176,7 +176,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 543556,
+        "bytes": 543788,
         "file": "styles.css"
       },
       {
@@ -1556,7 +1556,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.5.14",
+  "release": "7.5.5.15",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
