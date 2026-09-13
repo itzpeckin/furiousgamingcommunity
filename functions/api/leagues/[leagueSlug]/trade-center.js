@@ -24,6 +24,7 @@ import {
   queueTradeRoomUpdate,
   scheduleDiscordDeliveryFlush
 } from '../../../_lib/discord-delivery.js';
+import { discordTradeSyncStatement, queueDiscordTradeSync } from '../../../_lib/discord-trade-sync.js';
 
 const jsonParse = (value, fallback = null) => {
   try { return JSON.parse(value || 'null') ?? fallback; }
@@ -185,6 +186,8 @@ async function publicWorkflow(db, leagueId, row, session) {
       FROM trade_workflow_reviews review JOIN users user ON user.id=review.reviewer_user_id
       WHERE review.league_id=? AND review.trade_id=? AND review.revision=? ORDER BY review.updated_at`,leagueId,row.id,row.revision)
     : [];
+  const tallyReviews=privateAccess?reviews:await resultRows(db,`SELECT reviewer_user_id,decision FROM trade_workflow_reviews
+    WHERE league_id=? AND trade_id=? AND revision=?`,leagueId,row.id,row.revision);
   return {
     id:row.id,franchiseSeasonId:row.franchise_season_id,status:row.status,revision:Number(row.revision),proposerTeamKey:row.proposer_team_key,
     note:privateAccess?(row.note || ''):'',freeTrade:Boolean(row.free_trade),reviewThreshold:Number(row.review_threshold),
@@ -192,7 +195,7 @@ async function publicWorkflow(db, leagueId, row, session) {
     createdAt:row.created_at,updatedAt:row.updated_at,
     participants:participants.map(item => ({teamKey:item.team_key,acceptedRevision:item.accepted_revision,acceptedAt:item.accepted_at})),
     assets,messages,reviews,
-    review:workflowDecision(reviews.map(review => ({reviewerUserId:review.reviewerUserId,decision:review.decision})),row.review_threshold)
+    review:workflowDecision(tallyReviews,row.review_threshold)
   };
 }
 
@@ -461,11 +464,14 @@ async function review(c, row, participants, decision, reason, freeTrade) {
     await c.db.prepare(`UPDATE trade_workflows SET free_trade=1,updated_at=CURRENT_TIMESTAMP
       WHERE id=? AND league_id=? AND status='committee'`).bind(row.id,c.league.id).run();
   }
-  await c.db.prepare(`INSERT INTO trade_workflow_reviews
+  await c.db.batch([c.db.prepare(`INSERT INTO trade_workflow_reviews
     (trade_id,league_id,revision,reviewer_user_id,decision,reason,created_at,updated_at)
     VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
     ON CONFLICT(trade_id,revision,reviewer_user_id) DO UPDATE SET decision=excluded.decision,reason=excluded.reason,updated_at=CURRENT_TIMESTAMP`)
-    .bind(row.id,c.league.id,row.revision,c.session.user.id,decision,cleanText(reason)||null).run();
+    .bind(row.id,c.league.id,row.revision,c.session.user.id,decision,cleanText(reason)||null),
+    discordTradeSyncStatement(c.db,{league:c.league,tradeId:row.id})]);
+  // Every entry point (site, DM, channel, slash command) commits its vote here.
+  // Queue before threshold guards: even a blocked final approval has a tally.
   const reviews=await resultRows(c.db,`SELECT reviewer_user_id,decision FROM trade_workflow_reviews
     WHERE trade_id=? AND league_id=? AND revision=?`,row.id,c.league.id,row.revision);
   const result=workflowDecision(reviews,row.review_threshold);
@@ -750,6 +756,21 @@ export async function onRequestGet(context) {
     if(!featureAvailable(c.league,'trade_center')&&!featureAvailable(c.league,'trade_block')) {
       return json({ok:false,release:TRADE_CENTER_RELEASE,error:'Trade features are disabled for this league.'},403);
     }
+    const reviewTradeId=cleanText(new URL(context.request.url).searchParams.get('reviewTradeId'),100);
+    if(reviewTradeId){
+      const trade=await workflow(c.db,c.league.id,reviewTradeId);
+      if(!trade)return json({ok:false,error:'Trade not found.'},404);
+      const participants=await workflowParticipants(c.db,c.league.id,reviewTradeId);
+      const finalReviewerStatus=isReviewer(c.session)&&trade.status==='rejected'&&Boolean(trade.rejected_at);
+      if(!maySeeWorkflow(trade,participants,c.session)&&!finalReviewerStatus){
+        return json({ok:false,error:'This trade is private.'},403);
+      }
+      const reviews=await resultRows(c.db,`SELECT reviewer_user_id,decision FROM trade_workflow_reviews
+        WHERE league_id=? AND trade_id=? AND revision=?`,c.league.id,trade.id,trade.revision);
+      scheduleDiscordDeliveryFlush(context,c.db,c.league.id);
+      return json({ok:true,tradeId:trade.id,revision:Number(trade.revision),status:trade.status,
+        review:workflowDecision(reviews,trade.review_threshold)});
+    }
     const state=await tradeCenterState(c);
     // A transient Discord permission or API failure must not strand an accepted
     // trade until another workflow action occurs. Any authenticated Trade Center
@@ -799,12 +820,14 @@ export async function executeTradeCenterAction(c, body = {}) {
         .bind(`trade_message_${crypto.randomUUID()}`,tradeId,c.league.id,c.session.user.id,message).run();
     }else throw Object.assign(new Error('Unknown Trade Center action.'),{status:400});
   }
+  if(tradeId&&['counter','accept','reject','withdraw'].includes(action))await queueDiscordTradeSync(c.db,{league:c.league,tradeId});
   return {...await tradeCenterState(c),action,tradeId:tradeId||null};
 }
 
 export async function onRequestPost(context) {
+  let c;
   try {
-    const c=await requestContext(context); if(c.response)return c.response;
+    c=await requestContext(context); if(c.response)return c.response;
     let body={}; try{body=await context.request.json()}catch{throw Object.assign(new Error('Request body must be valid JSON.'),{status:400})}
     const result=await executeTradeCenterAction(c,body);
     if(body.action==='accept'&&result.tradeId){
@@ -829,6 +852,8 @@ export async function onRequestPost(context) {
     scheduleDiscordDeliveryFlush(context,c.db,c.league.id);
     return json(result);
   } catch (error) {
+    // Recorded votes must still reach Discord when final approval is blocked.
+    if(c?.db)scheduleDiscordDeliveryFlush(context,c.db,c.league.id);
     return json({ok:false,release:TRADE_CENTER_RELEASE,error:error?.message||'Trade Center action failed.'},Number(error?.status)||500);
   }
 }

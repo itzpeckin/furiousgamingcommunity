@@ -22,6 +22,7 @@ import { executeDiscordCommand, executeDiscordTradeComponent } from '../../_lib/
 import { discordAutocompleteChoices } from '../../_lib/discord-autocomplete.js';
 import { flushDiscordDeliveries } from '../../_lib/discord-delivery.js';
 import { parseTradeDecisionCustomId, tradeDenyModal } from '../../_lib/discord-trade-components.js';
+import { rememberDiscordTradeInteraction } from '../../_lib/discord-trade-sync.js';
 
 function httpJson(body,status){
   return new Response(JSON.stringify(body),{
@@ -48,6 +49,7 @@ async function runCommand(context,c,interaction){
       status:Number(error?.status)>=400&&Number(error?.status)<500?'rejected':'failed',
       response:message,errorCode:error?.code||`http-${Number(error?.status)||500}`
     }).catch(()=>{});
+    await flushDiscordDeliveries(context.env,c.db,{leagueId:c.league.id,limit:10}).catch(()=>{});
     return message;
   }
 }
@@ -62,19 +64,31 @@ async function runTradeComponent(context,interaction,decision){
   catch{return discordErrorResponse('FranchiseHQ trade buttons require database migration 37 before they can be enabled.');}
   if(!accepted)return discordErrorResponse('This trade decision was already received. Its first result remains authoritative.');
   try{
+    await rememberDiscordTradeInteraction(c.db,c,decision);
     const message=await executeDiscordTradeComponent(c,decision);
     await completeInteractionReceipt(c.db,interaction.id,{status:'completed',response:message});
     const work=flushDiscordDeliveries(context.env,c.db,{leagueId:c.league.id,limit:10}).catch(()=>{});
-    const waitUntil=context.waitUntil||context.executionContext?.waitUntil;
-    if(typeof waitUntil==='function')waitUntil.call(context.executionContext||context,work);
-    else work.catch(()=>{});
-    return discordInteractionResponse(DISCORD_RESPONSE_TYPES.UPDATE_MESSAGE,discordMessageData(message));
+    const owner=typeof context.waitUntil==='function'?context:context.executionContext;
+    if(typeof owner?.waitUntil==='function')owner.waitUntil(work);
+    else await work;
+    // A delayed direct UPDATE_MESSAGE could overwrite a newer vote. The
+    // durable fan-out edits this registered review message with all the others.
+    if(reviewer&&interaction.message?.id){
+      return discordInteractionResponse(DISCORD_RESPONSE_TYPES.DEFERRED_UPDATE_MESSAGE);
+    }
+    return discordInteractionResponse(DISCORD_RESPONSE_TYPES.UPDATE_MESSAGE,{
+      ...discordMessageData(message),components:message.components||[]
+    });
   }catch(error){
     const message=safeCommandError(error);
     await completeInteractionReceipt(c.db,interaction.id,{
       status:Number(error?.status)>=400&&Number(error?.status)<500?'rejected':'failed',
       response:message,errorCode:error?.code||`http-${Number(error?.status)||500}`
     }).catch(()=>{});
+    const work=flushDiscordDeliveries(context.env,c.db,{leagueId:c.league.id,limit:10}).catch(()=>{});
+    const owner=typeof context.waitUntil==='function'?context:context.executionContext;
+    if(typeof owner?.waitUntil==='function')owner.waitUntil(work);
+    else await work;
     return discordErrorResponse(message);
   }
 }

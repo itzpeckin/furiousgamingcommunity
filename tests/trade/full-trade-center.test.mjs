@@ -50,6 +50,42 @@ test('trade settings and transfer limits are normalized server-side',()=>{
   assert.equal(settings.valueModel.draft.futureRetention[2],65);
 });
 
+test('an open site review refreshes Discord vote totals without replacing typed notes or asset cards',async()=>{
+  const client=await readFile(new URL('../../league-engine/trade-center-live.js',import.meta.url),'utf8');
+  const page={innerHTML:''},fields={approvals:{textContent:'0'},rejections:{textContent:'0'},status:{textContent:'Committee Review'}};
+  const panel={dataset:{liveReviewTally:'trade-watch'},querySelector:selector=>fields[
+    selector==='[data-live-tally-approvals]'?'approvals':selector==='[data-live-tally-rejections]'?'rejections':'status'
+  ]};
+  const reason={value:'Do not disturb my typed review reason'},buttons=[{disabled:false},{disabled:false}];
+  let interval,leagueSlug='alpha',visiblePanel=null,status='committee',approvals=1,rejections=0,queries=0;
+  const initial={ok:true,session:{teamKey:null,role:'commissioner'},teams:[],notifications:[],listings:[],picks:[],
+    settings:normalizeTradeCenterSettings({calculatorEnabled:false}),workflows:[{id:'trade-watch',status:'committee',revision:1,
+      participants:[],assets:[],messages:[],review:{approvals:0,rejections:0}}]};
+  const document={visibilityState:'visible',querySelector:selector=>selector==='[data-page-content]'?page:
+    selector==='[data-live-review-tally]'?visiblePanel:selector==='[data-live-review-reason]'?reason:null,
+    querySelectorAll:selector=>selector==='[data-live-review]'?buttons:[],addEventListener(){},body:{style:{}}};
+  const window={FranchiseHQ:{leagueTenant:{getCurrentLeague:()=>({slug:leagueSlug})}},FGC_APP:{teams:[],players:[]},
+    addEventListener(){},setInterval(callback,ms){assert.equal(ms,5000);interval=callback}};
+  const requests=[];
+  const context=vm.createContext({window,location:{hash:'#trade-center/trade-watch'},document,Intl,console,
+    fetch:async(url,options)=>{requests.push({url,options});if(!url.includes('?reviewTradeId='))return{ok:true,json:async()=>initial};
+      queries++;return{ok:true,json:async()=>({ok:true,tradeId:'trade-watch',revision:1,status,review:{approvals,rejections}})}}
+  });
+  vm.runInContext(client,context);await window.FranchiseHQ.liveTradeCenter.load();
+  window.FranchiseHQ.liveTradeCenter.renderTradeCenter('trade-watch');visiblePanel=panel;
+  const markup=page.innerHTML;
+  await interval();assert.equal(fields.approvals.textContent,'1');assert.equal(fields.rejections.textContent,'0');
+  assert.equal(page.innerHTML,markup);assert.equal(reason.value,'Do not disturb my typed review reason');
+  document.visibilityState='hidden';await interval();assert.equal(queries,1);
+  document.visibilityState='visible';approvals=2;rejections=1;await interval();assert.equal(fields.approvals.textContent,'2');
+  visiblePanel=null;await interval();assert.equal(queries,2,'no review polling when another page is open');
+  visiblePanel=panel;status='approved';approvals=3;rejections=0;await interval();
+  assert.equal(fields.status.textContent,'Approved');assert.equal(fields.approvals.textContent,'3');
+  assert.ok(buttons.every(button=>button.disabled));await interval();assert.equal(queries,3,'completed review stops polling');
+  assert.ok(requests.filter(request=>request.url.includes('?')).every(request=>request.options.cache==='no-store'));
+  assert.equal(leagueSlug,'alpha');
+});
+
 test('generic draft horizon is tenant-scoped, complete, retry-safe, and ownership preserving',async()=>{
   const database=new DatabaseSync(':memory:');
   try{

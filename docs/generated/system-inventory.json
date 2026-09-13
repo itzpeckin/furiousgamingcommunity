@@ -80,6 +80,7 @@
       "functions/_lib/discord-api.js",
       "functions/_lib/discord-installation.js",
       "functions/_lib/discord-security.js",
+      "functions/_lib/discord-trade-sync.js",
       "functions/api/auth/discord/callback.js",
       "functions/api/auth/discord/login.js",
       "functions/api/leagues/[leagueSlug]/discord.js",
@@ -159,7 +160,7 @@
       ".css": 9,
       ".example": 1,
       ".html": 3,
-      ".js": 213,
+      ".js": 214,
       ".json": 7,
       ".jsonc": 1,
       ".md": 278,
@@ -172,7 +173,7 @@
     },
     "largest": [
       {
-        "bytes": 638960,
+        "bytes": 638962,
         "file": "app.js"
       },
       {
@@ -188,15 +189,15 @@
         "file": "tools/check-release.mjs"
       },
       {
+        "bytes": 146223,
+        "file": "tests/discord/discord-bot.test.mjs"
+      },
+      {
         "bytes": 130597,
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 127788,
-        "file": "tests/discord/discord-bot.test.mjs"
-      },
-      {
-        "bytes": 98232,
+        "bytes": 100420,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -204,7 +205,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75058,
+        "bytes": 75104,
         "file": "index.html"
       },
       {
@@ -212,7 +213,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 59107,
+        "bytes": 60909,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
@@ -224,7 +225,7 @@
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 45609,
+        "bytes": 48862,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
@@ -232,11 +233,11 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 39888,
+        "bytes": 39890,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 39003,
+        "bytes": 39006,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
@@ -248,11 +249,11 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 35064,
+        "bytes": 35068,
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 604
+    "total": 605
   },
   "frontend": {
     "assets": [
@@ -1556,7 +1557,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.6",
+  "release": "7.5.6.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

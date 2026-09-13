@@ -6,13 +6,13 @@
 
 **Updated:** September 13, 2026
 
-**Revision:** 2.54
+**Revision:** 2.55
 
 **Current production:** FranchiseHQ 7.5.6 is live from exact candidate `650ba089`, PR #94, Main `01609a6`, and verified Pages Production deployment `67546407-9ec0-46ec-a3be-4ff40f944c0e`. All four PR and five Main checks passed; strict gate 222/222 and authentication/mobile 12/12 passed. The synthetic 272-game acceptance retains Weeks 1–18 with Week 1 active, all 18 Confidence weeks available, and stable saved matchup identity. Public read-only acceptance confirms the healthy live release and exact Main landing/asset bytes. Trade UI and compact Command Center sizing remain unchanged. No migration, live import, snapshot activation, reset, archive/transition, export URL, trade/ownership, credential, membership/assignment, or Discord configuration/registration operation ran. Blocked Madden Free Agents remain unknown/null.
 
-**Current work:** 7.5.6 completed its standing-authorized build/checks/PR/Main/Production cycle. Full-season schedule horizon is separate from the current period, future matchups and Confidence identity are preserved, and automatic Discord synchronization requires a verified one-week advance. Real annual-import and Discord server behavior remain commissioner acceptance gates; this code-only deployment did not execute those operations.
+**Current work:** Owner deferred representative new-season current-week/source acceptance until the next season and requested 7.5.6.1: synchronize current-revision trade status, approvals and rejections across the site, all reviewer DMs, Trade Submit and the owner thread, regardless of the voting entry point. Standing-authorized build/checks/PR/Main/Production cycle is in progress. No live trade vote or protected-data operation is run for acceptance.
 
-**Next gate:** Commissioner off-season acceptance using docs/COMMISSIONER-SEASON-IMPORT-RUNBOOK.md, then 7.5.7 measured importer performance and thread readiness. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x.
+**Next gate:** Complete and owner-validate 7.5.6.1 cross-surface trade counters, then 7.5.7 measured importer performance and thread readiness. Real annual-import/current-week source proof remains deferred until the next season; full-season source with missing explicit current metadata is not claimed validated. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x.
 
 ## Product decisions
 
@@ -111,6 +111,7 @@
 | 7.5.5.8 | Production deployed; owner Discord acceptance pending | Visible character boundaries between Discord trade assets that render consistently on Mobile and Desktop without changing the trade package |
 | 7.5.5.9 | Production deployed; owner Discord interaction acceptance pending | Live current-revision committee approval/rejection tallies in Discord and FranchiseHQ plus contrast-safe Trade Block layering |
 | 7.5.6 | Production deployed; commissioner annual-import/Discord acceptance pending | Full-season schedule horizon separated from authoritative current period, with Discord threads created only for a proven league-week advance |
+| 7.5.6.1 | Implementation; standing-authorized publication | Current-revision approval/rejection/status synchronization across site, every reviewer DM, Trade Submit and owner trade thread |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -631,6 +632,10 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Publish an annual commissioner runbook covering season preparation, initial full-schedule import, weekly import, current-week proof, Confidence Pool availability, and recovery. It must not require new Codex tasks or manual engineering intervention.
 - Gate: a representative Weeks 1–18 fixture imports with current Week 1, every schedule week is visible to the schedule and Confidence Pool, current week remains Week 1, and no future thread exists. A same-week retry changes neither current week nor thread inventory; a Week 2 import advances only to Week 2 and creates only Week 2 threads. Historical results, future games, picks, snapshots, audits, route authority, atomic activation, and blocked/null Free Agent state remain intact.
 
+## 7.5.6.1 — Cross-Surface Trade Review Synchronization
+
+The 7.5.6.1 intervening patch makes every committee vote refresh all known current trade copies from the shared server tally. It preserves trade business rules and card design, uses existing durable outbox payload references without migration, keeps reviewer DMs active, converges concurrent votes, and supplies a lightweight open-site status refresh. Real Discord delivery acceptance remains owner-operated; no live vote is cast during code-only publication.
+
 ## 7.5.7 — Off-Season Import Performance and Thread Readiness
 
 - Instrument the complete commissioner path before optimizing it: source eligibility, fetch/read, parse/map, database build, validation, atomic activation, browser refresh, and post-activation Discord synchronization each receive a separate duration and outcome.
@@ -684,6 +689,8 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.55:** Owner deferred new-season current-week/source testing and requested cross-surface trade review synchronization. Added 7.5.6.1 as a patch without renumbering the remaining roadmap: atomic vote/refresh intent, existing Discord message references and legacy recovery, shared current-revision counts, all-copy edit fan-out, partial failure/concurrency protection and open-site tally refresh. Publication remains standing-authorized; no live import, vote, snapshot or protected-data operation is used for acceptance.
 
 - **Revision 2.54:** Completed 7.5.6 exact candidate `650ba089` through PR #94, Main `01609a6`, all four PR/five Main checks, and Pages Production `67546407-9ec0-46ec-a3be-4ff40f944c0e`. Strict gate 222/222, authentication/mobile 12/12, and synthetic full-season/current-week/Confidence/thread recovery acceptance passed. Public landing/runtime assets match Main and public health is healthy. No live import, activation, migration, reset, season operation, ownership edit, export URL rotation, Discord configuration/registration, credential or membership/assignment operation was performed. Real annual-import and guild acceptance remain commissioner-owned gates, followed by 7.5.7.
 - **Revision 2.53:** Owner accepted Command Center alignment and requested the 7.5.6 schedule-horizon/current-period release. Added multi-period schedule parsing, preserved future matchup identities, explicit current evidence and verified automatic Discord transition gates, safe command recovery, and an annual commissioner runbook. Remaining consistency/operations scope is unchanged but now numbered 7.5.8/7.5.9 after 7.5.7; historical release records remain unchanged. Publication is standing-authorized code-only; no live import, activation, migration, reset, season operation or Discord configuration is run.
