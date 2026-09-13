@@ -1,6 +1,191 @@
 {
-  "schemaVersion":1,"version":"7.5.6.2","status":"validated-production-authorized","productionChanged":false,"dataChanged":false,"credentialsChanged":false,"baselineGate":{"unregisteredFailures":0},
-  "checks":{"fullRepositorySuite":{"passed":true,"status":"passed","tests":232,"syntaxFiles":257,"routes":76,"canonicalMigrations":23,"requiredTables":116},"focusedDiscordSuite":{"passed":true,"tests":48},"authenticationAndMobile":{"passed":true,"tests":12},"pickCorrectionGuards":{"passed":true,"scenarios":5,"covers":["exact 672-pick replay","stale revision","different owner","inactive actor","audit failure rollback"]},"strictMigration":{"expectedFailure":false,"passed":true,"migrationVersion":40,"candidateRequiresMigration":false},"productionReadOnlyQueryBenchmark":{"passed":true,"optimizedQueryMs":35.24,"previousProductionMedianMs":1102.3,"sameSnapshotOldQueryMs":1060.83,"querySpeedup":30.1,"snapshotId":"9b713b20-6bf3-4d82-9df6-79c47acf53ec"},"tampaBayPickCorrection":{"authorized":true,"productionOperationApplied":false,"expectedFromTeam":"ne","toTeam":"tb","expectedRevision":2,"protectedPickCount":672}},
-  "scopeBoundaries":{"migrationApplied":false,"importExecuted":false,"activeSnapshotChanged":false,"tradeResetExecuted":false,"archiveSeasonExecuted":false,"transitionOperationExecuted":false,"exportUrlRotated":false,"credentialsChanged":false,"membershipAssignmentsChanged":false,"freeAgentInterpretedAsZero":false,"ownershipAuthorityRedesigned":false,"commissionerTransferToolsBuilt":false},
-  "external":{"githubPublication":{"authorized":true,"status":"pending"},"hostedChecks":{"status":"pending"},"productionMigration":{"authorized":false,"status":"not-required"},"discordCommandRegistration":{"authorized":false,"status":"not-required"},"productionDeployment":{"authorized":true,"status":"pending"}}
+  "schemaVersion": 1,
+  "version": "7.5.6.2",
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
+  "dataChanged": true,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "fullRepositorySuite": {
+      "passed": true,
+      "status": "passed",
+      "tests": 232,
+      "syntaxFiles": 257,
+      "routes": 76,
+      "canonicalMigrations": 23,
+      "requiredTables": 116
+    },
+    "focusedDiscordSuite": {
+      "passed": true,
+      "tests": 48
+    },
+    "authenticationAndMobile": {
+      "passed": true,
+      "tests": 12
+    },
+    "pickCorrectionGuards": {
+      "passed": true,
+      "scenarios": 5,
+      "covers": [
+        "exact 672-pick replay",
+        "stale revision",
+        "different owner",
+        "inactive actor",
+        "audit failure rollback"
+      ]
+    },
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 40,
+      "candidateRequiresMigration": false
+    },
+    "productionReadOnlyQueryBenchmark": {
+      "passed": true,
+      "optimizedQueryMs": 35.24,
+      "previousProductionMedianMs": 1102.3,
+      "sameSnapshotOldQueryMs": 1060.83,
+      "querySpeedup": 30.1,
+      "snapshotId": "9b713b20-6bf3-4d82-9df6-79c47acf53ec"
+    },
+    "tampaBayPickCorrection": {
+      "authorized": true,
+      "productionOperationApplied": true,
+      "expectedFromTeam": "ne",
+      "toTeam": "tb",
+      "expectedRevision": 2,
+      "protectedPickCount": 672,
+      "passed": true,
+      "onlyOnePickChanged": true,
+      "protectedRecordsVerified": true,
+      "ledgerAndAuditVerified": true,
+      "finalRevision": 3,
+      "pickId": "pick:franchise-hq-primary:season_0edd7760-1fe3-4756-9b0a-fa0d9cb58d33:2027:1:tb",
+      "unchangedOtherPicks": 671,
+      "recoveryBookmark": "0000021d-00003071-000050e5-e0a8b9e0ccb8f047c92accb336c8bdbc",
+      "databaseName": "franchise-hq-db-madden27",
+      "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+      "ledgerEventId": "pick_correction_20260913_tb_2027_round1",
+      "auditEventId": "audit_pick_correction_20260913_tb_2027_round1",
+      "ledgerCountBefore": 1345,
+      "ledgerCountAfter": 1346,
+      "tenantAuditCountBefore": 183,
+      "tenantAuditCountAfter": 184,
+      "foreignKeyViolations": 0,
+      "protectedCountsBefore": {
+        "leagues": 1,
+        "users": 33,
+        "memberships": 33,
+        "assignments": 31,
+        "teams": 0,
+        "players": 0,
+        "snapshots": 0,
+        "leagueSnapshots": 36,
+        "snapshotRecords": 456988,
+        "activeSnapshots": 1,
+        "snapshotId": "9b713b20-6bf3-4d82-9df6-79c47acf53ec",
+        "picks": 672,
+        "trades": 34,
+        "tradeAssets": 108,
+        "tradeReviews": 5,
+        "rosterOverlays": 3
+      },
+      "protectedCountsAfter": {
+        "leagues": 1,
+        "users": 33,
+        "memberships": 33,
+        "assignments": 31,
+        "teams": 0,
+        "players": 0,
+        "snapshots": 0,
+        "leagueSnapshots": 36,
+        "snapshotRecords": 456988,
+        "activeSnapshots": 1,
+        "snapshotId": "9b713b20-6bf3-4d82-9df6-79c47acf53ec",
+        "picks": 672,
+        "trades": 34,
+        "tradeAssets": 108,
+        "tradeReviews": 5,
+        "rosterOverlays": 3
+      },
+      "multilinePasteRejectedWithoutMutation": true,
+      "executedBatchFormat": "Complete three statements with newline characters converted to spaces for the single-line dashboard input",
+      "tradeHistoryChanged": false,
+      "rostersChanged": false
+    },
+    "livePublicReadOnlyAcceptance": {
+      "passed": true,
+      "checkedAt": "2026-09-13T15:54:53.518Z",
+      "runtimeRelease": "7.5.6.2",
+      "healthOk": true,
+      "landingVersionVerified": true,
+      "appSha256": "cf8f18e9e3f48a8bada36c1719b7b29e83fa610845b0f8465187cfefe8446114",
+      "tradeInterfaceSha256": "a6093d7b16eeaaabbb89434d7a798227827ee577e66d9080f33655ffa3d29593",
+      "exactMainAssetsMatched": [
+        "app.js",
+        "league-engine/trade-center-live.js"
+      ],
+      "discordServerRelease": "7.5.6.2",
+      "discordReadOnlyEndpointStatus": 405,
+      "authenticatedUiReloaded": false,
+      "liveTradeVoteExecuted": false,
+      "liveTradeCreated": false,
+      "endToEndDiscordLatency": "owner-operated acceptance pending; database-level benchmark verified"
+    }
+  },
+  "scopeBoundaries": {
+    "migrationApplied": false,
+    "importExecuted": false,
+    "activeSnapshotChanged": false,
+    "tradeResetExecuted": false,
+    "archiveSeasonExecuted": false,
+    "transitionOperationExecuted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false,
+    "ownershipAuthorityRedesigned": false,
+    "commissionerTransferToolsBuilt": false,
+    "productionDataChanged": true,
+    "pickOwnershipCorrectionApplied": true,
+    "protectedDataOperationsExecuted": 1
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": true,
+      "status": "published-main",
+      "candidateCommit": "5f9943b9bee13c1c8faa2ac998fe0c0d3b8abccb",
+      "pullRequest": 98,
+      "mainCommit": "2e06dbad51073427704b50d9efef119de19d93c9"
+    },
+    "hostedChecks": {
+      "status": "passed",
+      "pullRequestChecksPassed": 4,
+      "mainChecksPassed": 5,
+      "pullRequestQualityWorkflowRun": 34766691782,
+      "branchQualityWorkflowRun": 34766671939,
+      "mainQualityWorkflowRun": 34766763618,
+      "mainPagesWorkflowRun": 34766762843
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required"
+    },
+    "discordCommandRegistration": {
+      "authorized": false,
+      "status": "not-required"
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "deployed-read-only-verified",
+      "runtimeRelease": "7.5.6.2",
+      "mainCommit": "2e06dbad51073427704b50d9efef119de19d93c9",
+      "pagesDeployment": "784d8adf-9952-445a-86f4-f6e9398d15e8",
+      "authenticatedUiVerified": false
+    }
+  },
+  "productionDataChanged": true
 }
