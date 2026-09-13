@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.6.1",
   "releaseType": "cross-surface-discord-trade-review-synchronization",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {"repository": "itzpeckin/furiousgamingcommunity", "version": "7.5.6", "commit": "b810284b9b7a8e5299fae867d9a2cc670e89581f", "tag": "v7.0.0"},
   "implementationBranch": "codex/franchisehq-7.5.6.1",
   "environmentContract": "config/environment-contract.json",
@@ -11,8 +11,8 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized": true, "status": "awaiting-publication"},
+  "repositoryPublication": {"authorized": true, "status": "published-main", "candidateCommit": "b8581e635e3a944a5d6506a0f40e76af3b0bdb85", "pullRequest": 96, "mainCommit": "d08eed34ac79a51f929333b1f7618f4680cadd59"},
   "staging": {"authorized": false, "deployed": false, "status": "not-run"},
-  "production": {"authorized": true, "deployed": false, "status": "awaiting-publication", "currentRelease": "7.5.6", "candidateRelease": "7.5.6.1", "currentMigration": 40, "candidateMigration": 40, "scope": "Code-only trade approval/status synchronization across the website, reviewer DMs, Trade Submit and owner thread. No live vote or protected-data operation."},
+  "production": {"authorized": true, "deployed": true, "status": "success-pending-owner-acceptance", "currentRelease": "7.5.6.1", "candidateRelease": "7.5.6.1", "currentMigration": 40, "candidateMigration": 40, "pagesDeployment": "7537cc37-73f9-4399-a525-333f315b8c6d", "scope": "Code-only trade approval/status synchronization across the website, reviewer DMs, Trade Submit and owner thread. No live vote or protected-data operation."},
   "requiredArtifacts": ["functions/_lib/discord-trade-sync.js", "functions/_lib/discord-delivery.js", "functions/api/discord/interactions.js", "functions/api/leagues/[leagueSlug]/trade-center.js", "league-engine/trade-center-live.js", "tests/discord/discord-bot.test.mjs", "tests/trade/full-trade-center.test.mjs", "docs/ROADMAP.md", "docs/generated/system-inventory.json", "docs/generated/system-inventory.md", "releases/7.5.6.1/release-record.md", "releases/7.5.6.1/validation-evidence.json"]
 }

@@ -1,6 +1,6 @@
 # FranchiseHQ 7.5.6.1
 
-Status: Full strict gate passed; standing-authorized publication in progress.
+Status: Production deployed and public read-only acceptance passed; owner Discord/site vote acceptance pending.
 
 ## Scope
 
@@ -14,7 +14,7 @@ Detect votes arriving while rendering, editing or later in the fan-out, and conv
 
 ## Validation evidence
 
-Full strict gate passes 229/229 tests, 257 syntax modules, 76 routes, 23 canonical migrations and 116 required tables. Focused synthetic Discord/trade tests pass 57/57. Separate authentication/mobile acceptance passes 12/12. Regression scenarios cover each entry point, repeated/changing/abstaining votes, final approval, rejection/revision, concurrent early and late votes, partial API failure/retry, deleted messages, exact legacy discovery, multipart fallback and tenant-private status lookup. Hosted checks will be recorded after execution. No actual Production trade vote is used for acceptance.
+Full strict gate passes 229/229 tests, 257 syntax modules, 76 routes, 23 canonical migrations and 116 required tables. Focused synthetic Discord/trade tests pass 57/57. Separate authentication/mobile acceptance passes 12/12. Regression scenarios cover each entry point, repeated/changing/abstaining votes, final approval, rejection/revision, concurrent early and late votes, partial API failure/retry, deleted messages, exact legacy discovery, multipart fallback and tenant-private status lookup. All four PR and five Main/deployment checks passed. Public acceptance at 2026-09-13 06:59:50 UTC verified healthy Production, exact Main landing/asset bytes, and web/Discord server release 7.5.6.1. No actual Production trade vote is used for acceptance.
 
 ## Known inherited blockers
 
@@ -22,7 +22,7 @@ Code-only, migration 40 unchanged. No Discord command registration, channel/role
 
 ## Deployment status
 
-Standing-authorized branch/PR/hosted checks/Main/Production publication follows the full strict gate. Actual merge, deployment and read-only acceptance identifiers will be recorded after execution.
+Exact candidate `b8581e635e3a944a5d6506a0f40e76af3b0bdb85` was published through PR #96 and merged as code Main `d08eed34ac79a51f929333b1f7618f4680cadd59`. Cloudflare Pages Production `7537cc37-73f9-4399-a525-333f315b8c6d` succeeded. Main quality workflow `34744057027` and deployment workflow `34744056623` passed. Existing migration remains 40. Production acceptance issued only public GET requests; no authenticated UI, vote, import or protected data operation ran. Owner real-server/site vote acceptance follows.
 
 ## Rollback
 
