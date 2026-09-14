@@ -10,6 +10,8 @@ import { leagueNewsState } from './league-news.js';
 import { buildGmSeasonSummaries } from './gm-career.js';
 import { currentFranchiseContext } from './ownership-periods.js';
 import { snapshotCurrentPeriod } from './schedule-integrity.js';
+import { discordPlayerCardEmbed } from './discord-player-card.js';
+import { effectiveRosterOverlays } from './roster-ownership.js';
 
 const clean=value=>String(value??'').trim();
 const lower=value=>clean(value).toLowerCase();
@@ -57,8 +59,7 @@ export async function discordLeagueReadModel(c,{domains=[]}={}){
     });
   }
   if(Array.isArray(model.players)&&model.players.length){
-    const overlays=await rows(c.db,`SELECT source_player_id,to_team_key,internal_status
-      FROM trade_roster_overlays WHERE league_id=? AND internal_status='active'`,c.league.id);
+    const overlays=await effectiveRosterOverlays(c.db,c.league.id);
     const teamExternalIds=new Map((canonical||[]).map(team=>[team.teamKey,team.externalId]));
     model.players=applyRosterOverlays(model.players,overlays,teamExternalIds);
   }
@@ -367,14 +368,14 @@ export async function eliminatedCommand(c){
 function embedColor(value){const hex=clean(value).replace(/^#/,'');return /^[0-9a-f]{6}$/i.test(hex)?Number.parseInt(hex,16):0x4f8cff}
 
 export async function playerCommand(c,values){
-  const model=await discordLeagueReadModel(c,{domains:['teams','players','statistics']});
+  const model=await discordLeagueReadModel(c,{domains:['teams','players']});
   const query=clean(values.name),allMatches=playerSearchMatches(model,query),matches=allMatches.slice(0,6);
   if(!matches.length)return lines(`${c.league.name} · Player Search`,[]);
   const exact=matches.length===1&&playerIsExact(matches[0],query);
   const shown=exact?matches.slice(0,1):matches;
   return {
     content:`**${c.league.name} · Player Search** · ${allMatches.length} match${allMatches.length===1?'':'es'}${allMatches.length>shown.length?` · first ${shown.length} shown`:''}`,
-    embeds:shown.map(player=>playerStatEmbed(c,model,player))
+    embeds:await Promise.all(shown.map(player=>discordPlayerCardEmbed(c,player,resolveTeam(model.teams,player.teamId),{url:playerHref(c,player),portraitUrl:playerPortraitUrl(player)})))
   };
 }
 
@@ -789,23 +790,11 @@ export async function tradeBlockCommand(c,values){
   const needs=new Map(state.teamNeeds.map(item=>[item.teamKey,item.needs]));
   if(!listings.length)return lines(`${c.league.name} · Trade Block`,[],'No matching players are currently listed.');
   const shown=listings.slice(0,10);
-  const embeds=shown.map(item=>{
+  const embeds=await Promise.all(shown.map(async item=>{
     const player=listedPlayer(item);
     const looking=item.requestedReturn||needs.get(item.teamKey)?.join(', ')||'Open to offers';
     if(player){
-      const team=resolveTeam(model.teams,player.teamId),portrait=playerPortraitUrl(player);
-      return {
-        title:player.displayName,url:playerHref(c,player),color:embedColor(team?.primaryColor),
-        description:`${team?.displayName||'Team unavailable'} · ${player.position||'Position unavailable'}`,
-        ...(portrait?{thumbnail:{url:portrait}}:{}),
-        fields:[
-          {name:'Overall',value:String(player.overall??'—'),inline:true},
-          {name:'Age',value:String(player.age??'—'),inline:true},
-          {name:'Development',value:clean(player.devTrait)||'Normal',inline:true},
-          {name:'Looking For',value:truncate(looking,1000),inline:false}
-        ],
-        footer:{text:`${c.league.name} · Trade Block`}
-      };
+      return discordPlayerCardEmbed(c,player,resolveTeam(model.teams,player.teamId),{lookingFor:looking,url:playerHref(c,player),portraitUrl:playerPortraitUrl(player)});
     }
     const team=resolveTeam(model.teams,item.teamKey)||resolveTeam(state.teams,item.teamKey);
     return {
@@ -815,7 +804,7 @@ export async function tradeBlockCommand(c,values){
       fields:[{name:'Looking For',value:truncate(looking,1000),inline:false}],
       footer:{text:`${c.league.name} · Trade Block`}
     };
-  });
+  }));
   return {
     content:`**${c.league.name} · Trade Block** · ${listings.length} listed${listings.length>shown.length?` · first ${shown.length} shown`:''} · [Open Trade Block](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-block)`,
     embeds

@@ -1391,10 +1391,8 @@ test('/trade-block add and remove are private, roster-authorized, and use player
     const tradeBlockEmbed=viewedPayload.data.embeds[0];
     assert.equal(viewedPayload.data.embeds.length,1);
     for(const key of ['title','description','url','color'])assert.deepEqual(tradeBlockEmbed[key],playerCardEmbed[key]);
-    assert.deepEqual(tradeBlockEmbed.fields.map(field=>field.name),['Overall','Age','Development','Looking For']);
-    assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Overall').value,'87');
-    assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Age').value,'24');
-    assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Development').value,'Superstar');
+    assert.deepEqual(tradeBlockEmbed.fields.map(field=>field.name),['OVR · AGE · DEV','Core Ratings','Looking For']);
+    assert.equal(tradeBlockEmbed.fields[0].value,'87 · 24 · Superstar');
     assert.equal(tradeBlockEmbed.fields.find(field=>field.name==='Looking For').value,'Young corner or a pick');
     assert.doesNotMatch(tradeBlockEmbed.fields.map(field=>field.value).join(' '),/Rush Yds|Rushing TDs/);
     assert.equal(tradeBlockEmbed.thumbnail.url,'https://ratings-images-prod.pulse.ea.com/madden-nfl-26/portraits/123456.png');
@@ -1410,7 +1408,7 @@ test('/trade-block add and remove are private, roster-authorized, and use player
   }finally{database.close()}
 });
 
-test('Discord Player Cards use compact position statistics and portraits while team statistics remain complete',async()=>{
+test('Discord Player Cards use core ratings and portraits without statistics while team statistics remain complete',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -1443,23 +1441,19 @@ test('Discord Player Cards use compact position statistics and portraits while t
     })}));
     const playerPayload=await player.json();
     assert.equal(playerPayload.data.embeds[0].title,'Baker Example');
-    assert.equal(playerPayload.data.embeds[0].fields.find(field=>field.name==='Overall').value,'91');
-    assert.equal(playerPayload.data.embeds[0].fields.find(field=>field.name==='Age').value,'30');
-    assert.equal(playerPayload.data.embeds[0].fields.at(-1).name,'2026 · Major Statistics');
-    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/Completion Percentage:\*\* 60%/);
-    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/Yards:\*\* 250/);
-    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/TDs:\*\* 3/);
-    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/INTs:\*\* 1/);
-    assert.doesNotMatch(playerPayload.data.embeds[0].fields.at(-1).value,/Attempts|Passer Rating|Sacks Taken/);
+    assert.equal(playerPayload.data.embeds[0].fields[0].value,'91 · 30 · Star');
+    assert.equal(playerPayload.data.embeds[0].fields.at(-1).name,'Core Ratings');
+    assert.match(playerPayload.data.embeds[0].fields.at(-1).value,/AWR.*SPD.*THP.*AGI.*DAC.*MAC.*SAC.*TOR/);
+    assert.doesNotMatch(playerPayload.data.embeds[0].fields.at(-1).value,/Yards|TDs|INTs|Attempts|Passer Rating|Sacks Taken/);
     assert.equal(playerPayload.data.embeds[0].thumbnail.url,'https://ratings-images-prod.pulse.ea.com/madden-nfl-26/portraits/654321.png');
-    assert.equal(playerPayload.data.embeds[0].footer.text,'alpha League · Major position statistics');
+    assert.equal(playerPayload.data.embeds[0].footer.text,'alpha League · Player Ratings');
     assert.match(playerPayload.data.embeds[0].url,/\/leagues\/alpha#players\/player-tb/);
 
     const receiver=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000089',name:'player',options:[{type:3,name:'name',value:'Mike Example'}]
     })}));
     const receiverStats=(await receiver.json()).data.embeds[0].fields.at(-1).value;
-    assert.match(receiverStats,/Receptions:\*\* 15.*Yards:\*\* 200.*TDs:\*\* 3/s);
+    assert.match(receiverStats,/SPD.*ACC.*AGI.*COD.*CTH.*RLS.*JMP.*RTR/s);
     assert.doesNotMatch(receiverStats,/Catch %|Target Share|Drops|YAC/);
 
     const chases=await discordInteractions(await signedContext({db,key,interaction:interaction({
@@ -1469,16 +1463,16 @@ test('Discord Player Cards use compact position statistics and portraits while t
     assert.equal(chasePayload.data.embeds.length,2);
     const runner=chasePayload.data.embeds.find(embed=>embed.title==='Chase Runner');
     const defender=chasePayload.data.embeds.find(embed=>embed.title==='Chase Defender');
-    assert.match(runner.fields.map(field=>field.value).join(' '),/Attempts:\*\* 18.*Yards:\*\* 96.*TDs:\*\* 1.*Fumbles:\*\* 1/s);
+    assert.match(runner.fields.map(field=>field.value).join(' '),/SPD.*ACC.*AGI.*CAR.*BCV.*BTK.*COD.*CTH/s);
     assert.doesNotMatch(runner.fields.map(field=>field.value).join(' '),/Rush Yds \/ Game|Rush Share|Receptions|Rec Yds/);
-    assert.match(defender.fields.map(field=>field.value).join(' '),/Tackles:\*\* 7.*Sacks:\*\* 2.*INTs:\*\* 1/s);
+    assert.match(defender.fields.map(field=>field.value).join(' '),/SPD.*ACC.*STR.*AGI.*PMV.*FMV.*BSH.*TAK/s);
     assert.doesNotMatch(defender.fields.map(field=>field.value).join(' '),/Forced Fumbles|Fumble Recoveries|Defensive TDs/);
 
     const kicker=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000098',name:'player',options:[{type:3,name:'name',value:'Casey Kicker'}]
     })}));
     const kickerEmbed=(await kicker.json()).data.embeds[0];
-    assert.match(kickerEmbed.fields.at(-1).value,/FG Attempted:\*\* 4.*FG Made:\*\* 3/s);
+    assert.match(kickerEmbed.fields.at(-1).value,/KPW.*KAC/s);
     assert.doesNotMatch(kickerEmbed.fields.at(-1).value,/50\+|XP/);
     assert.equal(kickerEmbed.thumbnail.url,'https://ratings-images-prod.pulse.ea.com/madden-nfl-26/portraits/654322.png');
   }finally{database.close()}

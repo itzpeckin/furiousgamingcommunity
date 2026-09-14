@@ -3,6 +3,8 @@ import { requireActiveMembership } from '../../../../_lib/permissions.js';
 import { activeLeagueTeams, resolveTeam } from '../../../../_lib/league-teams.js';
 import { normalizePublicPlayerId, publicPlayerPath, normalizePublicTeamSlug } from '../../../../_lib/public-identity-routes.js';
 import { normalizePlayer } from '../snapshot/read-model.js';
+import { applyRosterOverlays } from '../../../../_lib/trade-center.js';
+import { effectiveRosterOverlays } from '../../../../_lib/roster-ownership.js';
 
 const RELEASE = '7.4.1';
 const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
@@ -54,8 +56,9 @@ export async function onRequestGet(context) {
 
   let activePlayer = null;
   if (active?.data_json) {
-    const normalized = normalizePlayer(parse(active.data_json) || {}, publicId);
     const teams = await activeLeagueTeams(db, league.id);
+    const [normalized] = applyRosterOverlays([normalizePlayer(parse(active.data_json) || {}, publicId)],
+      await effectiveRosterOverlays(db,league.id),new Map(teams.map(team=>[team.teamKey,team.externalId])));
     const team = resolveTeam(teams, normalized.teamId);
     activePlayer = {
       present:true,

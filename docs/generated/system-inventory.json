@@ -16,6 +16,7 @@
       "functions/api/leagues/[leagueSlug]/companion/export-url.js"
     ],
     "ASSETS": [
+      "functions/_lib/discord-player-card-renderer.js",
       "functions/leagues/[[path]].js"
     ],
     "AUTH_RATE_LIMITER": [
@@ -74,6 +75,7 @@
     "DISCORD_BOT_TOKEN": [
       "functions/_lib/discord-api.js",
       "functions/_lib/discord-delivery.js",
+      "functions/_lib/discord-player-card.js",
       "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
     "DISCORD_CLIENT_ID": [
@@ -157,31 +159,33 @@
   },
   "files": {
     "byExtension": {
+      ".bin": 1,
       ".css": 9,
       ".example": 1,
       ".html": 3,
-      ".js": 214,
+      ".js": 221,
       ".json": 7,
       ".jsonc": 1,
-      ".md": 278,
-      ".mjs": 43,
+      ".md": 279,
+      ".mjs": 47,
       ".png": 3,
-      ".sql": 42,
-      ".txt": 1,
+      ".sql": 43,
+      ".txt": 3,
+      ".wasm": 1,
       ".yml": 1,
       "[none]": 2
     },
     "largest": [
       {
-        "bytes": 638962,
+        "bytes": 639197,
         "file": "app.js"
       },
       {
-        "bytes": 543788,
+        "bytes": 547797,
         "file": "styles.css"
       },
       {
-        "bytes": 431623,
+        "bytes": 431685,
         "file": "trade-module.js"
       },
       {
@@ -189,7 +193,7 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 149508,
+        "bytes": 148894,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -201,11 +205,11 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 80829,
+        "bytes": 81143,
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75104,
+        "bytes": 75173,
         "file": "index.html"
       },
       {
@@ -213,11 +217,11 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 60909,
+        "bytes": 61459,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 53849,
+        "bytes": 53413,
         "file": "functions/_lib/discord-read-model.js"
       },
       {
@@ -225,7 +229,7 @@
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 48862,
+        "bytes": 48894,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
@@ -233,12 +237,12 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 39890,
-        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
+        "bytes": 40361,
+        "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 39006,
-        "file": "tests/import/game-year-transition.test.mjs"
+        "bytes": 39890,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
         "bytes": 37673,
@@ -253,7 +257,7 @@
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 605
+    "total": 622
   },
   "frontend": {
     "assets": [
@@ -728,6 +732,11 @@
         "versioned": true
       },
       {
+        "path": "league-engine/roster-management.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "auth-ui.js",
         "type": "script",
         "versioned": false
@@ -739,11 +748,11 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 94,
+    "scriptCount": 95,
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 76,
+    "routeCount": 78,
     "routes": [
       {
         "file": "functions/index.js",
@@ -796,6 +805,13 @@
           "onRequestPost"
         ],
         "route": "/api/discord/interactions"
+      },
+      {
+        "file": "functions/api/discord/player-card.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/discord/player-card"
       },
       {
         "file": "functions/api/health.js",
@@ -1235,6 +1251,14 @@
         "route": "/api/leagues/:leagueSlug/reset-data"
       },
       {
+        "file": "functions/api/leagues/[leagueSlug]/roster-management.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/roster-management"
+      },
+      {
         "file": "functions/api/leagues/[leagueSlug]/rules.js",
         "handlers": [
           "onRequestGet",
@@ -1329,6 +1353,7 @@
         "index.html",
         "league-engine/games.js",
         "league-engine/news.js",
+        "league-engine/roster-management.js",
         "league-engine/standings.js",
         "league-engine/statistics.js",
         "league-engine/trade-center-live.js",
@@ -1338,7 +1363,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 33
+      "occurrences": 34
     },
     "FGC_TRADE": {
       "files": [
@@ -1554,10 +1579,16 @@
       "recordsLedger": true,
       "sha256": "060be7133561e31e8e6a9d554f0fb9f244db9ff1af1c7a492eec5f0a9e8c3b20",
       "version": "0040"
+    },
+    {
+      "file": "migrations/0041_commissioner_roster_ownership.sql",
+      "recordsLedger": true,
+      "sha256": "06cfd2ed0bc93c1dd5b72d36cad0944370d8aab9e85230c42e883b44ac7e1e0c",
+      "version": "0041"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.6.2",
+  "release": "7.5.6.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -1,0 +1,19 @@
+{
+  "schemaVersion":1,
+  "version":"7.5.6.3",
+  "status":"validated-production-authorized",
+  "productionChanged":false,
+  "dataChanged":false,
+  "credentialsChanged":false,
+  "baselineGate":{"unregisteredFailures":0},
+  "checks":{
+    "strictMigration":{"expectedFailure":false,"passed":true,"migrationVersion":41,"candidateRequiresMigration":true,"productionApplied":false},
+    "repositoryRegression":{"passed":true,"tests":242},
+    "authenticationAndMobile":{"passed":true,"tests":12},
+    "rosterDialogBrowser":{"passed":true,"widths":[390,1280],"horizontalOverflow":false,"confirmTouchHeight":44},
+    "commissionerTransferSuite":{"passed":true,"tests":5,"productionMovesPerformed":0},
+    "discordPlayerCards":{"passed":true,"tests":5,"positionGroups":11,"statisticsRemoved":true,"routeSignatureGuarded":true,"workerPngAcceptance":{"passed":true,"bytes":115901,"firstRenderAndVerificationMs":485,"realLogoAndPortrait":true,"repeatPng":true,"unsignedAndForgedRejected":true}},
+    "productionPreservation":{"status":"pending","activeSnapshotChanged":false,"ownershipChanged":false}
+  },
+  "scopeBoundaries":{"websitePlayerCardDesignChanged":false,"tradeCreateCardDesignChanged":false,"discordCommandSchemaChanged":false,"importPerformed":false,"resetPerformed":false,"archivePerformed":false,"seasonTransitionPerformed":false,"exportUrlRotated":false,"credentialsChanged":false,"membershipChanged":false,"freeAgentReinterpreted":false,"rosterMovesPerformed":false}
+}

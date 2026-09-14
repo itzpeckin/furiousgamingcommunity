@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 13, 2026
+**Updated:** September 14, 2026
 
-**Revision:** 2.57
+**Revision:** 2.58
 
 **Current production:** FranchiseHQ 7.5.6.2 is live from exact candidate `5f9943b`, PR #98, code Main `2e06dba`, and verified Pages Production deployment `784d8adf-9952-445a-86f4-f6e9398d15e8`. All four PR and five Main checks passed; strict gate 232/232 and authentication/mobile 12/12 passed. Public health, exact Main app/trade-interface bytes and the Discord server release are verified. The separately requested Tampa Bay 2027 R1 pick is back with TB (NE revision 2 → TB revision 3), with one ledger/audit event and all other 671 picks/protected counts unchanged. No migration, live trade/vote/import, snapshot activation, reset, archive/transition, export URL, credential, membership/assignment or Discord configuration/registration operation ran. Blocked Madden Free Agents remain unknown/null. Trade card design and Command Center sizing are unchanged.
 
-**Current work:** Owner-validate live Discord latency/cross-surface trade counters. Discuss persistent FranchiseHQ player/pick ownership, commissioner transfers and safe whole-trade reversal before implementing that policy change. This patch did not change import authority or build transfer tools. Annual current-week/source acceptance remains deferred until the next season.
+**Current work:** Owner-authorized 7.5.6.3 builds shared rendered Discord player/trade-block cards and audited commissioner player/pick transfers. FranchiseHQ retains trade/correction ownership across imports; no current ownership is replayed or changed by migration. Migration 41 must be verified in Production before Main merge. Annual current-week/source acceptance remains deferred until the next season; year-by-year contract research is shelved.
 
-**Next gate:** Discuss persistent ownership and audited commissioner transfers before implementing that policy change; owner-validate live Discord latency/cross-surface counters. Then 7.5.7 measured importer performance and thread readiness. Real annual-import/current-week source proof remains deferred until the next season; full-season source with missing explicit current metadata is not claimed validated. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x.
+**Next gate:** Verify migration 41 and protected ownership, publish/check/merge 7.5.6.3, verify Pages Production and live read-only card/transfer surfaces, then owner-validate Discord cards and commissioner tools. Then 7.5.7 measured importer performance and thread readiness. Real annual-import/current-week source proof remains deferred until the next season; full-season source with missing explicit current metadata is not claimed validated. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x. Whole-trade reversal remains a separate, unimplemented policy/workflow decision.
 
 ## Product decisions
 

@@ -141,7 +141,8 @@ export async function loadCanonicalMigrations() {
       37: 'discord_trade_rooms',
       38: 'discord_trade_channel',
       39: 'discord_trade_committee_role',
-      40: 'trade_management_events'
+      40: 'trade_management_events',
+      41: 'commissioner_roster_ownership'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);
