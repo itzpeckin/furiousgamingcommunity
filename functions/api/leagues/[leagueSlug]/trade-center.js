@@ -25,6 +25,7 @@ import {
   scheduleDiscordDeliveryFlush
 } from '../../../_lib/discord-delivery.js';
 import { discordTradeSyncStatement, queueDiscordTradeSync } from '../../../_lib/discord-trade-sync.js';
+import { playerOwnershipStatement } from '../../../_lib/roster-ownership.js';
 
 const jsonParse = (value, fallback = null) => {
   try { return JSON.parse(value || 'null') ?? fallback; }
@@ -283,8 +284,10 @@ async function playerAsset(c, assetId, fromTeamKey) {
   const record = jsonParse(active.dataJson,{});
   const externalTeam = record.team_external_id ?? record.teamId ?? record.team_id;
   const sourceTeam = resolveTeam(c.teams,externalTeam);
-  const overlay = await c.db.prepare(`SELECT to_team_key AS toTeamKey FROM trade_roster_overlays
-    WHERE league_id=? AND player_identity_id=? AND internal_status='active' LIMIT 1`).bind(c.league.id,identity.playerIdentityId).first();
+  const overlay = await c.db.prepare(`SELECT current_team_key AS toTeamKey,1 AS priority FROM league_player_ownership
+    WHERE league_id=? AND player_identity_id=? UNION ALL SELECT to_team_key AS toTeamKey,0 AS priority FROM trade_roster_overlays
+    WHERE league_id=? AND player_identity_id=? AND internal_status='active' ORDER BY priority DESC LIMIT 1`)
+    .bind(c.league.id,identity.playerIdentityId,c.league.id,identity.playerIdentityId).first();
   const effectiveTeam = overlay?.toTeamKey ? canonicalTeamKey(overlay.toTeamKey) : sourceTeam?.teamKey;
   if (!effectiveTeam || effectiveTeam !== fromTeamKey) throw Object.assign(new Error('Player ownership changed. Refresh the Trade Center and try again.'),{status:409});
   return identity;
@@ -532,6 +535,8 @@ async function review(c, row, participants, decision, reason, freeTrade) {
       statements.push(c.db.prepare(`INSERT INTO trade_roster_overlays
         (trade_id,league_id,player_identity_id,source_player_id,from_team_key,to_team_key,source_snapshot_id,internal_status,created_at)
         VALUES (?,?,?,?,?,?,?,'active',CURRENT_TIMESTAMP)`).bind(row.id,c.league.id,asset.player_identity_id,asset.source_player_id,asset.from_team_key,asset.to_team_key,snapshotId));
+      statements.push(playerOwnershipStatement(c.db,{leagueId:c.league.id,playerIdentityId:asset.player_identity_id,
+        sourcePlayerId:asset.source_player_id,toTeamKey:asset.to_team_key,snapshotId,actorUserId:c.session.user.id,sourceType:'trade'}));
       statements.push(c.db.prepare(`UPDATE trade_block_listings SET active=0,updated_at=CURRENT_TIMESTAMP
         WHERE league_id=? AND player_identity_id=? AND active=1`).bind(c.league.id,asset.player_identity_id));
     }
@@ -576,7 +581,7 @@ async function review(c, row, participants, decision, reason, freeTrade) {
     VALUES (?,? ,?,'franchisehq-workflow',?,?,?,CURRENT_TIMESTAMP)`)
     .bind(`canonical_evidence_${crypto.randomUUID()}`,c.league.id,transactionId,`franchisehq-workflow:${row.id}:revision:${row.revision}`,snapshotId,
       JSON.stringify({...transactionDetails,eventType:'trade',season:season?.seasonYear??null,teamIds,playerIds,moves:movements,assetCount:assets.length})));
-  statements.push(...await notificationStatements(c.db,c.league.id,row.id,participantUsers,'approved','Trade approved','The approved players and picks now appear with their receiving teams. Madden will remain authoritative on the next import.'));
+  statements.push(...await notificationStatements(c.db,c.league.id,row.id,participantUsers,'approved','Trade approved','The approved players and picks now appear with their receiving teams. FranchiseHQ preserves this ownership across imports.'));
   await c.db.batch(statements);
 }
 

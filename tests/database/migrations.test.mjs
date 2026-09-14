@@ -127,7 +127,7 @@ test('the production-like legacy upgrade preserves identities and relationships'
       VALUES (?,?,?,?)`).run('league-future-test','Future League','FranchiseHQ','future-league');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints
       WHERE league_id='league-future-test'`).get().count,1);
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 40);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 41);
     const upgradedSession = database.prepare(`SELECT absolute_expires_at,last_rotated_at,recovery_mode
       FROM sessions WHERE id='session-upgrade-test'`).get();
     assert.ok(upgradedSession.absolute_expires_at);
@@ -275,7 +275,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 40', async () => {
+test('runtime schema verification fails closed before version 41', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -302,12 +302,14 @@ test('runtime schema verification fails closed before version 40', async () => {
     error => error?.code === 'DATABASE_MIGRATION_REQUIRED' && error?.currentVersion === 38
   );
   observedVersion = 39;
-  assert.equal((await requireDatabaseSchema(outdated)).version, 39);
+  await assert.rejects(() => requireDatabaseSchema(outdated), error => error?.currentVersion === 39);
+  observedVersion = 40;
+  await assert.rejects(() => requireDatabaseSchema(outdated), error => error?.currentVersion === 40);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 39, name: 'discord_trade_committee_role' }) };
+      return { first: async () => ({ version: 41, name: 'commissioner_roster_ownership' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 39);
+  assert.equal((await requireDatabaseSchema(current)).version, 41);
 });

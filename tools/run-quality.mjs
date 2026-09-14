@@ -21,6 +21,8 @@ const checks = [
     'tests/commissioner/commissioner-hq.test.mjs',
     'tests/commissioner/competition.test.mjs',
     'tests/discord/discord-bot.test.mjs',
+    'tests/discord/player-card.test.mjs',
+    'tests/commissioner/roster-management.test.mjs',
     'tests/import/madden-discovery.test.mjs',
     'tests/import/permanent-identity.test.mjs',
     'tests/import/candidate-import.test.mjs',

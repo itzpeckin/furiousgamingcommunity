@@ -1,11 +1,13 @@
 {
   "schemaVersion": 1,
-  "release": "7.5.6.2",
+  "release": "7.5.6.3",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 40,
+  "currentVersion": 41,
   "requiredTables": [
+    "commissioner_roster_movements",
+    "league_player_ownership",
     "canonical_capture_lifecycle_sessions",
     "canonical_free_agents",
     "canonical_historical_player_states",
@@ -124,6 +126,8 @@
     "users"
   ],
   "requiredCoreColumns": {
+    "league_player_ownership": ["league_id", "player_identity_id", "source_player_id", "current_team_key", "revision", "source_snapshot_id", "source_type", "actor_user_id", "updated_at"],
+    "commissioner_roster_movements": ["id", "league_id", "request_id", "asset_type", "player_identity_id", "draft_pick_id", "source_player_id", "asset_name", "from_team_key", "to_team_key", "source_team_key", "expected_revision", "source_snapshot_id", "actor_user_id", "reason", "created_at"],
     "leagues": ["id", "slug", "name", "product_name", "current_season", "current_week", "trade_start_week", "trade_deadline_week", "public_status", "tenant_status", "timezone", "branding_json", "configuration_json", "created_at", "updated_at"],
     "league_domains": ["id", "league_id", "hostname", "is_primary", "enabled", "created_at", "updated_at"],
     "league_features": ["league_id", "feature_key", "enabled", "configuration_json", "updated_by_user_id", "updated_at"],

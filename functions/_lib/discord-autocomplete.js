@@ -69,11 +69,13 @@ async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOve
   // for each player (millions of reads per keystroke on Production).
   const sql=`WITH identity_map AS MATERIALIZED (
       SELECT alias.source_player_id AS externalId,MAX(identity.public_id) AS publicId,
-        MAX(overlay.to_team_key) AS overlayTeamKey
+        COALESCE(MAX(ownership.current_team_key),MAX(overlay.to_team_key)) AS overlayTeamKey
       FROM player_source_aliases alias
       JOIN player_identities identity ON identity.league_id=alias.league_id AND identity.id=alias.player_identity_id
       LEFT JOIN trade_roster_overlays overlay ON overlay.league_id=alias.league_id
         AND overlay.player_identity_id=identity.id AND overlay.internal_status='active'
+      LEFT JOIN league_player_ownership ownership ON ownership.league_id=alias.league_id
+        AND ownership.player_identity_id=identity.id
       WHERE alias.league_id=? GROUP BY alias.source_player_id
     ),candidate AS (
       SELECT record.external_id AS externalId,record.data_json AS dataJson,

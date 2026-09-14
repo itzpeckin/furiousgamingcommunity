@@ -65,7 +65,7 @@ function bucket(initial={}) {
   };
 }
 
-async function createDatabase(maxVersion=39) {
+async function createDatabase(maxVersion=41) {
   const database=new DatabaseSync(':memory:');
   database.exec('PRAGMA foreign_keys=ON');
   const files=(await walkFiles())
@@ -159,6 +159,13 @@ async function fixture({activeSnapshot=true}={}) {
   database.prepare(`INSERT INTO canonical_transactions
     (id,league_id,event_type,authority,execution_status,workflow_trade_id,first_snapshot_id,last_snapshot_id)
     VALUES (?,?,'trade','snapshot-inferred','observed-roster',?,?,?)`).run('transaction-trade-1','league-1','trade-1','snapshot-1','snapshot-1');
+  database.exec(`INSERT INTO league_player_ownership (league_id,player_identity_id,source_player_id,current_team_key,revision,source_snapshot_id,source_type,actor_user_id)
+    VALUES ('league-1','identity-p1','p1','gb',1,'snapshot-1','trade','commissioner-1')`);
+  if(activeSnapshot){
+    database.exec(`INSERT INTO commissioner_roster_movements (id,league_id,request_id,asset_type,player_identity_id,source_player_id,asset_name,from_team_key,to_team_key,source_team_key,expected_revision,source_snapshot_id,actor_user_id)
+      VALUES ('manual-audit-1','league-1','manual-request-1','player','identity-p1','p1','Player One','gb','ne','tb',1,'snapshot-1','commissioner-1')`);
+    database.exec(`UPDATE league_player_ownership SET current_team_key='ne',revision=2,source_type='commissioner' WHERE player_identity_id='identity-p1'`);
+  }
   return {database,token};
 }
 
@@ -426,6 +433,8 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshots`).get().count,0);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_workflows`).get().count,0);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks`).get().count,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_player_ownership`).get().count,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM commissioner_roster_movements`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM users`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_memberships`).get().count,1);
     assert.equal(sources.objects.has('source/capture-1.json'),false);
@@ -442,6 +451,9 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_workflows`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_reconciliation_events`).get().count,1);
+    const ownership=database.prepare(`SELECT current_team_key,revision FROM league_player_ownership`).get();
+    assert.equal(ownership.current_team_key,'ne');assert.equal(ownership.revision,2);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM commissioner_roster_movements`).get().count,1);
     assert.equal(sources.objects.has('source/capture-1.json'),true);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{database.close();}
@@ -605,6 +617,6 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.doesNotMatch(ui,/data-game-year-season-confirmation/);
   assert.match(ui,/renderArchivePanel/);
   assert.match(ui,/data-game-year-archive-panel/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.5\.6\.2/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.5\.6\.3/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });

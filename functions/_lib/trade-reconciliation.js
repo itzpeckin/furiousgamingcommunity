@@ -13,7 +13,10 @@ export async function reconcileTradeRosterOverlays(db, leagueId, snapshotId) {
     FROM trade_roster_overlays overlay
     JOIN trade_workflows workflow ON workflow.id=overlay.trade_id AND workflow.league_id=overlay.league_id
     WHERE overlay.league_id=? AND overlay.internal_status='active' AND overlay.source_snapshot_id<>?
-    ORDER BY overlay.trade_id,overlay.player_identity_id`,leagueId,snapshotId);
+      AND NOT EXISTS (SELECT 1 FROM trade_reconciliation_events evidence
+        WHERE evidence.league_id=overlay.league_id AND evidence.trade_id=overlay.trade_id
+          AND evidence.player_identity_id=overlay.player_identity_id AND evidence.snapshot_id=?)
+    ORDER BY overlay.trade_id,overlay.player_identity_id`,leagueId,snapshotId,snapshotId);
   if (!overlays.length) return {checked:0,matched:0,reverted:0,differentTeam:0,notifications:0};
 
   const teams=await activeLeagueTeams(db,leagueId);
@@ -37,10 +40,8 @@ export async function reconcileTradeRosterOverlays(db, leagueId, snapshotId) {
     if(outcome==='matched')counts.matched++;
     else if(outcome==='reverted')counts.reverted++;
     else counts.differentTeam++;
-    const internalStatus=outcome==='matched'?'matched':outcome==='reverted'?'reverted':'superseded';
-    statements.push(db.prepare(`UPDATE trade_roster_overlays SET internal_status=?,resolved_snapshot_id=?,resolved_at=CURRENT_TIMESTAMP
-      WHERE trade_id=? AND player_identity_id=? AND league_id=? AND internal_status='active'`)
-      .bind(internalStatus,snapshotId,overlay.trade_id,overlay.player_identity_id,leagueId));
+    // Imports supply source evidence, never reverse FranchiseHQ asset ownership.
+    // Retain legacy active overlays too; no migration-time ownership replay/backfill.
     statements.push(db.prepare(`INSERT OR IGNORE INTO trade_reconciliation_events
       (id,league_id,trade_id,player_identity_id,snapshot_id,outcome,expected_team_key,madden_team_key,evidence_json,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(`trade_reconciliation_${crypto.randomUUID()}`,leagueId,overlay.trade_id,
@@ -54,8 +55,8 @@ export async function reconcileTradeRosterOverlays(db, leagueId, snapshotId) {
     const transaction=await db.prepare(`SELECT id FROM canonical_transactions WHERE league_id=? AND workflow_trade_id=? ORDER BY created_at LIMIT 1`).bind(leagueId,tradeId).first();
     if(transaction){
       const matched=trade.outcomes.every(value=>value==='matched');
-      const executionStatus=matched?'observed-roster':'madden-overridden';
-      const authority=matched?'snapshot-inferred':'trade-center';
+      const executionStatus=matched?'observed-roster':'franchisehq-retained';
+      const authority='trade-center';
       statements.push(db.prepare(`UPDATE canonical_transactions SET authority=?,execution_status=?,last_snapshot_id=?,updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND league_id=?`).bind(authority,executionStatus,snapshotId,transaction.id,leagueId));
       statements.push(db.prepare(`UPDATE league_transaction_history
@@ -68,8 +69,6 @@ export async function reconcileTradeRosterOverlays(db, leagueId, snapshotId) {
           `trade-reconciliation:${tradeId}:${snapshotId}`,snapshotId,JSON.stringify({tradeId,snapshotId,outcomes:trade.outcomes,playerIds:trade.playerIds})));
     }
     if(trade.outcomes.some(value=>value!=='matched')){
-      statements.push(db.prepare(`UPDATE trade_workflows SET slot_released_at=COALESCE(slot_released_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP
-        WHERE id=? AND league_id=? AND status='approved' AND free_trade=0`).bind(tradeId,leagueId));
       const reviewers=await rows(db,`SELECT user_id FROM league_memberships
         WHERE league_id=? AND active=1 AND role='commissioner'`,leagueId);
       for(const reviewer of reviewers){
@@ -77,7 +76,7 @@ export async function reconcileTradeRosterOverlays(db, leagueId, snapshotId) {
           (id,league_id,user_id,trade_id,notification_type,title,message,created_at)
           VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(`notification_${crypto.randomUUID()}`,leagueId,reviewer.user_id,tradeId,
             'madden-roster-difference','Madden roster differs from an approved trade',
-            'The latest Madden import placed one or more traded players on a different roster. Madden ownership is now displayed.'));
+            'The latest Madden import differs from this approved trade. FranchiseHQ retains the approved player and pick ownership. Use audited Roster & Pick Corrections if a correction is needed.'));
         counts.notifications++;
       }
     }

@@ -149,6 +149,7 @@
     if(snapshotId){
       try{sessionStorage.removeItem(storageKey(snapshotId,'players'))}catch{}
     }
+    document.dispatchEvent(new CustomEvent('franchisehq:roster-ownership-changed'));
   }
 
   async function loadSample(domain) {

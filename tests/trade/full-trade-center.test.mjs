@@ -186,13 +186,13 @@ test('a matching Madden roster publishes one detected transaction without public
     const result=await reconcileTradeRosterOverlays(d1(database),'league-1','snapshot-new');
     const transaction=database.prepare(`SELECT authority,execution_status AS executionStatus FROM canonical_transactions`).get();
     assert.equal(result.matched,1);
-    assert.equal(transaction.authority,'snapshot-inferred');
+    assert.equal(transaction.authority,'trade-center');
     assert.equal(transaction.executionStatus,'observed-roster');
     assert.equal(database.prepare(`SELECT slot_released_at AS releasedAt FROM trade_workflows`).get().releasedAt,null);
   }finally{database.close()}
 });
 
-test('a later Madden snapshot wins once and retains internal reconciliation evidence',async()=>{
+test('a later Madden snapshot records differences once without reversing FranchiseHQ ownership or releasing trades',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await migrate(database);
@@ -212,10 +212,10 @@ test('a later Madden snapshot wins once and retains internal reconciliation evid
     const second=await reconcileTradeRosterOverlays(d1(database),'league-1','snapshot-new');
     assert.equal(first.differentTeam,1);
     assert.equal(second.checked,0);
-    assert.equal(database.prepare(`SELECT internal_status FROM trade_roster_overlays`).get().internal_status,'superseded');
+    assert.equal(database.prepare(`SELECT internal_status FROM trade_roster_overlays`).get().internal_status,'active');
     assert.equal(database.prepare(`SELECT outcome FROM trade_reconciliation_events`).get().outcome,'different-team');
-    assert.equal(database.prepare(`SELECT execution_status FROM canonical_transactions`).get().execution_status,'madden-overridden');
-    assert.ok(database.prepare(`SELECT slot_released_at AS releasedAt FROM trade_workflows`).get().releasedAt);
+    assert.equal(database.prepare(`SELECT execution_status FROM canonical_transactions`).get().execution_status,'franchisehq-retained');
+    assert.equal(database.prepare(`SELECT slot_released_at AS releasedAt FROM trade_workflows`).get().releasedAt,null);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_reconciliation_events`).get().count,1);
   }finally{database.close()}
 });

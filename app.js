@@ -9928,6 +9928,12 @@ function canonicalPlayerDashboardStats(playerId='') {
     }
   });
   document.addEventListener('franchisehq:league-data-state-changed',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
+  document.addEventListener('franchisehq:roster-ownership-changed',()=>{
+    liveTeamDirectory=null;
+    liveRosterPlayers.clear();
+    window.__FHQ_HOME_DEEP_CACHE__=null;
+    window.FranchiseHQ?.transactionUiLoader?.clear?.();
+  });
   window.addEventListener('franchisehq:live-snapshot-booted',()=>syncTradeCenterLiveBridge({rerender:true,forceLive:true}));
   window.addEventListener('franchisehq:one-click-import-complete',async()=>{
     const route=currentAppRoute()||'home';
@@ -9944,7 +9950,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.5.6.2';
+  const VISIBLE_RELEASE = '7.5.6.3';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';
