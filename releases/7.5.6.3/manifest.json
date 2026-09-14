@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.6.3",
   "releaseType": "discord-rendered-player-cards-and-audited-roster-corrections",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {"repository":"itzpeckin/furiousgamingcommunity","version":"7.5.6.2","commit":"c03cf9b433563c114a3b89c20494acb498f3f916","tag":"v7.0.0"},
   "implementationBranch": "codex/franchisehq-7.5.6.3",
   "environmentContract": "config/environment-contract.json",
@@ -11,8 +11,8 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized":true,"status":"pending"},
+  "repositoryPublication": {"authorized":true,"status":"merged","candidateCommit":"1194136a7c6def03484269a08798220899c650ff","pullRequest":100,"mainCommit":"d2959e43a63bd6ea17c6c6bef990e7479dbbec83","followupBranch":"codex/franchisehq-7.5.6.3-production-evidence"},
   "staging": {"authorized":false,"deployed":false,"status":"not-run"},
-  "production": {"authorized":true,"deployed":false,"status":"migration-verification-required-before-merge","currentRelease":"7.5.6.2","candidateRelease":"7.5.6.3","currentMigration":40,"candidateMigration":41,"scope":"Schema-only migration 41, Discord-only shared image cards, commissioner transfer tools and persistent FranchiseHQ ownership. No live roster transfer or import."},
+  "production": {"authorized":true,"deployed":true,"status":"success-pending-owner-acceptance","currentRelease":"7.5.6.3","candidateRelease":"7.5.6.3","currentMigration":41,"candidateMigration":41,"deploymentId":"537fb56d-a1ec-4000-9dfc-ed3c7cadc16d","deployedAt":"2026-09-14T18:30:02Z","scope":"Schema-only migration 41, Discord-only shared image cards, commissioner transfer tools and persistent FranchiseHQ ownership. No live roster transfer or import."},
   "requiredArtifacts": ["functions/_lib/discord-player-card.js","functions/_lib/discord-player-card-renderer.js","functions/api/discord/player-card.js","functions/api/leagues/[leagueSlug]/roster-management.js","migrations/0041_commissioner_roster_ownership.sql","tests/discord/player-card.test.mjs","tests/commissioner/roster-management.test.mjs","releases/7.5.6.3/release-record.md","releases/7.5.6.3/validation-evidence.json"]
 }

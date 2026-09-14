@@ -14,7 +14,7 @@ FranchiseHQ retains approved-trade and commissioner ownership across imports. Ma
 
 ## Added during delivery
 
-Local Worker acceptance caught an unsupported redirect option. Image fetching now uses manual redirects and rejects non-2xx responses rather than following unvalidated origins. Temporary image failures retry after 60 seconds instead of caching a portrait-less card for a week. Cache keys discard unrelated query parameters. Persistent-plane classification preserves ownership/audits through separately authorized game-year archives. Mobile controls have 44-pixel touch targets and do not compress status text behind the confirmation panel.
+Local Worker acceptance caught an unsupported redirect option. Image fetching now uses manual redirects and rejects non-2xx responses rather than following unvalidated origins. Temporary image failures retry after 60 seconds instead of caching a portrait-less card for a week. Cache keys discard unrelated query parameters. Persistent-plane classification preserves ownership/audits through separately authorized game-year archives. Mobile controls have 44-pixel touch targets and do not compress status text behind the confirmation panel. Final read-through found the old public Transactions filter excluded commissioner movement records; the follow-up branch admits only completed commissioner-authority roster adjustments, with an authenticated tenant-isolation regression.
 
 ## Known inherited blockers
 
@@ -22,19 +22,21 @@ None blocking this release. Annual import/current-week source proof remains defe
 
 ## Validation evidence
 
-Repository regressions: 242 passing tests; authentication/mobile: 12 passing tests. Local Cloudflare runtime returned a signed 115,901-byte PNG with real team logo/portrait, repeat requests succeeded, and unsigned/forged requests returned 404. Local Chrome checks passed at 390 and 1280 pixels with no horizontal dialog overflow and a 44-pixel Confirm Move control. The generated preview uses explicitly illustrative ratings, not altered Production player data. Final inventory/release-contract gate is required before publication.
+Repository regressions: 243 passing tests including the final Transactions visibility regression; authentication/mobile: 12 passing tests. Local Cloudflare runtime returned a signed 115,901-byte PNG with real team logo/portrait, repeat requests succeeded, and unsigned/forged requests returned 404. Local Chrome checks passed at 390 and 1280 pixels with no horizontal dialog overflow and a 44-pixel Confirm Move control. The generated preview uses explicitly illustrative ratings, not altered Production player data. The initial code PR's four checks and Main's five checks passed; final follow-up publication must pass the same gates.
 
 ## Deployment status
 
-Publication and Production migration/deployment verification are pending. The following sequence is authorized:
+The authorized migration-before-merge sequence completed on September 14, 2026:
 
-1. Confirm account `cc973c5a4c4ed410382f376244af078f`, D1 `franchise-hq-db-madden27`, ID `b2529150-28af-42ca-a07b-69506764ccb6`. Never use the Madden 26 database.
-2. Capture protected counts, exact pick ownership/revisions, active overlays, user/membership assignment state and active snapshot. Retrieve `/bookmark` before schema changes.
-3. Execute the **complete** [migration 41](../../migrations/0041_commissioner_roster_ownership.sql), beginning with `PRAGMA foreign_keys = ON;`, without an introductory comment. It creates two empty tables, three unique indexes, two lookup indexes, seven guards/immutability triggers and migration ledger entry 41. No ownership baseline, player move or pick move is run.
-4. Verify migration 41, table columns/indexes/triggers, `PRAGMA foreign_key_check`, both new tables empty, protected counts and exact ownership state unchanged.
-5. Only then merge the checked PR to Main; monitor GitHub and Cloudflare Pages Production and verify live release/assets and signed PNG support read-only.
+1. Confirmed account `cc973c5a4c4ed410382f376244af078f`, D1 `franchise-hq-db-madden27`, ID `b2529150-28af-42ca-a07b-69506764ccb6`. The Madden 26 database was not used.
+2. Captured protected counts, exact pick ownership/revisions, active overlays, membership assignments and active snapshot. Pre-change D1 bookmark: `0000026f-000002d8-000050e6-316ac953297efd1c5510cd25b66d38bb`.
+3. Executed the **complete** [migration 41](../../migrations/0041_commissioner_roster_ownership.sql) exactly once, beginning with `PRAGMA foreign_keys = ON;`, without SQL comments. Committed source SHA-256: `06cfd2ed0bc93c1dd5b72d36cad0944370d8aab9e85230c42e883b44ac7e1e0c`. The complete normalized paste matched the source. No ownership baseline, player move or pick move was run.
+4. Verified migration 41, two empty tables (9 and 16 columns), all five indexes and seven triggers, foreign keys with zero violations, protected counts and exact ownership/assignments unchanged. Complete preservation results are in [migration-preservation.json](migration-preservation.json).
+5. Only after migration verification, merged [PR #100](https://github.com/itzpeckin/furiousgamingcommunity/pull/100), candidate `1194136a7c6def03484269a08798220899c650ff`, to Main `d2959e43a63bd6ea17c6c6bef990e7479dbbec83`. Four PR and five Main checks passed. Cloudflare Pages Production deployment `537fb56d-a1ec-4000-9dfc-ed3c7cadc16d` succeeded at `2026-09-14T18:30:02Z` and serves FranchiseHQ.app.
 
-Publication/deployment evidence is pending; standing owner authorization applies throughout this release. No production import, reset, archive, transition, export URL rotation, membership/credential change, active snapshot change or Free Agent reinterpretation is authorized or performed as an acceptance test.
+Live read-only acceptance showed Current Release 7.5.6.3, successful health, unsigned card rejection (404/no-store), a 40-pick commissioner directory and full-name Baker Mayfield search returning one Buccaneers player. The dialog was closed without any move. Signed PNG rendering with the real logo/portrait was verified in the local Cloudflare runtime; visual acceptance of actual new Discord responses remains owner-operated. The follow-up branch records this evidence and corrects public Transactions visibility; it requires hosted checks and code-only republication, not another migration.
+
+All 672 pick owners/revisions, three active overlays, 33 membership/access assignments and active snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0` were preserved. No production import, reset, archive, transition, export URL rotation, membership/credential change, active snapshot change or Free Agent reinterpretation was performed as an acceptance test.
 
 ## Rollback
 

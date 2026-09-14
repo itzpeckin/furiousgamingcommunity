@@ -92,6 +92,24 @@ test('active league members see only public executed tenant transactions',async(
   }finally{database.close()}
 });
 
+test('completed commissioner roster adjustments are public only within their league',async()=>{
+  const {database,context}=await fixture();
+  try{
+    const insert=database.prepare(`INSERT INTO canonical_transactions
+      (id,league_id,event_type,authority,execution_status,team_ids_json,player_ids_json)
+      VALUES (?,?,'roster-adjustment',?,?,'["tb","gb"]','["player-1"]')`);
+    insert.run('manual-move','league-1','commissioner','completed');
+    insert.run('unfinished-move','league-1','commissioner','pending');
+    insert.run('untrusted-move','league-1','franchisehq-workflow','completed');
+    insert.run('other-league-move','league-2','commissioner','completed');
+    const response=await getCanonicalTransactions(context('member-token'));
+    assert.equal(response.status,200);
+    const payload=await response.json();
+    assert.deepEqual(payload.transactions.map(item=>item.id).sort(),['manual-move','public-transaction']);
+    assert.equal(payload.transactions.find(item=>item.id==='manual-move').authority,'commissioner');
+  }finally{database.close()}
+});
+
 test('commissioner corrections are append-only, audited, permanent, and revision guarded',async()=>{
   const {database,context}=await fixture();
   try{
