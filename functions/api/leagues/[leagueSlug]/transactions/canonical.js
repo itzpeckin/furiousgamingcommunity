@@ -145,6 +145,7 @@ function publiclyVisibleTransaction(transaction={}){
   const authority=String(transaction.authority||'').toLowerCase();
   const execution=String(transaction.executionStatus||'').toLowerCase();
   const type=String(transaction.eventType||'').toLowerCase();
+  if(type==='roster-adjustment')return authority==='commissioner'&&execution==='completed';
   if(type==='roster-status-change')return false;
   const madden=authority==='madden-explicit'||authority==='franchisehq+madden'||execution==='confirmed-madden';
   const roster=authority==='franchisehq+snapshot-confirmed'||authority==='snapshot-inferred'||execution==='confirmed-roster'||execution==='observed-roster';

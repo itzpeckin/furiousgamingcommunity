@@ -1,19 +1,22 @@
 {
   "schemaVersion":1,
   "version":"7.5.6.3",
-  "status":"validated-production-authorized",
-  "productionChanged":false,
+  "status":"production-deployed-pending-owner-acceptance",
+  "productionChanged":true,
+  "productionSchemaChanged":true,
   "dataChanged":false,
   "credentialsChanged":false,
   "baselineGate":{"unregisteredFailures":0},
   "checks":{
-    "strictMigration":{"expectedFailure":false,"passed":true,"migrationVersion":41,"candidateRequiresMigration":true,"productionApplied":false},
-    "repositoryRegression":{"passed":true,"tests":242},
+    "strictMigration":{"expectedFailure":false,"passed":true,"migrationVersion":41,"candidateRequiresMigration":true,"productionApplied":true,"preservationEvidence":"releases/7.5.6.3/migration-preservation.json"},
+    "repositoryRegression":{"passed":true,"tests":243},
     "authenticationAndMobile":{"passed":true,"tests":12},
     "rosterDialogBrowser":{"passed":true,"widths":[390,1280],"horizontalOverflow":false,"confirmTouchHeight":44},
     "commissionerTransferSuite":{"passed":true,"tests":5,"productionMovesPerformed":0},
     "discordPlayerCards":{"passed":true,"tests":5,"positionGroups":11,"statisticsRemoved":true,"routeSignatureGuarded":true,"workerPngAcceptance":{"passed":true,"bytes":115901,"firstRenderAndVerificationMs":485,"realLogoAndPortrait":true,"repeatPng":true,"unsignedAndForgedRejected":true}},
-    "productionPreservation":{"status":"pending","activeSnapshotChanged":false,"ownershipChanged":false}
+    "productionPreservation":{"status":"passed","activeSnapshotChanged":false,"ownershipChanged":false,"exactPickOwnershipPreserved":true,"exactRosterOverlaysPreserved":true,"exactAssignmentsPreserved":true,"differences":[]},
+    "productionReadOnly":{"passed":true,"liveRelease":"7.5.6.3","healthStatus":200,"unsignedCardStatus":404,"rosterDirectoryPicks":40,"fullNamePlayerSearch":"Baker Mayfield","playerResults":1,"playerOwner":"Buccaneers","movesPerformed":0,"liveSignedPngVisualAcceptance":"owner-pending"}
   },
+  "external":{"githubPullRequest":{"number":100,"url":"https://github.com/itzpeckin/furiousgamingcommunity/pull/100","status":"merged","mainCommit":"d2959e43a63bd6ea17c6c6bef990e7479dbbec83"},"hostedChecks":{"status":"passed","pullRequestChecks":4,"mainChecks":5},"productionDeployment":{"authorized":true,"status":"success","id":"537fb56d-a1ec-4000-9dfc-ed3c7cadc16d","url":"https://537fb56d.franchise-hq.pages.dev","mainCommit":"d2959e43a63bd6ea17c6c6bef990e7479dbbec83"},"productionMigration":{"authorized":true,"status":"applied-and-verified","version":41}},
   "scopeBoundaries":{"websitePlayerCardDesignChanged":false,"tradeCreateCardDesignChanged":false,"discordCommandSchemaChanged":false,"importPerformed":false,"resetPerformed":false,"archivePerformed":false,"seasonTransitionPerformed":false,"exportUrlRotated":false,"credentialsChanged":false,"membershipChanged":false,"freeAgentReinterpreted":false,"rosterMovesPerformed":false}
 }

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": "7.5.6.3",
+  "verifiedAtDate": "2026-09-14",
+  "authorized": true,
+  "status": "applied-and-verified-before-main-merge",
+  "accountId": "cc973c5a4c4ed410382f376244af078f",
+  "databaseName": "franchise-hq-db-madden27",
+  "databaseId": "b2529150-28af-42ca-a07b-69506764ccb6",
+  "recoveryBookmark": "0000026f-000002d8-000050e6-316ac953297efd1c5510cd25b66d38bb",
+  "migration": {"file":"migrations/0041_commissioner_roster_ownership.sql","sha256":"06cfd2ed0bc93c1dd5b72d36cad0944370d8aab9e85230c42e883b44ac7e1e0c","version":41,"name":"commissioner_roster_ownership","executions":1,"introductoryCommentRemoved":true,"completeScriptVerified":true,"normalizedLength":4862,"normalizedFnv1a":"ba7bd4b5"},
+  "schema": {
+    "tables":[{"name":"league_player_ownership","columns":9,"rows":0},{"name":"commissioner_roster_movements","columns":16,"rows":0}],
+    "indexes":["idx_player_identities_tenant_identity","idx_draft_picks_tenant_identity","idx_snapshots_tenant_identity","idx_player_ownership_team","idx_roster_movements_league"],
+    "triggers":["trg_roster_movement_actor_guard","trg_roster_movement_snapshot_guard","trg_roster_movement_pick_guard","trg_roster_movement_player_guard","trg_trade_approval_player_ownership","trg_roster_movement_immutable_update","trg_roster_movement_immutable_delete"],
+    "foreignKeyViolations":0,
+    "ownershipForeignKeyGroups":["users","leagueSnapshots (league + snapshot)","playerIdentities (league + identity)","leagues"],
+    "movementForeignKeyGroups":["users","playerIdentities (league + identity)","leagues"],
+    "historicalMovementSnapshotAndPickIds":"Validated by insert guards; retained as immutable historical text across separately authorized game-year archives."
+  },
+  "protectedCountsBeforeAndAfter":{"leagues":1,"users":33,"memberships":33,"activeTeamAssignments":31,"legacyTeams":0,"legacyPlayers":0,"legacySnapshots":0,"leagueSnapshots":37,"snapshotRecords":474337,"activeSnapshots":1,"draftPicks":672,"trades":34,"tradeAssets":115,"tradeReviews":5,"activeRosterOverlays":3,"draftPickLedgerEvents":1346,"tenantAuditEvents":186},
+  "activeSnapshotId":"8a71d810-7e7c-475a-b471-e1babdc8d7a0",
+  "verification":{"passed":true,"differences":[],"exact672PickIdsOwnersAndRevisionsPreserved":true,"exact3ActiveRosterOverlaysPreserved":true,"exact33MembershipRolesAssignmentsAndAccessPreserved":true,"activeSnapshotPreserved":true},
+  "operations":{"schemaChanged":true,"migrationLedgerVersionBefore":40,"migrationLedgerVersionAfter":41,"businessDataChanged":false,"rosterMoves":0,"pickMoves":0,"imports":0,"resets":0,"archives":0,"transitions":0,"credentialChanges":0,"membershipChanges":0,"exportUrlRotated":false,"freeAgentReinterpreted":false}
+}
