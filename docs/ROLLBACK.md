@@ -2,9 +2,13 @@
 
 ## 7.5.6.5 Import Yearly Schedule impact
 
-The authorized 7.5.6.5 candidate adds additive migration 42. It stores season-bound yearly-schedule collection rows and links to already-immutable Companion captures. A completed 18-week/272-game schedule revision is itself immutable. Applying the migration creates no collection and performs no Madden export, import, snapshot activation, current-week change, Discord synchronization, reset, deletion, URL rotation, or season transition.
+Exact 7.5.6.5 candidate `21e3b23e4fd24bd16f921f12d85f280022f56503` merged through PR #106 as Main `6fe3facd8b01b1e66e4c089448e7bf90721a7662`. Pages deployment `76204841-1eba-46af-8dd5-7672fe519876` and import Worker build `e74f4b8e-c032-4807-b5db-6def6ebfbc51` / active version `924b2e52` serve the release. Additive migration 42 was applied between Production D1 bookmarks `000002c5-000002b2-000050e7-4d6e0ac3a9c03211afe397ae30029696` and `000002c5-000002e2-000050e7-fda80eaac71c0d9d9bb6c78af8461719`.
+
+The migration stores season-bound yearly-schedule collection rows and links to already-immutable Companion captures. A completed 18-week/272-game schedule revision is itself immutable. Applying the migration created no collection and performed no Madden export, import, snapshot activation, current-week change, Discord synchronization, reset, deletion, URL rotation, or season transition. Read-only acceptance retained zero yearly rows, active snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0`, all 189 tenant audits, all 105 schedule-thread rows with no update after September 13, and zero foreign-key violations.
 
 A runtime rollback must retain migration 42, every yearly schedule import row, linked capture, sealed schedule JSON/hash, raw R2 object, and start/finish tenant audit. Do not drop the tables or rewrite a completed revision. A collection left open during rollback remains non-live evidence; restore the compatible runtime before finishing it.
+
+The pre-release runtime baseline is exact Main `18d239bcd4cf15ab0da25d3340fd2ad071716c5c`, Pages deployment `72a3b739-d2b2-4052-8ae5-3c2ca201a1e4`, and prior Worker version `326ee7ef`. Runtime rollback may restore those artifacts only while deliberately retaining migration 42 and every current database row. It must not restore a D1 bookmark, change the active snapshot, or clear a collection.
 
 Finishing **Import Yearly Schedule** clears only the permanent endpoint's latest normal-source pointers so a fresh current-week export is required. It keeps the URL token version, all raw captures/reports/snapshots/audits, season/game-year state, Discord state, and blocked/null Free Agent semantics. Code rollback never implies importing the schedule, moving an active pointer, recreating threads, or restoring those latest-source pointers manually.
 
