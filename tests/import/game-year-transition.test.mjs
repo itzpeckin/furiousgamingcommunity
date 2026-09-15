@@ -117,6 +117,13 @@ async function fixture({activeSnapshot=true}={}) {
   record.run('snapshot-1','league-1','teams','tb','{"name":"Buccaneers"}');
   record.run('snapshot-1','league-1','players','p1','{"team_external_id":"tb"}');
   record.run('snapshot-1','league-1','players','p2','{"team_external_id":"tb"}');
+  record.run('snapshot-1','league-1','games','game-1',JSON.stringify({
+    stage:'regular-season',week_index:1,status:'final',home_team_external_id:'tb',away_team_external_id:'gb',home_score:24,away_score:17
+  }));
+  record.run('snapshot-1','league-1','statistics','passing-p1-week-1',JSON.stringify({
+    category:'passing',stage:'regular-season',week_index:1,player_external_id:'p1',
+    metrics_json:JSON.stringify({passAtt:30,passComp:21,passYds:275,passTDs:2,passInts:1,passLongest:44})
+  }));
   if(activeSnapshot)database.prepare(`INSERT INTO league_active_snapshots
     (league_id,snapshot_id,activated_by) VALUES (?,?,?)`).run('league-1','snapshot-1','commissioner-1');
   database.prepare(`INSERT INTO game_year_snapshots
@@ -131,6 +138,19 @@ async function fixture({activeSnapshot=true}={}) {
   database.prepare(`INSERT INTO canonical_roster_snapshot_players
     (league_id,snapshot_id,player_id,team_id,roster_status) VALUES (?,?,?,?,?)`).run('league-1','snapshot-1','p1','tb','active');
   database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,?,?,?)`).run('identity-p1','league-1','player-p1','Player One');
+  database.prepare(`INSERT INTO player_source_aliases
+    (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id)
+    VALUES (?,?,?,?,?,?,?)`).run('league-1','ea-madden-companion','742482','p1','identity-p1','season-1','season-1');
+  database.prepare(`INSERT INTO player_season_summaries
+    (league_id,franchise_season_id,player_identity_id,current_team_external_id,roster_status)
+    VALUES (?,?,?,?,?)`).run('league-1','season-1','identity-p1','tb','rostered');
+  database.prepare(`INSERT INTO gm_identities
+    (id,league_id,user_id,public_id,display_name) VALUES (?,?,?,?,?)`)
+    .run('gm-identity-1','league-1','commissioner-1','gm-1','Commissioner');
+  database.prepare(`INSERT INTO team_ownership_periods
+    (id,league_id,gm_identity_id,team_key,franchise_season_id,started_at,started_stage,started_week,assignment_source)
+    VALUES (?,?,?,?,?,CURRENT_TIMESTAMP,'preseason',1,'fixture')`)
+    .run('ownership-period-1','league-1','gm-identity-1','tb','season-1');
   database.prepare(`INSERT INTO trade_workflows
     (id,league_id,franchise_season_id,status,mutation_token,proposer_user_id,proposer_team_key,approved_at)
     VALUES (?,?,?,'approved',?,?,?,CURRENT_TIMESTAMP)`).run('trade-1','league-1','season-1','fixture-mutation','commissioner-1','tb');
@@ -235,6 +255,20 @@ test('one Archive Season action freezes History Books and prepares the next seas
     assert.deepEqual({sourceSeasonId:prepared.source_season_id,seasonYear:prepared.season_year,status:prepared.status},
       {sourceSeasonId:'2',seasonYear:2027,status:'preview'});
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM franchise_season_closures`).get().count,1);
+    const frozenPlayer=JSON.parse(database.prepare(`SELECT season_totals_json FROM player_season_summaries
+      WHERE league_id='league-1' AND franchise_season_id='season-1' AND player_identity_id='identity-p1'`).get().season_totals_json);
+    assert.equal(frozenPlayer.seasonYear,2026);
+    assert.equal(frozenPlayer.sourceSnapshotId,'snapshot-1');
+    assert.equal(frozenPlayer.statisticRowCount,1);
+    assert.equal(frozenPlayer.categories.passing.passYds,275);
+    assert.equal(frozenPlayer.categories.passing.passTDs,2);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM gm_season_summaries
+      WHERE league_id='league-1' AND franchise_season_id='season-1' AND frozen_at IS NOT NULL`).get().count,1);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM team_ownership_periods
+      WHERE league_id='league-1' AND franchise_season_id=? AND ended_at IS NULL`).get(prepared.id).count,1);
+    assert.equal(payload.result.playerSeasonSummaryCount,1);
+    assert.equal(payload.result.playersWithStatistics,1);
+    assert.equal(payload.result.carriedOwnershipAssignments,1);
     assert.equal(database.prepare(`SELECT status FROM companion_import_destinations WHERE id='destination-1'`).get().status,'archived');
     const endpoint=database.prepare(`SELECT token_version,latest_session_id,latest_ready_report_id
       FROM companion_league_export_endpoints WHERE league_id='league-1'`).get();
@@ -394,7 +428,7 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     assert.equal(payload.gameYear.activeSnapshotId,'snapshot-1');
     assert.equal(payload.freeAgents.status,'blocked');
     assert.equal(payload.freeAgents.count,null);
-    assert.equal(payload.affectedCounts.league_snapshot_records,3);
+    assert.equal(payload.affectedCounts.league_snapshot_records,5);
     assert.equal(payload.affectedCounts.trade_workflows,1);
     assert.equal(payload.affectedCounts.league_draft_picks,1);
 
@@ -447,7 +481,7 @@ test('commissioner workflow archives, verifies, detaches, removes, and restores 
     assert.equal(payload.rollback.restored,true);
     assert.equal(database.prepare(`SELECT snapshot_id FROM league_active_snapshots`).get().snapshot_id,'snapshot-1');
     assert.equal(database.prepare(`SELECT team_id FROM league_memberships WHERE id='membership-1'`).get().team_id,'tb');
-    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,3);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,5);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_workflows`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_draft_picks`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM trade_reconciliation_events`).get().count,1);
@@ -521,7 +555,7 @@ test('large recovery advances through durable bounded cursors and resumes idempo
     });
     payload=recovered.payload;
     assert.equal(payload.rollback.restored,true);
-    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,403);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,405);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_active_snapshots`).get().count,0);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{database.close();}
@@ -558,7 +592,7 @@ test('recovery cursor also bounds large archived row payloads by byte size', asy
     });
     payload=recovered.payload;
     assert.equal(payload.rollback.restored,true);
-    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,7);
+    assert.equal(database.prepare(`SELECT COUNT(*) count FROM league_snapshot_records`).get().count,9);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{database.close();}
 });
@@ -617,6 +651,6 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.doesNotMatch(ui,/data-game-year-season-confirmation/);
   assert.match(ui,/renderArchivePanel/);
   assert.match(ui,/data-game-year-archive-panel/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.5\.6\.3/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.5\.6\.4/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });

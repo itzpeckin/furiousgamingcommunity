@@ -12,7 +12,7 @@
 
 **Current work:** Owner validation of shared rendered Discord player/trade-block cards and audited commissioner player/pick transfer controls. FranchiseHQ retains approved-trade/correction ownership across imports; migration replayed or moved no existing ownership. Final release-evidence publication includes a narrow public Transactions visibility correction for completed commissioner movements. Annual current-week/source acceptance remains deferred until the next season; year-by-year contract research is shelved.
 
-**Next gate:** Finish hosted checks and code-only republication of the 7.5.6.3 evidence/Transactions follow-up, then owner-validate new Discord responses and commissioner tools. Next is 7.5.7 measured importer performance and thread readiness. Real annual-import/current-week source proof remains deferred until the next season; full-season source with missing explicit current metadata is not claimed validated. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x. Whole-trade reversal remains a separate, unimplemented policy/workflow decision.
+**Next gate:** Publish the authorized 7.5.6.4 season-rollover readiness and contract-years correction, then run the separately commissioner-operated 2026 Archive Season action before exporting/importing 2027 Week 1. Next is 7.5.7 measured importer performance and thread readiness. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x. Whole-trade reversal remains a separate, unimplemented policy/workflow decision.
 
 ## Product decisions
 
@@ -114,6 +114,7 @@
 | 7.5.6.1 | Production deployed; owner Discord/site vote acceptance pending | Current-revision approval/rejection/status synchronization across site, every reviewer DM, Trade Submit and owner trade thread |
 | 7.5.6.2 | Production deployed; owner acceptance pending | Measured Discord autocomplete/command-result latency and a separately guarded one-pick correction; ownership redesign remains discussion only |
 | 7.5.6.3 | Production deployed; owner acceptance pending | Shared team-branded rendered Discord rating cards, audited commissioner player/pick transfers, and FranchiseHQ ownership retained across imports; migration 41 preserved every existing owner and snapshot |
+| 7.5.6.4 | Validated production candidate | Freeze source-backed 2026 player/GM history, carry reviewed assignments into the prepared 2027 season, and separate Madden years left from total contract length |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |

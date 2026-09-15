@@ -17,9 +17,13 @@ import {
   validateTypedConfirmation
 } from '../../../_lib/game-year-transition.js';
 import { requireCommissioner } from '../../../_lib/permissions.js';
-import { activeLeagueTeams, resolveTeam } from '../../../_lib/league-teams.js';
+import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../_lib/league-teams.js';
 import { buildGmSeasonSummaries } from '../../../_lib/gm-career.js';
 import { ensureDraftPickHorizon } from '../../../_lib/draft-pick-baselines.js';
+import {
+  buildArchivedPlayerSeasonTotals,
+  emptyArchivedPlayerSeasonTotals
+} from '../../../_lib/player-season-history.js';
 
 const RELEASE = GAME_YEAR_TRANSITION_RELEASE;
 const PAGE_SIZE = 250;
@@ -27,9 +31,18 @@ const RESTORE_ROWS_PER_REQUEST = 96;
 const RESTORE_BYTES_PER_REQUEST = 256 * 1024;
 const RESTORE_SOURCES_PER_REQUEST = 8;
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+const MAX_D1_JSON_BIND_BYTES = 1_900_000;
 const text = value => String(value ?? '').trim();
 const parse = (value, fallback = null) => { try { return JSON.parse(value || 'null') ?? fallback; } catch { return fallback; } };
 const resultRows = result => result?.results || [];
+
+function jsonBind(value,label){
+  const payload=JSON.stringify(value);
+  if(new TextEncoder().encode(payload).byteLength>MAX_D1_JSON_BIND_BYTES){
+    throw new Error(`${label} is too large to freeze safely in one atomic archive action.`);
+  }
+  return payload;
+}
 
 const RESTORE_ORDER = Object.freeze([
   'madden_discovery_sessions',
@@ -123,11 +136,25 @@ async function gmSeasonFreeze(current,franchiseSeasonId,snapshotId){
     WHERE league_id=? AND snapshot_id=? AND domain='games' ORDER BY external_id`,current.league.id,snapshotId);
   const games=rows.map(row=>ownershipGameRecord(row,teams,franchiseSeasonId));
   const built=buildGmSeasonSummaries({games,periods,franchiseSeasonId});
-  const statements=built.summaries.map(summary=>current.db.prepare(`INSERT INTO gm_season_summaries
+  const frozen=built.summaries.map(summary=>({
+    gmIdentityId:summary.gmIdentityId,teams:summary.teams,
+    regularWins:summary.regularWins,regularLosses:summary.regularLosses,regularTies:summary.regularTies,
+    playoffWins:summary.playoffWins,playoffLosses:summary.playoffLosses,playoffTies:summary.playoffTies,
+    playoffAppearance:summary.playoffAppearance,conferenceChampionships:summary.conferenceChampionships,
+    superBowlAppearances:summary.superBowlAppearances,superBowlChampionships:summary.superBowlChampionships,
+    gameCount:summary.gameCount
+  }));
+  const statements=frozen.length?[current.db.prepare(`INSERT INTO gm_season_summaries
     (league_id,franchise_season_id,gm_identity_id,teams_json,regular_wins,regular_losses,regular_ties,
      playoff_wins,playoff_losses,playoff_ties,playoff_appearance,conference_championships,
      super_bowl_appearances,super_bowl_championships,game_count,source_snapshot_id,frozen_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+    SELECT ?,?,json_extract(value,'$.gmIdentityId'),json_extract(value,'$.teams'),
+      json_extract(value,'$.regularWins'),json_extract(value,'$.regularLosses'),json_extract(value,'$.regularTies'),
+      json_extract(value,'$.playoffWins'),json_extract(value,'$.playoffLosses'),json_extract(value,'$.playoffTies'),
+      json_extract(value,'$.playoffAppearance'),json_extract(value,'$.conferenceChampionships'),
+      json_extract(value,'$.superBowlAppearances'),json_extract(value,'$.superBowlChampionships'),
+      json_extract(value,'$.gameCount'),?,CURRENT_TIMESTAMP
+    FROM json_each(?) WHERE true
     ON CONFLICT(league_id,franchise_season_id,gm_identity_id) DO UPDATE SET
       teams_json=excluded.teams_json,regular_wins=excluded.regular_wins,regular_losses=excluded.regular_losses,
       regular_ties=excluded.regular_ties,playoff_wins=excluded.playoff_wins,playoff_losses=excluded.playoff_losses,
@@ -135,11 +162,51 @@ async function gmSeasonFreeze(current,franchiseSeasonId,snapshotId){
       conference_championships=excluded.conference_championships,super_bowl_appearances=excluded.super_bowl_appearances,
       super_bowl_championships=excluded.super_bowl_championships,game_count=excluded.game_count,
       source_snapshot_id=excluded.source_snapshot_id,frozen_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`)
-    .bind(current.league.id,franchiseSeasonId,summary.gmIdentityId,JSON.stringify(summary.teams),
-      summary.regularWins,summary.regularLosses,summary.regularTies,summary.playoffWins,summary.playoffLosses,summary.playoffTies,
-      summary.playoffAppearance,summary.conferenceChampionships,summary.superBowlAppearances,summary.superBowlChampionships,
-      summary.gameCount,snapshotId));
+    .bind(current.league.id,franchiseSeasonId,snapshotId,jsonBind(frozen,'GM season summaries'))]:[];
   return{summaries:built.summaries,statements,attributedGameCount:built.attributedGames.length};
+}
+
+async function playerSeasonFreeze(current,franchiseSeason,snapshotId,summaries){
+  const [records,aliases]=await Promise.all([
+    all(current.db,`SELECT data_json FROM league_snapshot_records
+      WHERE league_id=? AND snapshot_id=? AND domain='statistics' ORDER BY external_id`,current.league.id,snapshotId),
+    all(current.db,`SELECT source_player_id,player_identity_id FROM player_source_aliases
+      WHERE league_id=? ORDER BY source_player_id`,current.league.id)
+  ]);
+  const built=buildArchivedPlayerSeasonTotals({
+    records,aliases,seasonYear:franchiseSeason.season_year,sourceSnapshotId:snapshotId
+  });
+  const empty=emptyArchivedPlayerSeasonTotals({seasonYear:franchiseSeason.season_year,sourceSnapshotId:snapshotId});
+  const frozen=summaries.map(summary=>({
+    ...summary,
+    season_totals_json:JSON.stringify(built.byIdentity.get(String(summary.player_identity_id))||empty)
+  }));
+  const payload=Object.fromEntries(frozen.map(summary=>[summary.player_identity_id,parse(summary.season_totals_json,{})]));
+  const statements=frozen.length?[current.db.prepare(`UPDATE player_season_summaries SET
+      season_totals_json=(SELECT value FROM json_each(?) frozen WHERE frozen.key=player_season_summaries.player_identity_id),
+      last_seen_at=last_seen_at
+      WHERE league_id=? AND franchise_season_id=?`)
+    .bind(jsonBind(payload,'Player season summaries'),current.league.id,franchiseSeason.id)]:[];
+  return{...built,frozen,statements,summaryCount:frozen.length};
+}
+
+async function nextSeasonOwnership(current,franchiseSeasonId,teams){
+  const assignments=await activeTeamAssignments(current.db,current.league.id,teams);
+  const identities=await all(current.db,`SELECT id,user_id FROM gm_identities WHERE league_id=?`,current.league.id);
+  const identityByUser=new Map(identities.map(identity=>[String(identity.user_id),String(identity.id)]));
+  const carried=[];
+  for(const [teamKey,assignment] of assignments){
+    const gmIdentityId=identityByUser.get(String(assignment.userId));
+    if(!gmIdentityId)throw new Error(`The reviewed ${teamKey.toUpperCase()} assignment has no stable GM identity.`);
+    carried.push({id:`ownership_period_${crypto.randomUUID()}`,gmIdentityId,teamKey});
+  }
+  const statements=carried.length?[current.db.prepare(`INSERT INTO team_ownership_periods
+      (id,league_id,gm_identity_id,team_key,franchise_season_id,started_at,started_stage,started_week,assignment_source)
+      SELECT json_extract(value,'$.id'),?,json_extract(value,'$.gmIdentityId'),json_extract(value,'$.teamKey'),?,
+        CURRENT_TIMESTAMP,'preseason',1,'season-carry-forward'
+      FROM json_each(?)`)
+    .bind(current.league.id,franchiseSeasonId,jsonBind(carried,'Carried ownership assignments'))]:[];
+  return{assignmentCount:assignments.size,statements};
 }
 
 async function paged(db, sql, args = []) {
@@ -1052,19 +1119,30 @@ async function archiveFranchiseSeason(current, gameYear) {
   const summaries=await all(current.db,`SELECT player_identity_id,career_totals_json,season_totals_json FROM player_season_summaries WHERE league_id=? AND franchise_season_id=? ORDER BY player_identity_id`,current.league.id,previous.id);
   const periods=await all(current.db,`SELECT id,gm_identity_id,team_key,started_at,ended_at FROM team_ownership_periods WHERE league_id=? AND franchise_season_id=? ORDER BY id`,current.league.id,previous.id);
   const gmFreeze=await gmSeasonFreeze(current,previous.id,active.id);
-  const frozenSha=await archiveDigest({summaries,periods,gmSeasonSummaries:gmFreeze.summaries});
   const newSeasonId=`franchise_season_${crypto.randomUUID()}`,closureId=`franchise_season_closure_${crypto.randomUUID()}`,transitionId=`game_year_transition_${crypto.randomUUID()}`;
+  const teams=await activeLeagueTeams(current.db,current.league.id);
+  const playerFreeze=await playerSeasonFreeze(current,previous,active.id,summaries);
+  const ownershipCarry=await nextSeasonOwnership(current,newSeasonId,teams);
+  const frozenSha=await archiveDigest({summaries:playerFreeze.frozen,periods,gmSeasonSummaries:gmFreeze.summaries});
   await current.db.batch([
     current.db.prepare(`UPDATE franchise_seasons SET status='closed',updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=?`).bind(previous.id,current.league.id),
     current.db.prepare(`UPDATE team_ownership_periods SET ended_at=COALESCE(ended_at,CURRENT_TIMESTAMP),ended_stage=COALESCE(ended_stage,'pro-bowl'),ended_week=COALESCE(ended_week,999),updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND franchise_season_id=?`).bind(current.league.id,previous.id),
+    ...playerFreeze.statements,
     ...gmFreeze.statements,
     current.db.prepare(`INSERT INTO franchise_season_closures
       (id,league_id,game_year_id,franchise_season_id,player_summary_count,ownership_period_count,frozen_totals_sha256,postseason_summary_json,closed_by_user_id)
-      VALUES (?,?,?,?,?,?,?,?,?)`).bind(closureId,current.league.id,gameYear.id,previous.id,summaries.length,periods.length,frozenSha,JSON.stringify({gmSeasonSummaryCount:gmFreeze.summaries.length,attributedGameCount:gmFreeze.attributedGameCount}),current.authorization.session.user.id),
+      VALUES (?,?,?,?,?,?,?,?,?)`).bind(closureId,current.league.id,gameYear.id,previous.id,playerFreeze.summaryCount,periods.length,frozenSha,JSON.stringify({
+        gmSeasonSummaryCount:gmFreeze.summaries.length,attributedGameCount:gmFreeze.attributedGameCount,
+        playerSeasonSummaryCount:playerFreeze.summaryCount,playersWithStatistics:playerFreeze.playersWithStatistics,
+        retainedStatisticRows:playerFreeze.retainedStatisticRows,matchedStatisticRows:playerFreeze.matchedStatisticRows,
+        unmatchedStatisticRows:playerFreeze.retainedStatisticRows-playerFreeze.matchedStatisticRows,
+        carriedOwnershipAssignments:ownershipCarry.assignmentCount,sourceSnapshotId:active.id
+      }),current.authorization.session.user.id),
     current.db.prepare(`INSERT INTO franchise_seasons
       (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
       VALUES (?,?,?,?,?,?,?,?, 'preview')`).bind(newSeasonId,current.league.id,previous.source_system,previous.source_franchise_id,next.sourceSeasonId,gameYear.game_release,next.displayName,next.seasonYear),
     current.db.prepare(`INSERT INTO game_year_franchise_seasons (game_year_id,league_id,franchise_season_id) VALUES (?,?,?)`).bind(gameYear.id,current.league.id,newSeasonId),
+    ...ownershipCarry.statements,
     current.db.prepare(`UPDATE companion_import_destinations SET status='archived',updated_at=CURRENT_TIMESTAMP
       WHERE league_id=? AND franchise_season_id=?`).bind(current.league.id,previous.id),
     current.db.prepare(`UPDATE companion_league_export_endpoints SET latest_session_id=NULL,
@@ -1073,19 +1151,24 @@ async function archiveFranchiseSeason(current, gameYear) {
     current.db.prepare(`INSERT INTO game_year_transition_runs
       (id,league_id,operation,outgoing_game_year_id,incoming_game_year_id,status,phase,confirmation_scope,created_by_user_id,completed_at)
       VALUES (?,?,?,?,?,'completed','season-prepared',?,?,CURRENT_TIMESTAMP)`).bind(transitionId,current.league.id,GAME_YEAR_OPERATIONS.startFranchiseSeason,gameYear.id,gameYear.id,'one-click-archive-season',current.authorization.session.user.id),
-    event(current,transitionId,'franchise_season_closed',{franchiseSeasonId:previous.id,closureId,playerSummaryCount:summaries.length,ownershipPeriodCount:periods.length,gmSeasonSummaryCount:gmFreeze.summaries.length,attributedGameCount:gmFreeze.attributedGameCount,frozenTotalsSha256:frozenSha}),
-    event(current,transitionId,'franchise_season_prepared',{franchiseSeasonId:newSeasonId,sourceSeasonId:next.sourceSeasonId,seasonYear:next.seasonYear,latestExportSelectionCleared:true}),
+    event(current,transitionId,'franchise_season_closed',{franchiseSeasonId:previous.id,closureId,playerSummaryCount:playerFreeze.summaryCount,playersWithStatistics:playerFreeze.playersWithStatistics,retainedStatisticRows:playerFreeze.retainedStatisticRows,matchedStatisticRows:playerFreeze.matchedStatisticRows,ownershipPeriodCount:periods.length,gmSeasonSummaryCount:gmFreeze.summaries.length,attributedGameCount:gmFreeze.attributedGameCount,frozenTotalsSha256:frozenSha}),
+    event(current,transitionId,'franchise_season_prepared',{franchiseSeasonId:newSeasonId,sourceSeasonId:next.sourceSeasonId,seasonYear:next.seasonYear,carriedOwnershipAssignments:ownershipCarry.assignmentCount,latestExportSelectionCleared:true}),
     await audit(current,'franchise_season.archive_and_prepare','franchise_season',previous.id,{
       transitionId,previousSeasonId:previous.id,nextSeasonId:newSeasonId,closureId,gameYearId:gameYear.id,
       seasonYear:previous.season_year,nextSeasonYear:next.seasonYear,activeSnapshotChanged:false,
+      playerSeasonSummaryCount:playerFreeze.summaryCount,playersWithStatistics:playerFreeze.playersWithStatistics,
+      retainedStatisticRows:playerFreeze.retainedStatisticRows,matchedStatisticRows:playerFreeze.matchedStatisticRows,
+      carriedOwnershipAssignments:ownershipCarry.assignmentCount,
       historyPermanentlyDeleted:false,exportUrlRotated:false,freeAgentInterpretedAsZero:false
     })
   ]);
-  const teams=await activeLeagueTeams(current.db,current.league.id);
   const draftPickHorizon=await ensureDraftPickHorizon(current.db,{leagueId:current.league.id,franchiseSeasonId:newSeasonId,
     seasonYear:next.seasonYear,gameRelease:gameYear.game_release,teams});
   return{completed:true,archivedSeasonId:previous.id,franchiseSeasonId:newSeasonId,
     seasonYear:next.seasonYear,closureId,frozenTotalsSha256:frozenSha,historyPermanentlyDeleted:false,
+    playerSeasonSummaryCount:playerFreeze.summaryCount,playersWithStatistics:playerFreeze.playersWithStatistics,
+    retainedStatisticRows:playerFreeze.retainedStatisticRows,matchedStatisticRows:playerFreeze.matchedStatisticRows,
+    carriedOwnershipAssignments:ownershipCarry.assignmentCount,
     draftPickHorizon:{classes:draftPickHorizon.classes,expectedPickCount:draftPickHorizon.expectedPickCount}};
 }
 

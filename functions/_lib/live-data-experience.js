@@ -101,7 +101,10 @@ export function sourceSupportedContract(raw = {}) {
   const rawCapHit=raw.sourceCapHit ?? raw.cap_hit ?? raw.capHit ?? raw.salaryCapHit;
   const contractScale=maddenContractScale(rawCapHit);
   return {
-    yearsRemaining:number(raw.contract_years_remaining ?? raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.yearsRemaining),
+    // Madden exposes both the deal's original length and its live years-left value.
+    // Prefer the retained source years-left field so an older canonical mapper that
+    // copied contractLength into contract_years_remaining cannot produce 6 / 6.
+    yearsRemaining:number(raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.yearsRemaining ?? raw.contract_years_remaining),
     length:number(raw.contractLength ?? raw.contractYears ?? raw.totalContractYears),
     currentYearSalary:null,
     capHit:scaledMaddenCurrency(rawCapHit,contractScale),

@@ -1,10 +1,10 @@
-/* FHQ_BUILD: 5.9.11.0 */
+/* FHQ_BUILD: 7.5.6.4 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireActiveMembership, requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 import { createTenantAuditContext, tenantAuditStatement } from '../../../../_lib/tenant-context.js';
 
-const RELEASE='7.4.1';
+const RELEASE='7.5.6.4';
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
 const now=()=>new Date().toISOString();
@@ -1807,7 +1807,7 @@ function compactLifecycleRaw(raw={}){
     isRetired:raw.isRetired===true||raw.retired===true||raw.hasRetired===true,
     retired:raw.retired===true,
     hasRetired:raw.hasRetired===true,
-    contractYearsRemaining:raw.contractYearsRemaining??raw.yearsRemaining??raw.contractLength??raw.contractYears??null,
+    contractYearsRemaining:raw.contractYearsLeft??raw.contractYearsRemaining??raw.yearsRemaining??raw.contractLength??raw.contractYears??null,
     contractSalary:raw.contractSalary??raw.salary??raw.capHit??raw.currentSalary??null,
     contractBonus:raw.contractBonus??raw.signingBonus??raw.bonus??null
   };

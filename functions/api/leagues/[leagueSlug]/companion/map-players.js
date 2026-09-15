@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 5.9.11.0 */
+/* FHQ_BUILD: 7.5.6.4 */
 import {
   json,
   database,
@@ -8,7 +8,7 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE='7.3.0';
+const RELEASE='7.5.6.4';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -28,7 +28,7 @@ const A = Object.freeze({
   injury: ['injuryStatus','injury'], injured: ['isInjured','injured'],
   rosterStatus: ['rosterStatus','roster_status','playerStatus','player_status','status','transactionStatus'],
   retired: ['isRetired','retired','hasRetired'],
-  contractYears: ['contractYearsRemaining','yearsRemaining','contractLength','contractYears'],
+  contractYears: ['contractYearsLeft','contractYearsRemaining','yearsRemaining','contractLength','contractYears'],
   salary: ['salary','totalSalary','contractSalary'], capHit: ['capHit','salaryCapHit','cap'],
   portrait: ['portraitId','portraitID','headshotId','assetId']
 });
