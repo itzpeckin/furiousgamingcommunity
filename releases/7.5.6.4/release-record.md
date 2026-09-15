@@ -22,7 +22,9 @@ The strict repository gate passed 243 tests, including the full atomic Archive S
 
 ## Deployment status
 
-Branch publication, hosted checks, Main merge and the code-only Production deployment are authorized and pending. Migration 41 remains current; this release adds no migration. Archive Season and the 2027 import remain separate commissioner-operated actions and have not been executed by this deployment.
+The code release completed on September 14, 2026. Candidate `7ff17db1e1c2d9c6756c899de9efa4c289fd1658` passed all four PR checks in [PR #102](https://github.com/itzpeckin/furiousgamingcommunity/pull/102) and merged to Main as `9595f397a5047cd0d16c802f2d35c27afc6b60af`. Main quality and Pages deployment passed; Cloudflare Pages deployment `abc2b3a9-dd6b-440a-9f04-5a0311151163` serves FranchiseHQ 7.5.6.4.
+
+Live acceptance confirmed the release badge and a retained source contract that previously rendered 6 / 6 now renders 5 / 6. A post-deployment read-only D1 query confirmed 2026 is still active, `franchise_season_closures` remains zero and active snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0` is unchanged. Migration 41 remains current; no migration, archive, import, reset or data mutation ran during deployment or acceptance.
 
 ## Production preflight
 

@@ -6,13 +6,13 @@
 
 **Updated:** September 14, 2026
 
-**Revision:** 2.59
+**Revision:** 2.60
 
-**Current production:** FranchiseHQ 7.5.6.3 is live from candidate `1194136a7c6def03484269a08798220899c650ff`, PR #100, code Main `d2959e43a63bd6ea17c6c6bef990e7479dbbec83`, and verified Pages Production deployment `537fb56d-a1ec-4000-9dfc-ed3c7cadc16d`. All four PR and five Main checks passed; migration 41 was applied and verified before Main merge. All 672 pick owners/revisions, three active roster overlays, 33 memberships/assignments and active snapshot were preserved. Public health, release badge and the live commissioner player/pick directory are verified. Strict gate includes 243 tests after the final Transactions visibility regression; authentication/mobile 12/12 passed. No live move, trade/vote/import, reset, archive/transition, snapshot activation, export URL, credential, membership/assignment or Discord registration/configuration operation ran. Blocked Madden Free Agents remain unknown/null. Website Player Cards and Trade Create design are unchanged.
+**Current production:** FranchiseHQ 7.5.6.4 is live from candidate `7ff17db1e1c2d9c6756c899de9efa4c289fd1658`, PR #102, code Main `9595f397a5047cd0d16c802f2d35c27afc6b60af`, and verified Pages Production deployment `abc2b3a9-dd6b-440a-9f04-5a0311151163`. All four PR checks, Main quality and deployment checks passed. The strict gate is 243/243. Live contract acceptance shows retained Madden years left separately from total length (`5 / 6`), while read-only D1 acceptance confirms 2026 remains active, no season closure has run and active snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0` is unchanged. Migration 41 remains current. No migration, import, reset, archive/transition, export URL, credential, membership/assignment, Discord registration/configuration or Free Agent reinterpretation occurred.
 
-**Current work:** Owner validation of shared rendered Discord player/trade-block cards and audited commissioner player/pick transfer controls. FranchiseHQ retains approved-trade/correction ownership across imports; migration replayed or moved no existing ownership. Final release-evidence publication includes a narrow public Transactions visibility correction for completed commissioner movements. Annual current-week/source acceptance remains deferred until the next season; year-by-year contract research is shelved.
+**Current work:** Commissioner execution and verification of the now-ready 2026 Archive Season action, followed by a distinct 2027 Week 1 export/import. The deployed action freezes player and GM history, closes 2026 ownership periods, carries all reviewed assignments into 2027, prepares the next draft horizon and leaves the active 2026 snapshot untouched until the 2027 import activates atomically.
 
-**Next gate:** Publish the authorized 7.5.6.4 season-rollover readiness and contract-years correction, then run the separately commissioner-operated 2026 Archive Season action before exporting/importing 2027 Week 1. Next is 7.5.7 measured importer performance and thread readiness. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x. Whole-trade reversal remains a separate, unimplemented policy/workflow decision.
+**Next gate:** Run the separately commissioner-operated 2026 Archive Season action once, verify the prepared 2027 records, then export and import Madden 2027 Week 1 through the existing permanent URL. Next is 7.5.7 measured importer performance and thread readiness. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x. Whole-trade reversal remains a separate, unimplemented policy/workflow decision.
 
 ## Product decisions
 
@@ -114,7 +114,7 @@
 | 7.5.6.1 | Production deployed; owner Discord/site vote acceptance pending | Current-revision approval/rejection/status synchronization across site, every reviewer DM, Trade Submit and owner trade thread |
 | 7.5.6.2 | Production deployed; owner acceptance pending | Measured Discord autocomplete/command-result latency and a separately guarded one-pick correction; ownership redesign remains discussion only |
 | 7.5.6.3 | Production deployed; owner acceptance pending | Shared team-branded rendered Discord rating cards, audited commissioner player/pick transfers, and FranchiseHQ ownership retained across imports; migration 41 preserved every existing owner and snapshot |
-| 7.5.6.4 | Validated production candidate | Freeze source-backed 2026 player/GM history, carry reviewed assignments into the prepared 2027 season, and separate Madden years left from total contract length |
+| 7.5.6.4 | Production deployed; Archive Season pending commissioner action | Freeze source-backed 2026 player/GM history, carry reviewed assignments into the prepared 2027 season, and separate Madden years left from total contract length |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
