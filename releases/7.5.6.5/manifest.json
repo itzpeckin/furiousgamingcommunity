@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.6.5",
   "releaseType": "yearly-schedule-import-boundary",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.6.4",
@@ -18,17 +18,27 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "not-run"
+    "status": "published-hosted-checks-passed-main",
+    "candidateCommit": "21e3b23e4fd24bd16f921f12d85f280022f56503",
+    "pullRequest": "https://github.com/itzpeckin/furiousgamingcommunity/pull/106",
+    "mainCommit": "6fe3facd8b01b1e66e4c089448e7bf90721a7662",
+    "followupBranch": "codex/franchisehq-7.5.6.5-production-evidence"
   },
   "staging": {"authorized": false,"deployed": false,"status": "not-run"},
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.5.6.4",
+    "deployed": true,
+    "status": "deployed-read-only-verified",
+    "currentRelease": "7.5.6.5",
     "candidateRelease": "7.5.6.5",
-    "currentMigration": 41,
+    "currentCommit": "6fe3facd8b01b1e66e4c089448e7bf90721a7662",
+    "currentMigration": 42,
     "candidateMigration": 42,
+    "pagesDeployment": "76204841-1eba-46af-8dd5-7672fe519876",
+    "workerBuild": "e74f4b8e-c032-4807-b5db-6def6ebfbc51",
+    "workerVersion": "924b2e52",
+    "preMigrationBookmark": "000002c5-000002b2-000050e7-4d6e0ac3a9c03211afe397ae30029696",
+    "postMigrationBookmark": "000002c5-000002e2-000050e7-fda80eaac71c0d9d9bb6c78af8461719",
     "scope": "Additive schema and runtime for commissioner-operated yearly regular-season schedule collection. Deployment does not run a collection, export, import, snapshot activation, Discord synchronization, reset, deletion, URL rotation, archive or transition."
   },
   "requiredArtifacts": [
