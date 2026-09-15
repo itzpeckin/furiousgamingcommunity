@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.6.4",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-verified",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {"unregisteredFailures": 0},
@@ -54,10 +54,10 @@
     "freeAgentInterpretedAsZero": false
   },
   "external": {
-    "githubPublication": {"authorized": true,"status": "pending"},
-    "hostedChecks": {"status": "pending"},
+    "githubPublication": {"authorized": true,"status": "published-main","pullRequest": 102,"candidateCommit": "7ff17db1e1c2d9c6756c899de9efa4c289fd1658","mainCommit": "9595f397a5047cd0d16c802f2d35c27afc6b60af"},
+    "hostedChecks": {"status": "passed","pullRequestChecks": 4,"mainQuality": "passed","pagesDeployment": "passed"},
     "productionMigration": {"authorized": false,"status": "not-required"},
     "discordCommandRegistration": {"authorized": false,"status": "not-required"},
-    "productionDeployment": {"authorized": true,"status": "pending"}
+    "productionDeployment": {"authorized": true,"status": "success","deploymentId": "abc2b3a9-dd6b-440a-9f04-5a0311151163","liveRelease": "7.5.6.4","contractAcceptance": "Jaxon Smith-Njigba 5 / 6","archiveClosures": 0,"activeSnapshot": "8a71d810-7e7c-475a-b471-e1babdc8d7a0"}
   }
 }

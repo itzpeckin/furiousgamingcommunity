@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.6.4",
   "releaseType": "season-rollover-readiness-and-contract-years",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.6.3",
@@ -18,17 +18,18 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending",
-    "candidateCommit": null,
-    "pullRequest": null,
-    "mainCommit": null
+    "status": "published-hosted-checks-passed-main",
+    "candidateCommit": "7ff17db1e1c2d9c6756c899de9efa4c289fd1658",
+    "pullRequest": "https://github.com/itzpeckin/furiousgamingcommunity/pull/102",
+    "mainCommit": "9595f397a5047cd0d16c802f2d35c27afc6b60af"
   },
   "staging": {"authorized": false,"deployed": false,"status": "not-run"},
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending",
-    "currentRelease": "7.5.6.3",
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
+    "deploymentId": "abc2b3a9-dd6b-440a-9f04-5a0311151163",
+    "currentRelease": "7.5.6.4",
     "candidateRelease": "7.5.6.4",
     "currentMigration": 41,
     "candidateMigration": 41,
