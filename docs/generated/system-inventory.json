@@ -160,13 +160,13 @@
   "files": {
     "byExtension": {
       ".bin": 1,
-      ".css": 9,
+      ".css": 10,
       ".example": 1,
-      ".html": 3,
+      ".html": 4,
       ".js": 222,
       ".json": 7,
       ".jsonc": 1,
-      ".md": 279,
+      ".md": 281,
       ".mjs": 47,
       ".png": 3,
       ".sql": 43,
@@ -209,7 +209,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75173,
+        "bytes": 75294,
         "file": "index.html"
       },
       {
@@ -257,7 +257,7 @@
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 623
+    "total": 627
   },
   "frontend": {
     "assets": [

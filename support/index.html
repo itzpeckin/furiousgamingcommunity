@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d16">
+  <meta name="description" content="Learn to use the FranchiseHQ Discord bot: get started, find players and statistics, manage your trade block, and submit trades for approval.">
+  <title>Discord Bot Guide | FranchiseHQ Support</title>
+  <link rel="stylesheet" href="/support/support.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to guide</a>
+  <header class="site-header">
+    <a class="brand" href="/">FRANCHISE<span>HQ</span></a>
+    <nav aria-label="Website"><a href="/support/" aria-current="page">Support</a><a href="/leagues">Open FranchiseHQ <span aria-hidden="true">↗</span></a></nav>
+  </header>
+  <div class="layout">
+    <aside>
+      <p class="eyebrow">Support center</p>
+      <strong class="topic">Discord bot</strong>
+      <nav aria-label="Guide sections">
+        <a href="#getting-started">Getting started</a>
+        <a href="#commands">Command reference</a>
+        <a href="#trade-block">Managing your trade block</a>
+        <a href="#create-trade">Creating a trade</a>
+        <a href="#trade-review">Negotiation &amp; approval</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+      </nav>
+      <p class="aside-note">Step-by-step help for league members and team owners.</p>
+    </aside>
+    <main id="content">
+      <div class="intro">
+        <p class="eyebrow">FranchiseHQ / Support</p>
+        <h1>Using the Discord bot</h1>
+        <p class="lead">Find league information, manage your trade block, and take a trade from proposal to approval—all starting in Discord.</p>
+        <p class="meta">Updated September 15, 2026 · Bot version 7.5.6.4</p>
+      </div>
+
+      <section id="getting-started">
+        <h2>1. Getting started</h2>
+        <p>The FranchiseHQ (FHQ) bot connects your league’s Discord server to its FranchiseHQ website. Your league must have the bot connected before commands can work.</p>
+        <ol>
+          <li><strong>Use your league Discord account.</strong> Sign in to <a href="/">FranchiseHQ</a> with the same Discord account you use in the server.</li>
+          <li><strong>Join your league.</strong> If the bot asks you to join, use <code>/join</code> in the league server. This creates unassigned league access; a commissioner must assign your team before you can manage its trade block or propose trades.</li>
+          <li><strong>Select the FranchiseHQ bot.</strong> NeonSportz may also be active in your server with similar commands. Check which bot appears beside the command before selecting it.</li>
+          <li><strong>Allow bot direct messages.</strong> Keep your Discord privacy settings configured to receive the bot’s trade notifications.</li>
+        </ol>
+        <h3>How to enter a command</h3>
+        <p>Type <code>/</code> immediately followed by the command name—for example, <code>/player</code>. Select the FranchiseHQ command, fill in its fields, choose any suggested result, and send it. Player and team suggestions narrow as you type.</p>
+        <p>Commands with a <code>private</code> option can show the response only to you. Otherwise, information lookups may appear in the current channel.</p>
+        <div class="note"><strong>League data depends on imports.</strong> Game results, statistics, and standings reflect the latest Madden data imported into FranchiseHQ. A game finished in Madden will not immediately appear as played until the import is updated.</div>
+      </section>
+
+      <section id="commands">
+        <h2>2. Command reference</h2>
+        <p>Use Discord’s command menu to select the options shown below.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Discord command reference">
+          <table>
+            <thead><tr><th scope="col">Command</th><th scope="col">What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>/player</code></td><td>Find a player by name. Choose the player from the suggestions to view their player information and position-specific statistics.</td></tr>
+              <tr><td><code>/leaders</code></td><td>Show the top 10 players for a statistical category. Choose a group and a statistic, such as <code>/leaders passing touchdowns</code>.</td></tr>
+              <tr><td><code>/gm-history all</code><br><code>/gm-history player</code></td><td>View GM career results across the seasons recorded in FHQ, including wins, playoff appearances, Super Bowl appearances, and championships. Use <code>player</code> and the <code>name</code> field to select one GM.</td></tr>
+              <tr><td><code>/standings all</code></td><td>View standings for the entire league.</td></tr>
+              <tr><td><code>/standings conference</code><br><code>/standings division</code></td><td>View standings grouped by conference or division. Use the optional <code>name</code> field to select one, such as AFC or NFC East.</td></tr>
+              <tr><td><code>/playoffs</code></td><td>View the top 10 teams in each conference by current playoff seed. Use the conference field to narrow the results.</td></tr>
+              <tr><td><code>/eliminated</code></td><td>View teams mathematically eliminated from the playoffs based on their records.</td></tr>
+              <tr><td><code>/games played</code><br><code>/games unplayed</code></td><td>See completed or outstanding games for the current imported week.</td></tr>
+              <tr><td><code>/rules category</code><br><code>/rules section</code></td><td>Select a published category or section using the <code>name</code> field—for example, League Operations or Substitutions and Position Changes. Available choices come from your league’s published rules.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="trade-block">
+        <h2>3. Managing your trade block</h2>
+        <p>Your trade block lists players you are open to trading. Listing a player does not create a trade proposal.</p>
+        <h3>From the website</h3>
+        <p>Open your team in FranchiseHQ and select the star beside a player’s name to add them to the trade block. The listing also becomes available through the Discord bot.</p>
+        <h3>From Discord</h3>
+        <ul>
+          <li><code>/trade-block add</code> — select one of your players in the <code>player</code> field. You can add a <code>looking-for</code> note about the return you want.</li>
+          <li><code>/trade-block remove</code> — select the player you want to remove from your block.</li>
+          <li><code>/trade-block view</code> — view listings across the league. Select the optional <code>team</code> field to show only your team or another specific team.</li>
+        </ul>
+        <p>Changes made in Discord update the FHQ trade block. Refresh an already-open website page if a change is not yet visible.</p>
+      </section>
+
+      <section id="create-trade">
+        <h2>4. Creating a trade</h2>
+        <p>Use the FranchiseHQ Trade Center for your league’s trade process. Before proposing a deal, review the players and draft picks available to your team. Report missing or incorrect picks to a commissioner.</p>
+        <h3>Two-team trades in Discord</h3>
+        <ol>
+          <li>Choose <code>/trade create</code>.</li>
+          <li>In <code>owner</code>, select the registered owner and team you want to trade with.</li>
+          <li>In <code>send-1</code>, select the first player or draft pick your team will send.</li>
+          <li>In <code>receive-1</code>, select the first player or draft pick your team will receive.</li>
+          <li>Add more assets as needed using <code>send-2</code> through <code>send-6</code> and <code>receive-2</code> through <code>receive-6</code>.</li>
+          <li>Review the offer and submit it. You can also include an optional note.</li>
+        </ol>
+        <div class="note"><strong>Up to six assets per side.</strong> A player or draft pick counts as one asset. The sides do not need equal counts: you can send one player and receive two picks.</div>
+        <h3>Three- and four-team trades</h3>
+        <p>Create these deals in the website’s Trade Center. Use <code>/trade multi-team</code> to get the website link, then select the three or four participating teams and build the proposal there.</p>
+      </section>
+
+      <section id="trade-review">
+        <h2>5. Negotiation and approval</h2>
+        <p class="flow">Propose <span aria-hidden="true">→</span> Negotiate <span aria-hidden="true">→</span> Accept <span aria-hidden="true">→</span> Committee review <span aria-hidden="true">→</span> Execute in Madden</p>
+        <h3>Review the proposal together</h3>
+        <p>A two-team Discord proposal opens a private negotiation thread for the registered owners. Review the offered players and picks, discuss changes, and use the buttons on the latest offer. <strong>Counter Offer</strong> opens the trade in FHQ so you can revise it.</p>
+        <p>If the bot cannot open a private thread, it attempts to send private messages instead. You can also open the trade in the website’s Trade Center.</p>
+        <h3>If the trade partner rejects the proposal</h3>
+        <p>The bot sends a rejection notification by DM and closes the negotiation thread by archiving and locking it. Archiving closes the conversation; it does not delete the trade record.</p>
+        <h3>If the trade partner accepts</h3>
+        <p>Selecting <strong>Accept Trade</strong> sends the agreed proposal to the configured committee review channel, such as <strong>Trade-Submit</strong>. Authorized commissioners and Trade Committee members can approve or deny it. The committee post and private trade thread display the current approval and denial totals.</p>
+        <p>A reviewer who selects <strong>Deny</strong> can provide an optional reason explaining the concern or requested changes. A single vote does not necessarily decide the trade; the outcome follows your league’s review settings.</p>
+        <h3>After committee review</h3>
+        <ul>
+          <li><strong>Approved:</strong> the bot sends an approval DM and archives and locks the private thread. The owners can then execute the approved deal in Madden.</li>
+          <li><strong>Denied by the committee:</strong> the private thread remains available for discussion. Use <strong>Revise Trade</strong> to open FHQ, adjust the offer, and submit the revision for renewed acceptance and review.</li>
+        </ul>
+        <div class="note important"><strong>Acceptance is not final approval.</strong> Wait until FHQ shows the trade as approved before sending it in Madden. The bot manages the approval process; the owners still complete the transaction in the game.</div>
+      </section>
+
+      <section id="troubleshooting">
+        <h2>6. Troubleshooting</h2>
+        <details><summary>The command is missing or the wrong bot responds</summary><p>Check that you selected FranchiseHQ rather than another bot. If FHQ commands are unavailable, ask a commissioner to check the server connection and channel permissions.</p></details>
+        <details><summary>I cannot manage my team or create a trade</summary><p>Confirm you are using the same Discord account linked to your FHQ league membership. Use <code>/join</code> if prompted, then ask a commissioner to verify your active membership and team assignment. Joining alone does not assign a team.</p></details>
+        <details><summary>A player or draft pick is missing</summary><p>Check that you selected the correct team and trade side. Send a commissioner the player’s name or the pick’s year, round, and original team so they can verify ownership and the available data.</p></details>
+        <details><summary>A completed game still appears as unplayed</summary><p>The bot reads the latest imported Madden data. Check whether a new import has completed, or ask a commissioner to update the import.</p></details>
+        <details><summary>I did not receive a trade DM or cannot find the thread</summary><p>Check your Discord message requests and privacy settings. Open the trade in FHQ to confirm its current status. Approved trades and proposals rejected by a partner have their threads archived and locked. Contact a commissioner if an active negotiation is inaccessible.</p></details>
+        <details><summary>An old trade button no longer works</summary><p>A revised offer replaces the previous version. Open the latest trade message or the trade in FHQ before accepting, rejecting, or reviewing it.</p></details>
+        <p class="help"><strong>Still need help?</strong> Contact a league commissioner with the command you used, what you expected, and the error or result you received. For a trade issue, include the trade ID or its FHQ link.</p>
+      </section>
+      <footer><a href="#content">Back to top ↑</a><span>FranchiseHQ Support</span></footer>
+    </main>
+  </div>
+</body>
+</html>
