@@ -42,6 +42,11 @@ test('contract DTO uses documented Madden units and does not manufacture current
   assert.equal(contract.releasePenalty,9200000);
   assert.equal(contract.currentYearSalary,null);
   assert.equal(contract.currentYearBonus,null);
+  const retainedCanonicalConflict=sourceSupportedContract({
+    contract_years_remaining:6,contractYearsLeft:5,contractLength:6
+  });
+  assert.equal(retainedCanonicalConflict.yearsRemaining,5);
+  assert.equal(retainedCanonicalConflict.length,6);
   const retainedMadden27=sourceSupportedContract({sourceCapHit:3997,capReleaseNetSavings:10000000,capReleasePenalty:10651});
   assert.equal(retainedMadden27.capHit,39970000);
   assert.equal(retainedMadden27.releaseNetSavings,10000000);
