@@ -44,11 +44,11 @@ test('only missing canonical migrations are planned', () => {
   assert.deepEqual(pendingMigrations(ledger, migrations).map(item => item.version), [19, 20]);
 });
 
-test('canonical migration loading includes Trade Committee role routing', async () => {
+test('canonical migration loading includes yearly schedule collection', async () => {
   const { contract, migrations } = await loadCanonicalMigrations();
-  assert.equal(contract.currentVersion, 41);
-  assert.equal(migrations.at(-1)?.version, 41);
-  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0041_commissioner_roster_ownership.sql');
+  assert.equal(contract.currentVersion, 42);
+  assert.equal(migrations.at(-1)?.version, 42);
+  assert.equal(migrations.at(-1)?.relativePath, 'migrations/0042_yearly_schedule_import.sql');
   const tenantMigration = migrations.find(item => item.version === 21);
   assert.equal(
     tenantMigration?.sql.match(/INSERT OR IGNORE INTO league_features/g)?.length,

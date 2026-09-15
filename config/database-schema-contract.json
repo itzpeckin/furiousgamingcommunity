@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "7.5.6.4",
+  "release": "7.5.6.5",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 41,
+  "currentVersion": 42,
   "requiredTables": [
     "commissioner_roster_movements",
     "league_player_ownership",
@@ -124,6 +124,8 @@
     "tenant_audit_events",
     "transaction_movement_classifications",
     "users"
+    ,"yearly_schedule_imports"
+    ,"yearly_schedule_import_captures"
   ],
   "requiredCoreColumns": {
     "league_player_ownership": ["league_id", "player_identity_id", "source_player_id", "current_team_key", "revision", "source_snapshot_id", "source_type", "actor_user_id", "updated_at"],
@@ -185,6 +187,8 @@
     "companion_import_destinations": ["id", "league_id", "franchise_season_id", "game_year_id", "label", "status", "created_by_user_id"],
     "companion_candidate_import_runs": ["id", "league_id", "destination_id", "discovery_session_id", "source_fingerprint", "status", "completeness_status", "current_phase", "phase_index", "source_counts_json", "result_counts_json", "candidate_snapshot_id", "active_snapshot_id_before", "active_snapshot_id_after", "duration_ms"],
     "companion_league_export_endpoints": ["league_id", "token_version", "status", "latest_session_id", "latest_session_token_version", "latest_report_id", "latest_ready_report_id", "last_received_at", "last_analyzed_at", "analysis_requested_at", "created_at", "updated_at"],
+    "yearly_schedule_imports": ["id", "league_id", "game_year_id", "franchise_season_id", "revision", "status", "expected_week_count", "captured_week_count", "game_count", "coverage_json", "warnings_json", "schedule_json", "schedule_sha256", "started_by_user_id", "finished_by_user_id", "created_at", "updated_at", "finished_at"],
+    "yearly_schedule_import_captures": ["import_id", "league_id", "capture_id", "route_path", "observed_at"],
     "league_game_years": ["id", "league_id", "game_release", "edition_year", "display_name", "status"],
     "game_year_franchise_seasons": ["game_year_id", "league_id", "franchise_season_id"],
     "game_year_snapshots": ["game_year_id", "league_id", "snapshot_id", "snapshot_status"],

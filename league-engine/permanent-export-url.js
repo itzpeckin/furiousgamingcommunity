@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.6.4 */
+/* FHQ_BUILD: 7.5.6.5 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.5.6.4';
+  const VERSION = '7.5.6.5';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -16,6 +16,7 @@
   }[character]));
   const slug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || null;
   const endpoint = () => `/api/leagues/${encodeURIComponent(slug())}/companion/export-url`;
+  const yearlyEndpoint = () => `/api/leagues/${encodeURIComponent(slug())}/companion/yearly-schedule`;
   const count = value => value === null || value === undefined ? 'unknown' : Number(value).toLocaleString();
   const routineWarning = value => /free agents?|rostered-player-only|carried forward|retained from|source snapshot/i.test(String(value||''));
   const date = value => {
@@ -36,9 +37,24 @@
     return payload;
   }
 
+  async function yearlyApi(method='GET',body) {
+    if (!slug()) throw new Error('The current league context is unavailable.');
+    const response=await fetch(yearlyEndpoint(),{
+      method,credentials:'same-origin',cache:'no-store',
+      headers:{accept:'application/json','content-type':'application/json'},
+      body:body===undefined?undefined:JSON.stringify(body)
+    });
+    const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
+    if(!response.ok||payload.ok===false)throw Object.assign(
+      new Error(payload.error||`Yearly schedule request failed (${response.status}).`),{payload}
+    );
+    return payload;
+  }
+
   async function refresh() {
     try {
-      state = await api();
+      const [connection,yearly]=await Promise.all([api(),yearlyApi()]);
+      state={...connection,preparedSeason:yearly.preparedSeason||null,yearlyScheduleImport:yearly.yearlyScheduleImport||null};
       errorMessage = '';
       if (state?.latestExport?.status === 'ready') {
         window.dispatchEvent(new CustomEvent('franchisehq:latest-export-ready',{detail:state.latestExport}));
@@ -51,6 +67,24 @@
       rerender();
     }
   }
+
+  async function yearlyAction(action) {
+    if(busy)return state;
+    busy=true;errorMessage='';rerender();
+    try{
+      await yearlyApi('POST',{action});
+      await refresh();
+      return state;
+    }catch(error){
+      errorMessage=error.message;
+      throw error;
+    }finally{
+      busy=false;rerender();
+    }
+  }
+
+  const startYearlySchedule=()=>yearlyAction('start');
+  const finishYearlySchedule=()=>yearlyAction('finish');
 
   async function copyUrl() {
     const value = state?.endpoint?.exportUrl;
@@ -83,7 +117,8 @@
   }
 
   async function importLatest({inPlace=false}={}) {
-    if (busy || state?.latestExport?.status !== 'ready') return;
+    const yearlyStatus=state?.yearlyScheduleImport?.status;
+    if (busy || ['collecting','ready'].includes(yearlyStatus) || state?.latestExport?.status !== 'ready') return;
     busy = true;
     errorMessage = '';
     rerender();
@@ -153,6 +188,24 @@
     return `<details class="commissioner-export-advanced"><summary>Export URL security</summary><p>Rotate only if the URL is exposed or league access changes. The newest ready export and active snapshot are preserved.</p><button class="button ${rotateArmed ? 'button--danger' : 'button--ghost'}" data-rotate-permanent-export ${busy ? 'disabled' : ''}>${rotateArmed ? 'Confirm Rotation — Revoke Previous URL' : 'Rotate Export URL'}</button>${rotateArmed ? '<button class="button button--ghost" data-cancel-export-rotation>Cancel</button>' : ''}</details>`;
   }
 
+  function renderYearlyScheduleControls({compact=false}={}) {
+    const annual=state?.yearlyScheduleImport;
+    const prepared=state?.preparedSeason;
+    if(!annual)return `<section class="commissioner-yearly-schedule${compact?' commissioner-yearly-schedule--compact':''}">
+      <div><strong>Full regular-season schedule</strong><small>Collect Weeks 1–18 without changing the current week or creating Discord threads.</small></div>
+      <button class="button button--secondary" data-import-yearly-schedule ${busy||!prepared?'disabled':''}>${busy?'Working…':'Import Yearly Schedule'}</button>
+    </section>`;
+    if(annual.status==='completed')return `<section class="commissioner-yearly-schedule is-complete${compact?' commissioner-yearly-schedule--compact':''}">
+      <div><strong>Schedule Import Complete</strong><small>${count(annual.gameCount)} games across all 18 regular-season weeks. The next current-week export will use this schedule without changing its week.</small></div>
+      <span class="pill pill--success">Complete</span>
+    </section>`;
+    const ready=annual.status==='ready';
+    return `<section class="commissioner-yearly-schedule is-active${compact?' commissioner-yearly-schedule--compact':''}">
+      <div><strong>Yearly Schedule Import in Progress</strong><small>Regular Season Weeks: ${count(annual.capturedWeekCount)} of ${count(annual.expectedWeekCount)} received · ${count(annual.gameCount)} of ${count(annual.expectedGameCount)} games</small></div>
+      <button class="button ${ready?'button--primary':'button--secondary'}" data-finish-yearly-schedule ${busy||!annual.readyToFinish?'disabled':''}>${busy?'Working…':'Review & Finish Yearly Schedule'}</button>
+    </section>`;
+  }
+
   function ensurePolling() {
     if (pollTimer || !document.querySelector('[data-permanent-league-export-panel],[data-one-click-import-panel],[data-compact-import-panel]')) return;
     const status = state?.latestExport?.status;
@@ -171,7 +224,8 @@
     const status = latest.status || 'loading';
     const historicalBackfill = status === 'ready' && latest.importMode === 'historical-backfill';
     const importDone = latest.importLive === true || latest.importStatus === 'live';
-    const importDisabled = busy || status !== 'ready' || importDone;
+    const yearlyActive=['collecting','ready'].includes(state?.yearlyScheduleImport?.status);
+    const importDisabled = busy || yearlyActive || status !== 'ready' || importDone;
     const tone = status === 'ready' ? 'success' : status === 'review-required' ? 'warning' : status === 'revoked' ? 'danger' : 'neutral';
     ensurePolling();
     return `<article class="card commissioner-league-export-card" data-permanent-league-export-panel>
@@ -187,6 +241,7 @@
         <div><small>Free Agents</small><strong>${['located','empty-confirmed'].includes(counts.freeAgentStatus) ? count(counts.freeAgentCount) : 'unknown'}</strong></div>
         <div><small>Import status</small><strong>${esc(importDone ? 'Live' : latest.importStatus === 'preview-ready' ? 'Validated · ready to publish' : latest.importStatus || 'Not started')}</strong></div>
       </div>
+      ${renderYearlyScheduleControls()}
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> Week ${esc(latest.capturedWeek)} games and statistics can be added while live Week ${esc(latest.activeSnapshotWeek)} teams, rosters, players, standings, and week position remain unchanged.</span></div>`:''}
       ${renderNotices()}
       <div class="league-import-framework-actions">
@@ -208,13 +263,15 @@
     const importButton=event.target.closest('[data-import-latest-export]');
     if (importButton) importLatest({inPlace:importButton.hasAttribute('data-import-in-place')});
     if (event.target.closest('[data-refresh-permanent-export]')) refresh().catch(()=>{});
+    if (event.target.closest('[data-import-yearly-schedule]')) startYearlySchedule().catch(()=>{});
+    if (event.target.closest('[data-finish-yearly-schedule]')) finishYearlySchedule().catch(()=>{});
     if (event.target.closest('[data-rotate-permanent-export]')) rotateUrl();
     if (event.target.closest('[data-cancel-export-rotation]')) { rotateArmed=false;rerender(); }
   });
 
-  const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,copied,rotateArmed,permanent:true,revocable:true,activationPerformed:Boolean(state?.latestExport?.importLive)});
+  const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,copied,rotateArmed,permanent:true,revocable:true,yearlyScheduleImport:state?.yearlyScheduleImport||null,activationPerformed:Boolean(state?.latestExport?.importLive)});
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before permanent-export-url.js.');
-  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,renderPanel,renderNotices,renderSecurityControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
+  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,startYearlySchedule,finishYearlySchedule,renderPanel,renderNotices,renderSecurityControls,renderYearlyScheduleControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'permanent-league-export-url',service:'leagueExportUrl',script:'league-engine/permanent-export-url.js',version:VERSION,dependencies:['auth','leagueTenant','oneClickImport'],capabilities:['permanent-url','explicit-rotation','automatic-analysis','latest-export-readiness','one-click-import']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

@@ -6,11 +6,21 @@ Applies to FranchiseHQ 7.5.6 and later. These actions belong to your league; pub
 
 Complete the Madden season first. If you are closing a completed FranchiseHQ season, use its existing **Archive Season** control once after checking the season and confirmation. Do not archive simply to refresh a week. The archive workflow preserves history and prepares the next franchise-season identity; this release does not change that workflow or automatically run it. Keep your existing permanent export URL.
 
-## First schedule import
+## Import the yearly schedule
 
-Export League Info, Rosters, and All Weeks / Weekly Stats from Madden Companion to the existing league URL. In **Commish HQ → Command Center** or **League Data**, refresh the connection and select **Import Latest Export** when ready. The importer maps, builds, validates, and atomically makes the exact eligible snapshot live. A failure leaves the previous active snapshot in place.
+In **Commish HQ → Command Center** or **League Data**, select **Import Yearly Schedule** once for the prepared season. Keep using the existing permanent league URL. The panel will show **Yearly Schedule Import in Progress**, the number of Regular Season weeks received, and the number of unique games retained.
 
-The schedule shows every matchup Madden actually provided. FranchiseHQ cannot invent a missing future schedule. A multi-week `/week/reg/0/` schedule uses each row's zero-based payload week plus one; an ordinary nonzero route still wins over duplicate aggregate data. Empty Week 0 routes remain placeholders.
+In Madden Companion, send each Regular Season schedule week needed to reach Weeks 1–18. If All Weeks supplies the full horizon, one capture may satisfy the same validation; if Madden sends only its current period, continue with the individual regular-season weeks. Do not send preseason as part of the yearly schedule. Preseason schedule rows are ignored by this collection, and preseason statistics never become regular-season leaders.
+
+While this collection is open, **Import Latest Export** is unavailable. Schedule captures are retained, but they do not build or activate a snapshot, change the current week, create Discord scheduling threads, open Confidence Pool voting, or alter Free Agent data. An ordinary nonzero schedule route controls its named week. A non-empty `/week/reg/0/` route uses each row's zero-based payload period plus one, while an empty Week 0 route remains a placeholder.
+
+When the panel reports all 18 weeks and 272 unique games, select **Review & Finish Yearly Schedule**. FranchiseHQ atomically seals the immutable schedule revision and clears only the normal latest-export selection. It retains all source captures and audits, keeps the same permanent URL, and does not rotate credentials, reset data, archive a season, or activate anything live.
+
+## First current-week import
+
+After finishing the yearly schedule, run a fresh export for the period currently active in Madden and then select **Import Latest Export**. This normal import maps, builds, validates, and atomically makes the eligible snapshot live. It overlays the fresh current matchup/results beneath the completed yearly horizon while preserving earlier results and stable Confidence Pool game identity. The imported current-period evidence—not the highest schedule week—sets the league's current week.
+
+A failure leaves the previous active snapshot in place. An initial season import still requires commissioner review for Discord scheduling; it never creates Weeks 2–18 threads. After the intended Week 1 snapshot is live and verified, use the existing `/week1` recovery command only if the initial Week 1 scheduling threads are needed.
 
 Check the captured/current period in League Data and the global header. Week 1 must stay Week 1 even if the schedule extends to Week 18. Current-state metadata is preferred; when absent, the latest captured playable statistic period supplies the fallback evidence. Conflicting metadata or an unresolved aggregate stops import readiness. Current-period schedule and statistic routes must exist; successful empty current statistic routes are allowed before games finish. Future statistic routes are not required just because future games exist.
 

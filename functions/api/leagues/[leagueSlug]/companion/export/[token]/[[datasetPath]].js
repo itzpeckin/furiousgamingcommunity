@@ -17,7 +17,7 @@ import { hashToken } from '../../../../../../_lib/auth.js';
 import { deriveLeagueExportToken } from '../../../../../../_lib/permanent-league-export.js';
 import { generateMaddenDiscoveryReport } from '../../../../../../_lib/madden-discovery-report.js';
 
-const RELEASE = '7.4.1';
+const RELEASE = '7.5.6.5';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS']);
 const AUTOMATIC_COHORT_WINDOW_MS = 2 * 60 * 1000;
 const AUTOMATIC_LATE_CAPTURE_WINDOW_MS = 15 * 1000;
@@ -25,6 +25,7 @@ const AUTOMATIC_PARTIAL_COHORT_WINDOW_MS = 6 * 60 * 60 * 1000;
 const AUTOMATIC_SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 const AUTOMATIC_ANALYSIS_IDLE_MS = 3_000;
 const AUTOMATIC_ANALYSIS_MAX_WAIT_MS = 24_000;
+const YEARLY_REGULAR_SCHEDULE_ROUTE = /(?:^|\/)week\/reg\/\d+\/schedules\/?$/i;
 
 function slugOf(context) {
   return String(context.params?.leagueSlug || '').trim().toLowerCase();
@@ -151,6 +152,23 @@ async function discoverySessionFor(db, leagueId, token) {
 async function permanentEndpointFor(db, leagueId) {
   return db.prepare(`SELECT * FROM companion_league_export_endpoints
     WHERE league_id=? LIMIT 1`).bind(leagueId).first();
+}
+
+async function activeYearlyScheduleImport(db, leagueId) {
+  return db.prepare(`SELECT id FROM yearly_schedule_imports
+    WHERE league_id=? AND status='collecting' ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
+}
+
+async function linkYearlyScheduleCapture(db, leagueId, importId, captureId, routePath, observedAt) {
+  if (!importId || !YEARLY_REGULAR_SCHEDULE_ROUTE.test(String(routePath || ''))) return;
+  await db.prepare(`INSERT INTO yearly_schedule_import_captures
+    (import_id,league_id,capture_id,route_path,observed_at)
+    SELECT ?,?,?,?,? WHERE EXISTS (
+      SELECT 1 FROM yearly_schedule_imports
+      WHERE id=? AND league_id=? AND status='collecting'
+    )
+    ON CONFLICT(import_id,capture_id) DO UPDATE SET observed_at=excluded.observed_at`)
+    .bind(importId,leagueId,captureId,routePath,observedAt,importId,leagueId).run();
 }
 
 async function automaticCohortId(leagueId, endpoint) {
@@ -342,6 +360,8 @@ export async function onRequest(context) {
     if (permanentAuthorized && method !== 'GET') {
       discoverySession = await automaticSessionFor(db,league,permanentEndpoint);
     }
+    const yearlyScheduleImport = permanentAuthorized && method !== 'GET'
+      ? await activeYearlyScheduleImport(db,league.id) : null;
 
     if (method === 'GET') {
       return json({
@@ -393,7 +413,10 @@ export async function onRequest(context) {
       if (discoverySession) {
         await linkSessionCapture(db, league.id, discoverySession.id, duplicate.id, routePath, receivedAt);
       }
-      if (permanentAuthorized && discoverySession) {
+      if (yearlyScheduleImport) {
+        await linkYearlyScheduleCapture(db,league.id,yearlyScheduleImport.id,duplicate.id,routePath,receivedAt);
+      }
+      if (permanentAuthorized && discoverySession && !yearlyScheduleImport) {
         await afterPermanentCapture(context,db,league.id,discoverySession.id,receivedAt);
       }
       return json({
@@ -406,6 +429,7 @@ export async function onRequest(context) {
         routePath,
         requestMethod: method,
         bodyFormat: parsed.bodyFormat,
+        yearlyScheduleImportId:yearlyScheduleImport?.id || null,
         release: RELEASE
       }, 200);
     }
@@ -465,6 +489,17 @@ export async function onRequest(context) {
             WHERE league_id=? AND id=?`).bind(receivedAt, receivedAt, league.id, discoverySession.id)
         );
       }
+      if (yearlyScheduleImport && YEARLY_REGULAR_SCHEDULE_ROUTE.test(routePath)) {
+        statements.push(db.prepare(`INSERT INTO yearly_schedule_import_captures
+          (import_id,league_id,capture_id,route_path,observed_at)
+          SELECT ?,?,?,?,? WHERE EXISTS (
+            SELECT 1 FROM yearly_schedule_imports
+            WHERE id=? AND league_id=? AND status='collecting'
+          )`).bind(
+            yearlyScheduleImport.id,league.id,captureId,routePath,receivedAt,
+            yearlyScheduleImport.id,league.id
+          ));
+      }
       await db.batch(statements);
     } catch (error) {
       await context.env.COMPANION_EXPORTS.delete(key).catch(() => {});
@@ -476,7 +511,7 @@ export async function onRequest(context) {
       }, 500);
     }
 
-    if (permanentAuthorized && discoverySession) {
+    if (permanentAuthorized && discoverySession && !yearlyScheduleImport) {
       await afterPermanentCapture(context,db,league.id,discoverySession.id,receivedAt);
     }
 
@@ -520,6 +555,7 @@ export async function onRequest(context) {
         parseStatus: parsed.parseStatus,
         payloadShape: parsed.shape,
         freeAgentAssessment: freeAgentCaptureAssessment(routePath, parsed),
+        yearlyScheduleImportId:yearlyScheduleImport?.id || null,
         kvError: String(error?.message || error)
       });
     }
@@ -537,7 +573,8 @@ export async function onRequest(context) {
       bodyFormat: parsed.bodyFormat,
       parseStatus: parsed.parseStatus,
       payloadShape: parsed.shape,
-      freeAgentAssessment: freeAgentCaptureAssessment(routePath, parsed)
+      freeAgentAssessment: freeAgentCaptureAssessment(routePath, parsed),
+      yearlyScheduleImportId:yearlyScheduleImport?.id || null
     });
   } catch (error) {
     // Discovery mode must return a useful JSON response instead of a generic uncaught Worker exception.

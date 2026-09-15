@@ -24,7 +24,7 @@ import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
 import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 
-const RELEASE = '7.5.6.4';
+const RELEASE = '7.5.6.5';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -636,6 +636,19 @@ export async function onRequestPost(context) {
   let body = {};
   try { body = await context.request.json(); } catch {}
   const action = text(body.action).toLowerCase();
+  const yearlyScheduleImport = await current.db.prepare(`SELECT id FROM yearly_schedule_imports
+    WHERE league_id=? AND status='collecting' ORDER BY created_at DESC LIMIT 1`)
+    .bind(current.league.id).first();
+  if (yearlyScheduleImport && action !== 'create-destination') {
+    return json({
+      ok:false,
+      error:'Import Latest Export is unavailable while Import Yearly Schedule is in progress. Finish the yearly schedule, then run a fresh current-week export.',
+      release:RELEASE,
+      yearlyScheduleImportId:yearlyScheduleImport.id,
+      activationPerformed:false,
+      activeSnapshotChanged:false
+    },409);
+  }
   const identity = await identitySource(current.db,current.league.id);
   const report = await latestReport(current.db,current.league.id);
   const destinationResult = action === 'create-destination'
