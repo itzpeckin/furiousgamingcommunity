@@ -164,6 +164,7 @@ function page() {
     </main>
     <footer>
       <span>Franchise HQ</span>
+      <a href="/support/" style="color:inherit">Support &amp; Discord Guide</a>
       <span>Release ${RELEASE}</span>
     </footer>
   </div>
