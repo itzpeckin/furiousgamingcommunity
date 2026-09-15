@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 14, 2026
+**Updated:** September 15, 2026
 
-**Revision:** 2.60
+**Revision:** 2.61
 
 **Current production:** FranchiseHQ 7.5.6.4 is live from candidate `7ff17db1e1c2d9c6756c899de9efa4c289fd1658`, PR #102, code Main `9595f397a5047cd0d16c802f2d35c27afc6b60af`, and verified Pages Production deployment `abc2b3a9-dd6b-440a-9f04-5a0311151163`. All four PR checks, Main quality and deployment checks passed. The strict gate is 243/243. Live contract acceptance shows retained Madden years left separately from total length (`5 / 6`), while read-only D1 acceptance confirms 2026 remains active, no season closure has run and active snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0` is unchanged. Migration 41 remains current. No migration, import, reset, archive/transition, export URL, credential, membership/assignment, Discord registration/configuration or Free Agent reinterpretation occurred.
 
-**Current work:** Commissioner execution and verification of the now-ready 2026 Archive Season action, followed by a distinct 2027 Week 1 export/import. The deployed action freezes player and GM history, closes 2026 ownership periods, carries all reviewed assignments into 2027, prepares the next draft horizon and leaves the active 2026 snapshot untouched until the 2027 import activates atomically.
+**Current work:** Authorized 7.5.6.5 closes the empirical gap discovered after 2026 was archived: Madden's All Weeks control can emit only its current schedule period rather than all 18 weeks. The candidate adds the reusable commissioner-facing **Import Yearly Schedule** collection boundary, immutable season schedule revision, normal-import interlock, and later weekly-overlay path without changing the active week or invoking Discord during collection.
 
-**Next gate:** Run the separately commissioner-operated 2026 Archive Season action once, verify the prepared 2027 records, then export and import Madden 2027 Week 1 through the existing permanent URL. Next is 7.5.7 measured importer performance and thread readiness. Canonical consistency and operations follow as 7.5.8 and 7.5.9; their scope is unchanged and future delivery no longer runs backward into 7.4.x. Whole-trade reversal remains a separate, unimplemented policy/workflow decision.
+**Next gate:** Complete the 7.5.6.5 consolidated release gate, publish through the protected pull request, apply additive migration 42 with recovery bookmarks, merge Main, and deploy Production. Commissioner acceptance then starts **Import Yearly Schedule**, captures Regular Season Weeks 1–18 through the unchanged permanent URL, finishes the validated 272-game revision, and runs a fresh current-week export through **Import Latest Export**. No release action itself runs an export/import, activates a snapshot, creates Discord threads, rotates the URL, resets data, or changes season state. Next remains 7.5.7 measured importer performance and thread readiness.
 
 ## Product decisions
 
@@ -115,6 +115,7 @@
 | 7.5.6.2 | Production deployed; owner acceptance pending | Measured Discord autocomplete/command-result latency and a separately guarded one-pick correction; ownership redesign remains discussion only |
 | 7.5.6.3 | Production deployed; owner acceptance pending | Shared team-branded rendered Discord rating cards, audited commissioner player/pick transfers, and FranchiseHQ ownership retained across imports; migration 41 preserved every existing owner and snapshot |
 | 7.5.6.4 | Production deployed; Archive Season pending commissioner action | Freeze source-backed 2026 player/GM history, carry reviewed assignments into the prepared 2027 season, and separate Madden years left from total contract length |
+| 7.5.6.5 | Local candidate; publication authorized | Reusable Import Yearly Schedule collection for 18 regular-season weeks, immutable 272-game revision, weekly-import interlock, and later current-period overlay without collection-time snapshot or Discord work |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -134,7 +135,7 @@
 | 7 | Production deployed; owner Discord acceptance pending | 7.5.5.6 | Improve Discord trade readability, keep only the actual workflow status visible, preserve terminal owner DMs, and recover Trade Submit after its channel permits rich embeds. |
 | 8 | Production deployed; owner acceptance pending | 7.5.5.7 | Put trade resets in Command Center, fix phone Trade Review spacing, and deliver a functional committee package even when Discord strips rich embeds. |
 | 9 | Production deployed; owner acceptance pending | 7.5.5.8 | Replace Discord's invisible asset spacers with visible character boundaries that survive Mobile rendering while preserving the exact private/committee cards. |
-| 10 | Off-season | 7.5.6 | Import the complete season schedule while the latest accepted import alone controls the current period; preloading or re-importing a week creates no future or duplicate matchup threads. |
+| 10 | In progress | 7.5.6.5 | Collect the complete season schedule through **Import Yearly Schedule** while the latest accepted weekly import alone controls the current period; collection creates no snapshots or matchup threads. |
 | 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
@@ -635,6 +636,16 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Publish an annual commissioner runbook covering season preparation, initial full-schedule import, weekly import, current-week proof, Confidence Pool availability, and recovery. It must not require new Codex tasks or manual engineering intervention.
 - Gate: a representative Weeks 1–18 fixture imports with current Week 1, every schedule week is visible to the schedule and Confidence Pool, current week remains Week 1, and no future thread exists. A same-week retry changes neither current week nor thread inventory; a Week 2 import advances only to Week 2 and creates only Week 2 threads. Historical results, future games, picks, snapshots, audits, route authority, atomic activation, and blocked/null Free Agent state remain intact.
 
+## 7.5.6.5 — Import Yearly Schedule
+
+- Add one reusable commissioner action named **Import Yearly Schedule**. It is season-bound, server-authoritative, and uses the existing permanent Madden export URL without rotating it.
+- While collection is active, retain and link only Regular Season schedule routes. Ordinary nonzero routes retain route authority; a non-empty `/week/reg/0/` route uses each record's payload period; an empty Week 0 route remains a harmless placeholder. Preseason and postseason routes do not enter the yearly catalog.
+- Disable and server-block **Import Latest Export** until the yearly schedule finishes. Collection exports and completion cannot build, validate, activate, or synchronize a live snapshot and cannot create Discord threads.
+- Require Regular Season Weeks 1–18 and all 272 unique matchups before completion. Completion atomically seals one immutable schedule revision and clears only the normal latest-export selection so the next export is unambiguously fresh.
+- On the next normal current-week import, compose the completed catalog beneath retained same-season results and the newest current-week rows. Earlier final scores remain authoritative, the current export wins for its matchup, Confidence Pool game identity stays stable, and only the weekly import's proven period controls the live week and Discord transition.
+- Additive migration 42 retains every linked raw capture and both start/finish audits. It does not reset or delete data, change a season, rotate the permanent URL, or reinterpret blocked Free Agents.
+- Gate: route/sentinel/placeholder authority, complete/incomplete coverage, immutable finish, normal-import interlock, zero collection-time snapshots/threads, catalog overlay precedence, migration preservation, mobile/desktop controls, and the complete strict suite all pass before publication.
+
 ## 7.5.6.1 — Cross-Surface Trade Review Synchronization
 
 The 7.5.6.1 intervening patch makes every committee vote refresh all known current trade copies from the shared server tally. It preserves trade business rules and card design, uses existing durable outbox payload references without migration, keeps reviewer DMs active, converges concurrent votes, and supplies a lightweight open-site status refresh. Real Discord delivery acceptance remains owner-operated; no live vote is cast during code-only publication.
@@ -692,6 +703,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.61:** Began owner-authorized 7.5.6.5 from exact fetched Main `18d239b`. The candidate introduces the reusable **Import Yearly Schedule** server boundary after Production evidence showed Madden All Weeks can emit only the current period. Additive migration 42 stores a season-scoped collecting/completed revision and retained capture links; the UI shows 18-week/272-game progress, blocks weekly import during collection, and finishes without snapshot activation or Discord. A later normal import composes the immutable catalog beneath retained results and fresh current-week authority. Focused migration, parser, interlock, immutability, preservation and UI wiring tests pass. Publication is standing-authorized; no live export/import, snapshot/thread action, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Free Agent reinterpretation is performed by implementation or deployment.
 
 - **Revision 2.57:** Completed 7.5.6.2 candidate `5f9943b` through PR #98, code Main `2e06dba`, all four PR/five Main gates and verified Pages Production `784d8adf-9952-445a-86f4-f6e9398d15e8`. Strict gate 232/232; same-snapshot autocomplete improved 1,060.83→35.24 ms. Explicitly returned only Tampa Bay's 2027 R1 pick from NE/revision 2 to TB/revision 3 with recovery bookmark, ledger/audit, 0 FK violations, unchanged other 671 picks and protected counts. No import/snapshot/reset/credential/membership operation. Persistent player/pick ownership, commissioner transfers and safe reversals remain discussion only; import authority is unchanged and live Discord end-to-end acceptance remains owner-operated.
 

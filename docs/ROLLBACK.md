@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.6.5 Import Yearly Schedule impact
+
+The authorized 7.5.6.5 candidate adds additive migration 42. It stores season-bound yearly-schedule collection rows and links to already-immutable Companion captures. A completed 18-week/272-game schedule revision is itself immutable. Applying the migration creates no collection and performs no Madden export, import, snapshot activation, current-week change, Discord synchronization, reset, deletion, URL rotation, or season transition.
+
+A runtime rollback must retain migration 42, every yearly schedule import row, linked capture, sealed schedule JSON/hash, raw R2 object, and start/finish tenant audit. Do not drop the tables or rewrite a completed revision. A collection left open during rollback remains non-live evidence; restore the compatible runtime before finishing it.
+
+Finishing **Import Yearly Schedule** clears only the permanent endpoint's latest normal-source pointers so a fresh current-week export is required. It keeps the URL token version, all raw captures/reports/snapshots/audits, season/game-year state, Discord state, and blocked/null Free Agent semantics. Code rollback never implies importing the schedule, moving an active pointer, recreating threads, or restoring those latest-source pointers manually.
+
 ## 7.3.8 importer-health and display-cleanup Production impact
 
 Exact 7.3.8 commit `677c226b9289dda4dc4f84fbbe6245e912330541` is live on Production Pages deployment `2f96f87a-3a79-40b6-8ae6-296fb19d3a28` with exact-commit Worker build `44c70449-57eb-4db8-ac29-f86536d56a49`. The code-only release adds actionable importer failure guidance, removes customer-facing snapshot/validation and controlled-beta implementation callouts, and restores explicit Madden Cap Space from the already-retained nested team/standing source record. It added no migration, estimated no missing Cap Space, and performed no export, import, snapshot, archive, transition, membership, credential, or Production data operation.

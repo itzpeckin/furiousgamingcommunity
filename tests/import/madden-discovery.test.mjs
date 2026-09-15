@@ -52,7 +52,9 @@ const MIGRATIONS = [
   '../../migrations/0037_discord_trade_rooms.sql',
   '../../migrations/0038_discord_trade_channel.sql',
   '../../migrations/0039_discord_trade_committee_role.sql',
-  '../../migrations/0040_trade_management_events.sql'
+  '../../migrations/0040_trade_management_events.sql',
+  '../../migrations/0041_commissioner_roster_ownership.sql',
+  '../../migrations/0042_yearly_schedule_import.sql'
 ];
 
 function d1(database) {

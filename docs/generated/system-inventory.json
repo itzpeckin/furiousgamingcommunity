@@ -40,6 +40,7 @@
       "functions/api/leagues/[leagueSlug]/companion/statistics-capture-inspector.js",
       "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
       "functions/api/leagues/[leagueSlug]/companion/test.js",
+      "functions/api/leagues/[leagueSlug]/companion/yearly-schedule.js",
       "functions/api/leagues/[leagueSlug]/game-year-transition.js",
       "functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js",
       "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
@@ -163,13 +164,13 @@
       ".css": 10,
       ".example": 1,
       ".html": 4,
-      ".js": 222,
+      ".js": 224,
       ".json": 7,
       ".jsonc": 1,
       ".md": 281,
-      ".mjs": 47,
+      ".mjs": 48,
       ".png": 3,
-      ".sql": 43,
+      ".sql": 44,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -181,7 +182,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 547797,
+        "bytes": 548969,
         "file": "styles.css"
       },
       {
@@ -233,7 +234,7 @@
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 44367,
+        "bytes": 44482,
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
@@ -241,7 +242,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 39890,
+        "bytes": 40526,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -253,11 +254,11 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       },
       {
-        "bytes": 35068,
+        "bytes": 35468,
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 627
+    "total": 631
   },
   "frontend": {
     "assets": [
@@ -752,7 +753,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 78,
+    "routeCount": 79,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1080,6 +1081,14 @@
           "onRequestPost"
         ],
         "route": "/api/leagues/:leagueSlug/companion/test"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/yearly-schedule.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/yearly-schedule"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/competition.js",
@@ -1585,10 +1594,16 @@
       "recordsLedger": true,
       "sha256": "06cfd2ed0bc93c1dd5b72d36cad0944370d8aab9e85230c42e883b44ac7e1e0c",
       "version": "0041"
+    },
+    {
+      "file": "migrations/0042_yearly_schedule_import.sql",
+      "recordsLedger": true,
+      "sha256": "3177351d555b0a72246b75cdb1423ec40b2d6feeacc7a0ee70be4820ed8521d7",
+      "version": "0042"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.6.4",
+  "release": "7.5.6.5",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

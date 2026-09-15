@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.6.4 */
+/* FHQ_BUILD: 7.5.6.5 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.5.6.4';
+  const VERSION = '7.5.6.5';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -447,13 +447,15 @@
     const latestExportLive=latestExport.importLive===true||latestExport.importStatus==='live';
     const exportStatusLabel=({loading:'Loading connection','awaiting-export':'Awaiting export',receiving:'Receiving export',ready:'Ready to import','review-required':'Review required',revoked:'URL revoked'})[exportStatus]||'Loading connection';
     const live=Boolean(run?.activationPerformed);
-    const runDisabled=busy||connection.busy||exportStatus!=='ready'||!source||live||latestExportLive;
-    const runLabel=busy||connection.busy?'Working…':live||latestExportLive?'Latest Export Live':run?.status==='failed'?'Retry Candidate Import':'Import Latest Export';
+    const yearlyScheduleImport=connection.state?.yearlyScheduleImport||null;
+    const yearlyActive=['collecting','ready'].includes(yearlyScheduleImport?.status);
+    const runDisabled=busy||connection.busy||yearlyActive||exportStatus!=='ready'||!source||live||latestExportLive;
+    const runLabel=busy||connection.busy?'Working…':yearlyActive?'Finish Yearly Schedule First':live||latestExportLive?'Latest Export Live':run?.status==='failed'?'Retry Candidate Import':'Import Latest Export';
     const activePhase=run?.currentPhase||(!source?'analyze-source':live?'preview-ready':'analyze-source');
     const activePhaseIndex=Math.max(0,PHASES.findIndex(([id])=>id===activePhase));
     const segment=100/PHASES.length,overall=Number(run?.progress||0),activeItem=run?.phaseState?.[activePhase];
     const phaseProgress=live||activeItem?.status==='complete'?100:Math.max(0,Math.min(99,Math.round((overall-activePhaseIndex*segment)/segment*100)));
-    return {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,runDisabled,runLabel,activePhase,phaseProgress};
+    return {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,yearlyScheduleImport,yearlyActive,runDisabled,runLabel,activePhase,phaseProgress};
   }
 
   function renderCompactPanel() {
@@ -465,6 +467,7 @@
         <button class="button button--ghost" data-refresh-companion-import ${busy||connection.busy?'disabled':''}>Refresh</button>
         <button class="button button--primary" data-import-latest-export data-import-in-place ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
       </div>
+      ${exportUrlService()?.renderYearlyScheduleControls?.({compact:true})||''}
       <div class="commissioner-command-import__progress" aria-live="polite"><div><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" role="progressbar" aria-label="${esc(phaseLabel(activePhase))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${phaseProgress}"><span style="width:${phaseProgress}%"></span></div></div>
     </section>`;
   }
@@ -496,6 +499,7 @@
         <button class="button button--primary" data-import-latest-export ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
         <button class="button button--ghost" data-refresh-companion-import ${busy||connection.busy?'disabled':''}>Refresh</button>
       </div>
+      ${connectionService?.renderYearlyScheduleControls?.()||''}
       <div class="commissioner-import-progress-block commissioner-import-progress-block--modern"><div class="commissioner-import-progress-head"><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" aria-label="${esc(phaseLabel(activePhase))} ${phaseProgress}% complete"><span style="width:${phaseProgress}%"></span></div><p>${esc(notice||'Ready when the next Madden export arrives.')}</p><ol class="commissioner-import-phase-list">${phaseRows()}</ol></div>
       <section class="commissioner-latest-snapshot" aria-labelledby="commissioner-latest-snapshot-title"><header><div><span class="eyebrow">Most recent import source</span><h4 id="commissioner-latest-snapshot-title">Latest Snapshot</h4></div><span>${endpointState.exportUrl?'Permanent URL connected':'Connection unavailable'}</span></header><div class="commissioner-import-summary">
         <div><small>Latest export</small><strong>${esc(dateLabel(latestExport.receivedAt||source?.generatedAt))}</strong></div>

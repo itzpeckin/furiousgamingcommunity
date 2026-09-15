@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.6.5",
+  "releaseType": "yearly-schedule-import-boundary",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.6.4",
+    "commit": "18d239bcd4cf15ab0da25d3340fd2ad071716c5c",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-import-yearly-schedule",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "not-run"
+  },
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.6.4",
+    "candidateRelease": "7.5.6.5",
+    "currentMigration": 41,
+    "candidateMigration": 42,
+    "scope": "Additive schema and runtime for commissioner-operated yearly regular-season schedule collection. Deployment does not run a collection, export, import, snapshot activation, Discord synchronization, reset, deletion, URL rotation, archive or transition."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/yearly-schedule.js",
+    "functions/api/leagues/[leagueSlug]/companion/yearly-schedule.js",
+    "migrations/0042_yearly_schedule_import.sql",
+    "tests/import/yearly-schedule.test.mjs",
+    "docs/COMMISSIONER-SEASON-IMPORT-RUNBOOK.md",
+    "releases/7.5.6.5/release-record.md",
+    "releases/7.5.6.5/validation-evidence.json"
+  ]
+}

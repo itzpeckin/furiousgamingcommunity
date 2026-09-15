@@ -3,7 +3,8 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { candidateCoverageWarnings, candidateHistoricalBackfill, candidateHistoryCarryForward, candidateScheduleCarryForward, candidateMergedPeriodCoverage, candidatePeriodLabel, candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
 import { scheduleAdvanceDecision, snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
-const RELEASE='7.5.6.4';
+import { mergeYearlyScheduleCatalog } from '../../../../_lib/yearly-schedule.js';
+const RELEASE='7.5.6.5';
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 async function latest(db,table,leagueId,status=true){const where=status?" AND status='pending-preview'":'';return db.prepare(`SELECT * FROM ${table} WHERE league_id=?${where} ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();}
 async function rows(db,sql,...args){const r=await db.prepare(sql).bind(...args).all();return r.results||[];}
@@ -54,7 +55,7 @@ try{
  // identity, or active-pointer row is pruned during commissioner review.
  const retention={mode:'non-destructive',deletedSnapshots:0,deletedPreviewRows:0};
 
- const [freshTeams,freshPlayers,freshGames,freshStatistics,standingSource,sourceReport,activeSource]=await Promise.all([
+ const [freshTeams,freshPlayers,freshGames,freshStatistics,standingSource,sourceReport,activeSource,yearlySchedule]=await Promise.all([
    rows(db,`SELECT * FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id=?`,league.id,teamRun.id),
    rows(db,`SELECT * FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=?`,league.id,playerRun.id),
    rows(db,`SELECT * FROM companion_canonical_games_preview WHERE league_id=? AND mapping_run_id=?`,league.id,scheduleRun.id),
@@ -73,7 +74,11 @@ try{
        AND snapshot.season_year=? AND active_destination.franchise_season_id=?
      ORDER BY active_run.created_at DESC LIMIT 1`)
      .bind(candidateRun.active_snapshot_id_before,league.id,candidateRun.game_year_id,
-       candidateRun.destination_season_year,candidateRun.franchise_season_id).first():null
+       candidateRun.destination_season_year,candidateRun.franchise_season_id).first():null,
+   db.prepare(`SELECT * FROM yearly_schedule_imports
+     WHERE league_id=? AND franchise_season_id=? AND status='completed'
+     ORDER BY revision DESC,finished_at DESC LIMIT 1`)
+     .bind(league.id,candidateRun.franchise_season_id).first()
  ]);
  const runSourceCounts=parse(candidateRun.source_counts_json)||{};
  const coverage=runSourceCounts.sourceCoverage||candidateSourceCoverage({
@@ -96,9 +101,12 @@ try{
  const sourcePeriods=Array.isArray(coverage.completePeriods)&&coverage.completePeriods.length
    ?coverage.completePeriods:(currentWeek===null||currentWeek===undefined?[]:[{stage:'regular-season',week:currentWeek}]);
  const sourceWeeks=[...new Set(sourcePeriods.map(period=>Number(period.week)).filter(Number.isInteger))];
+ const yearlyScheduleGames=Array.isArray(parse(yearlySchedule?.schedule_json))?parse(yearlySchedule.schedule_json):[];
+ const priorScheduleGames=parsedDomain('games');
  const gameHistory=historicalBackfill
    ?candidateHistoricalBackfill(freshGames,priorDomain('games'),{keyName:'external_id',activeWeek:activeSource.week_index,activePeriod:coverage.activePeriod,sourceWeeks,sourcePeriods})
-   :candidateScheduleCarryForward(freshGames,priorDomain('games'),{seasonYear:candidateRun.destination_season_year});
+   :mergeYearlyScheduleCatalog({yearlyGames:yearlyScheduleGames,priorGames:priorScheduleGames,
+     currentGames:freshGames,seasonYear:candidateRun.destination_season_year});
  const statisticHistory=historicalBackfill
    ?candidateHistoricalBackfill(freshStatistics,priorDomain('statistics'),{keyName:'external_key',activeWeek:activeSource.week_index,activePeriod:coverage.activePeriod,sourceWeeks,sourcePeriods})
    :candidateHistoryCarryForward(freshStatistics,priorDomain('statistics'),{keyName:'external_key',currentWeek});
@@ -131,7 +139,7 @@ try{
  if(Number(scheduleRun.warning_count||0))warnings.push(`Schedule mapper reported ${scheduleRun.warning_count} warning(s).`);
  if(Number(statisticsRun.warning_count||0))warnings.push(`Statistics mapper reported ${statisticsRun.warning_count} warning(s).`);
  const seasonCandidates=[...games.map(x=>x.season_year),...statistics.map(x=>x.season_year),...standingRows.map(x=>x.calendarYear)].map(Number).filter(Number.isFinite);
- const manifest={release:RELEASE,leagueId:league.id,candidateImportRunId:candidateRun.id,storageRetention:retention,sourceCoverage:coverage,importMode:coverage.importMode,historyCarryForward:{sourceSnapshotId:activeSource?.id||null,games:historicalBackfill?0:gameHistory.retained,statistics:historicalBackfill?0:statisticHistory.retained,gameWeeks:historicalBackfill?[]:gameHistory.retainedWeeks,statisticWeeks:historicalBackfill?[]:statisticHistory.retainedWeeks},historicalBackfill:historicalBackfill?{sourceSnapshotId:activeSource.id,sourceWeeks,sourcePeriods,liveWeekPreserved:Number(activeSource.week_index),gamesApplied:gameHistory.applied,statisticsApplied:statisticHistory.applied,teamsPreserved:teams.length,playersPreserved:players.length,standingsPreserved:standingRows.length,mergedCoverage}:null,sources:{teamMappingRunId:teamRun.id,playerMappingRunId:playerRun.id,scheduleMappingRunId:scheduleRun.id,statisticsMappingRunId:statisticsRun.id,standingsCaptureId:standingSource.capture?.id||null,standingsRoute:standingSource.capture?.route_path||null},pinnedMappingRuns:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},builtAt:new Date().toISOString(),immutable:true,privateCandidate:true,activationPerformed:false,activeSnapshotChanged:false};
+ const manifest={release:RELEASE,leagueId:league.id,candidateImportRunId:candidateRun.id,storageRetention:retention,sourceCoverage:coverage,importMode:coverage.importMode,yearlySchedule:yearlySchedule?{importId:yearlySchedule.id,revision:Number(yearlySchedule.revision||1),scheduleSha256:yearlySchedule.schedule_sha256,gameCount:yearlyScheduleGames.length,finishedAt:yearlySchedule.finished_at,applied:!historicalBackfill}:null,historyCarryForward:{sourceSnapshotId:activeSource?.id||null,games:historicalBackfill?0:gameHistory.retained,statistics:historicalBackfill?0:statisticHistory.retained,gameWeeks:historicalBackfill?[]:gameHistory.retainedWeeks,statisticWeeks:historicalBackfill?[]:statisticHistory.retainedWeeks},historicalBackfill:historicalBackfill?{sourceSnapshotId:activeSource.id,sourceWeeks,sourcePeriods,liveWeekPreserved:Number(activeSource.week_index),gamesApplied:gameHistory.applied,statisticsApplied:statisticHistory.applied,teamsPreserved:teams.length,playersPreserved:players.length,standingsPreserved:standingRows.length,mergedCoverage}:null,sources:{teamMappingRunId:teamRun.id,playerMappingRunId:playerRun.id,scheduleMappingRunId:scheduleRun.id,statisticsMappingRunId:statisticsRun.id,standingsCaptureId:standingSource.capture?.id||null,standingsRoute:standingSource.capture?.route_path||null},pinnedMappingRuns:{teams:teamRun.id,players:playerRun.id,schedule:scheduleRun.id,statistics:statisticsRun.id},builtAt:new Date().toISOString(),immutable:true,privateCandidate:true,activationPerformed:false,activeSnapshotChanged:false};
  const snapshotId=crypto.randomUUID();
  manifest.currentPeriod=historicalBackfill?snapshotCurrentPeriod(activeSource):coverage.currentPeriod;
  manifest.currentPeriodProof=historicalBackfill?(parse(activeSource.manifest_json)?.currentPeriodProof||coverage.currentPeriodProof):coverage.currentPeriodProof;
