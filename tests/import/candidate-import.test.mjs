@@ -48,7 +48,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
-import { statisticsRouteOptionalEmpty } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
+import { statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
 import { onRequestPost as buildSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js';
 import { competitionState, executeCompetitionAction } from '../../functions/api/leagues/[leagueSlug]/competition.js';
 import { onRequestPost as validateSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js';
@@ -389,11 +389,41 @@ test('All Weeks coverage and statistics mapping ignore proven-empty future place
   assert.equal(statisticsRouteOptionalEmpty(malformed,{stage:'reg',week:18},{completedRegularWeek:23,sourceCoverage:coverage}),false);
 });
 
+test('candidate coverage keeps future cumulative team summaries outside the proven Week 1 snapshot',()=>{
+  const currentPeriod={stage:'regular-season',week:1,key:'regular-season:1'};
+  const datasetInventory=[{
+    datasetType:'schedule',routePath:'xbsx/742482/week/reg/0/schedules',recordCount:272,
+    periodSource:'payload-schedule-aggregate',canonicalPeriods:Array.from({length:18},(_,index)=>(
+      {stage:'regular-season',week:index+1,key:`regular-season:${index+1}`}
+    ))
+  }];
+  for(let week=1;week<=18;week++)datasetInventory.push({
+    datasetType:'statistics',routePath:`xbsx/742482/week/reg/${week}/passing`,recordCount:0
+  });
+  datasetInventory.push({
+    datasetType:'statistics',routePath:'xbsx/742482/week/reg/2/team',recordCount:32
+  });
+  const coverage=candidateSourceCoverage({
+    sourceMarkers:{currentPeriod:{status:'proven',period:currentPeriod,source:'empty-opening-statistics-period'}},
+    datasetInventory
+  });
+  assert.equal(coverage.currentPeriod.key,'regular-season:1');
+  assert.deepEqual(coverage.statisticsPeriods.map(period=>period.key),['regular-season:1']);
+  assert.deepEqual(coverage.completePeriods.map(period=>period.key),['regular-season:1']);
+  assert.equal(statisticsRouteOutsideCandidateScope(
+    {captureUsable:true,resolvedPeriod:{...currentPeriod,week:2,key:'regular-season:2',playable:true}},
+    {stage:'reg',week:2},{sourceCoverage:coverage}
+  ),true);
+  assert.equal(statisticsRouteOutsideCandidateScope(
+    {captureUsable:false},{stage:'reg',week:1},{sourceCoverage:coverage}
+  ),false);
+});
+
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'schedule-horizon-current-period-v4');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'schedule-horizon-current-period-v5');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:schedule-horizon-current-period-v4'
+    'report:capture:identity:destination:schedule-horizon-current-period-v5'
   );
 });
 

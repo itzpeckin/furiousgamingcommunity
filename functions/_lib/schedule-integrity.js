@@ -34,11 +34,17 @@ export function currentStatePeriodEvidence(payload,routePath){
 export function proveCurrentSchedulePeriod(analyses=[]){
   const statistics=analyses.filter(a=>a.datasetType==='statistics'&&a.period?.playable).map(a=>({
     ...canonicalSchedulePeriod(a.period),routePath:a.routePath,path:'$route-or-payload-period',
-    recordCount:Number.isFinite(Number(a.recordCount))?Number(a.recordCount):null
+    recordCount:Number.isFinite(Number(a.recordCount))?Number(a.recordCount):null,
+    category:String(a.routePath||'').split('/').filter(Boolean).at(-1)?.toLowerCase()||null
   })).filter(p=>p.key).sort(compareSchedulePeriods);
-  const populated=statistics.filter(period=>period.recordCount===null||period.recordCount>0);
+  // Team-stat routes are cumulative summaries and can contain preseason-era
+  // records under a future regular-season route before Week 1 is played. They
+  // remain importable within the proven period, but cannot move the league clock
+  // without a player-stat route or explicit current-state metadata.
+  const clockStatistics=statistics.filter(period=>period.category!=='team');
+  const populated=clockStatistics.filter(period=>period.recordCount===null||period.recordCount>0);
   const roots=analyses.flatMap(a=>a.currentPeriodEvidence||[]);
-  const fallbackStage=statistics.at(-1)?.stage;
+  const fallbackStage=clockStatistics.at(-1)?.stage||statistics.at(-1)?.stage;
   if(roots.length){
     const candidates=roots.map(item=>canonicalSchedulePeriod({...item,stage:item.stage||fallbackStage}));
     const keys=new Set(candidates.map(p=>p?.key));
@@ -49,10 +55,20 @@ export function proveCurrentSchedulePeriod(analyses=[]){
   // Weeks export also emits explicit empty routes for future weeks; those are
   // availability placeholders, not league-clock evidence. A single explicit
   // empty period remains sufficient for a normal pre-game weekly export.
-  const emptyKeys=new Set(statistics.map(period=>period.key));
-  const evidence=populated.length?populated:emptyKeys.size===1?statistics:[];
+  const emptyKeys=new Set(clockStatistics.map(period=>period.key));
+  let source='captured-statistics-period';
+  let evidence=populated.length?populated:emptyKeys.size===1?clockStatistics:[];
+  if(!evidence.length&&clockStatistics.length&&populated.length===0){
+    const opening=canonicalSchedulePeriod({stage:'regular-season',week:1});
+    const scheduleKeys=new Set(analyses.filter(a=>a.datasetType==='schedule')
+      .flatMap(a=>a.periods||[]).map(period=>period?.key).filter(Boolean));
+    if(emptyKeys.has(opening.key)&&scheduleKeys.has(opening.key)){
+      evidence=clockStatistics.filter(period=>period.key===opening.key);
+      source='empty-opening-statistics-period';
+    }
+  }
   const period=canonicalSchedulePeriod(evidence.at(-1));
-  return period?{status:'proven',period,source:'captured-statistics-period',evidence:evidence.filter(p=>p.key===period.key)}
+  return period?{status:'proven',period,source,evidence:evidence.filter(p=>p.key===period.key)}
     :{status:statistics.length?'ambiguous':'unknown',period:null,evidence:statistics};
 }
 

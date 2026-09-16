@@ -246,6 +246,33 @@ test('All Weeks package uses populated Week 1 statistics and ignores empty futur
   assert.equal(buildMaddenDiscoveryReport(captures,{expected:{...expected,week:undefined}}).sourceVerification.passed,false);
 });
 
+test('All Weeks package proves opening Week 1 when only a future cumulative team summary is populated',()=>{
+  const captures=liveLikeRosterCaptureSet();
+  delete captures[0].payload.week;
+  const schedule=captures.find(c=>c.routePath.endsWith('/schedules'));
+  schedule.routePath='xbsx/742482/week/reg/0/schedules';
+  schedule.payload={gameScheduleInfoList:Array.from({length:18},(_,i)=>({
+    gameId:`game-${i+1}`,weekIndex:i,stageIndex:1,homeTeamId:'team-1',awayTeamId:'team-2'
+  }))};
+  captures.splice(captures.findIndex(c=>c.routePath.endsWith('/week/reg/1/passing')),1);
+  for(let week=1;week<=18;week++){
+    for(const category of ['defense','kicking','passing','punting','receiving','rushing']){
+      captures.push(capture(`xbsx/742482/week/reg/${week}/${category}`,{[`${category}StatInfoList`]:[]},5_000+week));
+    }
+    captures.push(capture(`xbsx/742482/week/reg/${week}/team`,{
+      teamStatInfoList:week===2?Array.from({length:32},(_,index)=>({
+        teamId:`team-${index+1}`,stageIndex:1,weekIndex:1,totalWins:index%4,totalLosses:3-(index%4),offPtsPerGame:20+index
+      })):[]
+    },6_000+week));
+  }
+  const report=buildMaddenDiscoveryReport(captures,{expected:{...expected,week:undefined}});
+  assert.equal(report.sourceVerification.passed,true);
+  assert.equal(report.sourceMarkers.currentPeriod.period.key,'regular-season:1');
+  assert.equal(report.sourceMarkers.currentPeriod.source,'empty-opening-statistics-period');
+  assert.deepEqual(report.sourceMarkers.week.completePeriods,['regular-season:1']);
+  assert.equal(reportImportReadiness(report).ready,true);
+});
+
 test('normalizes Companion paths and recognizes explicit Madden Free Agent payloads', () => {
   assert.equal(normalizeMaddenRoute('/XBSX/fr-1/freeagents/roster/'), 'xbsx/fr-1/freeagents/roster');
   const analysis = analyzeMaddenCapture(completeCaptureSet()[3]);
