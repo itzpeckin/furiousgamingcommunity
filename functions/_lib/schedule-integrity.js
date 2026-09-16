@@ -33,8 +33,10 @@ export function currentStatePeriodEvidence(payload,routePath){
 
 export function proveCurrentSchedulePeriod(analyses=[]){
   const statistics=analyses.filter(a=>a.datasetType==='statistics'&&a.period?.playable).map(a=>({
-    ...canonicalSchedulePeriod(a.period),routePath:a.routePath,path:'$route-or-payload-period'
+    ...canonicalSchedulePeriod(a.period),routePath:a.routePath,path:'$route-or-payload-period',
+    recordCount:Number.isFinite(Number(a.recordCount))?Number(a.recordCount):null
   })).filter(p=>p.key).sort(compareSchedulePeriods);
+  const populated=statistics.filter(period=>period.recordCount===null||period.recordCount>0);
   const roots=analyses.flatMap(a=>a.currentPeriodEvidence||[]);
   const fallbackStage=statistics.at(-1)?.stage;
   if(roots.length){
@@ -43,11 +45,15 @@ export function proveCurrentSchedulePeriod(analyses=[]){
     if(roots.some(p=>p.invalid)||candidates.some(p=>!p)||keys.size!==1)return{status:'ambiguous',period:null,evidence:roots};
     return{status:'proven',period:candidates[0],source:'current-state-metadata',evidence:roots};
   }
-  // Weekly-stat routes belong to the latest accepted export, even when no game
-  // has finished yet. Their season history can prove the last captured period.
-  const period=canonicalSchedulePeriod(statistics.at(-1));
-  return period?{status:'proven',period,source:'captured-statistics-period',evidence:statistics.filter(p=>p.key===period.key)}
-    :{status:'unknown',period:null,evidence:[]};
+  // Populated weekly-stat routes prove the latest played period. Madden's All
+  // Weeks export also emits explicit empty routes for future weeks; those are
+  // availability placeholders, not league-clock evidence. A single explicit
+  // empty period remains sufficient for a normal pre-game weekly export.
+  const emptyKeys=new Set(statistics.map(period=>period.key));
+  const evidence=populated.length?populated:emptyKeys.size===1?statistics:[];
+  const period=canonicalSchedulePeriod(evidence.at(-1));
+  return period?{status:'proven',period,source:'captured-statistics-period',evidence:evidence.filter(p=>p.key===period.key)}
+    :{status:statistics.length?'ambiguous':'unknown',period:null,evidence:statistics};
 }
 
 export function snapshotCurrentPeriod(snapshot,legacy=true){

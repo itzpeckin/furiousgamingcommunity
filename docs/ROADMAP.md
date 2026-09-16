@@ -6,13 +6,13 @@
 
 **Updated:** September 15, 2026
 
-**Revision:** 2.62
+**Revision:** 2.63
 
-**Current production:** FranchiseHQ 7.5.6.5 is live from candidate `21e3b23e4fd24bd16f921f12d85f280022f56503`, PR #106, code Main `6fe3facd8b01b1e66e4c089448e7bf90721a7662`, verified Pages Production deployment `76204841-1eba-46af-8dd5-7672fe519876`, and import Worker version `924b2e52`. All four PR checks plus Main quality and Pages workflows passed; the repository suite is 259/259 and the strict gate is 247/247. Migration 42 is applied with recovery bookmarks. Authenticated acceptance shows **Import Yearly Schedule** without starting it; zero yearly rows, active snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0`, all 189 audits, and all 105 schedule-thread rows remain retained and foreign keys are clean.
+**Current production:** FranchiseHQ 7.5.6.5 is live from candidate `21e3b23e4fd24bd16f921f12d85f280022f56503`, PR #106, code Main `6fe3facd8b01b1e66e4c089448e7bf90721a7662`, verified Pages Production deployment `76204841-1eba-46af-8dd5-7672fe519876`, and import Worker version `924b2e52`. Migration 42 is applied. The commissioner completed **Import Yearly Schedule** for all 18 regular-season weeks and 272 games; that immutable catalog and every source capture remain retained.
 
-**Current work:** 7.5.6.5 is Production-deployed and ready for commissioner operation. It closes the empirical gap discovered after 2026 was archived: Madden's All Weeks control can emit only its current schedule period rather than all 18 weeks. The reusable **Import Yearly Schedule** boundary, immutable season schedule revision, normal-import interlock, and later weekly-overlay path are live without a release-driven current-week, snapshot, or Discord change.
+**Current work:** 7.5.6.6 corrects a Production boundary exposed by the first 2027 All Weeks weekly import. The retained 179-route package contains the complete 272-game schedule plus usable Week 1 statistics, but empty Week 2–18 statistics routes were incorrectly treated as current-period evidence and then as required mapping work. The failed candidate safely preserved active snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0`, the completed yearly catalog, the malformed candidate, prior snapshots, and audits.
 
-**Next gate:** Commissioner acceptance starts **Import Yearly Schedule**, captures Regular Season Weeks 1–18 through the unchanged permanent URL, finishes the validated 272-game revision, and runs a fresh current-week export through **Import Latest Export**. That current-week import alone may advance the live period and schedule threads. After that owner-operated acceptance, 7.5.7 measures and reduces importer and thread-readiness time without weakening validation, retention, or Free Agent truthfulness.
+**Next gate:** Validate and publish 7.5.6.6, then reanalyze and retry the exact retained All Weeks cohort without another Madden export. The candidate must prove Regular Season Week 1 from populated statistics, preserve the 18-week schedule horizon, ignore only verified-empty current/future statistics placeholders, fail closed on malformed non-empty routes, and atomically activate the corrected 2027 Week 1 snapshot. No reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is permitted.
 
 ## Product decisions
 
@@ -115,7 +115,8 @@
 | 7.5.6.2 | Production deployed; owner acceptance pending | Measured Discord autocomplete/command-result latency and a separately guarded one-pick correction; ownership redesign remains discussion only |
 | 7.5.6.3 | Production deployed; owner acceptance pending | Shared team-branded rendered Discord rating cards, audited commissioner player/pick transfers, and FranchiseHQ ownership retained across imports; migration 41 preserved every existing owner and snapshot |
 | 7.5.6.4 | Production deployed; Archive Season pending commissioner action | Freeze source-backed 2026 player/GM history, carry reviewed assignments into the prepared 2027 season, and separate Madden years left from total contract length |
-| 7.5.6.5 | Production deployed; commissioner collection acceptance pending | Reusable Import Yearly Schedule collection for 18 regular-season weeks, immutable 272-game revision, weekly-import interlock, and later current-period overlay without collection-time snapshot or Discord work |
+| 7.5.6.5 | Production deployed; yearly collection accepted | Reusable Import Yearly Schedule collection for 18 regular-season weeks, immutable 272-game revision, weekly-import interlock, and later current-period overlay without collection-time snapshot or Discord work |
+| 7.5.6.6 | Validated Production-authorized candidate | Reuse the retained All Weeks weekly cohort by deriving Week 1 from populated statistics and treating verified-empty future statistics routes as placeholders rather than missing required data |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -135,7 +136,8 @@
 | 7 | Production deployed; owner Discord acceptance pending | 7.5.5.6 | Improve Discord trade readability, keep only the actual workflow status visible, preserve terminal owner DMs, and recover Trade Submit after its channel permits rich embeds. |
 | 8 | Production deployed; owner acceptance pending | 7.5.5.7 | Put trade resets in Command Center, fix phone Trade Review spacing, and deliver a functional committee package even when Discord strips rich embeds. |
 | 9 | Production deployed; owner acceptance pending | 7.5.5.8 | Replace Discord's invisible asset spacers with visible character boundaries that survive Mobile rendering while preserving the exact private/committee cards. |
-| 10 | Production deployed; commissioner acceptance pending | 7.5.6.5 | Collect the complete season schedule through **Import Yearly Schedule** while the latest accepted weekly import alone controls the current period; collection creates no snapshots or matchup threads. |
+| 10 | Production deployed; yearly collection accepted | 7.5.6.5 | Collect the complete season schedule through **Import Yearly Schedule** while the latest accepted weekly import alone controls the current period; collection creates no snapshots or matchup threads. |
+| 10a | Immediate remediation | 7.5.6.6 | Reuse the retained All Weeks weekly export, keep the 18-week schedule visible, activate only proven Week 1, and reject malformed non-empty statistics without requiring another export. |
 | 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
@@ -646,6 +648,15 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Additive migration 42 retains every linked raw capture and both start/finish audits. It does not reset or delete data, change a season, rotate the permanent URL, or reinterpret blocked Free Agents.
 - Gate: route/sentinel/placeholder authority, complete/incomplete coverage, immutable finish, normal-import interlock, zero collection-time snapshots/threads, catalog overlay precedence, migration preservation, mobile/desktop controls, and the complete strict suite all pass before publication.
 
+## 7.5.6.6 — All Weeks Weekly-Import Remediation
+
+- Derive the current period from populated weekly statistics when current-state metadata is absent. Empty explicit future-week statistics routes are availability placeholders and cannot advance the league clock.
+- Preserve a single explicit empty current-week statistics period as a valid pre-game weekly export, while multiple empty periods remain ambiguous without stronger current-period evidence.
+- Keep the full schedule horizon independent from effective statistics coverage. A Week 1 import may therefore retain and display Weeks 1–18 while only Week 1 is complete for live mapping.
+- Skip only payloads proven to be empty for the candidate's covered current period or future horizon. Malformed, unreadable, or non-empty non-statistics payloads remain blocking failures with their captures and diagnostics retained.
+- Automatically reanalyze an otherwise-ready retained report when the discovery policy changes, so this correction can reuse the exact existing 179-route export rather than requiring another Madden export.
+- Gate: reproduce the Production-shaped All Weeks package, prove Week 1, retain the 272-game/18-week horizon, exclude 124 empty future routes from required mapping, preserve blocked Free Agents as unknown/null, and pass the complete strict suite before publication and retained-cohort retry.
+
 ## 7.5.6.1 — Cross-Surface Trade Review Synchronization
 
 The 7.5.6.1 intervening patch makes every committee vote refresh all known current trade copies from the shared server tally. It preserves trade business rules and card design, uses existing durable outbox payload references without migration, keeps reviewer DMs active, converges concurrent votes, and supplies a lightweight open-site status refresh. Real Discord delivery acceptance remains owner-operated; no live vote is cast during code-only publication.
@@ -703,6 +714,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.63:** Diagnosed the first post-archive 2027 weekly import without modifying Production data. The retained 179-route All Weeks cohort includes 272 schedule games and usable Week 1 statistics; 124 verified-empty future statistics routes were incorrectly counted as Week 2–18 current-period evidence, producing a false Week 18 source and a safe map-statistics failure. Local 7.5.6.6 makes populated statistics authoritative for the current period, separates future empty placeholders from effective coverage, retains strict malformed-payload blocking, and permits current-policy reanalysis of the exact retained cohort. The active 2026 snapshot, completed yearly schedule, failed candidate, prior/malformed snapshots, captures, audits, URL, season state, Discord state, and blocked/null Free Agent result remain retained.
 
 - **Revision 2.62:** Published exact 7.5.6.5 candidate `21e3b23` through PR #106 with all four checks passing, applied additive migration 42 to exact Madden 27 Production D1 between bookmarks `000002c5-000002b2-000050e7-4d6e0ac3a9c03211afe397ae30029696` and `000002c5-000002e2-000050e7-fda80eaac71c0d9d9bb6c78af8461719`, and merged Main `6fe3fac`. Main quality run `35033045177` and Pages run `35033043906` passed; Pages deployment `76204841-1eba-46af-8dd5-7672fe519876` serves 7.5.6.5 and Worker build `e74f4b8e-c032-4807-b5db-6def6ebfbc51` was promoted as version `924b2e52` at 100% traffic. Authenticated read-only acceptance verified **Import Yearly Schedule** without starting it. Zero yearly rows, unchanged active snapshot `8a71d810`, all 189 audits, all 105 schedule threads with no update after September 13, and zero foreign-key violations were retained. No export/import, release-driven activation, reset/deletion, URL rotation, archive/transition, credential/membership/assignment change, Discord registration/configuration, or Free Agent reinterpretation ran. Commissioner collection and fresh Week 1 import are next.
 
