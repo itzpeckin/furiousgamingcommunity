@@ -75,19 +75,6 @@ export function sourceRosterStatus(raw = {}, teamId = '') {
   return explicit || 'active';
 }
 
-// Madden 27's current roster payload encodes cap hit and release penalty in
-// ten-thousands of dollars (3997 => $39.97M). Earlier retained fixtures encoded
-// cap hit in thousands. A current-format cap-hit ceiling of 5000 distinguishes
-// the two observed payload shapes without rewriting their preserved source.
-const maddenContractScale = value => {
-  const numeric = number(value);
-  return numeric !== null && Math.abs(numeric) <= 5000 ? 10000 : 1000;
-};
-const scaledMaddenCurrency = (value, scale) => {
-  const numeric = number(value);
-  return numeric === null ? null : numeric * scale;
-};
-
 // Net release savings is already dollars in the current payload but was
 // thousands in older captures. Normalize it independently from cap hit and
 // release penalty because Madden does not use one shared unit for all fields.
@@ -97,9 +84,77 @@ const maddenVariableCurrency = value => {
   return Math.abs(numeric) >= 100000 ? numeric : numeric * 1000;
 };
 
+const MADDEN_CONTRACT_SCALES = Object.freeze({
+  'madden-thousands':1000,
+  'madden-ten-thousands':10000
+});
+
+const normalizeMaddenContractUnit = value => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (['madden-thousands','thousands','1000'].includes(normalized)) return 'madden-thousands';
+  if (['madden-ten-thousands','ten-thousands','10000'].includes(normalized)) return 'madden-ten-thousands';
+  return null;
+};
+
+const explicitMaddenContractUnit = raw => normalizeMaddenContractUnit(
+  raw.franchiseHqContractUnit
+  ?? raw.contractCurrencyUnit
+  ?? raw.contract_currency_unit
+  ?? raw.sourceUnits?.capHit
+);
+
+const inferredMaddenContractUnit = raw => {
+  const capHit = number(raw.sourceCapHit ?? raw.cap_hit ?? raw.capHit ?? raw.salaryCapHit);
+  const releasePenalty = number(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney);
+  const releaseNetSavings = maddenVariableCurrency(raw.capReleaseNetSavings ?? raw.releaseNetSavings ?? raw.capSavings);
+  const difference = capHit !== null && releasePenalty !== null ? capHit - releasePenalty : null;
+  if (difference === null || difference <= 0 || releaseNetSavings === null || releaseNetSavings <= 0) return null;
+  const matches = Object.entries(MADDEN_CONTRACT_SCALES).filter(([,scale]) => {
+    const expected = difference * scale;
+    const tolerance = Math.max(1, Math.abs(expected) * Number.EPSILON * 8);
+    return Math.abs(expected - releaseNetSavings) <= tolerance;
+  });
+  return matches.length === 1 ? matches[0][0] : null;
+};
+
+// Contract units belong to the export format, never to the size of one player's
+// cap hit. Use explicit mapper metadata when present. For retained snapshots,
+// Madden's release-savings identity supplies format evidence without imposing a
+// maximum contract value (cap hit - release penalty = net release savings).
+export function inferMaddenContractUnit(records = []) {
+  const explicit = new Set();
+  const inferred = new Set();
+  for (const raw of records) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const declared = explicitMaddenContractUnit(raw);
+    if (declared) explicit.add(declared);
+    const observed = inferredMaddenContractUnit(raw);
+    if (observed) inferred.add(observed);
+  }
+  if (explicit.size > 1 || inferred.size > 1) return null;
+  const declared = explicit.size === 1 ? [...explicit][0] : null;
+  const observed = inferred.size === 1 ? [...inferred][0] : null;
+  if (declared && observed && declared !== observed) return null;
+  return declared || observed;
+}
+
+const maddenContractUnit = raw => explicitMaddenContractUnit(raw)
+  || inferredMaddenContractUnit(raw)
+  // Retained canonical-only rows use snake_case/sourceCapHit. Raw Companion
+  // roster rows use capHit/salaryCapHit and follow the current source contract.
+  || ((raw.capHit !== null && raw.capHit !== undefined)
+    || (raw.salaryCapHit !== null && raw.salaryCapHit !== undefined)
+    ? 'madden-ten-thousands'
+    : 'madden-thousands');
+
+const scaledMaddenCurrency = (value, unit) => {
+  const numeric = number(value);
+  return numeric === null ? null : numeric * MADDEN_CONTRACT_SCALES[unit];
+};
+
 export function sourceSupportedContract(raw = {}) {
   const rawCapHit=raw.sourceCapHit ?? raw.cap_hit ?? raw.capHit ?? raw.salaryCapHit;
-  const contractScale=maddenContractScale(rawCapHit);
+  const contractUnit=maddenContractUnit(raw);
   return {
     // Madden exposes both the deal's original length and its live years-left value.
     // Prefer the retained source years-left field so an older canonical mapper that
@@ -107,16 +162,16 @@ export function sourceSupportedContract(raw = {}) {
     yearsRemaining:number(raw.contractYearsLeft ?? raw.contractYearsRemaining ?? raw.yearsRemaining ?? raw.contract_years_remaining),
     length:number(raw.contractLength ?? raw.contractYears ?? raw.totalContractYears),
     currentYearSalary:null,
-    capHit:scaledMaddenCurrency(rawCapHit,contractScale),
+    capHit:scaledMaddenCurrency(rawCapHit,contractUnit),
     currentYearBonus:null,
     totalSalary:number(raw.contractSalary ?? raw.totalSalary ?? raw.contractTotalSalary),
     totalBonus:number(raw.contractBonus ?? raw.totalBonus ?? raw.signingBonus),
     releaseNetSavings:maddenVariableCurrency(raw.capReleaseNetSavings ?? raw.releaseNetSavings ?? raw.capSavings),
-    releasePenalty:scaledMaddenCurrency(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney,contractScale),
+    releasePenalty:scaledMaddenCurrency(raw.capReleasePenalty ?? raw.releasePenalty ?? raw.deadCap ?? raw.deadMoney,contractUnit),
     sourceUnits:{
-      capHit:contractScale===10000?'madden-ten-thousands':'madden-thousands',
+      capHit:contractUnit,
       releaseNetSavings:'madden-variable-normalized',
-      releasePenalty:contractScale===10000?'madden-ten-thousands':'madden-thousands',
+      releasePenalty:contractUnit,
       salary:'dollars',bonus:'dollars'
     }
   };

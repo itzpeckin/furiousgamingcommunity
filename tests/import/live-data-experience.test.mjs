@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import {
   MADDEN_RATING_FIELDS,
   freeAgentStateFromMappingRun,
+  inferMaddenContractUnit,
   safeAbilityValues,
   safeRatingValues,
   sourceRosterStatus,
@@ -47,12 +48,25 @@ test('contract DTO uses documented Madden units and does not manufacture current
   });
   assert.equal(retainedCanonicalConflict.yearsRemaining,5);
   assert.equal(retainedCanonicalConflict.length,6);
-  const retainedMadden27=sourceSupportedContract({sourceCapHit:3997,capReleaseNetSavings:10000000,capReleasePenalty:10651});
+  const retainedMadden27=sourceSupportedContract({capHit:3997,capReleaseNetSavings:10000000,capReleasePenalty:10651});
   assert.equal(retainedMadden27.capHit,39970000);
   assert.equal(retainedMadden27.releaseNetSavings,10000000);
   assert.equal(retainedMadden27.releasePenalty,106510000);
   assert.equal(retainedMadden27.sourceUnits.capHit,'madden-ten-thousands');
   assert.equal(retainedMadden27.sourceUnits.releasePenalty,'madden-ten-thousands');
+});
+
+test('contract currency units are format-derived and impose no cap-hit ceiling', () => {
+  const retainedBosa={capHit:5485,capReleasePenalty:2218,capReleaseNetSavings:32670000};
+  assert.equal(inferMaddenContractUnit([retainedBosa]),'madden-ten-thousands');
+  assert.equal(sourceSupportedContract(retainedBosa).capHit,54850000);
+  assert.equal(sourceSupportedContract({...retainedBosa,capHit:10000,capReleasePenalty:6733}).capHit,100000000);
+  assert.equal(sourceSupportedContract({...retainedBosa,capHit:25000,capReleasePenalty:21733}).capHit,250000000);
+
+  const legacy={sourceCapHit:14350,capReleasePenalty:9200,capReleaseNetSavings:5150};
+  assert.equal(inferMaddenContractUnit([legacy]),'madden-thousands');
+  assert.equal(sourceSupportedContract(legacy).capHit,14350000);
+  assert.equal(inferMaddenContractUnit([retainedBosa,legacy]),null);
 });
 
 test('roster state is source-derived for active, injured reserve, practice squad, and Free Agents', () => {
@@ -77,7 +91,7 @@ test('normalized player exposes every approved rating, ability, contract, and so
   const sourceRatings=Object.fromEntries(MADDEN_RATING_FIELDS.map(field=>[field,88]));
   const player=normalizePlayer({
     external_id:'player-27',team_external_id:'team-27',display_name:'Source Player',position:'WR',overall:91,
-    source_record_json:JSON.stringify({...sourceRatings,contractYearsLeft:2,contractLength:4,contractSalary:48000000,contractBonus:12000000,capHit:8750,isOnIR:true,privateExportToken:'secret',signatureSlotList:[{isEmpty:false,locked:false,ovrThreshold:90,signatureAbility:{signatureTitle:'Route Technician',signatureDescription:'Sharper cuts.',rank:1,isUnlocked:true,abilityGUID:'hidden'}}]})
+    source_record_json:JSON.stringify({...sourceRatings,contractYearsLeft:2,contractLength:4,contractSalary:48000000,contractBonus:12000000,capHit:8750,franchiseHqContractUnit:'madden-thousands',isOnIR:true,privateExportToken:'secret',signatureSlotList:[{isEmpty:false,locked:false,ovrThreshold:90,signatureAbility:{signatureTitle:'Route Technician',signatureDescription:'Sharper cuts.',rank:1,isUnlocked:true,abilityGUID:'hidden'}}]})
   });
   assert.equal(Object.keys(player.ratings).length,MADDEN_RATING_FIELDS.length);
   assert.equal(player.abilities[0].title,'Route Technician');

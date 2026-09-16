@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.6.11 contract-currency authority impact
+
+This code-only correction removes the cap-hit magnitude cutoff and derives Madden contract currency units from explicit source-format metadata or a proven contract relationship. Existing retained snapshot JSON is not rewritten; the read model corrects it in place, and future roster mappings retain the proven unit alongside their immutable source record.
+
+The runtime rollback baseline is exact Main `9d3a021e22a9d93aa329bfcbfde48592b358d74f`, Production release 7.5.6.10, and migration 42. Runtime rollback may restore that code while retaining every snapshot, roster mapping, capture/report, yearly schedule, Confidence Pool entry/pick, audit, permanent export URL, Discord thread, season/game-year record, and blocked/null Free Agent state.
+
+Do not rewrite retained contract source fields, restore a D1 bookmark, reset/delete data, run a Madden export/import, move an active snapshot, create scheduling threads, rotate the export URL, archive/transition a season, or reinterpret blocked Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.6.10 Confidence Pool phone-containment impact
 
 This presentation-only patch makes the Confidence Pool Standings grid items and toolbar shrink within the phone viewport while the wide leaderboard remains horizontally scrollable inside its table wrapper. It changes no scoring, picks, API payload semantics, database schema, or stored data.

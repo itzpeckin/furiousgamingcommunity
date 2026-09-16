@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 7.5.6.10 */
+/* FHQ_BUILD: 7.5.6.11 */
 import {
   json,
   database,
@@ -7,8 +7,9 @@ import {
   resolveLeague
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { inferMaddenContractUnit } from '../../../../_lib/live-data-experience.js';
 
-const RELEASE='7.5.6.10';
+const RELEASE='7.5.6.11';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -376,6 +377,21 @@ export async function onRequestPost(context){
 
     if(!players.length)return json({ok:false,error:'No canonical players were produced from the captured team rosters.',rosterRouteCount:source.captures.length,rosterDiagnostics:diagnostics},422);
 
+    const contractRecords=players.map(player=>player.sourceRecord).filter(record=>record&&first(record,A.capHit)!=null);
+    const contractCurrencyUnit=inferMaddenContractUnit(contractRecords);
+    if(contractRecords.length&&!contractCurrencyUnit)return json({
+      ok:false,
+      error:'The roster export contract currency format could not be proven safely.',
+      detail:'FranchiseHQ refused to guess contract units from cap-hit size. Run one fresh roster export and retry.',
+      activeSnapshotChanged:false,
+      activationPerformed:false
+    },422);
+    if(contractCurrencyUnit){
+      for(const player of players){
+        player.sourceRecord={...player.sourceRecord,franchiseHqContractUnit:contractCurrencyUnit};
+      }
+    }
+
     await db.prepare(`UPDATE companion_player_mapping_runs SET status='superseded',updated_at=? WHERE league_id=? AND status='pending-preview'`).bind(new Date().toISOString(),league.id).run();
     const runId=crypto.randomUUID(),now=new Date().toISOString();
     const representative=source.captures[0];
@@ -393,6 +409,7 @@ export async function onRequestPost(context){
       rosterRouteCount:source.captures.length,
       expectedTeamCount:validTeams.size,
       rosteredPlayersReady:rostered>0,
+      contractCurrencyUnit,
       mappingCompleteness:freeAgentSource.assessment.accepted?'complete':'rostered-players-only',
       freeAgentsDeferred:!freeAgentSource.assessment.accepted,
       freeAgentCapture:{
