@@ -6754,12 +6754,15 @@ function canonicalPlayerDashboardStats(playerId='') {
     if(!service){renderStandingsLegacy();return;}
     pageContent.setAttribute('aria-busy','true');
     try{
-      const requestedView=state.standingsView==='confidence'?'division':state.standingsView;
+      const requestedView=state.standingsView;
       const ownership=ownershipCareerService();
       const historyPromise=requestedView==='history'&&ownership?.requestLeague
         ? ownership.requestLeague()
         : Promise.resolve(null);
-      const [stateValue,snapshot,teamRows,standingRows,leagueHistory]=await Promise.all([service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),historyPromise]);
+      const competitionPromise=requestedView==='confidence'&&window.FranchiseHQ?.competition?.load
+        ? window.FranchiseHQ.competition.load().catch(()=>window.FranchiseHQ.competition.getState?.()||null)
+        : Promise.resolve(null);
+      const [stateValue,snapshot,teamRows,standingRows,leagueHistory,competitionState]=await Promise.all([service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),historyPromise,competitionPromise]);
       pageContent.removeAttribute('aria-busy');
       if(routeBase(currentAppRoute())!=='standings')return;
       if(stateValue!=='live'||!snapshot){renderLiveState('Standings unavailable','Standings will appear after the first successful import.');return;}
@@ -6771,15 +6774,17 @@ function canonicalPlayerDashboardStats(playerId='') {
       const confGroups=Object.fromEntries(['AFC','NFC'].map(conf=>[conf,ranked.filter(r=>String(r.conference).toUpperCase()===conf).map((r,i)=>({...r,leagueRank:i+1}))]));
       const divisionGroups={};ranked.forEach(row=>{const key=[row.conference,row.division].filter(Boolean).join(' ')||'League';(divisionGroups[key]||(divisionGroups[key]=[])).push(row)});Object.values(divisionGroups).forEach(group=>group.sort(sortRows));
       const activeView=requestedView;
-      const content=activeView==='history'
+      const content=activeView==='confidence'
+        ? renderConfidenceStandings({competitionState,teamMapOverride:teamMap})
+        : activeView==='history'
         ? (ownership?.renderLeague?.(leagueHistory)||'<article class="card gm-career-empty"><h3>League History unavailable</h3><p>The ownership history service has not loaded.</p></article>')
         : activeView==='league'?`<article class="card">${table(ranked,true)}</article>`:
         activeView==='conference'?`<div class="content-grid content-grid--equal">${['AFC','NFC'].map(conf=>`<article class="card"><div class="card-header"><div><span class="eyebrow">Conference rankings</span><h3>${conf}</h3></div></div>${table(confGroups[conf]||[],true)}</article>`).join('')}</div>`:
         activeView==='playoffs'?`<div class="playoff-grid">${['AFC','NFC'].map(conf=>{const picture=buildConferencePicture(conf,rows);return `<article class="card"><div class="card-header"><div><h3>${conf} Playoff Picture</h3></div><span class="pill pill--accent">Top 7</span></div><div class="playoff-bracket">${picture.seeds.map(row=>{const team=teamMap.get(String(row.teamId))||{};return `<div class="playoff-seed"><span class="seed">${row.playoffSeed}</span>${renderTeamMark(team)}<div><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml(row.qualification)}</small></div><strong>${escapeHtml(row.record)}</strong></div>`}).join('')}</div></article>`}).join('')}</div>`:
         `<div class="division-grid">${Object.entries(divisionGroups).map(([name,group])=>`<article class="card division-card"><div class="card-header"><div><span class="eyebrow">${escapeHtml(name.split(' ')[0]||'League')}</span><h3>${escapeHtml(name.split(' ').slice(1).join(' ')||name)}</h3></div></div>${table(group,false)}</article>`).join('')}</div>`;
-      const tabs=[['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture'],['history','League History']];
+      const tabs=[['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture'],['confidence','Confidence Pool'],['history','League History']];
       const context=publicSeasonContext(snapshot,[]);
-      pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')}</span><h1>Standings</h1></div><div class="heading-actions"><div class="segmented-tabs standings-primary-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${activeView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div><div data-standings-content>${content}</div>`;
+      pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')}</span><h1>Standings</h1><p>League races and Confidence Pool results from completed games.</p></div><div class="heading-actions"><div class="segmented-tabs standings-primary-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${activeView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div><div data-standings-content>${content}</div>`;
     }catch(error){console.error('[Standings Live Integration]',error);if(routeBase(currentAppRoute())==='standings')renderLiveState('Standings unavailable',error.message||'League data could not be loaded.','warning');}
   }
   function renderStandings() {
@@ -6818,15 +6823,36 @@ function canonicalPlayerDashboardStats(playerId='') {
     return `<div class="playoff-grid">${['AFC','NFC'].map(conf=>{const data=picture[conf]||{seeds:[],inHunt:[]};return `<article class="card"><div class="card-header"><div><span class="eyebrow">Projected postseason</span><h3>${conf} Playoff Picture</h3></div><span class="pill pill--accent">7 teams qualify</span></div><div class="playoff-bracket">${data.seeds.map(row=>{const team=teamById(row.teamId);return `<div class="playoff-seed" data-team-id="${row.teamId}"><span class="seed">${row.seed}</span>${renderTeamMark(team)}<div><strong>${escapeHtml(row.team)}</strong><small>${row.type}</small></div><strong>${row.record}</strong></div>`}).join('')}${data.inHunt.length?`<div class="playoff-cutline-label">In the hunt</div>${data.inHunt.map(row=>{const team=teamById(row.teamId);return `<div class="playoff-seed playoff-seed--hunt" data-team-id="${row.teamId}"><span class="seed">—</span>${renderTeamMark(team)}<div><strong>${escapeHtml(row.team)}</strong><small>${row.pointDifferential>=0?'+':''}${row.pointDifferential} differential</small></div><strong>${row.record}</strong></div>`}).join('')}`:''}</div></article>`}).join('')}</div>`;
   }
 
-  function renderConfidenceStandings() {
+  function confidenceSeasonStandings(board=[]) {
+    const rows=board.map(row=>{
+      const weeks=(row.weeks||[]).slice();
+      const scoredWeeks=weeks.filter(week=>Number(week.finalGames)>0);
+      const graded=Number(row.gradedPicks)||Math.max(0,Number(row.correctPicks||0)+Number(row.incorrectPicks||0));
+      return {...row,gradedPicks:graded,correctPercentage:Number.isFinite(Number(row.correctPercentage))?Number(row.correctPercentage):(graded?Number(((Number(row.correctPicks||0)/graded)*100).toFixed(1)):0),weeksWon:0,bestWeek:weeks.reduce((best,week)=>Math.max(best,Number(week.points)||0),0),averageWeeklyScore:scoredWeeks.length?Number((scoredWeeks.reduce((sum,week)=>sum+(Number(week.points)||0),0)/scoredWeeks.length).toFixed(1)):0};
+    });
+    const weekNumbers=[...new Set(rows.flatMap(row=>(row.weeks||[]).map(week=>Number(week.week))))];
+    weekNumbers.forEach(week=>{const ranked=rows.map(row=>({row,points:Number((row.weeks||[]).find(item=>Number(item.week)===week)?.points||0)})).sort((a,b)=>b.points-a.points);if(ranked[0]?.points>0){const top=ranked[0].points;ranked.filter(item=>item.points===top).forEach(item=>item.row.weeksWon++)}});
+    return rows.sort((a,b)=>Number(b.totalPoints)-Number(a.totalPoints)||Number(b.correctPicks)-Number(a.correctPicks)||Number(b.correctPercentage)-Number(a.correctPercentage)||String(a.name).localeCompare(String(b.name))).map((row,index)=>({...row,rank:index+1}));
+  }
+
+  function confidenceWeekStandings(seasonRows=[],weekIndex=1) {
+    return seasonRows.map(row=>{const week=(row.weeks||[]).find(item=>Number(item.week)===Number(weekIndex))||{};const graded=Number(week.gradedPicks)||Math.max(0,Number(week.correct||0)+Number(week.incorrectPicks||0));return{...row,points:Number(week.points)||0,correctPicks:Number(week.correct)||0,gradedPicks:graded,correctPercentage:Number.isFinite(Number(week.correctPercentage))?Number(week.correctPercentage):(graded?Number(((Number(week.correct||0)/graded)*100).toFixed(1)):0)}}).sort((a,b)=>b.points-a.points||b.correctPicks-a.correctPicks||b.correctPercentage-a.correctPercentage||String(a.name).localeCompare(String(b.name))).map((row,index)=>({...row,rank:index+1,week:Number(weekIndex)}));
+  }
+
+  function renderConfidenceStandings({competitionState=null,teamMapOverride=null}={}) {
     const service=standingsService();
-    const seasonRows=service.getConfidencePoolStandings();
-    const maxWeek=Math.max(1,...(scheduleService()?.getAllGames?.()||[]).map(g=>Number(g.week)||1));
-    const weeklyRows=service.getConfidencePoolWeek(state.confidenceStandingsWeek);
+    const serverBoard=competitionState?.confidence?.leaderboard;
+    const seasonRows=Array.isArray(serverBoard)?confidenceSeasonStandings(serverBoard):(service?.getConfidencePoolStandings?.()||[]);
+    const gameWeeks=Array.isArray(competitionState?.games)?competitionState.games.filter(game=>game.stage==='regular').map(game=>Number(game.weekIndex)||1):(scheduleService()?.getAllGames?.()||[]).map(game=>Number(game.week)||1);
+    const maxWeek=Math.max(1,...gameWeeks);
+    state.confidenceStandingsWeek=clamp(Number(state.confidenceStandingsWeek)||1,1,maxWeek);
+    const weeklyRows=Array.isArray(serverBoard)?confidenceWeekStandings(seasonRows,state.confidenceStandingsWeek):(service?.getConfidencePoolWeek?.(state.confidenceStandingsWeek)||[]);
     const rows=state.confidenceStandingsView==='weekly'?weeklyRows:seasonRows;
+    const teamFor=row=>teamMapOverride?.get(String(row.teamId))||teamById(row.teamId);
+    const weekly=state.confidenceStandingsView==='weekly';
     return `<div class="confidence-standings-shell">
-      <article class="card confidence-standings-toolbar"><div><span class="eyebrow">Confidence Pool</span><h3>${state.confidenceStandingsView==='weekly'?`Week ${state.confidenceStandingsWeek} Results`:'Season Standings'}</h3><p>${state.confidenceStandingsView==='weekly'?'Compare points earned from completed games in the selected week.':'Track total points, correct picks, weekly wins, and remaining scoring potential.'}</p></div><div class="confidence-standings-controls"><div class="segmented-tabs"><button data-confidence-standings-view="season" class="${state.confidenceStandingsView==='season'?'is-active':''}">Season</button><button data-confidence-standings-view="weekly" class="${state.confidenceStandingsView==='weekly'?'is-active':''}">Weekly</button></div>${state.confidenceStandingsView==='weekly'?`<div class="week-nav compact"><button class="icon-button icon-button--small" data-confidence-standings-week="-1" ${state.confidenceStandingsWeek<=1?'disabled':''}>‹</button><strong>Week ${state.confidenceStandingsWeek}</strong><button class="icon-button icon-button--small" data-confidence-standings-week="1" ${state.confidenceStandingsWeek>=maxWeek?'disabled':''}>›</button></div>`:''}</div></article>
-      <article class="card"><div class="table-wrap"><table class="confidence-standings-table"><thead><tr>${state.confidenceStandingsView==='weekly'?'<th>Rank</th><th>Owner</th><th>Team</th><th>Points</th><th>Correct</th><th>Final Games</th><th>Status</th>':'<th>Rank</th><th>Owner</th><th>Team</th><th>Total Points</th><th>Correct</th><th>Weeks Won</th><th>Average</th><th>Best Week</th><th>Max Remaining</th><th>Status</th>'}</tr></thead><tbody>${rows.map(row=>{const team=teamById(row.teamId);return `<tr><td><span class="seed">${row.rank}</span></td><td><strong>${escapeHtml(row.name)}</strong></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<span>${team.abbr}</span></div>`:'—'}</td><td><strong>${state.confidenceStandingsView==='weekly'?row.points:row.totalPoints}</strong></td><td>${row.correctPicks}</td>${state.confidenceStandingsView==='weekly'?`<td>${row.finalGames}</td>`:`<td>${row.weeksWon}</td><td>${Number(row.averageWeeklyScore).toFixed(1)}</td><td>${row.bestWeek}</td><td>${row.remainingPossiblePoints}</td>`}<td><span class="pill ${row.status==='submitted'?'pill--success':'pill--neutral'}">${titleCase(row.status||'draft')}</span></td></tr>`}).join('')||`<tr><td colspan="${state.confidenceStandingsView==='weekly'?7:10}">No Confidence Pool entries have been saved yet.</td></tr>`}</tbody></table></div></article>
+      <article class="card confidence-standings-toolbar"><div><span class="eyebrow">Confidence Pool</span><h3>${weekly?`Week ${state.confidenceStandingsWeek} Results`:'Season Leaderboard'}</h3><p>${weekly?'Points and pick accuracy include only games with a final result.':'Rankings show confidence points, correct picks, and accuracy across finalized games. Upcoming games never count as incorrect.'}</p></div><div class="confidence-standings-controls"><div class="segmented-tabs"><button data-confidence-standings-view="season" class="${!weekly?'is-active':''}">Season</button><button data-confidence-standings-view="weekly" class="${weekly?'is-active':''}">Weekly</button></div>${weekly?`<div class="week-nav compact"><button class="icon-button icon-button--small" data-confidence-standings-week="-1" ${state.confidenceStandingsWeek<=1?'disabled':''} aria-label="Previous Confidence Pool week">‹</button><strong>Week ${state.confidenceStandingsWeek}</strong><button class="icon-button icon-button--small" data-confidence-standings-week="1" ${state.confidenceStandingsWeek>=maxWeek?'disabled':''} aria-label="Next Confidence Pool week">›</button></div>`:''}</div></article>
+      <article class="card"><div class="table-wrap"><table class="confidence-standings-table"><thead><tr>${weekly?'<th>Rank</th><th>Owner</th><th>Team</th><th>Points</th><th>Correct</th><th>Graded Picks</th><th>Correct %</th>':'<th>Rank</th><th>Owner</th><th>Team</th><th>Points</th><th>Correct</th><th>Graded Picks</th><th>Correct %</th><th>Weeks Won</th><th>Weekly Avg</th><th>Best Week</th>'}</tr></thead><tbody>${rows.map(row=>{const team=teamFor(row);return `<tr><td><span class="seed">${row.rank}</span></td><td><strong>${escapeHtml(row.name)}</strong></td><td>${team?`<div class="table-team">${renderTeamMark(team)}<span>${escapeHtml(team.abbr||team.fullName||'Team')}</span></div>`:'—'}</td><td><strong>${weekly?row.points:row.totalPoints}</strong></td><td>${row.correctPicks}</td><td>${row.gradedPicks}</td><td><strong>${Number(row.correctPercentage||0).toFixed(1)}%</strong></td>${weekly?'':`<td>${row.weeksWon}</td><td>${Number(row.averageWeeklyScore||0).toFixed(1)}</td><td>${row.bestWeek}</td>`}</tr>`}).join('')||`<tr><td colspan="${weekly?7:10}">No Confidence Pool entries have been saved yet.</td></tr>`}</tbody></table></div></article>
     </div>`;
   }
 
@@ -7439,15 +7465,27 @@ function canonicalPlayerDashboardStats(playerId='') {
   const confidenceDirtyWeeks=new Set();
   function confidenceCurrentIdentity(){const snap=window.FranchiseHQ?.auth?.getSnapshot?.()||{};return snap.authenticated&&snap.user?{id:String(snap.user.id),name:window.FranchiseHQ?.auth?.getDisplayName?.()||snap.user.displayName||'Member',teamId:snap.membership?.teamId||null}:{id:'anonymous',name:'Member',teamId:null}}
   function confidenceUnsavedPrompt(){return !confidenceDirtyWeeks.size||confirm('You have Confidence Pool picks that have not been submitted for this week. Leave without submitting them?')}
-  function renderScheduleConfidence(week,teamMap){const service=scheduleService(),identity=confidenceCurrentIdentity(),shared=window.FranchiseHQ?.competition?.getState?.();if(!service?.confidence||identity.id==='anonymous'||shared?.features?.confidencePool===false)return'';const poolWeek=service.getWeek(week),entry=service.confidence.getEntry(identity.id),open=service.confidence.isWeekOpen(week,identity.id),submitted=Boolean(entry.submittedWeeks?.[String(week)]);if(!poolWeek?.games?.length)return'';return `<section class="schedule-confidence-shell"><div class="card schedule-confidence-head"><div><span class="eyebrow">Confidence Pool</span><h2>Week ${week} Picks</h2><p>Choose each winner and confidence value. Submit or clear this week independently.</p></div><div class="confidence-week-actions"><button class="button button--ghost" data-confidence-clear-week="${week}" ${!open?'disabled':''}>Clear Week</button><button class="button button--primary" data-confidence-submit-week="${week}" ${!open?'disabled':''}>${submitted?'Week Submitted':'Submit Week'}</button></div></div><div class="confidence-pick-list">${poolWeek.games.map(game=>{const away=teamMap.get(String(game.awayId))||teamById(game.awayId),home=teamMap.get(String(game.homeId))||teamById(game.homeId),pick=entry.picks?.[game.id]||{};return `<article class="card confidence-pick-card"><div class="confidence-matchup"><strong>${escapeHtml(away?.abbr||game.awayId)} @ ${escapeHtml(home?.abbr||game.homeId)}</strong></div><div class="confidence-team-choice"><button type="button" data-confidence-team="${game.id}:${game.awayId}" class="${pick.selectedTeamId===game.awayId?'is-selected':''}" ${!open?'disabled':''}>${away?renderTeamMark(away,'mini-team'):''}<span>${escapeHtml(away?.abbr||game.awayId)}</span></button><button type="button" data-confidence-team="${game.id}:${game.homeId}" class="${pick.selectedTeamId===game.homeId?'is-selected':''}" ${!open?'disabled':''}>${home?renderTeamMark(home,'mini-team'):''}<span>${escapeHtml(home?.abbr||game.homeId)}</span></button></div><label class="field confidence-value"><span>Confidence</span><select data-confidence-value="${game.id}" ${!open?'disabled':''}><option value="">Select</option>${poolWeek.games.map((_,i)=>`<option value="${i+1}" ${Number(pick.confidence)===i+1?'selected':''}>${i+1}</option>`).join('')}</select></label></article>`}).join('')}</div></section>`}
+  function scheduleConfidenceModel(week){
+    const service=scheduleService(),identity=confidenceCurrentIdentity(),shared=window.FranchiseHQ?.competition?.getState?.();
+    if(!service?.confidence||identity.id==='anonymous'||shared?.features?.confidencePool===false)return null;
+    const poolWeek=service.getWeek(week),entry=service.confidence.getEntry(identity.id);
+    if(!poolWeek?.games?.length)return null;
+    const gameIds=new Set(poolWeek.games.map(game=>String(game.id))),confidenceOwners=new Map();
+    poolWeek.games.forEach(game=>{const value=Number(entry.picks?.[game.id]?.confidence);if(Number.isInteger(value))confidenceOwners.set(value,String(game.id))});
+    const open=service.confidence.isWeekOpen(week,identity.id),submitted=Boolean(entry.submittedWeeks?.[String(week)]),validation=service.confidence.validateWeek(week,identity.id);
+    return{week:Number(week),games:poolWeek.games,gameIds,confidenceOwners,entry,open,submitted,validation,totalGames:poolWeek.games.length};
+  }
+  function renderScheduleConfidenceHeader(model){if(!model)return'';const picked=Number(model.validation?.picked)||0,assigned=model.games.filter(game=>Number.isInteger(Number(model.entry.picks?.[game.id]?.confidence))).length,status=model.submitted?'Submitted':model.open?'Open':'Closed';return `<section class="card schedule-confidence-head" aria-label="Week ${model.week} Confidence Pool"><div><span class="eyebrow">Confidence Pool · ${status}</span><h2>Make picks while you read the schedule</h2><p>Select a winner and a unique confidence value inside each matchup. Only final games affect the standings.</p></div><div class="schedule-confidence-progress"><span class="pill ${model.open?'pill--success':'pill--neutral'}">${picked} / ${model.totalGames} winners</span><span class="pill ${assigned===model.totalGames?'pill--success':'pill--neutral'}">${assigned} / ${model.totalGames} confidence</span></div><div class="confidence-week-actions"><button class="button button--ghost" data-confidence-clear-week="${model.week}" ${!model.open?'disabled':''}>Clear Week</button><button class="button button--primary" data-confidence-submit-week="${model.week}" ${!model.open?'disabled':''}>${model.submitted?'Week Submitted':'Submit Week'}</button></div></section>`}
+  function renderScheduleGameConfidence(game,away,home,model){if(!model?.gameIds?.has(String(game.id)))return'';const pick=model.entry.picks?.[game.id]||{},selected=String(pick.selectedTeamId||''),max=model.totalGames;const choice=(team,label)=>`<button type="button" data-confidence-team="${escapeHtml(game.id)}:${escapeHtml(team.id)}" data-confidence-game-id="${escapeHtml(game.id)}" data-confidence-team-id="${escapeHtml(team.id)}" class="${selected===String(team.id)?'is-selected':''}" ${!model.open?'disabled':''} aria-pressed="${selected===String(team.id)}" aria-label="Pick ${escapeHtml(team.fullName||team.abbr)} to win">${renderTeamMark(team,'mini-team')}<span>${escapeHtml(label)}</span></button>`;return `<div class="game-card__confidence" data-confidence-control><div class="game-card__confidence-label"><strong>Your pick</strong><span>${model.submitted?'Submitted':model.open?'Choose winner + confidence':'Picks closed'}</span></div><div class="confidence-team-choice">${choice(away,away.abbr||'Away')}${choice(home,home.abbr||'Home')}</div><label class="field confidence-value"><span>Confidence</span><select data-confidence-value="${escapeHtml(game.id)}" ${!model.open?'disabled':''} aria-label="Confidence value for ${escapeHtml(away.abbr||'away')} at ${escapeHtml(home.abbr||'home')}"><option value="">Select</option>${model.games.map((_,index)=>{const value=index+1,label=value===1?'1 · Low':value===max?`${value} · High`:String(value),usedBy=model.confidenceOwners.get(value);return `<option value="${value}" ${Number(pick.confidence)===value?'selected':''} ${usedBy&&usedBy!==String(game.id)?'disabled':''}>${label}${usedBy&&usedBy!==String(game.id)?' · Used':''}</option>`}).join('')}</select></label></div>`}
   async function renderSchedule() {
     preloadScheduleMatchupData();
     pageContent.innerHTML='<section class="empty-state"><strong>Loading schedule…</strong><p>Reading league data.</p></section>';
     try{
       const service=liveReadModel();
       if(!service) throw new Error('Live Read Model service is unavailable.');
+      const competitionPromise=window.FranchiseHQ?.competition?.load?window.FranchiseHQ.competition.load().catch(()=>null):Promise.resolve(null);
       const [stateValue,snapshot,teamRows,standingRows,gameRows]=await Promise.all([
-        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule()
+        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),competitionPromise
       ]);
       if(stateValue!=='live'||!snapshot) throw new Error('No active live snapshot is available.');
       const liveTeams=teamRows.map(liveTeamUiShape);
@@ -7470,6 +7508,7 @@ function canonicalPlayerDashboardStats(playerId='') {
       const filtered=phaseGames.filter(game=>Number(game.week)===Number(state.scheduleWeek))
         .filter(game=>state.scheduleTeam==='All'||String(game.homeTeamId)===String(state.scheduleTeam)||String(game.awayTeamId)===String(state.scheduleTeam));
       const phaseLabel=state.schedulePhase==='preseason'?'Preseason':state.schedulePhase==='playoffs'?'Playoffs':'Regular Season';
+      const confidenceModel=state.schedulePhase==='regular'?scheduleConfidenceModel(Number(state.scheduleWeek)):null;
 
       pageContent.innerHTML=`
         <div class="page-heading"><div><span class="eyebrow">Franchise calendar</span><h1>League Schedule</h1><p>${escapeHtml(current.displayLabel)}</p></div></div>
@@ -7479,22 +7518,24 @@ function canonicalPlayerDashboardStats(playerId='') {
           <label class="field"><span>Filter team</span><select data-schedule-team><option value="All">All teams</option>${liveTeams.map(team=>`<option value="${team.id}" ${String(state.scheduleTeam)===String(team.id)?'selected':''}>${escapeHtml(team.abbr)} · ${escapeHtml(team.fullName)}</option>`).join('')}</select></label>
           <span class="pill pill--success">${escapeHtml(current.displayLabel)} current</span>
         </div>
-        <div class="schedule-grid">${filtered.length?filtered.map(game=>renderLiveScheduleCard(game,teamMap,current)).join(''):`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No games available</h3><p>No schedule records are available for this phase and week.</p></div></article>`}</div>${state.schedulePhase==='regular'?renderScheduleConfidence(Number(state.scheduleWeek),teamMap):''}`;
+        ${renderScheduleConfidenceHeader(confidenceModel)}
+        <div class="schedule-grid">${filtered.length?filtered.map(game=>renderLiveScheduleCard(game,teamMap,current,confidenceModel)).join(''):`<article class="card roadmap-state"><div class="roadmap-state__inner"><h3>No games available</h3><p>No schedule records are available for this phase and week.</p></div></article>`}</div>`;
     }catch(error){
       pageContent.innerHTML=`<section class="empty-state"><strong>Schedule unavailable</strong><p>${escapeHtml(error?.message||'The schedule could not be loaded.')}</p></section>`;
     }
   }
 
-  function renderLiveScheduleCard(game,teamMap,current) {
+  function renderLiveScheduleCard(game,teamMap,current,confidenceModel=null) {
     liveMatchupGames.set(String(game.id||''),game);
-    const away=teamMap.get(String(game.awayTeamId))||{fullName:'Away Team',record:'',abbr:'AWY'};
-    const home=teamMap.get(String(game.homeTeamId))||{fullName:'Home Team',record:'',abbr:'HME'};
+    const away=teamMap.get(String(game.awayTeamId))||{id:String(game.awayTeamId),fullName:'Away Team',record:'',abbr:'AWY'};
+    const home=teamMap.get(String(game.homeTeamId))||{id:String(game.homeTeamId),fullName:'Home Team',record:'',abbr:'HME'};
     const isFinal=game.status==='final';
     const isLive=game.status==='live';
     const scoresAvailable=game.awayScore!==null&&game.homeScore!==null;
     const winnerId=isFinal&&scoresAvailable?(game.awayScore>game.homeScore?String(game.awayTeamId):String(game.homeTeamId)):null;
     const label=canonicalScheduleLabel(game);
-    return `<button type="button" class="game-card card" data-game-id="${escapeHtml(game.id||'')}">
+    return `<article class="game-card card ${confidenceModel?'game-card--with-confidence':''}">
+      <button type="button" class="game-card__preview" data-game-id="${escapeHtml(game.id||'')}" aria-label="Open ${escapeHtml(away.fullName)} at ${escapeHtml(home.fullName)} matchup">
       <div class="game-card__meta"><span>${escapeHtml(label)}</span><span class="pill ${isFinal?'pill--neutral':isLive?'pill--danger':'pill--accent'}">${isFinal?'Final':isLive?'Live':'Upcoming'}</span></div>
       <div class="game-card__body">
         <div class="game-team">${renderTeamMark(away)}<div><strong>${escapeHtml(away.fullName)}</strong><span>${escapeHtml(away.record||'')}</span></div></div>
@@ -7502,7 +7543,8 @@ function canonicalPlayerDashboardStats(playerId='') {
         <div class="game-team game-team--away"><div><strong>${escapeHtml(home.fullName)}</strong><span>${escapeHtml(home.record||'')}</span></div>${renderTeamMark(home)}</div>
       </div>
       <div class="game-card__footer"><span>${escapeHtml(game.source?.stadiumName||game.source?.stadium||'')}</span><span>${isFinal?'Completed game':isLive?'In progress':Number(game.week)<Number(current.week)&&game.stage===current.phase?'Historical record':'Upcoming matchup'}</span></div>
-    </button>`;
+      </button>${renderScheduleGameConfidence(game,away,home,confidenceModel)}
+    </article>`;
   }
 
   function renderGameCard(game, perspectiveTeamId=null) {
@@ -9300,7 +9342,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const confidenceStandingsView=event.target.closest('[data-confidence-standings-view]');
     if(confidenceStandingsView){state.confidenceStandingsView=confidenceStandingsView.dataset.confidenceStandingsView;renderStandings();return;}
     const confidenceStandingsWeek=event.target.closest('[data-confidence-standings-week]');
-    if(confidenceStandingsWeek){state.confidenceStandingsWeek=clamp(state.confidenceStandingsWeek+Number(confidenceStandingsWeek.dataset.confidenceStandingsWeek),1,Math.max(1,...schedule.map(w=>w.week)));renderStandings();return;}
+    if(confidenceStandingsWeek){state.confidenceStandingsWeek=Math.max(1,state.confidenceStandingsWeek+Number(confidenceStandingsWeek.dataset.confidenceStandingsWeek));renderStandings();return;}
 
     const statsCategory=event.target.closest('[data-stats-category]');
     if (statsCategory) {
@@ -9324,7 +9366,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     const confidenceWeekChange=event.target.closest('[data-confidence-week-change]');
     if(confidenceWeekChange){state.confidenceWeek=clamp(state.confidenceWeek+Number(confidenceWeekChange.dataset.confidenceWeekChange),1,schedule.length);renderSchedule();return;}
     const confidenceTeam=event.target.closest('[data-confidence-team]');
-    if(confidenceTeam){confidenceDirtyWeeks.add(Number(state.scheduleWeek));const [gameId,teamId]=confidenceTeam.dataset.confidenceTeam.split(':');void (async()=>{try{const result=await scheduleService()?.confidence?.saveSelection(gameId,teamId);if(!result?.ok)showToast('Pick not saved',result?.error||'Unable to save pick.')}catch(error){showToast('Pick not saved',error?.message||String(error))}await renderSchedule()})();return;}
+    if(confidenceTeam){confidenceDirtyWeeks.add(Number(state.scheduleWeek));const encoded=confidenceTeam.dataset.confidenceTeam||'',separator=encoded.lastIndexOf(':'),gameId=confidenceTeam.dataset.confidenceGameId||encoded.slice(0,separator),teamId=confidenceTeam.dataset.confidenceTeamId||encoded.slice(separator+1);void (async()=>{try{const result=await scheduleService()?.confidence?.saveSelection(gameId,teamId);if(!result?.ok)showToast('Pick not saved',result?.error||'Unable to save pick.')}catch(error){showToast('Pick not saved',error?.message||String(error))}await renderSchedule()})();return;}
     const confidenceClearWeek=event.target.closest('[data-confidence-clear-week]');
     if(confidenceClearWeek){const week=Number(confidenceClearWeek.dataset.confidenceClearWeek);if(confirm(`Clear every winner and confidence value for Week ${week}? This cannot be undone.`)){void (async()=>{try{const result=await scheduleService()?.confidence?.clearWeek(week);if(result?.ok)confidenceDirtyWeeks.delete(week);showToast(result?.ok?'Week cleared':'Unable to clear week',result?.error||`Week ${week} selections were removed.`)}catch(error){showToast('Unable to clear week',error?.message||String(error))}await renderSchedule()})()}return;}
     const confidenceClearSeason=event.target.closest('[data-confidence-clear-season]');
@@ -9562,7 +9604,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     if (event.target.matches('[data-player-rookie]')) { state.playerRookiesOnly=Boolean(event.target.checked); state.playerPage=1; refreshPlayerTable(); }
     if (event.target.matches('[data-player-sort]')) { state.playerSort=event.target.value; state.playerPage=1; refreshPlayerTable(); }
     if (event.target.matches('[data-schedule-team]')) { state.scheduleTeam=event.target.value; renderSchedule(); }
-    if (event.target.matches('[data-confidence-value]')) { const gameId=event.target.dataset.confidenceValue,value=event.target.value; void (async()=>{try{const result=await scheduleService()?.confidence?.saveConfidence(gameId,value);if(!result?.ok)showToast('Confidence not saved',result?.error||'Choose another confidence value.')}catch(error){showToast('Confidence not saved',error?.message||String(error))}await renderSchedule()})(); }
+    if (event.target.matches('[data-confidence-value]')) { confidenceDirtyWeeks.add(Number(state.scheduleWeek));const gameId=event.target.dataset.confidenceValue,value=event.target.value; void (async()=>{try{const result=await scheduleService()?.confidence?.saveConfidence(gameId,value);if(!result?.ok)showToast('Confidence not saved',result?.error||'Choose another confidence value.')}catch(error){showToast('Confidence not saved',error?.message||String(error))}await renderSchedule()})(); }
     if (event.target.matches('[data-stats-scope]')) { state.statsScope=event.target.value; renderStats(); }
     if (event.target.matches('[data-stats-week]')) { state.statsWeek=Number(event.target.value)||1; renderStats(); }
     if (event.target.matches('[data-stats-team]')) { state.statsTeam=event.target.value; renderStats(); }
@@ -9950,7 +9992,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.5.6.8';
+  const VISIBLE_RELEASE = '7.5.6.9';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

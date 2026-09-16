@@ -2,7 +2,7 @@ import { maddenRoutePeriod, resolveMaddenPeriod, resolveMaddenSchedulePeriods } 
 import { compareSchedulePeriods, currentStatePeriodEvidence, proveCurrentSchedulePeriod } from './schedule-integrity.js';
 
 export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'schedule-horizon-current-period-v4';
-export const MADDEN_DISCOVERY_RELEASE = '7.5.6.8';
+export const MADDEN_DISCOVERY_RELEASE = '7.5.6.9';
 
 const DATASET_ORDER = Object.freeze([
   'league-info',

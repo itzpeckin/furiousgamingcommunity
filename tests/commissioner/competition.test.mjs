@@ -73,7 +73,7 @@ function context(db,token,method = 'GET',body = null) {
   };
 }
 
-function game(id,homeTeamId,awayTeamId) {
+function game(id,homeTeamId,awayTeamId,{status = 'scheduled',homeScore = null,awayScore = null} = {}) {
   return JSON.stringify({
     external_id:id,
     season_year:2026,
@@ -81,7 +81,9 @@ function game(id,homeTeamId,awayTeamId) {
     week_index:10,
     home_team_external_id:homeTeamId,
     away_team_external_id:awayTeamId,
-    status:'scheduled'
+    status,
+    home_score:homeScore,
+    away_score:awayScore
   });
 }
 
@@ -118,7 +120,7 @@ test('Game of the Week and Confidence Pool are tenant-scoped, shared, and commis
     const initial = await getCompetition(context(db,'owner-token'));
     const initialPayload = await initial.json();
     assert.equal(initial.status,200,JSON.stringify(initialPayload));
-    assert.equal(initialPayload.release,'7.5.6.8');
+    assert.equal(initialPayload.release,'7.5.6.9');
     assert.equal(initialPayload.games.length,2);
 
     const forbidden = await postCompetition(context(db,'owner-token','POST',{
@@ -146,6 +148,9 @@ test('Game of the Week and Confidence Pool are tenant-scoped, shared, and commis
       const payload = await saved.json();
       assert.equal(saved.status,200,JSON.stringify(payload));
     }
+    const draftState = await getCompetition(context(db,'owner-token'));
+    const draftPayload = await draftState.json();
+    assert.deepEqual(draftPayload.confidence.leaderboard,[], 'unfinished picks stay private and unscored');
     const submitted = await postCompetition(context(db,'owner-token','POST',{
       action:'submit-confidence-week',weekIndex:10
     }));
@@ -154,10 +159,41 @@ test('Game of the Week and Confidence Pool are tenant-scoped, shared, and commis
     assert.equal(submittedPayload.confidence.entry.status,'submitted');
     assert.equal(submittedPayload.confidence.entry.picks['game-10-a'].confidence,1);
     assert.equal(submittedPayload.confidence.entry.picks['game-10-b'].selectedTeamId,'kc');
+    database.prepare(`UPDATE league_snapshot_records SET data_json=?
+      WHERE snapshot_id='snapshot-week-10' AND external_id='game-10-a'`)
+      .run(game('game-10-a','tb','sf',{status:'final',homeScore:24,awayScore:17}));
+    database.prepare(`UPDATE league_snapshot_records SET data_json=?
+      WHERE snapshot_id='snapshot-week-10' AND external_id='game-10-b'`)
+      .run(game('game-10-b','kc','buf',{status:'final',homeScore:20,awayScore:27}));
+    const scored = await getCompetition(context(db,'owner-token'));
+    const scoredPayload = await scored.json();
+    const ownerScore = scoredPayload.confidence.leaderboard.find(row => row.userId === 'owner');
+    assert.equal(ownerScore.totalPoints,1);
+    assert.equal(ownerScore.correctPicks,1);
+    assert.equal(ownerScore.gradedPicks,2);
+    assert.equal(ownerScore.incorrectPicks,1);
+    assert.equal(ownerScore.correctPercentage,50);
+    assert.equal(ownerScore.weeks[0].correctPercentage,50);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM tenant_audit_events
       WHERE league_id='league-competition'`).get().count,5);
     assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
   } finally {
     database.close();
   }
+});
+
+test('Schedule and live Standings expose the integrated Confidence Pool experience', async () => {
+  const [app,styles] = await Promise.all([
+    readFile(path.join(ROOT,'app.js'),'utf8'),
+    readFile(path.join(ROOT,'styles.css'),'utf8')
+  ]);
+  assert.match(app,/function renderScheduleGameConfidence/);
+  assert.match(app,/class="game-card__preview" data-game-id=/);
+  assert.match(app,/Make picks while you read the schedule/);
+  assert.match(app,/\['confidence','Confidence Pool'\]/);
+  assert.match(app,/Graded Picks<\/th><th>Correct %/);
+  assert.match(app,/Upcoming games never count as incorrect/);
+  assert.match(styles,/schedule-integrated Confidence Pool/);
+  assert.match(styles,/\.game-card__confidence\{display:grid/);
+  assert.match(styles,/@media\(max-width:760px\)[\s\S]*\.game-card__confidence\{grid-template-columns:1fr\}/);
 });
