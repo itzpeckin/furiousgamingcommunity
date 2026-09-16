@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.6.8",
+  "releaseType": "statistics-route-authority-correction",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.6.7",
+    "commit": "b27a791c9171b24b1879f4e60e59934312d3bb63",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.6.8-stat-route-authority",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true,"status": "authorized-not-run"},
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.6.7",
+    "candidateRelease": "7.5.6.8",
+    "currentCommit": "b27a791c9171b24b1879f4e60e59934312d3bb63",
+    "currentMigration": 42,
+    "candidateMigration": 42,
+    "scope": "Code-only statistics route-authority correction and retained-source recomposition. No migration, new export, reset, deletion, URL rotation, season operation, Discord configuration, or Free Agent reinterpretation."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+    "tests/import/candidate-import.test.mjs",
+    "releases/7.5.6.8/release-record.md",
+    "releases/7.5.6.8/validation-evidence.json"
+  ]
+}

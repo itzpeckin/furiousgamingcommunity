@@ -13,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'schedule-horizon-current-period-v5';
+export const CANDIDATE_MAPPING_REVISION = 'schedule-horizon-current-period-v6';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`;

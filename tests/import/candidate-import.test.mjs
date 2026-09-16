@@ -48,7 +48,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
-import { statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
+import { authoritativeStatisticsPeriod, statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
 import { onRequestPost as buildSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js';
 import { competitionState, executeCompetitionAction } from '../../functions/api/leagues/[leagueSlug]/competition.js';
 import { onRequestPost as validateSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js';
@@ -411,19 +411,25 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
   assert.deepEqual(coverage.statisticsPeriods.map(period=>period.key),['regular-season:1']);
   assert.deepEqual(coverage.completePeriods.map(period=>period.key),['regular-season:1']);
   assert.equal(statisticsRouteOutsideCandidateScope(
-    {captureUsable:true,resolvedPeriod:{...currentPeriod,week:2,key:'regular-season:2',playable:true}},
+    {captureUsable:true,resolvedPeriod:{...currentPeriod,playable:true}},
     {stage:'reg',week:2},{sourceCoverage:coverage}
   ),true);
+  assert.equal(authoritativeStatisticsPeriod(
+    {resolvedPeriod:{...currentPeriod,playable:true}},{stage:'reg',week:2}
+  ).key,'regular-season:2');
+  assert.equal(authoritativeStatisticsPeriod(
+    {resolvedPeriod:{...currentPeriod,playable:true}},{stage:'reg',week:0}
+  ).key,'regular-season:1');
   assert.equal(statisticsRouteOutsideCandidateScope(
     {captureUsable:false},{stage:'reg',week:1},{sourceCoverage:coverage}
   ),false);
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'schedule-horizon-current-period-v5');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'schedule-horizon-current-period-v6');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:schedule-horizon-current-period-v5'
+    'report:capture:identity:destination:schedule-horizon-current-period-v6'
   );
 });
 

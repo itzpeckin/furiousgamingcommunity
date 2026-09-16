@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.6.8 statistics route-authority correction impact
+
+This code-only correction makes every ordinary nonzero statistics route authoritative for its stage and week while preserving payload-period resolution for Week 0 sentinel routes. It adds no migration. Mapping revision v6 may recompose the exact retained All Weeks package into a new 2027 Week 1 snapshot with all 272 yearly-schedule games and without the 32 cumulative Week 2 team rows admitted by 7.5.6.7.
+
+The runtime rollback baseline is exact Main `b27a791c9171b24b1879f4e60e59934312d3bb63`, Production release 7.5.6.7, Pages deployment `00156068-d518-4cea-9ad4-95c60a0ab4fc`, and migration 42. The active pre-correction snapshot is `512d2196-338b-4ab9-8f6d-51128c9d036b`; previous snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0` also remains retained.
+
+Runtime rollback must retain the corrected snapshot after activation, both named prior snapshots, the completed 18-week/272-game yearly schedule, all 179 routes and R2 objects, every report, candidate, mapping run, lifecycle event, audit, the permanent export URL, game-year/season state, Discord state, and blocked/null Free Agent state. Do not restore a D1 bookmark, reset/delete data, run another export, rotate the URL, archive/transition a season, create scheduling threads for the same-week retry, or interpret blocked Free Agents as zero. Any active-pointer recovery is a separate explicit retained-snapshot operation, never an implied code rollback.
+
 ## 7.5.6.7 Week 1 team-summary boundary impact
 
 This code-only patch prevents a cumulative team-summary route from advancing the league clock without corroborating player-stat or current-state evidence. When an All Weeks package has no regular-season player statistics yet, the full schedule and explicit empty player-stat routes prove the regular-season opening as Week 1. Candidate statistics mapping excludes routes later than that proven period, including the retained Week 2 team summary containing preseason-era records.
