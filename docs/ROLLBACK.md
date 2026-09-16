@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.6.10 Confidence Pool phone-containment impact
+
+This presentation-only patch makes the Confidence Pool Standings grid items and toolbar shrink within the phone viewport while the wide leaderboard remains horizontally scrollable inside its table wrapper. It changes no scoring, picks, API payload semantics, database schema, or stored data.
+
+The runtime rollback baseline is exact Main `8c961b7c23f8c98f0cc3648fbe3849688c0763b2`, Production release 7.5.6.9, Pages run `35046620364`, and migration 42. Runtime rollback may restore that code while retaining every Confidence Pool week, entry, pick, audit, snapshot, yearly schedule, capture/report, export URL, Discord thread record, season/game-year record, and blocked/null Free Agent state.
+
+Do not clear or resubmit Confidence Pool entries, restore a D1 bookmark, reset/delete data, run a Madden export/import, move an active snapshot, create scheduling threads, rotate the export URL, archive/transition a season, or reinterpret blocked Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.6.9 Schedule-integrated Confidence Pool impact
 
 This code-only release moves the existing server-backed Confidence Pool controls into each regular-season schedule matchup and restores season/weekly Confidence Pool rankings to live Standings. It adds graded-pick and correct-percentage response fields derived from already-stored entries and final game results. It changes no database schema or stored scoring rule: correct picks still earn their assigned confidence, ties still earn half-confidence, and upcoming games remain ungraded.

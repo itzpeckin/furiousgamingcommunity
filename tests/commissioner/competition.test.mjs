@@ -120,7 +120,7 @@ test('Game of the Week and Confidence Pool are tenant-scoped, shared, and commis
     const initial = await getCompetition(context(db,'owner-token'));
     const initialPayload = await initial.json();
     assert.equal(initial.status,200,JSON.stringify(initialPayload));
-    assert.equal(initialPayload.release,'7.5.6.9');
+    assert.equal(initialPayload.release,'7.5.6.10');
     assert.equal(initialPayload.games.length,2);
 
     const forbidden = await postCompetition(context(db,'owner-token','POST',{
@@ -196,4 +196,6 @@ test('Schedule and live Standings expose the integrated Confidence Pool experien
   assert.match(styles,/schedule-integrated Confidence Pool/);
   assert.match(styles,/\.game-card__confidence\{display:grid/);
   assert.match(styles,/@media\(max-width:760px\)[\s\S]*\.game-card__confidence\{grid-template-columns:1fr\}/);
+  assert.match(styles,/\.confidence-standings-shell,\s*\.confidence-standings-shell>\.card,\s*\.confidence-standings-toolbar>div\{min-width:0\}/);
+  assert.match(styles,/\.confidence-standings-shell>\.card>\.table-wrap\{width:100%;max-width:100%;overflow-x:auto\}/);
 });

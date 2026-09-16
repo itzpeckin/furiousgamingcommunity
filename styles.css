@@ -7963,7 +7963,7 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
   .roster-management-list{flex:none;max-height:210px}
 }
 
-/* FranchiseHQ 7.5.6.9 — schedule-integrated Confidence Pool */
+/* FranchiseHQ 7.5.6.10 — schedule-integrated Confidence Pool */
 .schedule-confidence-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px 20px;margin:0 0 14px;padding:20px}
 .schedule-confidence-head h2{margin:4px 0 6px;font-size:1.2rem}
 .schedule-confidence-head p{margin:0;max-width:720px;color:var(--muted)}
@@ -7997,3 +7997,11 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
   .game-card__confidence .confidence-team-choice button{min-height:46px}
   .game-card__confidence .confidence-value select{min-height:46px}
 }
+
+/* FranchiseHQ 7.5.6.10 — contain wide Confidence Pool standings on phones */
+.confidence-standings-shell,
+.confidence-standings-shell>.card,
+.confidence-standings-toolbar>div{min-width:0}
+.confidence-standings-shell>.card{max-width:100%}
+.confidence-standings-shell>.card>.table-wrap{width:100%;max-width:100%;overflow-x:auto}
+.confidence-standings-toolbar p{overflow-wrap:anywhere}

@@ -7,7 +7,7 @@ import { currentFranchiseContext } from '../../../_lib/ownership-periods.js';
 import { playerOwnershipStatement } from '../../../_lib/roster-ownership.js';
 import { createTenantAuditContext,tenantAuditStatement } from '../../../_lib/tenant-context.js';
 
-const RELEASE='7.5.6.9';
+const RELEASE='7.5.6.10';
 const clean=(value,max=160)=>String(value??'').trim().slice(0,max);
 const parse=value=>{try{return JSON.parse(value || '{}')}catch{return{}}};
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results || [];

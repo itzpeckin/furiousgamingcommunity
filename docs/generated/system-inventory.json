@@ -178,11 +178,11 @@
     },
     "largest": [
       {
-        "bytes": 644704,
+        "bytes": 644705,
         "file": "app.js"
       },
       {
-        "bytes": 551723,
+        "bytes": 552111,
         "file": "styles.css"
       },
       {
@@ -198,7 +198,7 @@
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 130713,
+        "bytes": 130715,
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
@@ -210,7 +210,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75294,
+        "bytes": 75318,
         "file": "index.html"
       },
       {
@@ -238,15 +238,15 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 43000,
+        "bytes": 43001,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 40526,
+        "bytes": 40527,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 39584,
+        "bytes": 39585,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
@@ -1603,7 +1603,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.6.9",
+  "release": "7.5.6.10",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
