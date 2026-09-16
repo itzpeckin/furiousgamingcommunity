@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 15, 2026
+**Updated:** September 16, 2026
 
-**Revision:** 2.67
+**Revision:** 2.68
 
-**Current production:** FranchiseHQ 7.5.6.9 is live from candidate `8f3a35b8ef4063cdc0125ba55e8ed55beda6d18c`, PR #111, code Main `8c961b7c23f8c98f0cc3648fbe3849688c0763b2`, and Pages run `35046620364`. Migration 42 remains applied. Signed-in acceptance confirms the Schedule-integrated Confidence Pool and server-backed Standings leaderboard on desktop; phone acceptance confirmed Schedule composition and identified one contained Standings overflow defect.
+**Current production:** FranchiseHQ 7.5.6.10 is live from candidate `6242cc3`, PR #112, and code Main `9d3a021e22a9d93aa329bfcbfde48592b358d74f`. Migration 42 remains applied. The Confidence Pool remains schedule-integrated and its Standings card is contained at phone width.
 
-**Current work:** 7.5.6.10 constrains the Confidence Pool Standings toolbar and table card to the phone viewport while retaining an internal horizontal table scroller. This is a presentation-only follow-up to 7.5.6.9; scoring, picks, imports, snapshots, threads, and stored data are unchanged.
+**Current work:** 7.5.6.11 removes the cap-hit magnitude cutoff that misread Nick Bosa's retained `5485` value as $5.485M instead of $54.85M. Contract units are now selected from explicit export-format metadata or proven contract relationships, never from the size of the cap hit; future roster mappings retain that unit metadata.
 
-**Next gate:** Validate and publish 7.5.6.10, then repeat signed-in read-only phone acceptance and prove the document, standings shell, toolbar, and table wrapper remain within 390px while the wide leaderboard alone scrolls internally. No migration, Madden export/import, pick submission, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
+**Next gate:** Validate and publish 7.5.6.11, then perform signed-in read-only Production acceptance against Nick Bosa and the other high-cap players. No migration, Madden export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
 
 ## Product decisions
 
@@ -120,7 +120,8 @@
 | 7.5.6.7 | Production; superseded by 7.5.6.8 correction | Proved the retained All Weeks opening as Week 1 and activated the full 272-game schedule; follow-up found 32 cumulative team rows admitted by misleading payload-period fields |
 | 7.5.6.8 | Production; owner accepted | Make ordinary nonzero statistics routes authoritative, retain Week 0 sentinel payload handling, and recompose the same retained Week 1 source with zero preseason/cumulative statistics |
 | 7.5.6.9 | Production deployed; superseded by 7.5.6.10 phone containment | Integrate Confidence Pool picks directly into Schedule and publish server-scored season/weekly Confidence Pool standings with correct percentage |
-| 7.5.6.10 | Validated Production-authorized candidate | Keep the Confidence Pool Standings toolbar and table container within the phone viewport while the wide result columns scroll internally |
+| 7.5.6.10 | Production | Keep the Confidence Pool Standings toolbar and table container within the phone viewport while the wide result columns scroll internally |
+| 7.5.6.11 | Validated Production-authorized candidate | Remove cap-hit magnitude guessing, correct retained Madden contract values at any size, and stamp future roster snapshots with proven unit metadata |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -146,6 +147,7 @@
 | 10c | Immediate remediation | 7.5.6.8 | Enforce ordinary statistics-route authority, rebuild the exact retained Week 1 package without the Week 2 cumulative team rows, and atomically supersede the live snapshot without new schedule threads. |
 | 10d | Production deployed | 7.5.6.9 | Put Confidence Pool picks inside each schedule matchup and expose accurate season/weekly pool standings from finalized results. |
 | 10e | Immediate presentation patch | 7.5.6.10 | Contain the live Confidence Pool Standings layout at phone width without changing the leaderboard or stored picks. |
+| 10f | Immediate contract correction | 7.5.6.11 | Normalize Madden contract currency by source format rather than cap-hit magnitude, with no numeric ceiling and no data rewrite. |
 | 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
@@ -689,6 +691,15 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Presentation-only release: no scoring, pick, API, schema, import, snapshot, Discord, season, identity, or Free Agent behavior changes.
 - Gate: focused UI regression, complete repository suite, strict release checks, exact Main deployment, and signed-in 390px Production measurements all pass.
 
+## 7.5.6.11 — Contract Currency Format Authority
+
+- Remove the `5000` cap-hit cutoff that treated larger Madden values as a different unit and reduced current high-value contracts by a factor of ten.
+- Select contract units from explicit mapper metadata or a proven source relationship between cap hit, release penalty, and net release savings. The cap-hit amount itself never selects the unit and has no maximum.
+- Correct retained snapshots at read time without rewriting them. Nick Bosa's current retained `5485` value resolves to $54.85M; `10000` resolves to $100M and higher values continue linearly.
+- Stamp the proven dataset-wide unit into future roster mapping records. Conflicting or unprovable future source formats stop safely before candidate publication instead of silently guessing.
+- Code-only release: no migration, export/import, snapshot activation, thread creation, reset, deletion, URL rotation, archive/transition, or Free Agent state change.
+- Gate: focused retained/current/boundary regressions, complete repository suite, strict release checks, exact Main deployment, and signed-in read-only Production contract acceptance all pass.
+
 ## 7.5.6.1 — Cross-Surface Trade Review Synchronization
 
 The 7.5.6.1 intervening patch makes every committee vote refresh all known current trade copies from the shared server tally. It preserves trade business rules and card design, uses existing durable outbox payload references without migration, keeps reviewer DMs active, converges concurrent votes, and supplies a lightweight open-site status refresh. Real Discord delivery acceptance remains owner-operated; no live vote is cast during code-only publication.
@@ -746,6 +757,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.68:** Began standing-authorized 7.5.6.11 from exact Main `9d3a021`. Production evidence proved Nick Bosa's retained Madden fields encode a $54.85M cap hit (`5485`) with $22.18M release penalty plus $32.67M net savings, while the runtime's `5000` cutoff displayed $5.485M. The candidate removes cap-hit magnitude inference, adds dataset-level format evidence and future mapper metadata, preserves legacy thousand-unit compatibility, and covers $54.85M, $100M, and $250M without a ceiling. No migration, Production data write, export/import, snapshot/thread operation, reset, deletion, archive/transition, URL rotation, credential/membership/assignment change, Discord configuration/registration, or Free Agent reinterpretation occurred during implementation.
 
 - **Revision 2.67:** Published 7.5.6.9 candidate `8f3a35b` through PR #111 as Main `8c961b7` with all four pull-request checks, Main quality run `35046621120`, and Pages run `35046620364` passing. Signed-in Production acceptance confirmed release 7.5.6.9, integrated Schedule controls, and the Confidence Pool Standings fields without changing picks or league data. The 390px phone check found the Standings toolbar/table card inheriting the table's roughly 900px minimum width. Follow-up 7.5.6.10 contains the card and toolbar while keeping the table internally scrollable; no data operation occurred.
 

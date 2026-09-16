@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.6.11",
+  "releaseType": "contract-currency-format-authority",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.6.10",
+    "commit": "9d3a021e22a9d93aa329bfcbfde48592b358d74f",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-contract-units",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true,"status": "authorized-not-run"},
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.6.10",
+    "candidateRelease": "7.5.6.11",
+    "currentCommit": "9d3a021e22a9d93aa329bfcbfde48592b358d74f",
+    "currentMigration": 42,
+    "candidateMigration": 42,
+    "scope": "Code-only Madden contract currency-format authority. No database write, export/import, snapshot, thread, reset, deletion, URL, season, Discord, identity, or Free Agent operation."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/live-data-experience.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-players.js",
+    "tests/import/live-data-experience.test.mjs",
+    "releases/7.5.6.11/release-record.md",
+    "releases/7.5.6.11/validation-evidence.json"
+  ]
+}
