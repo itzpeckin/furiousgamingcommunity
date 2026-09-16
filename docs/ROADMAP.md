@@ -6,13 +6,13 @@
 
 **Updated:** September 15, 2026
 
-**Revision:** 2.64
+**Revision:** 2.65
 
-**Current production:** FranchiseHQ 7.5.6.6 is live from candidate `a7bb4eb0bba365beb22bc259141098adaa4f2df7`, PR #108, and code Main `9c968e3e0348d607f37addc3dd2f9d786ed63f8d`. Migration 42 remains applied. The commissioner completed **Import Yearly Schedule** for all 18 regular-season weeks and 272 games; that immutable catalog and every source capture remain retained.
+**Current production:** FranchiseHQ 7.5.6.7 is live from candidate `9a0541b0f786a9c75fe4d725023e9e4b4acf16fd`, PR #109, code Main `b27a791c9171b24b1879f4e60e59934312d3bb63`, and Pages deployment `00156068-d518-4cea-9ad4-95c60a0ab4fc`. Migration 42 remains applied. The retained All Weeks source activated 2027 Regular Season Week 1 snapshot `512d2196-338b-4ab9-8f6d-51128c9d036b` with the complete 272-game schedule. Production acceptance then identified 32 cumulative `team-game` rows from the ordinary Week 2 team route in that snapshot; no player-stat rows were imported and the previous snapshot remains retained.
 
-**Current work:** 7.5.6.7 closes the final Production-shaped Week 1 boundary exposed after 7.5.6.6 reanalysis. The retained 179-route package has empty player-stat routes for every regular-season week, while one Week 2 team-summary route contains 32 cumulative preseason-era records. That aggregate alone must not advance the league clock or enter the Week 1 snapshot. The active snapshot, completed yearly catalog, malformed and previous candidates/snapshots, raw captures, and audits remain retained.
+**Current work:** 7.5.6.8 makes every ordinary nonzero statistics route authoritative for its own period. The retained `/week/reg/2/team` route therefore stays Week 2 and remains outside the proven Week 1 candidate even though its cumulative payload contains misleading Week 1 fields. Only the established `/week/.../0/` sentinel may use a playable payload period. Mapping revision v6 permits one exact-source recomposition from the already-retained package.
 
-**Next gate:** Validate and publish 7.5.6.7, reanalyze the exact retained cohort, verify that it proves Regular Season Week 1, then run the already-authorized import through atomic 2027 Week 1 activation. The full 18-week schedule must remain visible, future team summaries/statistics must stay outside the live candidate, and no new Madden export, reset, deletion, URL rotation, season operation, Discord synchronization outside the proven week, or blocked-Free-Agent reinterpretation is permitted.
+**Next gate:** Validate and publish 7.5.6.8, reanalyze the exact retained cohort, and atomically supersede the current Week 1 snapshot with a corrected Week 1 snapshot containing 272 games and zero preseason/cumulative statistics. Snapshot `512d2196-338b-4ab9-8f6d-51128c9d036b`, previous snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0`, malformed evidence, captures, and audits must remain retained. No new Madden export, reset, deletion, URL rotation, season operation, new scheduling threads, or blocked-Free-Agent reinterpretation is permitted.
 
 ## Product decisions
 
@@ -117,7 +117,8 @@
 | 7.5.6.4 | Production deployed; Archive Season pending commissioner action | Freeze source-backed 2026 player/GM history, carry reviewed assignments into the prepared 2027 season, and separate Madden years left from total contract length |
 | 7.5.6.5 | Production deployed; yearly collection accepted | Reusable Import Yearly Schedule collection for 18 regular-season weeks, immutable 272-game revision, weekly-import interlock, and later current-period overlay without collection-time snapshot or Discord work |
 | 7.5.6.6 | Validated Production-authorized candidate | Reuse the retained All Weeks weekly cohort by deriving Week 1 from populated statistics and treating verified-empty future statistics routes as placeholders rather than missing required data |
-| 7.5.6.7 | Validated Production-authorized candidate | Prevent cumulative team-summary rows from advancing the current week, prove an all-empty player-stat All Weeks opening as Week 1, and exclude future statistics from the Week 1 candidate |
+| 7.5.6.7 | Production; superseded by 7.5.6.8 correction | Proved the retained All Weeks opening as Week 1 and activated the full 272-game schedule; follow-up found 32 cumulative team rows admitted by misleading payload-period fields |
+| 7.5.6.8 | Validated Production-authorized candidate | Make ordinary nonzero statistics routes authoritative, retain Week 0 sentinel payload handling, and recompose the same retained Week 1 source with zero preseason/cumulative statistics |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -140,6 +141,7 @@
 | 10 | Production deployed; yearly collection accepted | 7.5.6.5 | Collect the complete season schedule through **Import Yearly Schedule** while the latest accepted weekly import alone controls the current period; collection creates no snapshots or matchup threads. |
 | 10a | Immediate remediation | 7.5.6.6 | Reuse the retained All Weeks weekly export, keep the 18-week schedule visible, activate only proven Week 1, and reject malformed non-empty statistics without requiring another export. |
 | 10b | Immediate remediation | 7.5.6.7 | Treat team summaries as non-clock aggregates, scope mapped statistics to the proven current period, and activate the retained 2027 Week 1 package without another export. |
+| 10c | Immediate remediation | 7.5.6.8 | Enforce ordinary statistics-route authority, rebuild the exact retained Week 1 package without the Week 2 cumulative team rows, and atomically supersede the live snapshot without new schedule threads. |
 | 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
@@ -659,6 +661,14 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Automatically reanalyze an otherwise-ready retained report when the discovery policy changes, so this correction can reuse the exact existing 179-route export rather than requiring another Madden export.
 - Gate: reproduce the Production-shaped All Weeks package, prove Week 1, retain the 272-game/18-week horizon, exclude 124 empty future routes from required mapping, preserve blocked Free Agents as unknown/null, and pass the complete strict suite before publication and retained-cohort retry.
 
+## 7.5.6.8 — Statistics Route-Authority Correction
+
+- Ordinary `/week/{stage}/{week>0}/{category}` statistics routes own their stage and week even when a cumulative row embeds a different period. Only a Week 0 sentinel route may use a playable payload period, preserving the established All Weeks sentinel remediation and empty-placeholder behavior.
+- Under a proven Week 1 candidate, the retained `/week/reg/2/team` route is a future route and is skipped. The batch manifest records Week 2 rather than the misleading embedded Week 1 value, so candidate scope and mapped provenance use the same authority rule.
+- Mapping revision v6 creates a new candidate from the exact retained cohort without another export. Same-week history carry-forward cannot reintroduce the current snapshot's 32 affected rows; the completed yearly schedule continues to supply all 272 games across 18 weeks.
+- The corrected activation must preserve current snapshot `512d2196-338b-4ab9-8f6d-51128c9d036b`, previous snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0`, every malformed/failed candidate, capture, R2 object, mapping run, lifecycle event, and audit. It must not reset/delete data, rotate the permanent URL, archive/transition a season, create new scheduling threads for a same-week retry, or interpret blocked Free Agents as zero.
+- Gate: the Production-shaped regression proves normal nonzero route authority and Week 0 sentinel payload authority, all focused/repository/strict checks pass, and Production acceptance confirms Season 2027 Week 1, 272 games, zero statistic rows, the full schedule visible, retained prior snapshots, unchanged blocked/null Free Agents, and zero foreign-key violations.
+
 ## 7.5.6.1 — Cross-Surface Trade Review Synchronization
 
 The 7.5.6.1 intervening patch makes every committee vote refresh all known current trade copies from the shared server tally. It preserves trade business rules and card design, uses existing durable outbox payload references without migration, keeps reviewer DMs active, converges concurrent votes, and supplies a lightweight open-site status refresh. Real Discord delivery acceptance remains owner-operated; no live vote is cast during code-only publication.
@@ -716,6 +726,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.65:** Published 7.5.6.7 candidate `9a0541b` through PR #109 as Main `b27a791` and Pages deployment `00156068-d518-4cea-9ad4-95c60a0ab4fc`, then reused the retained All Weeks source to atomically activate 2027 Week 1 snapshot `512d2196-338b-4ab9-8f6d-51128c9d036b` with all 272 schedule games. Post-activation audit found 32 cumulative `team-game` rows from `/week/reg/2/team` admitted because the mapper preferred misleading payload fields over its ordinary nonzero route; no player statistics were imported. Follow-up 7.5.6.8 restores normal statistics-route authority, preserves Week 0 sentinel handling, bumps the mapping revision for exact retained-source recomposition, and will replace those 32 rows with zero current-season statistics while retaining both current and previous snapshots, captures, audits, URL, season state, Discord state, and blocked/null Free Agents.
 
 - **Revision 2.63:** Diagnosed the first post-archive 2027 weekly import without modifying Production data. The retained 179-route All Weeks cohort includes 272 schedule games and usable Week 1 statistics; 124 verified-empty future statistics routes were incorrectly counted as Week 2–18 current-period evidence, producing a false Week 18 source and a safe map-statistics failure. Local 7.5.6.6 makes populated statistics authoritative for the current period, separates future empty placeholders from effective coverage, retains strict malformed-payload blocking, and permits current-policy reanalysis of the exact retained cohort. The active 2026 snapshot, completed yearly schedule, failed candidate, prior/malformed snapshots, captures, audits, URL, season state, Discord state, and blocked/null Free Agent result remain retained.
 
