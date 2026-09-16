@@ -7,7 +7,7 @@ import {
   tenantAuditStatement
 } from '../../../_lib/tenant-context.js';
 
-const RELEASE = '7.5.6.8';
+const RELEASE = '7.5.6.9';
 const MAX_BODY_BYTES = 16 * 1024;
 const SAFE_GAME_ID = /^[A-Za-z0-9._:-]{1,180}$/;
 const SAFE_TEAM_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -161,30 +161,66 @@ function leaderboard(entryRows, pickRows, games, members) {
   const gameMap = new Map(games.map(game => [game.id, game]));
   const entryMap = new Map(entryRows.map(entry => [entry.id, entry]));
   const userScores = new Map();
+  for (const entry of entryRows) {
+    if (entry.status !== 'submitted') continue;
+    const row = userScores.get(entry.userId) || {
+      userId:entry.userId,totalPoints:0,correctPicks:0,gradedPicks:0,
+      incorrectPicks:0,tiedPicks:0,totalPicks:0,remainingPossiblePoints:0,
+      submittedWeeks:0,weeks:{},status:'draft'
+    };
+    row.status = 'submitted';
+    row.submittedWeeks += 1;
+    userScores.set(entry.userId, row);
+  }
   for (const pick of pickRows) {
     const entry = entryMap.get(pick.entryId);
     const game = gameMap.get(pick.gameId);
-    if (!entry || !game || !pick.selectedTeamId) continue;
-    const row = userScores.get(entry.userId) || {userId:entry.userId,totalPoints:0,correctPicks:0,weeks:{},status:'draft'};
+    if (!entry || entry.status !== 'submitted' || !game || !pick.selectedTeamId) continue;
+    const row = userScores.get(entry.userId) || {
+      userId:entry.userId,totalPoints:0,correctPicks:0,gradedPicks:0,
+      incorrectPicks:0,tiedPicks:0,totalPicks:0,remainingPossiblePoints:0,
+      submittedWeeks:0,weeks:{},status:'draft'
+    };
     const gameWinner = winner(game);
     const value = Number(pick.confidenceValue || 0);
     const points = !gameWinner ? 0 : gameWinner === 'tie' ? value / 2 : gameWinner === pick.selectedTeamId ? value : 0;
-    if (gameWinner && gameWinner !== 'tie' && gameWinner === pick.selectedTeamId) row.correctPicks += 1;
+    row.totalPicks += 1;
+    if (!gameWinner) row.remainingPossiblePoints += value;
+    else if (gameWinner === 'tie') row.tiedPicks += 1;
+    else {
+      row.gradedPicks += 1;
+      if (gameWinner === pick.selectedTeamId) row.correctPicks += 1;
+      else row.incorrectPicks += 1;
+    }
     row.totalPoints += points;
-    const week = row.weeks[entry.weekIndex] || {week:Number(entry.weekIndex),points:0,correct:0,finalGames:0};
+    const week = row.weeks[entry.weekIndex] || {
+      week:Number(entry.weekIndex),points:0,correct:0,gradedPicks:0,
+      incorrectPicks:0,tiedPicks:0,totalPicks:0,finalGames:0
+    };
     week.points += points;
-    if (gameWinner) week.finalGames += 1;
-    if (gameWinner && gameWinner !== 'tie' && gameWinner === pick.selectedTeamId) week.correct += 1;
+    week.totalPicks += 1;
+    if (gameWinner) {
+      week.finalGames += 1;
+      if (gameWinner === 'tie') week.tiedPicks += 1;
+      else {
+        week.gradedPicks += 1;
+        if (gameWinner === pick.selectedTeamId) week.correct += 1;
+        else week.incorrectPicks += 1;
+      }
+    }
     row.weeks[entry.weekIndex] = week;
-    if (entry.status === 'submitted') row.status = 'submitted';
     userScores.set(entry.userId, row);
   }
   const memberMap = new Map(members.map(member => [member.userId, member]));
   return [...userScores.values()].map(row => ({
     ...row,
+    correctPercentage:row.gradedPicks ? Number(((row.correctPicks / row.gradedPicks) * 100).toFixed(1)) : 0,
     name:memberMap.get(row.userId)?.displayName || 'League Member',
     teamId:memberMap.get(row.userId)?.teamId || null,
-    weeks:Object.values(row.weeks).sort((a,b) => a.week - b.week)
+    weeks:Object.values(row.weeks).sort((a,b) => a.week - b.week).map(week => ({
+      ...week,
+      correctPercentage:week.gradedPicks ? Number(((week.correct / week.gradedPicks) * 100).toFixed(1)) : 0
+    }))
   })).sort((a,b) => b.totalPoints - a.totalPoints || b.correctPicks - a.correctPicks || a.name.localeCompare(b.name));
 }
 

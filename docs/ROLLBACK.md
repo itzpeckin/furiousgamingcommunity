@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.6.9 Schedule-integrated Confidence Pool impact
+
+This code-only release moves the existing server-backed Confidence Pool controls into each regular-season schedule matchup and restores season/weekly Confidence Pool rankings to live Standings. It adds graded-pick and correct-percentage response fields derived from already-stored entries and final game results. It changes no database schema or stored scoring rule: correct picks still earn their assigned confidence, ties still earn half-confidence, and upcoming games remain ungraded.
+
+The runtime rollback baseline is exact Main `0d1018438772b5227364187692d2bd256bacb867`, Production release 7.5.6.8, and migration 42. Runtime rollback may restore that code while retaining every Confidence Pool week, entry, pick, audit, active/prior/malformed snapshot, yearly schedule, export capture/report, permanent URL, Discord thread record, season/game-year record, and blocked/null Free Agent state.
+
+Do not clear or resubmit Confidence Pool entries, restore a D1 bookmark, reset/delete data, run a Madden export/import, move an active snapshot, create scheduling threads, rotate the export URL, archive/transition a season, or reinterpret blocked Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.6.8 statistics route-authority correction impact
 
 This code-only correction makes every ordinary nonzero statistics route authoritative for its stage and week while preserving payload-period resolution for Week 0 sentinel routes. It adds no migration. Mapping revision v6 may recompose the exact retained All Weeks package into a new 2027 Week 1 snapshot with all 272 yearly-schedule games and without the 32 cumulative Week 2 team rows admitted by 7.5.6.7.

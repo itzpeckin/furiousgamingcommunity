@@ -6,13 +6,13 @@
 
 **Updated:** September 15, 2026
 
-**Revision:** 2.65
+**Revision:** 2.66
 
-**Current production:** FranchiseHQ 7.5.6.7 is live from candidate `9a0541b0f786a9c75fe4d725023e9e4b4acf16fd`, PR #109, code Main `b27a791c9171b24b1879f4e60e59934312d3bb63`, and Pages deployment `00156068-d518-4cea-9ad4-95c60a0ab4fc`. Migration 42 remains applied. The retained All Weeks source activated 2027 Regular Season Week 1 snapshot `512d2196-338b-4ab9-8f6d-51128c9d036b` with the complete 272-game schedule. Production acceptance then identified 32 cumulative `team-game` rows from the ordinary Week 2 team route in that snapshot; no player-stat rows were imported and the previous snapshot remains retained.
+**Current production:** FranchiseHQ 7.5.6.8 is live from candidate `225c32428ad619551de9a02a6856ec27360bae64`, PR #110, and code Main `0d1018438772b5227364187692d2bd256bacb867`. Migration 42 remains applied. The owner accepted the corrected 2027 Week 1 import, complete 18-week schedule, and Week 1 scheduling-thread workflow.
 
-**Current work:** 7.5.6.8 makes every ordinary nonzero statistics route authoritative for its own period. The retained `/week/reg/2/team` route therefore stays Week 2 and remains outside the proven Week 1 candidate even though its cumulative payload contains misleading Week 1 fields. Only the established `/week/.../0/` sentinel may use a playable payload period. Mapping revision v6 permits one exact-source recomposition from the already-retained package.
+**Current work:** 7.5.6.9 incorporates Confidence Pool winner/confidence selection into each regular-season schedule matchup and restores the server-backed Confidence Pool leaderboard to the live Standings page. Season and weekly results show confidence points, correct picks, graded picks, correct percentage, weekly wins, weekly average, and best week. Unplayed games never lower accuracy; tied finals retain half-confidence scoring and remain outside the correct-percentage denominator.
 
-**Next gate:** Validate and publish 7.5.6.8, reanalyze the exact retained cohort, and atomically supersede the current Week 1 snapshot with a corrected Week 1 snapshot containing 272 games and zero preseason/cumulative statistics. Snapshot `512d2196-338b-4ab9-8f6d-51128c9d036b`, previous snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0`, malformed evidence, captures, and audits must remain retained. No new Madden export, reset, deletion, URL rotation, season operation, new scheduling threads, or blocked-Free-Agent reinterpretation is permitted.
+**Next gate:** Publish 7.5.6.9 through the standing-authorized pull request, Main, and Production cycle, then perform signed-in read-only desktop and phone acceptance of Schedule and Standings. No migration, Madden export/import, pick submission, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
 
 ## Product decisions
 
@@ -118,7 +118,8 @@
 | 7.5.6.5 | Production deployed; yearly collection accepted | Reusable Import Yearly Schedule collection for 18 regular-season weeks, immutable 272-game revision, weekly-import interlock, and later current-period overlay without collection-time snapshot or Discord work |
 | 7.5.6.6 | Validated Production-authorized candidate | Reuse the retained All Weeks weekly cohort by deriving Week 1 from populated statistics and treating verified-empty future statistics routes as placeholders rather than missing required data |
 | 7.5.6.7 | Production; superseded by 7.5.6.8 correction | Proved the retained All Weeks opening as Week 1 and activated the full 272-game schedule; follow-up found 32 cumulative team rows admitted by misleading payload-period fields |
-| 7.5.6.8 | Validated Production-authorized candidate | Make ordinary nonzero statistics routes authoritative, retain Week 0 sentinel payload handling, and recompose the same retained Week 1 source with zero preseason/cumulative statistics |
+| 7.5.6.8 | Production; owner accepted | Make ordinary nonzero statistics routes authoritative, retain Week 0 sentinel payload handling, and recompose the same retained Week 1 source with zero preseason/cumulative statistics |
+| 7.5.6.9 | Validated Production-authorized candidate | Integrate Confidence Pool picks directly into Schedule and publish server-scored season/weekly Confidence Pool standings with correct percentage |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -142,6 +143,7 @@
 | 10a | Immediate remediation | 7.5.6.6 | Reuse the retained All Weeks weekly export, keep the 18-week schedule visible, activate only proven Week 1, and reject malformed non-empty statistics without requiring another export. |
 | 10b | Immediate remediation | 7.5.6.7 | Treat team summaries as non-clock aggregates, scope mapped statistics to the proven current period, and activate the retained 2027 Week 1 package without another export. |
 | 10c | Immediate remediation | 7.5.6.8 | Enforce ordinary statistics-route authority, rebuild the exact retained Week 1 package without the Week 2 cumulative team rows, and atomically supersede the live snapshot without new schedule threads. |
+| 10d | In progress | 7.5.6.9 | Put Confidence Pool picks inside each schedule matchup and expose accurate season/weekly pool standings from finalized results. |
 | 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
@@ -669,6 +671,15 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - The corrected activation must preserve current snapshot `512d2196-338b-4ab9-8f6d-51128c9d036b`, previous snapshot `8a71d810-7e7c-475a-b471-e1babdc8d7a0`, every malformed/failed candidate, capture, R2 object, mapping run, lifecycle event, and audit. It must not reset/delete data, rotate the permanent URL, archive/transition a season, create new scheduling threads for a same-week retry, or interpret blocked Free Agents as zero.
 - Gate: the Production-shaped regression proves normal nonzero route authority and Week 0 sentinel payload authority, all focused/repository/strict checks pass, and Production acceptance confirms Season 2027 Week 1, 272 games, zero statistic rows, the full schedule visible, retained prior snapshots, unchanged blocked/null Free Agents, and zero foreign-key violations.
 
+## 7.5.6.9 — Schedule-Integrated Confidence Pool
+
+- Render the existing server-backed winner and confidence controls inside each regular-season schedule matchup, with one weekly progress, clear, and submit header above the schedule. Remove the duplicate matchup list formerly placed below the schedule.
+- Preserve all existing week-window, unique-confidence, submission-lock, tenant, and audit rules. Values already assigned to another matchup are visibly unavailable, and Schedule remains available when a guest cannot load private competition state.
+- Restore **Confidence Pool** as a live Standings view. Provide season and weekly leaderboards with confidence points, correct picks, graded picks, correct percentage, weekly wins, weekly average, and best week.
+- Score only submitted weekly entries. Calculate correct percentage only from finalized non-tie picks in those entries. Upcoming games are not incorrect; a tied final continues earning half of its confidence value and is excluded from the accuracy denominator.
+- Code-only release: no migration, export/import, snapshot activation, thread creation, pick submission, reset, deletion, URL rotation, archive/transition, or Free Agent state change.
+- Gate: focused competition/UI tests, complete repository suite, strict release checks, phone/desktop composition, exact Main deployment, and signed-in read-only Production acceptance all pass.
+
 ## 7.5.6.1 — Cross-Surface Trade Review Synchronization
 
 The 7.5.6.1 intervening patch makes every committee vote refresh all known current trade copies from the shared server tally. It preserves trade business rules and card design, uses existing durable outbox payload references without migration, keeps reviewer DMs active, converges concurrent votes, and supplies a lightweight open-site status refresh. Real Discord delivery acceptance remains owner-operated; no live vote is cast during code-only publication.
@@ -726,6 +737,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.66:** Began the standing-authorized 7.5.6.9 code-only release from exact Main `0d10184`. Schedule now composes Confidence Pool winner/confidence controls inside every regular-season matchup instead of duplicating the games at the bottom. Live Standings now exposes server-backed season and weekly Confidence Pool rankings with correct and graded pick counts plus correct percentage; unplayed games do not reduce accuracy, and tied finals retain half-confidence scoring outside the accuracy denominator. Focused validation passes 8/8, the complete repository suite passes 263/263, and the consolidated strict gate passes 251/251. No migration, Production data write, export/import, snapshot/thread operation, pick submission, reset, deletion, archive/transition, URL rotation, credential/membership/assignment change, Discord configuration/registration, or Free Agent reinterpretation occurred during implementation.
 
 - **Revision 2.65:** Published 7.5.6.7 candidate `9a0541b` through PR #109 as Main `b27a791` and Pages deployment `00156068-d518-4cea-9ad4-95c60a0ab4fc`, then reused the retained All Weeks source to atomically activate 2027 Week 1 snapshot `512d2196-338b-4ab9-8f6d-51128c9d036b` with all 272 schedule games. Post-activation audit found 32 cumulative `team-game` rows from `/week/reg/2/team` admitted because the mapper preferred misleading payload fields over its ordinary nonzero route; no player statistics were imported. Follow-up 7.5.6.8 restores normal statistics-route authority, preserves Week 0 sentinel handling, bumps the mapping revision for exact retained-source recomposition, and will replace those 32 rows with zero current-season statistics while retaining both current and previous snapshots, captures, audits, URL, season state, Discord state, and blocked/null Free Agents.
 
