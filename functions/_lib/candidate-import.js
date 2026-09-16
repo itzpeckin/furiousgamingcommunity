@@ -13,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'schedule-horizon-current-period-v4';
+export const CANDIDATE_MAPPING_REVISION = 'schedule-horizon-current-period-v5';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`;
@@ -122,14 +122,16 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
   const routes = datasetInventory.map(item => ({
     datasetType: String(item?.datasetType || item?.dataset_type || ''),
     routePath: String(item?.routePath || item?.route_path || ''),
+    category:String(item?.routePath || item?.route_path || '').split('/').filter(Boolean).at(-1)?.toLowerCase()||null,
     periods:periodsFromInventoryItem(item),
     recordCount:Number.isFinite(Number(item?.recordCount??item?.record_count))
       ?Number(item?.recordCount??item?.record_count):null
   }));
   const schedulePeriods=uniquePeriods(routes.filter(item=>item.datasetType==='schedule').flatMap(item=>item.periods));
-  const allStatisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics').flatMap(item=>item.periods));
-  const populatedStatisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics'
-    &&(item.recordCount===null||item.recordCount>0)).flatMap(item=>item.periods));
+  const clockStatisticsRoutes=routes.filter(item=>item.datasetType==='statistics'&&item.category!=='team');
+  const allStatisticsPeriods=uniquePeriods(clockStatisticsRoutes.flatMap(item=>item.periods));
+  const populatedStatisticsPeriods=uniquePeriods(clockStatisticsRoutes
+    .filter(item=>item.recordCount===null||item.recordCount>0).flatMap(item=>item.periods));
   const suppliedCurrentPeriodProof=sourceMarkers.currentPeriod;
   const fallbackStatisticsPeriods=populatedStatisticsPeriods.length
     ?populatedStatisticsPeriods:allStatisticsPeriods.length===1?allStatisticsPeriods:[];
@@ -140,7 +142,9 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
   const currentPeriod=currentPeriodProof.status==='proven'?canonicalSchedulePeriod(currentPeriodProof.period):null;
   const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics'
     &&(item.recordCount===null||item.recordCount>0
-      ||item.periods.some(period=>period.key===currentPeriod?.key))).flatMap(item=>item.periods));
+      ||item.periods.some(period=>period.key===currentPeriod?.key)))
+    .flatMap(item=>item.periods)
+    .filter(period=>!currentPeriod||comparePeriods(period,currentPeriod)<=0));
   const scheduleKeys=new Set(schedulePeriods.map(period=>period.key));
   const statisticKeys=new Set(statisticsPeriods.map(period=>period.key));
   const completePeriods=uniquePeriods(schedulePeriods.filter(period=>statisticKeys.has(period.key)));

@@ -1,5 +1,11 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.6.7 Week 1 team-summary boundary impact
+
+This code-only patch prevents a cumulative team-summary route from advancing the league clock without corroborating player-stat or current-state evidence. When an All Weeks package has no regular-season player statistics yet, the full schedule and explicit empty player-stat routes prove the regular-season opening as Week 1. Candidate statistics mapping excludes routes later than that proven period, including the retained Week 2 team summary containing preseason-era records.
+
+The runtime rollback baseline is exact Main `9c968e3e0348d607f37addc3dd2f9d786ed63f8d`, Production release 7.5.6.6, and migration 42. Rollback must retain the completed 18-week/272-game yearly schedule, all 179 cohort routes and R2 objects, the failed and reanalyzed reports/candidates, every prior and malformed snapshot, every audit, the permanent export URL, game-year/season state, Discord state, and blocked/null Free Agent state. Do not restore a D1 bookmark, delete the corrected candidate or snapshot, or run another Madden export as part of rollback.
+
 ## 7.5.6.6 All Weeks weekly-import remediation impact
 
 This code-only patch changes discovery/current-period classification and statistics-route mapping. It adds no migration and must retain migration 42, the completed 18-week/272-game yearly schedule revision, every route capture/R2 object, the failed pre-fix candidate, every prior and malformed snapshot, every audit, the active pointer, the unchanged permanent export URL, and blocked/null Free Agent state.

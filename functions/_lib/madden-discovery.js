@@ -1,8 +1,8 @@
 import { maddenRoutePeriod, resolveMaddenPeriod, resolveMaddenSchedulePeriods } from './madden-period.js';
 import { compareSchedulePeriods, currentStatePeriodEvidence, proveCurrentSchedulePeriod } from './schedule-integrity.js';
 
-export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'schedule-horizon-current-period-v3';
-export const MADDEN_DISCOVERY_RELEASE = '7.5.6.6';
+export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'schedule-horizon-current-period-v4';
+export const MADDEN_DISCOVERY_RELEASE = '7.5.6.7';
 
 const DATASET_ORDER = Object.freeze([
   'league-info',
@@ -305,6 +305,8 @@ function completePeriodCoverage(analyses,currentPeriod=null) {
   for (const analysis of analyses) {
     if (!['schedule', 'statistics'].includes(analysis.datasetType)) continue;
     for(const period of analysis.periods||[]){
+      if(analysis.datasetType==='statistics'&&currentPeriod
+        &&compareSchedulePeriods(period,currentPeriod)>0)continue;
       if(analysis.datasetType==='statistics'
         && Number.isFinite(Number(analysis.recordCount))
         && Number(analysis.recordCount)<=0

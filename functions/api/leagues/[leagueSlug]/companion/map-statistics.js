@@ -5,7 +5,7 @@ import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
 import { canonicalSchedulePeriod, compareSchedulePeriods } from '../../../../_lib/schedule-integrity.js';
 
-const RELEASE='7.5.6.6';
+const RELEASE='7.5.6.7';
 const RECORD_CHUNK_SIZE=200;
 const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;
@@ -73,6 +73,13 @@ export function statisticsRouteOptionalEmpty(capture,meta,{completedRegularWeek=
     completeKeys.has(routePeriod.key)||compareSchedulePeriods(routePeriod,currentPeriod)>=0
   ))return true;
   return meta.stage==='reg'&&completedRegularWeek!==null&&Number(meta.week)>completedRegularWeek;
+}
+export function statisticsRouteOutsideCandidateScope(capture,meta,{sourceCoverage=null}={}){
+  if(!meta||sourceCoverage?.currentPeriodProof?.status!=='proven')return false;
+  const currentPeriod=canonicalSchedulePeriod(sourceCoverage.currentPeriod);
+  const routePeriod=canonicalSchedulePeriod(capture?.resolvedPeriod?.playable
+    ?capture.resolvedPeriod:{stage:canonicalStage(meta.stage),week:meta.week});
+  return Boolean(currentPeriod&&routePeriod&&compareSchedulePeriods(routePeriod,currentPeriod)>0);
 }
 function flattenMetrics(record={},prefix='',out={}){
   for(const[key,value]of Object.entries(record||{})){
@@ -346,8 +353,9 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[],sourceC
     if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
     const optionalEmpty=statisticsRouteOptionalEmpty(capture,meta,{completedRegularWeek,sourceCoverage});
+    const outsideScope=statisticsRouteOutsideCandidateScope(capture,meta,{sourceCoverage});
     const unchanged=Boolean(!forceProcessRetainedBundle && capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
-    if(unchanged||optionalEmpty)skipped++;else pending++;
+    if(unchanged||optionalEmpty||outsideScope)skipped++;else pending++;
   }
 
   await db.prepare(`INSERT INTO companion_statistics_mapping_runs
@@ -368,16 +376,17 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[],sourceC
     const meta=routeMeta(capture.route_path);if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
     const optionalEmpty=statisticsRouteOptionalEmpty(capture,meta,{completedRegularWeek,sourceCoverage});
+    const outsideScope=statisticsRouteOutsideCandidateScope(capture,meta,{sourceCoverage});
     const unchanged=Boolean(!forceProcessRetainedBundle && capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     statements.push(db.prepare(sql).bind(
       crypto.randomUUID(),runId,leagueId,capture.capture_id,capture.discovery_session_id,capture.route_path,
       capture.r2_object_key,capture.payload_hash||'',meta.category,capture.resolvedPeriod?.playable?capture.resolvedPeriod.stage:canonicalStage(meta.stage),capture.resolvedPeriod?.playable?capture.resolvedPeriod.week:meta.week,
       prior?.season_year==null?null:Number(prior.season_year),
-      (unchanged||optionalEmpty)?'skipped':capture.captureUsable?'pending':'failed',
+      (unchanged||optionalEmpty||outsideScope)?'skipped':capture.captureUsable?'pending':'failed',
       unchanged?Number(prior?.record_count||0):0,
       0,
       unchanged?Number(prior?.record_count||0):null,
-      (unchanged||optionalEmpty||!capture.captureUsable)?new Date().toISOString():null
+      (unchanged||optionalEmpty||outsideScope||!capture.captureUsable)?new Date().toISOString():null
     ));
   }
   for(let i=0;i<statements.length;i+=75)await db.batch(statements.slice(i,i+75));
@@ -385,7 +394,8 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[],sourceC
   for(const capture of routes.filter(row=>{
     if(row.captureUsable)return false;
     const meta=routeMeta(row.route_path);
-    return !statisticsRouteOptionalEmpty(row,meta,{completedRegularWeek,sourceCoverage});
+    return !statisticsRouteOptionalEmpty(row,meta,{completedRegularWeek,sourceCoverage})
+      &&!statisticsRouteOutsideCandidateScope(row,meta,{sourceCoverage});
   })){
     const diagnostic={
       error:capture.selectionError||'No usable statistics capture found.',
@@ -405,7 +415,8 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[],sourceC
     unusableRoutes:routes.filter(row=>{
       if(row.captureUsable)return false;
       const meta=routeMeta(row.route_path);
-      return !statisticsRouteOptionalEmpty(row,meta,{completedRegularWeek,sourceCoverage});
+      return !statisticsRouteOptionalEmpty(row,meta,{completedRegularWeek,sourceCoverage})
+        &&!statisticsRouteOutsideCandidateScope(row,meta,{sourceCoverage});
     }).map(row=>({
       routePath:row.route_path,
       error:row.selectionError,
