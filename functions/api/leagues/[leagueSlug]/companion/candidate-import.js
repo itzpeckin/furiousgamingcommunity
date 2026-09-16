@@ -24,7 +24,7 @@ import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
 import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 
-const RELEASE = '7.5.6.5';
+const RELEASE = '7.5.6.6';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {

@@ -1,8 +1,8 @@
 import { maddenRoutePeriod, resolveMaddenPeriod, resolveMaddenSchedulePeriods } from './madden-period.js';
 import { compareSchedulePeriods, currentStatePeriodEvidence, proveCurrentSchedulePeriod } from './schedule-integrity.js';
 
-export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'schedule-horizon-current-period-v2';
-export const MADDEN_DISCOVERY_RELEASE = '7.5.6.5';
+export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'schedule-horizon-current-period-v3';
+export const MADDEN_DISCOVERY_RELEASE = '7.5.6.6';
 
 const DATASET_ORDER = Object.freeze([
   'league-info',
@@ -300,11 +300,15 @@ function mergeMarkers(analyses, expected = {}) {
   return output;
 }
 
-function completePeriodCoverage(analyses) {
+function completePeriodCoverage(analyses,currentPeriod=null) {
   const periods = new Map();
   for (const analysis of analyses) {
     if (!['schedule', 'statistics'].includes(analysis.datasetType)) continue;
     for(const period of analysis.periods||[]){
+      if(analysis.datasetType==='statistics'
+        && Number.isFinite(Number(analysis.recordCount))
+        && Number(analysis.recordCount)<=0
+        && period.key!==currentPeriod?.key)continue;
       const key=period.key;
       const domains=periods.get(key)||new Set();
       domains.add(analysis.datasetType);
@@ -521,7 +525,7 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
   const markers = mergeMarkers(analyses, options.expected || {});
   markers.currentPeriod=proveCurrentSchedulePeriod(analyses);
   const current=markers.currentPeriod.period;
-  const completeKeys=new Set(completePeriodCoverage(analyses));
+  const completeKeys=new Set(completePeriodCoverage(analyses,current));
   const horizonValid=current&&completeKeys.has(current.key)
     &&analyses.filter(a=>a.datasetType==='schedule').every(a=>a.periods!==null)
     &&analyses.filter(a=>['schedule','statistics'].includes(a.datasetType))

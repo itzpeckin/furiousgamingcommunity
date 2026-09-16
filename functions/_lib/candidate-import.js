@@ -13,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'schedule-horizon-current-period-v3';
+export const CANDIDATE_MAPPING_REVISION = 'schedule-horizon-current-period-v4';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`;
@@ -122,10 +122,25 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
   const routes = datasetInventory.map(item => ({
     datasetType: String(item?.datasetType || item?.dataset_type || ''),
     routePath: String(item?.routePath || item?.route_path || ''),
-    periods:periodsFromInventoryItem(item)
+    periods:periodsFromInventoryItem(item),
+    recordCount:Number.isFinite(Number(item?.recordCount??item?.record_count))
+      ?Number(item?.recordCount??item?.record_count):null
   }));
   const schedulePeriods=uniquePeriods(routes.filter(item=>item.datasetType==='schedule').flatMap(item=>item.periods));
-  const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics').flatMap(item=>item.periods));
+  const allStatisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics').flatMap(item=>item.periods));
+  const populatedStatisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics'
+    &&(item.recordCount===null||item.recordCount>0)).flatMap(item=>item.periods));
+  const suppliedCurrentPeriodProof=sourceMarkers.currentPeriod;
+  const fallbackStatisticsPeriods=populatedStatisticsPeriods.length
+    ?populatedStatisticsPeriods:allStatisticsPeriods.length===1?allStatisticsPeriods:[];
+  const currentPeriodProof=suppliedCurrentPeriodProof||{
+    status:fallbackStatisticsPeriods.length?'proven':allStatisticsPeriods.length?'ambiguous':'unknown',
+    source:'captured-statistics-period',period:fallbackStatisticsPeriods.at(-1)||null
+  };
+  const currentPeriod=currentPeriodProof.status==='proven'?canonicalSchedulePeriod(currentPeriodProof.period):null;
+  const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics'
+    &&(item.recordCount===null||item.recordCount>0
+      ||item.periods.some(period=>period.key===currentPeriod?.key))).flatMap(item=>item.periods));
   const scheduleKeys=new Set(schedulePeriods.map(period=>period.key));
   const statisticKeys=new Set(statisticsPeriods.map(period=>period.key));
   const completePeriods=uniquePeriods(schedulePeriods.filter(period=>statisticKeys.has(period.key)));
@@ -143,10 +158,6 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
     for(const week of markerWeeks)observedPeriods.push({stage:markerStage,week,key:`${markerStage}:${week}`});
   }
   observedPeriods.sort(comparePeriods);
-  const currentPeriodProof=sourceMarkers.currentPeriod||{
-    status:statisticsPeriods.length?'proven':'unknown',source:'captured-statistics-period',period:statisticsPeriods.at(-1)||null
-  };
-  const currentPeriod=currentPeriodProof.status==='proven'?canonicalSchedulePeriod(currentPeriodProof.period):null;
   const currentWeek=currentPeriod?.week??null;
   const activePeriod=typeof activeWeekIndex==='object'&&activeWeekIndex!==null
     ?snapshotCurrentPeriod(activeWeekIndex)

@@ -24,7 +24,7 @@ import {
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.5.6.5';
+const RELEASE = '7.5.6.6';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();
@@ -76,7 +76,7 @@ async function maybeAnalyzeIdleExport(current, endpoint) {
   const session = await sessionFor(current.db,current.league.id,endpoint?.latest_session_id);
   const latestReport = await reportFor(current.db,current.league.id,endpoint?.latest_report_id);
   const idleMs = session?.last_capture_at ? Date.now()-(Date.parse(session.last_capture_at) || Date.now()) : 0;
-  const stalePolicyReport = session?.status === 'review_required'
+  const stalePolicyReport = ['passed','review_required'].includes(String(session?.status || ''))
     && latestReport?.session_id === session.id
     && !maddenDiscoveryReportUsesCurrentPolicy(latestReport);
   const idleOpenSession = session?.status === 'open' && idleMs >= AUTO_ANALYZE_IDLE_MS;

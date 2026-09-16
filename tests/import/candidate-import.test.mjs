@@ -48,6 +48,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
+import { statisticsRouteOptionalEmpty } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
 import { onRequestPost as buildSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js';
 import { competitionState, executeCompetitionAction } from '../../functions/api/leagues/[leagueSlug]/competition.js';
 import { onRequestPost as validateSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js';
@@ -362,11 +363,37 @@ test('non-empty All Weeks sentinel routes resolve payload Week 10 while empty pl
   assert.deepEqual(coverage.partialPeriods,[]);
 });
 
+test('All Weeks coverage and statistics mapping ignore proven-empty future placeholders without hiding malformed data',()=>{
+  const datasetInventory=[{
+    datasetType:'schedule',routePath:'xbsx/742482/week/reg/0/schedules',recordCount:272,
+    periodSource:'payload-schedule-aggregate',canonicalPeriods:Array.from({length:18},(_,index)=>({
+      stage:'regular-season',week:index+1,key:`regular-season:${index+1}`
+    }))
+  },{
+    datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing',recordCount:32
+  }];
+  for(let week=2;week<=18;week++)datasetInventory.push({
+    datasetType:'statistics',routePath:`xbsx/742482/week/reg/${week}/passing`,recordCount:0
+  });
+  const coverage=candidateSourceCoverage({datasetInventory});
+  assert.equal(coverage.currentPeriod.key,'regular-season:1');
+  assert.deepEqual(coverage.statisticsPeriods.map(period=>period.key),['regular-season:1']);
+  assert.deepEqual(coverage.completePeriods.map(period=>period.key),['regular-season:1']);
+  assert.equal(coverage.futureSchedulePeriods.length,17);
+  assert.deepEqual(candidateCoverageWarnings(coverage),[]);
+
+  const empty={captureUsable:false,candidateAudit:[{recordCount:0,reason:'no-stat-object-collection'}]};
+  const malformed={captureUsable:false,candidateAudit:[{recordCount:4,reason:'collection-does-not-look-like-player-statistics'}]};
+  assert.equal(statisticsRouteOptionalEmpty(empty,{stage:'reg',week:1},{completedRegularWeek:23,sourceCoverage:coverage}),true);
+  assert.equal(statisticsRouteOptionalEmpty(empty,{stage:'reg',week:18},{completedRegularWeek:23,sourceCoverage:coverage}),true);
+  assert.equal(statisticsRouteOptionalEmpty(malformed,{stage:'reg',week:18},{completedRegularWeek:23,sourceCoverage:coverage}),false);
+});
+
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'schedule-horizon-current-period-v3');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'schedule-horizon-current-period-v4');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:schedule-horizon-current-period-v3'
+    'report:capture:identity:destination:schedule-horizon-current-period-v4'
   );
 });
 

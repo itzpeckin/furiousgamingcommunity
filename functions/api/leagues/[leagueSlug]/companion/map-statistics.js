@@ -3,8 +3,9 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
+import { canonicalSchedulePeriod, compareSchedulePeriods } from '../../../../_lib/schedule-integrity.js';
 
-const RELEASE='7.4.1';
+const RELEASE='7.5.6.6';
 const RECORD_CHUNK_SIZE=200;
 const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;
@@ -57,6 +58,22 @@ function choose(payload,category){
 }
 function routeMeta(path){const m=String(path||'').match(WEEKLY_ROUTE);return m?{stage:m[1].toLowerCase(),week:int(m[2]),category:m[3].toLowerCase()}:null}
 function canonicalStage(value){return value==='pre'?'preseason':value==='post'?'playoffs':'regular-season'}
+function captureProvenEmpty(capture){
+  const audit=Array.isArray(capture?.candidateAudit)?capture.candidateAudit:[];
+  return audit.length>0&&audit.every(item=>Number(item?.recordCount||0)===0&&item?.reason==='no-stat-object-collection');
+}
+export function statisticsRouteOptionalEmpty(capture,meta,{completedRegularWeek=null,sourceCoverage=null}={}){
+  if(capture?.captureUsable||!captureProvenEmpty(capture)||!meta)return false;
+  if(meta.stage==='pre'||(meta.stage==='reg'&&Number(meta.week)===0))return true;
+  const routePeriod=canonicalSchedulePeriod({stage:canonicalStage(meta.stage),week:meta.week});
+  const currentPeriod=sourceCoverage?.currentPeriodProof?.status==='proven'
+    ?canonicalSchedulePeriod(sourceCoverage.currentPeriod):null;
+  const completeKeys=new Set((sourceCoverage?.completePeriods||[]).map(period=>period?.key).filter(Boolean));
+  if(routePeriod&&currentPeriod&&(
+    completeKeys.has(routePeriod.key)||compareSchedulePeriods(routePeriod,currentPeriod)>=0
+  ))return true;
+  return meta.stage==='reg'&&completedRegularWeek!==null&&Number(meta.week)>completedRegularWeek;
+}
 function flattenMetrics(record={},prefix='',out={}){
   for(const[key,value]of Object.entries(record||{})){
     if(META.has(key)&&!prefix)continue;
@@ -308,7 +325,7 @@ async function latestRun(db,leagueId,includeRows=false){
   const result=await db.prepare(`SELECT * FROM companion_canonical_statistics_preview WHERE league_id=? AND mapping_run_id=? ORDER BY category,stage,week_index,player_name,team_external_id,external_key LIMIT 500`).bind(leagueId,run.id).all();
   return{...pub,statistics:(result.results||[]).map(row=>({externalKey:row.external_key,category:row.category,seasonYear:row.season_year,stage:row.stage,weekIndex:row.week_index,playerExternalId:row.player_external_id,teamExternalId:row.team_external_id,playerName:row.player_name,position:row.position,metrics:safeParse(row.metrics_json,{}),sourceRoutePath:row.source_route_path}))};
 }
-async function startRun(db,env,leagueId,discoverySessionId,captureIds=[]){
+async function startRun(db,env,leagueId,discoverySessionId,captureIds=[],sourceCoverage=null){
   const routes=await capturedRoutes(db,env,leagueId,discoverySessionId,captureIds);
   if(!routes.length)throw Object.assign(new Error('No weekly statistics datasets were captured.'),{status:422});
   // A retained-period candidate is an exact, auditable re-composition. Process
@@ -328,11 +345,7 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[]){
     const meta=routeMeta(capture.route_path);
     if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
-    const optionalEmpty=Boolean(!capture.captureUsable && (
-      meta?.stage==='pre' ||
-      (meta?.stage==='reg' && Number(meta.week)===0) ||
-      (meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)
-    ));
+    const optionalEmpty=statisticsRouteOptionalEmpty(capture,meta,{completedRegularWeek,sourceCoverage});
     const unchanged=Boolean(!forceProcessRetainedBundle && capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     if(unchanged||optionalEmpty)skipped++;else pending++;
   }
@@ -354,11 +367,7 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[]){
   for(const capture of routes){
     const meta=routeMeta(capture.route_path);if(!meta)continue;
     const prior=committed.get(String(capture.route_path));
-    const optionalEmpty=Boolean(!capture.captureUsable && (
-      meta.stage==='pre' ||
-      (meta.stage==='reg' && Number(meta.week)===0) ||
-      (meta.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)
-    ));
+    const optionalEmpty=statisticsRouteOptionalEmpty(capture,meta,{completedRegularWeek,sourceCoverage});
     const unchanged=Boolean(!forceProcessRetainedBundle && capture.captureUsable && Number(prior?.record_count||0)>0 && prior?.payload_hash && capture.payload_hash && String(prior.payload_hash)===String(capture.payload_hash));
     statements.push(db.prepare(sql).bind(
       crypto.randomUUID(),runId,leagueId,capture.capture_id,capture.discovery_session_id,capture.route_path,
@@ -376,10 +385,7 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[]){
   for(const capture of routes.filter(row=>{
     if(row.captureUsable)return false;
     const meta=routeMeta(row.route_path);
-    if(meta?.stage==='pre')return false;
-    if(meta?.stage==='reg' && Number(meta.week)===0)return false;
-    if(meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)return false;
-    return true;
+    return !statisticsRouteOptionalEmpty(row,meta,{completedRegularWeek,sourceCoverage});
   })){
     const diagnostic={
       error:capture.selectionError||'No usable statistics capture found.',
@@ -399,10 +405,7 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[]){
     unusableRoutes:routes.filter(row=>{
       if(row.captureUsable)return false;
       const meta=routeMeta(row.route_path);
-      if(meta?.stage==='pre')return false;
-      if(meta?.stage==='reg' && Number(meta.week)===0)return false;
-      if(meta?.stage==='reg' && completedRegularWeek!==null && Number(meta.week)>completedRegularWeek)return false;
-      return true;
+      return !statisticsRouteOptionalEmpty(row,meta,{completedRegularWeek,sourceCoverage});
     }).map(row=>({
       routePath:row.route_path,
       error:row.selectionError,
@@ -511,7 +514,7 @@ export async function onRequestPost(context){
       if(candidateRunId&&!candidateRun)return json({ok:false,error:'A running candidate import is required for retained-period statistics mapping.',release:RELEASE},409);
       const sourceCounts=candidateRun?safeParse(candidateRun.source_counts_json,{}):{};
       const sourceCaptureIds=Array.isArray(sourceCounts.sourceCaptureIds)?sourceCounts.sourceCaptureIds.map(String):[];
-      const started=await startRun(state.db,context.env,state.league.id,candidateRun?.discovery_session_id||text(body.discoverySessionId),sourceCaptureIds);
+      const started=await startRun(state.db,context.env,state.league.id,candidateRun?.discovery_session_id||text(body.discoverySessionId),sourceCaptureIds,sourceCounts.sourceCoverage||null);
       const run=await state.db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=?`).bind(started.runId).first();
       const pub=await runPublic(state.db,run);
       return json({ok:true,release:RELEASE,action:'start',...pub,

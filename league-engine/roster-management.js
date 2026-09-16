@@ -85,5 +85,5 @@
     filter.q=event.target.value;filter.offset=0;generation++;clearTimeout(timer);timer=setTimeout(()=>load(),200);
   });
   window.addEventListener('franchisehq:league-tenant-changed',()=>{if(!busy)dialog?.close();generation++;});
-  HQ.rosterManagement={release:'7.5.6.5',renderControl,open};
+  HQ.rosterManagement={release:'7.5.6.6',renderControl,open};
 })();

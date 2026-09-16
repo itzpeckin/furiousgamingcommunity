@@ -225,15 +225,20 @@ const expected = {
   week: '3'
 };
 
-test('full-season aggregate proves current Week 1 without requiring future statistics and rejects unresolved rows',()=>{
+test('All Weeks package uses populated Week 1 statistics and ignores empty future statistics routes',()=>{
   const captures=liveLikeRosterCaptureSet();
-  captures[0].payload={...captures[0].payload,week:1,weekIndex:0,stageIndex:1};
+  delete captures[0].payload.week;
   const schedule=captures.find(c=>c.routePath.endsWith('/schedules'));
   schedule.routePath='xbsx/742482/week/reg/0/schedules';
   schedule.payload={gameScheduleInfoList:Array.from({length:18},(_,i)=>({gameId:`game-${i+1}`,weekIndex:i,stageIndex:1,homeTeamId:'team-1',awayTeamId:'team-2'}))};
+  for(let week=2;week<=18;week++)captures.push(capture(
+    `xbsx/742482/week/reg/${week}/passing`,{playerPassingStatInfoList:[]},4_000+week
+  ));
   const report=buildMaddenDiscoveryReport(captures,{expected:{...expected,week:undefined}});
   assert.equal(report.sourceVerification.passed,true);
   assert.equal(report.sourceMarkers.currentPeriod.period.key,'regular-season:1');
+  assert.equal(report.sourceMarkers.currentPeriod.source,'captured-statistics-period');
+  assert.deepEqual(report.sourceMarkers.week.completePeriods,['regular-season:1']);
   assert.equal(report.datasetInventory.find(c=>c.routePath===schedule.routePath).canonicalPeriods.length,18);
   assert.equal(reportImportReadiness(report).ready,true);
   assert.equal(reportImportReadiness(report).freeAgentCount,null);

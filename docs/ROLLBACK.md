@@ -1,5 +1,11 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.6.6 All Weeks weekly-import remediation impact
+
+This code-only patch changes discovery/current-period classification and statistics-route mapping. It adds no migration and must retain migration 42, the completed 18-week/272-game yearly schedule revision, every route capture/R2 object, the failed pre-fix candidate, every prior and malformed snapshot, every audit, the active pointer, the unchanged permanent export URL, and blocked/null Free Agent state.
+
+Before the retained export is retried, the runtime rollback baseline is exact Main `911a787692cb2ad9576da2ee611662d6d32bb5f9`, Production release 7.5.6.5, Pages deployment `76204841-1eba-46af-8dd5-7672fe519876`, and Worker version `924b2e52`. A runtime rollback must not restore a D1 bookmark or delete the corrected candidate/snapshot after retry. If the corrected Week 1 snapshot has activated, recovery uses an explicit retained-snapshot operation rather than code rollback.
+
 ## 7.5.6.5 Import Yearly Schedule impact
 
 Exact 7.5.6.5 candidate `21e3b23e4fd24bd16f921f12d85f280022f56503` merged through PR #106 as Main `6fe3facd8b01b1e66e4c089448e7bf90721a7662`. Pages deployment `76204841-1eba-46af-8dd5-7672fe519876` and import Worker build `e74f4b8e-c032-4807-b5db-6def6ebfbc51` / active version `924b2e52` serve the release. Additive migration 42 was applied between Production D1 bookmarks `000002c5-000002b2-000050e7-4d6e0ac3a9c03211afe397ae30029696` and `000002c5-000002e2-000050e7-fda80eaac71c0d9d9bb6c78af8461719`.
