@@ -6,13 +6,13 @@
 
 **Updated:** September 15, 2026
 
-**Revision:** 2.66
+**Revision:** 2.67
 
-**Current production:** FranchiseHQ 7.5.6.8 is live from candidate `225c32428ad619551de9a02a6856ec27360bae64`, PR #110, and code Main `0d1018438772b5227364187692d2bd256bacb867`. Migration 42 remains applied. The owner accepted the corrected 2027 Week 1 import, complete 18-week schedule, and Week 1 scheduling-thread workflow.
+**Current production:** FranchiseHQ 7.5.6.9 is live from candidate `8f3a35b8ef4063cdc0125ba55e8ed55beda6d18c`, PR #111, code Main `8c961b7c23f8c98f0cc3648fbe3849688c0763b2`, and Pages run `35046620364`. Migration 42 remains applied. Signed-in acceptance confirms the Schedule-integrated Confidence Pool and server-backed Standings leaderboard on desktop; phone acceptance confirmed Schedule composition and identified one contained Standings overflow defect.
 
-**Current work:** 7.5.6.9 incorporates Confidence Pool winner/confidence selection into each regular-season schedule matchup and restores the server-backed Confidence Pool leaderboard to the live Standings page. Season and weekly results show confidence points, correct picks, graded picks, correct percentage, weekly wins, weekly average, and best week. Unplayed games never lower accuracy; tied finals retain half-confidence scoring and remain outside the correct-percentage denominator.
+**Current work:** 7.5.6.10 constrains the Confidence Pool Standings toolbar and table card to the phone viewport while retaining an internal horizontal table scroller. This is a presentation-only follow-up to 7.5.6.9; scoring, picks, imports, snapshots, threads, and stored data are unchanged.
 
-**Next gate:** Publish 7.5.6.9 through the standing-authorized pull request, Main, and Production cycle, then perform signed-in read-only desktop and phone acceptance of Schedule and Standings. No migration, Madden export/import, pick submission, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
+**Next gate:** Validate and publish 7.5.6.10, then repeat signed-in read-only phone acceptance and prove the document, standings shell, toolbar, and table wrapper remain within 390px while the wide leaderboard alone scrolls internally. No migration, Madden export/import, pick submission, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
 
 ## Product decisions
 
@@ -119,7 +119,8 @@
 | 7.5.6.6 | Validated Production-authorized candidate | Reuse the retained All Weeks weekly cohort by deriving Week 1 from populated statistics and treating verified-empty future statistics routes as placeholders rather than missing required data |
 | 7.5.6.7 | Production; superseded by 7.5.6.8 correction | Proved the retained All Weeks opening as Week 1 and activated the full 272-game schedule; follow-up found 32 cumulative team rows admitted by misleading payload-period fields |
 | 7.5.6.8 | Production; owner accepted | Make ordinary nonzero statistics routes authoritative, retain Week 0 sentinel payload handling, and recompose the same retained Week 1 source with zero preseason/cumulative statistics |
-| 7.5.6.9 | Validated Production-authorized candidate | Integrate Confidence Pool picks directly into Schedule and publish server-scored season/weekly Confidence Pool standings with correct percentage |
+| 7.5.6.9 | Production deployed; superseded by 7.5.6.10 phone containment | Integrate Confidence Pool picks directly into Schedule and publish server-scored season/weekly Confidence Pool standings with correct percentage |
+| 7.5.6.10 | Validated Production-authorized candidate | Keep the Confidence Pool Standings toolbar and table container within the phone viewport while the wide result columns scroll internally |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -143,7 +144,8 @@
 | 10a | Immediate remediation | 7.5.6.6 | Reuse the retained All Weeks weekly export, keep the 18-week schedule visible, activate only proven Week 1, and reject malformed non-empty statistics without requiring another export. |
 | 10b | Immediate remediation | 7.5.6.7 | Treat team summaries as non-clock aggregates, scope mapped statistics to the proven current period, and activate the retained 2027 Week 1 package without another export. |
 | 10c | Immediate remediation | 7.5.6.8 | Enforce ordinary statistics-route authority, rebuild the exact retained Week 1 package without the Week 2 cumulative team rows, and atomically supersede the live snapshot without new schedule threads. |
-| 10d | In progress | 7.5.6.9 | Put Confidence Pool picks inside each schedule matchup and expose accurate season/weekly pool standings from finalized results. |
+| 10d | Production deployed | 7.5.6.9 | Put Confidence Pool picks inside each schedule matchup and expose accurate season/weekly pool standings from finalized results. |
+| 10e | Immediate presentation patch | 7.5.6.10 | Contain the live Confidence Pool Standings layout at phone width without changing the leaderboard or stored picks. |
 | 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
@@ -680,6 +682,13 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Code-only release: no migration, export/import, snapshot activation, thread creation, pick submission, reset, deletion, URL rotation, archive/transition, or Free Agent state change.
 - Gate: focused competition/UI tests, complete repository suite, strict release checks, phone/desktop composition, exact Main deployment, and signed-in read-only Production acceptance all pass.
 
+## 7.5.6.10 — Confidence Pool Phone Containment
+
+- Keep the Confidence Pool Standings grid items, toolbar content, and table card shrinkable within the available phone width.
+- Preserve all leaderboard columns and provide horizontal scrolling only inside the table wrapper; the page, toolbar, and explanatory text must not clip or expand to the table's minimum width.
+- Presentation-only release: no scoring, pick, API, schema, import, snapshot, Discord, season, identity, or Free Agent behavior changes.
+- Gate: focused UI regression, complete repository suite, strict release checks, exact Main deployment, and signed-in 390px Production measurements all pass.
+
 ## 7.5.6.1 — Cross-Surface Trade Review Synchronization
 
 The 7.5.6.1 intervening patch makes every committee vote refresh all known current trade copies from the shared server tally. It preserves trade business rules and card design, uses existing durable outbox payload references without migration, keeps reviewer DMs active, converges concurrent votes, and supplies a lightweight open-site status refresh. Real Discord delivery acceptance remains owner-operated; no live vote is cast during code-only publication.
@@ -737,6 +746,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.67:** Published 7.5.6.9 candidate `8f3a35b` through PR #111 as Main `8c961b7` with all four pull-request checks, Main quality run `35046621120`, and Pages run `35046620364` passing. Signed-in Production acceptance confirmed release 7.5.6.9, integrated Schedule controls, and the Confidence Pool Standings fields without changing picks or league data. The 390px phone check found the Standings toolbar/table card inheriting the table's roughly 900px minimum width. Follow-up 7.5.6.10 contains the card and toolbar while keeping the table internally scrollable; no data operation occurred.
 
 - **Revision 2.66:** Began the standing-authorized 7.5.6.9 code-only release from exact Main `0d10184`. Schedule now composes Confidence Pool winner/confidence controls inside every regular-season matchup instead of duplicating the games at the bottom. Live Standings now exposes server-backed season and weekly Confidence Pool rankings with correct and graded pick counts plus correct percentage; unplayed games do not reduce accuracy, and tied finals retain half-confidence scoring outside the accuracy denominator. Focused validation passes 8/8, the complete repository suite passes 263/263, and the consolidated strict gate passes 251/251. No migration, Production data write, export/import, snapshot/thread operation, pick submission, reset, deletion, archive/transition, URL rotation, credential/membership/assignment change, Discord configuration/registration, or Free Agent reinterpretation occurred during implementation.
 
