@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.7.4",
+  "releaseType": "roster-carry-forward-team-id-rebase",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.7.3",
+    "commit": "168f267e8bf2a322c19dc94b27b2b039460662ef",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.7.4-roster-team-rebase",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true,"status": "authorized-not-run"},
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.7.3",
+    "candidateRelease": "7.5.7.4",
+    "currentCommit": "168f267e8bf2a322c19dc94b27b2b039460662ef",
+    "currentMigration": 43,
+    "candidateMigration": 43,
+    "scope": "Code-only correction that rebases carried roster team foreign keys onto a uniquely proven one-to-one League Info team identity map. Player source records, contracts, roster ownership, Free Agent authority, active data, and retained snapshots remain unchanged by deployment."
+  },
+  "requiredArtifacts": [
+    "functions/api/leagues/[leagueSlug]/companion/map-players.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "tests/import/candidate-import.test.mjs",
+    "releases/7.5.7.4/release-record.md",
+    "releases/7.5.7.4/validation-evidence.json"
+  ]
+}

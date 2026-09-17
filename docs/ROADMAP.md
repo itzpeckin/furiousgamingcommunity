@@ -6,13 +6,13 @@
 
 **Updated:** September 17, 2026
 
-**Revision:** 2.73
+**Revision:** 2.74
 
-**Current production:** FranchiseHQ 7.5.7.2 is the accepted Main baseline at `12a2bd4b6983273ac504326dee2c69845834b3f1`. Migration 43 is applied. The retained 2026 regular/postseason history and all prior snapshots remain intact.
+**Current production:** FranchiseHQ 7.5.7.3 is the accepted Main baseline at `168f267e8bf2a322c19dc94b27b2b039460662ef`. Migration 43 is applied. The retained exports, active/prior/malformed snapshots, roster authority, and audits remain intact.
 
-**Current work:** 7.5.7.3 permits a same-season weekly snapshot when Madden exports complete League Info and Weekly Stats but omits Rosters. The importer must prove an exact compatible active snapshot, carry its players, assignments, contracts, and Free Agent authority forward unchanged, and still validate current-period games/results/statistics normally.
+**Current work:** 7.5.7.4 corrects roster carry-forward when Madden changes the technical IDs of all teams between the live roster snapshot and new League Info. It requires a complete unique team-identity proof before translating player foreign keys and preserves player source, contracts, semantic assignments, and Free Agent authority.
 
-**Next gate:** Validate and publish 7.5.7.3, then let the commissioner use the already-retained League Info + Weekly Stats export through **Import Latest Export**. Deployment itself runs no export/import or snapshot operation; the later commissioner import remains guarded, validated, atomic, and auditable.
+**Next gate:** Validate and publish 7.5.7.4, then let the commissioner select **Retry** against the already-retained League Info + Weekly Stats export. No new export is required. Deployment itself runs no import or snapshot operation; the commissioner retry remains guarded, validated, atomic, and auditable.
 
 ## Product decisions
 
@@ -126,7 +126,8 @@
 | 7.5.7 | Production; owner accepted | Bounded importer batching and split timing, mobile two-axis Depth Chart navigation, grouped table view, and canonical Player Card height/weight |
 | 7.5.7.1 | Production; superseded by 7.5.7.2 completion | Retained-snapshot GM History repair with separate regular/postseason records and accurate playoff appearances |
 | 7.5.7.2 | Main baseline | Complete playoff W/L recovery from unambiguous later-round advancement without inventing scores |
-| 7.5.7.3 | Production-authorized candidate | Accept complete same-season League Info + Weekly Stats while carrying the exact live roster, contracts, and Free Agent authority forward unchanged |
+| 7.5.7.3 | Production | Accept complete same-season League Info + Weekly Stats while carrying the live roster, contracts, and Free Agent authority forward |
+| 7.5.7.4 | Production-authorized candidate | Safely rebase carried roster foreign keys when Madden changes all team IDs but the complete team identities still match one-to-one |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
@@ -155,6 +156,7 @@
 | 10g | Production; owner accepted | 7.5.6.12 | Audit the 10-carry rushing rule and player/team rushing-yard integrity, and expose weighted ability counts with FB and specialist/line half weights. |
 | 11 | Complete | 7.5.7.2 | Complete retained GM History playoff W/L from bracket advancement while preserving score truthfulness and all immutable data. |
 | 11a | Active importer continuity patch | 7.5.7.3 | Allow same-season weekly data to publish during a Companion roster outage without emptying or reinterpreting the active roster. |
+| 11b | Active importer identity correction | 7.5.7.4 | Translate changed Madden team IDs only after complete one-to-one team identity proof, preserving every player, contract, and semantic roster assignment. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
@@ -756,6 +758,15 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Skip development-trait observations and trade-roster reconciliation because a rosterless export supplies no new roster evidence. A later complete roster export resumes the ordinary roster-authoritative path automatically.
 - Gate: focused readiness/mapping regressions, complete repository and strict release checks, exact Main deployment, and read-only Production verification. Deployment runs no import or protected data operation.
 
+## 7.5.7.4 — Roster Carry-Forward Team-ID Rebase
+
+- Diagnose the failed `candidate_im · map-players` attempt read-only and retain it. Production evidence shows all 32 old team IDs changed while each old team has exactly one corresponding new League Info identity.
+- Require equal complete team sets, unique IDs, a one-to-one canonical/exact identity match for every changed ID, and complete coverage of every rostered player before rebasing.
+- Change only the candidate player `team_external_id` foreign key. Preserve immutable player source records, contracts, ratings, semantic team assignments, active/prior/malformed snapshots, audits, and blocked/missing Free Agent authority.
+- Record source/destination team counts, remapped team/player counts, proof type, and preservation flags in mapping warnings, candidate metadata, snapshot manifest, and activation audit.
+- Fail closed for missing, duplicate, ambiguous, conflicting, or incomplete mappings. Continue ordinary current-period, validation, and atomic activation guards.
+- Gate: focused identity-rebase regressions, complete repository and strict release checks, exact Main deployment, and read-only Production verification. Deployment runs no import or protected data operation; the commissioner retries the retained export afterward.
+
 ## 7.5.8 — Canonical League Consistency (formerly 7.4.5)
 
 - Use one server season/week/snapshot and shared team/player/game selectors across all features.
@@ -800,6 +811,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.74:** Published 7.5.7.3 through PR #118 as Main `168f267`, then diagnosed the retained rosterless import failure read-only. Madden changed all 32 team numeric IDs, but each old team maps uniquely to the same new League Info identity; no team or player is missing. Began standing-authorized 7.5.7.4 to rebase only candidate roster foreign keys after complete one-to-one proof, retain the failed candidate and all active/prior/malformed snapshots and audits, and require no new export. No Production data write, import, activation, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Free Agent reinterpretation occurred during diagnosis or local implementation.
 
 - **Revision 2.73:** Began standing-authorized 7.5.7.3 from exact Main baseline `12a2bd4`. A rosterless export becomes eligible only when complete League Info and current-period schedule/statistics match the exact active game year and franchise season. The candidate copies the active snapshot's full player/contract domain into a new auditable mapping run, preserves located/empty/blocked/missing Free Agent authority without converting unknown to zero, guards against active-pointer changes, and suppresses roster-derived trait/trade reconciliation because no new roster evidence exists. First-season and partial-roster imports still require Rosters. No migration, Production data write, import, snapshot activation, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Discord command operation ran during local implementation.
 

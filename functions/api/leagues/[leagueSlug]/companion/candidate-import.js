@@ -26,7 +26,7 @@ import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../.
 import { observeDevelopmentTraitsStatement } from '../../../../_lib/development-traits.js';
 import { reportImportReadiness, rosterCarryForwardEligibility } from '../../../../_lib/permanent-league-export.js';
 
-const RELEASE = '7.5.7.3';
+const RELEASE = '7.5.7.4';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -572,7 +572,10 @@ async function finalize(current, body) {
   const completeness = candidateCompleteness(freeAgentStatus);
   const warnings = parseCandidateJson(run.warnings_json, []);
   if (rosterCarryForward) warnings.push(
-    `Rosters, players, contracts, and Free Agent state were carried forward unchanged from active snapshot ${rosterCarryForward.sourceSnapshotId}.`
+    `Players, contracts, roster assignments, and Free Agent state were carried forward from active snapshot ${rosterCarryForward.sourceSnapshotId}.`
+  );
+  if (Number(rosterCarryForward?.teamIdentityRebase?.remappedTeamCount || 0)) warnings.push(
+    `Madden team IDs were safely rebased for ${Number(rosterCarryForward.teamIdentityRebase.remappedTeamCount)} uniquely matched teams; roster assignments remain unchanged.`
   );
   if (freeAgentStatus === 'blocked') warnings.push(
     'Madden Free Agents are blocked upstream. Candidate is rostered-player-only; the Free Agent count remains unknown.'
