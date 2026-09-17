@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.7.2 GM History bracket-advancement completion impact
+
+This code-only release completes playoff wins and losses for retained scoreless postseason rows only when exactly one team appears in a later postseason round. It does not invent or rewrite a score, and ambiguous or unresolved rows remain uncounted. It adds no migration and changes no Production data.
+
+The runtime rollback baseline is exact Main `4cd58f9991cf2dfb751987ddc1abd7544d8e11de`, Production release 7.5.7.1, and migration 43. Runtime rollback may restore that code while retaining every frozen GM summary, ownership period, active/prior/malformed snapshot, capture/report, yearly schedule, audit, permanent export URL, Discord thread record, season/game-year record, and blocked/null Free Agent state.
+
+Do not rewrite retained 0–0 scores or GM history rows, run a Madden export/import, move an active snapshot, create or remove scheduling threads, reset/delete data, rotate the export URL, archive/transition a season, or reinterpret blocked Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.7.1 GM History postseason correction impact
 
 This code-only release reclassifies Madden ownership-history schedule rows after Week 18 as postseason, rebuilds archived GM season totals at read time from each retained immutable source snapshot, and separates Regular and Playoffs records in `/gm-history`. It does not rewrite frozen summaries, source snapshots, ownership periods, or audits, and it adds no migration.

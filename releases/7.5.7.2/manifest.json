@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.7.2",
+  "releaseType": "gm-history-bracket-advancement-completion",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.7.1",
+    "commit": "4cd58f9991cf2dfb751987ddc1abd7544d8e11de",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.7.2-gm-history-complete",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true,"status": "authorized-not-run"},
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.7.1",
+    "candidateRelease": "7.5.7.2",
+    "currentCommit": "4cd58f9991cf2dfb751987ddc1abd7544d8e11de",
+    "currentMigration": 43,
+    "candidateMigration": 43,
+    "scope": "Code-only completion of playoff W/L from unambiguous later-round advancement. No score, frozen summary, snapshot, ownership period, audit, import, or Production data is rewritten."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/gm-career.js",
+    "functions/_lib/gm-career-history.js",
+    "functions/_lib/discord-read-model.js",
+    "functions/api/leagues/[leagueSlug]/ownership-career.js",
+    "tests/import/gm-career.test.mjs",
+    "releases/7.5.7.2/release-record.md",
+    "releases/7.5.7.2/validation-evidence.json"
+  ]
+}

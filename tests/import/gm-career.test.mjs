@@ -59,6 +59,20 @@ test('postseason appearances do not require a completed score and playoff result
     {regular:[0,1],playoffs:[0,1],appearances:1});
 });
 
+test('later-round participation proves an otherwise missing playoff result without inventing a score',()=>{
+  const games=[
+    {id:'wild-card',franchiseSeasonId:season,stage:'regular-season',week:19,status:'1',homeTeamKey:'tb',awayTeamKey:'gb',homeScore:0,awayScore:0},
+    {id:'divisional',franchiseSeasonId:season,stage:'regular-season',week:20,status:'1',homeTeamKey:'tb',awayTeamKey:'sf',homeScore:0,awayScore:0}
+  ];
+  const result=buildGmSeasonSummaries({games,periods,franchiseSeasonId:season});
+  const justin=result.summaries.find(row=>row.gmIdentityId==='gm-justin');
+  const gas=result.summaries.find(row=>row.gmIdentityId==='gm-gas');
+  assert.equal(justin.playoffWins,1);
+  assert.equal(gas.playoffLosses,1);
+  assert.equal(result.attributedGames.find(row=>row.gameId==='wild-card'&&row.teamKey==='tb').resultProof,'bracket-advancement');
+  assert.equal(result.attributedGames.some(row=>row.gameId==='divisional'),false);
+});
+
 test('frozen GM rows are rebuilt from their retained immutable snapshot without mutating storage',async()=>{
   const archived={
     gm_identity_id:'gm-justin',franchise_season_id:season,source_snapshot_id:'snapshot-2026',teams_json:'["tb"]',

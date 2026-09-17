@@ -7,7 +7,7 @@ import {
   tenantAuditStatement
 } from '../../../_lib/tenant-context.js';
 
-const RELEASE = '7.5.7.1';
+const RELEASE = '7.5.7.2';
 const MAX_BODY_BYTES = 16 * 1024;
 const SAFE_GAME_ID = /^[A-Za-z0-9._:-]{1,180}$/;
 const SAFE_TEAM_ID = /^[A-Za-z0-9._:-]{1,128}$/;

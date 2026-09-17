@@ -6,13 +6,13 @@
 
 **Updated:** September 17, 2026
 
-**Revision:** 2.71
+**Revision:** 2.72
 
-**Current production:** FranchiseHQ 7.5.7 is live from PR #115 and code Main `92d8b6326ca190fc1b926ee1e2b45ab066db8e5e`. Migration 43 is applied. The owner accepted the importer timing, mobile Depth Chart/table, and Player Card biography work; the next commissioner-initiated import remains the Production timing baseline.
+**Current production:** FranchiseHQ 7.5.7.1 is live from PR #116 and code Main `4cd58f9991cf2dfb751987ddc1abd7544d8e11de`. Migration 43 is applied. Read-only acceptance shows the 272-game regular season separated from the postseason, 14 playoff participants, two Super Bowl participants, and one champion.
 
-**Current work:** 7.5.7.1 repairs GM History from retained source snapshots. Madden postseason schedule rows carried under regular-season stage/week routes after Week 18 are classified as playoffs for ownership history, playoff appearances remain visible even when a retained final score is unavailable, and `/gm-history` shows separate Regular and Playoffs records.
+**Current work:** 7.5.7.2 completes the retained 2026 playoff record. Nine 0–0 postseason rows have no completed score, but every one has exactly one team proven in a later playoff round; GM History records those unambiguous advancement wins/losses without inventing a score.
 
-**Next gate:** Validate and publish 7.5.7.1, then verify the signed-in league History Books response and `/gm-history` rendering against the retained 2026 snapshot. The Madden Companion server-load outage does not block this release and no export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
+**Next gate:** Validate and publish 7.5.7.2, then verify that the signed-in History Books shows all 13 postseason decisions while keeping the 272-game regular season unchanged. The Madden Companion server-load outage does not block this release and no export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
 
 ## Product decisions
 
@@ -124,7 +124,8 @@
 | 7.5.6.11 | Production | Remove cap-hit magnitude guessing, correct retained Madden contract values at any size, and stamp future roster snapshots with proven unit metadata |
 | 7.5.6.12 | Production; owner command acceptance passed | Add completed-game rushing-rule audits plus weighted Superstar/X-Factor roster counts and honest first-observed trait timing |
 | 7.5.7 | Production; owner accepted | Bounded importer batching and split timing, mobile two-axis Depth Chart navigation, grouped table view, and canonical Player Card height/weight |
-| 7.5.7.1 | Production-authorized candidate | Retained-snapshot GM History repair with separate regular/postseason records and accurate playoff appearances |
+| 7.5.7.1 | Production; superseded by 7.5.7.2 completion | Retained-snapshot GM History repair with separate regular/postseason records and accurate playoff appearances |
+| 7.5.7.2 | Production-authorized candidate | Complete playoff W/L recovery from unambiguous later-round advancement without inventing scores |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
@@ -151,7 +152,7 @@
 | 10e | Immediate presentation patch | 7.5.6.10 | Contain the live Confidence Pool Standings layout at phone width without changing the leaderboard or stored picks. |
 | 10f | Immediate contract correction | 7.5.6.11 | Normalize Madden contract currency by source format rather than cap-hit magnitude, with no numeric ceiling and no data rewrite. |
 | 10g | Production; owner accepted | 7.5.6.12 | Audit the 10-carry rushing rule and player/team rushing-yard integrity, and expose weighted ability counts with FB and specialist/line half weights. |
-| 11 | Active corrective patch | 7.5.7.1 | Correct retained GM History postseason classification and expose separate Discord regular/playoff records without requiring another Madden export. |
+| 11 | Active corrective patch | 7.5.7.2 | Complete retained GM History playoff W/L from bracket advancement while preserving score truthfulness and all immutable data. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
@@ -736,6 +737,14 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Show separate **Regular** and **Playoffs** records plus playoff appearances in `/gm-history`; make the web History Books consume the same corrected retained-snapshot totals.
 - Gate: focused ownership/Discord regressions, complete repository and strict release checks, exact Main deployment, and signed-in read-only Production verification. No export/import, migration, snapshot activation, season operation, Discord command registration, or Production data write is required.
 
+## 7.5.7.2 — GM History Bracket-Advancement Completion
+
+- For a postseason row with no completed score, inspect only later postseason rounds in the same retained snapshot. Record a winner and loser only when exactly one of the two teams appears later; leave the result unrecorded when advancement is missing or ambiguous.
+- Keep the retained 0–0 score unchanged and mark internal attribution provenance as bracket advancement rather than a completed score.
+- Complete all nine previously scoreless 2026 playoff decisions because Production evidence proves exactly one advancing team for each and zero unresolved games. Combined with four score-complete rows, History Books can show the full 13-game postseason record.
+- Preserve the 272-game regular season, 14 playoff appearances, two Super Bowl appearances, one championship, frozen summaries, source snapshots, ownership periods, and audits.
+- Gate: advancement/ambiguity regressions, complete repository and strict release checks, exact Main deployment, and signed-in read-only Production verification. No export/import, migration, snapshot activation, Discord command registration, or Production data write is required.
+
 ## 7.5.8 — Canonical League Consistency (formerly 7.4.5)
 
 - Use one server season/week/snapshot and shared team/player/game selectors across all features.
@@ -780,6 +789,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.72:** Published 7.5.7.1 through PR #116 as Main `4cd58f9` with all hosted and Production checks passing. Signed-in read-only acceptance confirmed the regular/postseason split and all 14 playoff appearances, but exposed nine retained 0–0 playoff rows. A read-only bracket audit proved that each of those nine games has exactly one team in a later playoff round and zero remain ambiguous. Began 7.5.7.2 to use only that unambiguous advancement evidence for complete playoff W/L while retaining the original scores and every frozen/source record.
 
 - **Revision 2.71:** Published and owner-accepted 7.5.7 through PR #115 as Main `92d8b632`, then diagnosed the archived 2026 GM History defect read-only in Production. All 32 frozen summaries reported 275-275-2 as regular season with zero playoff appearances/records, while the retained 285-game non-preseason schedule proved 272 regular-season games plus the 13-game postseason in Weeks 19–23. Began standing-authorized 7.5.7.1 to classify those retained late weeks as playoffs for ownership history, rebuild frozen displays from the immutable snapshot, and show separate Discord Regular/Playoffs records. No Madden export/import, Production data write, snapshot/thread operation, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Free Agent reinterpretation occurred.
 
