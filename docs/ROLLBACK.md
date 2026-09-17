@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.7.1 GM History postseason correction impact
+
+This code-only release reclassifies Madden ownership-history schedule rows after Week 18 as postseason, rebuilds archived GM season totals at read time from each retained immutable source snapshot, and separates Regular and Playoffs records in `/gm-history`. It does not rewrite frozen summaries, source snapshots, ownership periods, or audits, and it adds no migration.
+
+The runtime rollback baseline is exact Main `92d8b6326ca190fc1b926ee1e2b45ab066db8e5e`, Production release 7.5.7, and migration 43. Runtime rollback may restore that code while retaining every frozen GM summary, ownership period, active/prior/malformed snapshot, capture/report, yearly schedule, audit, permanent export URL, Discord thread record, season/game-year record, and blocked/null Free Agent state.
+
+Do not run a Madden export/import, rewrite GM history rows, move an active snapshot, create or remove scheduling threads, reset/delete data, rotate the export URL, archive/transition a season, or reinterpret blocked Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.7 importer timing, Depth Chart, and player-bio impact
 
 This code-only release reduces browser round trips by processing bounded statistics and validation batches per request, records importer activation/refresh/thread timing separately, adds a grouped Depth Chart table, restores mobile two-axis formation scrolling, and carries existing canonical Madden height/weight fields into Player Cards. It adds no migration and changes no Madden source, snapshot, schedule, current week, Discord thread gate, roster authority, or stored player biography.

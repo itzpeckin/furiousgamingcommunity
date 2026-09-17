@@ -1590,7 +1590,8 @@ test('GM History includes current-season results before the season is archived',
     })}));
     const payload=await response.json();
     assert.match(payload.data.content,/Member user-a/);
-    assert.match(payload.data.content,/1-0/);
+    assert.match(payload.data.content,/Regular 1-0/);
+    assert.match(payload.data.content,/Playoffs 0-0/);
     assert.doesNotMatch(payload.data.content,/Second GM/);
     const all=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000083',name:'gm-history',options:[{type:1,name:'all'}]

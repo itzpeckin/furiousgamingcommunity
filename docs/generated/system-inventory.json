@@ -164,7 +164,7 @@
       ".css": 10,
       ".example": 1,
       ".html": 4,
-      ".js": 225,
+      ".js": 226,
       ".json": 7,
       ".jsonc": 1,
       ".md": 281,
@@ -178,7 +178,7 @@
     },
     "largest": [
       {
-        "bytes": 650245,
+        "bytes": 650247,
         "file": "app.js"
       },
       {
@@ -194,11 +194,11 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 154841,
+        "bytes": 154904,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 130709,
+        "bytes": 130713,
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
@@ -210,7 +210,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75246,
+        "bytes": 75294,
         "file": "index.html"
       },
       {
@@ -218,7 +218,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 63997,
+        "bytes": 65341,
         "file": "functions/_lib/discord-read-model.js"
       },
       {
@@ -238,7 +238,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 44037,
+        "bytes": 44039,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -246,11 +246,11 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 39777,
+        "bytes": 39781,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 37558,
+        "bytes": 37562,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -258,7 +258,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
       }
     ],
-    "total": 633
+    "total": 634
   },
   "frontend": {
     "assets": [
@@ -1609,7 +1609,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.7",
+  "release": "7.5.7.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

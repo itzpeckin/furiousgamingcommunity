@@ -6,13 +6,13 @@
 
 **Updated:** September 17, 2026
 
-**Revision:** 2.70
+**Revision:** 2.71
 
-**Current production:** FranchiseHQ 7.5.6.12 is live from PR #114 and code Main `4d51e4f7d57beb523b9fe33879e39becfebbbdda`. Migration 43 is applied. The owner validated `/rush rule` and `/abilities` in the connected league.
+**Current production:** FranchiseHQ 7.5.7 is live from PR #115 and code Main `92d8b6326ca190fc1b926ee1e2b45ab066db8e5e`. Migration 43 is applied. The owner accepted the importer timing, mobile Depth Chart/table, and Player Card biography work; the next commissioner-initiated import remains the Production timing baseline.
 
-**Current work:** 7.5.7 reduces importer round trips with bounded four-batch statistics mapping and four-by-500 validation batches, separates click-to-live, activation, browser-refresh, and Discord thread-readiness timing, repairs two-axis mobile Depth Chart navigation, adds the requested grouped table view, and restores canonical Madden height/weight on Player Cards.
+**Current work:** 7.5.7.1 repairs GM History from retained source snapshots. Madden postseason schedule rows carried under regular-season stage/week routes after Week 18 are classified as playoffs for ownership history, playoff appearances remain visible even when a retained final score is unavailable, and `/gm-history` shows separate Regular and Playoffs records.
 
-**Next gate:** Validate and publish 7.5.7, then perform signed-in read-only desktop/390px Production acceptance. The next commissioner-initiated import will establish the retained-source Production timing baseline; deployment itself does not require or authorize an export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation.
+**Next gate:** Validate and publish 7.5.7.1, then verify the signed-in league History Books response and `/gm-history` rendering against the retained 2026 snapshot. The Madden Companion server-load outage does not block this release and no export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
 
 ## Product decisions
 
@@ -123,7 +123,8 @@
 | 7.5.6.10 | Production | Keep the Confidence Pool Standings toolbar and table container within the phone viewport while the wide result columns scroll internally |
 | 7.5.6.11 | Production | Remove cap-hit magnitude guessing, correct retained Madden contract values at any size, and stamp future roster snapshots with proven unit metadata |
 | 7.5.6.12 | Production; owner command acceptance passed | Add completed-game rushing-rule audits plus weighted Superstar/X-Factor roster counts and honest first-observed trait timing |
-| 7.5.7 | Production-authorized candidate | Bounded importer batching and split timing, mobile two-axis Depth Chart navigation, grouped table view, and canonical Player Card height/weight |
+| 7.5.7 | Production; owner accepted | Bounded importer batching and split timing, mobile two-axis Depth Chart navigation, grouped table view, and canonical Player Card height/weight |
+| 7.5.7.1 | Production-authorized candidate | Retained-snapshot GM History repair with separate regular/postseason records and accurate playoff appearances |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
@@ -150,7 +151,7 @@
 | 10e | Immediate presentation patch | 7.5.6.10 | Contain the live Confidence Pool Standings layout at phone width without changing the leaderboard or stored picks. |
 | 10f | Immediate contract correction | 7.5.6.11 | Normalize Madden contract currency by source format rather than cap-hit magnitude, with no numeric ceiling and no data rewrite. |
 | 10g | Production; owner accepted | 7.5.6.12 | Audit the 10-carry rushing rule and player/team rushing-yard integrity, and expose weighted ability counts with FB and specialist/line half weights. |
-| 11 | Active off-season work | 7.5.7 | Reduce importer round trips, separate activation/refresh/thread timing, and complete the requested Depth Chart/mobile and Player Card bio repairs. |
+| 11 | Active corrective patch | 7.5.7.1 | Correct retained GM History postseason classification and expose separate Discord regular/playoff records without requiring another Madden export. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
@@ -726,6 +727,15 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Preserve exact-source idempotency, tenant isolation, recovery bookmarks, append-only snapshots/audits, previous and malformed evidence, schedule/history continuity, and unknown/null treatment for blocked Free Agents.
 - Gate: focused UI/data/import regressions, complete repository and strict release checks, exact Main deployment, desktop/390px read-only Production acceptance, and the next owner-operated import timing record pass. Existing same-week/no-thread, one-week-only thread creation, failed-build preservation, and failed-Discord recovery regressions remain mandatory.
 
+## 7.5.7.1 — GM History Postseason Correction
+
+- Treat Madden schedule weeks after the 18-week regular season as postseason for ownership history even when the retained source labels them `regular-season` and serves them from `/week/reg/` routes.
+- Apply the same corrected scope to GM ownership start/end boundaries so a postseason ownership change remains attributable to the correct GM.
+- Rebuild archived GM season totals at read time from each retained immutable source snapshot, falling back to stored frozen totals only when a historical source snapshot is unavailable. Do not rewrite or delete frozen summaries, snapshots, or audits.
+- Count a playoff appearance from scheduled postseason participation even when a retained schedule result is unavailable; count playoff wins/losses/ties only from completed results. Keep preseason excluded.
+- Show separate **Regular** and **Playoffs** records plus playoff appearances in `/gm-history`; make the web History Books consume the same corrected retained-snapshot totals.
+- Gate: focused ownership/Discord regressions, complete repository and strict release checks, exact Main deployment, and signed-in read-only Production verification. No export/import, migration, snapshot activation, season operation, Discord command registration, or Production data write is required.
+
 ## 7.5.8 — Canonical League Consistency (formerly 7.4.5)
 
 - Use one server season/week/snapshot and shared team/player/game selectors across all features.
@@ -770,6 +780,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.71:** Published and owner-accepted 7.5.7 through PR #115 as Main `92d8b632`, then diagnosed the archived 2026 GM History defect read-only in Production. All 32 frozen summaries reported 275-275-2 as regular season with zero playoff appearances/records, while the retained 285-game non-preseason schedule proved 272 regular-season games plus the 13-game postseason in Weeks 19–23. Began standing-authorized 7.5.7.1 to classify those retained late weeks as playoffs for ownership history, rebuild frozen displays from the immutable snapshot, and show separate Discord Regular/Playoffs records. No Madden export/import, Production data write, snapshot/thread operation, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Free Agent reinterpretation occurred.
 
 - **Revision 2.70:** Published 7.5.6.12 through PR #114 as Main `4d51e4f` and recorded owner validation of both new Discord commands. Began standing-authorized 7.5.7 from that exact baseline. The candidate bounds statistics and validation work per request, separates click-to-live from browser and Discord readiness, restores Player Card height/weight from already-canonical read-model fields, and adds a mobile-scrollable Formation view plus grouped Depth Chart table. No Madden export/import, snapshot/thread operation, Production data write, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Free Agent reinterpretation occurred during implementation.
 

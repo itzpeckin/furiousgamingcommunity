@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 7.5.7 */
+/* FHQ_BUILD: 7.5.7.1 */
 import {
   json,
   database,
@@ -9,7 +9,7 @@ import {
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { inferMaddenContractUnit } from '../../../../_lib/live-data-experience.js';
 
-const RELEASE='7.5.7';
+const RELEASE='7.5.7.1';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
