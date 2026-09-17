@@ -9,7 +9,8 @@ import { requireCommissioner, requirePlatformOwner } from '../../../../_lib/perm
 import {
   deriveLeagueExportToken,
   leagueExportUrl,
-  permanentExportPublicState
+  permanentExportPublicState,
+  rosterCarryForwardEligibility
 } from '../../../../_lib/permanent-league-export.js';
 import {
   CANDIDATE_MAPPING_REVISION,
@@ -24,7 +25,7 @@ import {
 } from '../../../../_lib/madden-discovery-report.js';
 import { CANONICAL_APP_ORIGIN } from '../../../../_lib/origin.js';
 
-const RELEASE = '7.5.7.2';
+const RELEASE = '7.5.7.3';
 const AUTO_ANALYZE_IDLE_MS = 5_000;
 const AUTO_ANALYZE_CLAIM_STALE_MS = 30_000;
 const text = value => String(value ?? '').trim();
@@ -134,19 +135,22 @@ function readinessProblems(report) {
   return [...new Set(problems)];
 }
 
-function countsFor(report) {
+function countsFor(report, rosterCarryForward = null) {
   const requirements = report?.requirements || {};
   const freeAgents = report?.freeAgentEvidence || {};
   const freeAgentStatus = String(freeAgents.status || 'missing');
   return {
     teams:Number(requirements?.teams?.recordCount || 0),
-    rosteredPlayers:Number(requirements?.players?.recordCount || 0),
+    rosteredPlayers:Number(rosterCarryForward?.eligible
+      ? rosterCarryForward.rosteredCount : requirements?.players?.recordCount || 0),
     standings:Number(requirements?.standings?.recordCount || 0),
     schedule:Number(requirements?.schedule?.recordCount || 0),
     statistics:Number(requirements?.statistics?.recordCount || 0),
-    freeAgentStatus,
-    freeAgentCount:['located','empty-confirmed'].includes(freeAgentStatus)
-      ? Number(freeAgents.recordCount || 0) : null
+    freeAgentStatus:rosterCarryForward?.eligible ? rosterCarryForward.freeAgentStatus : freeAgentStatus,
+    freeAgentCount:rosterCarryForward?.eligible
+      ? rosterCarryForward.freeAgentCount
+      : ['located','empty-confirmed'].includes(freeAgentStatus) ? Number(freeAgents.recordCount || 0) : null,
+    rosterCarryForward:rosterCarryForward?.eligible ? rosterCarryForward : null
   };
 }
 
@@ -166,6 +170,8 @@ async function publicState(current) {
   ]);
   const latestReport = publicMaddenDiscoveryReport(latestReportRow);
   const readyReport = publicMaddenDiscoveryReport(readyReportRow);
+  const rosterCarryForward = latestReport
+    ? await rosterCarryForwardEligibility(current.db,current.league.id,latestReport) : null;
   const candidate = await candidateFor(current.db,current.league.id,readyReport?.discoverySessionId);
   const summary = permanentExportPublicState({
     endpoint,
@@ -206,7 +212,8 @@ async function publicState(current) {
       sourceCoverage,
       importMode:sourceCoverage.importMode,
       reportStatus:latestReport?.status || null,
-      counts:countsFor(latestReport || readyReport),
+      counts:countsFor(latestReport || readyReport,rosterCarryForward),
+      rosterCarryForward:rosterCarryForward?.eligible ? rosterCarryForward : null,
       candidateSnapshotId:candidate?.candidate_snapshot_id || null,
       durationMs:candidate?.duration_ms === null || candidate?.duration_ms === undefined ? null : Number(candidate.duration_ms),
       readinessProblems:problems,

@@ -3,7 +3,7 @@ import {
   buildMaddenDiscoveryReport,
   MADDEN_DISCOVERY_ANALYSIS_POLICY
 } from './madden-discovery.js';
-import { reportImportReadiness } from './permanent-league-export.js';
+import { reportImportReadiness, rosterCarryForwardEligibility } from './permanent-league-export.js';
 
 const MAX_CAPTURE_COUNT = 250;
 const READ_CONCURRENCY = 8;
@@ -403,7 +403,8 @@ export async function generateMaddenDiscoveryReport({
     && maddenDiscoveryReportUsesCurrentPolicy(retained)
     && (Date.parse(retained.generated_at || '') || 0) >= newestObservedAt) {
     const retainedPublic = publicMaddenDiscoveryReport(retained);
-    const retainedReadiness = reportImportReadiness(retainedPublic);
+    const rosterCarryForward = await rosterCarryForwardEligibility(db,leagueId,retainedPublic);
+    const retainedReadiness = reportImportReadiness(retainedPublic,{rosterCarryForward});
     await updatePermanentPointer(db,leagueId,session.id,retained.id,retained.generated_at,retainedReadiness.ready);
     return { report:retainedPublic,reusedExisting:true,readiness:retainedReadiness };
   }
@@ -424,7 +425,9 @@ export async function generateMaddenDiscoveryReport({
     WHERE league_id=? AND session_id=? LIMIT 1`).bind(leagueId,session.id).first();
   const reportId = existing?.id || `m27_report_${crypto.randomUUID()}`;
   const generatedAt = new Date().toISOString();
-  const readiness = reportImportReadiness(report);
+  const rosterCarryForward = await rosterCarryForwardEligibility(db,leagueId,report);
+  const readiness = reportImportReadiness(report,{rosterCarryForward});
+  const retainedStatus = readiness.ready ? 'passed' : report.status;
 
   await db.batch([
     db.prepare(`INSERT INTO madden_discovery_reports
@@ -442,7 +445,7 @@ export async function generateMaddenDiscoveryReport({
        requirement_results_json=excluded.requirement_results_json,free_agent_evidence_json=excluded.free_agent_evidence_json,
        sanitized_fixture_json=excluded.sanitized_fixture_json,report_hash=excluded.report_hash,
        generated_by_user_id=excluded.generated_by_user_id,generated_at=excluded.generated_at,updated_at=excluded.updated_at`).bind(
-        reportId,leagueId,session.id,report.status,report.routeCount,report.captureCount,report.totalBytes,
+        reportId,leagueId,session.id,retainedStatus,report.routeCount,report.captureCount,report.totalBytes,
         report.captureWindowMs,JSON.stringify(report.sourceMarkers),JSON.stringify(report.sourceVerification),
         JSON.stringify(report.datasetInventory),JSON.stringify(report.fieldInventory),JSON.stringify(report.relationshipInventory),
         JSON.stringify(report.requirements),JSON.stringify(report.freeAgentEvidence),JSON.stringify(report.sanitizedFixture),
@@ -462,7 +465,7 @@ export async function generateMaddenDiscoveryReport({
   ]);
 
   return {
-    report:{...report,id:reportId,reportHash,generatedAt},
+    report:{...report,status:retainedStatus,id:reportId,reportHash,generatedAt},
     reusedExisting:false,
     readiness
   };

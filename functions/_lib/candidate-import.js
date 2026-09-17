@@ -13,10 +13,11 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'schedule-horizon-current-period-v6';
+export const CANDIDATE_MAPPING_REVISION = 'roster-carry-forward-v7';
 
-export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId) {
-  return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`;
+export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId, rosterSourceSnapshotId = null) {
+  return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`
+    + (rosterSourceSnapshotId ? `:${rosterSourceSnapshotId}` : '');
 }
 
 export const parseCandidateJson = (value, fallback) => {
