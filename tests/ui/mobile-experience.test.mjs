@@ -126,3 +126,34 @@ test('League Home rushing leaders include Madden halfbacks', async () => {
   const app=await source('app.js');
   assert.match(app,/rushing:\s*\{\s*positions:\['RB','HB','FB','QB'\]/);
 });
+
+test('team Depth Chart supports two-axis phone scrolling and a grouped table view', async () => {
+  const [app,styles]=await Promise.all([source('app.js'),source('styles.css')]);
+  const release=styles.slice(styles.lastIndexOf('/* FranchiseHQ 7.5.7 — mobile depth-chart navigation and grouped table view */'));
+
+  assert.match(app,/depthChartView:\s*'formation'/);
+  assert.match(app,/data-depth-chart-view="formation"/);
+  assert.match(app,/data-depth-chart-view="table"/);
+  for(const group of [
+    'Quarterbacks','Running Backs & Fullbacks','Wide Receivers & Tight Ends','Offensive Linemen',
+    'Defensive Tackles','Edge','Linebackers','Secondary','Kickers & Punters'
+  ])assert.ok(app.includes(`'${group}'`),`${group} is present in the grouped depth table`);
+  for(const column of ['Position','Player Name','Overall','Age','Height','Weight','Development']){
+    assert.match(app,new RegExp(`<th>${column}<\\/th>`));
+  }
+  assert.match(app,/positionPlayers\.sort\(sortDepth\)\.slice\(0,3\)/);
+  assert.match(release,/\.depth-formation-scroll\{[^}]*overflow:auto[^}]*overscroll-behavior:contain[^}]*touch-action:pan-x pan-y/s);
+  assert.match(release,/@media\(max-width:760px\)[\s\S]*\.depth-formation-scroll\{[^}]*max-height:72svh/s);
+  assert.match(release,/\.depth-formation-canvas\{[^}]*width:max-content[^}]*min-width:1180px/s);
+  assert.match(release,/\.depth-chart-table-wrap\{[^}]*overflow-x:auto/s);
+});
+
+test('Player Card and depth table retain and format canonical Madden height and weight', async () => {
+  const app=await source('app.js');
+  assert.match(app,/heightInches:Number\(player\.heightInches\?\?source\.heightInches\?\?source\.height_inches/);
+  assert.match(app,/weightLbs:Number\(player\.weightLbs\?\?source\.weightLbs\?\?source\.weight_lbs/);
+  assert.match(app,/height: formatRosterHeight\(player\?\.heightInches \?\? raw\.heightInches \?\? raw\.height_inches \?\? raw\.height\)/);
+  assert.match(app,/weight: formatRosterWeight\(player\?\.weightLbs \?\? raw\.weightLbs \?\? raw\.weight_lbs \?\? raw\.weight\)/);
+  assert.match(app,/Math\.floor\(inches\/12\)/);
+  assert.match(app,/\$\{escapeHtml\(player\.weight\)\} lbs/);
+});

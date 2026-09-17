@@ -759,7 +759,7 @@ test('one finalize request atomically publishes the exact validated snapshot and
     const invoke=()=>candidateImport({
       request:new Request('https://franchisehq.app/api/leagues/fgc/companion/candidate-import',{
         method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},
-        body:JSON.stringify({action:'finalize',runId:'candidate-week-9',durationMs:45000})
+        body:JSON.stringify({action:'finalize',runId:'candidate-week-9',durationMs:45000,clientTimings:{sourceEligibilityMs:1200}})
       }),
       params:{leagueSlug:'fgc'},env:{DB:binding,FRANCHISE_HQ_DB:binding}
     });
@@ -768,6 +768,9 @@ test('one finalize request atomically publishes the exact validated snapshot and
     let payload=await response.json();
     assert.equal(payload.run.activationPerformed,true);
     assert.equal(payload.run.activeSnapshotChanged,true);
+    assert.equal(payload.run.phaseState['source-eligibility'].durationMs,1200);
+    assert.equal(payload.run.phaseState['atomic-activation'].status,'complete');
+    assert.equal(Number.isFinite(payload.importPerformance.activationMs),true);
     assert.equal(sqlite.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id='league-1'`).get().snapshot_id,'snapshot-week-9');
     assert.deepEqual(sqlite.prepare(`SELECT id,status FROM league_snapshots ORDER BY id`).all().map(row=>({...row})),[
       {id:'snapshot-week-7',status:'archived'},
@@ -778,6 +781,18 @@ test('one finalize request atomically publishes the exact validated snapshot and
     assert.equal(counts.freeAgentCount,null);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM tenant_audit_events WHERE action='companion.live_import.activate'`).get().count,1);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_lifecycle_events WHERE event_type='import-activated'`).get().count,1);
+    response=await candidateImport({
+      request:new Request('https://franchisehq.app/api/leagues/fgc/companion/candidate-import',{
+        method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},
+        body:JSON.stringify({action:'record-performance',runId:'candidate-week-9',clickToLiveMs:48750,browserRefreshMs:215,browserRefreshOk:true})
+      }),
+      params:{leagueSlug:'fgc'},env:{DB:binding,FRANCHISE_HQ_DB:binding}
+    });
+    assert.equal(response.status,200);
+    payload=await response.json();
+    assert.equal(payload.run.durationMs,48750);
+    assert.equal(payload.run.phaseState['browser-refresh'].durationMs,215);
+    assert.equal(payload.run.phaseState['browser-refresh'].status,'complete');
     response=await invoke();
     assert.equal(response.status,200);
     payload=await response.json();
@@ -840,7 +855,13 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(schedule,/period\?\.playable\?period\.week:meta\.week\?\?/);
   assert.match(schedule,/candidateImportRunId/);
   assert.match(statistics,/forceProcessRetainedBundle/);
+  assert.match(statistics,/Math\.min\(4,Number\(body\.batches\)\|\|1\)/);
   for(const source of [ui,worker])assert.match(source,/candidateImportRunId/);
+  for(const source of [ui,worker])assert.match(source,/action:'next',runId,batches:4/);
+  assert.match(ui,/action:'validate-next',snapshotId,limit:500,batches:4/);
+  assert.match(ui,/action:'record-performance'/);
+  assert.match(ui,/Click to live/);
+  assert.match(ui,/Thread readiness/);
 
   assert.match(lifecycle,/\['activate','rollback'\]\.includes\(action\)/);
   assert.match(lifecycle,/requirePlatformOwner\(context\)/);

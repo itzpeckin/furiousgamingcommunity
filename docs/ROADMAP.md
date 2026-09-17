@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 16, 2026
+**Updated:** September 17, 2026
 
-**Revision:** 2.69
+**Revision:** 2.70
 
-**Current production:** FranchiseHQ 7.5.6.11 is live from PR #113 and code Main `6adcdd43880d7c70b6aee9e4fddf733d3823413f`. Migration 42 remains applied. Madden contract units no longer depend on cap-hit magnitude.
+**Current production:** FranchiseHQ 7.5.6.12 is live from PR #114 and code Main `4d51e4f7d57beb523b9fe33879e39becfebbbdda`. Migration 43 is applied. The owner validated `/rush rule` and `/abilities` in the connected league.
 
-**Current work:** 7.5.6.12 adds `/rush rule` and `/abilities` as shared multi-league Discord commands. The rushing audit totals team carries and checks player-versus-team rushing yards for completed regular-season games. Ability counts use 0.5 for FB, K, P, LT, LG, C, RG, RT, OL, and LS, and 1 for every other position; an additive ledger records honest season-opening or first-observed trait timing.
+**Current work:** 7.5.7 reduces importer round trips with bounded four-batch statistics mapping and four-by-500 validation batches, separates click-to-live, activation, browser-refresh, and Discord thread-readiness timing, repairs two-axis mobile Depth Chart navigation, adds the requested grouped table view, and restores canonical Madden height/weight on Player Cards.
 
-**Next gate:** Validate and publish 7.5.6.12, apply additive migration 43, name-upsert only `rush` and `abilities`, and perform read-only Production acceptance. No Madden export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
+**Next gate:** Validate and publish 7.5.7, then perform signed-in read-only desktop/390px Production acceptance. The next commissioner-initiated import will establish the retained-source Production timing baseline; deployment itself does not require or authorize an export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation.
 
 ## Product decisions
 
@@ -122,8 +122,8 @@
 | 7.5.6.9 | Production deployed; superseded by 7.5.6.10 phone containment | Integrate Confidence Pool picks directly into Schedule and publish server-scored season/weekly Confidence Pool standings with correct percentage |
 | 7.5.6.10 | Production | Keep the Confidence Pool Standings toolbar and table container within the phone viewport while the wide result columns scroll internally |
 | 7.5.6.11 | Production | Remove cap-hit magnitude guessing, correct retained Madden contract values at any size, and stamp future roster snapshots with proven unit metadata |
-| 7.5.6.12 | Validated Production-authorized candidate | Add completed-game rushing-rule audits plus weighted Superstar/X-Factor roster counts and honest first-observed trait timing |
-| 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
+| 7.5.6.12 | Production; owner command acceptance passed | Add completed-game rushing-rule audits plus weighted Superstar/X-Factor roster counts and honest first-observed trait timing |
+| 7.5.7 | Production-authorized candidate | Bounded importer batching and split timing, mobile two-axis Depth Chart navigation, grouped table view, and canonical Player Card height/weight |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
@@ -149,8 +149,8 @@
 | 10d | Production deployed | 7.5.6.9 | Put Confidence Pool picks inside each schedule matchup and expose accurate season/weekly pool standings from finalized results. |
 | 10e | Immediate presentation patch | 7.5.6.10 | Contain the live Confidence Pool Standings layout at phone width without changing the leaderboard or stored picks. |
 | 10f | Immediate contract correction | 7.5.6.11 | Normalize Madden contract currency by source format rather than cap-hit magnitude, with no numeric ceiling and no data rewrite. |
-| 10g | Immediate Discord operations | 7.5.6.12 | Audit the 10-carry rushing rule and player/team rushing-yard integrity, and expose weighted ability counts with FB and specialist/line half weights. |
-| 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
+| 10g | Production; owner accepted | 7.5.6.12 | Audit the 10-carry rushing rule and player/team rushing-yard integrity, and expose weighted ability counts with FB and specialist/line half weights. |
+| 11 | Active off-season work | 7.5.7 | Reduce importer round trips, separate activation/refresh/thread timing, and complete the requested Depth Chart/mobile and Player Card bio repairs. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
@@ -717,12 +717,14 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## 7.5.7 — Off-Season Import Performance and Thread Readiness
 
-- Instrument the complete commissioner path before optimizing it: source eligibility, fetch/read, parse/map, database build, validation, atomic activation, browser refresh, and post-activation Discord synchronization each receive a separate duration and outcome.
-- Establish repeatable Production-sized baselines for both the retained 43-route export and a representative full-season schedule import, then record an explicit owner-approved performance target before implementation is accepted.
-- Remove avoidable repeated work, bound concurrency and database batches safely, and reuse unchanged verified inputs where exact hashes and mapping revisions prove equivalence. Never trade speed for incomplete validation or stale mapping behavior.
-- Keep import activation and Discord synchronization independently observable. A successful import should become live as soon as its atomic activation completes; thread creation follows the 7.5.6 period-advance gate and reports its own success, retry, or review status instead of hiding delay inside a generic import state.
+- Retain the existing per-phase importer measurements and add separate source-eligibility, atomic-activation, browser-refresh, click-to-live, and Discord thread-readiness duration/outcome fields in Commissioner HQ.
+- Reduce browser/network round trips without weakening work: process up to four statistics batches per request and four 500-record validation batches per request, using the endpoint's existing hard caps and sequential database writes.
+- Keep exact-hash reuse, mapping-revision authority, validation, atomic activation, and post-activation Discord synchronization intact. A successful import is live when its pointer moves; thread creation remains behind the proven 7.5.6 period-advance gate and reports independently.
+- Establish the retained-source and full-season Production timing baselines on the next commissioner-initiated imports rather than creating a synthetic Production import for release acceptance. Preserve the existing visible sub-60-second click-to-live target and record live-to-thread-ready separately.
+- Repair the current formation Depth Chart on phones with one bounded two-axis scroller. Add a Formation/Table toggle; the table groups quarterbacks, backs/fullbacks, receivers/tight ends, offensive line, defensive tackles, edge, linebackers, secondary, and specialists, showing depth 1–3 with position, player, OVR, age, height, weight, and development.
+- Preserve `heightInches` and `weightLbs` through the browser roster adapter and format them consistently in the Depth Chart table and canonical Player Card banner.
 - Preserve exact-source idempotency, tenant isolation, recovery bookmarks, append-only snapshots/audits, previous and malformed evidence, schedule/history continuity, and unknown/null treatment for blocked Free Agents.
-- Gate: repeated benchmark runs meet the agreed target and produce the same validated snapshot content as the correctness baseline. Acceptance records both click-to-live time and live-to-thread-ready time, proves same-week imports create no Discord work, proves a true one-week advance creates only the new week's threads, and verifies safe recovery from a failed build or failed Discord synchronization without partial activation or data loss.
+- Gate: focused UI/data/import regressions, complete repository and strict release checks, exact Main deployment, desktop/390px read-only Production acceptance, and the next owner-operated import timing record pass. Existing same-week/no-thread, one-week-only thread creation, failed-build preservation, and failed-Discord recovery regressions remain mandatory.
 
 ## 7.5.8 — Canonical League Consistency (formerly 7.4.5)
 
@@ -768,6 +770,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.70:** Published 7.5.6.12 through PR #114 as Main `4d51e4f` and recorded owner validation of both new Discord commands. Began standing-authorized 7.5.7 from that exact baseline. The candidate bounds statistics and validation work per request, separates click-to-live from browser and Discord readiness, restores Player Card height/weight from already-canonical read-model fields, and adds a mobile-scrollable Formation view plus grouped Depth Chart table. No Madden export/import, snapshot/thread operation, Production data write, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Free Agent reinterpretation occurred during implementation.
 
 - **Revision 2.69:** Published 7.5.6.11 through PR #113 as Main `6adcdd4`, then began standing-authorized 7.5.6.12 from that exact baseline. The candidate adds tenant-safe `/rush rule` and `/abilities`, applies the requested FB half weight alongside K/P/offensive line, keeps all other positions at 1, distinguishes the 7.5 opening/trade benchmark from allowed development gains, and records source-backed trait observations through additive migration 43. Missing rushing data remains unverifiable rather than zero. No Production migration, command registration, export/import, active-snapshot/thread action, reset, deletion, archive/transition, URL rotation, credential/membership/assignment change, or Free Agent reinterpretation occurred during implementation.
 

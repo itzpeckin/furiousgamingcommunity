@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.7 importer timing, Depth Chart, and player-bio impact
+
+This code-only release reduces browser round trips by processing bounded statistics and validation batches per request, records importer activation/refresh/thread timing separately, adds a grouped Depth Chart table, restores mobile two-axis formation scrolling, and carries existing canonical Madden height/weight fields into Player Cards. It adds no migration and changes no Madden source, snapshot, schedule, current week, Discord thread gate, roster authority, or stored player biography.
+
+The runtime rollback baseline is exact Main `4d51e4f7d57beb523b9fe33879e39becfebbbdda`, Production release 7.5.6.12, and migration 43. Runtime rollback may restore that code while retaining every import timing record, development-trait observation, active/prior/malformed snapshot, capture/report, schedule revision, audit, permanent export URL, Discord thread record, season/game-year record, and blocked/null Free Agent state.
+
+Do not run a Madden export/import, move an active snapshot, create or remove scheduling threads, reset/delete data, rotate the export URL, archive/transition a season, rewrite player height/weight, or reinterpret blocked Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.6.12 Discord rushing and abilities impact
 
 This release adds `/rush rule`, weighted `/abilities`, and additive migration 43's tenant- and season-scoped development-trait observations. The ledger establishes the active snapshot as the first honest observation and records later qualifying traits during atomic activation. It does not alter Madden source records, roster authority, rule enforcement, or the 7.5 opening/trade benchmark.

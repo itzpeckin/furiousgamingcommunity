@@ -25,7 +25,7 @@ import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliat
 import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 import { observeDevelopmentTraitsStatement } from '../../../../_lib/development-traits.js';
 
-const RELEASE = '7.5.6.12';
+const RELEASE = '7.5.7';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -558,6 +558,12 @@ async function finalize(current, body) {
       ? Number(freeAgentEvidence.recordCount || 0) : null
   };
   const durationMs = Math.max(0,Number(body.durationMs || 0));
+  const phaseState=parseCandidateJson(run.phase_state_json,{});
+  const sourceEligibilityMs=Math.max(0,Number(body.clientTimings?.sourceEligibilityMs||0));
+  if(sourceEligibilityMs)phaseState['source-eligibility']={
+    status:'complete',summary:'Latest export and destination confirmed',durationMs:sourceEligibilityMs,
+    completedAt:new Date().toISOString()
+  };
   const actor=current.authorization.session.user.id;
   const expectedActive=run.active_snapshot_id_before || '';
   const lifecycleId=crypto.randomUUID();
@@ -598,10 +604,10 @@ async function finalize(current, body) {
       week:snapshotManifest?.currentPeriod?.week??snapshot.week_index
     }),
     current.db.prepare(`UPDATE companion_candidate_import_runs SET
-      status='preview-ready',completeness_status=?,result_counts_json=?,warnings_json=?,retry_json='{}',
+      status='preview-ready',completeness_status=?,result_counts_json=?,warnings_json=?,phase_state_json=?,retry_json='{}',
       active_snapshot_id_after=?,duration_ms=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
       WHERE id=? AND league_id=? AND ${activationGuard}`)
-      .bind(completeness,JSON.stringify(counts),JSON.stringify(uniqueWarnings),snapshot.id,durationMs,run.id,current.league.id,current.league.id,snapshot.id),
+      .bind(completeness,JSON.stringify(counts),JSON.stringify(uniqueWarnings),JSON.stringify(phaseState),snapshot.id,durationMs,run.id,current.league.id,current.league.id,snapshot.id),
     current.db.prepare(`INSERT INTO league_snapshot_lifecycle_events
       (id,league_id,snapshot_id,event_type,actor_id,detail_json)
       SELECT ?,?,?,?,?,? WHERE ${activationGuard}`)
@@ -621,13 +627,47 @@ async function finalize(current, body) {
           freeAgentInterpretedAsZero:false
         }),current.league.id,snapshot.id)
   ];
+  const activationStartedAt=Date.now();
   await current.db.batch(statements);
+  const activationDurationMs=Math.max(0,Date.now()-activationStartedAt);
   const activated=await activeSnapshotId(current.db,current.league.id);
   if(activated!==snapshot.id){
     return { response:json({ok:false,error:'The active snapshot changed during live import; activation was refused.',release:RELEASE},409) };
   }
+  phaseState['atomic-activation']={
+    status:'complete',summary:'Validated snapshot made live atomically',durationMs:activationDurationMs,
+    completedAt:new Date().toISOString()
+  };
+  try{
+    await current.db.prepare(`UPDATE companion_candidate_import_runs SET phase_state_json=?,updated_at=CURRENT_TIMESTAMP
+      WHERE id=? AND league_id=? AND active_snapshot_id_after=?`)
+      .bind(JSON.stringify(phaseState),run.id,current.league.id,snapshot.id).run();
+  }catch(error){
+    console.warn('Candidate activation timing could not be retained:',error?.message||String(error));
+  }
   const tradeReconciliation=await reconcileTradeRosterOverlays(current.db,current.league.id,snapshot.id);
-  return { run:await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first(), tradeReconciliation };
+  return { run:await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first(), tradeReconciliation, activationDurationMs };
+}
+
+async function recordPerformance(current,body){
+  const runId=text(body.runId);
+  const run=runId?await current.db.prepare(`SELECT * FROM companion_candidate_import_runs
+    WHERE id=? AND league_id=?`).bind(runId,current.league.id).first():null;
+  if(!run)return{response:json({ok:false,error:'Candidate import run not found.',release:RELEASE},404)};
+  if(!run.active_snapshot_id_after||String(run.active_snapshot_id_after)!==String(run.candidate_snapshot_id||'')){
+    return{response:json({ok:false,error:'Client performance can be recorded only after the candidate is live.',release:RELEASE},409)};
+  }
+  const phaseState=parseCandidateJson(run.phase_state_json,{});
+  const clickToLiveMs=Math.max(0,Math.min(86400000,Number(body.clickToLiveMs||0)));
+  const browserRefreshMs=Math.max(0,Math.min(86400000,Number(body.browserRefreshMs||0)));
+  if(browserRefreshMs||body.browserRefreshOk!==undefined)phaseState['browser-refresh']={
+    status:body.browserRefreshOk===false?'failed':'complete',
+    summary:body.browserRefreshOk===false?'Live data refresh will retry':'Browser read model refreshed',
+    durationMs:browserRefreshMs,completedAt:new Date().toISOString()
+  };
+  await current.db.prepare(`UPDATE companion_candidate_import_runs SET phase_state_json=?,duration_ms=?,updated_at=CURRENT_TIMESTAMP
+    WHERE id=? AND league_id=?`).bind(JSON.stringify(phaseState),clickToLiveMs||Number(run.duration_ms||0),run.id,current.league.id).run();
+  return{run:await current.db.prepare(`SELECT * FROM companion_candidate_import_runs WHERE id=?`).bind(run.id).first()};
 }
 
 export async function onRequestGet(context) {
@@ -676,6 +716,11 @@ export async function onRequestPost(context) {
     if (result.response) return result.response;
     return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run) });
   }
+  if(action==='record-performance'){
+    const result=await recordPerformance(current,body);
+    if(result.response)return result.response;
+    return json({...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run)});
+  }
   if (action === 'finalize') {
     const result = await finalize(current,body);
     if (result.response) return result.response;
@@ -686,7 +731,7 @@ export async function onRequestPost(context) {
       requestedByUserId:current.authorization.session.user.id,
       source:'candidate-import'
     });
-    return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run),tradeReconciliation:result.tradeReconciliation||null,discordScheduleSync });
+    return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run),tradeReconciliation:result.tradeReconciliation||null,discordScheduleSync,importPerformance:{activationMs:Number(result.activationDurationMs||0),discordScheduleSync} });
   }
   return json({ ok:false,error:`Unsupported action: ${action || 'none'}.`,release:RELEASE }, 400);
 }

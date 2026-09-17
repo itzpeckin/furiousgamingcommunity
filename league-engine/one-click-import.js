@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.6.8 */
+/* FHQ_BUILD: 7.5.7 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.5.6.8';
+  const VERSION = '7.5.7';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -237,7 +237,7 @@
       const progress = result.progress || {};
       notice = `Map Statistics · ${Number(progress.done||0).toLocaleString()}/${Number(progress.total||0).toLocaleString()} routes`;
       rerender();
-      result = await api('map-statistics','POST',{action:'next',runId});
+      result = await api('map-statistics','POST',{action:'next',runId,batches:4});
       guard += 1;
     }
     if (!result.complete) throw new Error('Statistics mapping exceeded the 5,000-batch safety limit.');
@@ -254,7 +254,7 @@
       const job = result.validationJob || {};
       notice = `Validate Candidate · ${Number(job.processedCount||0).toLocaleString()}/${Number(job.totalCount||0).toLocaleString()} records`;
       rerender();
-      result = await api('snapshot-lifecycle','POST',{action:'validate-next',snapshotId,limit:250});
+      result = await api('snapshot-lifecycle','POST',{action:'validate-next',snapshotId,limit:500,batches:4});
       guard += 1;
     }
     if (!result.complete) throw new Error('Candidate validation exceeded the 500-batch safety limit.');
@@ -267,6 +267,7 @@
   }
 
   async function refreshLiveApplication(detail={}) {
+    const startedAt=now();
     let refreshed=true;
     const liveData=HQ?.liveData || HQ?.league?.liveData || HQ?.getModuleService?.('league','liveData');
     try {
@@ -278,7 +279,18 @@
     const eventDetail={...detail,activationPerformed:true,applicationDataRefreshed:refreshed};
     window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:eventDetail}));
     window.dispatchEvent(new CustomEvent('franchisehq:league-import-live',{detail:eventDetail}));
-    return refreshed;
+    return {refreshed,durationMs:Math.max(0,Math.round(now()-startedAt))};
+  }
+
+  async function retainClientPerformance(runId,{clickToLiveMs,browserRefreshMs,browserRefreshOk}={}){
+    try{
+      const reported=await api('candidate-import','POST',{
+        action:'record-performance',runId,clickToLiveMs,browserRefreshMs,browserRefreshOk
+      });
+      if(reported?.run)state=reported;
+    }catch(error){
+      console.warn('[One-Click Import] Performance timing could not be retained.',error);
+    }
   }
 
   async function runImport({retry=false}={}) {
@@ -291,24 +303,29 @@
     rerender();
     const wallStartedAt = now();
     let runId = null;
+    let sourceEligibilityMs = 0;
     try {
+      const sourceEligibilityStartedAt=now();
       if (!state?.destination) {
         state = await api('candidate-import','POST',{action:'create-destination'});
         if (!state?.destination) throw new Error('The franchise-season import destination is unavailable.');
       }
       state = await api('candidate-import','POST',{action:'start',retry});
+      sourceEligibilityMs=Math.max(0,Math.round(now()-sourceEligibilityStartedAt));
       runId = state?.run?.id;
       if (!runId) throw new Error('Candidate importer did not return a durable run ID.');
       if (state.warm && state.run?.status === 'preview-ready') {
-        const finalDuration=Math.max(0,Math.round(now()-wallStartedAt));
-        state=await api('candidate-import','POST',{action:'finalize',runId,durationMs:finalDuration});
-        notice = `Validated import is live in ${durationLabel(finalDuration)}.`;
-        const refreshed=await refreshLiveApplication({
-          runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:finalDuration,
+        const elapsedBeforeActivation=Math.max(0,Math.round(now()-wallStartedAt));
+        state=await api('candidate-import','POST',{action:'finalize',runId,durationMs:elapsedBeforeActivation,clientTimings:{sourceEligibilityMs}});
+        const clickToLiveMs=Math.max(0,Math.round(now()-wallStartedAt));
+        notice = `Validated import is live in ${durationLabel(clickToLiveMs)}.`;
+        const refreshResult=await refreshLiveApplication({
+          runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:clickToLiveMs,
           importMode:state.run?.resultCounts?.importMode||state.source?.coverage?.importMode
         });
-        if(!refreshed)notice+=' Live data will retry in the background without requiring a browser reload.';
-        lastOutcome={tone:'success',title:'Import complete',summary:`The latest league data is live${finalDuration?` in ${durationLabel(finalDuration)}`:''}.`};
+        await retainClientPerformance(runId,{clickToLiveMs,browserRefreshMs:refreshResult.durationMs,browserRefreshOk:refreshResult.refreshed});
+        if(!refreshResult.refreshed)notice+=' Live data will retry in the background without requiring a browser reload.';
+        lastOutcome={tone:'success',title:'Import complete',summary:`The latest league data is live${clickToLiveMs?` in ${durationLabel(clickToLiveMs)}`:''}.`};
         renderImportNotification();
         return;
       }
@@ -386,17 +403,19 @@
         candidateSnapshotId:snapshotId
       }),wallStartedAt);
 
-      const finalDuration=Math.max(0,Math.round(now()-wallStartedAt));
-      state = await api('candidate-import','POST',{action:'finalize',runId,durationMs:finalDuration});
-      notice = finalDuration < 60000
-        ? `Import live in ${durationLabel(finalDuration)}.`
-        : `Import live in ${durationLabel(finalDuration)}; review the sub-60-second performance target.`;
-      const refreshed=await refreshLiveApplication({
-        runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:finalDuration,
+      const elapsedBeforeActivation=Math.max(0,Math.round(now()-wallStartedAt));
+      state = await api('candidate-import','POST',{action:'finalize',runId,durationMs:elapsedBeforeActivation,clientTimings:{sourceEligibilityMs}});
+      const clickToLiveMs=Math.max(0,Math.round(now()-wallStartedAt));
+      notice = clickToLiveMs < 60000
+        ? `Import live in ${durationLabel(clickToLiveMs)}.`
+        : `Import live in ${durationLabel(clickToLiveMs)}; review the sub-60-second performance target.`;
+      const refreshResult=await refreshLiveApplication({
+        runId,candidateSnapshotId:state.run?.candidateSnapshotId,durationMs:clickToLiveMs,
         importMode:state.run?.resultCounts?.importMode||state.source?.coverage?.importMode
       });
-      if(!refreshed)notice+=' Live data will retry in the background without requiring a browser reload.';
-      lastOutcome={tone:'success',title:'Import complete',summary:`The latest league data is live in ${durationLabel(finalDuration)}.`};
+      await retainClientPerformance(runId,{clickToLiveMs,browserRefreshMs:refreshResult.durationMs,browserRefreshOk:refreshResult.refreshed});
+      if(!refreshResult.refreshed)notice+=' Live data will retry in the background without requiring a browser reload.';
+      lastOutcome={tone:'success',title:'Import complete',summary:`The latest league data is live in ${durationLabel(clickToLiveMs)}.`};
       renderImportNotification();
     } catch (error) {
       errorMessage = error.message;
@@ -490,6 +509,11 @@
     const actionableSourceWarnings=sourceWarnings.filter(value=>!routineWarning(value));
     const sourceIsNew=source?.selectionStatus==='new-source';
     const threadSync=state?.discordScheduleSync;
+    const sourceTiming=run?.phaseState?.['source-eligibility'];
+    const activationTiming=run?.phaseState?.['atomic-activation'];
+    const refreshTiming=run?.phaseState?.['browser-refresh'];
+    const threadTiming=threadSync?.durationMs!=null?durationLabel(threadSync.durationMs)
+      :threadSync?.status==='not-required'?'Not required':threadSync?.scheduled?'Running':threadSync?.status||'—';
     const threadReview=threadSync?.reviewRequired?`Schedule threads need commissioner review (${threadSync.reason}). After verifying the current period, use /week${threadSync.weekIndex} in the connected Discord server.`
       :['failed','partial'].includes(threadSync?.status)?`Schedule thread sync needs retry: ${threadSync.lastError||'Discord delivery failed'}. Check the configured channel permissions, then use /week${threadSync.weekIndex}.`:'';
     return `<section class="card commissioner-live-import-card commissioner-companion-workspace" data-one-click-import-panel>
@@ -511,7 +535,11 @@
         <div><small>Teams</small><strong>${countLabel(resultCounts.teams ?? source?.counts?.teams ?? latestExport.counts?.teams)}</strong></div>
         <div><small>Rostered players</small><strong>${countLabel(resultCounts.rosteredPlayers ?? resultCounts.players ?? source?.counts?.rosteredPlayers ?? latestExport.counts?.rosteredPlayers)}</strong></div>
         <div><small>Free Agents</small><strong>${esc(faCount)}</strong></div>
-        <div><small>Wall time</small><strong>${durationLabel(run?.durationMs)}</strong></div>
+        <div><small>Click to live</small><strong>${durationLabel(run?.durationMs)}</strong></div>
+        <div><small>Source check</small><strong>${durationLabel(sourceTiming?.durationMs)}</strong></div>
+        <div><small>Atomic activation</small><strong>${durationLabel(activationTiming?.durationMs)}</strong></div>
+        <div><small>Browser refresh</small><strong>${durationLabel(refreshTiming?.durationMs)}</strong></div>
+        <div><small>Thread readiness</small><strong>${esc(threadTiming)}</strong></div>
       </div></section>
       <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}

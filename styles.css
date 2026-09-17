@@ -8005,3 +8005,41 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 .confidence-standings-shell>.card{max-width:100%}
 .confidence-standings-shell>.card>.table-wrap{width:100%;max-width:100%;overflow-x:auto}
 .confidence-standings-toolbar p{overflow-wrap:anywhere}
+
+/* FranchiseHQ 7.5.7 — mobile depth-chart navigation and grouped table view */
+.madden-depth-card>.card-header{align-items:flex-start;gap:16px}
+.madden-depth-card>.card-body{overflow:visible}
+.depth-chart-header-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0}
+.depth-view-toggle{display:inline-flex;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}
+.depth-view-toggle button{min-height:34px;padding:6px 11px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:inherit;font-size:.68rem;font-weight:800;cursor:pointer}
+.depth-view-toggle button:hover,.depth-view-toggle button:focus-visible{color:var(--text);background:rgba(var(--accent-rgb),.08)}
+.depth-view-toggle button.is-active{color:var(--text);background:rgba(var(--accent-rgb),.18);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.28)}
+.depth-formation-scroll{width:100%;max-width:100%;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+.depth-formation-canvas{min-width:0}
+.depth-chart-table-groups{display:grid;gap:22px}
+.depth-chart-table-group{min-width:0}
+.depth-chart-table-group h4{margin:0 0 10px;color:var(--muted);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase}
+.depth-chart-table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+.depth-chart-table{width:100%;min-width:720px;border-collapse:collapse}
+.depth-chart-table th,.depth-chart-table td{padding:10px 12px;white-space:nowrap}
+.depth-chart-table th{font-size:.62rem;letter-spacing:.06em;text-transform:uppercase}
+.depth-chart-table td{border-top:1px solid var(--border);font-size:.76rem}
+.depth-table-position{display:inline-flex;align-items:center;gap:8px}
+.depth-table-position>b{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:rgba(var(--accent-rgb),.16);color:var(--text);font-size:.68rem}
+.depth-table-player{padding:0;border:0;background:transparent;color:var(--text);font:inherit;font-weight:800;text-align:left;cursor:pointer}
+.depth-table-player:hover,.depth-table-player:focus-visible{color:var(--accent)}
+.depth-chart-table-empty{color:var(--muted);text-align:center}
+@media(max-width:760px){
+  .madden-depth-card>.card-header{display:grid;grid-template-columns:minmax(0,1fr)}
+  .depth-chart-header-actions{width:100%;align-items:stretch}
+  .depth-chart-header-actions>.pill{align-self:flex-start}
+  .depth-view-toggle{display:grid;grid-template-columns:1fr 1fr;width:100%;box-sizing:border-box}
+  .depth-view-toggle button{min-height:44px}
+  .depth-formation-scroll{max-height:72svh;border:1px solid var(--border);border-radius:12px}
+  .depth-formation-canvas{width:max-content;min-width:1180px;padding:12px;box-sizing:border-box}
+  .depth-formation-canvas .football-formation--offense,
+  .depth-formation-canvas .football-formation--defense{width:1154px;min-width:1154px}
+  .depth-formation-canvas .football-formation--special{min-width:520px}
+  .depth-chart-table{min-width:760px}
+  .depth-chart-table th,.depth-chart-table td{padding:10px}
+}

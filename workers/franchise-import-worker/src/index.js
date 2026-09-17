@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 7.4.1 */
+/* FHQ_BUILD: 7.5.7 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='7.4.1';
+const RELEASE='7.5.7';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -67,7 +67,7 @@ async function mapStatistics(context,step){
   let guard=0;
   while(!result.complete&&guard<5000){
     result=await step.do(`map-statistics-next-${guard+1}`,()=>call(
-      context,companion(context.slug,'map-statistics'),'POST',{action:'next',runId}
+      context,companion(context.slug,'map-statistics'),'POST',{action:'next',runId,batches:4}
     ));
     guard+=1;
   }
