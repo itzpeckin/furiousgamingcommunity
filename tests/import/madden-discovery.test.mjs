@@ -54,7 +54,8 @@ const MIGRATIONS = [
   '../../migrations/0039_discord_trade_committee_role.sql',
   '../../migrations/0040_trade_management_events.sql',
   '../../migrations/0041_commissioner_roster_ownership.sql',
-  '../../migrations/0042_yearly_schedule_import.sql'
+  '../../migrations/0042_yearly_schedule_import.sql',
+  '../../migrations/0043_player_development_trait_observations.sql'
 ];
 
 function d1(database) {

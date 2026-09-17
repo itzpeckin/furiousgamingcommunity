@@ -164,13 +164,13 @@
       ".css": 10,
       ".example": 1,
       ".html": 4,
-      ".js": 224,
+      ".js": 225,
       ".json": 7,
       ".jsonc": 1,
       ".md": 281,
       ".mjs": 48,
       ".png": 3,
-      ".sql": 44,
+      ".sql": 45,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -194,7 +194,7 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 148894,
+        "bytes": 154841,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -206,7 +206,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 86735,
+        "bytes": 87103,
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
@@ -218,6 +218,10 @@
         "file": "FHQ-6126-index.html"
       },
       {
+        "bytes": 63997,
+        "file": "functions/_lib/discord-read-model.js"
+      },
+      {
         "bytes": 61459,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
@@ -226,15 +230,11 @@
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 53413,
-        "file": "functions/_lib/discord-read-model.js"
-      },
-      {
         "bytes": 48894,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 46334,
+        "bytes": 46403,
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
@@ -242,7 +242,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 40527,
+        "bytes": 40957,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -258,7 +258,7 @@
         "file": "league-engine/one-click-import.js"
       }
     ],
-    "total": 631
+    "total": 633
   },
   "frontend": {
     "assets": [
@@ -1600,10 +1600,16 @@
       "recordsLedger": true,
       "sha256": "3177351d555b0a72246b75cdb1423ec40b2d6feeacc7a0ee70be4820ed8521d7",
       "version": "0042"
+    },
+    {
+      "file": "migrations/0043_player_development_trait_observations.sql",
+      "recordsLedger": true,
+      "sha256": "fd8cb1fb3517cd78f65ba81e0392c706afa7513888ec62c9f70469e1f31f3890",
+      "version": "0043"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.6.11",
+  "release": "7.5.6.12",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

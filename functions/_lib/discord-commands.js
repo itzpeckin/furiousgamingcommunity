@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '7.5.6.11';
+export const DISCORD_COMMAND_RELEASE = '7.5.6.12';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -85,6 +85,22 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
       {type:OPTION.SUB_COMMAND,name:'unplayed',description:'View unplayed games in the current week.',options:[privateOption]},
       {type:OPTION.SUB_COMMAND,name:'played',description:'View completed games in the current week.',options:[privateOption]},
       {type:OPTION.SUB_COMMAND,name:'all',description:'View played and unplayed games in the current week.',options:[privateOption]}
+    ]
+  },
+  {
+    name:'rush',description:'Check the league team-rushing rule for completed games.',
+    options:[
+      {type:OPTION.SUB_COMMAND,name:'rule',description:'Find teams below 10 carries and audit team rushing yards.',options:[
+        {type:OPTION.INTEGER,name:'week',description:'Regular-season week. Defaults to the current imported week.',min_value:1,max_value:18},
+        privateOption
+      ]}
+    ]
+  },
+  {
+    name:'abilities',description:'View weighted Superstar and X-Factor roster counts.',
+    options:[
+      autocompleteString('team','Optional team for a player-by-player breakdown.'),
+      privateOption
     ]
   },
   {

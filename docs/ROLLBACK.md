@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.6.12 Discord rushing and abilities impact
+
+This release adds `/rush rule`, weighted `/abilities`, and additive migration 43's tenant- and season-scoped development-trait observations. The ledger establishes the active snapshot as the first honest observation and records later qualifying traits during atomic activation. It does not alter Madden source records, roster authority, rule enforcement, or the 7.5 opening/trade benchmark.
+
+The runtime rollback baseline is exact Main `6adcdd43880d7c70b6aee9e4fddf733d3823413f`, Production release 7.5.6.11, and migration 42. Runtime rollback may restore that code while retaining migration 43 and all observation rows; dropping the table or restoring a D1 bookmark is not part of runtime rollback.
+
+Do not run a Madden export/import, move an active snapshot, create scheduling threads, reset/delete data, rotate the export URL, archive/transition a season, or reinterpret blocked Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.6.11 contract-currency authority impact
 
 This code-only correction removes the cap-hit magnitude cutoff and derives Madden contract currency units from explicit source-format metadata or a proven contract relationship. Existing retained snapshot JSON is not rewritten; the read model corrects it in place, and future roster mappings retain the proven unit alongside their immutable source record.

@@ -225,6 +225,7 @@ export async function discordAutocompleteChoices(c){
   if(command==='schedule'&&subcommand==='team'&&name==='name')return teamChoices(c,query);
   if(command==='player'&&name==='name')return playerChoices(c,query);
   if(command==='team'&&name==='name')return teamChoices(c,query);
+  if(command==='abilities'&&name==='team')return teamChoices(c,query);
   if(command==='player-stats'&&name==='player')return playerChoices(c,query);
   if(command==='team-stats'&&name==='team')return teamChoices(c,query);
   if(command==='stats'&&name==='name')return lower(values.target)==='team'?teamChoices(c,query):playerChoices(c,query);

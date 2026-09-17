@@ -1,6 +1,6 @@
 import { sha256Hex } from './cloud-platform.js';
 
-export const GAME_YEAR_TRANSITION_RELEASE = '7.5.6.11';
+export const GAME_YEAR_TRANSITION_RELEASE = '7.5.6.12';
 export const GAME_YEAR_ARCHIVE_FORMAT = 1;
 
 export const GAME_YEAR_OPERATIONS = Object.freeze({
@@ -38,6 +38,7 @@ export const PERSISTENT_PLATFORM_TABLES = Object.freeze([
 export const ARCHIVE_DATASETS = Object.freeze([
   'league_snapshots',
   'league_snapshot_records',
+  'player_development_trait_observations',
   'snapshot_validation_jobs',
   'snapshot_validation_player_ids',
   'league_snapshot_lifecycle_events',

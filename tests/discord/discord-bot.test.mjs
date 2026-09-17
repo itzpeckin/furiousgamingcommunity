@@ -468,10 +468,10 @@ function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000
 }
 
 test('global Discord command inventory restores legacy week commands and remains multi-league capable',()=>{
-  assert.equal(DISCORD_GLOBAL_COMMANDS.length,37);
-  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,37);
+  assert.equal(DISCORD_GLOBAL_COMMANDS.length,39);
+  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,39);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.map(command=>command.name),[
-    'standings','playoffs','eliminated','schedule','games','leaders','player','team','trade-block','trade-history','news',
+    'standings','playoffs','eliminated','schedule','games','rush','abilities','leaders','player','team','trade-block','trade-history','news',
     'gotw','league-site','twitch','join','gm-history','confidence','rules','trade',
     ...Array.from({length:18},(_,index)=>`week${index+1}`)
   ]);
@@ -491,6 +491,12 @@ test('global Discord command inventory restores legacy week commands and remains
   assert.equal(schedule.options.find(option=>option.name==='week').options.find(option=>option.name==='number').required,true);
   assert.equal(schedule.options.find(option=>option.name==='team').options.find(option=>option.name==='name').autocomplete,true);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='games').options.map(option=>option.name),['unplayed','played','all']);
+  const rush=DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='rush');
+  assert.deepEqual(rush.options.map(option=>option.name),['rule']);
+  assert.equal(rush.options[0].options.find(option=>option.name==='week').required,undefined);
+  const abilities=DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='abilities');
+  assert.equal(abilities.options.find(option=>option.name==='team').autocomplete,true);
+  assert.equal(abilities.options.find(option=>option.name==='team').required,false);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='standings').options.map(option=>option.name),['all','division','conference','team']);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='gm-history').options.map(option=>option.name),['all','player']);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.find(command=>command.name==='rules').options.map(option=>option.name),['all','category','section','rule']);
@@ -581,6 +587,82 @@ test('/eliminated lists only teams with no division or Wild Card path through a 
     assert.match(schedule,/🟢 SF \(10-4\) @ 🟢 TB \(12-2\)/);
     assert.match(schedule,/🔴 SEA \(2-12\) @ ⚪ ARI \(4-10\)/);
     assert.doesNotMatch(schedule,/\*\*/);
+  }finally{database.close()}
+});
+
+test('/rush rule verifies team carries and yard mismatches while /abilities applies the FB and line half weights',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    const snapshotId=seedDiscordStatFixture(database,{leagueId:'league-a',week:1});
+    database.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','madden-companion','franchise-a','2026','Madden NFL 27','2026',2026,'active')`).run();
+
+    const gameRow=database.prepare(`SELECT data_json AS dataJson FROM league_snapshot_records
+      WHERE snapshot_id=? AND domain='games' AND external_id='game-1'`).get(snapshotId);
+    database.prepare(`UPDATE league_snapshot_records SET data_json=?
+      WHERE snapshot_id=? AND domain='games' AND external_id='game-1'`).run(JSON.stringify({
+        ...JSON.parse(gameRow.dataJson),status:'completed',home_score:21,away_score:17
+      }),snapshotId);
+    const rushRow=database.prepare(`SELECT data_json AS dataJson FROM league_snapshot_records
+      WHERE snapshot_id=? AND domain='statistics' AND external_id='chase-rush-w1'`).get(snapshotId);
+    const rushData=JSON.parse(rushRow.dataJson),rushMetrics=JSON.parse(rushData.metrics_json);
+    database.prepare(`UPDATE league_snapshot_records SET data_json=?
+      WHERE snapshot_id=? AND domain='statistics' AND external_id='chase-rush-w1'`).run(JSON.stringify({
+        ...rushData,metrics_json:JSON.stringify({...rushMetrics,rushAtt:8})
+      }),snapshotId);
+    seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'statistics',externalId:'sf-rush-w1',data:{
+      external_key:'sf-rush-w1',category:'rushing',player_external_id:'player-sf',team_external_id:'1002',
+      season_year:2026,stage:'regular-season',week_index:1,metrics_json:JSON.stringify({rushAtt:12,rushYds:44})
+    }});
+    seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'statistics',externalId:'sf-team-w1',data:{
+      external_key:'sf-team-w1',category:'team-game',team_external_id:'1002',season_year:2026,
+      stage:'regular-season',week_index:1,metrics_json:JSON.stringify({offRushYds:44})
+    }});
+
+    const addedPlayers=[
+      {external_id:'rookie-fb',team_external_id:'1001',display_name:'Rookie Fullback',position:'FB',development_trait:'X-Factor',years_pro:0},
+      {external_id:'line-star',team_external_id:'1001',display_name:'Line Star',position:'LT',development_trait:'Superstar',years_pro:4},
+      {external_id:'tight-end-star',team_external_id:'1001',display_name:'Tight End Star',position:'TE',development_trait:'Superstar',years_pro:2}
+    ];
+    for(const player of addedPlayers)seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'players',externalId:player.external_id,data:player});
+    const observations=[
+      ['chase-rb','Chase Runner','RB','Superstar',1],
+      ['rookie-fb','Rookie Fullback','FB','X-Factor',3],
+      ['line-star','Line Star','LT','Superstar',1],
+      ['tight-end-star','Tight End Star','TE','Superstar',2]
+    ];
+    for(const [sourceId,name,position,trait,week] of observations)database.prepare(`INSERT INTO player_development_trait_observations
+      (league_id,franchise_season_id,snapshot_id,source_player_id,team_external_id,player_name,position,years_pro,
+       development_trait,season_year,stage,week_index)
+      VALUES ('league-a','season-a',?,?,?,?,?,?,?,2026,'regular-season',?)`).run(
+        snapshotId,sourceId,'1001',name,position,sourceId==='rookie-fb'?0:2,trait,week
+      );
+
+    const db=d1(database),key=await signingKey();
+    const run=async(id,name,options=[])=>{
+      const response=await discordInteractions(await signedContext({db,key,interaction:interaction({id,name,options})}));
+      const payload=await response.json();assert.equal(response.status,200,JSON.stringify(payload));return payload.data;
+    };
+    const rush=await run('100000000000000191','rush',[{type:1,name:'rule',options:[{type:4,name:'week',value:1}]}]);
+    const rushFields=rush.embeds[0].fields.map(field=>field.value).join('\n');
+    assert.match(rushFields,/\*\*TB\*\* vs SF · 8 carries/);
+    assert.match(rushFields,/96 player yds \/ 100 team yds · Mismatch \(-4\)/);
+    assert.doesNotMatch(rushFields,/\*\*SF\*\* vs TB · 12 carries.*Unable to verify/s);
+    assert.match(rush.embeds[0].description,/never treated as zero/);
+
+    const summary=await run('100000000000000192','abilities');
+    const summaryText=summary.embeds[0].fields.map(field=>field.value).join('\n');
+    assert.match(summaryText,/\*\*TB\*\* · 3 · 1 XF \/ 3 SS/);
+    assert.match(summary.embeds[0].footer.text,/FB, K, P, LT, LG, C, RG, RT, OL and LS = 0.5/);
+    const team=await run('100000000000000193','abilities',[{type:3,name:'team',value:'tb'}]);
+    assert.match(team.embeds[0].title,/3 weighted/);
+    assert.match(team.embeds[0].description,/Rookie Fullback.*FB.*X-Factor.*0.5.*Rookie.*First observed Week 3/s);
+    assert.match(team.embeds[0].description,/Line Star.*LT.*Superstar.*0.5.*Season opening/s);
+    assert.match(team.embeds[0].description,/Tight End Star.*TE.*Superstar.*1.*First observed Week 2/s);
   }finally{database.close()}
 });
 

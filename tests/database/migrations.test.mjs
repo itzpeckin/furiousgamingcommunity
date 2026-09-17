@@ -127,7 +127,7 @@ test('the production-like legacy upgrade preserves identities and relationships'
       VALUES (?,?,?,?)`).run('league-future-test','Future League','FranchiseHQ','future-league');
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints
       WHERE league_id='league-future-test'`).get().count,1);
-    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 42);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM schema_migrations').get().count, 43);
     const upgradedSession = database.prepare(`SELECT absolute_expires_at,last_rotated_at,recovery_mode
       FROM sessions WHERE id='session-upgrade-test'`).get();
     assert.ok(upgradedSession.absolute_expires_at);
@@ -275,7 +275,7 @@ test('request handlers do not create or alter database schema', async () => {
   assert.deepEqual(offenders, []);
 });
 
-test('runtime schema verification fails closed before version 42', async () => {
+test('runtime schema verification fails closed before version 43', async () => {
   let observedVersion = 17;
   const outdated = {
     prepare() {
@@ -305,11 +305,13 @@ test('runtime schema verification fails closed before version 42', async () => {
   await assert.rejects(() => requireDatabaseSchema(outdated), error => error?.currentVersion === 39);
   observedVersion = 40;
   await assert.rejects(() => requireDatabaseSchema(outdated), error => error?.currentVersion === 40);
+  observedVersion = 42;
+  await assert.rejects(() => requireDatabaseSchema(outdated), error => error?.currentVersion === 42);
 
   const current = {
     prepare() {
-      return { first: async () => ({ version: 42, name: 'yearly_schedule_import' }) };
+      return { first: async () => ({ version: 43, name: 'player_development_trait_observations' }) };
     }
   };
-  assert.equal((await requireDatabaseSchema(current)).version, 42);
+  assert.equal((await requireDatabaseSchema(current)).version, 43);
 });

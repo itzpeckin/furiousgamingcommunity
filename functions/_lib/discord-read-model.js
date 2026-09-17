@@ -284,6 +284,178 @@ export async function gamesCommand(c,values){
   return lines(`${c.league.name} · ${stage} Week ${context.week} Games`,items,'No games are scheduled for the active week.');
 }
 
+const RUSHING_RULE_MINIMUM=10;
+
+function sameRegularWeek(stat,week,season){
+  return canonicalGameStage(stat?.stage)==='regular-season'
+    &&number(stat?.week)===number(week)
+    &&(number(stat?.season)===null||number(season)===null||number(stat?.season)===number(season));
+}
+
+function discordFieldChunks(name,items,empty){
+  if(!items.length)return[{name,value:empty,inline:false}];
+  const chunks=[];let current=[];let length=0;
+  for(const item of items){
+    const next=clean(item),size=next.length+(current.length?1:0);
+    if(current.length&&length+size>950){chunks.push(current.join('\n'));current=[];length=0}
+    current.push(next);length+=size;
+  }
+  if(current.length)chunks.push(current.join('\n'));
+  return chunks.map((value,index)=>({name:index?`${name} (continued)`:name,value,inline:false}));
+}
+
+function rushingTeamAudit(model,game,teamId,opponentId,week,season){
+  const team=resolveTeam(model.teams,teamId),opponent=resolveTeam(model.teams,opponentId);
+  if(!team)return null;
+  const rushing=model.statistics.filter(stat=>lower(stat.category)==='rushing'
+    &&sameRegularWeek(stat,week,season)
+    &&resolveTeam(model.teams,stat.teamId)?.teamKey===team.teamKey);
+  const carriesComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.rushAtt)!==null);
+  const playerYardsComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.rushYds)!==null);
+  const carries=carriesComplete?rushing.reduce((sum,stat)=>sum+Number(stat.metrics.rushAtt),0):null;
+  const playerYards=playerYardsComplete?rushing.reduce((sum,stat)=>sum+Number(stat.metrics.rushYds),0):null;
+  const teamRows=model.statistics.filter(stat=>lower(stat.category)==='team-game'
+    &&sameRegularWeek(stat,week,season)
+    &&resolveTeam(model.teams,stat.teamId)?.teamKey===team.teamKey);
+  const exactGame=teamRows.find(stat=>clean(stat.source?.gameId)===clean(game.id));
+  const teamRow=exactGame||(teamRows.length===1?teamRows[0]:null);
+  const teamYards=number(teamRow?.metrics?.offRushYds);
+  const yardsComparable=playerYards!==null&&teamYards!==null;
+  return{
+    team,opponent,carries,playerYards,teamYards,
+    violation:carries!==null&&carries<RUSHING_RULE_MINIMUM,
+    yardStatus:yardsComparable?(playerYards===teamYards?'match':'mismatch'):'unavailable'
+  };
+}
+
+function rushingAuditLine(item){
+  const matchup=`**${item.team.abbreviation||item.team.displayName}** vs ${item.opponent?.abbreviation||item.opponent?.displayName||'Unknown'}`;
+  const carries=item.carries===null?'carries unavailable':`${formatMetric(item.carries)} carries`;
+  const yards=item.yardStatus==='unavailable'?'player/team rushing yards unavailable'
+    :`${formatMetric(item.playerYards)} player yds / ${formatMetric(item.teamYards)} team yds · ${item.yardStatus==='match'?'Match':`Mismatch (${formatMetric(item.playerYards-item.teamYards)})`}`;
+  return `${matchup} · ${carries} · ${yards}`;
+}
+
+export async function rushRuleCommand(c,values={}){
+  const model=await discordLeagueReadModel(c,{domains:['teams','games','statistics']});
+  const context=await currentFranchiseContext(c.db,c.league.id);
+  const requested=number(values.week),week=requested??number(context.week)??number(model.snapshot.week_index);
+  if(!Number.isInteger(week)||week<1||week>18)throw Object.assign(new Error('Choose a Regular Season week from 1 through 18.'),{status:400});
+  const season=number(model.snapshot.season_year)??number(context.seasonYear);
+  const games=model.games.filter(game=>gamePlayed(game)&&canonicalGameStage(game.stage)==='regular-season'
+    &&number(game.week)===week&&(number(game.season)===null||season===null||number(game.season)===season));
+  const audits=games.flatMap(game=>[
+    rushingTeamAudit(model,game,game.homeTeamId,game.awayTeamId,week,season),
+    rushingTeamAudit(model,game,game.awayTeamId,game.homeTeamId,week,season)
+  ]).filter(Boolean).sort((a,b)=>a.team.displayName.localeCompare(b.team.displayName));
+  const violations=audits.filter(item=>item.violation).map(rushingAuditLine);
+  const mismatches=audits.filter(item=>item.yardStatus==='mismatch').map(rushingAuditLine);
+  const unverifiable=audits.filter(item=>item.carries===null||item.yardStatus==='unavailable').map(rushingAuditLine);
+  const fields=[
+    ...discordFieldChunks(`Below ${RUSHING_RULE_MINIMUM} carries`,violations,'No verified violations.'),
+    ...discordFieldChunks('Player / team yard mismatches',mismatches,'No verified mismatches.'),
+    ...discordFieldChunks('Unable to verify',unverifiable,'No data gaps for the completed games checked.')
+  ];
+  return{content:`**${c.league.name} · Week ${week} Rushing Rule**`,embeds:[{
+    title:`${games.length} completed regular-season game${games.length===1?'':'s'} checked`,
+    description:`Team minimum: **${RUSHING_RULE_MINIMUM} total carries**. Carries are summed across every source-backed player row. Missing statistics stay unverified and are never treated as zero.`,
+    color:violations.length?0xef4444:mismatches.length?0xf59e0b:0x22c55e,fields:fields.slice(0,25),
+    footer:{text:`${audits.length} team result${audits.length===1?'':'s'} · Regular season only`}
+  }]};
+}
+
+const HALF_ABILITY_POSITIONS=new Set(['FB','K','P','LT','LG','C','RG','RT','OL','LS']);
+const COUNTED_ROSTER_STATUSES=new Set(['active','injured-reserve','practice-squad','rostered']);
+
+function canonicalAbilityTrait(value){
+  const trait=lower(value).replace(/[_ -]+/g,'');
+  if(['3','xfactor','superstarxfactor'].includes(trait))return'X-Factor';
+  if(['2','superstar'].includes(trait))return'Superstar';
+  return null;
+}
+
+function abilityWeight(position){return HALF_ABILITY_POSITIONS.has(clean(position).toUpperCase())?0.5:1}
+
+function abilityTotal(value){return Number.isInteger(Number(value))?String(Number(value)):Number(value).toFixed(1)}
+
+function qualifyingAbilityPlayers(model){
+  return model.players.map(player=>{
+    const trait=canonicalAbilityTrait(player.devTrait),team=resolveTeam(model.teams,player.teamId);
+    const rosterStatus=lower(player.rosterStatus||player.source?.rosterStatus||'active');
+    return trait&&team&&COUNTED_ROSTER_STATUSES.has(rosterStatus)
+      ?{...player,team,trait,weight:abilityWeight(player.position)}:null;
+  }).filter(Boolean);
+}
+
+function abilityObservedLabel(observation){
+  if(!observation)return'Trait history unavailable';
+  const stage=canonicalGameStage(observation.stage),week=number(observation.weekIndex)??0;
+  if(stage==='preseason'||(stage==='regular-season'&&week<=1))return'Season opening';
+  return stage==='playoffs'?`First observed Postseason Week ${week}`:`First observed Week ${week}`;
+}
+
+async function abilityHistory(c,franchiseSeasonId,players){
+  const ids=[...new Set(players.map(player=>String(player.id||'')).filter(Boolean))];
+  if(!franchiseSeasonId||!ids.length)return new Map();
+  const result=[];
+  for(let offset=0;offset<ids.length;offset+=75){
+    const chunk=ids.slice(offset,offset+75),marks=chunk.map(()=>'?').join(',');
+    result.push(...await rows(c.db,`SELECT source_player_id AS sourcePlayerId,development_trait AS developmentTrait,
+        stage,week_index AS weekIndex,observed_at AS observedAt
+      FROM player_development_trait_observations
+      WHERE league_id=? AND franchise_season_id=? AND source_player_id IN (${marks})
+      ORDER BY observed_at,week_index`,c.league.id,franchiseSeasonId,...chunk));
+  }
+  const earliest=new Map();
+  for(const item of result){
+    const key=`${item.sourcePlayerId}:${item.developmentTrait}`;
+    if(!earliest.has(key))earliest.set(key,item);
+  }
+  return earliest;
+}
+
+export async function abilitiesCommand(c,values={}){
+  const model=await discordLeagueReadModel(c,{domains:['teams','players']});
+  const players=qualifyingAbilityPlayers(model),selected=clean(values.team);
+  if(!selected){
+    const byTeam=new Map(model.teams.map(team=>[team.teamKey,{team,total:0,superstars:0,xFactors:0}]));
+    for(const player of players){
+      const row=byTeam.get(player.team.teamKey);if(!row)continue;
+      row.total+=player.weight;
+      if(player.trait==='X-Factor')row.xFactors+=1;else row.superstars+=1;
+    }
+    const ranked=[...byTeam.values()].sort((a,b)=>b.total-a.total||a.team.displayName.localeCompare(b.team.displayName));
+    const teamLines=ranked.map(item=>`**${item.team.abbreviation||item.team.displayName}** · ${abilityTotal(item.total)} · ${item.xFactors} XF / ${item.superstars} SS`);
+    const midpoint=Math.ceil(teamLines.length/2);
+    return{content:`**${c.league.name} · Superstar / X-Factor Counts**`,embeds:[{
+      title:'All team rosters',color:0x4f8cff,
+      description:'Weighted current roster totals. **7.5** is the season-opening and trade-acquisition benchmark; development gains can place a team above it.',
+      fields:[{name:'Teams 1–16',value:teamLines.slice(0,midpoint).join('\n')||'No teams available.',inline:true},
+        {name:'Teams 17–32',value:teamLines.slice(midpoint).join('\n')||'No teams available.',inline:true}],
+      footer:{text:'FB, K, P, LT, LG, C, RG, RT, OL and LS = 0.5 · Every other position = 1'}
+    }]};
+  }
+  const team=resolveTeam(model.teams,selected);
+  if(!team)throw Object.assign(new Error('That team was not found in the active league.'),{status:404});
+  const teamPlayers=players.filter(player=>player.team.teamKey===team.teamKey)
+    .sort((a,b)=>b.weight-a.weight||a.trait.localeCompare(b.trait)||a.displayName.localeCompare(b.displayName));
+  const context=await currentFranchiseContext(c.db,c.league.id),history=await abilityHistory(c,context.franchiseSeasonId,teamPlayers);
+  const total=teamPlayers.reduce((sum,player)=>sum+player.weight,0);
+  const playerLines=teamPlayers.map(player=>{
+    const observed=history.get(`${player.id}:${player.trait}`);
+    const rookie=number(player.yearsPro)===0?' · Rookie':'';
+    return `**${player.displayName}** · ${player.position||'—'} · ${player.trait} · ${abilityTotal(player.weight)}${rookie} · ${abilityObservedLabel(observed)}`;
+  });
+  return{content:`**${c.league.name} · ${team.displayName} Abilities**`,embeds:[{
+    title:`${abilityTotal(total)} weighted Superstar / X-Factor players`,color:embedColor(team.primaryColor),
+    description:playerLines.join('\n')||'No Superstar or X-Factor players are on this active roster.',
+    fields:[{name:'Benchmark',value:total>7.5
+      ?'Above 7.5. Development gains are allowed; this is not labeled a roster violation.'
+      :'At or below the 7.5 season-opening and trade-acquisition benchmark.',inline:false}],
+    footer:{text:'First observed is source-backed and does not claim an exact earn week across import gaps.'}
+  }]};
+}
+
 const REGULAR_SEASON_GAME_COUNT=17;
 
 function playoffRecordRows(model){

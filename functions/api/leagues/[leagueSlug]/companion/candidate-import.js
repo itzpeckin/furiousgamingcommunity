@@ -23,8 +23,9 @@ import {
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
 import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
+import { observeDevelopmentTraitsStatement } from '../../../../_lib/development-traits.js';
 
-const RELEASE = '7.5.6.11';
+const RELEASE = '7.5.6.12';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -591,6 +592,11 @@ async function finalize(current, body) {
     current.db.prepare(`UPDATE franchise_seasons SET status=CASE WHEN status='preview' THEN 'active' ELSE status END,
       updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND ${activationGuard}`)
       .bind(destination.franchise_season_id,current.league.id,current.league.id,snapshot.id),
+    observeDevelopmentTraitsStatement(current.db,{
+      leagueId:current.league.id,franchiseSeasonId:destination.franchise_season_id,snapshotId:snapshot.id,
+      seasonYear:snapshot.season_year,stage:snapshotManifest?.currentPeriod?.stage||'regular-season',
+      week:snapshotManifest?.currentPeriod?.week??snapshot.week_index
+    }),
     current.db.prepare(`UPDATE companion_candidate_import_runs SET
       status='preview-ready',completeness_status=?,result_counts_json=?,warnings_json=?,retry_json='{}',
       active_snapshot_id_after=?,duration_ms=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP

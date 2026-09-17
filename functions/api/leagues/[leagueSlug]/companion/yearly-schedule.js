@@ -14,7 +14,7 @@ import {
   yearlyScheduleCoverage
 } from '../../../../_lib/yearly-schedule.js';
 
-const RELEASE='7.5.6.11';
+const RELEASE='7.5.6.12';
 const EXPECTED_GAME_COUNT=272;
 const text=value=>String(value??'').trim();
 const parse=(value,fallback)=>{try{return JSON.parse(value||'')}catch{return fallback}};

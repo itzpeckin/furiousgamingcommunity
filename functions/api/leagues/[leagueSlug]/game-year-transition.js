@@ -65,6 +65,7 @@ const RESTORE_ORDER = Object.freeze([
   'league_snapshots',
   'league_player_ownership',
   'league_snapshot_records',
+  'player_development_trait_observations',
   'snapshot_validation_jobs',
   'snapshot_validation_player_ids',
   'league_snapshot_lifecycle_events',
@@ -294,6 +295,7 @@ function datasetQueries(leagueId, gameYearId) {
   return {
     league_snapshots:[`SELECT * FROM league_snapshots WHERE league_id=? AND id IN (${snapshotScope}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
     league_snapshot_records:[`SELECT * FROM league_snapshot_records WHERE league_id=? AND snapshot_id IN (${snapshotScope}) ORDER BY snapshot_id,domain,external_id`, [leagueId, leagueId, gameYearId]],
+    player_development_trait_observations:[`SELECT * FROM player_development_trait_observations WHERE league_id=? AND snapshot_id IN (${snapshotScope}) ORDER BY snapshot_id,source_player_id`, [leagueId, leagueId, gameYearId]],
     snapshot_validation_jobs:[`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id IN (${snapshotScope}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
     snapshot_validation_player_ids:[`SELECT player.* FROM snapshot_validation_player_ids player JOIN snapshot_validation_jobs job ON job.id=player.job_id AND job.league_id=player.league_id WHERE player.league_id=? AND job.snapshot_id IN (${snapshotScope}) ORDER BY player.job_id,player.player_id`, [leagueId, leagueId, gameYearId]],
     league_snapshot_lifecycle_events:[`SELECT * FROM league_snapshot_lifecycle_events WHERE league_id=? AND snapshot_id IN (${snapshotScope}) ORDER BY id`, [leagueId, leagueId, gameYearId]],
@@ -753,6 +755,7 @@ async function removeActiveData(current, gameYear, transition, body) {
     ...deleteWhere(current.db,'league_snapshot_lifecycle_events','snapshot_id',snapshotIds),
     ...deleteWhere(current.db,'canonical_statistics_snapshot_manifest','snapshot_id',snapshotIds),
     ...deleteWhere(current.db,'import_performance_certifications','snapshot_id',snapshotIds),
+    ...deleteWhere(current.db,'player_development_trait_observations','snapshot_id',snapshotIds),
     ...deleteWhere(current.db,'league_snapshot_records','snapshot_id',snapshotIds),
     ...deleteWhere(current.db,'league_snapshots','id',snapshotIds),
     current.db.prepare(`UPDATE game_year_snapshots SET snapshot_status='removed',updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND game_year_id=?`).bind(current.league.id,gameYear.id),
