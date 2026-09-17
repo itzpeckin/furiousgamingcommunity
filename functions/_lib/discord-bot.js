@@ -1,5 +1,6 @@
 import { discordCommandName, discordCommandOptions, discordScheduleThreadWeek } from './discord-commands.js';
 import {
+  abilitiesCommand,
   confidenceViewCommand,
   eliminatedCommand,
   gamesCommand,
@@ -11,6 +12,7 @@ import {
   playerStatsCommand,
   playoffsCommand,
   rulesCommand,
+  rushRuleCommand,
   scheduleCommand,
   standingsCommand,
   statsCommand,
@@ -328,6 +330,8 @@ export async function executeDiscordCommand(c){
     if(subcommand==='team')return scheduleCommand(c,{...values,view:`team:${values.name}`});
   }
   if(command==='games'&&['all','played','unplayed'].includes(subcommand))return gamesCommand(c,{...values,status:subcommand});
+  if(command==='rush'&&subcommand==='rule')return rushRuleCommand(c,values);
+  if(command==='abilities')return abilitiesCommand(c,values);
   if(command==='stats')return statsCommand(c,values);
   if(command==='player-stats')return playerStatsCommand(c,values);
   if(command==='team-stats')return teamStatsCommand(c,values);

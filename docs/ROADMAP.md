@@ -6,13 +6,13 @@
 
 **Updated:** September 16, 2026
 
-**Revision:** 2.68
+**Revision:** 2.69
 
-**Current production:** FranchiseHQ 7.5.6.10 is live from candidate `6242cc3`, PR #112, and code Main `9d3a021e22a9d93aa329bfcbfde48592b358d74f`. Migration 42 remains applied. The Confidence Pool remains schedule-integrated and its Standings card is contained at phone width.
+**Current production:** FranchiseHQ 7.5.6.11 is live from PR #113 and code Main `6adcdd43880d7c70b6aee9e4fddf733d3823413f`. Migration 42 remains applied. Madden contract units no longer depend on cap-hit magnitude.
 
-**Current work:** 7.5.6.11 removes the cap-hit magnitude cutoff that misread Nick Bosa's retained `5485` value as $5.485M instead of $54.85M. Contract units are now selected from explicit export-format metadata or proven contract relationships, never from the size of the cap hit; future roster mappings retain that unit metadata.
+**Current work:** 7.5.6.12 adds `/rush rule` and `/abilities` as shared multi-league Discord commands. The rushing audit totals team carries and checks player-versus-team rushing yards for completed regular-season games. Ability counts use 0.5 for FB, K, P, LT, LG, C, RG, RT, OL, and LS, and 1 for every other position; an additive ledger records honest season-opening or first-observed trait timing.
 
-**Next gate:** Validate and publish 7.5.6.11, then perform signed-in read-only Production acceptance against Nick Bosa and the other high-cap players. No migration, Madden export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
+**Next gate:** Validate and publish 7.5.6.12, apply additive migration 43, name-upsert only `rush` and `abilities`, and perform read-only Production acceptance. No Madden export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
 
 ## Product decisions
 
@@ -121,7 +121,8 @@
 | 7.5.6.8 | Production; owner accepted | Make ordinary nonzero statistics routes authoritative, retain Week 0 sentinel payload handling, and recompose the same retained Week 1 source with zero preseason/cumulative statistics |
 | 7.5.6.9 | Production deployed; superseded by 7.5.6.10 phone containment | Integrate Confidence Pool picks directly into Schedule and publish server-scored season/weekly Confidence Pool standings with correct percentage |
 | 7.5.6.10 | Production | Keep the Confidence Pool Standings toolbar and table container within the phone viewport while the wide result columns scroll internally |
-| 7.5.6.11 | Validated Production-authorized candidate | Remove cap-hit magnitude guessing, correct retained Madden contract values at any size, and stamp future roster snapshots with proven unit metadata |
+| 7.5.6.11 | Production | Remove cap-hit magnitude guessing, correct retained Madden contract values at any size, and stamp future roster snapshots with proven unit metadata |
+| 7.5.6.12 | Validated Production-authorized candidate | Add completed-game rushing-rule audits plus weighted Superstar/X-Factor roster counts and honest first-observed trait timing |
 | 7.5.7 | Planned for off-season | Measured importer performance and faster click-to-live/thread-ready delivery without weakening validation, atomic activation, retention, or Free Agent truthfulness |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
@@ -148,6 +149,7 @@
 | 10d | Production deployed | 7.5.6.9 | Put Confidence Pool picks inside each schedule matchup and expose accurate season/weekly pool standings from finalized results. |
 | 10e | Immediate presentation patch | 7.5.6.10 | Contain the live Confidence Pool Standings layout at phone width without changing the leaderboard or stored picks. |
 | 10f | Immediate contract correction | 7.5.6.11 | Normalize Madden contract currency by source format rather than cap-hit magnitude, with no numeric ceiling and no data rewrite. |
+| 10g | Immediate Discord operations | 7.5.6.12 | Audit the 10-carry rushing rule and player/team rushing-yard integrity, and expose weighted ability counts with FB and specialist/line half weights. |
 | 11 | Off-season | 7.5.7 | Reduce measured import and thread-readiness time on the final full-season architecture, with separate timing and status for import activation and Discord synchronization. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
@@ -700,6 +702,15 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critic
 - Code-only release: no migration, export/import, snapshot activation, thread creation, reset, deletion, URL rotation, archive/transition, or Free Agent state change.
 - Gate: focused retained/current/boundary regressions, complete repository suite, strict release checks, exact Main deployment, and signed-in read-only Production contract acceptance all pass.
 
+## 7.5.6.12 — Discord Rushing Rule and Ability Rosters
+
+- Add `/rush rule` with an optional regular-season week. Default to the current imported week, check completed games only, total player carries for both teams, name the opponent, and separately report whether summed player rushing yards match Madden's team-game rushing yards.
+- Missing player or team statistics remain **Unable to verify** and can never become a zero-carry violation. Preseason, future, bye, and unplayed games are excluded.
+- Add `/abilities` for all-team weighted Superstar/X-Factor counts and an optional autocompleted team breakdown. FB, K, P, LT, LG, C, RG, RT, OL, and LS count 0.5; all other positions count 1. Rookies are labeled only when Madden explicitly reports zero years of experience.
+- Treat 7.5 as the opening/trade-acquisition benchmark. Natural development may raise a current roster above it, so the command does not label an overage as a live roster violation.
+- Add tenant- and season-scoped migration 43 observations. Current active snapshots become the baseline; later imports append observations atomically. Output says **Season opening** or **First observed Week N**, never an unsupported exact earn date across an import gap.
+- Gate: migration and archive/restore coverage, signed command/autocomplete regressions, full repository and strict gates, exact-name command registration, exact Main deployment, and read-only Production acceptance all pass.
+
 ## 7.5.6.1 — Cross-Surface Trade Review Synchronization
 
 The 7.5.6.1 intervening patch makes every committee vote refresh all known current trade copies from the shared server tally. It preserves trade business rules and card design, uses existing durable outbox payload references without migration, keeps reviewer DMs active, converges concurrent votes, and supplies a lightweight open-site status refresh. Real Discord delivery acceptance remains owner-operated; no live vote is cast during code-only publication.
@@ -757,6 +768,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.69:** Published 7.5.6.11 through PR #113 as Main `6adcdd4`, then began standing-authorized 7.5.6.12 from that exact baseline. The candidate adds tenant-safe `/rush rule` and `/abilities`, applies the requested FB half weight alongside K/P/offensive line, keeps all other positions at 1, distinguishes the 7.5 opening/trade benchmark from allowed development gains, and records source-backed trait observations through additive migration 43. Missing rushing data remains unverifiable rather than zero. No Production migration, command registration, export/import, active-snapshot/thread action, reset, deletion, archive/transition, URL rotation, credential/membership/assignment change, or Free Agent reinterpretation occurred during implementation.
 
 - **Revision 2.68:** Began standing-authorized 7.5.6.11 from exact Main `9d3a021`. Production evidence proved Nick Bosa's retained Madden fields encode a $54.85M cap hit (`5485`) with $22.18M release penalty plus $32.67M net savings, while the runtime's `5000` cutoff displayed $5.485M. The candidate removes cap-hit magnitude inference, adds dataset-level format evidence and future mapper metadata, preserves legacy thousand-unit compatibility, and covers $54.85M, $100M, and $250M without a ceiling. No migration, Production data write, export/import, snapshot/thread operation, reset, deletion, archive/transition, URL rotation, credential/membership/assignment change, Discord configuration/registration, or Free Agent reinterpretation occurred during implementation.
 

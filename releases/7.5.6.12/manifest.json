@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.6.12",
+  "releaseType": "discord-rushing-rule-and-ability-roster-audit",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.6.11",
+    "commit": "6adcdd43880d7c70b6aee9e4fddf733d3823413f",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-discord-rush-abilities",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true,"status": "authorized-not-run"},
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.6.11",
+    "candidateRelease": "7.5.6.12",
+    "currentCommit": "6adcdd43880d7c70b6aee9e4fddf733d3823413f",
+    "currentMigration": 42,
+    "candidateMigration": 43,
+    "scope": "Additive trait-observation ledger plus tenant-scoped /rush rule and /abilities Discord commands. No export/import, snapshot activation, scheduling-thread action, reset, deletion, URL rotation, season operation, or Free Agent reinterpretation."
+  },
+  "requiredArtifacts": [
+    "migrations/0043_player_development_trait_observations.sql",
+    "functions/_lib/development-traits.js",
+    "functions/_lib/discord-commands.js",
+    "functions/_lib/discord-read-model.js",
+    "tests/discord/discord-bot.test.mjs",
+    "releases/7.5.6.12/release-record.md",
+    "releases/7.5.6.12/validation-evidence.json"
+  ]
+}
