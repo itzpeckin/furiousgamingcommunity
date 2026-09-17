@@ -4,7 +4,7 @@ import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { candidateCoverageWarnings, candidateHistoricalBackfill, candidateHistoryCarryForward, candidateScheduleCarryForward, candidateMergedPeriodCoverage, candidatePeriodLabel, candidateSourceCoverage } from '../../../../_lib/candidate-import.js';
 import { scheduleAdvanceDecision, snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
 import { mergeYearlyScheduleCatalog } from '../../../../_lib/yearly-schedule.js';
-const RELEASE='7.5.7';
+const RELEASE='7.5.7.1';
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 async function latest(db,table,leagueId,status=true){const where=status?" AND status='pending-preview'":'';return db.prepare(`SELECT * FROM ${table} WHERE league_id=?${where} ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();}
 async function rows(db,sql,...args){const r=await db.prepare(sql).bind(...args).all();return r.results||[];}

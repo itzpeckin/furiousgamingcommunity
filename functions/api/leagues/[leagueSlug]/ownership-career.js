@@ -2,10 +2,11 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireActiveMembership, requireCommissioner } from '../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../_lib/league-teams.js';
 import { buildGmSeasonSummaries, careerTotals } from '../../../_lib/gm-career.js';
+import { rehydrateFrozenGmSeasonRows } from '../../../_lib/gm-career-history.js';
 import { currentFranchiseContext, ownershipChangeStatements } from '../../../_lib/ownership-periods.js';
 import { createTenantAuditContext, writeTenantAuditEvent } from '../../../_lib/tenant-context.js';
 
-const RELEASE='7.4.1';
+const RELEASE='7.5.7.1';
 const safeTeamKey=value=>/^[a-z0-9][a-z0-9._:-]{0,99}$/.test(String(value||'').trim().toLowerCase());
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 const text=value=>value===null||value===undefined?'':String(value).trim();
@@ -91,8 +92,11 @@ async function leagueCareerResponse(current,teams){
     FROM gm_season_summaries summary JOIN franchise_seasons season ON season.id=summary.franchise_season_id AND season.league_id=summary.league_id
     WHERE summary.league_id=? AND summary.franchise_season_id<>?
     ORDER BY season.season_year,summary.gm_identity_id`).bind(current.league.id,contextState.franchiseSeasonId||'').all();
+  const historyRows=await rehydrateFrozenGmSeasonRows(current.db,{
+    leagueId:current.league.id,teams,periods,rows:historyResult?.results||[]
+  });
   const historyByIdentity=new Map();
-  for(const row of historyResult?.results||[]){
+  for(const row of historyRows){
     const id=text(row.gm_identity_id);
     if(!historyByIdentity.has(id))historyByIdentity.set(id,[]);
     historyByIdentity.get(id).push(publicSeason(row));
@@ -162,9 +166,12 @@ export async function onRequestGet(context){
       FROM gm_season_summaries summary JOIN franchise_seasons season ON season.id=summary.franchise_season_id AND season.league_id=summary.league_id
       WHERE summary.league_id=? AND summary.gm_identity_id=? AND summary.franchise_season_id<>?
       ORDER BY season.season_year`).bind(current.league.id,identity.id,contextState.franchiseSeasonId||'').all();
+    const historyRows=await rehydrateFrozenGmSeasonRows(current.db,{
+      leagueId:current.league.id,teams,periods:periodResult?.results||[],rows:historyResult?.results||[]
+    });
     const teamName=key=>resolveTeam(teams,key)?.displayName||String(key).toUpperCase();
     const liveSeason={...live,seasonYear:Number(activeSeason?.season_year)||contextState.seasonYear,label:activeSeason?.display_name||`Season ${contextState.seasonYear}`,frozen:false};
-    const seasons=[...(historyResult?.results||[]).map(publicSeason),liveSeason];
+    const seasons=[...historyRows.map(publicSeason),liveSeason];
     const totals=careerTotals(seasons);
     const relevantAttributions=currentBuilt.attributedGames.filter(row=>row.gmIdentityId===identity.id);
     return json({

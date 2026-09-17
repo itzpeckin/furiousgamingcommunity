@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "7.5.7",
+  "release": "7.5.7.1",
   "resolution": {
     "source": "server",
     "requiresExplicitSlug": true,

@@ -8,6 +8,7 @@ import { tradeCenterState } from '../api/leagues/[leagueSlug]/trade-center.js';
 import { competitionState } from '../api/leagues/[leagueSlug]/competition.js';
 import { leagueNewsState } from './league-news.js';
 import { buildGmSeasonSummaries } from './gm-career.js';
+import { rehydrateFrozenGmSeasonRows } from './gm-career-history.js';
 import { currentFranchiseContext } from './ownership-periods.js';
 import { snapshotCurrentPeriod } from './schedule-integrity.js';
 import { discordPlayerCardEmbed } from './discord-player-card.js';
@@ -1053,29 +1054,42 @@ export async function gmHistoryCommand(c,values){
   }));
   const live=buildGmSeasonSummaries({games,periods,franchiseSeasonId:context.franchiseSeasonId});
   const liveByIdentity=new Map(live.summaries.map(summary=>[String(summary.gmIdentityId),summary]));
-  const result=await rows(c.db,`SELECT identity.id,identity.user_id AS userId,identity.display_name AS displayName,identity.public_id AS publicId,
-      COALESCE(SUM(summary.regular_wins),0) AS wins,COALESCE(SUM(summary.regular_losses),0) AS losses,
-      COALESCE(SUM(summary.regular_ties),0) AS ties,COALESCE(SUM(summary.playoff_appearance),0) AS playoffs,
-      COALESCE(SUM(summary.super_bowl_appearances),0) AS superBowls,
-      COALESCE(SUM(summary.super_bowl_championships),0) AS championships
-    FROM gm_identities identity
-    LEFT JOIN gm_season_summaries summary ON summary.league_id=identity.league_id AND summary.gm_identity_id=identity.id
-    WHERE identity.league_id=?
-    GROUP BY identity.id,identity.display_name,identity.public_id
-    ORDER BY championships DESC,wins DESC,displayName`,c.league.id);
-  const combined=result.map(item=>{
+  const [identities,storedHistory]=await Promise.all([
+    rows(c.db,`SELECT identity.id,identity.user_id AS userId,identity.display_name AS displayName,identity.public_id AS publicId
+      FROM gm_identities identity WHERE identity.league_id=? ORDER BY lower(identity.display_name),identity.id`,c.league.id),
+    rows(c.db,`SELECT summary.*,season.display_name,season.season_year
+      FROM gm_season_summaries summary JOIN franchise_seasons season
+        ON season.id=summary.franchise_season_id AND season.league_id=summary.league_id
+      WHERE summary.league_id=? AND summary.franchise_season_id<>?
+      ORDER BY season.season_year,summary.gm_identity_id`,c.league.id,context.franchiseSeasonId||'')
+  ]);
+  const history=await rehydrateFrozenGmSeasonRows(c.db,{leagueId:c.league.id,teams:model.teams,periods,rows:storedHistory});
+  const historicalByIdentity=new Map();
+  for(const season of history){
+    const id=String(season.gm_identity_id||'');
+    const item=historicalByIdentity.get(id)||{wins:0,losses:0,ties:0,playoffWins:0,playoffLosses:0,playoffTies:0,playoffs:0,superBowls:0,championships:0};
+    item.wins+=Number(season.regular_wins||0);item.losses+=Number(season.regular_losses||0);item.ties+=Number(season.regular_ties||0);
+    item.playoffWins+=Number(season.playoff_wins||0);item.playoffLosses+=Number(season.playoff_losses||0);item.playoffTies+=Number(season.playoff_ties||0);
+    item.playoffs+=Number(season.playoff_appearance||0);item.superBowls+=Number(season.super_bowl_appearances||0);item.championships+=Number(season.super_bowl_championships||0);
+    historicalByIdentity.set(id,item);
+  }
+  const combined=identities.map(item=>{
     const current=liveByIdentity.get(String(item.id));
+    const archived=historicalByIdentity.get(String(item.id))||{};
     const teams=[...new Set(periods.filter(period=>String(period.gmIdentityId)===String(item.id)).map(period=>period.teamKey))];
-    return {...item,teams,wins:Number(item.wins||0)+Number(current?.regularWins||0),
-      losses:Number(item.losses||0)+Number(current?.regularLosses||0),ties:Number(item.ties||0)+Number(current?.regularTies||0),
-      playoffs:Number(item.playoffs||0)+Number(current?.playoffAppearance||0),
-      superBowls:Number(item.superBowls||0)+Number(current?.superBowlAppearances||0),
-      championships:Number(item.championships||0)+Number(current?.superBowlChampionships||0)};
+    return {...item,teams,wins:Number(archived.wins||0)+Number(current?.regularWins||0),
+      losses:Number(archived.losses||0)+Number(current?.regularLosses||0),ties:Number(archived.ties||0)+Number(current?.regularTies||0),
+      playoffWins:Number(archived.playoffWins||0)+Number(current?.playoffWins||0),
+      playoffLosses:Number(archived.playoffLosses||0)+Number(current?.playoffLosses||0),
+      playoffTies:Number(archived.playoffTies||0)+Number(current?.playoffTies||0),
+      playoffs:Number(archived.playoffs||0)+Number(current?.playoffAppearance||0),
+      superBowls:Number(archived.superBowls||0)+Number(current?.superBowlAppearances||0),
+      championships:Number(archived.championships||0)+Number(current?.superBowlChampionships||0)};
   }).sort((a,b)=>b.championships-a.championships||b.wins-a.wins||clean(a.displayName).localeCompare(clean(b.displayName)));
   const filtered=query?combined.filter(item=>[item.displayName,item.publicId,item.userId,...item.teams]
     .some(value=>lower(value).includes(query))):combined;
   return lines(`${c.league.name} · GM History`,filtered.slice(0,25).map((item,index)=>
-    `${index+1}. **${item.displayName}** · ${record(item.wins,item.losses,item.ties)} · ${item.playoffs} playoffs · ${item.superBowls} Super Bowls · ${item.championships} titles`
+    `${index+1}. **${item.displayName}** · Regular ${record(item.wins,item.losses,item.ties)} · Playoffs ${record(item.playoffWins,item.playoffLosses,item.playoffTies)} · ${item.playoffs} playoff appearance${item.playoffs===1?'':'s'} · ${item.superBowls} Super Bowls · ${item.championships} titles`
   ),'No current or archived GM results are available.');
 }
 
