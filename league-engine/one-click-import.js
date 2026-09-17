@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.7.4 */
+/* FHQ_BUILD: 7.5.7.5 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.5.7.4';
+  const VERSION = '7.5.7.5';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -247,6 +247,26 @@
     return {...final, mappingRun:{...(final.mappingRun||{}),id:runId}};
   }
 
+  async function buildCandidate(candidateImportRunId,mappingRunIds) {
+    let result=await api('build-snapshot','POST',{
+      action:'start',candidateImportRunId,...mappingRunIds
+    });
+    const snapshotId=result?.snapshot?.snapshotId;
+    if(!snapshotId)throw new Error('Candidate builder did not return a snapshot ID.');
+    let guard=0;
+    while(!result.complete&&guard<100){
+      const job=result.buildJob||{};
+      notice=`Build Import Snapshot · ${Number(job.processedCount||0).toLocaleString()}/${Number(job.totalCount||0).toLocaleString()} records`;
+      rerender();
+      result=await api('build-snapshot','POST',{
+        action:'next',candidateImportRunId,snapshotId,limit:500
+      });
+      guard+=1;
+    }
+    if(!result.complete)throw new Error('Candidate snapshot build exceeded the 100-batch safety limit.');
+    return result;
+  }
+
   async function validateCandidate(snapshotId) {
     let result = await api('snapshot-lifecycle','POST',{action:'validate-start',snapshotId});
     let guard = 0;
@@ -387,9 +407,7 @@
         scheduleMappingRunId:schedule.mappingRun?.id,
         statisticsMappingRunId:statistics.mappingRun?.id
       };
-      const built = await runPhase(runId,'build-candidate',()=>api('build-snapshot','POST',{
-        candidateImportRunId:runId,...mappingRunIds
-      }),payload=>({
+      const built = await runPhase(runId,'build-candidate',()=>buildCandidate(runId,mappingRunIds),payload=>({
         summary:`Import snapshot ${payload.snapshot?.snapshotId || 'built'}`,
         counts:payload.snapshot?.counts||{},
         warnings:payload.snapshot?.warnings||[],
