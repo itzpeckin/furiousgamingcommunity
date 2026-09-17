@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.7.5",
+  "releaseType": "resumable-candidate-snapshot-build",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.7.4",
+    "commit": "897255b7bf27e8b66da442385d589d990734099d",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.7.5-batched-snapshot-build",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true,"status": "authorized-not-run"},
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.7.4",
+    "candidateRelease": "7.5.7.5",
+    "currentCommit": "897255b7bf27e8b66da442385d589d990734099d",
+    "currentMigration": 43,
+    "candidateMigration": 43,
+    "scope": "Code-only correction that writes a private candidate snapshot across bounded, resumable requests and allows validation only after every expected record is present. Deployment does not run an import or modify the active snapshot."
+  },
+  "requiredArtifacts": [
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "league-engine/one-click-import.js",
+    "tests/import/candidate-import.test.mjs",
+    "releases/7.5.7.5/release-record.md",
+    "releases/7.5.7.5/validation-evidence.json"
+  ]
+}

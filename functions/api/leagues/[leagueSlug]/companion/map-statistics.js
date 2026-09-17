@@ -1,11 +1,11 @@
-/* FHQ_BUILD: 7.5.7.4 */
+/* FHQ_BUILD: 7.5.7.5 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
 import { canonicalSchedulePeriod, compareSchedulePeriods } from '../../../../_lib/schedule-integrity.js';
 
-const RELEASE='7.5.7.4';
+const RELEASE='7.5.7.5';
 const RECORD_CHUNK_SIZE=200;
 const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;

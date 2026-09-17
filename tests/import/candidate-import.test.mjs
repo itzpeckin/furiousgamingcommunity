@@ -200,8 +200,17 @@ test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-for
     const context=body=>({request:new Request('https://franchisehq.app/api/leagues/fgc/companion/test',{method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},body:JSON.stringify(body)}),params:{leagueSlug:'fgc'},env});
     const mapped=await mapSchedule(context({discoverySessionId:'capture-1'}));
     assert.equal(mapped.status,200);const mapping=await mapped.json();assert.equal(mapping.mappingRun.gameCount,272);
-    const built=await buildSnapshot(context({candidateImportRunId:'candidate-full',teamMappingRunId:'teams-run',playerMappingRunId:'players-run',scheduleMappingRunId:mapping.mappingRun.id,statisticsMappingRunId:'stats-run'}));
-    const result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
+    sqlite.prepare(`UPDATE companion_candidate_import_runs SET team_mapping_run_id='teams-run',player_mapping_run_id='players-run',schedule_mapping_run_id=?,statistics_mapping_run_id='stats-run' WHERE id='candidate-full'`).run(mapping.mappingRun.id);
+    let built=await buildSnapshot(context({action:'start',limit:50,candidateImportRunId:'candidate-full',teamMappingRunId:'teams-run',playerMappingRunId:'players-run',scheduleMappingRunId:mapping.mappingRun.id,statisticsMappingRunId:'stats-run'}));
+    let result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
+    assert.equal(result.complete,false);assert.equal(result.buildJob.processedCount,50);assert.equal(result.buildJob.totalCount,368);
+    const buildSnapshotId=result.snapshot.snapshotId;
+    for(let i=0;i<20&&!result.complete;i++){
+      built=await buildSnapshot(context({action:'next',limit:50,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
+      result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
+    }
+    assert.equal(result.complete,true);assert.equal(result.buildJob.processedCount,368);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE snapshot_id=?`).get(buildSnapshotId).count,368);
     assert.equal(result.snapshot.weekIndex,1);assert.equal(result.snapshot.counts.games,272);
     assert.equal(result.snapshot.manifest.scheduleHorizon.week,18);assert.equal(result.snapshot.manifest.discordScheduleTransition.reason,'initial-import');
     assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM league_active_snapshots').get().count,0);

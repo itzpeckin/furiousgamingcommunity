@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.7.5 resumable candidate snapshot build impact
+
+This code-only release replaces the single long snapshot-record write with bounded, resumable requests. Continuations are limited to the exact candidate and private pending snapshot, recalculate the immutable source plan, verify expected domain counts, and cannot enter validation until every expected record is present. It adds no migration, and deployment itself changes no Production data.
+
+The runtime rollback baseline is exact Main `897255b7bf27e8b66da442385d589d990734099d`, Production release 7.5.7.4, and migration 43. Runtime rollback may restore that code while retaining the failed candidate, its three private partial snapshots, the captured export, discovery report, mapping runs, active/prior/malformed snapshots, lifecycle events, audits, yearly schedule, permanent export URL, Discord thread records, season/game-year records, and blocked/missing Free Agent state.
+
+Do not delete or repair the private partial snapshots in place, run another export/import, move the active pointer, create/remove scheduling threads, reset/delete data, rotate the export URL, archive/transition a season, alter roster ownership, or reinterpret blocked/missing Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.7.4 roster team-ID rebase impact
 
 This code-only release allows a carried roster to join a new League Info namespace only after every active team maps one-to-one to a unique candidate identity. It changes only candidate player team foreign keys; player source records, contracts, roster assignments, Free Agent authority, and the active snapshot remain unchanged until the commissioner's later guarded import. It adds no migration and deployment itself changes no Production data.

@@ -6,13 +6,13 @@
 
 **Updated:** September 17, 2026
 
-**Revision:** 2.74
+**Revision:** 2.75
 
-**Current production:** FranchiseHQ 7.5.7.3 is the accepted Main baseline at `168f267e8bf2a322c19dc94b27b2b039460662ef`. Migration 43 is applied. The retained exports, active/prior/malformed snapshots, roster authority, and audits remain intact.
+**Current production:** FranchiseHQ 7.5.7.4 is the accepted Main baseline at `897255b7bf27e8b66da442385d589d990734099d`. Migration 43 is applied. The retained export, active Week 1 snapshot, prior/malformed snapshots, roster authority, and audits remain intact.
 
-**Current work:** 7.5.7.4 corrects roster carry-forward when Madden changes the technical IDs of all teams between the live roster snapshot and new League Info. It requires a complete unique team-identity proof before translating player foreign keys and preserves player source, contracts, semantic assignments, and Free Agent authority.
+**Current work:** 7.5.7.5 makes candidate snapshot construction resumable and bounded. Production proved that the same Week 2 candidate repeatedly stopped after 2,250 of 3,353 records because a single request performed too many sequential D1 write batches. The repair keeps every partial attempt private and retained while completing a new candidate across bounded requests before validation.
 
-**Next gate:** Validate and publish 7.5.7.4, then let the commissioner select **Retry** against the already-retained League Info + Weekly Stats export. No new export is required. Deployment itself runs no import or snapshot operation; the commissioner retry remains guarded, validated, atomic, and auditable.
+**Next gate:** Validate and publish 7.5.7.5, then let the commissioner select **Retry** against the already-retained League Info + Weekly Stats export. No new export is required. Deployment itself runs no import or snapshot operation; the commissioner retry remains guarded, validated, atomic, and auditable.
 
 ## Product decisions
 
@@ -127,7 +127,8 @@
 | 7.5.7.1 | Production; superseded by 7.5.7.2 completion | Retained-snapshot GM History repair with separate regular/postseason records and accurate playoff appearances |
 | 7.5.7.2 | Main baseline | Complete playoff W/L recovery from unambiguous later-round advancement without inventing scores |
 | 7.5.7.3 | Production | Accept complete same-season League Info + Weekly Stats while carrying the live roster, contracts, and Free Agent authority forward |
-| 7.5.7.4 | Production-authorized candidate | Safely rebase carried roster foreign keys when Madden changes all team IDs but the complete team identities still match one-to-one |
+| 7.5.7.4 | Production | Safely rebase carried roster foreign keys when Madden changes all team IDs but the complete team identities still match one-to-one |
+| 7.5.7.5 | Production-authorized candidate | Resume candidate snapshot construction in bounded record batches so large rosterless weekly imports complete without a request timeout |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
@@ -157,6 +158,7 @@
 | 11 | Complete | 7.5.7.2 | Complete retained GM History playoff W/L from bracket advancement while preserving score truthfulness and all immutable data. |
 | 11a | Active importer continuity patch | 7.5.7.3 | Allow same-season weekly data to publish during a Companion roster outage without emptying or reinterpreting the active roster. |
 | 11b | Active importer identity correction | 7.5.7.4 | Translate changed Madden team IDs only after complete one-to-one team identity proof, preserving every player, contract, and semantic roster assignment. |
+| 11c | Active importer snapshot-build correction | 7.5.7.5 | Build and resume the retained Week 2 candidate in bounded requests, validate only after all expected records exist, and keep every prior partial attempt private and retained. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
@@ -767,6 +769,15 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Fail closed for missing, duplicate, ambiguous, conflicting, or incomplete mappings. Continue ordinary current-period, validation, and atomic activation guards.
 - Gate: focused identity-rebase regressions, complete repository and strict release checks, exact Main deployment, and read-only Production verification. Deployment runs no import or protected data operation; the commissioner retries the retained export afterward.
 
+## 7.5.7.5 — Resumable Candidate Snapshot Build
+
+- Diagnose `candidate_im · build-candidate` read-only. Three retained private attempts each contain exactly 2,250 records: 32 teams, 2,046 players, and 172 of 304 games, proving a repeatable server request cutoff before statistics or standings—not a commissioner network failure.
+- Replace the single long candidate build with a resumable server-authoritative job capped at 500 records per request. Every continuation verifies the exact candidate, pending snapshot, mapping runs, season/game year, active roster source, source coverage, and immutable expected domain counts.
+- Determine continuation from already committed snapshot records so a lost response resumes safely instead of duplicating work. Validation cannot begin until all expected teams, players, games, statistics, and standings have been written.
+- Keep every failed/partial snapshot, mapping run, capture, report, lifecycle event, and audit retained. Do not delete or rewrite the three malformed attempts; none is live or validation-ready.
+- Preserve the active Week 1 pointer, 2027 schedule catalog, roster/contracts, blocked Free Agent authority, current-period rules, Discord thread authority, and guarded atomic activation.
+- Gate: incremental-build and resume regressions, complete repository and strict release checks, exact Main deployment, and read-only Production verification. Deployment runs no import or protected data operation; the commissioner retries the retained export afterward without a new Madden export.
+
 ## 7.5.8 — Canonical League Consistency (formerly 7.4.5)
 
 - Use one server season/week/snapshot and shared team/player/game selectors across all features.
@@ -811,6 +822,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.75:** Published 7.5.7.4 through PR #119 as Main `897255b7`, then diagnosed the retained Week 2 import failure read-only. The roster rebase completed for all 2,046 players, but three private candidate snapshots each stopped at exactly 2,250 of 3,353 expected records after 15 sequential D1 batches. Began standing-authorized 7.5.7.5 to resume candidate construction in bounded requests, retain all partial attempts, and require no new export. The active Week 1 snapshot remained unchanged; no import activation, reset, deletion, URL rotation, archive/transition, Discord thread action, credential/membership/assignment change, or Free Agent reinterpretation occurred during diagnosis or local implementation.
 
 - **Revision 2.74:** Published 7.5.7.3 through PR #118 as Main `168f267`, then diagnosed the retained rosterless import failure read-only. Madden changed all 32 team numeric IDs, but each old team maps uniquely to the same new League Info identity; no team or player is missing. Began standing-authorized 7.5.7.4 to rebase only candidate roster foreign keys after complete one-to-one proof, retain the failed candidate and all active/prior/malformed snapshots and audits, and require no new export. No Production data write, import, activation, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Free Agent reinterpretation occurred during diagnosis or local implementation.
 
