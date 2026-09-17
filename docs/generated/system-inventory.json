@@ -218,6 +218,10 @@
         "file": "FHQ-6126-index.html"
       },
       {
+        "bytes": 66653,
+        "file": "tests/import/candidate-import.test.mjs"
+      },
+      {
         "bytes": 65341,
         "file": "functions/_lib/discord-read-model.js"
       },
@@ -226,20 +230,16 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 58531,
-        "file": "tests/import/candidate-import.test.mjs"
-      },
-      {
         "bytes": 48894,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 46403,
-        "file": "tests/import/madden-discovery.test.mjs"
+        "bytes": 46609,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 44039,
-        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
+        "bytes": 46403,
+        "file": "tests/import/madden-discovery.test.mjs"
       },
       {
         "bytes": 42997,
@@ -250,7 +250,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 37562,
+        "bytes": 38403,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -1609,7 +1609,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.7.2",
+  "release": "7.5.7.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

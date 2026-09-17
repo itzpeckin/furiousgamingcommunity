@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.7.3 same-season rosterless snapshot impact
+
+This code-only release permits complete League Info and Weekly Stats to update a same-season snapshot while copying the exact active roster/player/contract domain and Free Agent authority forward. A first season snapshot, partial roster source, mismatched season/game year, incomplete active roster, or changed active pointer still fails closed. It adds no migration and deployment itself changes no Production data.
+
+The runtime rollback baseline is exact Main `12a2bd4b6983273ac504326dee2c69845834b3f1`, Production release 7.5.7.2, and migration 43. Runtime rollback may restore that code while retaining every captured rosterless export, discovery report, player mapping run, candidate/active/prior/malformed snapshot, lifecycle event, audit, yearly schedule, permanent export URL, Discord thread record, season/game-year record, and blocked/missing Free Agent state.
+
+Do not delete a carried-forward snapshot or its roster provenance, restore a D1 bookmark, rerun an export/import, move the active pointer, create or remove scheduling threads, reset/delete data, rotate the export URL, archive/transition a season, or reinterpret blocked/missing Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.7.2 GM History bracket-advancement completion impact
 
 This code-only release completes playoff wins and losses for retained scoreless postseason rows only when exactly one team appears in a later postseason round. It does not invent or rewrite a score, and ambiguous or unresolved rows remain uncounted. It adds no migration and changes no Production data.

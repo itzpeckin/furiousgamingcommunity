@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.7.3",
+  "releaseType": "same-season-rosterless-snapshot-import",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.7.2",
+    "commit": "12a2bd4b6983273ac504326dee2c69845834b3f1",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.7.3-rosterless-snapshots",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true,"status": "authorized-not-run"},
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.7.2",
+    "candidateRelease": "7.5.7.3",
+    "currentCommit": "12a2bd4b6983273ac504326dee2c69845834b3f1",
+    "currentMigration": 43,
+    "candidateMigration": 43,
+    "scope": "Code-only support for same-season League Info plus Weekly Stats imports that retain the exact active roster, player, contract, and Free Agent authority. No import is executed and no Production data is rewritten by deployment."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/permanent-league-export.js",
+    "functions/_lib/madden-discovery-report.js",
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-players.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "league-engine/one-click-import.js",
+    "tests/import/permanent-league-export.test.mjs",
+    "tests/import/candidate-import.test.mjs",
+    "releases/7.5.7.3/release-record.md",
+    "releases/7.5.7.3/validation-evidence.json"
+  ]
+}

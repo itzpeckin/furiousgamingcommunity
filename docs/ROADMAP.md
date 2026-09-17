@@ -6,13 +6,13 @@
 
 **Updated:** September 17, 2026
 
-**Revision:** 2.72
+**Revision:** 2.73
 
-**Current production:** FranchiseHQ 7.5.7.1 is live from PR #116 and code Main `4cd58f9991cf2dfb751987ddc1abd7544d8e11de`. Migration 43 is applied. Read-only acceptance shows the 272-game regular season separated from the postseason, 14 playoff participants, two Super Bowl participants, and one champion.
+**Current production:** FranchiseHQ 7.5.7.2 is the accepted Main baseline at `12a2bd4b6983273ac504326dee2c69845834b3f1`. Migration 43 is applied. The retained 2026 regular/postseason history and all prior snapshots remain intact.
 
-**Current work:** 7.5.7.2 completes the retained 2026 playoff record. Nine 0–0 postseason rows have no completed score, but every one has exactly one team proven in a later playoff round; GM History records those unambiguous advancement wins/losses without inventing a score.
+**Current work:** 7.5.7.3 permits a same-season weekly snapshot when Madden exports complete League Info and Weekly Stats but omits Rosters. The importer must prove an exact compatible active snapshot, carry its players, assignments, contracts, and Free Agent authority forward unchanged, and still validate current-period games/results/statistics normally.
 
-**Next gate:** Validate and publish 7.5.7.2, then verify that the signed-in History Books shows all 13 postseason decisions while keeping the 272-game regular season unchanged. The Madden Companion server-load outage does not block this release and no export/import, snapshot operation, scheduling-thread action, reset, deletion, URL rotation, season operation, or blocked-Free-Agent reinterpretation is required.
+**Next gate:** Validate and publish 7.5.7.3, then let the commissioner use the already-retained League Info + Weekly Stats export through **Import Latest Export**. Deployment itself runs no export/import or snapshot operation; the later commissioner import remains guarded, validated, atomic, and auditable.
 
 ## Product decisions
 
@@ -125,7 +125,8 @@
 | 7.5.6.12 | Production; owner command acceptance passed | Add completed-game rushing-rule audits plus weighted Superstar/X-Factor roster counts and honest first-observed trait timing |
 | 7.5.7 | Production; owner accepted | Bounded importer batching and split timing, mobile two-axis Depth Chart navigation, grouped table view, and canonical Player Card height/weight |
 | 7.5.7.1 | Production; superseded by 7.5.7.2 completion | Retained-snapshot GM History repair with separate regular/postseason records and accurate playoff appearances |
-| 7.5.7.2 | Production-authorized candidate | Complete playoff W/L recovery from unambiguous later-round advancement without inventing scores |
+| 7.5.7.2 | Main baseline | Complete playoff W/L recovery from unambiguous later-round advancement without inventing scores |
+| 7.5.7.3 | Production-authorized candidate | Accept complete same-season League Info + Weekly Stats while carrying the exact live roster, contracts, and Free Agent authority forward unchanged |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
@@ -152,7 +153,8 @@
 | 10e | Immediate presentation patch | 7.5.6.10 | Contain the live Confidence Pool Standings layout at phone width without changing the leaderboard or stored picks. |
 | 10f | Immediate contract correction | 7.5.6.11 | Normalize Madden contract currency by source format rather than cap-hit magnitude, with no numeric ceiling and no data rewrite. |
 | 10g | Production; owner accepted | 7.5.6.12 | Audit the 10-carry rushing rule and player/team rushing-yard integrity, and expose weighted ability counts with FB and specialist/line half weights. |
-| 11 | Active corrective patch | 7.5.7.2 | Complete retained GM History playoff W/L from bracket advancement while preserving score truthfulness and all immutable data. |
+| 11 | Complete | 7.5.7.2 | Complete retained GM History playoff W/L from bracket advancement while preserving score truthfulness and all immutable data. |
+| 11a | Active importer continuity patch | 7.5.7.3 | Allow same-season weekly data to publish during a Companion roster outage without emptying or reinterpreting the active roster. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
@@ -745,6 +747,15 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Preserve the 272-game regular season, 14 playoff appearances, two Super Bowl appearances, one championship, frozen summaries, source snapshots, ownership periods, and audits.
 - Gate: advancement/ambiguity regressions, complete repository and strict release checks, exact Main deployment, and signed-in read-only Production verification. No export/import, migration, snapshot activation, Discord command registration, or Production data write is required.
 
+## 7.5.7.3 — Same-Season Rosterless Weekly Snapshots
+
+- Treat complete League Info plus current-period Weekly Stats as importable when Rosters are wholly absent and a populated, validated snapshot for the exact active Madden game year and franchise season is already live.
+- Copy the exact active players, team assignments, contracts, and Free Agent authority into a new provenance-linked player mapping run. Never turn a blocked or missing Free Agent source into zero.
+- Refuse roster carry-forward for a first season snapshot, a different franchise season/game year, a changed active pointer, incomplete active roster records, or any partial roster export.
+- Continue to require authoritative schedule/statistics coverage, current-period proof, candidate validation, retained snapshots/audits, and guarded atomic activation.
+- Skip development-trait observations and trade-roster reconciliation because a rosterless export supplies no new roster evidence. A later complete roster export resumes the ordinary roster-authoritative path automatically.
+- Gate: focused readiness/mapping regressions, complete repository and strict release checks, exact Main deployment, and read-only Production verification. Deployment runs no import or protected data operation.
+
 ## 7.5.8 — Canonical League Consistency (formerly 7.4.5)
 
 - Use one server season/week/snapshot and shared team/player/game selectors across all features.
@@ -789,6 +800,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.73:** Began standing-authorized 7.5.7.3 from exact Main baseline `12a2bd4`. A rosterless export becomes eligible only when complete League Info and current-period schedule/statistics match the exact active game year and franchise season. The candidate copies the active snapshot's full player/contract domain into a new auditable mapping run, preserves located/empty/blocked/missing Free Agent authority without converting unknown to zero, guards against active-pointer changes, and suppresses roster-derived trait/trade reconciliation because no new roster evidence exists. First-season and partial-roster imports still require Rosters. No migration, Production data write, import, snapshot activation, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Discord command operation ran during local implementation.
 
 - **Revision 2.72:** Published 7.5.7.1 through PR #116 as Main `4cd58f9` with all hosted and Production checks passing. Signed-in read-only acceptance confirmed the regular/postseason split and all 14 playoff appearances, but exposed nine retained 0–0 playoff rows. A read-only bracket audit proved that each of those nine games has exactly one team in a later playoff round and zero remain ambiguous. Began 7.5.7.2 to use only that unambiguous advancement evidence for complete playoff W/L while retaining the original scores and every frozen/source record.
 

@@ -143,7 +143,7 @@
     if(/teams?|league info|classified teams dataset/i.test(message))return{
       title:'League Info is missing',
       summary:'The newest export did not include a complete 32-team League Info source.',
-      action:'Run the Madden export again with League Info, Rosters, and Weekly Stats selected, using the same league URL.'
+      action:'Run the Madden export again with League Info and Weekly Stats selected, using the same league URL. Include Rosters for the season’s first snapshot.'
     };
     if(/schedule|statistics|weekly|week.*(?:missing|gap|incomplete)/i.test(message))return{
       title:'Weekly data is incomplete',
@@ -152,13 +152,13 @@
     };
     if(/roster|players?/i.test(message))return{
       title:'Roster data is incomplete',
-      summary:'The newest export did not include a complete roster for every team.',
-      action:'Run the Madden export again with Rosters and League Info selected, using the same league URL.'
+      summary:'The newest export did not include a complete roster and no compatible live same-season roster could be retained.',
+      action:'Run the Madden export again with Rosters and League Info selected. Rosters may be omitted only after a complete snapshot for this exact season is live.'
     };
     return{
       title:'The newest export needs attention',
       summary:'FranchiseHQ received the export, but it did not pass source readiness checks.',
-      action:'Run the export again with League Info, Rosters, and Weekly Stats selected. If it repeats, open Import Details.'
+      action:'Run the export again with League Info and Weekly Stats selected. Include Rosters for the first snapshot of the season. If it repeats, open Import Details.'
     };
   }
 

@@ -97,6 +97,26 @@ test('explicit empty current-week statistics routes are ready but missing routes
   assert.equal(reportImportReadiness(advancedWeek).ready,false);
 });
 
+test('rosterless League Info and Weekly Stats are ready only with a proven active roster carry-forward', () => {
+  const rosterless=eligibleReport('missing');
+  rosterless.requirements['team-rosters']={status:'missing',recordCount:0,routes:[]};
+  rosterless.requirements.players={status:'missing',recordCount:0,routes:[],assignmentEvidence:{canBuildRosteredPlayerPreview:false}};
+  rosterless.requirements['free-agents']={status:'missing',recordCount:0,routes:[]};
+  rosterless.freeAgentEvidence={status:'missing',recordCount:0};
+  assert.equal(reportImportReadiness(rosterless).ready,false);
+  const carried={
+    eligible:true,mode:'active-snapshot-roster-carry-forward',sourceSnapshotId:'snapshot-week-1',
+    playerCount:2044,rosteredCount:2044,freeAgentStatus:'blocked',freeAgentCount:null,
+    freeAgentInterpretedAsZero:false
+  };
+  assert.deepEqual(reportImportReadiness(rosterless,{rosterCarryForward:carried}),{
+    ready:true,completeness:'rostered-players-only',freeAgentStatus:'blocked',freeAgentCount:null,
+    rosterCarryForward:carried
+  });
+  rosterless.requirements['team-rosters']={status:'located',recordCount:12,routes:['xbsx/742482/team/1/roster']};
+  assert.equal(reportImportReadiness(rosterless,{rosterCarryForward:carried}).ready,false);
+});
+
 test('repeated routes retain only the newest capture for one cohort', () => {
   const selected=latestCapturePerRoute([
     {id:'old-roster',route_path:'xbsx/742482/team/1/roster',session_observed_at:'2026-08-31T20:00:00.000Z'},

@@ -14,7 +14,7 @@ import { applyRosterOverlays } from '../../../../_lib/trade-center.js';
 import { snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
 import { effectiveRosterOverlays } from '../../../../_lib/roster-ownership.js';
 
-const RELEASE = '7.5.7.2';
+const RELEASE = '7.5.7.3';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
 

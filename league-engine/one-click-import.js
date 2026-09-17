@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.7.2 */
+/* FHQ_BUILD: 7.5.7.3 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.5.7.2';
+  const VERSION = '7.5.7.3';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -59,8 +59,8 @@
     };
     if(/no analyzed league export|no .*export is ready|selected ready export|exact capture session|recognized teams dataset|teams dataset|team-like record/i.test(message))return{
       ...shared,title:'The export is not ready',
-      summary:'FranchiseHQ could not find a complete League Info and roster source in the latest export.',
-      action:'In the Madden Companion App, export League Info, Rosters, and Weekly Stats to the same league URL. Wait for Ready to import, then try again.'
+      summary:'FranchiseHQ could not prove a complete League Info and player source for this franchise season.',
+      action:'Export League Info and Weekly Stats to the same league URL. Include Rosters for the first snapshot of a season; later same-season imports may safely carry the live roster forward.'
     };
     if(/historical.*did not produce|week\/period backfill|schedule.*(?:missing|failed|unavailable)|statistics.*(?:missing|failed|unavailable)|missing week|coverage gap/i.test(message))return{
       ...shared,title:'Weekly game data is incomplete',
@@ -75,7 +75,7 @@
     if(/validation|duplicate|invalid assignment|not ready/i.test(message))return{
       ...shared,title:'The export did not pass validation',
       summary:'FranchiseHQ found data that could not be published safely.',
-      action:'Open Import Details to review the failed phase. If the source is incomplete, export League Info, Rosters, and Weekly Stats again before retrying.'
+      action:'Open Import Details to review the failed phase. Export League Info and Weekly Stats again; include Rosters if no complete snapshot is already live for this season.'
     };
     if(status>=500||/network|failed to fetch|load failed|timed out|timeout|safety limit|HTTP 5\d\d/i.test(message))return{
       ...shared,title:'The importer could not finish',
@@ -351,15 +351,17 @@
         teamMappingRunId:payload.mappingRun?.id
       }),wallStartedAt);
 
-      const players = await runPhase(runId,'map-players',()=>api('map-players','POST',{compact:true,discoverySessionId}),payload=>{
+      const players = await runPhase(runId,'map-players',()=>api('map-players','POST',{compact:true,discoverySessionId,candidateImportRunId:runId}),payload=>{
         const count=Number(payload.mappingRun?.playerCount ?? payload.playerCount ?? 0);
-        const freeAgentStatus=payload.mappingCompleteness === 'complete' ? 'located' : (analyzed.report?.freeAgentEvidence?.status || 'missing');
+        const freeAgentStatus=payload.rosterCarryForward?.freeAgentStatus
+          || (payload.mappingCompleteness === 'complete' ? 'located' : (analyzed.report?.freeAgentEvidence?.status || 'missing'));
         const warnings=[...(payload.mappingRun?.warnings||[])];
         if (freeAgentStatus === 'blocked') warnings.push('Madden Free Agents are blocked upstream; count remains unknown.');
         return {
-          summary:`${count} rostered players mapped`,
+          summary:payload.rosterCarryForward ? `${count} players carried forward unchanged` : `${count} rostered players mapped`,
           counts:{players:count,rosteredPlayers:Number(payload.mappingRun?.rosteredCount ?? count),freeAgentStatus,
-            freeAgentCount:['located','empty-confirmed'].includes(freeAgentStatus)?Number(payload.mappingRun?.freeAgentCount||0):null},
+            freeAgentCount:['located','empty-confirmed'].includes(freeAgentStatus)?Number(payload.mappingRun?.freeAgentCount||0):null,
+            rosterCarryForward:payload.rosterCarryForward||null},
           warnings,
           playerMappingRunId:payload.mappingRun?.id
         };
@@ -512,6 +514,7 @@
     const sourceTiming=run?.phaseState?.['source-eligibility'];
     const activationTiming=run?.phaseState?.['atomic-activation'];
     const refreshTiming=run?.phaseState?.['browser-refresh'];
+    const rosterCarryForward=resultCounts.rosterCarryForward||source?.rosterCarryForward||source?.counts?.rosterCarryForward||null;
     const threadTiming=threadSync?.durationMs!=null?durationLabel(threadSync.durationMs)
       :threadSync?.status==='not-required'?'Not required':threadSync?.scheduled?'Running':threadSync?.status||'—';
     const threadReview=threadSync?.reviewRequired?`Schedule threads need commissioner review (${threadSync.reason}). After verifying the current period, use /week${threadSync.weekIndex} in the connected Discord server.`
@@ -543,6 +546,7 @@
       </div></section>
       <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
+      ${rosterCarryForward?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Roster carried forward:</strong> Players, team assignments, contracts, and the ${esc(rosterCarryForward.freeAgentStatus||'unknown')} Free Agent state remain unchanged from the active snapshot. League Info, games, results, standings, and weekly statistics will update normally.</span></div>`:''}
       ${threadReview?`<p class="commissioner-import-thread-review" role="status">${esc(threadReview)}</p>`:''}
       ${connectionService?.renderNotices?.()||''}
       ${actionableSourceWarnings.length?`<details class="commissioner-import-source-notes"><summary>${actionableSourceWarnings.length} source note${actionableSourceWarnings.length===1?'':'s'}</summary><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}

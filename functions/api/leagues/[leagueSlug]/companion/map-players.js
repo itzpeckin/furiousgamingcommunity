@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 7.5.7.2 */
+/* FHQ_BUILD: 7.5.7.3 */
 import {
   json,
   database,
@@ -8,8 +8,9 @@ import {
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { inferMaddenContractUnit } from '../../../../_lib/live-data-experience.js';
+import { rosterCarryForwardEligibility } from '../../../../_lib/permanent-league-export.js';
 
-const RELEASE='7.5.7.2';
+const RELEASE='7.5.7.3';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -250,12 +251,87 @@ function canonical(record,index,sourceTeamId,validTeams){
   const ratings={};for(const [k,v] of Object.entries(record||{})){if(typeof v==='number'&&/(speed|accel|agility|awareness|throw|catch|route|tackle|block|strength|power|accuracy|coverage|pursuit|playrec)/i.test(k))ratings[k]=v;}
   return {externalId,teamExternalId,recordTeamId,sourceTeamId:text(sourceTeamId),firstName,lastName,displayName,position:normalizePosition(first(record,A.position)),archetype:text(first(record,A.archetype)),overall:int(first(record,A.overall)),developmentTrait:normalizeDev(first(record,A.dev)),age:int(first(record,A.age)),yearsPro:int(first(record,A.yearsPro)),jerseyNumber:int(first(record,A.jersey)),heightInches:heightInches(first(record,A.height)),weightLbs:int(first(record,A.weight)),college:text(first(record,A.college)),injuryStatus:injury,isInjured:bool(first(record,A.injured))||Boolean(injury&&!/none|healthy/i.test(injury)),contractYearsRemaining:int(first(record,A.contractYears)),salary:money(first(record,A.salary)),capHit:money(first(record,A.capHit)),portraitId:text(first(record,A.portrait)),ratings,sourceRecord:record};
 }
-async function teamIds(db,leagueId){const run=await db.prepare(`SELECT id FROM companion_team_mapping_runs WHERE league_id=? AND status='pending-preview' ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();if(!run)return new Set();const r=await db.prepare(`SELECT external_id FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id=?`).bind(leagueId,run.id).all();return new Set((r.results||[]).map(x=>String(x.external_id)));}
+async function teamIds(db,leagueId,runId=null){const run=runId?{id:runId}:await db.prepare(`SELECT id FROM companion_team_mapping_runs WHERE league_id=? AND status='pending-preview' ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();if(!run)return new Set();const r=await db.prepare(`SELECT external_id FROM companion_canonical_teams_preview WHERE league_id=? AND mapping_run_id=?`).bind(leagueId,run.id).all();return new Set((r.results||[]).map(x=>String(x.external_id)));}
 async function latestRun(db,leagueId){return db.prepare(`SELECT * FROM companion_player_mapping_runs WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();}
 async function preview(db,leagueId,runId){if(!runId)return[];const r=await db.prepare(`SELECT external_id,team_external_id,first_name,last_name,display_name,position,archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id FROM companion_canonical_players_preview WHERE league_id=? AND mapping_run_id=? ORDER BY team_external_id,overall DESC,display_name`).bind(leagueId,runId).all();return (r.results||[]).map(x=>({externalId:x.external_id,teamExternalId:x.team_external_id,firstName:x.first_name,lastName:x.last_name,displayName:x.display_name,position:x.position,archetype:x.archetype,overall:x.overall,developmentTrait:x.development_trait,age:x.age,yearsPro:x.years_pro,jerseyNumber:x.jersey_number,heightInches:x.height_inches,weightLbs:x.weight_lbs,college:x.college,injuryStatus:x.injury_status,isInjured:Boolean(x.is_injured),contractYearsRemaining:x.contract_years_remaining,salary:x.salary,capHit:x.cap_hit,portraitId:x.portrait_id}));}
 function runPayload(run){if(!run)return null;let warnings=[];try{warnings=JSON.parse(run.warnings_json||'[]')}catch{}return{id:run.id,discoverySessionId:run.discovery_session_id,sourceCaptureId:run.source_capture_id,sourceRoutePath:run.source_route_path,status:run.status,playerCount:run.player_count,rosteredCount:run.rostered_count,freeAgentCount:run.free_agent_count,warningCount:run.warning_count,warnings,createdAt:run.created_at,updatedAt:run.updated_at};}
 function response(run,players,slug,leagueId,extra={}){return{ok:true,release:RELEASE,leagueId,leagueSlug:slug,previewAvailable:Boolean(run),mappingRun:runPayload(run),players,activeSnapshotChanged:false,activationPerformed:false,rawPayloadReturned:false,...extra};}
 async function runBatches(db,statements,size=150){for(let i=0;i<statements.length;i+=size)await db.batch(statements.slice(i,i+size));}
+const parseJson=(value,fallback=null)=>{try{return value?JSON.parse(value):fallback}catch{return fallback}};
+
+async function carryForwardPlayers(db,leagueId,discoverySessionId,candidateImportRunId){
+  const candidate=await db.prepare(`SELECT * FROM companion_candidate_import_runs
+    WHERE id=? AND league_id=? AND discovery_session_id=? AND status='running' LIMIT 1`)
+    .bind(candidateImportRunId,leagueId,discoverySessionId).first();
+  const requested=parseJson(candidate?.source_counts_json,{})?.rosterCarryForward;
+  if(!candidate||requested?.eligible!==true)return null;
+  const report=await db.prepare(`SELECT * FROM madden_discovery_reports
+    WHERE league_id=? AND session_id=? LIMIT 1`).bind(leagueId,discoverySessionId).first();
+  const eligibility=await rosterCarryForwardEligibility(db,leagueId,report||{});
+  if(!eligibility.eligible
+    ||String(eligibility.sourceSnapshotId)!==String(candidate.active_snapshot_id_before||'')
+    ||String(eligibility.sourceSnapshotId)!==String(requested.sourceSnapshotId||'')){
+    throw Object.assign(new Error('The active roster source changed during this rosterless import.'),{status:409});
+  }
+  const active=await db.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id=?`)
+    .bind(leagueId).first();
+  if(String(active?.snapshot_id||'')!==String(eligibility.sourceSnapshotId)){
+    throw Object.assign(new Error('The active snapshot changed before rosters could be carried forward.'),{status:409});
+  }
+  if(!candidate.team_mapping_run_id)throw Object.assign(new Error('The candidate team mapping is not pinned yet.'),{status:409});
+  const validTeams=await teamIds(db,leagueId,candidate.team_mapping_run_id);
+  if(!validTeams.size)throw Object.assign(new Error('Map the canonical Teams preview before carrying players forward.'),{status:409});
+  const result=await db.prepare(`SELECT data_json FROM league_snapshot_records
+    WHERE league_id=? AND snapshot_id=? AND domain='players' ORDER BY external_id`)
+    .bind(leagueId,eligibility.sourceSnapshotId).all();
+  const players=(result.results||[]).map(row=>parseJson(row.data_json)).filter(Boolean);
+  if(players.length!==Number(eligibility.playerCount||0)){
+    throw Object.assign(new Error('The active snapshot player records are incomplete; roster carry-forward was refused.'),{status:409});
+  }
+  const invalidAssignment=players.find(player=>player.team_external_id&&!validTeams.has(String(player.team_external_id)));
+  if(invalidAssignment){
+    throw Object.assign(new Error('The active roster references a team outside the newly mapped League Info dataset.'),{status:409});
+  }
+  const sourceCapture=await db.prepare(`SELECT c.id FROM madden_discovery_session_captures link
+    JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
+    WHERE link.league_id=? AND link.session_id=? ORDER BY link.observed_at,c.id LIMIT 1`)
+    .bind(leagueId,discoverySessionId).first();
+  if(!sourceCapture?.id)throw Object.assign(new Error('The rosterless export capture provenance is unavailable.'),{status:409});
+  const priorRun=await db.prepare(`SELECT warnings_json FROM companion_player_mapping_runs
+    WHERE id=? AND league_id=? LIMIT 1`).bind(eligibility.playerMappingRunId,leagueId).first();
+  const warnings=[...new Set([
+    ...(parseJson(priorRun?.warnings_json,[])||[]),
+    `Rosters, players, contracts, and Free Agent state carried forward unchanged from active snapshot ${eligibility.sourceSnapshotId}.`
+  ])];
+  const runId=crypto.randomUUID(),now=new Date().toISOString();
+  await db.prepare(`UPDATE companion_player_mapping_runs SET status='superseded',updated_at=?
+    WHERE league_id=? AND status='pending-preview'`).bind(now,leagueId).run();
+  await db.prepare(`INSERT INTO companion_player_mapping_runs
+    (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,
+     rostered_count,free_agent_count,warning_count,warnings_json,created_at,updated_at)
+    VALUES (?,?,?,?,?,'pending-preview',?,?,?,?,?,?,?)`).bind(
+      runId,leagueId,discoverySessionId,sourceCapture.id,
+      `carried-forward:${eligibility.sourceSnapshotId}:${eligibility.playerMappingRunId}`,
+      players.length,Number(eligibility.rosteredCount||0),Number(eligibility.freeAgentCount||0),
+      warnings.length,JSON.stringify(warnings),now,now
+    ).run();
+  const insertSql=`INSERT INTO companion_canonical_players_preview
+    (mapping_run_id,league_id,external_id,team_external_id,first_name,last_name,display_name,position,
+     archetype,overall,development_trait,age,years_pro,jersey_number,height_inches,weight_lbs,college,
+     injury_status,is_injured,contract_years_remaining,salary,cap_hit,portrait_id,ratings_json,source_record_json,created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+  const statements=players.map(player=>db.prepare(insertSql).bind(
+    runId,leagueId,player.external_id,player.team_external_id??null,player.first_name??null,player.last_name??null,
+    player.display_name,player.position??null,player.archetype??null,player.overall??null,player.development_trait??null,
+    player.age??null,player.years_pro??null,player.jersey_number??null,player.height_inches??null,
+    player.weight_lbs??null,player.college??null,player.injury_status??null,Number(player.is_injured||0),
+    player.contract_years_remaining??null,player.salary??null,player.cap_hit??null,player.portrait_id??null,
+    player.ratings_json||'{}',player.source_record_json||'{}',now
+  ));
+  await runBatches(db,statements);
+  return{run:await db.prepare(`SELECT * FROM companion_player_mapping_runs WHERE id=?`).bind(runId).first(),
+    players,eligibility,warnings};
+}
 
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.'},400);
@@ -275,7 +351,24 @@ export async function onRequestPost(context){
   try{
     const discoverySessionId=String(requestBody.discoverySessionId||'').trim();
     const source=await rosterCaptureSet(db,league.id,discoverySessionId);
-    if(!source.captures.length)return json({ok:false,error:'No team roster payloads have been captured yet.',detail:'Run the Madden Companion export with Rosters selected, then classify the latest export.',availableRoutes:source.availableRoutes},404);
+    if(!source.captures.length){
+      const carried=await carryForwardPlayers(db,league.id,discoverySessionId,String(requestBody.candidateImportRunId||'').trim());
+      if(!carried)return json({ok:false,error:'No team roster payloads have been captured yet.',detail:'Run the Madden Companion export with Rosters selected, or import League Info and Weekly Stats after a complete same-season snapshot is already live.',availableRoutes:source.availableRoutes},404);
+      const responsePlayers=compact?[]:await preview(db,league.id,carried.run.id);
+      return json(response(carried.run,responsePlayers,slug,league.id,{
+        compact,playerCount:carried.players.length,rosterRouteCount:0,
+        expectedTeamCount:carried.eligibility.teamCount,
+        rosteredPlayersReady:carried.eligibility.rosteredCount>0,
+        mappingCompleteness:['located','empty-confirmed'].includes(carried.eligibility.freeAgentStatus)
+          ?'complete':'rostered-players-only',
+        freeAgentsDeferred:!['located','empty-confirmed'].includes(carried.eligibility.freeAgentStatus),
+        rosterCarryForward:carried.eligibility,
+        freeAgentCapture:{accepted:false,status:carried.eligibility.freeAgentStatus,captureId:null,
+          routePath:null,recordCount:carried.eligibility.freeAgentCount,attempts:[]},
+        rosterDiagnostics:[],sessionDiagnostics:[discoverySessionId],
+        rosterSelectionStrategy:'active-snapshot-carry-forward'
+      }));
+    }
     if(source.captures.length<32){
       return json({
         ok:false,
@@ -424,5 +517,5 @@ export async function onRequestPost(context){
       sessionDiagnostics:source.sessionDiagnostics,
       rosterSelectionStrategy:source.strategy||'unknown'
     }));
-  }catch(error){return json({ok:false,error:'Player roster aggregation failed.',detail:error?.message||String(error),release:RELEASE},500);}
+  }catch(error){return json({ok:false,error:'Player roster aggregation failed.',detail:error?.message||String(error),release:RELEASE},Number(error?.status||500));}
 }
