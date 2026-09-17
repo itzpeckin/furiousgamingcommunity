@@ -327,5 +327,7 @@ export async function latestDiscordScheduleSync(db,leagueId) {
       error_count AS errorCount,last_error AS lastError,completed_at AS completedAt,created_at AS createdAt
     FROM discord_schedule_sync_runs WHERE league_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1`)
     .bind(leagueId).first();
-  return row || null;
+  if(!row)return null;
+  const started=Date.parse(row.createdAt||''),completed=Date.parse(row.completedAt||'');
+  return {...row,durationMs:Number.isFinite(started)&&Number.isFinite(completed)?Math.max(0,completed-started):null};
 }

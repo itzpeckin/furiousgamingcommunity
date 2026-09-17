@@ -178,11 +178,11 @@
     },
     "largest": [
       {
-        "bytes": 644705,
+        "bytes": 650245,
         "file": "app.js"
       },
       {
-        "bytes": 552111,
+        "bytes": 555293,
         "file": "styles.css"
       },
       {
@@ -198,7 +198,7 @@
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 130715,
+        "bytes": 130709,
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
@@ -210,7 +210,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75318,
+        "bytes": 75246,
         "file": "index.html"
       },
       {
@@ -226,7 +226,7 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 57131,
+        "bytes": 58531,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -238,24 +238,24 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 43001,
-        "file": "tests/import/game-year-transition.test.mjs"
-      },
-      {
-        "bytes": 40957,
+        "bytes": 44037,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 39585,
+        "bytes": 42997,
+        "file": "tests/import/game-year-transition.test.mjs"
+      },
+      {
+        "bytes": 39777,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
+      },
+      {
+        "bytes": 37558,
+        "file": "league-engine/one-click-import.js"
       },
       {
         "bytes": 36783,
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js"
-      },
-      {
-        "bytes": 35468,
-        "file": "league-engine/one-click-import.js"
       }
     ],
     "total": 633
@@ -1609,7 +1609,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.6.12",
+  "release": "7.5.7",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

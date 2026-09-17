@@ -91,6 +91,7 @@ test('normalized player exposes every approved rating, ability, contract, and so
   const sourceRatings=Object.fromEntries(MADDEN_RATING_FIELDS.map(field=>[field,88]));
   const player=normalizePlayer({
     external_id:'player-27',team_external_id:'team-27',display_name:'Source Player',position:'WR',overall:91,
+    height_inches:76,weight_lbs:218,
     source_record_json:JSON.stringify({...sourceRatings,contractYearsLeft:2,contractLength:4,contractSalary:48000000,contractBonus:12000000,capHit:8750,franchiseHqContractUnit:'madden-thousands',isOnIR:true,privateExportToken:'secret',signatureSlotList:[{isEmpty:false,locked:false,ovrThreshold:90,signatureAbility:{signatureTitle:'Route Technician',signatureDescription:'Sharper cuts.',rank:1,isUnlocked:true,abilityGUID:'hidden'}}]})
   });
   assert.equal(Object.keys(player.ratings).length,MADDEN_RATING_FIELDS.length);
@@ -98,6 +99,8 @@ test('normalized player exposes every approved rating, ability, contract, and so
   assert.equal(player.contract.capHit,8750000);
   assert.equal(player.contract.currentYearSalary,null);
   assert.equal(player.rosterStatus,'injured-reserve');
+  assert.equal(player.heightInches,76);
+  assert.equal(player.weightLbs,218);
   assert.equal(JSON.stringify(player).includes('privateExportToken'),false);
   assert.equal(JSON.stringify(player).includes('abilityGUID'),false);
 });

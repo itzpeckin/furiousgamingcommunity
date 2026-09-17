@@ -93,6 +93,7 @@
     rosterGroup: 'All',
     rosterPosition: 'All',
     rosterDev: 'All',
+    depthChartView: 'formation',
     depthSelectedPlayer: null,
     teamSchedulePhase: 'regular',
     capPosition: 'All',
@@ -2792,6 +2793,8 @@
       position:canonicalFilterPosition(player.position||source.position||source.positionName||source.pos||''),
       overall:officialRating({...source,...player},['overall','overallRating','ovrRating','playerBestOvr','bestOverall','overall_rating','playerOverall','ovr']),
       age:Number(player.age??source.age??0)||null,
+      heightInches:Number(player.heightInches??source.heightInches??source.height_inches??source.height??0)||null,
+      weightLbs:Number(player.weightLbs??source.weightLbs??source.weight_lbs??source.weight??0)||null,
       yearsPro:Number(source.yearsPro||source.experience||0)||null,
       developmentTrait:normalizeLiveDevelopment(player.devTrait??source.devTrait??source.developmentTrait??source.dev),
       injuryStatus:source.injuryStatus||source.injury||'Healthy',
@@ -3007,6 +3010,26 @@
     return window.FranchiseHQ?.modules?.league?.rosters || window.FranchiseHQ?.leagueRosters || null;
   }
 
+  function formatRosterHeight(value) {
+    if(value===null||value===undefined||value==='')return '—';
+    const numeric=Number(value);
+    if(Number.isFinite(numeric)&&numeric>=48&&numeric<=96){
+      const inches=Math.round(numeric);
+      return `${Math.floor(inches/12)}'${inches%12}\"`;
+    }
+    const supplied=String(value).trim();
+    const feetAndInches=supplied.match(/^(\d+)\D+(\d+)\D*$/);
+    return feetAndInches?`${Number(feetAndInches[1])}'${Number(feetAndInches[2])}\"`:supplied||'—';
+  }
+
+  function formatRosterWeight(value) {
+    if(value===null||value===undefined||value==='')return '—';
+    const numeric=Number(value);
+    if(Number.isFinite(numeric)&&numeric>0)return String(Math.round(numeric));
+    const supplied=String(value).trim().replace(/\s*(?:lbs?\.?|pounds?)\s*$/i,'');
+    return supplied||'—';
+  }
+
   function rosterPlayerView(player) {
     const raw = player?.raw || {};
     const contract = canonicalContract(player);
@@ -3030,8 +3053,10 @@
       imageAssetId: raw.imageAssetId || raw.portraitId || raw.headshotId || null,
       number: raw.jersey_number || raw.jerseyNumber || raw.number || player?.jersey_number || player?.jerseyNumber || '—',
       age: Number(player?.age ?? raw.age ?? 0) || null,
-      height: raw.height || '—',
-      weight: raw.weight || '—',
+      heightInches: Number(player?.heightInches ?? raw.heightInches ?? raw.height_inches ?? 0) || null,
+      weightLbs: Number(player?.weightLbs ?? raw.weightLbs ?? raw.weight_lbs ?? 0) || null,
+      height: formatRosterHeight(player?.heightInches ?? raw.heightInches ?? raw.height_inches ?? raw.height),
+      weight: formatRosterWeight(player?.weightLbs ?? raw.weightLbs ?? raw.weight_lbs ?? raw.weight),
       tradeBlock: Boolean(raw.tradeBlock),
       initials: raw.initials || String(player?.name || '?').split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase(),
       ratings:{...(player?.ratings||raw.ratings||{}),...corePlayerRatings(raw,player?.ratings||raw.ratings||{})},
@@ -3313,7 +3338,38 @@
     const special = [stackMarkup('K',prefer('K',position('K')),'k'),stackMarkup('P',prefer('P',position('P')),'p')].join('');
     const explicitCount=players.filter(player=>{const slot=slotName(player); return slot && slot!==String(player.position||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}).length;
     const sourceLabel=explicitCount ? 'Madden depth-chart slots' : 'Madden roster depth order';
-    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Current lineup</span><h3>Depth Chart</h3><p>Built from the current roster using ${sourceLabel}. When an explicit Madden slot is unavailable, Franchise HQ falls back to depth order, OVR, development trait, then player name.</p></div><span class="pill pill--success">Current</span></div><div class="card-body"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div><div class="formation-section"><h4>Special Teams</h4><div class="football-formation football-formation--special">${special}</div></div></div></article>`;
+    const tableGroups=[
+      ['Quarterbacks',['QB']],
+      ['Running Backs & Fullbacks',['HB','RB','FB']],
+      ['Wide Receivers & Tight Ends',['WR','TE']],
+      ['Offensive Linemen',['LT','LG','C','RG','RT','OL']],
+      ['Defensive Tackles',['DT']],
+      ['Edge',['REDGE','LEDGE','REDG','LEDG','RE','LE']],
+      ['Linebackers',['SAM','MIKE','WILL','LOLB','MLB','ROLB','SLB','ILB','WLB','LB']],
+      ['Secondary',['CB','SCB','FS','SS','S','DB']],
+      ['Kickers & Punters',['K','P','LS']]
+    ];
+    const positionOrder=tableGroups.flatMap(([,positions])=>positions.map(canonicalFilterPosition));
+    const tableRowsForGroup = positions => {
+      const allowed=new Set(positions.map(canonicalFilterPosition));
+      const groupPlayers=players.filter(player=>allowed.has(canonicalFilterPosition(player.position)));
+      const byPosition=new Map();
+      groupPlayers.forEach(player=>{
+        const key=canonicalFilterPosition(player.position)||'—';
+        if(!byPosition.has(key))byPosition.set(key,[]);
+        byPosition.get(key).push(player);
+      });
+      return [...byPosition.entries()]
+        .sort(([left],[right])=>positionOrder.indexOf(left)-positionOrder.indexOf(right))
+        .flatMap(([positionName,positionPlayers])=>positionPlayers.sort(sortDepth).slice(0,3).map((player,index)=>({player,positionName,depth:index+1})));
+    };
+    const tableMarkup=`<div class="depth-chart-table-groups">${tableGroups.map(([label,positions])=>{
+      const rows=tableRowsForGroup(positions);
+      return `<section class="depth-chart-table-group"><h4>${escapeHtml(label)}</h4><div class="table-wrap depth-chart-table-wrap"><table class="depth-chart-table"><thead><tr><th>Position</th><th>Player Name</th><th>Overall</th><th>Age</th><th>Height</th><th>Weight</th><th>Development</th></tr></thead><tbody>${rows.length?rows.map(({player,positionName,depth})=>`<tr><td><span class="depth-table-position"><strong>${escapeHtml(positionName)}</strong><b aria-label="Depth ${depth}">${depth}</b></span></td><td><button type="button" class="depth-table-player" data-roster-player-detail="${escapeHtml(player.id||'')}">${escapeHtml(player.name||'Unknown Player')}</button></td><td><span class="rating-chip ${player.overall>=90?'rating-chip--elite':player.overall>=84?'rating-chip--high':''}">${player.overall??'—'}</span></td><td>${player.age??'—'}</td><td>${escapeHtml(player.height||'—')}</td><td>${player.weight==='—'?'—':`${escapeHtml(player.weight)} lbs`}</td><td><span class="dev-badge ${devClass(player.dev)}">${escapeHtml(player.dev||'—')}</span></td></tr>`).join(''):`<tr><td colspan="7" class="depth-chart-table-empty">No active players in this group.</td></tr>`}</tbody></table></div></section>`;
+    }).join('')}</div>`;
+    const formationMarkup=`<div class="depth-formation-scroll" tabindex="0" aria-label="Scrollable formation depth chart"><div class="depth-formation-canvas"><div class="formation-section"><h4>Offense</h4><div class="football-formation football-formation--offense">${offense}</div></div><div class="formation-section"><h4>Defense</h4><div class="football-formation football-formation--defense">${defense}</div></div><div class="formation-section"><h4>Special Teams</h4><div class="football-formation football-formation--special">${special}</div></div></div></div>`;
+    const tableView=state.depthChartView==='table';
+    return `<article class="card madden-depth-card"><div class="card-header"><div><span class="eyebrow">Current lineup</span><h3>Depth Chart</h3><p>Built from the current roster using ${sourceLabel}. When an explicit Madden slot is unavailable, Franchise HQ falls back to depth order, OVR, development trait, then player name.</p></div><div class="depth-chart-header-actions"><span class="pill pill--success">Current</span><div class="depth-view-toggle" role="group" aria-label="Depth chart view"><button type="button" data-depth-chart-view="formation" aria-pressed="${tableView?'false':'true'}" class="${tableView?'':'is-active'}">Formation</button><button type="button" data-depth-chart-view="table" aria-pressed="${tableView?'true':'false'}" class="${tableView?'is-active':''}">Table</button></div></div></div><div class="card-body">${tableView?tableMarkup:formationMarkup}</div></article>`;
   }
 
   function playerCardField(raw={},aliases=[],fallback=null) {
@@ -9100,6 +9156,20 @@ function canonicalPlayerDashboardStats(playerId='') {
     const rosterTradeTarget=event.target.closest('[data-add-player-trade]');
     if (rosterTradeTarget) return;
 
+    const depthChartViewTarget=event.target.closest('[data-depth-chart-view]');
+    if(depthChartViewTarget){
+      event.preventDefault();
+      event.stopPropagation();
+      const nextView=depthChartViewTarget.dataset.depthChartView==='table'?'table':'formation';
+      state.depthChartView=nextView;
+      const teamId=activeTeamIdForTeamPage();
+      const team=liveTeamDirectory?.teamMap?.get(teamId);
+      const players=liveTeamDirectory?.playersByTeam?.get(teamId)||[];
+      const target=pageContent?.querySelector?.('[data-team-tab-content]');
+      if(team&&target)target.innerHTML=renderRosterDepthChart(liveRosterModel(team,players));
+      return;
+    }
+
     const depthPlayerTarget=event.target.closest('[data-depth-player-id]');
     if (depthPlayerTarget) {
       event.preventDefault();
@@ -9992,7 +10062,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.5.6.12';
+  const VISIBLE_RELEASE = '7.5.7';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.7",
+  "releaseType": "import-performance-and-depth-chart-mobile",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.6.12",
+    "commit": "4d51e4f7d57beb523b9fe33879e39becfebbbdda",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.7",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true,"status": "authorized-not-run"},
+  "staging": {"authorized": false,"deployed": false,"status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.6.12",
+    "candidateRelease": "7.5.7",
+    "currentCommit": "4d51e4f7d57beb523b9fe33879e39becfebbbdda",
+    "currentMigration": 43,
+    "candidateMigration": 43,
+    "scope": "Code-only importer batching and timing observability plus Depth Chart mobile/table presentation and canonical Player Card height/weight. No export/import, snapshot, thread, reset, deletion, URL, season, credential, membership, assignment, or Free Agent data operation."
+  },
+  "requiredArtifacts": [
+    "app.js",
+    "styles.css",
+    "league-engine/one-click-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+    "functions/_lib/discord-schedule.js",
+    "tests/import/candidate-import.test.mjs",
+    "tests/import/live-data-experience.test.mjs",
+    "tests/ui/mobile-experience.test.mjs",
+    "releases/7.5.7/release-record.md",
+    "releases/7.5.7/validation-evidence.json"
+  ]
+}

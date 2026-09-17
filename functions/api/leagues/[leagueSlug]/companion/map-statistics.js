@@ -1,11 +1,11 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
+/* FHQ_BUILD: 7.5.7 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
 import { canonicalSchedulePeriod, compareSchedulePeriods } from '../../../../_lib/schedule-integrity.js';
 
-const RELEASE='7.5.6.12';
+const RELEASE='7.5.7';
 const RECORD_CHUNK_SIZE=200;
 const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;
@@ -547,7 +547,13 @@ export async function onRequestPost(context){
     }
     if(action==='next'){
       const runId=text(body.runId);if(!runId)return json({ok:false,error:'runId is required.'},400);
-      const result=await processNext(state.db,context.env,state.league.id,runId),run=await state.db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=?`).bind(runId).first();
+      const requestedBatches=Math.max(1,Math.min(4,Number(body.batches)||1));
+      let result=null;
+      for(let index=0;index<requestedBatches;index++){
+        result=await processNext(state.db,context.env,state.league.id,runId);
+        if(result.complete)break;
+      }
+      const run=await state.db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=?`).bind(runId).first();
       return json({ok:true,release:RELEASE,action:'next',...result,...(await runPublic(state.db,run)),activeSnapshotChanged:false,activationPerformed:false});
     }
     if(action==='resume'){
