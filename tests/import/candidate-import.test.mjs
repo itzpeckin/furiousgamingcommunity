@@ -48,7 +48,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
-import { onRequestPost as mapPlayers } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
+import { onRequestPost as mapPlayers, rebaseCarriedRoster } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { authoritativeStatisticsPeriod, statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
 import { onRequestPost as buildSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js';
 import { competitionState, executeCompetitionAction } from '../../functions/api/leagues/[leagueSlug]/competition.js';
@@ -428,15 +428,15 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'roster-carry-forward-v7');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'roster-carry-forward-v8');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:roster-carry-forward-v7'
+    'report:capture:identity:destination:roster-carry-forward-v8'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
 });
 
-test('rosterless imports copy the exact active player and contract source into a new auditable mapping run',async()=>{
+test('rosterless imports preserve players and contracts while safely rebasing changed Madden team IDs',async()=>{
   const sqlite=await database();
   try{
     sqlite.exec(`
@@ -447,19 +447,22 @@ test('rosterless imports copy the exact active player and contract source into a
       INSERT INTO companion_route_captures (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,r2_object_key) VALUES ('league-info-carry','league-1','capture-1','xbsx/742482/leagueteams','POST',100,'hash-carry','carry/league-info');
       INSERT INTO madden_discovery_session_captures (session_id,league_id,capture_id,route_path) VALUES ('capture-1','league-1','league-info-carry','xbsx/742482/leagueteams');
       INSERT INTO companion_team_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,team_count) VALUES ('teams-carry','league-1','capture-1','league-info-carry','xbsx/742482/leagueteams','pending-preview',2);
-      INSERT INTO companion_canonical_teams_preview (mapping_run_id,league_id,external_id,display_name,source_record_json) VALUES ('teams-carry','league-1','team-1','Team 1','{}'),('teams-carry','league-1','team-2','Team 2','{}');
+      INSERT INTO companion_canonical_teams_preview (mapping_run_id,league_id,external_id,display_name,abbreviation,source_record_json) VALUES ('teams-carry','league-1','new-chi','Chicago Bears','CHI','{}'),('teams-carry','league-1','new-tb','Tampa Bay Buccaneers','TB','{}');
       INSERT INTO companion_player_mapping_runs (id,league_id,discovery_session_id,source_capture_id,source_route_path,status,player_count,rostered_count,free_agent_count,warning_count,warnings_json) VALUES ('players-active','league-1','capture-1','league-info-carry','prior-rosters','superseded',2,2,0,1,'["Free Agent roster was captured but is blocked upstream."]');
       INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,team_count,player_count,game_count,statistic_count,standing_count,warnings_json,manifest_json,validation_status) VALUES ('snapshot-active','league-1','active',2026,1,2,2,1,1,2,'[]','{"sources":{"playerMappingRunId":"players-active"}}','ready');
       INSERT INTO game_year_snapshots (game_year_id,league_id,snapshot_id,snapshot_status) VALUES ('year-carry','league-1','snapshot-active','active');
       INSERT INTO league_active_snapshots (league_id,snapshot_id,activated_by) VALUES ('league-1','snapshot-active','commissioner-1');
       INSERT INTO companion_candidate_import_runs (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,current_phase,candidate_snapshot_id,active_snapshot_id_after,created_by_user_id) VALUES ('run-active','league-1','destination-carry','capture-1','fingerprint-active','preview-ready','preview-ready','snapshot-active','snapshot-active','commissioner-1');
     `);
-    for(const team of ['team-1','team-2'])sqlite.prepare(`INSERT INTO league_snapshot_records
+    for(const team of [
+      {external_id:'old-chi',display_name:'Chicago Bears',abbreviation:'CHI'},
+      {external_id:'old-tb',display_name:'Tampa Bay Buccaneers',abbreviation:'TB'}
+    ])sqlite.prepare(`INSERT INTO league_snapshot_records
       (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-active','league-1','teams',?,?)`)
-      .run(team,JSON.stringify({external_id:team,display_name:team}));
+      .run(team.external_id,JSON.stringify(team));
     const activePlayers=[
-      {external_id:'player-1',team_external_id:'team-1',display_name:'Player One',position:'QB',cap_hit:5000000,ratings_json:'{}',source_record_json:'{"contractSalary":5000000}'},
-      {external_id:'player-2',team_external_id:'team-2',display_name:'Player Two',position:'HB',cap_hit:12000000,ratings_json:'{}',source_record_json:'{"contractSalary":12000000}'}
+      {external_id:'player-1',team_external_id:'old-chi',display_name:'Player One',position:'QB',cap_hit:5000000,ratings_json:'{}',source_record_json:'{"contractSalary":5000000}'},
+      {external_id:'player-2',team_external_id:'old-tb',display_name:'Player Two',position:'HB',cap_hit:12000000,ratings_json:'{}',source_record_json:'{"contractSalary":12000000}'}
     ];
     for(const player of activePlayers)sqlite.prepare(`INSERT INTO league_snapshot_records
       (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-active','league-1','players',?,?)`)
@@ -498,15 +501,43 @@ test('rosterless imports copy the exact active player and contract source into a
     const response=await mapPlayers(context),payload=await response.json();
     assert.equal(response.status,200,JSON.stringify(payload));
     assert.equal(payload.rosterCarryForward.sourceSnapshotId,'snapshot-active');
+    assert.deepEqual(payload.rosterCarryForward.teamIdentityRebase,{
+      proof:'complete-one-to-one-team-identity',sourceTeamCount:2,destinationTeamCount:2,
+      remappedTeamCount:2,rosterAssignmentCount:2,remappedAssignmentCount:2,
+      assignmentsUnchanged:true,sourcePlayerRecordsUnchanged:true
+    });
     assert.equal(payload.mappingRun.playerCount,2);
     assert.match(payload.mappingRun.sourceRoutePath,/carried-forward:snapshot-active/);
     const copied=sqlite.prepare(`SELECT external_id,team_external_id,cap_hit,source_record_json
       FROM companion_canonical_players_preview WHERE mapping_run_id=? ORDER BY external_id`).all(payload.mappingRun.id);
-    assert.deepEqual(copied.map(row=>({...row})),activePlayers.map(player=>({
-      external_id:player.external_id,team_external_id:player.team_external_id,cap_hit:player.cap_hit,
+    assert.deepEqual(copied.map(row=>({...row})),activePlayers.map((player,index)=>({
+      external_id:player.external_id,team_external_id:index?'new-tb':'new-chi',cap_hit:player.cap_hit,
       source_record_json:player.source_record_json
     })));
+    const storedCarry=JSON.parse(sqlite.prepare(`SELECT source_counts_json FROM companion_candidate_import_runs WHERE id='run-carry'`).get().source_counts_json).rosterCarryForward;
+    assert.equal(storedCarry.teamIdentityRebase.remappedTeamCount,2);
   }finally{sqlite.close()}
+});
+
+test('roster carry-forward refuses ambiguous or incomplete team identity rebases',()=>{
+  const players=[{external_id:'player-1',team_external_id:'old-chi'}];
+  const source=[{external_id:'old-chi',display_name:'Chicago Bears',abbreviation:'CHI'}];
+  assert.throws(()=>rebaseCarriedRoster(players,source,[]),/same number of teams/);
+  assert.throws(()=>rebaseCarriedRoster(
+    [{external_id:'player-1',team_external_id:'unknown-team'}],source,
+    [{external_id:'new-chi',display_name:'Chicago Bears',abbreviation:'CHI'}]
+  ),/unknown team/);
+  assert.throws(()=>rebaseCarriedRoster(players,[...source,{external_id:'old-tb',display_name:'Tampa Bay Buccaneers',abbreviation:'TB'}],[
+    {external_id:'new-chi-1',display_name:'Chicago Bears',abbreviation:'CHI'},
+    {external_id:'new-chi-2',display_name:'Chicago Bears',abbreviation:'CHI'}
+  ]),/unique identity match/);
+  assert.throws(()=>rebaseCarriedRoster(players,source,[
+    {external_id:'old-chi',display_name:'Tampa Bay Buccaneers',abbreviation:'TB'}
+  ]),/identifies different teams/);
+  assert.throws(()=>rebaseCarriedRoster(players,[...source,{external_id:'old-tb',display_name:'Tampa Bay Buccaneers',abbreviation:'TB'}],[
+    {external_id:'new-team',display_name:'Chicago Bears',abbreviation:'CHI'},
+    {external_id:'new-team',display_name:'Tampa Bay Buccaneers',abbreviation:'TB'}
+  ]),/missing or duplicate team ID/);
 });
 
 test('ordinary Week 10 schedule routes outrank duplicate All Weeks sentinel games regardless of arrival order', () => {

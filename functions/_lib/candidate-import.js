@@ -13,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'roster-carry-forward-v7';
+export const CANDIDATE_MAPPING_REVISION = 'roster-carry-forward-v8';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId, rosterSourceSnapshotId = null) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`

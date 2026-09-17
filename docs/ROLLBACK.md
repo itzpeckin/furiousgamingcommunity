@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.7.4 roster team-ID rebase impact
+
+This code-only release allows a carried roster to join a new League Info namespace only after every active team maps one-to-one to a unique candidate identity. It changes only candidate player team foreign keys; player source records, contracts, roster assignments, Free Agent authority, and the active snapshot remain unchanged until the commissioner's later guarded import. It adds no migration and deployment itself changes no Production data.
+
+The runtime rollback baseline is exact Main `168f267e8bf2a322c19dc94b27b2b039460662ef`, Production release 7.5.7.3, and migration 43. Runtime rollback may restore that code while retaining the failed candidate, captured export, discovery report, mapping runs, active/prior/malformed snapshots, lifecycle events, audits, yearly schedule, permanent export URL, Discord thread records, season/game-year records, and blocked/missing Free Agent state.
+
+Do not delete the failed candidate, run another export/import, move the active pointer, create/remove scheduling threads, reset/delete data, rotate the export URL, archive/transition a season, alter roster ownership, or reinterpret blocked/missing Free Agents as zero as part of deployment or rollback.
+
 ## 7.5.7.3 same-season rosterless snapshot impact
 
 This code-only release permits complete League Info and Weekly Stats to update a same-season snapshot while copying the exact active roster/player/contract domain and Free Agent authority forward. A first season snapshot, partial roster source, mismatched season/game year, incomplete active roster, or changed active pointer still fails closed. It adds no migration and deployment itself changes no Production data.
