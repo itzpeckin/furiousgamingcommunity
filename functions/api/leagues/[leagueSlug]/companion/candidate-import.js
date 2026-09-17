@@ -25,7 +25,7 @@ import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliat
 import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 import { observeDevelopmentTraitsStatement } from '../../../../_lib/development-traits.js';
 
-const RELEASE = '7.5.7.1';
+const RELEASE = '7.5.7.2';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {

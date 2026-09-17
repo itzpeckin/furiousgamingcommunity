@@ -1609,7 +1609,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.7.1",
+  "release": "7.5.7.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -6,7 +6,7 @@ import {
   jsonResponse
 } from "../../../_lib/auth.js";
 
-const RELEASE = "7.5.7.1";
+const RELEASE = "7.5.7.2";
 
 export async function onRequestGet(context) {
   return jsonResponse({

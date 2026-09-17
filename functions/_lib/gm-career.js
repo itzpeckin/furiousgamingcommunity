@@ -56,6 +56,21 @@ function completed(game = {}) {
     || (Number.isFinite(home) && Number.isFinite(away) && (home !== 0 || away !== 0));
 }
 
+const gameTeamKey=(game,side)=>text(game[`${side}TeamKey`] ?? game[`${side}_team_key`] ?? game[`${side}TeamId`]);
+
+function bracketAdvancedSide(game,games=[]){
+  const week=Number(game.week ?? game.weekIndex),home=gameTeamKey(game,'home'),away=gameTeamKey(game,'away');
+  if(!Number.isFinite(week)||!home||!away)return null;
+  const laterTeams=new Set();
+  for(const later of games){
+    const laterWeek=Number(later.week ?? later.weekIndex);
+    if(canonicalOwnershipStage(later.stage,laterWeek)!=='playoffs'||!Number.isFinite(laterWeek)||laterWeek<=week)continue;
+    laterTeams.add(gameTeamKey(later,'home'));laterTeams.add(gameTeamKey(later,'away'));
+  }
+  const homeAdvanced=laterTeams.has(home),awayAdvanced=laterTeams.has(away);
+  return homeAdvanced===awayAdvanced?null:homeAdvanced?'home':'away';
+}
+
 export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeasonId = ''} = {}) {
   const relevantPeriods = periods.filter(period => text(period.franchiseSeasonId ?? period.franchise_season_id) === text(franchiseSeasonId));
   const summaries = new Map();
@@ -72,8 +87,10 @@ export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeaso
   for (const game of games) {
     const stage = canonicalOwnershipStage(game.stage,game.week ?? game.weekIndex);
     if (stage === 'preseason' || stage === 'pro-bowl') continue;
+    const scoreCompleted=completed(game);
+    const advancedSide=!scoreCompleted&&stage==='playoffs'?bracketAdvancedSide(game,games):null;
     for (const side of ['home','away']) {
-      const teamKey = text(game[`${side}TeamKey`] ?? game[`${side}_team_key`] ?? game[`${side}TeamId`]);
+      const teamKey = gameTeamKey(game,side);
       const period = periodFor(teamKey, game);
       if (!period) continue;
       const gmIdentityId = text(period.gmIdentityId ?? period.gm_identity_id);
@@ -86,23 +103,22 @@ export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeaso
         summary.superBowlAppearances = 1;
       }
       summaries.set(gmIdentityId, summary);
-      if (!completed(game)) continue;
+      if (!scoreCompleted&&!advancedSide) continue;
       const ownScore = Number(game[`${side}Score`] ?? game[`${side}_score`]);
       const other = side === 'home' ? 'away' : 'home';
       const otherScore = Number(game[`${other}Score`] ?? game[`${other}_score`]);
       const prefix = stage === 'playoffs' ? 'playoff' : 'regular';
-      if (ownScore > otherScore) summary[`${prefix}Wins`]++;
-      else if (ownScore < otherScore) summary[`${prefix}Losses`]++;
-      else summary[`${prefix}Ties`]++;
+      const result=advancedSide?(side===advancedSide?'win':'loss'):ownScore>otherScore?'win':ownScore<otherScore?'loss':'tie';
+      summary[`${prefix}${result==='win'?'Wins':result==='loss'?'Losses':'Ties'}`]++;
       summary.gameCount++;
-      if (stage === 'playoffs' && ownershipScopeOrdinal(game.stage,game.week ?? game.weekIndex) === championshipScope) {
+      if (scoreCompleted&&stage === 'playoffs' && ownershipScopeOrdinal(game.stage,game.week ?? game.weekIndex) === championshipScope) {
         if (ownScore > otherScore) summary.superBowlChampionships = 1;
       }
       summaries.set(gmIdentityId, summary);
       attributedGames.push({
         gameId:text(game.id ?? game.externalId), gmIdentityId, teamKey, side,
         stage, week:Number(game.week ?? game.weekIndex),
-        result:ownScore > otherScore ? 'win' : ownScore < otherScore ? 'loss' : 'tie'
+        result,resultProof:advancedSide?'bracket-advancement':'completed-score'
       });
     }
   }
