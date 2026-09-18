@@ -173,7 +173,6 @@
       ".sql": 45,
       ".txt": 3,
       ".wasm": 1,
-      ".yaml": 1,
       ".yml": 1,
       "[none]": 2
     },
@@ -259,7 +258,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       }
     ],
-    "total": 635
+    "total": 634
   },
   "frontend": {
     "assets": [

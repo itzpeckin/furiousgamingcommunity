@@ -1,7 +1,7 @@
 # FranchiseHQ System Inventory
 
 **Release:** 7.5.7.6
-**Tracked files:** 635
+**Tracked files:** 634
 **Function routes:** 79
 **Frontend scripts:** 95
 
