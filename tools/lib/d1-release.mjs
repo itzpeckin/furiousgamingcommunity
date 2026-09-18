@@ -144,7 +144,8 @@ export async function loadCanonicalMigrations() {
       40: 'trade_management_events',
       41: 'commissioner_roster_ownership',
       42: 'yearly_schedule_import',
-      43: 'player_development_trait_observations'
+      43: 'player_development_trait_observations',
+      44: 'operational_recovery_evidence'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);

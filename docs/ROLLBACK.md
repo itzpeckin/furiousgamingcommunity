@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.9 canonical consistency and operations impact
+
+This release makes the active server snapshot the season/week authority on all core pages, adds explicit live/empty/stale/incomplete status, exposes tenant-scoped Commissioner operations health, sanitizes request telemetry, and bounds league mutations. Additive migration 44 records operational and recovery evidence only; it does not alter or activate league data. The exact-target recovery drill obtains a current D1 Time Travel bookmark and reconciles schema, protected counts, foreign keys, and active-snapshot domains without calling restore.
+
+The runtime rollback baseline is exact Main `c02064e5ce690df1314735cb4489bf32d3a7a5b0`, Production release 7.5.7.7, and migration 43. Runtime rollback may restore that application code while deliberately retaining forward-compatible migration 44, its evidence rows, every active/prior/malformed/private snapshot, capture and import run, yearly schedule, audit, permanent export URL, Discord record, roster/ownership record, and blocked/missing Free Agent state.
+
+Do not drop the evidence tables, restore a D1 bookmark, reset/delete data, move an active snapshot, run an export/import, rotate the export URL, archive/transition a season, create/remove Discord threads, change roster ownership, or reinterpret blocked/missing Free Agents as zero. A Time Travel restore overwrites D1 and requires a separate incident decision plus full post-restore reconciliation.
+
 ## 7.5.7.7 retained-schedule checkpoint repair impact
 
 This code-only release resumes the exact 7.5.7.6 private checkpoint after Madden changed all team IDs. It maps every retained yearly/prior schedule reference through the same complete one-to-one team identity proof already used for roster carry-forward, resolves exact Madden game IDs once, and replays the private game domain with bounded cursor-based upserts. The active Week 1 snapshot remains untouched until the commissioner's later retry completes ordinary validation and atomic activation.

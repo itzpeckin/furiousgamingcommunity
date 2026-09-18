@@ -15,16 +15,39 @@ const CSP_REPORT_ONLY = [
 ].join("; ");
 
 const AUTH_RATE_POLICIES = Object.freeze({
-  "/api/auth/discord/login": { limit: 30, windowMs: 10 * 60 * 1000 },
-  "/api/auth/session/claim": { limit: 30, windowMs: 10 * 60 * 1000 }
+  "/api/auth/discord/login": { limit: 30, windowMs: 10 * 60 * 1000, bucket:"auth", useBinding:true },
+  "/api/auth/session/claim": { limit: 30, windowMs: 10 * 60 * 1000, bucket:"auth", useBinding:true }
 });
+
+const MUTATION_RATE_POLICIES = Object.freeze([
+  {
+    test:path => /^\/api\/leagues\/[^/]+\/companion\/(?:candidate-import|build-snapshot|map-teams|map-players|map-schedule|map-statistics|import-job|import-orchestrator|export\/[^/]+(?:\/.*)?)$/.test(path),
+    policy:{limit:240,windowMs:5*60*1000,bucket:"league-import",useBinding:false}
+  },
+  {
+    test:path => /^\/api\/leagues\/[^/]+\//.test(path),
+    policy:{limit:180,windowMs:60*1000,bucket:"league-mutation",useBinding:false}
+  }
+]);
+
+export function operationalRouteTemplate(pathname) {
+  return String(pathname || '/')
+    .replace(/^(\/api\/leagues\/)[^/]+/,'$1:leagueSlug')
+    .replace(/(\/companion\/export\/)[^/]+/,'$1:token');
+}
+
+function ratePolicy(pathname, method) {
+  if (AUTH_RATE_POLICIES[pathname]) return AUTH_RATE_POLICIES[pathname];
+  if (["GET","HEAD","OPTIONS"].includes(String(method || 'GET').toUpperCase())) return null;
+  return MUTATION_RATE_POLICIES.find(item => item.test(pathname))?.policy || null;
+}
 
 function requestId(request) {
   const presented = String(request.headers.get("x-franchisehq-request-id") || "").trim();
   return /^[A-Za-z0-9._:-]{8,100}$/.test(presented) ? presented : crypto.randomUUID();
 }
 
-function applySecurityHeaders(response, id, request) {
+function applySecurityHeaders(response, id, request, durationMs = null) {
   const headers = new Headers(response.headers);
   headers.set("x-franchisehq-request-id", id);
   headers.set("x-content-type-options", "nosniff");
@@ -33,6 +56,8 @@ function applySecurityHeaders(response, id, request) {
   headers.set("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
   headers.set("cross-origin-opener-policy", "same-origin-allow-popups");
   headers.set("content-security-policy-report-only", CSP_REPORT_ONLY);
+  headers.set("x-franchisehq-release", "7.5.9");
+  if (durationMs !== null) headers.set("server-timing", `franchisehq;dur=${Math.max(0,Math.round(durationMs))}`);
   if (new URL(request.url).protocol === "https:") {
     headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
   }
@@ -84,11 +109,11 @@ function mutationOriginStatus(request, pathname) {
 }
 
 async function rateLimit(context, pathname) {
-  const policy = AUTH_RATE_POLICIES[pathname];
+  const policy = ratePolicy(pathname, context.request.method);
   if (!policy) return null;
   const client = String(context.request.headers.get("cf-connecting-ip") || "unidentified");
-  const key = await hashToken(`${pathname}:${client}`);
-  if (context.env?.AUTH_RATE_LIMITER?.limit) {
+  const key = await hashToken(`${policy.bucket}:${pathname}:${client}`);
+  if (policy.useBinding && context.env?.AUTH_RATE_LIMITER?.limit) {
     const outcome = await context.env.AUTH_RATE_LIMITER.limit({ key });
     return outcome?.success === false ? Math.ceil(policy.windowMs / 1000) : null;
   }
@@ -107,14 +132,16 @@ async function rateLimit(context, pathname) {
       .bind(key,`+${seconds} seconds`,`+${seconds} seconds`).first();
     return Number(row?.requestCount || 0) > policy.limit ? Number(row?.retryAfter || seconds) : null;
   } catch (error) {
-    console.error("FranchiseHQ authentication rate limit unavailable", { pathname, error });
+    console.error("FranchiseHQ request rate limit unavailable", { pathname, error });
     return null;
   }
 }
 
 export async function onRequest(context) {
+  const startedAt = Date.now();
   const id = requestId(context.request);
   const pathname = new URL(context.request.url).pathname;
+  const route = operationalRouteTemplate(pathname);
   let response;
   const canonicalLocation = canonicalDocumentRedirect(context.request);
   if (canonicalLocation) {
@@ -126,13 +153,13 @@ export async function onRequest(context) {
         "x-franchisehq-canonical-host": "franchisehq.app"
       }
     });
-    return applySecurityHeaders(response, id, context.request);
+    return applySecurityHeaders(response, id, context.request, Date.now()-startedAt);
   }
   const retryAfter = await rateLimit(context, pathname);
   if (retryAfter) {
     response = new Response(JSON.stringify({
       ok: false,
-      error: "Too many authentication attempts. Please wait and try again.",
+      error: "Too many requests. Please wait and try again.",
       requestId: id
     }), {
       status: 429,
@@ -142,7 +169,8 @@ export async function onRequest(context) {
         "retry-after": String(retryAfter)
       }
     });
-    return applySecurityHeaders(response, id, context.request);
+    console.warn(JSON.stringify({event:"request_rate_limited",requestId:id,route,method:context.request.method,status:429}));
+    return applySecurityHeaders(response, id, context.request, Date.now()-startedAt);
   }
   const mutationOrigin = mutationOriginStatus(context.request, pathname);
   if (!mutationOrigin.valid) {
@@ -158,7 +186,8 @@ export async function onRequest(context) {
         "cache-control": "no-store"
       }
     });
-    return applySecurityHeaders(response, id, context.request);
+    console.warn(JSON.stringify({event:"mutation_origin_rejected",requestId:id,route,method:context.request.method,status:403}));
+    return applySecurityHeaders(response, id, context.request, Date.now()-startedAt);
   }
   if (mutationOrigin.browserSession) {
     const csrf = await verifyMutationCsrf(context).catch((error) => {
@@ -178,21 +207,26 @@ export async function onRequest(context) {
           "cache-control":"no-store"
         }
       });
-      return applySecurityHeaders(response, id, context.request);
+      console.warn(JSON.stringify({event:"csrf_validation_failed",requestId:id,route,method:context.request.method,status:403}));
+      return applySecurityHeaders(response, id, context.request, Date.now()-startedAt);
     }
   }
   try {
     response = await context.next();
   } catch (error) {
-    console.error("Unhandled FranchiseHQ request failure", { requestId: id, pathname, error });
+    console.error(JSON.stringify({event:"unhandled_request_failure",requestId:id,route,method:context.request.method,errorName:error?.name||"Error"}));
     response = pathname.startsWith("/api/")
       ? safeApiFailure(id)
       : new Response("FranchiseHQ could not load this page.", { status: 500 });
   }
 
   if (pathname.startsWith("/api/") && response.status >= 500) {
-    console.error("FranchiseHQ API failure response", { requestId: id, pathname, status: response.status });
+    console.error(JSON.stringify({event:"api_failure_response",requestId:id,route,method:context.request.method,status:response.status}));
     response = safeApiFailure(id, response.status);
   }
-  return applySecurityHeaders(response, id, context.request);
+  const durationMs=Date.now()-startedAt;
+  if (!['GET','HEAD','OPTIONS'].includes(context.request.method.toUpperCase()) || response.status >= 400) {
+    console.log(JSON.stringify({event:"request_complete",requestId:id,route,method:context.request.method,status:response.status,durationMs}));
+  }
+  return applySecurityHeaders(response, id, context.request, durationMs);
 }

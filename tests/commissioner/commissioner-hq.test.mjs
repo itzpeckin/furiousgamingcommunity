@@ -229,9 +229,13 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.5.7.7');
+    assert.equal(overviewPayload.release,'7.5.9');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
+    assert.equal(overviewPayload.operations.context.authority,'server-active-snapshot');
+    assert.equal(overviewPayload.operations.context.state,'empty');
+    assert.equal(overviewPayload.operations.checks.find(item => item.code === 'schema').status,'healthy');
+    assert.equal(overviewPayload.operations.privacy.rawExportsLogged,false);
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM league_setting_revisions
       WHERE league_id='league-command' AND revision=2`).get().count,1);
 

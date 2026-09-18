@@ -719,7 +719,7 @@ function renderCommissionerOverview(){
  const hq=commissionerHqCache;
  if(!hq){setTimeout(()=>loadCommissionerHq().then(()=>{if(commissionerTab()==='overview')renderCommissioner('overview')}),0);return`<section class="commissioner-hq-loading"><span></span><strong>Opening your league control room…</strong></section>`}
  if(hq.error)return`<section class="card commissioner-hq-error"><span class="commissioner-attention-icon">!</span><div><h2>Commissioner status could not load</h2><p>${escapeHtml(hq.error)}</p></div><button class="button button--primary" data-refresh-commissioner-hq>Try Again</button></section>`;
- const league=hq.league||{},liveContext=window.FranchiseHQ?.currentSeasonContext||{},members=hq.memberships||{},snapshot=hq.activeSnapshot,attention=hq.attention||[],audit=(hq.audit||[]).slice(0,6),quick=hq.quickControls||{};
+ const league=hq.league||{},liveContext=hq.operations?.context||window.FranchiseHQ?.currentSeasonContext||{},members=hq.memberships||{},snapshot=hq.activeSnapshot,attention=hq.attention||[],audit=(hq.audit||[]).slice(0,6),quick=hq.quickControls||{},operations=hq.operations||{};
  const activeSeason=Number(liveContext.seasonYear??liveContext.season??league.currentSeason??1)||1,activeWeek=Number(liveContext.week??league.currentWeek??1)||1;
  const rulesTone=hq.rules?.dirty?'warning':'success',rulesLabel=hq.rules?.dirty?'Draft changes':'Published';
  return`<section class="commissioner-command-hero">
@@ -731,6 +731,7 @@ function renderCommissionerOverview(){
    <button data-commissioner-tab="teams"><span>Members</span><strong>${members.active||0}</strong><small>${members.online||0} online · ${members.assigned||0} teams assigned</small><i class="is-${members.pending||members.unassigned?'warning':'success'}"></i></button>
    <button data-commissioner-tab="rules"><span>League Rules</span><strong>${escapeHtml(rulesLabel)}</strong><small>Publication ${hq.rules?.publicationRevision||0}</small><i class="is-${rulesTone}"></i></button>
    <button data-commissioner-tab="controls"><span>Transactions</span><strong>${Number(hq.transactionCount||0).toLocaleString()}</strong><small>Recorded league movements</small><i class="is-accent"></i></button>
+   <button data-commissioner-tab="audit"><span>Operations</span><strong>${operations.status==='healthy'?'Healthy':'Attention'}</strong><small>${operations.checkedAt?`Checked ${escapeHtml(commissionerDate(operations.checkedAt))}`:'Awaiting health check'}</small><i class="is-${operations.status==='healthy'?'success':'warning'}"></i></button>
  </section>
  <div class="commissioner-command-grid commissioner-command-grid--refined">
    <div class="commissioner-command-column">

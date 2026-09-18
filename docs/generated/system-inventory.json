@@ -164,13 +164,13 @@
       ".css": 10,
       ".example": 1,
       ".html": 4,
-      ".js": 227,
+      ".js": 229,
       ".json": 7,
       ".jsonc": 1,
-      ".md": 281,
-      ".mjs": 48,
+      ".md": 282,
+      ".mjs": 50,
       ".png": 3,
-      ".sql": 45,
+      ".sql": 46,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -178,15 +178,15 @@
     },
     "largest": [
       {
-        "bytes": 650247,
+        "bytes": 651053,
         "file": "app.js"
       },
       {
-        "bytes": 555293,
+        "bytes": 555426,
         "file": "styles.css"
       },
       {
-        "bytes": 431685,
+        "bytes": 432080,
         "file": "trade-module.js"
       },
       {
@@ -198,7 +198,7 @@
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 130713,
+        "bytes": 130709,
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
@@ -210,7 +210,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75294,
+        "bytes": 75246,
         "file": "index.html"
       },
       {
@@ -234,7 +234,7 @@
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 46882,
+        "bytes": 46880,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -246,19 +246,19 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 40188,
+        "bytes": 40184,
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 39781,
+        "bytes": 39777,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 39249,
+        "bytes": 39245,
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 635
+    "total": 641
   },
   "frontend": {
     "assets": [
@@ -1417,7 +1417,7 @@
         "platform/store.js",
         "trade-module.js"
       ],
-      "occurrences": 66
+      "occurrences": 63
     },
     "hardCodedFgc": {
       "files": [
@@ -1606,10 +1606,16 @@
       "recordsLedger": true,
       "sha256": "fd8cb1fb3517cd78f65ba81e0392c706afa7513888ec62c9f70469e1f31f3890",
       "version": "0043"
+    },
+    {
+      "file": "migrations/0044_operational_recovery_evidence.sql",
+      "recordsLedger": true,
+      "sha256": "84916311ddbf5a5a83e4a6cfd05f9f230e76cfcbe6d937b6a785079ea45509bb",
+      "version": "0044"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.7.7",
+  "release": "7.5.9",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

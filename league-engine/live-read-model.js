@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.4.1';
+  const VERSION = '7.5.9';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();
@@ -88,6 +88,8 @@
   async function getState() { return (summary || await request({})).state; }
   async function getFreeAgentState() { return (summary || await request({})).freeAgents; }
   async function getIntegrity() { return (summary || await request({})).integrity; }
+  async function getContext() { return (summary || await request({})).context; }
+  async function getDataStatus() { return (summary || await request({})).dataStatus; }
   async function getDomain(domain) {
     const domainKey=`${leagueSlug()}:${domain}`;
     if (domainCache.has(domainKey)) return domainCache.get(domainKey);
@@ -251,7 +253,7 @@
     }catch{return false}
   }
 
-  const service = {refresh,warm,invalidateOwnership,invalidateRosterAuthority,getSummary,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,getFreeAgentState,getIntegrity,loadSample,renderPanel,diagnostics};
+  const service = {refresh,warm,invalidateOwnership,invalidateRosterAuthority,getSummary,getLeague,getTeams,getPlayers,getStandings,getSchedule,getStatistics,getSnapshot,getState,getFreeAgentState,getIntegrity,getContext,getDataStatus,loadSample,renderPanel,diagnostics};
   HQ.defineModuleService('league','liveData',service,{replace:true,alias:'liveData'});
 
   const scheduleWarm=()=>setTimeout(()=>warm(),0);

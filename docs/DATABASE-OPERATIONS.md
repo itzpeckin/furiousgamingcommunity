@@ -2,6 +2,14 @@
 
 This runbook governs FranchiseHQ database changes beginning with 7.1.0. It is written to protect the first FGC league today and the future multi-league platform later.
 
+## What 7.5.9 adds
+
+- `migrations/0044_operational_recovery_evidence.sql` advances the required schema to version 44.
+- It adds tenant-scoped sanitized operational events and recovery evidence. It does not copy, activate, archive, update, or delete any existing league data.
+- `tools/run-recovery-drill.mjs` verifies the exact Cloudflare target, current Time Travel bookmark, protected counts, continuous migration ledger, foreign keys, and active-snapshot domain counts. It never calls restore.
+- Normal application rollback retains migration 44. A D1 Time Travel restore remains destructive, separately controlled incident work.
+- The full response, alert, secret, dependency, reconciliation, and communication procedure is in `docs/OPERATIONS-AND-INCIDENT-RESPONSE.md`.
+
 ## What 7.1 establishes
 
 - `migrations/0018_canonical_core_foundation.sql`, `0019_canonical_import_snapshot_foundation.sql`, and `0020_canonical_transaction_runtime_foundation.sql` are the active immutable sequence.
@@ -51,7 +59,7 @@ This runbook governs FranchiseHQ database changes beginning with 7.1.0. It is wr
 
 ## Authorization boundary
 
-Building and testing a migration does not authorize applying it to Cloudflare. Staging application and production application are separate decisions. A production migration requires a new, explicit owner authorization after the local candidate and recovery plan are reviewed.
+Building and testing a migration does not by itself authorize applying it to Cloudflare. Staging and Production remain distinct decisions. The owner's standing release authorization covers an additive, required release migration after the exact candidate and recovery plan pass validation; resets, deletion, snapshot movement, season lifecycle changes, URL rotation, and a D1 restore remain separate protected operations.
 
 7.3.0 does not reset Madden data, activate an import, edit memberships, change Discord settings, or redesign session-refresh behavior. Applying migration 22, deploying Preview, running a real Companion capture, and applying anything to production are separate authorization decisions.
 
@@ -127,6 +135,8 @@ After 7.3.2, the active ledger must contain every version from 1 through 24 and 
 After 7.3.3, the ledger must contain every version from 1 through 25 and the foreign-key check must return no rows. Migration 25 adds game-year links and immutable archive/recovery evidence. Applying it does not itself archive, detach, remove, restore, or activate anything. Before any later transition operation, record the exact game year, active snapshot, protected counts, typed confirmation, private R2 target, and verified archive digest.
 
 After 7.5.5, the ledger must contain every version from 1 through 38 and the foreign-key check must return no rows. Migration 38 adds only `discord_league_installations.trade_channel_id`; protected identity, membership, snapshot, import, trade-workflow, trade-room, audit, and Free Agent state must remain unchanged.
+
+After 7.5.9, the ledger must contain every version from 1 through 44 and the foreign-key check must return no rows. Migration 44 adds only operational/recovery evidence tables and indexes. All protected counts, active snapshot pointers, snapshot records, imports, captures, Discord state, permanent export URLs, roster/ownership state, and Free Agent authority must remain unchanged.
 
 ## Stop conditions
 

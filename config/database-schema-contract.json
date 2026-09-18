@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "7.5.7.7",
+  "release": "7.5.9",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 43,
+  "currentVersion": 44,
   "requiredTables": [
     "commissioner_roster_movements",
     "league_player_ownership",
@@ -122,6 +122,8 @@
     "league_draft_pick_baseline_applications",
     "draft_pick_ledger_events",
     "league_notifications",
+    "league_operational_events",
+    "league_recovery_evidence",
     "tenant_audit_events",
     "transaction_movement_classifications",
     "users"
@@ -161,6 +163,8 @@
     "sessions": ["id", "user_id", "session_token_hash", "expires_at", "absolute_expires_at", "last_seen_at", "last_rotated_at", "parent_session_id", "csrf_token_hash", "revoked_at", "revocation_reason", "recovery_mode"],
     "session_security_events": ["id", "session_id", "user_id", "league_id", "event_type", "reason", "request_origin", "user_agent_hash", "detail_json", "created_at"],
     "authentication_rate_limits": ["bucket_key", "request_count", "expires_at", "updated_at"],
+    "league_operational_events": ["id", "league_id", "request_id", "action_id", "component", "event_code", "severity", "outcome", "snapshot_id", "duration_ms", "detail_json", "created_at"],
+    "league_recovery_evidence": ["id", "league_id", "release", "environment", "evidence_type", "status", "database_bookmark", "schema_version", "active_snapshot_id", "protected_counts_json", "reconciliation_json", "request_id", "action_id", "recorded_by_user_id", "verified_at", "created_at"],
     "madden_discovery_sessions": ["id", "league_id", "token_hash", "status", "capture_count", "expires_at", "created_at", "updated_at"],
     "madden_discovery_reports": ["id", "league_id", "session_id", "status", "route_count", "capture_count", "source_verification_json", "report_hash", "generated_at"],
     "franchise_seasons": ["id", "league_id", "source_system", "source_franchise_id", "source_season_id", "game_release", "display_name", "status"],

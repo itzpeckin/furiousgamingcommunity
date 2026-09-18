@@ -3,7 +3,7 @@ import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { resolveMaddenPeriod as resolveSingleMaddenPeriod, resolveMaddenSchedulePeriods } from '../../../../_lib/madden-period.js';
 import { candidateScheduleIdentity } from '../../../../_lib/candidate-import.js';
 
-const RELEASE='7.5.7.7';
+const RELEASE='7.5.9';
 function resolveMaddenPeriod(routePath,records){
   const single=resolveSingleMaddenPeriod(routePath,records);
   if(!single?.sentinel)return single;
