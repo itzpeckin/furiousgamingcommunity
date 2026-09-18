@@ -8,7 +8,7 @@
   "credentialsChanged": false,
   "baselineGate": {"unregisteredFailures": 0},
   "checks": {
-    "strictMigration": {"expectedFailure": false, "passed": true, "migrationVersion": 44, "candidateRequiresMigration": true, "productionApplied": false},
+    "strictMigration": {"expectedFailure": false, "passed": true, "migrationVersion": 44, "candidateRequiresMigration": true, "productionApplied": true},
     "canonicalContext": {"passed": true, "authority": "server-active-snapshot", "statuses": ["live", "empty", "stale", "incomplete"], "browserAuthorityFallbackRemoved": true},
     "commissionerOperations": {"passed": true, "checks": ["canonical-snapshot", "import-pipeline", "discord-delivery", "recovery-evidence", "schema"]},
     "sanitizedTelemetry": {"passed": true, "requestIds": true, "tenantSlugRedacted": true, "exportTokenRedacted": true, "requestBodiesLogged": false, "credentialsLogged": false, "rawExportsLogged": false},
@@ -18,14 +18,34 @@
     "freeAgentAuthority": {"passed": true, "blockedRemainsUnknown": true, "missingRemainsUnknown": true, "interpretedAsZero": false},
     "focusedRegression": {"passed": true, "tests": 31},
     "repositoryRegression": {"passed": true, "tests": 267, "status": "passed"},
-    "strictGate": {"passed": true, "tests": 267, "status": "passed"}
+    "strictGate": {"passed": true, "tests": 267, "status": "passed"},
+    "productionProtectedState": {
+      "passed": true,
+      "beforeBookmark": "00000347-0000012c-000050ea-a169dcd7f8d8434d43cc9881090862f4",
+      "afterBookmark": "00000349-0000001a-000050ea-38e12801252478a9075c1d95b55194e9",
+      "before": {"schemaVersion": 43, "leagues": 1, "users": 34, "memberships": 34, "activeTeamAssignments": 32, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1, "foreignKeyViolations": 0},
+      "after": {"schemaVersion": 44, "leagues": 1, "users": 34, "memberships": 34, "activeTeamAssignments": 32, "teams": 0, "players": 0, "snapshots": 0, "activeSnapshots": 1, "foreignKeyViolations": 0, "evidenceTables": 2},
+      "protectedCountsChanged": false
+    },
+    "productionRecoveryReconciliation": {
+      "passed": true,
+      "mode": "read-only",
+      "leagueId": "franchise-hq-primary",
+      "snapshotId": "5cee59c2-1610-4e70-8a65-2707a40da95a",
+      "seasonYear": 2027,
+      "weekIndex": 2,
+      "expected": {"teams": 32, "players": 2046, "games": 272, "statistics": 939, "standings": 32},
+      "actual": {"teams": 32, "players": 2046, "games": 272, "statistics": 939, "standings": 32},
+      "foreignKeyViolations": 0,
+      "mismatches": []
+    }
   },
   "scopeBoundaries": {
     "productionChanged": false,
     "gitMainChanged": false,
-    "gitRemoteChanged": false,
-    "migrationApplied": false,
-    "databaseRowsWritten": 0,
+    "gitRemoteChanged": true,
+    "migrationApplied": true,
+    "databaseRowsWritten": 1,
     "exportExecuted": false,
     "importExecuted": false,
     "activeSnapshotChanged": false,
@@ -41,11 +61,21 @@
     "freeAgentInterpretedAsZero": false
   },
   "external": {
-    "githubPublication": {"authorized": true, "status": "not-run"},
-    "hostedChecks": {"authorized": true, "status": "not-run"},
-    "productionMigration": {"authorized": true, "status": "not-run", "currentMigration": 43, "candidateMigration": 44},
+    "githubPublication": {"authorized": true, "status": "pull-request-open", "pullRequest": 123, "candidateCommit": "39ba25d44cb41ae5c6dc0391db5bc532cbfd551b"},
+    "hostedChecks": {"authorized": true, "status": "passed", "candidateCommit": "39ba25d44cb41ae5c6dc0391db5bc532cbfd551b"},
+    "productionMigration": {
+      "authorized": true,
+      "status": "applied-and-verified",
+      "previousMigration": 43,
+      "currentMigration": 44,
+      "candidateMigration": 44,
+      "beforeBookmark": "00000347-0000012c-000050ea-a169dcd7f8d8434d43cc9881090862f4",
+      "afterBookmark": "00000349-0000001a-000050ea-38e12801252478a9075c1d95b55194e9",
+      "foreignKeyViolations": 0,
+      "protectedCountsChanged": false
+    },
     "productionDeployment": {"authorized": true, "status": "not-run", "currentRelease": "7.5.7.7", "candidateRelease": "7.5.9"},
-    "productionRecoveryReconciliation": {"authorized": true, "status": "not-run", "restoreAuthorized": false},
+    "productionRecoveryReconciliation": {"authorized": true, "status": "read-only-passed", "restoreAuthorized": false, "evidenceRecordStatus": "pending-post-deployment"},
     "signedInAcceptance": {"authorized": true, "status": "not-run"},
     "maddenExport": {"authorized": false, "status": "not-required"},
     "snapshotImport": {"authorized": false, "status": "not-run"}

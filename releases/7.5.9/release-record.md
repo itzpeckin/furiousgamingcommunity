@@ -20,11 +20,11 @@ Madden's explicit Free Agents route may remain blocked upstream. FranchiseHQ pre
 
 ## Validation evidence
 
-The strict gate covers canonical context, stale/incomplete state, migration continuity through 44, legacy-data preservation, local backup/restore, active-snapshot reconciliation, sanitized route logs, bounded writes, tenant boundaries, Commissioner HQ, imports, Discord, trades, transactions, mobile behavior, secrets, assets, and release contracts. Production migration and reconciliation results are recorded after the exact candidate passes hosted checks.
+The strict gate covers canonical context, stale/incomplete state, migration continuity through 44, legacy-data preservation, local backup/restore, active-snapshot reconciliation, sanitized route logs, bounded writes, tenant boundaries, Commissioner HQ, imports, Discord, trades, transactions, mobile behavior, secrets, assets, and release contracts. The exact candidate passed all hosted checks. Production migration 44 advanced the ledger from 43 to 44 between retained Time Travel bookmarks, preserved every protected count, created both evidence tables, and left foreign-key violations at zero. Read-only reconciliation then matched active snapshot `5cee59c2-1610-4e70-8a65-2707a40da95a` exactly across 32 teams, 2,046 players, 272 games, 939 statistics rows, and 32 standings rows.
 
 ## Deployment status
 
-Pull request, protected Main merge, additive migration 44, exact Production deployment, and read-only recovery reconciliation are standing-authorized for this release. No Madden export/import, active-snapshot change, reset/delete, export-URL rotation, season archive/transition, Discord scheduling action, roster/ownership change, or Free Agent reinterpretation is included.
+Pull request [#123](https://github.com/itzpeckin/furiousgamingcommunity/pull/123) is open from exact candidate `39ba25d`. All hosted checks passed, additive migration 44 is applied and verified, and the read-only active-snapshot reconciliation passed. Protected Main merge, exact Production deployment, post-deployment evidence recording, and signed-in acceptance remain in progress. No Madden export/import, active-snapshot change, reset/delete, export-URL rotation, season archive/transition, Discord scheduling action, roster/ownership change, or Free Agent reinterpretation is included.
 
 ## Rollback
 

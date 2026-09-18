@@ -6,13 +6,13 @@
 
 **Updated:** September 18, 2026
 
-**Revision:** 2.78
+**Revision:** 2.79
 
-**Current production:** FranchiseHQ 7.5.7.7 is the Main baseline at `c02064e`. The commissioner successfully resumed and completed the retained Week 2 import. Migration 43, the active/prior/malformed/private snapshots, source captures, roster and Free Agent authority, permanent export URL, Discord state, and audits remain retained.
+**Current production:** FranchiseHQ 7.5.7.7 is the Main application baseline at `c02064e`. Additive migration 44 is applied and verified in Production between retained Time Travel bookmarks; all protected counts remain unchanged and foreign-key violations remain zero. The active 2027 Week 2 snapshot reconciles exactly across 32 teams, 2,046 players, 272 games, 939 statistics rows, and 32 standings rows. The active/prior/malformed/private snapshots, source captures, roster and Free Agent authority, permanent export URL, Discord state, and audits remain retained.
 
 **Current work:** 7.5.9 consolidates roadmap stages 7.5.8 and 7.5.9 into one release. Every live league page receives the same server-owned active-snapshot season/week context and explicit live, empty, stale, or incomplete status. Commissioner HQ adds tenant-safe operations health for the active snapshot, importer, Discord delivery, schema, and recovery evidence. Sanitized request telemetry, request IDs, bounded mutation throttling, additive migration 44, exact D1 bookmark/reconciliation tooling, and documented recovery procedures complete the operations foundation.
 
-**Next gate:** Pass the consolidated strict gate, publish 7.5.9 through protected Main, apply additive migration 44 with before/after bookmarks and protected-count verification, deploy the exact merge commit, and record a read-only Production reconciliation. No import, snapshot activation, reset/deletion, URL rotation, season archive/transition, roster rewrite, Discord thread operation, or Free Agent reinterpretation is part of the release.
+**Next gate:** Merge passing pull request #123 through protected Main, deploy the exact 7.5.9 merge commit, record the verified Production reconciliation in the new evidence ledger, and complete signed-in Commissioner Operations acceptance. No import, snapshot activation, reset/deletion, URL rotation, season archive/transition, roster rewrite, Discord thread operation, or Free Agent reinterpretation is part of the release.
 
 ## Product decisions
 
@@ -93,7 +93,7 @@
 | 7.4.4.10 | Production deployed; pending owner Discord acceptance | Trade Block results rendered as the same rich, linked Player Cards used by `/player`, with Looking For notes retained |
 | 7.4.4.11 | Production deployed; pending owner Discord acceptance | Schedule records, record-ceiling `/eliminated`, and portrait-backed Trade Block cards without player statistics |
 | 7.4.4.12 | Production deployed; pending owner Discord acceptance | Compact portrait-backed Discord Player Cards and unbolded playoff-state schedule indicators |
-| 7.5.8–7.5.9 | 7.5.9 validation candidate | One canonical active-snapshot context plus tenant-safe monitoring, backups, security, recovery evidence, and commissioner operations health |
+| 7.5.8–7.5.9 | 7.5.9 PR #123 checks passed; migration 44 verified; deployment in progress | One canonical active-snapshot context plus tenant-safe monitoring, backups, security, recovery evidence, and commissioner operations health |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Production deployed; authenticated device acceptance passed | Central public-domain authentication/session framework, migration 36, exact-route desktop/mobile refresh, rotation, CSRF, revocation, durable throttling, and privacy-minimized security events |
 | 7.5.1 | Production through cumulative 7.5.2 release | Madden-source cap provenance, unequal two-team packages, private two-owner negotiation threads, direct decision buttons, and Bot-DM fallback |

@@ -16,7 +16,12 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized": true, "status": "authorized-not-run"},
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "published-branch-pr-open",
+    "pullRequest": 123,
+    "candidateCommit": "39ba25d44cb41ae5c6dc0391db5bc532cbfd551b"
+  },
   "staging": {"authorized": false, "deployed": false, "status": "not-run"},
   "production": {
     "authorized": true,
@@ -25,7 +30,7 @@
     "currentRelease": "7.5.7.7",
     "candidateRelease": "7.5.9",
     "currentCommit": "c02064e5ce690df1314735cb4489bf32d3a7a5b0",
-    "currentMigration": 43,
+    "currentMigration": 44,
     "candidateMigration": 44,
     "scope": "One canonical active-snapshot context, commissioner operations health, sanitized request telemetry, bounded mutation throttling, additive recovery-evidence schema, and exact-target recovery reconciliation. No import, snapshot activation, reset, deletion, URL rotation, season lifecycle action, Discord thread operation, roster rewrite, or Free Agent reinterpretation."
   },
