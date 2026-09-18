@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 7.5.7.5 */
+/* FHQ_BUILD: 7.5.7.6 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='7.5.7.5';
+const RELEASE='7.5.7.6';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -76,6 +76,33 @@ async function mapStatistics(context,step){
   const failed=Number(final?.progress?.failed??final?.delta?.failedRoutes??0);
   if(failed)throw new Error(`${failed} statistics route(s) failed; candidate build stopped safely.`);
   return{...final,mappingRun:{...(final.mappingRun||{}),id:runId}};
+}
+
+async function buildCandidate(context,step,mappingRunIds){
+  let result=await step.do('build-candidate-start',()=>call(
+    context,companion(context.slug,'build-snapshot'),'POST',{
+      action:'start',candidateImportRunId:context.runId,...mappingRunIds
+    }
+  ));
+  const snapshotId=result?.snapshot?.snapshotId;
+  if(!snapshotId)throw new Error('Candidate builder did not return a snapshot ID.');
+  let iteration=0,stalled=0,priorProgress=-1,priorPhase='';
+  while(!result.complete){
+    iteration+=1;
+    result=await step.do(`build-candidate-next-${iteration}`,()=>call(
+      context,companion(context.slug,'build-snapshot'),'POST',{
+        action:'next',candidateImportRunId:context.runId,snapshotId,limit:125
+      }
+    ));
+    const job=result.buildJob||{};
+    const progress=Number(job.processedCount||0),phase=String(job.phase||'');
+    if(progress<=priorProgress&&phase===priorPhase)stalled+=1;
+    else stalled=0;
+    if(stalled>=3)throw new Error('Candidate snapshot build stopped making progress at its durable checkpoint.');
+    priorProgress=progress;
+    priorPhase=phase;
+  }
+  return result;
 }
 
 async function validateCandidate(context,step,snapshotId){
@@ -157,7 +184,9 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
     }));
 
     const players=await phase(context,step,'map-players',()=>call(
-      context,companion(context.slug,'map-players'),'POST',{compact:true,discoverySessionId:context.discoverySessionId}
+      context,companion(context.slug,'map-players'),'POST',{
+        compact:true,discoverySessionId:context.discoverySessionId,candidateImportRunId:context.runId
+      }
     ),payload=>{
       const count=Number(payload.mappingRun?.playerCount??payload.playerCount??0);
       const freeAgentStatus=payload.mappingCompleteness==='complete'
@@ -192,11 +221,7 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
       scheduleMappingRunId:schedule.mappingRun?.id,
       statisticsMappingRunId:statistics.mappingRun?.id
     };
-    const built=await phase(context,step,'build-candidate',()=>call(
-      context,companion(context.slug,'build-snapshot'),'POST',{
-        candidateImportRunId:context.runId,...mappingRunIds
-      }
-    ),payload=>({
+    const built=await phase(context,step,'build-candidate',()=>buildCandidate(context,step,mappingRunIds),payload=>({
       summary:`Import snapshot ${payload.snapshot?.snapshotId||'built'}`,
       counts:payload.snapshot?.counts||{},candidateSnapshotId:payload.snapshot?.snapshotId
     }));

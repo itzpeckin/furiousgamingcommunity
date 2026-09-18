@@ -186,12 +186,20 @@ test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-for
       INSERT INTO companion_statistics_mapping_runs (id,league_id,discovery_session_id) VALUES ('stats-run','league-1','capture-1');`);
     for(let i=0;i<32;i++){
       sqlite.prepare(`INSERT INTO companion_canonical_teams_preview (mapping_run_id,league_id,external_id,display_name,source_record_json) VALUES ('teams-run','league-1',?,?,'{}')`).run(`team-${i}`,`Team ${i}`);
-      sqlite.prepare(`INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,team_external_id,display_name,source_record_json) VALUES ('players-run','league-1',?,?,?,'{}')`).run(`player-${i}`,`team-${i}`,`Player ${i}`);
     }
+    const playerInsert=sqlite.prepare(`INSERT INTO companion_canonical_players_preview
+      (mapping_run_id,league_id,external_id,team_external_id,display_name,source_record_json)
+      VALUES ('players-run','league-1',?,?,?,'{}')`);
+    for(let i=0;i<2046;i++)playerInsert.run(`player-${i}`,`team-${i%32}`,`Player ${i}`);
+    const statisticInsert=sqlite.prepare(`INSERT INTO companion_canonical_statistics_preview
+      (mapping_run_id,league_id,external_key,category,season_year,stage,week_index,player_external_id,
+       team_external_id,player_name,metrics_json,source_route_path,source_record_json)
+      VALUES ('stats-run','league-1',?,'passing',2026,'regular-season',1,?,?,?,'{}','xbsx/742482/week/reg/1/passing','{}')`);
+    for(let i=0;i<939;i++)statisticInsert.run(`stat-${i}`,`player-${i%2046}`,`team-${i%32}`,`Player ${i%2046}`);
     const proof={status:'proven',source:'current-state-metadata',period:canonicalSchedulePeriod({stage:'reg',week:1})};
     const coverage=candidateSourceCoverage({sourceMarkers:{currentPeriod:proof},datasetInventory:[
       {datasetType:'schedule',routePath:route,recordCount:272,periodSource:'payload-schedule-aggregate',canonicalPeriods:resolveMaddenSchedulePeriods(route,payload)},
-      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing',recordCount:0}
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing',recordCount:939}
     ]});
     assert.equal(coverage.currentWeek,1);assert.equal(coverage.scheduleHorizon.week,18);
     assert.equal(coverage.futureSchedulePeriods.length,17);assert.deepEqual(candidateCoverageWarnings(coverage),[]);
@@ -203,14 +211,18 @@ test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-for
     sqlite.prepare(`UPDATE companion_candidate_import_runs SET team_mapping_run_id='teams-run',player_mapping_run_id='players-run',schedule_mapping_run_id=?,statistics_mapping_run_id='stats-run' WHERE id='candidate-full'`).run(mapping.mappingRun.id);
     let built=await buildSnapshot(context({action:'start',limit:50,candidateImportRunId:'candidate-full',teamMappingRunId:'teams-run',playerMappingRunId:'players-run',scheduleMappingRunId:mapping.mappingRun.id,statisticsMappingRunId:'stats-run'}));
     let result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
-    assert.equal(result.complete,false);assert.equal(result.buildJob.processedCount,50);assert.equal(result.buildJob.totalCount,368);
+    assert.equal(result.complete,false);assert.equal(result.buildJob.processedCount,0);assert.equal(result.buildJob.totalCount,null);
     const buildSnapshotId=result.snapshot.snapshotId;
-    for(let i=0;i<20&&!result.complete;i++){
-      built=await buildSnapshot(context({action:'next',limit:50,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
+    built=await buildSnapshot(context({action:'start',candidateImportRunId:'candidate-full'}));
+    result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
+    assert.equal(result.snapshot.snapshotId,buildSnapshotId,'a repeated start must resume the durable checkpoint');
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshots WHERE id=?`).get(buildSnapshotId).count,1);
+    for(let i=0;i<100&&!result.complete;i++){
+      built=await buildSnapshot(context({action:'next',limit:125,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
       result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
     }
-    assert.equal(result.complete,true);assert.equal(result.buildJob.processedCount,368);
-    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE snapshot_id=?`).get(buildSnapshotId).count,368);
+    assert.equal(result.complete,true);assert.equal(result.buildJob.processedCount,3321);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE snapshot_id=?`).get(buildSnapshotId).count,3321);
     assert.equal(result.snapshot.weekIndex,1);assert.equal(result.snapshot.counts.games,272);
     assert.equal(result.snapshot.manifest.scheduleHorizon.week,18);assert.equal(result.snapshot.manifest.discordScheduleTransition.reason,'initial-import');
     assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM league_active_snapshots').get().count,0);
@@ -959,11 +971,14 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(builder,/historyCarryForward/);
   assert.match(builder,/candidateHistoricalBackfill/);
   assert.match(builder,/Historical Week/);
-  assert.match(builder,/teams=historicalBackfill\?parsedDomain\('teams'\):freshTeams/);
-  assert.match(builder,/players=historicalBackfill\?parsedDomain\('players'\):freshPlayers/);
-  assert.match(builder,/standingRows=historicalBackfill\?parsedDomain\('standings'\):standingSource\.records/);
+  assert.match(builder,/checkpointed-domain-v2/);
+  assert.match(builder,/domain==='teams'/);
+  assert.match(builder,/domain==='players'/);
+  assert.match(builder,/domain==='standings'/);
+  assert.match(builder,/candidate_snapshot_id=\?/);
+  assert.match(builder,/INSERT OR IGNORE INTO league_snapshot_records/);
   assert.match(builder,/candidateCoverageWarnings/);
-  assert.match(builder,/domain IN \('teams','players','games','statistics','standings'\)/);
+  assert.match(builder,/domain IN \('games','statistics'\)/);
   assert.doesNotMatch(builder,/DELETE\s+FROM/i);
   assert.doesNotMatch(builder,/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?league_active_snapshots/i);
 
@@ -974,6 +989,8 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(statistics,/Math\.min\(4,Number\(body\.batches\)\|\|1\)/);
   for(const source of [ui,worker])assert.match(source,/candidateImportRunId/);
   for(const source of [ui,worker])assert.match(source,/action:'next',runId,batches:4/);
+  assert.match(ui,/action:'next',candidateImportRunId,snapshotId,limit:125/);
+  assert.match(ui,/stopped making progress at its durable checkpoint/);
   assert.match(ui,/action:'validate-next',snapshotId,limit:500,batches:4/);
   assert.match(ui,/action:'record-performance'/);
   assert.match(ui,/Click to live/);

@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.7.6 checkpointed candidate snapshot build impact
+
+This code-only release creates and links the private candidate checkpoint before any expensive domain reconstruction, then builds teams, players, games, statistics, and standings independently in bounded 125-record requests. Each request prepares only its current domain slice, and transient response retries resume the same candidate snapshot through the run's durable pointer. There is no fixed total-record guard, validation still waits for every domain to complete, and deployment itself changes no Production data.
+
+The runtime rollback baseline is exact Main `dc662ae51e8f21a115cb5a61dfc4d7f906848bd2`, Production release 7.5.7.5, and migration 43. Runtime rollback may restore that code while retaining the failed candidate, every private partial/checkpoint snapshot, the captured export, discovery report, mapping runs, active/prior/malformed snapshots, lifecycle events, audits, yearly schedule, permanent export URL, Discord thread records, season/game-year records, and blocked/missing Free Agent state.
+
+Do not delete or rewrite a private partial/checkpoint snapshot, run another export/import as part of rollback, move the active pointer, create/remove scheduling threads, reset/delete data, rotate the export URL, archive/transition a season, alter roster ownership, or reinterpret blocked/missing Free Agents as zero.
+
 ## 7.5.7.5 resumable candidate snapshot build impact
 
 This code-only release replaces the single long snapshot-record write with bounded, resumable requests. Continuations are limited to the exact candidate and private pending snapshot, recalculate the immutable source plan, verify expected domain counts, and cannot enter validation until every expected record is present. It adds no migration, and deployment itself changes no Production data.

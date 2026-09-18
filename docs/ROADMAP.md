@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 17, 2026
+**Updated:** September 18, 2026
 
-**Revision:** 2.75
+**Revision:** 2.76
 
-**Current production:** FranchiseHQ 7.5.7.4 is the accepted Main baseline at `897255b7bf27e8b66da442385d589d990734099d`. Migration 43 is applied. The retained export, active Week 1 snapshot, prior/malformed snapshots, roster authority, and audits remain intact.
+**Current production:** FranchiseHQ 7.5.7.5 is the Main baseline at `dc662ae51e8f21a115cb5a61dfc4d7f906848bd2`. Migration 43 is applied. The retained export, active Week 1 snapshot, prior/malformed/private partial snapshots, roster authority, and audits remain intact.
 
-**Current work:** 7.5.7.5 makes candidate snapshot construction resumable and bounded. Production proved that the same Week 2 candidate repeatedly stopped after 2,250 of 3,353 records because a single request performed too many sequential D1 write batches. The repair keeps every partial attempt private and retained while completing a new candidate across bounded requests before validation.
+**Current work:** 7.5.7.6 moves snapshot construction to an immediate durable checkpoint followed by independent team, player, game, statistic, and standing steps. Production proved 7.5.7.5 still timed out before creating its first private snapshot because the request reconstructed every domain and prepared the complete record plan before returning its checkpoint. The corrected flow prepares and writes only one bounded domain slice per request, retries transient response loss against the same candidate, and has no fixed total-record guard.
 
-**Next gate:** Validate and publish 7.5.7.5, then let the commissioner select **Retry** against the already-retained League Info + Weekly Stats export. No new export is required. Deployment itself runs no import or snapshot operation; the commissioner retry remains guarded, validated, atomic, and auditable.
+**Next gate:** Validate and publish 7.5.7.6, then let the commissioner select **Retry** against the already-retained League Info + Weekly Stats export. No new export is required. Deployment itself runs no import or snapshot operation; the commissioner retry remains guarded, validated, atomic, and auditable.
 
 ## Product decisions
 
@@ -128,7 +128,8 @@
 | 7.5.7.2 | Main baseline | Complete playoff W/L recovery from unambiguous later-round advancement without inventing scores |
 | 7.5.7.3 | Production | Accept complete same-season League Info + Weekly Stats while carrying the live roster, contracts, and Free Agent authority forward |
 | 7.5.7.4 | Production | Safely rebase carried roster foreign keys when Madden changes all team IDs but the complete team identities still match one-to-one |
-| 7.5.7.5 | Production-authorized candidate | Resume candidate snapshot construction in bounded record batches so large rosterless weekly imports complete without a request timeout |
+| 7.5.7.5 | Production; superseded by 7.5.7.6 correction | Added record-batched continuation, but Production still exceeded the request window while reconstructing the full cross-domain plan before its first checkpoint |
+| 7.5.7.6 | Production-authorized candidate | Create the private candidate checkpoint immediately, build one domain slice per request, and resume transient response loss without a fixed total-record ceiling |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
@@ -159,6 +160,7 @@
 | 11a | Active importer continuity patch | 7.5.7.3 | Allow same-season weekly data to publish during a Companion roster outage without emptying or reinterpreting the active roster. |
 | 11b | Active importer identity correction | 7.5.7.4 | Translate changed Madden team IDs only after complete one-to-one team identity proof, preserving every player, contract, and semantic roster assignment. |
 | 11c | Active importer snapshot-build correction | 7.5.7.5 | Build and resume the retained Week 2 candidate in bounded requests, validate only after all expected records exist, and keep every prior partial attempt private and retained. |
+| 11d | Active importer checkpoint correction | 7.5.7.6 | Persist the exact candidate before expensive reconstruction, build each domain independently in one D1 batch per request, and resume the same checkpoint after a transient server response failure. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |

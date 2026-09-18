@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.7.5 */
+/* FHQ_BUILD: 7.5.7.6 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.5.7.5';
+  const VERSION = '7.5.7.6';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -247,23 +247,47 @@
     return {...final, mappingRun:{...(final.mappingRun||{}),id:runId}};
   }
 
+  async function checkpointedBuildRequest(body) {
+    let lastError=null;
+    for(let attempt=0;attempt<3;attempt+=1){
+      try{return await api('build-snapshot','POST',body);}
+      catch(error){
+        lastError=error;
+        const retryable=!Number(error?.status||0)||Number(error.status)>=500;
+        if(!retryable||attempt===2)throw error;
+        await new Promise(resolve=>window.setTimeout(resolve,250*(attempt+1)));
+      }
+    }
+    throw lastError||new Error('Checkpointed snapshot request failed.');
+  }
+
   async function buildCandidate(candidateImportRunId,mappingRunIds) {
-    let result=await api('build-snapshot','POST',{
+    let result=await checkpointedBuildRequest({
       action:'start',candidateImportRunId,...mappingRunIds
     });
     const snapshotId=result?.snapshot?.snapshotId;
     if(!snapshotId)throw new Error('Candidate builder did not return a snapshot ID.');
-    let guard=0;
-    while(!result.complete&&guard<100){
+    let stalled=0;
+    let priorProgress=-1;
+    let priorPhase='';
+    while(!result.complete){
       const job=result.buildJob||{};
-      notice=`Build Import Snapshot · ${Number(job.processedCount||0).toLocaleString()}/${Number(job.totalCount||0).toLocaleString()} records`;
+      const total=Number.isFinite(Number(job.totalCount))&&Number(job.totalCount)>0
+        ?Number(job.totalCount).toLocaleString():'planning';
+      notice=`Build Import Snapshot · ${Number(job.processedCount||0).toLocaleString()}/${total} records · ${job.phase||'checkpoint'}`;
       rerender();
-      result=await api('build-snapshot','POST',{
-        action:'next',candidateImportRunId,snapshotId,limit:500
+      result=await checkpointedBuildRequest({
+        action:'next',candidateImportRunId,snapshotId,limit:125
       });
-      guard+=1;
+      const nextJob=result.buildJob||{};
+      const progress=Number(nextJob.processedCount||0);
+      const phase=String(nextJob.phase||'');
+      if(progress<=priorProgress&&phase===priorPhase)stalled+=1;
+      else stalled=0;
+      if(stalled>=3)throw new Error('Candidate snapshot build stopped making progress at its durable checkpoint.');
+      priorProgress=progress;
+      priorPhase=phase;
     }
-    if(!result.complete)throw new Error('Candidate snapshot build exceeded the 100-batch safety limit.');
     return result;
   }
 

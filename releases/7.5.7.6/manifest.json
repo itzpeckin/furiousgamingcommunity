@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.7.6",
+  "releaseType": "checkpointed-domain-candidate-snapshot-build",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.7.5",
+    "commit": "dc662ae51e8f21a115cb5a61dfc4d7f906848bd2",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.7.6-checkpointed-snapshot-build",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "authorized-not-run"},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.7.5",
+    "candidateRelease": "7.5.7.6",
+    "currentCommit": "dc662ae51e8f21a115cb5a61dfc4d7f906848bd2",
+    "currentMigration": 43,
+    "candidateMigration": 43,
+    "scope": "Code-only repair that checkpoints the private candidate immediately and builds one bounded domain slice per request. Deployment does not run an import or modify the active snapshot."
+  },
+  "requiredArtifacts": [
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "league-engine/one-click-import.js",
+    "workers/franchise-import-worker/src/index.js",
+    "tests/import/candidate-import.test.mjs",
+    "releases/7.5.7.6/release-record.md",
+    "releases/7.5.7.6/validation-evidence.json"
+  ]
+}
