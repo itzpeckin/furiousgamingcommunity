@@ -12,7 +12,7 @@
 
 **Current work:** Roadmap stages 7.5.8 and 7.5.9 are complete in Production. Every live league page receives the same server-owned active-snapshot season/week context and explicit live, empty, stale, or incomplete status. Commissioner HQ now exposes tenant-safe operations health for the active snapshot, importer, Discord delivery, schema, and recovery evidence. Sanitized request telemetry, request IDs, bounded mutation throttling, additive migration 44, exact D1 bookmark/reconciliation tooling, and documented recovery procedures complete the operations foundation.
 
-**Next gate:** Begin 7.6.0-rc.1 private FGC release-candidate work: freeze scope except release blockers, run a representative commissioner/committee/owner acceptance cohort, rehearse deployment and recovery from exact artifacts, and close critical/high blockers. The two pre-existing Discord delivery failures currently shown in Operations should be investigated as a separate follow-up; they did not affect the 7.5.9 deployment or canonical league data.
+**Next gate:** 7.6.0-rc.1 is in implementation from exact Main `7e9f6f4`. The two retained Discord trade-sync failures exposed a release blocker: aggregate errors discarded each destination's reason and unresolved failures aged out of Operations. The candidate adds migration 45 destination evidence, persistent unresolved health, and an audited commissioner-only retry that updates failed copies without deleting the original failure. Complete the exact candidate gate, Production publication, read-only reconciliation, and representative commissioner/committee/owner acceptance before promoting 7.7.0.
 
 ## Product decisions
 
@@ -131,7 +131,7 @@
 | 7.5.7.5 | Production; superseded by 7.5.7.6 correction | Added record-batched continuation, but Production still exceeded the request window while reconstructing the full cross-domain plan before its first checkpoint |
 | 7.5.7.6 | Production; superseded by 7.5.7.7 correction | Created the durable candidate and completed teams/players, then exposed an exact-ID duplicate plan at the game checkpoint after Madden rebased team IDs |
 | 7.5.7.7 | Production; owner accepted | Rebase retained schedule team IDs, deduplicate exact Madden game IDs, resume the private checkpoint, and complete the retained Week 2 import |
-| 7.6.0-rc.1 | Planned | Private FGC release candidate |
+| 7.6.0-rc.1 | In implementation | Private FGC release candidate; Discord delivery blocker correction and acceptance package |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
 | 8.1.0 | Planned | Multi-league administration and operations |
@@ -805,6 +805,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 ## 7.6.0-rc.1 — Private FGC Release Candidate
 
 - Freeze scope except release blockers and test a representative private cohort of commissioners, committee members, and owners.
+- Retain sanitized destination-level results for every Discord trade-message synchronization attempt. Keep unresolved failures visible until resolved, and allow commissioners to retry only exhausted trade-sync copies without replaying trades, votes, schedule threads, or unrelated messages.
 - Validate onboarding, ownership, Madden data, URLs, trades, transactions, rules, GOTW, confidence, mobile, recovery, and sessions.
 - Rehearse deployment/rollback from exact artifacts; publish privacy, terms, support, retention, incident, and help material.
 - Gate: no unresolved critical/high blocker, recovery reconciles, monitoring/support are active, and the owner accepts one exact candidate.

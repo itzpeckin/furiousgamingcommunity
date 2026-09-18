@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.6.0-rc.1",
+  "releaseType": "private-fgc-release-candidate",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.9",
+    "commit": "7e9f6f49d08514dcf838740877e7b42f12ceb836",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.6.0-rc.1",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending", "pullRequest": null, "candidateCommit": null, "mergeCommit": null},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-awaiting-publication",
+    "currentRelease": "7.5.9",
+    "candidateRelease": "7.6.0-rc.1",
+    "currentCommit": "7e9f6f49d08514dcf838740877e7b42f12ceb836",
+    "currentPagesDeployment": "22823aae-5621-405c-b8e7-cff61bf82069",
+    "currentWorkerBuild": "9082f91e-e683-4f5a-a8c1-f4fd410d89c9",
+    "currentMigration": 44,
+    "candidateMigration": 45,
+    "scope": "Private FGC release candidate with retained per-destination Discord diagnostics, persistent unresolved Operations health, audited failed-copy retry, representative role acceptance, and public trust/support material. No Madden export/import, snapshot activation, reset, deletion, URL rotation, season lifecycle action, scheduling-thread action, roster/ownership mutation, credential change, live Discord retry, or Free Agent reinterpretation."
+  },
+  "requiredArtifacts": [
+    "migrations/0045_discord_delivery_diagnostics.sql",
+    "functions/_lib/discord-trade-sync.js",
+    "functions/_lib/discord-delivery.js",
+    "functions/_lib/operational-health.js",
+    "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
+    "docs/PRIVATE-RC-ACCEPTANCE.md",
+    "docs/RC-DEPLOYMENT-ROLLBACK-REHEARSAL.md",
+    "support/privacy/index.html",
+    "support/terms/index.html",
+    "support/retention/index.html",
+    "support/incidents/index.html",
+    "releases/7.6.0-rc.1/release-record.md",
+    "releases/7.6.0-rc.1/validation-evidence.json"
+  ]
+}

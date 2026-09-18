@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.5.9';
+  const VERSION = '7.6.0-rc.1';
   const cache = new Map();
   let summary = null;
   const domainCache = new Map();

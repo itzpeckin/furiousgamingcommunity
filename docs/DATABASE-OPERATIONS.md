@@ -136,7 +136,7 @@ After 7.3.3, the ledger must contain every version from 1 through 25 and the for
 
 After 7.5.5, the ledger must contain every version from 1 through 38 and the foreign-key check must return no rows. Migration 38 adds only `discord_league_installations.trade_channel_id`; protected identity, membership, snapshot, import, trade-workflow, trade-room, audit, and Free Agent state must remain unchanged.
 
-After 7.5.9, the ledger must contain every version from 1 through 44 and the foreign-key check must return no rows. Migration 44 adds only operational/recovery evidence tables and indexes. All protected counts, active snapshot pointers, snapshot records, imports, captures, Discord state, permanent export URLs, roster/ownership state, and Free Agent authority must remain unchanged.
+After 7.6.0-rc.1, the ledger must contain every version from 1 through 45 and the foreign-key check must return no rows. Migration 44 adds only operational/recovery evidence tables and indexes. Migration 45 adds only a retained Discord destination-diagnostic table and indexes; it does not replay or rewrite existing outbox events. All protected counts, active snapshot pointers, snapshot records, imports, captures, existing Discord state, permanent export URLs, roster/ownership state, and Free Agent authority must remain unchanged.
 
 ## Stop conditions
 

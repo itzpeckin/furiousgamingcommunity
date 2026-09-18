@@ -1,6 +1,6 @@
 # FranchiseHQ Operations and Incident Response
 
-This runbook governs 7.5.9 and later operations. It applies per tenant: an incident in one league must never broaden a query, repair, or recovery action to another league.
+This runbook governs 7.6.0-rc.1 and later operations. It applies per tenant: an incident in one league must never broaden a query, repair, or recovery action to another league.
 
 ## Normal health
 
@@ -8,7 +8,7 @@ Commissioner HQ reports five signals from server-owned records:
 
 1. The active snapshot exists, has a canonical period, passed validation, and its stored domain counts match its declared counts.
 2. No candidate import has stopped progressing for more than 15 minutes and the latest run is not failed.
-3. A connected Discord installation has no failed delivery in the prior day and its latest schedule sync is not failed or partial.
+3. A connected Discord installation has no unresolved delivery and its latest schedule sync is not failed or partial. Unresolved failures never age out of Commissioner Operations merely because 24 hours passed.
 4. Recovery evidence was verified in the prior 30 days.
 5. The database ledger is continuous through the runtime-required migration.
 
@@ -18,7 +18,7 @@ Request telemetry contains a request ID, sanitized route template, method, statu
 
 - **Canonical league data:** Stop publication activity for that league. Confirm the active snapshot pointer and reconcile declared versus stored teams, players, games, statistics, and standings. Do not activate or delete a snapshot to clear the alert.
 - **Import pipeline:** Keep the current active snapshot live. Inspect the exact candidate/run checkpoint and use its ordinary retry only after the failure is understood. Do not request a new export merely to clear a retained failure.
-- **Discord delivery:** Keep web data authoritative. Inspect only that tenant's latest sync/delivery rows, channel permissions, and request ID. Do not recreate every thread or change league week.
+- **Discord delivery:** Keep web data authoritative. Commissioner Operations shows retained, sanitized per-destination evidence. Use **Retry Failed Copies** only for an exhausted trade-message synchronization; it creates a new audited delivery intent and edits the retained copies in place. It never recreates every thread, changes league week, rewrites a trade, or deletes the old failed row. A successful retry marks the old row resolved while preserving its attempts, error, and diagnostics.
 - **Schema:** Stop the new runtime. Verify the exact D1 target, bookmark, ledger, and pending migration before retrying deployment.
 - **Recovery evidence:** Run the read-only exact-target reconciliation. Recording successful evidence is additive; it is not a restore.
 
@@ -30,7 +30,7 @@ Use the committed target registry and a short-lived Cloudflare token supplied th
 npm run recovery:drill -- --target production
 ```
 
-The drill verifies Cloudflare's returned database identity, captures the current D1 Time Travel bookmark, checks the continuous ledger and foreign keys, preserves protected counts, and reconciles every enabled tenant's active snapshot. After migration 44, `--record` may append the verified tenant-scoped result when the exact production target confirmation is supplied.
+The drill verifies Cloudflare's returned database identity, captures the current D1 Time Travel bookmark, checks the continuous ledger and foreign keys, preserves protected counts, and reconciles every enabled tenant's active snapshot. After migration 44, `--record` may append the verified tenant-scoped result when the exact production target confirmation is supplied. Migration 45 adds only retained Discord destination diagnostics; applying it does not replay a delivery.
 
 The drill contains no restore call. A Time Travel restore overwrites the selected D1 database and is never an automatic remediation. Before any actual restore: stop writes, capture the current bookmark, identify the exact incident and tenant impact, obtain specific destructive-operation authority, document expected row/pointer effects, and prepare a post-restore reconciliation. If any item is missing, do not restore.
 

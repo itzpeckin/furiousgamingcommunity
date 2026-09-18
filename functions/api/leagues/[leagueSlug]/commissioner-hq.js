@@ -11,8 +11,9 @@ import {
   withTradeCenterSettings
 } from '../../../_lib/trade-center.js';
 import { operationalHealth } from '../../../_lib/operational-health.js';
+import { scheduleDiscordDeliveryFlush } from '../../../_lib/discord-delivery.js';
 
-const RELEASE = '7.5.9';
+const RELEASE = '7.6.0-rc.1';
 const MANAGED_FEATURES = new Map([
   ['trade_center', 'Trade Center'],
   ['trade_block', 'Trade Block'],
@@ -40,7 +41,7 @@ async function requestContext(context) {
   if (!league || authorization.session.membership?.leagueId !== league.id) {
     return { response:jsonResponse({ ok:false, error:'Not found.' }, 404) };
   }
-  return { db:context.env.DB, league, session:authorization.session, request:context.request };
+  return { db:context.env.DB, league, session:authorization.session, request:context.request, context };
 }
 
 async function settingsState(db, leagueId) {
@@ -293,6 +294,53 @@ async function updateFeature(c, body) {
   ]);
 }
 
+async function retryDiscordDelivery(c, body) {
+  const deliveryId=String(body.deliveryId||'').trim();
+  if(!/^discord_delivery_[a-z0-9-]{20,80}$/i.test(deliveryId)){
+    throw Object.assign(new Error('That Discord delivery could not be verified.'),{status:400});
+  }
+  const original=await c.db.prepare(`SELECT id,channel_id AS channelId,event_type AS eventType,
+      resource_type AS resourceType,resource_id AS resourceId,payload_json AS payloadJson,status,attempts
+    FROM discord_delivery_events WHERE id=? AND league_id=? LIMIT 1`).bind(deliveryId,c.league.id).first();
+  if(!original)throw Object.assign(new Error('That Discord delivery was not found in this league.'),{status:404});
+  if(original.eventType!=='trade-message-sync'){
+    throw Object.assign(new Error('This delivery cannot use the destination-safe retry.'),{status:400});
+  }
+  if(original.status!=='failed'||Number(original.attempts||0)<5){
+    throw Object.assign(new Error('This delivery is not waiting for commissioner retry.'),{status:409});
+  }
+  const installation=await c.db.prepare(`SELECT status FROM discord_league_installations
+    WHERE league_id=? LIMIT 1`).bind(c.league.id).first();
+  if(installation?.status!=='active'){
+    throw Object.assign(new Error('Reconnect this league to Discord before retrying the delivery.'),{status:409});
+  }
+  const existing=await c.db.prepare(`SELECT id,status FROM discord_delivery_events
+    WHERE league_id=? AND json_extract(payload_json,'$.retryOfDeliveryEventId')=?
+      AND status IN ('pending','sending','sent') ORDER BY created_at DESC LIMIT 1`).bind(c.league.id,deliveryId).first();
+  if(existing?.status==='sent'){
+    throw Object.assign(new Error('This delivery was already resolved by a retained retry.'),{status:409});
+  }
+  let queuedId=existing?.id||null;
+  if(!queuedId){
+    queuedId=`discord_delivery_${crypto.randomUUID()}`;
+    const payload=parseJson(original.payloadJson,{});
+    const audit=createTenantAuditContext({request:c.request},c.league,c.session,'discord_delivery_retry_queued');
+    await c.db.batch([
+      c.db.prepare(`INSERT INTO discord_delivery_events
+        (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
+        VALUES (?,?,?,'trade-message-sync',?,?,'private-channel',?,?)`)
+        .bind(queuedId,c.league.id,original.channelId||'trade-message-sync',original.resourceType||'trade_workflow',
+          original.resourceId,JSON.stringify({...payload,tradeId:payload.tradeId||original.resourceId,
+            leagueSlug:c.league.slug,retryOfDeliveryEventId:deliveryId}),
+          `trade-sync-retry:${c.league.id}:${deliveryId}`),
+      tenantAuditStatement(c.db,audit,{resourceType:'discord_delivery_event',resourceId:deliveryId,
+        detail:{queuedDeliveryEventId:queuedId,eventType:'trade-message-sync',resourceId:original.resourceId}})
+    ]);
+  }
+  scheduleDiscordDeliveryFlush(c.context,c.db,c.league.id);
+  return {queuedDeliveryEventId:queuedId};
+}
+
 export async function onRequestGet(context) {
   try {
     const c = await requestContext(context);
@@ -311,6 +359,10 @@ export async function onRequestPost(context) {
     if (body?.action === 'quick-control') {
       await updateQuickControl(c,body);
       return jsonResponse({...await overview(c),action:'quick-control'});
+    }
+    if (body?.action === 'retry-discord-delivery') {
+      const retry=await retryDiscordDelivery(c,body);
+      return jsonResponse({...await overview(c),action:'retry-discord-delivery',retry});
     }
     if (body?.action !== 'feature') {
       return jsonResponse({ok:false,release:RELEASE,error:'Unknown Commissioner HQ action.'}, 400);
