@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.5.9",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "released",
+  "productionChanged": true,
   "productionDataChanged": false,
   "dataChanged": false,
   "credentialsChanged": false,
@@ -29,7 +29,8 @@
     },
     "productionRecoveryReconciliation": {
       "passed": true,
-      "mode": "read-only",
+      "mode": "recorded",
+      "evidenceId": "recovery_39b56cce-15fa-4b3f-9e4d-deeb1956d5dd",
       "leagueId": "franchise-hq-primary",
       "snapshotId": "5cee59c2-1610-4e70-8a65-2707a40da95a",
       "seasonYear": 2027,
@@ -37,15 +38,32 @@
       "expected": {"teams": 32, "players": 2046, "games": 272, "statistics": 939, "standings": 32},
       "actual": {"teams": 32, "players": 2046, "games": 272, "statistics": 939, "standings": 32},
       "foreignKeyViolations": 0,
-      "mismatches": []
+      "mismatches": [],
+      "evidenceRows": 1
+    },
+    "productionHttpsAcceptance": {
+      "passed": true,
+      "liveReleaseMarker": "7.5.9",
+      "league": "Furious Gaming Community",
+      "seasonYear": 2027,
+      "weekIndex": 2,
+      "snapshotStatus": "live",
+      "yearlyScheduleGames": 272,
+      "rosteredPlayers": 2046,
+      "freeAgents": "unknown",
+      "operationsStatus": "attention",
+      "operationsAttentionReason": "2 pre-existing Discord delivery failures in the last 24 hours",
+      "canonicalDataHealthy": true,
+      "recoveryEvidenceHealthy": true,
+      "schemaHealthy": true
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "gitMainChanged": false,
+    "productionChanged": true,
+    "gitMainChanged": true,
     "gitRemoteChanged": true,
     "migrationApplied": true,
-    "databaseRowsWritten": 1,
+    "databaseRowsWritten": 2,
     "exportExecuted": false,
     "importExecuted": false,
     "activeSnapshotChanged": false,
@@ -61,8 +79,8 @@
     "freeAgentInterpretedAsZero": false
   },
   "external": {
-    "githubPublication": {"authorized": true, "status": "pull-request-open", "pullRequest": 123, "candidateCommit": "39ba25d44cb41ae5c6dc0391db5bc532cbfd551b"},
-    "hostedChecks": {"authorized": true, "status": "passed", "candidateCommit": "39ba25d44cb41ae5c6dc0391db5bc532cbfd551b"},
+    "githubPublication": {"authorized": true, "status": "published-main", "pullRequest": 123, "candidateCommit": "b0ef247ab86891e95c5bf77ec750c0575e853a7c", "mergeCommit": "1e86ea7794f406208d79484dfdb23f067ee32667"},
+    "hostedChecks": {"authorized": true, "status": "passed", "candidateCommit": "b0ef247ab86891e95c5bf77ec750c0575e853a7c", "mergeCommit": "1e86ea7794f406208d79484dfdb23f067ee32667", "quality": "success", "pages": "success", "worker": "success"},
     "productionMigration": {
       "authorized": true,
       "status": "applied-and-verified",
@@ -74,9 +92,9 @@
       "foreignKeyViolations": 0,
       "protectedCountsChanged": false
     },
-    "productionDeployment": {"authorized": true, "status": "not-run", "currentRelease": "7.5.7.7", "candidateRelease": "7.5.9"},
-    "productionRecoveryReconciliation": {"authorized": true, "status": "read-only-passed", "restoreAuthorized": false, "evidenceRecordStatus": "pending-post-deployment"},
-    "signedInAcceptance": {"authorized": true, "status": "not-run"},
+    "productionDeployment": {"authorized": true, "status": "deployed-and-verified", "currentRelease": "7.5.9", "mergeCommit": "1e86ea7794f406208d79484dfdb23f067ee32667", "pagesDeployment": "22823aae-5621-405c-b8e7-cff61bf82069", "workerBuild": "9082f91e-e683-4f5a-a8c1-f4fd410d89c9"},
+    "productionRecoveryReconciliation": {"authorized": true, "status": "recorded-and-verified", "restoreAuthorized": false, "evidenceRecordStatus": "verified", "evidenceId": "recovery_39b56cce-15fa-4b3f-9e4d-deeb1956d5dd"},
+    "signedInAcceptance": {"authorized": true, "status": "passed", "releaseMarker": "7.5.9", "seasonYear": 2027, "weekIndex": 2},
     "maddenExport": {"authorized": false, "status": "not-required"},
     "snapshotImport": {"authorized": false, "status": "not-run"}
   }

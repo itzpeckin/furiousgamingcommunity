@@ -6,13 +6,13 @@
 
 **Updated:** September 18, 2026
 
-**Revision:** 2.79
+**Revision:** 2.80
 
-**Current production:** FranchiseHQ 7.5.7.7 is the Main application baseline at `c02064e`. Additive migration 44 is applied and verified in Production between retained Time Travel bookmarks; all protected counts remain unchanged and foreign-key violations remain zero. The active 2027 Week 2 snapshot reconciles exactly across 32 teams, 2,046 players, 272 games, 939 statistics rows, and 32 standings rows. The active/prior/malformed/private snapshots, source captures, roster and Free Agent authority, permanent export URL, Discord state, and audits remain retained.
+**Current production:** FranchiseHQ 7.5.9 is live from Main `1e86ea7`, Cloudflare Pages deployment `22823aae`, import Worker build `9082f91e`, and migration 44. All protected counts remain unchanged and foreign-key violations remain zero. The active 2027 Week 2 snapshot reconciles exactly across 32 teams, 2,046 players, 272 games, 939 statistics rows, and 32 standings rows. Recovery evidence is recorded; the active/prior/malformed/private snapshots, source captures, roster and Free Agent authority, permanent export URL, Discord state, and audits remain retained.
 
-**Current work:** 7.5.9 consolidates roadmap stages 7.5.8 and 7.5.9 into one release. Every live league page receives the same server-owned active-snapshot season/week context and explicit live, empty, stale, or incomplete status. Commissioner HQ adds tenant-safe operations health for the active snapshot, importer, Discord delivery, schema, and recovery evidence. Sanitized request telemetry, request IDs, bounded mutation throttling, additive migration 44, exact D1 bookmark/reconciliation tooling, and documented recovery procedures complete the operations foundation.
+**Current work:** Roadmap stages 7.5.8 and 7.5.9 are complete in Production. Every live league page receives the same server-owned active-snapshot season/week context and explicit live, empty, stale, or incomplete status. Commissioner HQ now exposes tenant-safe operations health for the active snapshot, importer, Discord delivery, schema, and recovery evidence. Sanitized request telemetry, request IDs, bounded mutation throttling, additive migration 44, exact D1 bookmark/reconciliation tooling, and documented recovery procedures complete the operations foundation.
 
-**Next gate:** Merge passing pull request #123 through protected Main, deploy the exact 7.5.9 merge commit, record the verified Production reconciliation in the new evidence ledger, and complete signed-in Commissioner Operations acceptance. No import, snapshot activation, reset/deletion, URL rotation, season archive/transition, roster rewrite, Discord thread operation, or Free Agent reinterpretation is part of the release.
+**Next gate:** Begin 7.6.0-rc.1 private FGC release-candidate work: freeze scope except release blockers, run a representative commissioner/committee/owner acceptance cohort, rehearse deployment and recovery from exact artifacts, and close critical/high blockers. The two pre-existing Discord delivery failures currently shown in Operations should be investigated as a separate follow-up; they did not affect the 7.5.9 deployment or canonical league data.
 
 ## Product decisions
 
@@ -93,7 +93,7 @@
 | 7.4.4.10 | Production deployed; pending owner Discord acceptance | Trade Block results rendered as the same rich, linked Player Cards used by `/player`, with Looking For notes retained |
 | 7.4.4.11 | Production deployed; pending owner Discord acceptance | Schedule records, record-ceiling `/eliminated`, and portrait-backed Trade Block cards without player statistics |
 | 7.4.4.12 | Production deployed; pending owner Discord acceptance | Compact portrait-backed Discord Player Cards and unbolded playoff-state schedule indicators |
-| 7.5.8–7.5.9 | 7.5.9 PR #123 checks passed; migration 44 verified; deployment in progress | One canonical active-snapshot context plus tenant-safe monitoring, backups, security, recovery evidence, and commissioner operations health |
+| 7.5.8–7.5.9 | Production; signed-in acceptance passed | One canonical active-snapshot context plus tenant-safe monitoring, backups, security, recovery evidence, and commissioner operations health |
 | 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
 | 7.5.0 | Production deployed; authenticated device acceptance passed | Central public-domain authentication/session framework, migration 36, exact-route desktop/mobile refresh, rotation, CSRF, revocation, durable throttling, and privacy-minimized security events |
 | 7.5.1 | Production through cumulative 7.5.2 release | Madden-source cap provenance, unequal two-team packages, private two-owner negotiation threads, direct decision buttons, and Bot-DM fallback |
@@ -163,7 +163,7 @@
 | 11c | Active importer snapshot-build correction | 7.5.7.5 | Build and resume the retained Week 2 candidate in bounded requests, validate only after all expected records exist, and keep every prior partial attempt private and retained. |
 | 11d | Active importer checkpoint correction | 7.5.7.6 | Persist the exact candidate before expensive reconstruction, build each domain independently in one D1 batch per request, and resume the same checkpoint after a transient server response failure. |
 | 11e | Active importer schedule-checkpoint correction | 7.5.7.7 | Rebase retained games to current team identities, reduce the 304-row collision plan to 272 unique games, and replay the existing private game domain without deletion before ordinary validation and atomic activation. |
-| 12 | Validation candidate | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
+| 12 | Complete in Production | 7.5.8–7.5.9 | Canonical consistency, monitoring, backups, security, and recovery are live against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
 | 15 | Expansion | 8.0.0 | Activate a second real league and prove tenant-isolated operation and recovery while FGC remains unchanged. |
@@ -784,7 +784,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## 7.5.8 — Canonical League Consistency (formerly 7.4.5)
 
-**Delivered in 7.5.9 candidate**
+**Delivered in Production**
 
 - The authenticated read model returns one server-computed active-snapshot context with snapshot, season, stage, week, display label, configuration-alignment proof, and stable context key.
 - League Home, Teams, Schedule, Statistics, Standings, player surfaces, and Commissioner HQ consume the same active snapshot. Home and Standings no longer silently substitute browser-local or legacy/demo data when the canonical service is unavailable.
@@ -793,7 +793,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## 7.5.9 — Monitoring, Backups, Security, and Recovery (formerly 7.4.6)
 
-**Delivered in 7.5.9 candidate**
+**Delivered in Production**
 
 - Commissioner HQ shows tenant-scoped health for canonical snapshot counts, stalled/failed import work, Discord failures, schema level, and recent recovery evidence, with actionable alerts routed to the proper workspace.
 - Edge telemetry emits request IDs, release/timing headers, sanitized route templates, outcome/status, and duration without logging tenant slugs, export credentials, request bodies, raw exports, or secrets.
@@ -836,6 +836,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## Change log
 
+- **Revision 2.80:** Published consolidated 7.5.9 through PR #123 as Main `1e86ea7`; GitHub quality, Cloudflare Pages, and the import Worker all passed. Applied additive migration 44 between retained Time Travel bookmarks with every protected count unchanged and zero foreign-key violations. Reconciled active 2027 Week 2 snapshot `5cee59c2` exactly across 32 teams, 2,046 players, 272 games, 939 statistics rows, and 32 standings rows, then recorded verified recovery evidence. Signed-in Production acceptance confirmed release 7.5.9, the live snapshot, yearly schedule, roster count, and Free Agents still unknown. Commissioner Operations reports only two pre-existing Discord delivery failures from the last 24 hours; canonical data, schema, and recovery evidence are healthy. No Madden export/import, snapshot activation, reset/deletion, URL rotation, archive/transition, roster or ownership mutation, Discord scheduling action, credential change, or Free Agent reinterpretation occurred.
 - **Revision 2.78:** The owner accepted the completed 7.5.7.7 Week 2 retry and authorized roadmap stages 7.5.8 and 7.5.9. Consolidated both into the 7.5.9 candidate: one server active-snapshot context/status contract; removal of Home/Standings browser/legacy authority fallbacks; Commissioner operations health; sanitized request telemetry and IDs; bounded league mutation limits; additive migration 44; exact-target D1 bookmark, protected-count, foreign-key, and active-snapshot reconciliation tooling; simulated local restore coverage; and updated incident/recovery procedures. No Production import, snapshot activation, reset/deletion, URL rotation, archive/transition, roster or ownership mutation, Discord scheduling action, credential change, or Free Agent reinterpretation ran during implementation.
 - **Revision 2.77:** Published 7.5.7.6 through PR #121 as Main `6971c92`, then diagnosed the commissioner's retained retry read-only. The new durable candidate `88e633a8-a26f-4812-aa46-397bc2ff5755` retained 2,350 records and completed 32 teams plus all 2,046 players before stalling at games. The builder planned 304 games because 32 Week 2 rows shared exact Madden game IDs with the 272-game yearly schedule but carried newly rebased team IDs; D1 correctly retained 272 unique rows. Began standing-authorized 7.5.7.7 to apply the proven team identity rebase to all retained games, resolve exact Madden IDs once, and resume the same private checkpoint with cursor-based idempotent upserts. The active Week 1 snapshot and all prior/malformed/private snapshots, audits, export evidence, roster authority, Discord state, and blocked/null Free Agent state remain unchanged; no import, activation, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Discord thread operation ran during diagnosis or implementation.
 
