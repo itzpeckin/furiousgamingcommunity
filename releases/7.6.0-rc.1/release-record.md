@@ -22,7 +22,11 @@ Focused migration, Commissioner HQ, and Discord coverage passes 64/64 tests. The
 
 ## Deployment status
 
-Implementation and Production publication are owner-authorized. Publication, migration 45, hosted checks, Main merge, Pages/Worker deployment, and read-only Production verification are pending the exact candidate commit. Staging is not used.
+Exact candidate `39afd1404379131db92051a08be55a96d9c4533f` passed all four pull-request checks in [PR #125](https://github.com/itzpeckin/furiousgamingcommunity/pull/125) and merged to Main as `a6fe3c486f2ba0f0e6e464e477ce2f1ad76e63ec`. Main quality run `35393363265` and Pages run `35393362470` passed. Production Pages deployment `88165072-ce60-4607-9880-f5d38a237697` and import Worker build `83c71925-e492-4095-98f0-c6686eb77aa0` / version `2299b1d3` serve the exact merge.
+
+Migration 45 was applied only to `franchise-hq-db-madden27` between Time Travel bookmarks `00000350-00000100-000050ea-fd1a13c813396cb84f3170522dbcd07c` and `00000350-00000118-000050ea-db91a677e4c14c3b0bb8c4d53e6f56d2`. It added one empty diagnostics table, two indexes, and one migration-ledger row. Protected counts remained exactly 1 league, 34 users, 34 memberships, 32 active team assignments, and 1 active-snapshot pointer; relational team/player/snapshot tables remained empty by design because canonical Madden domains stay inside the retained snapshot model. Foreign-key violations are zero.
+
+Signed-in commissioner acceptance confirms release 7.6.0-rc.1, Season 2027 Regular Season Week 2, active snapshot `5cee59c2-1610-4e70-8a65-2707a40da95a`, Free Agents unknown, the four retained Discord failures, and two commissioner-safe retry controls. No retry was selected. Privacy, terms, retention, and incident pages are live. Human trade-committee and team-owner acceptance remain the private RC follow-up before 7.7.0 promotion. No Madden export/import, snapshot activation, reset/delete, export-URL rotation, season archive/transition, scheduling-thread action, roster/ownership change, credential change, Discord command registration, or Free Agent reinterpretation ran during release.
 
 ## Rollback
 
