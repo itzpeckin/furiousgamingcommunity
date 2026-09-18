@@ -1,5 +1,13 @@
 # FranchiseHQ Rollback and Recovery
 
+## 7.5.7.7 retained-schedule checkpoint repair impact
+
+This code-only release resumes the exact 7.5.7.6 private checkpoint after Madden changed all team IDs. It maps every retained yearly/prior schedule reference through the same complete one-to-one team identity proof already used for roster carry-forward, resolves exact Madden game IDs once, and replays the private game domain with bounded cursor-based upserts. The active Week 1 snapshot remains untouched until the commissioner's later retry completes ordinary validation and atomic activation.
+
+The runtime rollback baseline is exact Main `6971c92`, Production release 7.5.7.6, and migration 43. Runtime rollback may restore that code while retaining candidate snapshot `88e633a8-a26f-4812-aa46-397bc2ff5755`, its 2,350 stored records, every earlier private partial snapshot, the captured export, discovery report, mapping runs, active/prior/malformed snapshots, lifecycle events, audits, yearly schedule, permanent export URL, Discord thread records, season/game-year records, and blocked/missing Free Agent state.
+
+Do not delete or reset the candidate checkpoint, run another export/import as part of rollback, move the active pointer, create/remove scheduling threads, rotate the export URL, archive/transition a season, alter roster ownership, or reinterpret blocked/missing Free Agents as zero.
+
 ## 7.5.7.6 checkpointed candidate snapshot build impact
 
 This code-only release creates and links the private candidate checkpoint before any expensive domain reconstruction, then builds teams, players, games, statistics, and standings independently in bounded 125-record requests. Each request prepares only its current domain slice, and transient response retries resume the same candidate snapshot through the run's durable pointer. There is no fixed total-record guard, validation still waits for every domain to complete, and deployment itself changes no Production data.

@@ -183,8 +183,20 @@ export function yearlyScheduleCoverage(games=[]) {
 export function mergeYearlyScheduleCatalog({yearlyGames=[],priorGames=[],currentGames=[],seasonYear=null}={}) {
   const priorOverlay=candidateScheduleCarryForward(priorGames,yearlyGames,{seasonYear});
   const currentOverlay=candidateScheduleCarryForward(currentGames,priorOverlay.records,{seasonYear});
+  const selected=new Map(),recordsWithoutIds=[];
+  let deduplicatedExternalIds=0;
+  for(const record of currentOverlay.records){
+    const externalId=String(record?.external_id??'').trim();
+    if(!externalId){recordsWithoutIds.push(record);continue;}
+    if(selected.has(externalId))deduplicatedExternalIds+=1;
+    // Overlay order is yearly, prior, then current, so a later exact Madden
+    // game ID is the more recent authority even after Madden rebases team IDs.
+    selected.set(externalId,record);
+  }
   return{
     ...currentOverlay,
+    records:[...selected.values(),...recordsWithoutIds],
+    deduplicatedExternalIds,
     yearlyGameCount:yearlyGames.length,
     priorGameCount:priorGames.length,
     currentGameCount:currentGames.length

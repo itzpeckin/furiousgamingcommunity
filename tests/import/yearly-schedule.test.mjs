@@ -10,6 +10,7 @@ import {
   selectYearlyScheduleGames,
   yearlyScheduleCoverage
 } from '../../functions/_lib/yearly-schedule.js';
+import { buildTeamIdentityRebase, rebaseScheduleTeamIds } from '../../functions/_lib/team-identity-rebase.js';
 import {
   onRequestGet as getYearlySchedule,
   onRequestPost as updateYearlySchedule
@@ -142,6 +143,52 @@ test('weekly imports overlay the catalog without erasing earlier results or Conf
   assert.equal(merged.records.find(game=>game.week_index===3).status,'scheduled');
 });
 
+test('retained schedules rebase team IDs and exact Madden game IDs remain unique',()=>{
+  const sourceTeams=[
+    {external_id:'old-chi',display_name:'Chicago Bears',abbreviation:'CHI'},
+    {external_id:'old-tb',display_name:'Tampa Bay Buccaneers',abbreviation:'TB'}
+  ];
+  const destinationTeams=[
+    {external_id:'new-chi',display_name:'Chicago Bears',abbreviation:'CHI'},
+    {external_id:'new-tb',display_name:'Tampa Bay Buccaneers',abbreviation:'TB'}
+  ];
+  const {teamIdMap,audit}=buildTeamIdentityRebase(sourceTeams,destinationTeams);
+  assert.equal(audit.remappedTeamCount,2);
+  const oldGame={
+    external_id:'545784060',season_year:2027,stage:'regular-season',week_index:2,
+    away_team_external_id:'old-chi',home_team_external_id:'old-tb',
+    away_score:0,home_score:0,status:'scheduled'
+  };
+  const directCollision=mergeYearlyScheduleCatalog({
+    yearlyGames:[oldGame],
+    currentGames:[{...oldGame,away_team_external_id:'new-chi',home_team_external_id:'new-tb',home_score:24}],
+    seasonYear:2027
+  });
+  assert.equal(directCollision.records.length,1);
+  assert.equal(directCollision.records[0].home_team_external_id,'new-tb');
+  assert.equal(directCollision.deduplicatedExternalIds,1);
+
+  const retained=rebaseScheduleTeamIds([oldGame],teamIdMap);
+  assert.equal(retained.remappedGameCount,1);
+  assert.equal(retained.remappedReferenceCount,2);
+  assert.equal(retained.records[0].away_team_external_id,'new-chi');
+  assert.equal(retained.records[0].home_team_external_id,'new-tb');
+
+  const current=[{
+    ...retained.records[0],away_score:17,home_score:24,status:'completed'
+  }];
+  const merged=mergeYearlyScheduleCatalog({
+    yearlyGames:retained.records,
+    priorGames:[{...retained.records[0],home_score:7}],
+    currentGames:current,
+    seasonYear:2027
+  });
+  assert.equal(merged.records.length,1);
+  assert.equal(merged.records[0].home_score,24);
+  assert.equal(merged.records[0].home_team_external_id,'new-tb');
+  assert.equal(merged.deduplicatedExternalIds,0);
+});
+
 test('Import Yearly Schedule seals 18 weeks atomically without snapshots, Discord, URL rotation, or data deletion',async()=>{
   const {sqlite,objects,context}=await fixture();
   try{
@@ -228,6 +275,10 @@ test('runtime and commissioner UI wire collection separately from live import an
   assert.match(candidate,/Import Latest Export is unavailable while Import Yearly Schedule is in progress/);
   assert.match(builder,/yearly_schedule_imports/);
   assert.match(builder,/yearlySchedule:/);
+  assert.match(builder,/checkpointed-domain-v3/);
+  assert.match(builder,/ON CONFLICT\(snapshot_id,domain,external_id\) DO UPDATE/);
+  assert.match(builder,/checkpointToken/);
+  assert.match(builder,/rebaseScheduleTeamIds/);
   assert.match(ui,/data-import-yearly-schedule/);
   assert.match(ui,/Import Yearly Schedule/);
   assert.match(ui,/Review & Finish Yearly Schedule/);

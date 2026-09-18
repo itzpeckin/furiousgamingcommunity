@@ -217,6 +217,37 @@ test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-for
     result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
     assert.equal(result.snapshot.snapshotId,buildSnapshotId,'a repeated start must resume the durable checkpoint');
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshots WHERE id=?`).get(buildSnapshotId).count,1);
+    for(let i=0;i<30&&result.buildJob.phase!=='games';i++){
+      built=await buildSnapshot(context({action:'next',limit:125,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
+      result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
+    }
+    assert.equal(result.buildJob.phase,'games');
+
+    // Reproduce the Production v2 checkpoint: 304 games were planned because
+    // 32 exact Madden IDs appeared twice, while D1 retained 272 unique rows.
+    const insertLegacyGame=sqlite.prepare(`INSERT INTO league_snapshot_records
+      (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,'league-1','games',?,?)`);
+    for(const game of payload)insertLegacyGame.run(buildSnapshotId,game.gameId,JSON.stringify({
+      external_id:game.gameId,season_year:2026,stage:'regular-season',week_index:game.weekIndex+1,
+      home_team_external_id:`old-${game.homeTeamId}`,away_team_external_id:`old-${game.awayTeamId}`
+    }));
+    const legacySnapshot=sqlite.prepare(`SELECT manifest_json FROM league_snapshots WHERE id=?`).get(buildSnapshotId);
+    const legacyManifest=JSON.parse(legacySnapshot.manifest_json);
+    legacyManifest.buildState.mode='checkpointed-domain-v2';
+    legacyManifest.buildState.currentDomain='games';
+    legacyManifest.buildState.domains.games={total:304,processed:272,complete:false,meta:{}};
+    sqlite.prepare(`UPDATE league_snapshots SET game_count=304,manifest_json=? WHERE id=?`)
+      .run(JSON.stringify(legacyManifest),buildSnapshotId);
+
+    built=await buildSnapshot(context({action:'next',limit:125,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
+    result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
+    assert.equal(result.buildJob.phase,'games');
+    assert.match(result.buildJob.checkpointToken,/checkpointed-domain-v3:unique-external-id-upsert-v1:games:125/);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
+      WHERE snapshot_id=? AND domain='games'`).get(buildSnapshotId).count,272);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
+      WHERE snapshot_id=? AND domain='games' AND json_extract(data_json,'$.home_team_external_id') LIKE 'old-%'`)
+      .get(buildSnapshotId).count,147);
     for(let i=0;i<100&&!result.complete;i++){
       built=await buildSnapshot(context({action:'next',limit:125,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
       result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
@@ -971,12 +1002,13 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(builder,/historyCarryForward/);
   assert.match(builder,/candidateHistoricalBackfill/);
   assert.match(builder,/Historical Week/);
-  assert.match(builder,/checkpointed-domain-v2/);
+  assert.match(builder,/checkpointed-domain-v3/);
   assert.match(builder,/domain==='teams'/);
   assert.match(builder,/domain==='players'/);
   assert.match(builder,/domain==='standings'/);
   assert.match(builder,/candidate_snapshot_id=\?/);
-  assert.match(builder,/INSERT OR IGNORE INTO league_snapshot_records/);
+  assert.match(builder,/ON CONFLICT\(snapshot_id,domain,external_id\) DO UPDATE/);
+  assert.match(builder,/checkpointToken/);
   assert.match(builder,/candidateCoverageWarnings/);
   assert.match(builder,/domain IN \('games','statistics'\)/);
   assert.doesNotMatch(builder,/DELETE\s+FROM/i);
@@ -991,6 +1023,7 @@ test('commissioner live import activates only its validated candidate and never 
   for(const source of [ui,worker])assert.match(source,/action:'next',runId,batches:4/);
   assert.match(ui,/action:'next',candidateImportRunId,snapshotId,limit:125/);
   assert.match(ui,/stopped making progress at its durable checkpoint/);
+  for(const source of [ui,worker])assert.match(source,/checkpointToken/);
   assert.match(ui,/action:'validate-next',snapshotId,limit:500,batches:4/);
   assert.match(ui,/action:'record-performance'/);
   assert.match(ui,/Click to live/);

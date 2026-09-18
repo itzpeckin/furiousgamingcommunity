@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.7.7",
+  "releaseType": "retained-schedule-checkpoint-repair",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.7.6",
+    "commit": "6971c92e46851d0ea0cabc18fb1ffda4b3770954",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.7.7-deduplicate-snapshot-plan",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "authorized-not-run"},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.7.6",
+    "candidateRelease": "7.5.7.7",
+    "currentCommit": "6971c92e46851d0ea0cabc18fb1ffda4b3770954",
+    "currentMigration": 43,
+    "candidateMigration": 43,
+    "scope": "Code-only repair that rebases retained schedule team IDs, resolves exact Madden game IDs once, and resumes the existing private checkpoint through bounded cursor-based upserts. Deployment does not run an import or modify the active snapshot."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/team-identity-rebase.js",
+    "functions/_lib/yearly-schedule.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "league-engine/one-click-import.js",
+    "workers/franchise-import-worker/src/index.js",
+    "tests/import/candidate-import.test.mjs",
+    "tests/import/yearly-schedule.test.mjs",
+    "releases/7.5.7.7/release-record.md",
+    "releases/7.5.7.7/validation-evidence.json"
+  ]
+}

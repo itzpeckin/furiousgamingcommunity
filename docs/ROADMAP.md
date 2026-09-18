@@ -6,13 +6,13 @@
 
 **Updated:** September 18, 2026
 
-**Revision:** 2.76
+**Revision:** 2.77
 
-**Current production:** FranchiseHQ 7.5.7.5 is the Main baseline at `dc662ae51e8f21a115cb5a61dfc4d7f906848bd2`. Migration 43 is applied. The retained export, active Week 1 snapshot, prior/malformed/private partial snapshots, roster authority, and audits remain intact.
+**Current production:** FranchiseHQ 7.5.7.6 is the Main baseline at `6971c92`. Migration 43 is applied. The retained export, active Week 1 snapshot, prior/malformed/private partial snapshots, roster authority, and audits remain intact.
 
-**Current work:** 7.5.7.6 moves snapshot construction to an immediate durable checkpoint followed by independent team, player, game, statistic, and standing steps. Production proved 7.5.7.5 still timed out before creating its first private snapshot because the request reconstructed every domain and prepared the complete record plan before returning its checkpoint. The corrected flow prepares and writes only one bounded domain slice per request, retries transient response loss against the same candidate, and has no fixed total-record guard.
+**Current work:** 7.5.7.7 repairs the exact 7.5.7.6 game-domain checkpoint stall. Production successfully created one new private candidate with 2,350 records, completed 32 teams and 2,046 players, and stored 272 games. The retained yearly schedule and current Week 2 export shared 32 exact Madden game IDs but used old and newly rebased team IDs, so the matchup-based overlay incorrectly planned 304 rows while D1 correctly retained 272 unique rows. The correction safely rebases every retained schedule reference through the proven 32-team one-to-one identity map, resolves exact Madden game IDs once, and resumes the existing private checkpoint with cursor-based idempotent upserts.
 
-**Next gate:** Validate and publish 7.5.7.6, then let the commissioner select **Retry** against the already-retained League Info + Weekly Stats export. No new export is required. Deployment itself runs no import or snapshot operation; the commissioner retry remains guarded, validated, atomic, and auditable.
+**Next gate:** Validate and publish 7.5.7.7, then let the commissioner select **Retry** against the already-retained League Info + Weekly Stats export and candidate checkpoint. No new export is required. Deployment itself runs no import or snapshot operation; the commissioner retry remains guarded, validated, atomic, and auditable.
 
 ## Product decisions
 
@@ -129,7 +129,8 @@
 | 7.5.7.3 | Production | Accept complete same-season League Info + Weekly Stats while carrying the live roster, contracts, and Free Agent authority forward |
 | 7.5.7.4 | Production | Safely rebase carried roster foreign keys when Madden changes all team IDs but the complete team identities still match one-to-one |
 | 7.5.7.5 | Production; superseded by 7.5.7.6 correction | Added record-batched continuation, but Production still exceeded the request window while reconstructing the full cross-domain plan before its first checkpoint |
-| 7.5.7.6 | Production-authorized candidate | Create the private candidate checkpoint immediately, build one domain slice per request, and resume transient response loss without a fixed total-record ceiling |
+| 7.5.7.6 | Production; superseded by 7.5.7.7 correction | Created the durable candidate and completed teams/players, then exposed an exact-ID duplicate plan at the game checkpoint after Madden rebased team IDs |
+| 7.5.7.7 | Production-authorized candidate | Rebase retained schedule team IDs, deduplicate exact Madden game IDs, and resume the existing private checkpoint through cursor-based idempotent upserts |
 | 7.6.0-rc.1 | Planned | Private FGC release candidate |
 | 7.7.0 | Planned | FGC production launch |
 | 8.0.0 | Planned | Multi-league activation |
@@ -161,6 +162,7 @@
 | 11b | Active importer identity correction | 7.5.7.4 | Translate changed Madden team IDs only after complete one-to-one team identity proof, preserving every player, contract, and semantic roster assignment. |
 | 11c | Active importer snapshot-build correction | 7.5.7.5 | Build and resume the retained Week 2 candidate in bounded requests, validate only after all expected records exist, and keep every prior partial attempt private and retained. |
 | 11d | Active importer checkpoint correction | 7.5.7.6 | Persist the exact candidate before expensive reconstruction, build each domain independently in one D1 batch per request, and resume the same checkpoint after a transient server response failure. |
+| 11e | Active importer schedule-checkpoint correction | 7.5.7.7 | Rebase retained games to current team identities, reduce the 304-row collision plan to 272 unique games, and replay the existing private game domain without deletion before ordinary validation and atomic activation. |
 | 12 | Pre-RC | 7.5.8–7.5.9 | Finish canonical consistency, monitoring, backups, security, and recovery against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | FGC completion | 7.7.0 | Complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
@@ -824,6 +826,10 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 7. Publish one exact commit, validate that exact build, observe it, and record owner acceptance.
 
 ## Change log
+
+- **Revision 2.77:** Published 7.5.7.6 through PR #121 as Main `6971c92`, then diagnosed the commissioner's retained retry read-only. The new durable candidate `88e633a8-a26f-4812-aa46-397bc2ff5755` retained 2,350 records and completed 32 teams plus all 2,046 players before stalling at games. The builder planned 304 games because 32 Week 2 rows shared exact Madden game IDs with the 272-game yearly schedule but carried newly rebased team IDs; D1 correctly retained 272 unique rows. Began standing-authorized 7.5.7.7 to apply the proven team identity rebase to all retained games, resolve exact Madden IDs once, and resume the same private checkpoint with cursor-based idempotent upserts. The active Week 1 snapshot and all prior/malformed/private snapshots, audits, export evidence, roster authority, Discord state, and blocked/null Free Agent state remain unchanged; no import, activation, reset, deletion, URL rotation, archive/transition, credential/membership/assignment change, or Discord thread operation ran during diagnosis or implementation.
+
+- **Revision 2.76:** Published 7.5.7.5 through PR #120 as Main `dc662ae`, then proved its retry still ended before creating a private checkpoint because the first request reconstructed every source domain. Built and published 7.5.7.6 through PR #121 to persist the exact zero-record candidate first and construct one bounded domain slice per request. No migration or deployment-time Madden data operation was required.
 
 - **Revision 2.75:** Published 7.5.7.4 through PR #119 as Main `897255b7`, then diagnosed the retained Week 2 import failure read-only. The roster rebase completed for all 2,046 players, but three private candidate snapshots each stopped at exactly 2,250 of 3,353 expected records after 15 sequential D1 batches. Began standing-authorized 7.5.7.5 to resume candidate construction in bounded requests, retain all partial attempts, and require no new export. The active Week 1 snapshot remained unchanged; no import activation, reset, deletion, URL rotation, archive/transition, Discord thread action, credential/membership/assignment change, or Free Agent reinterpretation occurred during diagnosis or local implementation.
 

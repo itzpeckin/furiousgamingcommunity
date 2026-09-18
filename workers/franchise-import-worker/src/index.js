@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 7.5.7.6 */
+/* FHQ_BUILD: 7.5.7.7 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='7.5.7.6';
+const RELEASE='7.5.7.7';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -86,7 +86,7 @@ async function buildCandidate(context,step,mappingRunIds){
   ));
   const snapshotId=result?.snapshot?.snapshotId;
   if(!snapshotId)throw new Error('Candidate builder did not return a snapshot ID.');
-  let iteration=0,stalled=0,priorProgress=-1,priorPhase='';
+  let iteration=0,stalled=0,priorCheckpoint=String(result?.buildJob?.checkpointToken||'');
   while(!result.complete){
     iteration+=1;
     result=await step.do(`build-candidate-next-${iteration}`,()=>call(
@@ -95,12 +95,11 @@ async function buildCandidate(context,step,mappingRunIds){
       }
     ));
     const job=result.buildJob||{};
-    const progress=Number(job.processedCount||0),phase=String(job.phase||'');
-    if(progress<=priorProgress&&phase===priorPhase)stalled+=1;
+    const checkpoint=String(job.checkpointToken||`${job.phase||''}:${Number(job.processedCount||0)}`);
+    if(checkpoint===priorCheckpoint)stalled+=1;
     else stalled=0;
     if(stalled>=3)throw new Error('Candidate snapshot build stopped making progress at its durable checkpoint.');
-    priorProgress=progress;
-    priorPhase=phase;
+    priorCheckpoint=checkpoint;
   }
   return result;
 }
