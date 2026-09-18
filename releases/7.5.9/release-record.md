@@ -24,7 +24,7 @@ The strict gate covers canonical context, stale/incomplete state, migration cont
 
 ## Deployment status
 
-Pull request [#123](https://github.com/itzpeckin/furiousgamingcommunity/pull/123) is open from exact candidate `39ba25d`. All hosted checks passed, additive migration 44 is applied and verified, and the read-only active-snapshot reconciliation passed. Protected Main merge, exact Production deployment, post-deployment evidence recording, and signed-in acceptance remain in progress. No Madden export/import, active-snapshot change, reset/delete, export-URL rotation, season archive/transition, Discord scheduling action, roster/ownership change, or Free Agent reinterpretation is included.
+Pull request [#123](https://github.com/itzpeckin/furiousgamingcommunity/pull/123) merged exact candidate `b0ef247` to Main `1e86ea7`. GitHub quality, Cloudflare Pages deployment `22823aae`, and import Worker build `9082f91e` all passed. Signed-in Production acceptance confirmed release 7.5.9, Season 2027 Week 2, the live snapshot, 272 schedule games, 2,046 rostered players, and Free Agents still unknown. Recovery evidence `recovery_39b56cce-15fa-4b3f-9e4d-deeb1956d5dd` is recorded and verified. The only Commissioner Operations warning is two pre-existing Discord delivery failures from the preceding 24 hours; canonical data, schema, and recovery evidence are healthy. No Madden export/import, active-snapshot change, reset/delete, export-URL rotation, season archive/transition, Discord scheduling action, roster/ownership change, or Free Agent reinterpretation occurred.
 
 ## Rollback
 

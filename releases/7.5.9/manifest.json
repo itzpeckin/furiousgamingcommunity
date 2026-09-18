@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.5.9",
   "releaseType": "canonical-consistency-operations-hardening",
-  "status": "validated-production-authorized",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.5.7.7",
@@ -18,18 +18,21 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "published-branch-pr-open",
+    "status": "published-main",
     "pullRequest": 123,
-    "candidateCommit": "39ba25d44cb41ae5c6dc0391db5bc532cbfd551b"
+    "candidateCommit": "b0ef247ab86891e95c5bf77ec750c0575e853a7c",
+    "mergeCommit": "1e86ea7794f406208d79484dfdb23f067ee32667"
   },
   "staging": {"authorized": false, "deployed": false, "status": "not-run"},
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "authorized-not-run",
-    "currentRelease": "7.5.7.7",
+    "deployed": true,
+    "status": "deployed-read-only-accepted",
+    "currentRelease": "7.5.9",
     "candidateRelease": "7.5.9",
-    "currentCommit": "c02064e5ce690df1314735cb4489bf32d3a7a5b0",
+    "currentCommit": "1e86ea7794f406208d79484dfdb23f067ee32667",
+    "currentPagesDeployment": "22823aae-5621-405c-b8e7-cff61bf82069",
+    "currentWorkerBuild": "9082f91e-e683-4f5a-a8c1-f4fd410d89c9",
     "currentMigration": 44,
     "candidateMigration": 44,
     "scope": "One canonical active-snapshot context, commissioner operations health, sanitized request telemetry, bounded mutation throttling, additive recovery-evidence schema, and exact-target recovery reconciliation. No import, snapshot activation, reset, deletion, URL rotation, season lifecycle action, Discord thread operation, roster rewrite, or Free Agent reinterpretation."
