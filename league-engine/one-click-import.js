@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.7.6 */
+/* FHQ_BUILD: 7.5.7.7 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.5.7.6';
+  const VERSION = '7.5.7.7';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -268,8 +268,7 @@
     const snapshotId=result?.snapshot?.snapshotId;
     if(!snapshotId)throw new Error('Candidate builder did not return a snapshot ID.');
     let stalled=0;
-    let priorProgress=-1;
-    let priorPhase='';
+    let priorCheckpoint=String(result?.buildJob?.checkpointToken||'');
     while(!result.complete){
       const job=result.buildJob||{};
       const total=Number.isFinite(Number(job.totalCount))&&Number(job.totalCount)>0
@@ -280,13 +279,12 @@
         action:'next',candidateImportRunId,snapshotId,limit:125
       });
       const nextJob=result.buildJob||{};
-      const progress=Number(nextJob.processedCount||0);
-      const phase=String(nextJob.phase||'');
-      if(progress<=priorProgress&&phase===priorPhase)stalled+=1;
+      const checkpoint=String(nextJob.checkpointToken
+        ||`${nextJob.phase||''}:${Number(nextJob.processedCount||0)}`);
+      if(checkpoint===priorCheckpoint)stalled+=1;
       else stalled=0;
       if(stalled>=3)throw new Error('Candidate snapshot build stopped making progress at its durable checkpoint.');
-      priorProgress=progress;
-      priorPhase=phase;
+      priorCheckpoint=checkpoint;
     }
     return result;
   }

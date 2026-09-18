@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 7.5.7.6 */
+/* FHQ_BUILD: 7.5.7.7 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import {
@@ -11,9 +11,12 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { scheduleAdvanceDecision, snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
 import { mergeYearlyScheduleCatalog } from '../../../../_lib/yearly-schedule.js';
+import { buildTeamIdentityRebase, rebaseScheduleTeamIds } from '../../../../_lib/team-identity-rebase.js';
 
-const RELEASE='7.5.7.6';
-const BUILD_MODE='checkpointed-domain-v2';
+const RELEASE='7.5.7.7';
+const BUILD_MODE='checkpointed-domain-v3';
+const LEGACY_BUILD_MODES=Object.freeze(['checkpointed-domain-v2']);
+const BUILD_PLAN_REVISION='unique-external-id-upsert-v1';
 const BUILD_DOMAINS=Object.freeze(['teams','players','games','statistics','standings']);
 const BUILD_RECORD_LIMIT=125;
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
@@ -85,6 +88,7 @@ function buildState(manifest={}){
   const state=manifest?.buildState&&typeof manifest.buildState==='object'?manifest.buildState:{};
   return{
     mode:BUILD_MODE,
+    planRevision:BUILD_PLAN_REVISION,
     status:state.status||'building',
     currentDomain:state.currentDomain||BUILD_DOMAINS[0],
     domains:state.domains&&typeof state.domains==='object'?state.domains:{},
@@ -187,11 +191,13 @@ function parsedPrior(records){
 }
 
 function plannedRecords(domain,items,idFn){
-  return(items||[]).map((item,index)=>({
-    domain,
-    externalId:String(idFn(item,index)),
-    item
-  })).sort((left,right)=>left.externalId.localeCompare(right.externalId));
+  const selected=new Map();
+  for(const [index,item] of (items||[]).entries()){
+    const externalId=String(idFn(item,index)??'').trim();
+    if(!externalId)throw new Error(`The ${domain} build plan contains a record without an external ID.`);
+    selected.set(externalId,{domain,externalId,item});
+  }
+  return[...selected.values()].sort((left,right)=>left.externalId.localeCompare(right.externalId));
 }
 
 async function domainPlan({context,db,league,candidateRun,runs,shared,domain}){
@@ -217,20 +223,39 @@ async function domainPlan({context,db,league,candidateRun,runs,shared,domain}){
     return{records:plannedRecords(domain,items,(item,index)=>item.external_id||index),meta:{}};
   }
   if(domain==='games'){
-    const [fresh,prior,yearlySchedule]=await Promise.all([
+    const [fresh,prior,yearlySchedule,sourceTeamRows,destinationTeams]=await Promise.all([
       rows(db,`SELECT * FROM companion_canonical_games_preview
         WHERE league_id=? AND mapping_run_id=? ORDER BY external_id`,league.id,runs.schedule.id),
       priorDomain(db,league.id,activeSnapshotId,'games'),
       db.prepare(`SELECT * FROM yearly_schedule_imports
         WHERE league_id=? AND franchise_season_id=? AND status='completed'
         ORDER BY revision DESC,finished_at DESC LIMIT 1`)
-        .bind(league.id,candidateRun.franchise_season_id).first()
+        .bind(league.id,candidateRun.franchise_season_id).first(),
+      activeSnapshotId&&!shared.historicalBackfill
+        ?priorDomain(db,league.id,activeSnapshotId,'teams'):Promise.resolve([]),
+      activeSnapshotId&&!shared.historicalBackfill
+        ?rows(db,`SELECT * FROM companion_canonical_teams_preview
+          WHERE league_id=? AND mapping_run_id=? ORDER BY external_id`,league.id,runs.team.id):Promise.resolve([])
     ]);
     const yearlyGames=Array.isArray(parse(yearlySchedule?.schedule_json))?parse(yearlySchedule.schedule_json):[];
+    let retainedYearlyGames=yearlyGames,retainedPriorGames=parsedPrior(prior),scheduleTeamRebase=null;
+    if(activeSnapshotId&&!shared.historicalBackfill){
+      const sourceTeams=sourceTeamRows.map(row=>({...(parse(row.data_json)||{}),external_id:row.external_id}));
+      const {teamIdMap,audit}=buildTeamIdentityRebase(sourceTeams,destinationTeams);
+      const yearlyRebase=rebaseScheduleTeamIds(retainedYearlyGames,teamIdMap);
+      const priorRebase=rebaseScheduleTeamIds(retainedPriorGames,teamIdMap);
+      retainedYearlyGames=yearlyRebase.records;
+      retainedPriorGames=priorRebase.records;
+      scheduleTeamRebase={
+        ...audit,
+        remappedGameCount:yearlyRebase.remappedGameCount+priorRebase.remappedGameCount,
+        remappedReferenceCount:yearlyRebase.remappedReferenceCount+priorRebase.remappedReferenceCount
+      };
+    }
     const history=shared.historicalBackfill
       ?candidateHistoricalBackfill(fresh,prior,{keyName:'external_id',activeWeek:shared.activeSource.week_index,
         activePeriod:shared.coverage.activePeriod,sourceWeeks:shared.sourceWeeks,sourcePeriods:shared.sourcePeriods})
-      :mergeYearlyScheduleCatalog({yearlyGames,priorGames:parsedPrior(prior),currentGames:fresh,
+      :mergeYearlyScheduleCatalog({yearlyGames:retainedYearlyGames,priorGames:retainedPriorGames,currentGames:fresh,
         seasonYear:candidateRun.destination_season_year});
     const appliedKeys=new Set((history.appliedPeriods||[]).map(period=>period.key));
     const missingAppliedPeriods=shared.historicalBackfill
@@ -247,6 +272,8 @@ async function domainPlan({context,db,league,candidateRun,runs,shared,domain}){
         retainedWeeks:history.retainedWeeks||[],
         applied:Number(history.applied||0),
         appliedPeriods:history.appliedPeriods||[],
+        deduplicatedExternalIds:Number(history.deduplicatedExternalIds||0),
+        teamIdentityRebase:scheduleTeamRebase,
         yearlySchedule:yearlySchedule?{
           importId:yearlySchedule.id,
           revision:Number(yearlySchedule.revision||1),
@@ -312,11 +339,14 @@ function buildProgress(state){
     if(value?.total===undefined||value?.total===null)knownTotal=false;
     else totalCount+=Number(value.total||0);
   }
+  const current=state.domains?.[state.currentDomain]||{};
+  const cursor=Number(current.cursor??current.processed??0);
   return{
     phase:state.currentDomain,
     processedCount,
     totalCount:knownTotal?totalCount:null,
-    remainingCount:knownTotal?Math.max(0,totalCount-processedCount):null
+    remainingCount:knownTotal?Math.max(0,totalCount-processedCount):null,
+    checkpointToken:`${state.mode}:${state.planRevision||BUILD_PLAN_REVISION}:${state.currentDomain}:${cursor}`
   };
 }
 
@@ -353,6 +383,12 @@ async function finalizeSnapshot({db,league,candidateRun,runs,snapshot,manifest,s
   }else{
     if(shared.activeSource&&gameMeta.retained)warnings.push(`${gameMeta.retained} known same-season game record(s) were carried forward from active snapshot ${shared.activeSource.id}.`);
     if(shared.activeSource&&statisticMeta.retained)warnings.push(`${statisticMeta.retained} earlier statistic record(s) were carried forward from active snapshot ${shared.activeSource.id}.`);
+    if(Number(gameMeta.teamIdentityRebase?.remappedTeamCount||0))warnings.push(
+      `Retained schedule team IDs were safely rebased for ${Number(gameMeta.teamIdentityRebase.remappedTeamCount)} uniquely matched teams before weekly results were overlaid.`
+    );
+    if(Number(gameMeta.deduplicatedExternalIds||0))warnings.push(
+      `${Number(gameMeta.deduplicatedExternalIds)} duplicate retained Madden game ID(s) were resolved using the current weekly schedule authority.`
+    );
   }
   if(candidateRun.active_snapshot_id_before&&!shared.activeSource)warnings.push('The active snapshot was not eligible for same-season history carry-forward; no prior weekly records were merged.');
   if(counts.teams!==32)warnings.push(`Expected 32 teams; found ${counts.teams}.`);
@@ -528,7 +564,7 @@ export async function onRequestPost(context){
       .bind(requestedSnapshotId,league.id).first():null;
     let manifest=parse(snapshot?.manifest_json)||{};
     const resumable=Boolean(snapshot
-      &&manifest?.buildState?.mode===BUILD_MODE
+      &&[BUILD_MODE,...LEGACY_BUILD_MODES].includes(manifest?.buildState?.mode)
       &&String(manifest.candidateImportRunId||'')===candidateRun.id
       &&String(snapshot.linked_game_year_id||'')===String(candidateRun.game_year_id)
       &&Object.entries({teams:requested.team,players:requested.player,schedule:requested.schedule,statistics:requested.statistics})
@@ -597,15 +633,37 @@ export async function onRequestPost(context){
       WHERE snapshot_id=? AND league_id=? AND domain=?`).bind(snapshot.id,league.id,domain).first())?.count||0);
     if(existing>plan.records.length)return json({ok:false,
       error:`The pending snapshot contains more ${domain} records than its immutable build plan.`,release:RELEASE},409);
+    const domainState=state.domains?.[domain]||{};
+    const hasCurrentCursor=domainState.planRevision===BUILD_PLAN_REVISION
+      &&Number.isInteger(Number(domainState.cursor))&&Number(domainState.cursor)>=0;
+    // v2 used stored row count as its plan offset. That cannot represent a
+    // duplicate-ID repair, so v3 deliberately replays this private domain
+    // from cursor zero with idempotent upserts and leaves every audit intact.
+    const cursor=hasCurrentCursor?Number(domainState.cursor):0;
+    if(cursor>plan.records.length)return json({ok:false,
+      error:`The pending snapshot ${domain} cursor exceeds its immutable build plan.`,release:RELEASE},409);
     const requestLimit=Math.max(1,Math.min(BUILD_RECORD_LIMIT,Math.floor(Number(body?.limit)||BUILD_RECORD_LIMIT)));
-    const pending=plan.records.slice(existing,existing+requestLimit).map(record=>db.prepare(`INSERT OR IGNORE INTO league_snapshot_records
-      (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)`)
+    const pending=plan.records.slice(cursor,cursor+requestLimit).map(record=>db.prepare(`INSERT INTO league_snapshot_records
+      (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)
+      ON CONFLICT(snapshot_id,domain,external_id) DO UPDATE SET data_json=excluded.data_json`)
       .bind(snapshot.id,league.id,record.domain,record.externalId,JSON.stringify(record.item)));
     if(pending.length)await db.batch(pending);
-    const processed=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
+    const storedCount=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
       WHERE snapshot_id=? AND league_id=? AND domain=?`).bind(snapshot.id,league.id,domain).first())?.count||0);
-    const complete=processed===plan.records.length;
-    state.domains[domain]={total:plan.records.length,processed,complete,meta:plan.meta||{}};
+    const nextCursor=cursor+pending.length;
+    if(nextCursor===plan.records.length&&storedCount!==plan.records.length)return json({ok:false,
+      error:`The pending snapshot stored ${storedCount} unique ${domain} records but its immutable build plan contains ${plan.records.length}.`,
+      release:RELEASE},409);
+    const complete=nextCursor===plan.records.length;
+    state.domains[domain]={
+      total:plan.records.length,
+      processed:nextCursor,
+      cursor:nextCursor,
+      storedCount,
+      complete,
+      planRevision:BUILD_PLAN_REVISION,
+      meta:plan.meta||{}
+    };
     if(complete){
       const nextIndex=BUILD_DOMAINS.indexOf(domain)+1;
       state.currentDomain=nextIndex<BUILD_DOMAINS.length?BUILD_DOMAINS[nextIndex]:'finalize';
@@ -614,7 +672,7 @@ export async function onRequestPost(context){
     const countColumn={teams:'team_count',players:'player_count',games:'game_count',statistics:'statistic_count',standings:'standing_count'}[domain];
     await db.prepare(`UPDATE league_snapshots SET ${countColumn}=?,manifest_json=?,updated_at=CURRENT_TIMESTAMP
       WHERE id=? AND league_id=? AND status='pending-validation'`)
-      .bind(plan.records.length,JSON.stringify(manifest),snapshot.id,league.id).run();
+      .bind(storedCount,JSON.stringify(manifest),snapshot.id,league.id).run();
     return snapshotResponse(db,league.id,snapshot.id,state,retention,{
       importMode:shared.coverage.importMode,
       historicalBackfill:manifest.historicalBackfill||null,

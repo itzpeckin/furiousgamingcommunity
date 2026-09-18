@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 7.5.7.6 */
+/* FHQ_BUILD: 7.5.7.7 */
 import {
   json,
   database,
@@ -9,9 +9,9 @@ import {
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { inferMaddenContractUnit } from '../../../../_lib/live-data-experience.js';
 import { rosterCarryForwardEligibility } from '../../../../_lib/permanent-league-export.js';
-import { findTeamBranding } from '../../../../_lib/team-branding.js';
+import { buildTeamIdentityRebase } from '../../../../_lib/team-identity-rebase.js';
 
-const RELEASE='7.5.7.6';
+const RELEASE='7.5.7.7';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
@@ -260,76 +260,8 @@ function response(run,players,slug,leagueId,extra={}){return{ok:true,release:REL
 async function runBatches(db,statements,size=150){for(let i=0;i<statements.length;i+=size)await db.batch(statements.slice(i,i+size));}
 const parseJson=(value,fallback=null)=>{try{return value?JSON.parse(value):fallback}catch{return fallback}};
 
-const teamText=(team,...keys)=>{
-  for(const key of keys){const value=text(team?.[key]);if(value)return value;}
-  return null;
-};
-function carriedTeamIdentity(team={}){
-  const normalized={
-    abbreviation:teamText(team,'abbreviation','abbrName','abbr_name','teamAbbr','team_abbr'),
-    displayName:teamText(team,'displayName','display_name','fullName','full_name','teamName','team_name'),
-    cityName:teamText(team,'cityName','city_name','city'),
-    nickname:teamText(team,'nickname','nickName','nick_name','name')
-  };
-  const branding=findTeamBranding(normalized);
-  if(branding?.key)return `nfl:${branding.key}`;
-  const exact=value=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-  const abbreviation=exact(normalized.abbreviation),displayName=exact(normalized.displayName);
-  return abbreviation&&displayName?`exact:${abbreviation}:${displayName}`:null;
-}
-function carriedTeamExternalId(team={}){
-  return teamText(team,'externalId','external_id','teamId','team_id','id');
-}
-
 export function rebaseCarriedRoster(players=[],sourceTeams=[],destinationTeams=[]){
-  if(!sourceTeams.length||sourceTeams.length!==destinationTeams.length){
-    throw new Error('The active and newly mapped team sets do not contain the same number of teams.');
-  }
-  const uniqueById=(teams,label)=>{
-    const map=new Map();
-    for(const team of teams){
-      const id=carriedTeamExternalId(team);
-      if(!id||map.has(id))throw new Error(`${label} contains a missing or duplicate team ID.`);
-      map.set(id,team);
-    }
-    return map;
-  };
-  const sourceById=uniqueById(sourceTeams,'The active snapshot');
-  const destinationById=uniqueById(destinationTeams,'The newly mapped League Info dataset');
-  const destinationsByIdentity=new Map();
-  for(const team of destinationTeams){
-    const identity=carriedTeamIdentity(team);
-    if(!identity)continue;
-    if(!destinationsByIdentity.has(identity))destinationsByIdentity.set(identity,[]);
-    destinationsByIdentity.get(identity).push(team);
-  }
-  const teamIdMap=new Map(),usedDestinationIds=new Set();
-  for(const [sourceId,sourceTeam] of sourceById){
-    let destination=destinationById.get(sourceId)||null;
-    if(destination){
-      const sourceIdentity=carriedTeamIdentity(sourceTeam),destinationIdentity=carriedTeamIdentity(destination);
-      if(sourceIdentity&&destinationIdentity&&sourceIdentity!==destinationIdentity){
-        throw new Error(`Team ID ${sourceId} identifies different teams in the active and newly mapped datasets.`);
-      }
-    }
-    if(!destination){
-      const identity=carriedTeamIdentity(sourceTeam);
-      const matches=identity?destinationsByIdentity.get(identity)||[]:[];
-      if(matches.length!==1){
-        throw new Error(`The active team ${sourceId} does not have one unique identity match in the newly mapped League Info dataset.`);
-      }
-      destination=matches[0];
-    }
-    const destinationId=carriedTeamExternalId(destination);
-    if(usedDestinationIds.has(destinationId)){
-      throw new Error('Multiple active teams resolve to the same newly mapped League Info team.');
-    }
-    usedDestinationIds.add(destinationId);
-    teamIdMap.set(sourceId,destinationId);
-  }
-  if(usedDestinationIds.size!==destinationTeams.length){
-    throw new Error('The newly mapped League Info team set was not matched completely.');
-  }
+  const {teamIdMap,audit}=buildTeamIdentityRebase(sourceTeams,destinationTeams);
   let rosterAssignmentCount=0,remappedAssignmentCount=0;
   const rebasedPlayers=players.map(player=>{
     const sourceId=text(player?.team_external_id);
@@ -341,14 +273,10 @@ export function rebaseCarriedRoster(players=[],sourceTeams=[],destinationTeams=[
     remappedAssignmentCount++;
     return {...player,team_external_id:destinationId};
   });
-  const remappedTeamCount=[...teamIdMap].filter(([sourceId,destinationId])=>sourceId!==destinationId).length;
   return{
     players:rebasedPlayers,
     audit:{
-      proof:'complete-one-to-one-team-identity',
-      sourceTeamCount:sourceTeams.length,
-      destinationTeamCount:destinationTeams.length,
-      remappedTeamCount,
+      ...audit,
       rosterAssignmentCount,
       remappedAssignmentCount,
       assignmentsUnchanged:true,
