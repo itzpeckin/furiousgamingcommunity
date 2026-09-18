@@ -173,6 +173,7 @@
       ".sql": 45,
       ".txt": 3,
       ".wasm": 1,
+      ".yaml": 1,
       ".yml": 1,
       "[none]": 2
     },
@@ -218,7 +219,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 69763,
+        "bytes": 70921,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -250,15 +251,15 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-players.js"
       },
       {
-        "bytes": 39781,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
+        "bytes": 40176,
+        "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 39206,
-        "file": "league-engine/one-click-import.js"
+        "bytes": 39781,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       }
     ],
-    "total": 634
+    "total": 635
   },
   "frontend": {
     "assets": [
@@ -1609,7 +1610,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.5.7.5",
+  "release": "7.5.7.6",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
