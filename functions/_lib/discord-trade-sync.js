@@ -4,6 +4,41 @@ import { parseTradeDecisionCustomId } from './discord-trade-components.js';
 const parse=value=>{try{return JSON.parse(value||'{}')||{}}catch{return{}}};
 const rows=async(db,sql,...values)=>(await db.prepare(sql).bind(...values).all()).results||[];
 const SNOWFLAKE=/^\d{17,20}$/;
+const cleanDiagnostic=value=>String(value?.message||value||'Discord destination synchronization failed.')
+  .replace(/Bot\s+[A-Za-z0-9._-]+/g,'Bot [redacted]')
+  .replace(/\b\d{17,20}\b/g,'[discord-id]')
+  .slice(0,500);
+
+function destinationKind(delivery){
+  if(delivery.visibility==='direct-message')return delivery.eventType==='review-required'?'reviewer-direct-message':'owner-direct-message';
+  if(delivery.syntheticRoom)return 'private-trade-room-root';
+  return delivery.eventType==='review-required'?'trade-committee-channel':'private-trade-thread';
+}
+
+function diagnosticError(error,stage){
+  const status=Number(error?.status);
+  return {
+    errorCode:Number.isInteger(status)&&status>0?`discord-http-${status}`:`${stage||'destination'}-failed`,
+    errorStatus:Number.isInteger(status)&&status>0?status:null,
+    errorMessage:cleanDiagnostic(error)
+  };
+}
+
+async function retainDestinationAttempts(db,event,tradeId,diagnostics){
+  if(!event?.id||!diagnostics.length)return;
+  const attemptNumber=Math.max(1,Number(event.attempts)||1);
+  const statements=diagnostics.slice(0,501).map(item=>db.prepare(`INSERT INTO discord_delivery_destination_attempts
+    (id,league_id,delivery_event_id,destination_delivery_event_id,resource_id,attempt_number,
+      destination_kind,event_type,visibility,outcome,message_count,error_code,error_status,error_message)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+      `discord_destination_attempt_${crypto.randomUUID()}`,event.leagueId,event.id,item.deliveryId||null,tradeId,
+      attemptNumber,item.destinationKind,item.eventType,item.visibility,item.outcome,
+      Math.max(0,Number(item.messageCount)||0),item.errorCode||null,item.errorStatus||null,item.errorMessage||null
+    ));
+  // Keep each transactional D1 batch comfortably bounded while retaining every
+  // destination result from the bounded 500-message inventory.
+  for(let index=0;index<statements.length;index+=50)await db.batch(statements.slice(index,index+50));
+}
 
 // Message references live in the existing outbox payload. No schema migration,
 // token, or Discord configuration change is needed to refresh delivered cards.
@@ -69,7 +104,7 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
   const payload=parse(event.payloadJson),tradeId=String(payload.tradeId||event.resourceId||'');
   const startingStamp=await stamp(db,event.leagueId,tradeId);
   if(!startingStamp)return {updated:0};
-  const deliveries=await rows(db,`SELECT id,league_id AS leagueId,user_id AS userId,
+  let deliveries=await rows(db,`SELECT id,league_id AS leagueId,user_id AS userId,
       discord_user_id AS discordUserId,channel_id AS channelId,event_type AS eventType,
       resource_id AS resourceId,visibility,payload_json AS payloadJson
     FROM discord_delivery_events WHERE league_id=? AND resource_id=?
@@ -78,31 +113,54 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
   if(deliveries.length>500)throw new Error('Discord trade synchronization exceeded its bounded message inventory.');
   const room=await db.prepare(`SELECT discord_thread_id AS channelId,message_id AS messageId
     FROM discord_trade_rooms WHERE league_id=? AND trade_id=? LIMIT 1`).bind(event.leagueId,tradeId).first();
-  if(room?.channelId&&room?.messageId)deliveries.push({leagueId:event.leagueId,channelId:room.channelId,
+  if(room?.channelId&&room?.messageId)deliveries.push({leagueId:event.leagueId,channelId:room.channelId,syntheticRoom:true,
     eventType:'thread-update',resourceId:tradeId,visibility:'private-channel',
     payloadJson:JSON.stringify({title:'Private trade negotiation',message:'Both registered team owners can review and respond here.',
       tradeId,leagueSlug:payload.leagueSlug,discordMessages:{channelId:room.channelId,messageIds:[room.messageId]}})});
+  const retryOfDeliveryEventId=String(payload.retryOfDeliveryEventId||'').trim();
+  if(retryOfDeliveryEventId){
+    const targets=await rows(db,`SELECT destination_delivery_event_id AS deliveryId,destination_kind AS destinationKind
+      FROM discord_delivery_destination_attempts WHERE league_id=? AND delivery_event_id=? AND outcome='failed'
+        AND attempt_number=(SELECT MAX(attempt_number) FROM discord_delivery_destination_attempts
+          WHERE league_id=? AND delivery_event_id=?)`,event.leagueId,retryOfDeliveryEventId,event.leagueId,retryOfDeliveryEventId);
+    if(targets.length){
+      const deliveryIds=new Set(targets.map(item=>String(item.deliveryId||'')).filter(Boolean));
+      const syntheticKinds=new Set(targets.filter(item=>!item.deliveryId).map(item=>String(item.destinationKind||'')));
+      deliveries=deliveries.filter(delivery=>delivery.id?deliveryIds.has(String(delivery.id)):
+        syntheticKinds.has(destinationKind(delivery)));
+    }
+  }
   const installation=await db.prepare(`SELECT application_id AS botId FROM discord_league_installations
     WHERE league_id=? AND status='active' LIMIT 1`).bind(event.leagueId).first();
   const botId=String(installation?.botId||env?.DISCORD_CLIENT_ID||'');
   const histories=new Map(),patched=new Set(),detailsCache=new Map();let renderedStamp=null;
   let updated=0,failures=0;
+  const diagnostics=[];
   for(const delivery of deliveries){
+    const diagnostic={deliveryId:delivery.id||null,destinationKind:destinationKind(delivery),eventType:delivery.eventType,
+      visibility:delivery.visibility,messageCount:0};
+    let stage='destination';
     try{
       if(delivery.visibility==='direct-message'){
+        stage='membership';
         const member=await db.prepare(`SELECT membership.role FROM league_memberships membership JOIN users user ON user.id=membership.user_id
           WHERE membership.league_id=? AND membership.active=1 AND user.discord_user_id=? LIMIT 1`)
           .bind(event.leagueId,delivery.discordUserId).first();
-        if(!member||(delivery.eventType==='review-required'&&!['commissioner','trade_committee'].includes(member.role)))continue;
+        if(!member||(delivery.eventType==='review-required'&&!['commissioner','trade_committee'].includes(member.role))){
+          diagnostics.push({...diagnostic,outcome:'skipped',errorCode:'destination-no-longer-eligible'});continue;
+        }
       }
       let reference=parse(delivery.payloadJson).discordMessages;
       if(!reference?.messageIds?.length){
+        stage='destination-discovery';
         let channelId=delivery.channelId;
         if(delivery.visibility==='direct-message'){
           const dm=await discordBotRequest(env,'/users/@me/channels',{method:'POST',body:{recipient_id:delivery.discordUserId},fetchImpl});
           channelId=dm?.id;
         }
-        if(!SNOWFLAKE.test(String(channelId||'')))continue;
+        if(!SNOWFLAKE.test(String(channelId||''))){
+          diagnostics.push({...diagnostic,outcome:'skipped',errorCode:'destination-unavailable'});continue;
+        }
         // Recover pre-release messages only in known delivery destinations,
         // with the exact application author and trade link/button identity.
         if(!histories.has(channelId)){
@@ -121,7 +179,12 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
           textMessageIds:found.filter(message=>!message.embeds?.length).map(message=>String(message.id))};
         await rememberDiscordTradeMessages(db,delivery,channelId,reference.messageIds,reference);
       }
+      if(!reference?.messageIds?.length){
+        diagnostics.push({...diagnostic,outcome:'missing',errorCode:'message-not-found'});continue;
+      }
+      const updatedBefore=updated;
       for(let index=0;index<(reference?.messageIds||[]).length;index++){
+        stage='message-update';
         const messageId=reference.messageIds[index],key=`${reference.channelId}:${messageId}`;
         if(patched.has(key))continue;
         for(let attempt=0;attempt<3;attempt++){
@@ -147,12 +210,18 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
         }
         if(!patched.has(key))throw new Error('Discord trade votes changed while rendering; retry required.');
       }
+      diagnostic.messageCount=Math.max(0,updated-updatedBefore);
+      diagnostics.push({...diagnostic,outcome:diagnostic.messageCount?'updated':'skipped',
+        ...(!diagnostic.messageCount?{errorCode:'message-already-current'}:{})});
     }catch(error){
       // Deleted messages/closed threads are not recreated. One unavailable DM
       // must not stop the other owners, reviewers, or committee channel.
-      if(Number(error?.status)!==404)failures++;
+      if(Number(error?.status)===404)diagnostics.push({...diagnostic,outcome:'missing',errorCode:'discord-http-404',errorStatus:404,
+        errorMessage:'The retained Discord message or channel no longer exists.'});
+      else{failures++;diagnostics.push({...diagnostic,outcome:'failed',...diagnosticError(error,stage)})}
     }
   }
+  await retainDestinationAttempts(db,event,tradeId,diagnostics);
   if(failures)throw new Error(`Discord trade synchronization requires retry for ${failures} destination(s).`);
   // A late vote can arrive after earlier copies were patched. Repeat the whole
   // inventory once so they converge too, not only the last clicked message.

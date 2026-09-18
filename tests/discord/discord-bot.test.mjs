@@ -255,6 +255,10 @@ test('one unavailable reviewer DM does not stop other copies and retry uses the 
     const failing=`${reference.channelId}:${reference.messageIds[0]}`;
     fail(failing);await vote('reviewer-1','approve');
     const result=await flush();assert.equal(result.failed,1);
+    const destinationFailure=database.prepare(`SELECT outcome,error_code AS errorCode,error_status AS errorStatus,error_message AS errorMessage
+      FROM discord_delivery_destination_attempts WHERE outcome='failed' ORDER BY created_at DESC LIMIT 1`).get();
+    assert.deepEqual({...destinationFailure},{outcome:'failed',errorCode:'discord-http-503',errorStatus:503,
+      errorMessage:'Discord API 503: {"message":"Temporary failure"}'});
     for(const [key,message] of messages)if(key!==failing&&message.embeds?.at(-1)?.title==='Trade status')assert.match(message.embeds.at(-1).description,/Approvals:\*\* 1/);
     const posts=calls.filter(call=>call.method==='POST'&&call.path.endsWith('/messages')).length;
     fail(null);await vote('reviewer-2','reject');await flush();
@@ -587,6 +591,35 @@ test('/eliminated lists only teams with no division or Wild Card path through a 
     assert.match(schedule,/🟢 SF \(10-4\) @ 🟢 TB \(12-2\)/);
     assert.match(schedule,/🔴 SEA \(2-12\) @ ⚪ ARI \(4-10\)/);
     assert.doesNotMatch(schedule,/\*\*/);
+  }finally{database.close()}
+});
+
+test('a successful destination-safe retry resolves but does not delete the exhausted Discord failure',async()=>{
+  const {database,tradeId,vote,flush,fail,calls}=await tradeSyncFixture();
+  try{
+    const reference=JSON.parse(database.prepare(`SELECT payload_json AS payload FROM discord_delivery_events
+      WHERE resource_id=? AND discord_user_id='100000000000000021' AND event_type='review-required'`).get(tradeId).payload).discordMessages;
+    fail(`${reference.channelId}:${reference.messageIds[0]}`);await vote('reviewer-1','approve');
+    assert.equal((await flush()).failed,1);
+    const original=database.prepare(`SELECT id,payload_json AS payloadJson FROM discord_delivery_events
+      WHERE event_type='trade-message-sync' AND status='failed' ORDER BY created_at DESC LIMIT 1`).get();
+    database.prepare(`UPDATE discord_delivery_events SET attempts=5 WHERE id=?`).run(original.id);
+    const retryId='discord_delivery_destination_safe_retry';
+    database.prepare(`INSERT INTO discord_delivery_events
+      (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
+      VALUES (?,'league-sync','trade-message-sync','trade-message-sync','trade_workflow',?,'private-channel',?,'destination-safe-retry')`)
+      .run(retryId,tradeId,JSON.stringify({...JSON.parse(original.payloadJson),retryOfDeliveryEventId:original.id}));
+    fail(null);calls.length=0;assert.equal((await flush()).failed,0);
+    assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path.includes('/messages/')).length,1,
+      'a retry with retained diagnostics edits only the failed destination');
+    assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id=?`).get(retryId).status,'sent');
+    const retained=database.prepare(`SELECT status,attempts,last_error AS lastError,payload_json AS payloadJson
+      FROM discord_delivery_events WHERE id=?`).get(original.id);
+    assert.equal(retained.status,'suppressed');assert.equal(retained.attempts,5);
+    assert.match(retained.lastError,/requires retry/);
+    assert.equal(JSON.parse(retained.payloadJson).resolvedByDeliveryEventId,retryId);
+    assert.ok(database.prepare(`SELECT COUNT(*) AS count FROM discord_delivery_destination_attempts
+      WHERE delivery_event_id=?`).get(original.id).count>0,'the original destination evidence remains retained');
   }finally{database.close()}
 });
 

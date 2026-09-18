@@ -56,7 +56,7 @@ function applySecurityHeaders(response, id, request, durationMs = null) {
   headers.set("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
   headers.set("cross-origin-opener-policy", "same-origin-allow-popups");
   headers.set("content-security-policy-report-only", CSP_REPORT_ONLY);
-  headers.set("x-franchisehq-release", "7.5.9");
+  headers.set("x-franchisehq-release", "7.6.0-rc.1");
   if (durationMs !== null) headers.set("server-timing", `franchisehq;dur=${Math.max(0,Math.round(durationMs))}`);
   if (new URL(request.url).protocol === "https:") {
     headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");

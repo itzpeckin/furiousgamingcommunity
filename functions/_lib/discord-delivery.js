@@ -446,10 +446,18 @@ export async function flushDiscordDeliveries(env,db,{leagueId=null,limit=10,fetc
       // already includes their latest votes; do not replay the entire fan-out
       // once per queued vote. New intents arriving during work stay queued.
       const duplicateSync=row.eventType==='trade-message-sync'&&synchronizedTrades.has(syncKey);
-      const outcome=duplicateSync?null:await sendDelivery(env,db,row,fetchImpl);
+      const claimedRow={...row,attempts:Number(row.attempts||0)+1};
+      const outcome=duplicateSync?null:await sendDelivery(env,db,claimedRow,fetchImpl);
       if(row.eventType==='trade-message-sync')synchronizedTrades.add(syncKey);
-      await db.prepare(`UPDATE discord_delivery_events SET status='sent',sent_at=CURRENT_TIMESTAMP,
-        last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(row.id).run();
+      const payload=parse(row.payloadJson),retryOfDeliveryEventId=String(payload.retryOfDeliveryEventId||'').trim();
+      const successStatements=[db.prepare(`UPDATE discord_delivery_events SET status='sent',sent_at=CURRENT_TIMESTAMP,
+        last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(row.id)];
+      if(retryOfDeliveryEventId)successStatements.push(db.prepare(`UPDATE discord_delivery_events
+        SET status='suppressed',payload_json=json_set(payload_json,'$.resolvedAt',CURRENT_TIMESTAMP,
+          '$.resolvedByDeliveryEventId',?),updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND league_id=? AND event_type='trade-message-sync' AND status='failed'`)
+        .bind(row.id,retryOfDeliveryEventId,row.leagueId));
+      await db.batch(successStatements);
       if(outcome?.room?.id&&outcome.archived){
         await db.prepare(`UPDATE discord_trade_rooms SET status='archived',last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
           .bind(outcome.room.id).run();

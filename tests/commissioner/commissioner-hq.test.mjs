@@ -229,7 +229,7 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.5.9');
+    assert.equal(overviewPayload.release,'7.6.0-rc.1');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
     assert.equal(overviewPayload.operations.context.authority,'server-active-snapshot');
@@ -249,6 +249,60 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const settingsDocument = JSON.parse(database.prepare(`SELECT settings_json AS settingsJson
       FROM league_settings WHERE league_id='league-command'`).get().settingsJson);
     assert.equal(settingsDocument.tradeCenter.calculatorEnabled,false);
+  } finally {
+    database.close();
+  }
+});
+
+test('Commissioner Operations retains exhausted Discord failures and queues only a tenant-safe trade sync retry', async () => {
+  const database = new DatabaseSync(':memory:');
+  try {
+    database.exec('PRAGMA foreign_keys=ON');
+    await applyFiles(database, await migrationFiles());
+    seedLeague(database);
+    await seedIdentity(database,{id:'commissioner',role:'commissioner',token:'commissioner-token'});
+    await seedIdentity(database,{id:'owner',role:'team_owner',teamId:'tb',token:'owner-token'});
+    database.prepare(`INSERT INTO discord_delivery_events
+      (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key,status,attempts,last_error,updated_at)
+      VALUES ('discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','league-command','trade-message-sync','trade-message-sync','trade_workflow',
+        'trade-retained','private-channel','{"tradeId":"trade-retained","leagueSlug":"command-league"}',
+        'trade-sync:exhausted-test','failed',5,'Discord trade synchronization requires retry for 2 destination(s).',datetime('now','-3 days'))`).run();
+    database.prepare(`INSERT INTO discord_league_installations
+      (id,league_id,discord_guild_id,application_id,status)
+      VALUES ('installation-command','league-command','100000000000000001','100000000000000002','active')`).run();
+    database.prepare(`INSERT INTO discord_delivery_destination_attempts
+      (id,league_id,delivery_event_id,resource_id,attempt_number,destination_kind,event_type,visibility,outcome,error_code,error_status,error_message)
+      VALUES ('attempt-retained','league-command','discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','trade-retained',5,
+        'reviewer-direct-message','review-required','direct-message','failed','discord-http-403',403,'Discord API 403: Missing Access')`).run();
+    const db=d1(database);
+
+    const overview=await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
+    const overviewPayload=await overview.json();
+    const failure=overviewPayload.operations.discordFailures[0];
+    assert.equal(failure.id,'discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    assert.equal(failure.retryable,true,'unresolved exhausted failures do not age out after 24 hours');
+    assert.equal(failure.diagnostics[0].errorCode,'discord-http-403');
+
+    const forbidden=await postCommissionerHq(requestContext(db,'owner-token','commissioner-hq','POST',{
+      action:'retry-discord-delivery',deliveryId:'discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    }));
+    assert.equal(forbidden.status,403);
+
+    const queued=await postCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq','POST',{
+      action:'retry-discord-delivery',deliveryId:'discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    }));
+    const queuedPayload=await queued.json();
+    assert.equal(queued.status,200,JSON.stringify(queuedPayload));
+    assert.equal(queuedPayload.operations.discordFailures[0].retryPending,true);
+    const retry=database.prepare(`SELECT status,payload_json AS payloadJson FROM discord_delivery_events
+      WHERE id<> 'discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND resource_id='trade-retained'`).get();
+    assert.equal(retry.status,'pending');
+    assert.equal(JSON.parse(retry.payloadJson).retryOfDeliveryEventId,'discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    assert.equal(database.prepare(`SELECT status,last_error AS lastError FROM discord_delivery_events
+      WHERE id='discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'`).get().lastError,
+      'Discord trade synchronization requires retry for 2 destination(s).');
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM tenant_audit_events
+      WHERE league_id='league-command' AND action='discord_delivery_retry_queued'`).get().count,1);
   } finally {
     database.close();
   }
@@ -333,6 +387,9 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(ui,/data-rule-richtext/);
   assert.match(ui,/data-rule-media-upload/);
   assert.match(ui,/Audit & Revisions/);
+  assert.match(ui,/Retry Failed Copies/);
+  assert.match(ui,/data-retry-discord-delivery/);
+  assert.match(ui,/Unresolved items remain here until they are fixed or explicitly resolved/);
   assert.match(ui,/window\.FranchiseHQ\?\.currentSeasonContext/);
   assert.match(styles,/@media\(max-width:760px\)/);
   assert.match(styles,/\.commissioner-tabs--command\{display:flex;overflow-x:auto/);
@@ -360,6 +417,7 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(styles,/\.commissioner-directory-panel \.commissioner-team-row>span:nth-child\(2\),\.commissioner-directory-panel \.commissioner-team-row>span:nth-child\(3\),\.commissioner-directory-panel \.commissioner-team-row>span:nth-child\(4\)\{display:grid\}/);
   assert.match(styles,/@media\(max-width:560px\)[\s\S]*?\.ownership-member-actions \.button\{width:100%;min-height:44px\}/);
   assert.match(styles,/grid-template-areas:"franchise franchise" "owner owner" "role status" "trades trades" "manage manage"!important/);
+  assert.match(styles,/@media\(max-width:700px\)[^{]*\{[^}]*\.commissioner-operations-health/s);
   assert.match(app,/function applyLeagueFeaturePresentation\(\)/);
   assert.match(app,/A league commissioner has turned this feature off/);
   const rulesMedia = await readFile(path.join(ROOT,'functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js'),'utf8');
@@ -367,4 +425,13 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(rulesMedia,/requireCommissioner/);
   assert.match(rulesMedia,/documentReferencesMedia/);
   assert.match(rulesMedia,/cache-control':'private, max-age=300/);
+  const policyFiles=await Promise.all(['privacy','terms','retention','incidents'].map(name=>
+    readFile(path.join(ROOT,`support/${name}/index.html`),'utf8')));
+  for(const policy of policyFiles){
+    assert.match(policy,/Release 7\.6\.0-rc\.1/);
+    assert.match(policy,/\/support\/support\.css/);
+  }
+  assert.match(policyFiles[0],/does not sell personal data/i);
+  assert.match(policyFiles[2],/No automatic deletion timetable is promised today/);
+  assert.match(policyFiles[3],/Retry Failed Copies/);
 });

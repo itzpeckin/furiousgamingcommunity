@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 7.5.9 */
+/* FHQ_BUILD: 7.6.0-rc.1 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import {
@@ -13,7 +13,7 @@ import { scheduleAdvanceDecision, snapshotCurrentPeriod } from '../../../../_lib
 import { mergeYearlyScheduleCatalog } from '../../../../_lib/yearly-schedule.js';
 import { buildTeamIdentityRebase, rebaseScheduleTeamIds } from '../../../../_lib/team-identity-rebase.js';
 
-const RELEASE='7.5.9';
+const RELEASE='7.6.0-rc.1';
 const BUILD_MODE='checkpointed-domain-v3';
 const LEGACY_BUILD_MODES=Object.freeze(['checkpointed-domain-v2']);
 const BUILD_PLAN_REVISION='unique-external-id-upsert-v1';

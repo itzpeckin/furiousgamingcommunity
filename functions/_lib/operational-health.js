@@ -16,7 +16,7 @@ const check = (code, label, status, detail, observedAt = null) => ({
 
 export async function operationalHealth(db, league) {
   const [active, domainRows, latestImport, stalledImports, installation, latestSync,
-    failedDeliveries, recovery, migration] = await Promise.all([
+    failedDeliverySummary, failedDeliveryRows, destinationAttemptRows, recovery, migration] = await Promise.all([
     db.prepare(`SELECT snapshot.*,active.activated_at AS active_activated_at
       FROM league_active_snapshots active
       JOIN league_snapshots snapshot
@@ -42,8 +42,41 @@ export async function operationalHealth(db, league) {
         updated_at AS updatedAt
       FROM discord_schedule_sync_runs WHERE league_id=?
       ORDER BY created_at DESC LIMIT 1`).bind(league.id).first(),
-    db.prepare(`SELECT COUNT(*) AS count FROM discord_delivery_events
-      WHERE league_id=? AND status='failed' AND updated_at>=datetime('now','-1 day')`).bind(league.id).first(),
+    db.prepare(`SELECT COUNT(*) AS unresolved,
+        SUM(CASE WHEN delivery.event_type='trade-message-sync' AND delivery.attempts>=5 AND NOT EXISTS (
+          SELECT 1 FROM discord_delivery_events retry
+          WHERE retry.league_id=delivery.league_id
+            AND json_extract(retry.payload_json,'$.retryOfDeliveryEventId')=delivery.id
+            AND retry.status IN ('pending','sending')
+        ) THEN 1 ELSE 0 END) AS retryable
+      FROM discord_delivery_events delivery WHERE delivery.league_id=? AND delivery.status='failed'`).bind(league.id).first(),
+    rows(db, `SELECT id,event_type AS eventType,resource_type AS resourceType,resource_id AS resourceId,
+        attempts,last_error AS lastError,updated_at AS updatedAt,
+        CASE WHEN event_type='trade-message-sync' AND attempts>=5 AND NOT EXISTS (
+          SELECT 1 FROM discord_delivery_events retry
+          WHERE retry.league_id=delivery.league_id
+            AND json_extract(retry.payload_json,'$.retryOfDeliveryEventId')=delivery.id
+            AND retry.status IN ('pending','sending')
+        ) THEN 1 ELSE 0 END AS retryable,
+        CASE WHEN EXISTS (
+          SELECT 1 FROM discord_delivery_events retry
+          WHERE retry.league_id=delivery.league_id
+            AND json_extract(retry.payload_json,'$.retryOfDeliveryEventId')=delivery.id
+            AND retry.status IN ('pending','sending')
+        ) THEN 1 ELSE 0 END AS retryPending
+      FROM discord_delivery_events delivery
+      WHERE league_id=? AND status='failed'
+      ORDER BY updated_at DESC,id DESC LIMIT 12`, league.id),
+    rows(db, `SELECT attempt.delivery_event_id AS deliveryEventId,attempt.attempt_number AS attemptNumber,
+        attempt.destination_kind AS destinationKind,attempt.event_type AS eventType,
+        attempt.visibility,attempt.outcome,attempt.message_count AS messageCount,
+        attempt.error_code AS errorCode,attempt.error_status AS errorStatus,
+        attempt.error_message AS errorMessage,attempt.created_at AS createdAt
+      FROM discord_delivery_destination_attempts attempt
+      JOIN discord_delivery_events delivery ON delivery.id=attempt.delivery_event_id
+        AND delivery.league_id=attempt.league_id
+      WHERE attempt.league_id=? AND delivery.status='failed'
+      ORDER BY attempt.created_at DESC,attempt.id DESC LIMIT 60`, league.id),
     db.prepare(`SELECT id,release,evidence_type AS evidenceType,status,
         active_snapshot_id AS activeSnapshotId,schema_version AS schemaVersion,
         verified_at AS verifiedAt
@@ -66,10 +99,26 @@ export async function operationalHealth(db, league) {
   const importStalled = Number(stalledImports?.count || 0) > 0;
   const importHealthy = !importStalled && (!latestImport || latestImport.status !== 'failed');
   const discordEnabled = installation?.status === 'active';
-  const discordHealthy = !discordEnabled || (
-    Number(failedDeliveries?.count || 0) === 0
-    && !['failed','partial'].includes(String(latestSync?.status || '').toLowerCase())
-  );
+  const diagnosticsByDelivery = new Map();
+  for (const item of destinationAttemptRows) {
+    if (!diagnosticsByDelivery.has(item.deliveryEventId)) diagnosticsByDelivery.set(item.deliveryEventId, []);
+    if (diagnosticsByDelivery.get(item.deliveryEventId).length < 12) diagnosticsByDelivery.get(item.deliveryEventId).push({
+      attemptNumber:Number(item.attemptNumber || 0),destinationKind:item.destinationKind,eventType:item.eventType,
+      visibility:item.visibility,outcome:item.outcome,messageCount:Number(item.messageCount || 0),
+      errorCode:item.errorCode || null,errorStatus:item.errorStatus == null ? null : Number(item.errorStatus),
+      errorMessage:item.errorMessage || null,createdAt:item.createdAt
+    });
+  }
+  const discordFailures = failedDeliveryRows.map(item => ({
+    ...item,attempts:Number(item.attempts || 0),retryable:discordEnabled&&Boolean(Number(item.retryable)),
+    retryPending:Boolean(Number(item.retryPending)),
+    diagnostics:diagnosticsByDelivery.get(item.id) || []
+  }));
+  const unresolvedFailures = Number(failedDeliverySummary?.unresolved || 0);
+  const retryableFailures = Number(failedDeliverySummary?.retryable || 0);
+  const availableRetryableFailures = discordEnabled ? retryableFailures : 0;
+  const discordHealthy = unresolvedFailures === 0 && (!discordEnabled
+    || !['failed','partial'].includes(String(latestSync?.status || '').toLowerCase()));
   const recoveryAge = isoAgeMinutes(recovery?.verifiedAt);
   const recoveryHealthy = recovery?.status === 'verified' && recoveryAge !== null && recoveryAge <= 60 * 24 * 30;
 
@@ -81,12 +130,13 @@ export async function operationalHealth(db, league) {
       importStalled?`${stalledImports.count} import checkpoint(s) have not progressed for 15 minutes.`
         :latestImport?`${latestImport.status} · ${latestImport.currentPhase}`:'No import run has been recorded.',latestImport?.updatedAt),
     check('discord_delivery','Discord delivery',discordHealthy?'healthy':'attention',
-      !discordEnabled?'Discord is not enabled for this league.'
-        :Number(failedDeliveries?.count || 0)>0?`${failedDeliveries.count} delivery event(s) failed in the last 24 hours.`
-        :latestSync?`${latestSync.status} · ${latestSync.phase} Week ${latestSync.week}`:'Connected; no schedule sync has run yet.',latestSync?.updatedAt || installation?.updatedAt),
+      unresolvedFailures?`${unresolvedFailures} unresolved delivery event(s).${availableRetryableFailures?` ${availableRetryableFailures} need commissioner retry.`:''}${!discordEnabled?' Reconnect Discord before retrying.':''}`
+        :!discordEnabled?'Discord is not enabled for this league.'
+        :latestSync?`${latestSync.status} · ${latestSync.phase} Week ${latestSync.week}`:'Connected; no schedule sync has run yet.',
+      discordFailures[0]?.updatedAt || latestSync?.updatedAt || installation?.updatedAt),
     check('recovery_evidence','Recovery evidence',recoveryHealthy?'healthy':recovery?'attention':'unavailable',
       recovery?`${recovery.release} ${recovery.evidenceType} · ${recovery.status}`:'No release recovery drill has been recorded yet.',recovery?.verifiedAt),
-    check('schema','Database schema',Number(migration?.version || 0) >= 44?'healthy':'attention',
+    check('schema','Database schema',Number(migration?.version || 0) >= 45?'healthy':'attention',
       `Migration ${Number(migration?.version || 0)} · ${migration?.name || 'unknown'}`,migration?.appliedAt)
   ];
   const attention = checks.filter(item => item.status === 'attention');
@@ -96,6 +146,8 @@ export async function operationalHealth(db, league) {
     context,
     checks,
     alerts:attention.map(item => ({code:item.code,title:item.label,message:item.detail,tone:'warning'})),
+    discordFailures,
+    discordFailureSummary:{unresolved:unresolvedFailures,retryable:availableRetryableFailures,shown:discordFailures.length},
     latestRecovery:recovery ? {...recovery,bookmarkRetained:Boolean(recovery.id)} : null,
     privacy:{requestBodiesLogged:false,credentialsLogged:false,rawExportsLogged:false}
   };
