@@ -18,6 +18,7 @@ const checks = [
     'tests/tooling/routes.test.mjs',
     'tests/tooling/d1-release.test.mjs',
     'tests/database/migrations.test.mjs',
+    'tests/operations/recovery.test.mjs',
     'tests/commissioner/commissioner-hq.test.mjs',
     'tests/commissioner/competition.test.mjs',
     'tests/discord/discord-bot.test.mjs',

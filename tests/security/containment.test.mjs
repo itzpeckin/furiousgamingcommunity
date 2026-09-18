@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { onRequest as eaContainment } from '../../functions/api/leagues/[leagueSlug]/ea-direct/_middleware.js';
-import { onRequest as securityMiddleware } from '../../functions/_middleware.js';
+import { onRequest as securityMiddleware, operationalRouteTemplate } from '../../functions/_middleware.js';
 import {
   normalizeGame,
   normalizePlayer,
@@ -128,6 +128,40 @@ test('authentication entry points have a bounded per-client request budget', asy
   }
   assert.equal(finalResponse.status, 429);
   assert.ok(Number(finalResponse.headers.get('retry-after')) > 0);
+});
+
+test('league mutations have a bounded per-client request budget', async () => {
+  let finalResponse;
+  let attempts=0;
+  const DB={
+    prepare(){
+      return {bind(){return {first:async()=>({requestCount:++attempts,retryAfter:60})};}};
+    }
+  };
+  const originalLog=console.log;
+  console.log=()=>{};
+  try {
+    for (let attempt = 0; attempt < 181; attempt += 1) {
+      finalResponse = await securityMiddleware({
+        request:new Request('https://franchisehq.app/api/leagues/fgc/rules', {
+          method:'PUT',headers:{origin:'https://franchisehq.app','cf-connecting-ip':'203.0.113.8'},body:'{}'
+        }),
+        env:{DB},
+        next:async()=>new Response(null,{status:204})
+      });
+    }
+  } finally {
+    console.log=originalLog;
+  }
+  assert.equal(finalResponse.status,429);
+  assert.ok(Number(finalResponse.headers.get('retry-after')) > 0);
+});
+
+test('operational routes redact tenant slugs and export credentials', () => {
+  assert.equal(
+    operationalRouteTemplate('/api/leagues/furious-gaming-community/companion/export/secret-token'),
+    '/api/leagues/:leagueSlug/companion/export/:token'
+  );
 });
 
 test('security-sensitive source cannot regress to URL tokens, raw DTOs, or unbounded reads', async () => {

@@ -13,8 +13,9 @@ import {
 import { applyRosterOverlays } from '../../../../_lib/trade-center.js';
 import { snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
 import { effectiveRosterOverlays } from '../../../../_lib/roster-ownership.js';
+import { canonicalDataStatus, canonicalLeagueContext } from '../../../../_lib/league-context.js';
 
-const RELEASE = '7.5.7.7';
+const RELEASE = '7.5.9';
 const ALLOWED_DOMAINS = new Set(['teams','players','games','statistics','standings']);
 const POSITION_ALIASES = Object.freeze({REDG:'REDGE',RDE:'REDGE',RE:'REDGE',LEDG:'LEDGE',LDE:'LEDGE',LE:'LEDGE',LOLB:'SAM',SLB:'SAM',MLB:'MIKE',ILB:'MIKE',ROLB:'WILL',WLB:'WILL'});
 
@@ -351,12 +352,15 @@ export async function onRequestGet(context) {
 
   const active = await activeSnapshotRecord(db, league.id);
   if (!active) {
+    const contextState = canonicalLeagueContext(league, null);
     return json({
       ok:true,
       release:RELEASE,
       state:'empty',
       league:{id:league.id,slug:league.slug,name:league.name},
       snapshot:null,
+      context:contextState,
+      dataStatus:canonicalDataStatus(contextState, {}, {}),
       domains:{teams:0,players:0,games:0,statistics:0,standings:0},
       rosteredPlayers:0,
       freeAgents:{status:'unavailable',count:null,reason:'No active snapshot is available.',interpretedAsZero:false,authority:'active-snapshot',sourceSnapshotId:null},
@@ -384,6 +388,8 @@ export async function onRequestGet(context) {
     sourceSnapshotId:playerMappingRun?.sourceSnapshotId || active.id
   } : null;
   const integrity = validationIntegrity(active);
+  const contextState = canonicalLeagueContext(league, active);
+  const dataStatus = canonicalDataStatus(contextState, integrity, summary);
 
   const base = {
     ok:true,
@@ -400,8 +406,12 @@ export async function onRequestGet(context) {
       activatedAt:active.activated_at,
       createdAt:active.created_at,
       validationStatus:integrity.status,
-      validationScore:integrity.score
+      validationScore:integrity.score,
+      canonicalContext:contextState,
+      dataStatus
     },
+    context:contextState,
+    dataStatus,
     domains:summary,
     rosteredPlayers:includeSummaryMetadata
       ? (numeric(playerMappingRun?.rostered_count) ?? (freeAgents?.status === 'ready' ? Math.max(0, summary.players - Number(freeAgents.count || 0)) : summary.players))

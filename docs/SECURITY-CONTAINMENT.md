@@ -1,5 +1,13 @@
 # FranchiseHQ 7.0.1 Security Containment
 
+## 7.5.9 operations hardening
+
+- Every response carries a request ID and release marker; measured responses also carry server timing.
+- Operational logs use sanitized route templates. League slugs and permanent Companion export tokens are replaced before logging, and request bodies, raw exports, credentials, cookies, and authorization headers are not logged.
+- Existing authentication throttling remains in place. Tenant mutation routes use bounded D1-backed budgets, with a distinct wider window for resumable importer steps.
+- Commissioner-visible health reads tenant-scoped server records for active-snapshot integrity, importer progress, Discord delivery, schema, and recovery evidence.
+- Incident, secret, dependency, and recovery procedures are maintained in `docs/OPERATIONS-AND-INCIDENT-RESPONSE.md`.
+
 ## Purpose
 
 Release 7.0.1 closes the known public data and credential-bearing paths before FGC begins using FranchiseHQ as a real league service. It does not redesign the database, activate Madden NFL 27 data, reset league data, or make browser-local league workflows authoritative.

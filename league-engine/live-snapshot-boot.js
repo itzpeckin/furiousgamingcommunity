@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.4.1';
+  const VERSION = '7.5.9';
   let running = null;
   let lastResult = null;
   let lastError = null;
@@ -38,12 +38,14 @@
         emptyState: false,
         remoteReadModel: true
       },
-      metadata: {
-        snapshotId: snapshot.id,
-        status: snapshot.status || 'live',
-        activatedAt: snapshot.activatedAt || null,
-        domainCounts: {...(summary?.domains || {})}
-      },
+        metadata: {
+          snapshotId: snapshot.id,
+          status: snapshot.status || 'live',
+          activatedAt: snapshot.activatedAt || null,
+          domainCounts: {...(summary?.domains || {})},
+          canonicalContext: summary?.context || null,
+          dataStatus: summary?.dataStatus || null
+        },
       teams: [], franchises: [], owners: [], players: [], rosters: [], games: [], standings: [], stats: [], contracts: [], injuries: [], draftPicks: []
     };
   }

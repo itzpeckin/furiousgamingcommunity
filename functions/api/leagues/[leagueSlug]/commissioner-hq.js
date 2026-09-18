@@ -10,8 +10,9 @@ import {
   tradeCenterSettingsFromLeagueDocument,
   withTradeCenterSettings
 } from '../../../_lib/trade-center.js';
+import { operationalHealth } from '../../../_lib/operational-health.js';
 
-const RELEASE = '7.5.7.7';
+const RELEASE = '7.5.9';
 const MANAGED_FEATURES = new Map([
   ['trade_center', 'Trade Center'],
   ['trade_block', 'Trade Block'],
@@ -157,6 +158,18 @@ async function overview(c) {
     code:'snapshot_missing',tone:'danger',title:'No active league snapshot',
     message:'Review League Data before owners use the league.',target:'league-data'
   });
+  const operations = await operationalHealth(c.db, c.league);
+  for (const alert of operations.alerts) {
+    attention.push({
+      code:`operations_${alert.code}`,
+      tone:alert.tone,
+      title:alert.title,
+      message:alert.message,
+      target:['canonical_snapshot','import_pipeline'].includes(alert.code)
+        ? 'league-data'
+        : alert.code === 'discord_delivery' ? 'controls' : 'audit'
+    });
+  }
 
   return {
     ok:true,
@@ -194,7 +207,8 @@ async function overview(c) {
     },
     settingHistory,
     audit,
-    attention
+    attention,
+    operations
   };
 }
 

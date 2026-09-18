@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.5.9",
+  "releaseType": "canonical-consistency-operations-hardening",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.5.7.7",
+    "commit": "c02064e5ce690df1314735cb4489bf32d3a7a5b0",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.5.8-7.5.9-hardening",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "published-branch-pr-open",
+    "pullRequest": 123,
+    "candidateCommit": "39ba25d44cb41ae5c6dc0391db5bc532cbfd551b"
+  },
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "authorized-not-run",
+    "currentRelease": "7.5.7.7",
+    "candidateRelease": "7.5.9",
+    "currentCommit": "c02064e5ce690df1314735cb4489bf32d3a7a5b0",
+    "currentMigration": 44,
+    "candidateMigration": 44,
+    "scope": "One canonical active-snapshot context, commissioner operations health, sanitized request telemetry, bounded mutation throttling, additive recovery-evidence schema, and exact-target recovery reconciliation. No import, snapshot activation, reset, deletion, URL rotation, season lifecycle action, Discord thread operation, roster rewrite, or Free Agent reinterpretation."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/league-context.js",
+    "functions/_lib/operational-health.js",
+    "functions/api/leagues/[leagueSlug]/snapshot/read-model.js",
+    "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
+    "functions/_middleware.js",
+    "migrations/0044_operational_recovery_evidence.sql",
+    "tools/run-recovery-drill.mjs",
+    "tests/operations/recovery.test.mjs",
+    "docs/OPERATIONS-AND-INCIDENT-RESPONSE.md",
+    "releases/7.5.9/release-record.md",
+    "releases/7.5.9/validation-evidence.json"
+  ]
+}

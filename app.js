@@ -812,7 +812,19 @@
     return 'scheduled';
   }
 
+  function serverSeasonContext(snapshot) {
+    const context=snapshot?.canonicalContext;
+    if(!context||context.snapshotId!==snapshot?.id)return null;
+    const raw=String(context.stage||'regular-season').toLowerCase();
+    const phase=raw.includes('pre')?'preseason':raw.includes('post')||raw.includes('playoff')?'playoffs':'regular';
+    const label=phase==='preseason'?'Preseason':phase==='playoffs'?'Playoffs':'Regular Season';
+    const week=Number(context.week);
+    const round=phase==='playoffs'?({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'})[week]||`Playoff Week ${week}`:null;
+    return {...context,season:context.seasonYear??'—',phase,label,round,displayLabel:context.displayLabel||round||`${label} Week ${week}`};
+  }
   function authoritativeSeasonContext(snapshot,standings=[],games=[]) {
+    const serverContext=serverSeasonContext(snapshot);
+    if(serverContext)return serverContext;
     const resolver=window.FranchiseHQ?.canonicalWeekContext?.resolveSeason;
     const selected=typeof resolver==='function'?resolver(snapshot,standings):null;
     if(selected)return selected;
@@ -920,6 +932,16 @@
     };
   }
   function publicSeasonContext(snapshot,games) {
+    const serverContext=serverSeasonContext(snapshot);
+    if(serverContext)return serverContext;
+    if(snapshot?.currentPeriod&&Number.isFinite(Number(snapshot.currentPeriod.week))){
+      const stage=String(snapshot.currentPeriod.stage||'regular-season');
+      const week=Number(snapshot.currentPeriod.week);
+      const phase=stage.includes('pre')?'preseason':stage.includes('post')||stage.includes('playoff')?'playoffs':'regular';
+      const label=phase==='preseason'?'Preseason':phase==='playoffs'?'Playoffs':'Regular Season';
+      const round=phase==='playoffs'?({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'})[week]||`Playoff Week ${week}`:null;
+      return {season:snapshot.seasonYear??'—',seasonYear:snapshot.seasonYear??null,stage:phase,phase,label,week,round,displayLabel:round||`${label} Week ${week}`,authority:'active-snapshot'};
+    }
     const normalized=games.filter(game=>Number(game.week)>0);
     const priority=stage=>{const value=String(stage||'').toLowerCase();return value.includes('post')||value.includes('playoff')?3:value.includes('reg')?2:value.includes('pre')?1:0};
     const latest=[...normalized].sort((a,b)=>priority(b.stage)-priority(a.stage)||Number(b.week)-Number(a.week)||String(b.id||'').localeCompare(String(a.id||'')))[0];
@@ -967,41 +989,15 @@
   }
   async function renderLeagueHomeLive() {
     const service=liveReadModel();
-    if(!service){renderLeagueHomeLegacy();return;}
+    if(!service){renderLiveState('League data unavailable','The canonical league service has not loaded.','warning');return;}
     pageContent.setAttribute('aria-busy','true');
     try{
       // 6.5.1a — Home critical render path.
       // Teams / standings / schedule paint immediately. The large player/statistics
       // domains hydrate after first paint and never block a hard-refresh render.
-      const leagueSlug=location.pathname.match(/\/leagues\/([^/]+)/i)?.[1]||'';
-      const criticalCacheKey=`fhq:home-critical:v6.5.1a:${leagueSlug}`;
-      let cachedCritical=null;
-      try{
-        const stored=JSON.parse(localStorage.getItem(criticalCacheKey)||'null');
-        if(stored?.payload)cachedCritical=stored;
-      }catch{}
-
-      const criticalRequest=Promise.all([
+      const criticalPayload=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule()
       ]);
-
-      let criticalPayload;
-      if(cachedCritical?.payload){
-        criticalPayload=cachedCritical.payload;
-        // Refresh cached shell data behind the already-visible page.
-        criticalRequest.then(fresh=>{
-          try{localStorage.setItem(criticalCacheKey,JSON.stringify({savedAt:Date.now(),payload:fresh}));}catch{}
-          const oldSnapshot=String(cachedCritical?.payload?.[1]?.id||'');
-          const newSnapshot=String(fresh?.[1]?.id||'');
-          if(newSnapshot&&newSnapshot!==oldSnapshot&&routeBase(currentAppRoute())==='home'){
-            window.__FHQ_HOME_DEEP_CACHE__=null;
-            renderLeagueHomeLive();
-          }
-        }).catch(error=>console.warn('[Home Critical Refresh]',error));
-      }else{
-        criticalPayload=await criticalRequest;
-        try{localStorage.setItem(criticalCacheKey,JSON.stringify({savedAt:Date.now(),payload:criticalPayload}));}catch{}
-      }
 
       const [stateValue,snapshot,teamRows,standingRows,gameRows]=criticalPayload;
       const deepCache=window.__FHQ_HOME_DEEP_CACHE__;
@@ -1193,7 +1189,7 @@
   function renderLeagueHome() {
     const service=liveReadModel();
     if(service){renderLeagueHomeLive();return;}
-    renderLeagueHomeLegacy();
+    renderLiveState('League data unavailable','The canonical league service has not loaded.','warning');
   }
 
   function renderActivity() {
@@ -6807,7 +6803,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   async function renderStandingsLive() {
     const service=liveReadModel();
-    if(!service){renderStandingsLegacy();return;}
+    if(!service){renderLiveState('Standings unavailable','The canonical league service has not loaded.','warning');return;}
     pageContent.setAttribute('aria-busy','true');
     try{
       const requestedView=state.standingsView;
@@ -6846,7 +6842,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   function renderStandings() {
     const service=liveReadModel();
     if(service){renderStandingsLive();return;}
-    renderStandingsLegacy();
+    renderLiveState('Standings unavailable','The canonical league service has not loaded.','warning');
   }
 
   function renderStandingsLegacy() {
@@ -10062,7 +10058,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.5.7.7';
+  const VISIBLE_RELEASE = '7.5.9';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';
