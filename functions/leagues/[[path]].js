@@ -1,6 +1,7 @@
 import { onRequestGet as renderLeagueSelector } from "./index.js";
 import { appendBrowserSessionCookies, getCurrentSession, rotateBrowserSession } from "../_lib/auth.js";
 import { isOwnerFallbackHost } from "../_lib/origin.js";
+import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
 import { resolveTenant } from "../_lib/tenant-context.js";
 
 const RELEASE='7.7.2';
@@ -50,6 +51,7 @@ async function fetchSpaShell(context,request,session=null){
   if(session){
     const bootstrap=JSON.stringify({
       authenticated:true,
+      platformOwner:isOwnerFallbackIdentity(context.env,session.user),
       user:session.user||null,
       membership:session.membership||null,
       capabilities:session.capabilities||[],

@@ -5,6 +5,7 @@
   const VERSION = '5.9.4.2a';
   const OWNER_ACCOUNT_ID = String(document.querySelector('meta[name="franchise-hq-platform-owner-account-id"]')?.content || 'owner-tb').trim();
   const OWNER_DISCORD_ID = String(document.querySelector('meta[name="franchise-hq-platform-owner-discord-id"]')?.content || '').trim();
+  const SERVER_PLATFORM_OWNER = window.__FHQ_AUTH_BOOTSTRAP__?.platformOwner === true;
 
   const currentAccount = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
   const authenticatedIdentity = () => {
@@ -29,6 +30,17 @@
   function resolution() {
     const authIdentity = authenticatedIdentity();
     const discordId = readDiscordId(authIdentity);
+
+    if (SERVER_PLATFORM_OWNER) {
+      return Object.freeze({
+        allowed: true,
+        method: 'server-session',
+        configured: true,
+        authenticated: true,
+        accountId: currentAccount()?.id || null,
+        discordId: discordId || null
+      });
+    }
 
     if (OWNER_DISCORD_ID && discordId) {
       return Object.freeze({
