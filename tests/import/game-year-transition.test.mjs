@@ -65,7 +65,7 @@ function bucket(initial={}) {
   };
 }
 
-async function createDatabase(maxVersion=45) {
+async function createDatabase(maxVersion=46) {
   const database=new DatabaseSync(':memory:');
   database.exec('PRAGMA foreign_keys=ON');
   const files=(await walkFiles())
@@ -651,6 +651,6 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.doesNotMatch(ui,/data-game-year-season-confirmation/);
   assert.match(ui,/renderArchivePanel/);
   assert.match(ui,/data-game-year-archive-panel/);
-  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.7\.1/);
+  assert.match(html,/league-engine\/game-year-transition\.js\?v=7\.7\.2/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
 });

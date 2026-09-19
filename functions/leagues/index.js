@@ -6,7 +6,7 @@ import {
 } from "../_lib/auth.js";
 import { isOwnerFallbackHost } from "../_lib/origin.js";
 
-const RELEASE = "7.7.1";
+const RELEASE = "7.7.2";
 
 function esc(value) {
   return String(value ?? "")

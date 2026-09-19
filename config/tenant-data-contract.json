@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "7.7.1",
+  "release": "7.7.2",
   "resolution": {
     "source": "server",
     "requiresExplicitSlug": true,
@@ -16,6 +16,8 @@
     "authentication_rate_limits",
     "leagues",
     "oauth_states",
+    "platform_league_onboarding_events",
+    "platform_league_onboarding_plans",
     "schema_migrations",
     "session_security_events",
     "sessions",
