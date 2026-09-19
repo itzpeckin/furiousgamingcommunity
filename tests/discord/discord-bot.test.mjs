@@ -15,6 +15,7 @@ import { flushDiscordDeliveries, queueCommitteeReviewDelivery, queueTradeRoomUpd
 import { queueDiscordTradeSync } from '../../functions/_lib/discord-trade-sync.js';
 import { tradeDecisionCustomId } from '../../functions/_lib/discord-trade-components.js';
 import {
+  discordBotRequest,
   ensureDiscordGlobalCommands,
   reconcileDiscordGlobalCommands,
   upsertDiscordGlobalCommands,
@@ -137,7 +138,7 @@ async function tradeSyncFixture(){
   database.prepare(`INSERT INTO discord_trade_rooms
     (id,league_id,trade_id,revision,discord_guild_id,parent_channel_id,discord_thread_id,message_id,status)
     VALUES ('room-sync','league-sync',?,1,'100000000000000001','100000000000000066','100000000000000077','100000000000000300','active')`).run(tradeId);
-  const messages=new Map(),calls=[];let nextId=301,failure=null,duringPatch=null;
+  const messages=new Map(),calls=[],archivedChannels=new Set();let nextId=301,failure=null,duringPatch=null;
   const clone=value=>JSON.parse(JSON.stringify(value));
   const fetchImpl=async(url,options={})=>{
     const address=new URL(url),parts=address.pathname.split('/').slice(3),method=options.method||'GET';
@@ -153,6 +154,7 @@ async function tradeSyncFixture(){
         messages.set(`${channelId}:${id}`,message);return respond(clone(message));
       }
       if(method==='PATCH'){
+        if(archivedChannels.has(channelId))return respond({message:'Thread is archived',code:50083},400);
         if(failure===key)return respond({message:'Temporary failure'},503);
         if(!messages.has(key))return respond({message:'Unknown Message'},404);
         messages.set(key,{...messages.get(key),...body});
@@ -161,6 +163,11 @@ async function tradeSyncFixture(){
       }
       if(messageId)return messages.has(key)?respond(clone(messages.get(key))):respond({message:'Unknown Message'},404);
       return respond([...messages.values()].filter(message=>message.channel_id===channelId).map(clone));
+    }
+    if(parts[0]==='channels'&&parts.length===2&&method==='PATCH'){
+      if(body.archived===false)archivedChannels.delete(channelId);
+      if(body.archived===true)archivedChannels.add(channelId);
+      return respond({id:channelId,thread_metadata:{archived:archivedChannels.has(channelId),locked:Boolean(body.locked)}});
     }
     return respond({id:channelId,...body});
   };
@@ -186,13 +193,33 @@ async function tradeSyncFixture(){
       `**${status}**\n**Approvals:** ${approvals}\n**Rejections:** ${rejections}`,message.channel_id);
   };
   return {database,db,league,tradeId,context,messages,calls,fetchImpl,vote,flush,assertTally,
-    fail:key=>{failure=key},onPatch:callback=>{duringPatch=callback}};
+    fail:key=>{failure=key},onPatch:callback=>{duringPatch=callback},
+    archiveChannel:channelId=>archivedChannels.add(String(channelId)),archivedChannels};
 }
+
+test('Discord API rate limits honor retry_after before retrying the same request',async()=>{
+  const waits=[];let requests=0;
+  const result=await discordBotRequest({DISCORD_BOT_TOKEN:'test-token'},'/channels/100000000000000077/messages/100000000000000300',{
+    method:'PATCH',body:{content:'Updated'},sleepImpl:async milliseconds=>waits.push(milliseconds),
+    fetchImpl:async()=>{
+      requests+=1;
+      if(requests===1)return new Response(JSON.stringify({message:'Maximum number of edits to messages older than 1 hour reached.',
+        retry_after:4.757,global:false,code:30046}),{status:429,headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({id:'100000000000000300',content:'Updated'}),{status:200,headers:{'content-type':'application/json'}});
+    }
+  });
+  assert.equal(result.content,'Updated');
+  assert.equal(requests,2);
+  assert.deepEqual(waits,[4782]);
+});
 
 test('queued votes synchronize each Discord card once per flush instead of replaying the entire fan-out',async()=>{
   const {database,calls,vote,flush,assertTally}=await tradeSyncFixture();
   try{
     await vote('reviewer-1','approve');await vote('reviewer-1','reject');await vote('reviewer-1','approve');
+    assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM discord_delivery_events
+      WHERE event_type='trade-message-sync' AND status='pending'`).get().n,1,
+    'multiple changes coalesce behind one pending authoritative synchronization');
     calls.length=0;
     const result=await flush();assertTally(1,0);
     const patches=calls.filter(call=>call.method==='PATCH'&&call.path.includes('/messages/'));
@@ -620,6 +647,52 @@ test('a successful destination-safe retry resolves but does not delete the exhau
     assert.equal(JSON.parse(retained.payloadJson).resolvedByDeliveryEventId,retryId);
     assert.ok(database.prepare(`SELECT COUNT(*) AS count FROM discord_delivery_destination_attempts
       WHERE delivery_event_id=?`).get(original.id).count>0,'the original destination evidence remains retained');
+  }finally{database.close()}
+});
+
+test('unchanged trade state skips Discord message edits that are already current',async()=>{
+  const {database,db,league,tradeId,calls,flush}=await tradeSyncFixture();
+  try{
+    await queueDiscordTradeSync(db,{league,tradeId});await flush();
+    calls.length=0;
+    await queueDiscordTradeSync(db,{league,tradeId});
+    const result=await flush();
+    assert.equal(result.failed,0);
+    assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path.includes('/messages/')).length,0);
+  }finally{database.close()}
+});
+
+test('an active archived private trade thread reopens in place before synchronization',async()=>{
+  const fixture=await tradeSyncFixture();
+  const {database,calls,vote,flush,archiveChannel,archivedChannels}=fixture;
+  try{
+    await vote('reviewer-1','approve');
+    archiveChannel('100000000000000077');calls.length=0;
+    const result=await flush();
+    assert.equal(result.failed,0);
+    assert.ok(calls.some(call=>call.path==='channels/100000000000000077'&&call.method==='PATCH'
+      &&call.body.archived===false&&call.body.locked===false));
+    assert.equal(archivedChannels.has('100000000000000077'),false);
+    assert.equal(database.prepare(`SELECT status FROM discord_trade_rooms WHERE id='room-sync'`).get().status,'committee');
+  }finally{database.close()}
+});
+
+test('a terminal archived trade thread is reopened, synchronized, and archived again without replacement',async()=>{
+  const fixture=await tradeSyncFixture();
+  const {database,db,league,tradeId,calls,flush,archiveChannel,archivedChannels}=fixture;
+  try{
+    database.prepare(`UPDATE trade_workflows SET status='approved',updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(tradeId);
+    await queueDiscordTradeSync(db,{league,tradeId});
+    archiveChannel('100000000000000077');calls.length=0;
+    const result=await flush();
+    assert.equal(result.failed,0);
+    const stateChanges=calls.filter(call=>call.path==='channels/100000000000000077'&&call.method==='PATCH')
+      .map(call=>call.body);
+    assert.deepEqual(stateChanges,[{archived:false,locked:false},{archived:true,locked:true}]);
+    assert.equal(archivedChannels.has('100000000000000077'),true);
+    assert.equal(database.prepare(`SELECT discord_thread_id AS threadId,status FROM discord_trade_rooms WHERE id='room-sync'`).get().threadId,
+      '100000000000000077');
+    assert.equal(database.prepare(`SELECT status FROM discord_trade_rooms WHERE id='room-sync'`).get().status,'archived');
   }finally{database.close()}
 });
 

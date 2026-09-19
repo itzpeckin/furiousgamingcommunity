@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "7.7.0",
+  "releaseType": "fgc-production-launch",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.6.0-rc.1",
+    "commit": "7e860ed058f8056dc44c76784c2bd79872a0272f",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-7.7.0-discord-reliability",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "not-run"},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "7.6.0-rc.1",
+    "candidateRelease": "7.7.0",
+    "currentCommit": "7e860ed058f8056dc44c76784c2bd79872a0272f",
+    "currentMigration": 45,
+    "candidateMigration": 45,
+    "scope": "FGC Production launch with Discord archived-thread recovery, exact retry-after handling, trade-sync coalescing, no-op message detection, retained failed-copy repair, and correct Commissioner Audit routing. No migration, Madden export/import, snapshot activation, reset, deletion, URL rotation, season lifecycle action, scheduling-thread action, roster/ownership mutation, credential change, Discord command registration, or Free Agent reinterpretation."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-api.js",
+    "functions/_lib/discord-trade-sync.js",
+    "functions/_lib/discord-delivery.js",
+    "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
+    "tests/discord/discord-bot.test.mjs",
+    "tests/commissioner/commissioner-hq.test.mjs",
+    "releases/7.7.0/release-record.md",
+    "releases/7.7.0/validation-evidence.json"
+  ]
+}

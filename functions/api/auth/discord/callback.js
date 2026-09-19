@@ -33,7 +33,7 @@ import { ensureDiscordGlobalCommands, upsertDiscordGuildCommands } from "../../.
 import { DISCORD_GLOBAL_COMMANDS, DISCORD_SCHEDULE_THREAD_COMMANDS } from "../../../_lib/discord-commands.js";
 import { scheduleActiveDiscordSync } from "../../../_lib/discord-schedule.js";
 
-const RELEASE = "7.6.0-rc.1";
+const RELEASE = "7.7.0";
 
 function escapeHtml(value) {
   return String(value ?? "")

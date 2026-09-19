@@ -229,7 +229,7 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.6.0-rc.1');
+    assert.equal(overviewPayload.release,'7.7.0');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
     assert.equal(overviewPayload.operations.context.authority,'server-active-snapshot');
@@ -282,6 +282,8 @@ test('Commissioner Operations retains exhausted Discord failures and queues only
     assert.equal(failure.id,'discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
     assert.equal(failure.retryable,true,'unresolved exhausted failures do not age out after 24 hours');
     assert.equal(failure.diagnostics[0].errorCode,'discord-http-403');
+    assert.equal(overviewPayload.attention.find(item=>item.code==='operations_discord_delivery')?.target,'audit',
+      'Discord delivery alerts open the retained diagnostics and retry controls');
 
     const forbidden=await postCommissionerHq(requestContext(db,'owner-token','commissioner-hq','POST',{
       action:'retry-discord-delivery',deliveryId:'discord_delivery_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
@@ -428,7 +430,7 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   const policyFiles=await Promise.all(['privacy','terms','retention','incidents'].map(name=>
     readFile(path.join(ROOT,`support/${name}/index.html`),'utf8')));
   for(const policy of policyFiles){
-    assert.match(policy,/Release 7\.6\.0-rc\.1/);
+    assert.match(policy,/Release 7\.7\.0/);
     assert.match(policy,/\/support\/support\.css/);
   }
   assert.match(policyFiles[0],/does not sell personal data/i);
