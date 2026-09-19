@@ -2,7 +2,7 @@ import { maddenRoutePeriod, resolveMaddenPeriod, resolveMaddenSchedulePeriods } 
 import { compareSchedulePeriods, currentStatePeriodEvidence, proveCurrentSchedulePeriod } from './schedule-integrity.js';
 
 export const MADDEN_DISCOVERY_ANALYSIS_POLICY = 'roster-carry-forward-v5';
-export const MADDEN_DISCOVERY_RELEASE = '7.6.0-rc.1';
+export const MADDEN_DISCOVERY_RELEASE = '7.7.0';
 
 const DATASET_ORDER = Object.freeze([
   'league-info',

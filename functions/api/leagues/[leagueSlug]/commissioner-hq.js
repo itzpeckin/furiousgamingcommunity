@@ -13,7 +13,7 @@ import {
 import { operationalHealth } from '../../../_lib/operational-health.js';
 import { scheduleDiscordDeliveryFlush } from '../../../_lib/discord-delivery.js';
 
-const RELEASE = '7.6.0-rc.1';
+const RELEASE = '7.7.0';
 const MANAGED_FEATURES = new Map([
   ['trade_center', 'Trade Center'],
   ['trade_block', 'Trade Block'],
@@ -168,7 +168,7 @@ async function overview(c) {
       message:alert.message,
       target:['canonical_snapshot','import_pipeline'].includes(alert.code)
         ? 'league-data'
-        : alert.code === 'discord_delivery' ? 'controls' : 'audit'
+        : 'audit'
     });
   }
 

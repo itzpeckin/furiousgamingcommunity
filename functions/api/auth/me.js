@@ -6,7 +6,7 @@ import {
   rotateBrowserSession
 } from "../../_lib/auth.js";
 
-const RELEASE = "7.6.0-rc.1";
+const RELEASE = "7.7.0";
 
 export async function onRequestGet(context) {
   try {

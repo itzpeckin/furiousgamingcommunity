@@ -479,9 +479,11 @@ export async function flushDiscordDeliveries(env,db,{leagueId=null,limit=10,fetc
       }
       sent+=1;
     }catch(error){
+      const retrySeconds=Number.isFinite(Number(error?.retryAfterSeconds))
+        ?Math.max(1,Math.min(3600,Math.ceil(Number(error.retryAfterSeconds)))):300;
       await db.prepare(`UPDATE discord_delivery_events SET status='failed',last_error=?,
-        available_at=datetime('now','+5 minutes'),updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-        .bind(cleanError(error),row.id).run();
+        available_at=datetime('now',?),updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+        .bind(cleanError(error),`+${retrySeconds} seconds`,row.id).run();
       failed+=1;
     }
   }

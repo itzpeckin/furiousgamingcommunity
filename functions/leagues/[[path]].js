@@ -3,7 +3,7 @@ import { appendBrowserSessionCookies, getCurrentSession, rotateBrowserSession } 
 import { isOwnerFallbackHost } from "../_lib/origin.js";
 import { resolveTenant } from "../_lib/tenant-context.js";
 
-const RELEASE='7.6.0-rc.1';
+const RELEASE='7.7.0';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',

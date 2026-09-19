@@ -4,10 +4,34 @@ import { parseTradeDecisionCustomId } from './discord-trade-components.js';
 const parse=value=>{try{return JSON.parse(value||'{}')||{}}catch{return{}}};
 const rows=async(db,sql,...values)=>(await db.prepare(sql).bind(...values).all()).results||[];
 const SNOWFLAKE=/^\d{17,20}$/;
+const TERMINAL_TRADE_STATUSES=new Set(['approved','rejected','withdrawn','cancelled','declined','expired']);
 const cleanDiagnostic=value=>String(value?.message||value||'Discord destination synchronization failed.')
   .replace(/Bot\s+[A-Za-z0-9._-]+/g,'Bot [redacted]')
   .replace(/\b\d{17,20}\b/g,'[discord-id]')
   .slice(0,500);
+
+function archivedThreadError(error){
+  return Number(error?.status)===400&&Number(error?.discordCode)===50083;
+}
+
+function desiredSubset(actual,desired){
+  if(Array.isArray(desired))return Array.isArray(actual)&&desired.length===actual.length
+    &&desired.every((value,index)=>desiredSubset(actual[index],value));
+  if(desired&&typeof desired==='object')return actual&&typeof actual==='object'
+    &&Object.entries(desired).every(([key,value])=>desiredSubset(actual[key],value));
+  return actual===desired;
+}
+
+function messageAlreadyCurrent(current,body){
+  return ['content','embeds','components','flags'].every(key=>body[key]===undefined||desiredSubset(current?.[key],body[key]));
+}
+
+async function rememberDiscordTradeSyncStamp(db,delivery,syncStamp){
+  if(!delivery?.id||!syncStamp)return;
+  await db.prepare(`UPDATE discord_delivery_events SET payload_json=json_set(payload_json,
+      '$.discordMessages.syncStamp',?),updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=?`)
+    .bind(syncStamp,delivery.id,delivery.leagueId).run();
+}
 
 function destinationKind(delivery){
   if(delivery.visibility==='direct-message')return delivery.eventType==='review-required'?'reviewer-direct-message':'owner-direct-message';
@@ -53,9 +77,12 @@ export async function rememberDiscordTradeMessages(db,row,channelId,messageIds,{
 export function discordTradeSyncStatement(db,{league,tradeId}={}){
   return db.prepare(`INSERT INTO discord_delivery_events
     (id,league_id,channel_id,event_type,resource_type,resource_id,visibility,payload_json,idempotency_key)
-    VALUES (?,?,?,'trade-message-sync','trade_workflow',?,'private-channel',?,?)`)
+    SELECT ?,?,?,'trade-message-sync','trade_workflow',?,'private-channel',?,?
+    WHERE NOT EXISTS (SELECT 1 FROM discord_delivery_events
+      WHERE league_id=? AND resource_id=? AND event_type='trade-message-sync' AND status IN ('pending','sending'))`)
     .bind(`discord_delivery_${crypto.randomUUID()}`,league.id,'trade-message-sync',tradeId,
-      JSON.stringify({tradeId,leagueSlug:league.slug}),`trade-sync:${league.id}:${tradeId}:${crypto.randomUUID()}`);
+      JSON.stringify({tradeId,leagueSlug:league.slug}),`trade-sync:${league.id}:${tradeId}:${crypto.randomUUID()}`,
+      league.id,tradeId);
 }
 
 export async function queueDiscordTradeSync(db,options){
@@ -104,6 +131,7 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
   const payload=parse(event.payloadJson),tradeId=String(payload.tradeId||event.resourceId||'');
   const startingStamp=await stamp(db,event.leagueId,tradeId);
   if(!startingStamp)return {updated:0};
+  const workflowState=parse(startingStamp),terminal=TERMINAL_TRADE_STATUSES.has(String(workflowState.status||''));
   let deliveries=await rows(db,`SELECT id,league_id AS leagueId,user_id AS userId,
       discord_user_id AS discordUserId,channel_id AS channelId,event_type AS eventType,
       resource_id AS resourceId,visibility,payload_json AS payloadJson
@@ -111,7 +139,7 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
       AND event_type IN ('review-required','received','thread-update','revision-submitted')
       AND status IN ('sent','sending','failed') ORDER BY created_at DESC LIMIT 501`,event.leagueId,tradeId);
   if(deliveries.length>500)throw new Error('Discord trade synchronization exceeded its bounded message inventory.');
-  const room=await db.prepare(`SELECT discord_thread_id AS channelId,message_id AS messageId
+  const room=await db.prepare(`SELECT id,discord_thread_id AS channelId,message_id AS messageId,status
     FROM discord_trade_rooms WHERE league_id=? AND trade_id=? LIMIT 1`).bind(event.leagueId,tradeId).first();
   if(room?.channelId&&room?.messageId)deliveries.push({leagueId:event.leagueId,channelId:room.channelId,syntheticRoom:true,
     eventType:'thread-update',resourceId:tradeId,visibility:'private-channel',
@@ -133,9 +161,18 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
   const installation=await db.prepare(`SELECT application_id AS botId FROM discord_league_installations
     WHERE league_id=? AND status='active' LIMIT 1`).bind(event.leagueId).first();
   const botId=String(installation?.botId||env?.DISCORD_CLIENT_ID||'');
-  const histories=new Map(),patched=new Set(),detailsCache=new Map();let renderedStamp=null;
+  const histories=new Map(),patched=new Set(),detailsCache=new Map(),reopenedThreads=new Map();let renderedStamp=null;
   let updated=0,failures=0;
   const diagnostics=[];
+  const reopenTradeThread=async channelId=>{
+    if(String(room?.channelId||'')!==String(channelId||''))return false;
+    if(reopenedThreads.has(String(channelId)))return true;
+    await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}`,{
+      method:'PATCH',body:{archived:false,locked:false},fetchImpl
+    });
+    reopenedThreads.set(String(channelId),{roomId:room.id,terminal});
+    return true;
+  };
   for(const delivery of deliveries){
     const diagnostic={deliveryId:delivery.id||null,destinationKind:destinationKind(delivery),eventType:delivery.eventType,
       visibility:delivery.visibility,messageCount:0};
@@ -151,6 +188,9 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
         }
       }
       let reference=parse(delivery.payloadJson).discordMessages;
+      if(delivery.id&&reference?.syncStamp===startingStamp){
+        diagnostics.push({...diagnostic,outcome:'skipped',errorCode:'message-already-current'});continue;
+      }
       if(!reference?.messageIds?.length){
         stage='destination-discovery';
         let channelId=delivery.channelId;
@@ -204,12 +244,23 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
           }
           // If another vote arrived while rendering, never send the old tally.
           if(before!==await stamp(db,event.leagueId,tradeId))continue;
-          await discordBotRequest(env,`/channels/${reference.channelId}/messages/${encodeURIComponent(messageId)}`,{method:'PATCH',body,fetchImpl});
+          let current;
+          if(!(reference.textFallback||reference.textMessageIds?.includes(String(messageId)))){
+            current=await discordBotRequest(env,`/channels/${reference.channelId}/messages/${encodeURIComponent(messageId)}`,{fetchImpl});
+          }
+          if(current&&messageAlreadyCurrent(current,body)){patched.add(key);break}
+          try{
+            await discordBotRequest(env,`/channels/${reference.channelId}/messages/${encodeURIComponent(messageId)}`,{method:'PATCH',body,fetchImpl});
+          }catch(error){
+            if(!archivedThreadError(error)||!await reopenTradeThread(reference.channelId))throw error;
+            await discordBotRequest(env,`/channels/${reference.channelId}/messages/${encodeURIComponent(messageId)}`,{method:'PATCH',body,fetchImpl});
+          }
           if(before===await stamp(db,event.leagueId,tradeId)){patched.add(key);updated++;break}
           if(attempt===2)throw new Error('Discord trade votes changed during synchronization; retry required.');
         }
         if(!patched.has(key))throw new Error('Discord trade votes changed while rendering; retry required.');
       }
+      await rememberDiscordTradeSyncStamp(db,delivery,startingStamp);
       diagnostic.messageCount=Math.max(0,updated-updatedBefore);
       diagnostics.push({...diagnostic,outcome:diagnostic.messageCount?'updated':'skipped',
         ...(!diagnostic.messageCount?{errorCode:'message-already-current'}:{})});
@@ -219,6 +270,22 @@ export async function syncDiscordTradeMessages(env,db,event,{render,fetchImpl=fe
       if(Number(error?.status)===404)diagnostics.push({...diagnostic,outcome:'missing',errorCode:'discord-http-404',errorStatus:404,
         errorMessage:'The retained Discord message or channel no longer exists.'});
       else{failures++;diagnostics.push({...diagnostic,outcome:'failed',...diagnosticError(error,stage)})}
+    }
+  }
+  for(const [channelId,state] of reopenedThreads){
+    try{
+      if(state.terminal){
+        await discordBotRequest(env,`/channels/${encodeURIComponent(channelId)}`,{
+          method:'PATCH',body:{archived:true,locked:true},fetchImpl
+        });
+      }
+      await db.prepare(`UPDATE discord_trade_rooms SET status=?,last_error=NULL,updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND league_id=?`).bind(state.terminal?'archived':(workflowState.status==='committee'?'committee':'active'),
+        state.roomId,event.leagueId).run();
+    }catch(error){
+      failures+=1;
+      diagnostics.push({deliveryId:null,destinationKind:'private-trade-thread',eventType:'thread-state',
+        visibility:'private-channel',outcome:'failed',messageCount:0,...diagnosticError(error,'thread-state')});
     }
   }
   await retainDestinationAttempts(db,event,tradeId,diagnostics);
