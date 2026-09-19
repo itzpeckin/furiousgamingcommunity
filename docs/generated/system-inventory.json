@@ -218,7 +218,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 73350,
+        "bytes": 73767,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -254,7 +254,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 39245,
+        "bytes": 39727,
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
@@ -1621,7 +1621,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.7.0",
+  "release": "7.7.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

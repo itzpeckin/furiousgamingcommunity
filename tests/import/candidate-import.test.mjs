@@ -242,7 +242,7 @@ test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-for
     built=await buildSnapshot(context({action:'next',limit:125,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
     result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
     assert.equal(result.buildJob.phase,'games');
-    assert.match(result.buildJob.checkpointToken,/checkpointed-domain-v3:unique-external-id-upsert-v1:games:125/);
+    assert.match(result.buildJob.checkpointToken,/checkpointed-domain-v3:retained-schedule-team-bridge-v2:games:125/);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
       WHERE snapshot_id=? AND domain='games'`).get(buildSnapshotId).count,272);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
@@ -1003,6 +1003,10 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(builder,/candidateHistoricalBackfill/);
   assert.match(builder,/Historical Week/);
   assert.match(builder,/checkpointed-domain-v3/);
+  assert.match(builder,/retained-schedule-team-bridge-v2/);
+  assert.match(builder,/const BUILD_RECORD_LIMIT=500/);
+  assert.match(builder,/const BUILD_WRITE_BATCH_LIMIT=125/);
+  assert.match(builder,/extendTeamIdRebaseFromMatchingGames/);
   assert.match(builder,/domain==='teams'/);
   assert.match(builder,/domain==='players'/);
   assert.match(builder,/domain==='standings'/);
@@ -1021,7 +1025,9 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(statistics,/Math\.min\(4,Number\(body\.batches\)\|\|1\)/);
   for(const source of [ui,worker])assert.match(source,/candidateImportRunId/);
   for(const source of [ui,worker])assert.match(source,/action:'next',runId,batches:4/);
-  assert.match(ui,/action:'next',candidateImportRunId,snapshotId,limit:125/);
+  assert.match(ui,/action:'next',candidateImportRunId,snapshotId,limit:500/);
+  assert.match(worker,/checkpointedPhase\(context,step,'build-candidate'/);
+  assert.match(worker,/action:'next',candidateImportRunId:context\.runId,snapshotId,limit:500/);
   assert.match(ui,/stopped making progress at its durable checkpoint/);
   for(const source of [ui,worker])assert.match(source,/checkpointToken/);
   assert.match(ui,/action:'validate-next',snapshotId,limit:500,batches:4/);

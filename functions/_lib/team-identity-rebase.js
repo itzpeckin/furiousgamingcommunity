@@ -113,3 +113,51 @@ export function rebaseScheduleTeamIds(games=[],teamIdMap=new Map()){
   });
   return{records,remappedGameCount,remappedReferenceCount};
 }
+
+const gameExternalId=game=>teamText(game,'external_id','externalId','gameId','game_id','id');
+
+export function extendTeamIdRebaseFromMatchingGames(sourceGames=[],referenceGames=[],baseTeamIdMap=new Map()){
+  const referenceByGameId=new Map();
+  for(const game of referenceGames||[]){
+    const id=gameExternalId(game);
+    if(!id||referenceByGameId.has(id))continue;
+    referenceByGameId.set(id,game);
+  }
+  const extendedTeamIdMap=new Map(baseTeamIdMap),inferredTeamIdMap=new Map(),inferredSourceByDestination=new Map();
+  let matchedGameCount=0,matchedReferenceCount=0;
+  for(const sourceGame of sourceGames||[]){
+    const gameId=gameExternalId(sourceGame),referenceGame=gameId?referenceByGameId.get(gameId):null;
+    if(!referenceGame)continue;
+    matchedGameCount+=1;
+    for(const field of ['away_team_external_id','home_team_external_id']){
+      const sourceTeamId=text(sourceGame?.[field]),referenceTeamId=text(referenceGame?.[field]);
+      if(!sourceTeamId||!referenceTeamId)continue;
+      const destinationTeamId=baseTeamIdMap.get(referenceTeamId);
+      if(!destinationTeamId){
+        throw new Error(`The retained game ${gameId} references an active team outside the verified team identity map.`);
+      }
+      const existingDestination=extendedTeamIdMap.get(sourceTeamId);
+      if(existingDestination&&existingDestination!==destinationTeamId){
+        throw new Error(`The retained schedule team ${sourceTeamId} resolves to conflicting current teams.`);
+      }
+      const existingSource=inferredSourceByDestination.get(destinationTeamId);
+      if(existingSource&&existingSource!==sourceTeamId){
+        throw new Error(`Multiple retained schedule teams resolve to current team ${destinationTeamId}.`);
+      }
+      extendedTeamIdMap.set(sourceTeamId,destinationTeamId);
+      inferredTeamIdMap.set(sourceTeamId,destinationTeamId);
+      inferredSourceByDestination.set(destinationTeamId,sourceTeamId);
+      matchedReferenceCount+=1;
+    }
+  }
+  return{
+    teamIdMap:extendedTeamIdMap,
+    audit:{
+      proof:'matching-game-team-identity',
+      matchedGameCount,
+      matchedReferenceCount,
+      inferredTeamCount:inferredTeamIdMap.size,
+      inferredRemappedTeamCount:[...inferredTeamIdMap].filter(([sourceId,destinationId])=>sourceId!==destinationId).length
+    }
+  };
+}
