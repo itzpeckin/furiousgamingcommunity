@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "7.7.2",
   "releaseType": "multi-league-onboarding-foundation",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.7.1",
@@ -18,7 +18,9 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "not-run"
+    "status": "merged",
+    "pullRequests": [132, 133, 134, 135],
+    "mainCommit": "c953eab187d91a86efa17cba911b89916fb11754"
   },
   "staging": {
     "authorized": false,
@@ -27,12 +29,15 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "7.7.1",
+    "deployed": true,
+    "status": "verified",
+    "currentRelease": "7.7.2",
     "candidateRelease": "7.7.2",
-    "currentMigration": 45,
+    "currentMigration": 46,
     "candidateMigration": 46,
+    "pagesWorkflowRun": 35419284107,
+    "qualityWorkflowRun": 35419284746,
+    "recoveryBookmark": "0000035e-00000b0a-000050eb-47c3c2ebb7135944514dbe35b7f77797",
     "scope": "Apply additive migration 46 and publish the owner-only onboarding planner. Do not create or activate a real second league, alter FGC, run an import, move a snapshot, retry Discord, rotate an export URL, change a season, assign membership, or reinterpret Free Agents."
   },
   "requiredArtifacts": [
