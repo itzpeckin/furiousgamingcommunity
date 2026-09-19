@@ -253,21 +253,25 @@ test('owner API saves, prepares, lists, and safely cancels one disabled plan', a
   } finally { sqlite.close(); }
 });
 
-test('the private onboarding workspace is responsive and exposes no activation action', async () => {
-  const [html,ui,workspace,identity,middleware] = await Promise.all([
+test('the private onboarding workspace is responsive, owner-routed, and exposes no activation action', async () => {
+  const [html,ui,workspace,identity,middleware,tradeModule] = await Promise.all([
     readFile(path.join(ROOT,'index.html'),'utf8'),
     readFile(path.join(ROOT,'league-engine/platform-onboarding.js'),'utf8'),
     readFile(path.join(ROOT,'league-engine/platform-workspace.js'),'utf8'),
     readFile(path.join(ROOT,'league-engine/platform-owner-identity.js'),'utf8'),
-    readFile(path.join(ROOT,'functions/_middleware.js'),'utf8')
+    readFile(path.join(ROOT,'functions/_middleware.js'),'utf8'),
+    readFile(path.join(ROOT,'trade-module.js'),'utf8')
   ]);
   assert.match(html,/platform-onboarding-form-grid[^}]+grid-template-columns:repeat\(2/);
   assert.match(html,/@media\(max-width:700px\)\{\.platform-onboarding-form-grid,\.platform-onboarding-readiness\{grid-template-columns:1fr/);
   assert.ok(html.indexOf('league-engine/platform-onboarding.js') < html.indexOf('league-engine/platform-workspace.js'));
   assert.match(html,/platform-owner-identity\.js\?v=7\.7\.2\.1/);
+  assert.match(html,/trade-module\.js\?v=7\.7\.2\.2/);
   assert.match(identity,/VERSION = '7\.7\.2\.1'/);
   assert.match(identity,/SERVER_PLATFORM_OWNER/);
   assert.match(workspace,/\['league-onboarding','League Onboarding'\]/);
+  assert.match(tradeModule,/function renderCommissionerV743\(section\)[\s\S]+requested==='platform-workspace'[\s\S]+data-platform-workspace-host[\s\S]+workspace\.renderWorkspace\(\)/);
+  assert.doesNotMatch(tradeModule,/function renderCommissionerV743\(section\)\{[^}]+Platform development tools are not exposed inside production leagues/);
   assert.match(ui,/activationAvailable:false/);
   assert.doesNotMatch(ui,/data-onboarding-activate|action:\s*['"]activate['"]/);
   assert.match(middleware,/platform-mutation/);
