@@ -22,7 +22,11 @@ Focused Commissioner and Discord validation passes 61/61 tests, including archiv
 
 ## Deployment status
 
-The exact 7.7.0 candidate is locally validated and authorized for branch publication, pull request, hosted checks, Main merge, and a code-only Production deployment. No migration or Discord command registration is required. Exact publication and Production evidence will be appended after the deployed Main commit is verified.
+Exact candidate `82a2eab02ed6a761b510736005be3c3e48fae3b5` passed all three pull-request checks in [PR #127](https://github.com/itzpeckin/furiousgamingcommunity/pull/127) and merged to Main as `4391efbd2f3cb780f019ff295ef0c7e263ab26eb`. Main quality run `35410456767` and Pages run `35410455878` passed. Production Pages deployment `4391efbd2f3cb780f019ff295ef0c7e263ab26eb` and import Worker build `e5e8cadd-9706-4ce0-8b08-78e63c9c30ca` / version `f14d368d-25ed-4aa0-9f82-4bb4ad65d05c` serve the exact merge. No migration or Discord command registration was required.
+
+Signed-in read-only acceptance confirms release 7.7.0, Season 2027 Regular Season Week 2, active snapshot `5cee59c2-1610-4e70-8a65-2707a40da95a`, and Free Agents still unknown. The Discord Command Center alert now opens Audit → Platform Health → Discord Deliveries. Five retained failures remain visible, including two eligible commissioner retries; no retry was selected and no live trade was manufactured. A pre-deployment private candidate remains stopped at Build Import Snapshot, while the prior active snapshot stays live exactly as designed. The next natural trade lifecycle is the remaining interaction acceptance.
+
+The release performed no Madden export/import, snapshot activation, reset/delete, export-URL rotation, season archive/transition, scheduling-thread action, roster/ownership change, credential change, Discord command registration, live Discord retry, or Free Agent reinterpretation.
 
 ## Rollback
 

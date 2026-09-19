@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.7.0",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "productionDataChanged": false,
   "dataChanged": false,
   "credentialsChanged": false,
@@ -20,9 +20,9 @@
     "freeAgentAuthority": {"passed": true, "blockedRemainsUnknown": true, "missingRemainsUnknown": true, "interpretedAsZero": false}
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "productionChanged": true,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "databaseRowsWritten": 0,
     "leagueDataRowsWritten": 0,
@@ -42,13 +42,13 @@
     "freeAgentInterpretedAsZero": false
   },
   "external": {
-    "githubPublication": {"authorized": true, "status": "not-run"},
-    "hostedChecks": {"authorized": true, "status": "not-run"},
+    "githubPublication": {"authorized": true, "status": "merged", "pullRequest": 127, "candidateCommit": "82a2eab02ed6a761b510736005be3c3e48fae3b5", "mergeCommit": "4391efbd2f3cb780f019ff295ef0c7e263ab26eb"},
+    "hostedChecks": {"authorized": true, "status": "passed", "pullRequestChecks": "3/3", "mainQualityRun": 35410456767, "mainPagesRun": 35410455878},
     "productionMigration": {"authorized": false, "status": "not-required", "currentMigration": 45, "candidateMigration": 45},
-    "productionDeployment": {"authorized": true, "status": "not-run", "currentRelease": "7.6.0-rc.1", "candidateRelease": "7.7.0"},
-    "signedInAcceptance": {"authorized": true, "status": "not-run", "liveRetryExecuted": false},
+    "productionDeployment": {"authorized": true, "status": "passed", "currentRelease": "7.7.0", "pagesDeployment": "4391efbd2f3cb780f019ff295ef0c7e263ab26eb", "pagesRun": 35410455878, "workerBuild": "e5e8cadd-9706-4ce0-8b08-78e63c9c30ca", "workerVersion": "f14d368d-25ed-4aa0-9f82-4bb4ad65d05c"},
+    "signedInAcceptance": {"authorized": true, "status": "read-only-passed", "season": 2027, "seasonType": "reg", "week": 2, "activeSnapshotId": "5cee59c2-1610-4e70-8a65-2707a40da95a", "freeAgents": "unknown", "retainedDiscordFailures": 5, "commissionerRetryRequired": 2, "discordAlertDestination": "audit", "liveRetryExecuted": false, "liveTradeManufactured": false},
     "maddenExport": {"authorized": false, "status": "not-required"},
     "snapshotImport": {"authorized": false, "status": "not-run"},
-    "discordDeliveryRetry": {"authorized": false, "status": "not-run"}
+    "discordDeliveryRetry": {"authorized": false, "status": "not-run-by-release"}
   }
 }
