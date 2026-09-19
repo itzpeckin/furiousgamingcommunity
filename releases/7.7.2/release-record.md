@@ -21,11 +21,15 @@ None are registered in the repository quality baseline. Madden Free Agents remai
 
 Fresh-schema, legacy-upgrade, source-validation, identity-conflict, full owner API, idempotent replay, disabled-route denial, two-tenant preservation, readiness, and cancellation tests cover the new authority. The full repository and strict release gate must pass before publication.
 
-The Production release is limited to additive migration 46 and code publication. It does not create an onboarding plan or another real league, activate a tenant, assign a commissioner membership, import Madden data, move a snapshot, retry Discord, rotate an export URL, change a season, reset/delete data, change credentials, or reinterpret Free Agents.
+The Production release was limited to additive migration 46 and code publication. It did not create an onboarding plan or another real league, activate a tenant, assign a commissioner membership, import Madden data, move a snapshot, retry Discord, rotate an export URL, change a season, reset/delete data, change credentials, or reinterpret Free Agents.
 
 ## Deployment status
 
-The exact local candidate from Main `da9c1e9feddb1d25f17b7eaab19ffc00e314dd14` passes all 281 repository and strict-gate tests. Publication, migration 46, Main merge, Production deployment, and read-only acceptance will be recorded after completion.
+Production is deployed from Main `c953eab187d91a86efa17cba911b89916fb11754` through PRs [#132](https://github.com/itzpeckin/furiousgamingcommunity/pull/132), [#133](https://github.com/itzpeckin/furiousgamingcommunity/pull/133), [#134](https://github.com/itzpeckin/furiousgamingcommunity/pull/134), and [#135](https://github.com/itzpeckin/furiousgamingcommunity/pull/135). Pull-request quality run `35419226733`, Main quality run `35419284746`, and Pages deployment run `35419284107` passed. The complete strict gate passes all 281 tests with a current 653-file / 80-route inventory.
+
+Additive migration 46 is applied in Production after Time Travel bookmark `0000035e-00000b0a-000050eb-47c3c2ebb7135944514dbe35b7f77797`. Post-deployment read-only verification reports schema 46, zero foreign-key violations, zero onboarding plans, zero onboarding events, and the same one enabled/public FGC tenant. Protected counts remain 34 users, 34 memberships, 31 active team assignments, and one active-snapshot pointer. FGC still points to active snapshot `a21862ef-fc18-40d2-887a-14349f1cfa32` and previous snapshot `5cee59c2-1610-4e70-8a65-2707a40da95a`.
+
+Signed-in Production acceptance confirms release 7.7.2 renders the owner-only Platform Workspace and its League Onboarding panel, shows an empty zero-plan queue, and exposes no activation control. The final route/cache corrections were code-only and changed no database or league data.
 
 ## Rollback
 
