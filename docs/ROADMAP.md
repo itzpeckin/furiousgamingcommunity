@@ -6,13 +6,13 @@
 
 **Updated:** September 18, 2026
 
-**Revision:** 2.85
+**Revision:** 2.86
 
-**Current production:** FranchiseHQ 7.7.1 is live from Main `0d897d5`, Pages run `35413033341` / deployment `b36ac1a0`, import Worker build `fc4d1223` / version `dcbc79bb`, and migration 45. This code-only release ran no database or league-data operation. Read-only verification confirms the active 2027 Week 2 snapshot remains `5cee59c2`, the failed private candidate remains retained, Free Agents remain unknown, and all retained snapshots, source captures, permanent export URL, Discord failures/destination evidence, and audits remain in place.
+**Current production:** FranchiseHQ 7.7.1 is live from runtime Main `0d897d5` with release evidence finalized on Main `cb6c9b5`, Pages deployment `266d32aa`, import Worker build `fc4d1223` / version `dcbc79bb`, and migration 45. This code-only release ran no database or league-data operation. Read-only verification confirms the active 2027 Week 2 snapshot remains `5cee59c2`, the failed private candidate remains retained, Free Agents remain unknown, and all retained snapshots, source captures, permanent export URL, Discord failures/destination evidence, and audits remain in place.
 
-**Current work:** 7.7.1 is deployed. The importer now bridges the retained 272-game yearly schedule’s older Madden team IDs through exact game identity, advances 500 records per request while retaining 125-row D1 transactions, and keeps Workflow work at granular durable checkpoints. The existing failed run and private snapshot remain available for the commissioner’s ordinary Retry action; the live Week 2 snapshot remains authoritative until that retry validates and atomically publishes.
+**Current work:** 7.7.0 and 7.7.1 are completed stabilization releases, not a replacement for the originally scheduled 7.7 multi-league onboarding milestone. The Discord corrections closed private-RC blockers, and the importer correction preserves the commissioner’s retained Retry path. The intended 7.7 work resumes as 7.7.2: build and validate a tenant-safe onboarding foundation without activating a second real league or changing FGC.
 
-**Next gate:** Publish 7.7.1, verify the exact Pages and import Worker builds read-only, then let the commissioner retry the retained export. The retry must resume the private checkpoint, build all 272 games plus retained statistics/standings, validate, and atomically publish only through the ordinary import action. No new export is required. Natural trade acceptance remains open independently before 8.0.0 second-league activation planning.
+**Next gate:** First record the commissioner’s ordinary 7.7.1 import retry outcome; no new export is required and the current live snapshot remains authoritative until validation and atomic publication succeed. Then deliver 7.7.2 multi-league onboarding readiness: a disabled, previewable, repeatable tenant-creation path with complete isolation and rollback evidence. Activating a second real league remains the separate 8.0.0 gate.
 
 ## Product decisions
 
@@ -132,8 +132,9 @@
 | 7.5.7.6 | Production; superseded by 7.5.7.7 correction | Created the durable candidate and completed teams/players, then exposed an exact-ID duplicate plan at the game checkpoint after Madden rebased team IDs |
 | 7.5.7.7 | Production; owner accepted | Rebase retained schedule team IDs, deduplicate exact Madden game IDs, resume the private checkpoint, and complete the retained Week 2 import |
 | 7.6.0-rc.1 | Production private RC; commissioner accepted | Retained destination-safe Discord diagnostics, persistent Operations health, audited commissioner retry, public trust pages, and exact deployment/recovery evidence; committee and team-owner human acceptance remain |
-| 7.7.0 | Production; read-only acceptance passed, natural trade acceptance pending | FGC Production launch plus archived-thread recovery, Discord rate-limit compliance, trade-sync coalescing, no-op suppression, and actionable Operations routing |
-| 7.7.1 | Production deployed; commissioner retry pending | Bridge older yearly-schedule team IDs through exact game identity, reduce resumable build round trips, and preserve granular Workflow checkpoints without changing live league data during deployment |
+| 7.7.0 | Production stabilization; read-only acceptance passed | Private-RC blocker correction for archived Discord threads, rate-limit compliance, trade-sync coalescing, no-op suppression, and actionable Operations routing; this did not replace the intended 7.7 multi-league onboarding milestone |
+| 7.7.1 | Production emergency repair; commissioner retry pending | Bridge older yearly-schedule team IDs through exact game identity, reduce resumable build round trips, and preserve granular Workflow checkpoints without changing live league data during deployment; this did not replace the intended 7.7 milestone |
+| 7.7.2 | Planned next | Resume the original 7.7 multi-league onboarding work with a disabled, previewable, tenant-isolated setup path while FGC remains unchanged |
 | 8.0.0 | Planned | Multi-league activation |
 | 8.1.0 | Planned | Multi-league administration and operations |
 
@@ -166,9 +167,10 @@
 | 11e | Active importer schedule-checkpoint correction | 7.5.7.7 | Rebase retained games to current team identities, reduce the 304-row collision plan to 272 unique games, and replay the existing private game domain without deletion before ordinary validation and atomic activation. |
 | 12 | Complete in Production | 7.5.8–7.5.9 | Canonical consistency, monitoring, backups, security, and recovery are live against the completed importer and Discord behavior. |
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
-| 14 | Production live; interaction acceptance pending | 7.7.0 | Correct the Discord defects found during private acceptance, then complete the formal FGC Production launch, observation window, owner acceptance, support record, and recovery evidence. |
-| 14a | Immediate importer remediation | 7.7.1 | Resume the retained Week 2 candidate across the yearly-schedule team-ID boundary and cut build latency without another export or any deployment-time league-data operation. |
-| 15 | Expansion | 8.0.0 | Activate a second real league and prove tenant-isolated operation and recovery while FGC remains unchanged. |
+| 14 | Completed stabilization | 7.7.0 | Close the Discord blockers discovered during private-RC acceptance without treating those repairs as the intended 7.7 product milestone. |
+| 14a | Production emergency repair | 7.7.1 | Resume the retained Week 2 candidate across the yearly-schedule team-ID boundary and cut build latency without another export or any deployment-time league-data operation. |
+| 14b | Next — original 7.7 scope | 7.7.2 | Build a repeatable, previewable, tenant-isolated onboarding path and prove that a disabled second tenant can be prepared without changing FGC or enabling another real league. |
+| 15 | Expansion | 8.0.0 | Activate a second real league through the accepted onboarding path and prove tenant-isolated operation and recovery while FGC remains unchanged. |
 | 16 | Product completion | 8.1.0 | Complete multi-league administration, safe switching, lifecycle operations, quotas/billing readiness, support tooling, and custom-domain automation. |
 
 The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critical path unless the owner explicitly reopens it.
@@ -812,17 +814,16 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Rehearse deployment/rollback from exact artifacts; publish privacy, terms, support, retention, incident, and help material.
 - Gate: no unresolved critical/high blocker, recovery reconciles, monitoring/support are active, and the owner accepts one exact candidate.
 
-## 7.7.0 — FGC Production Launch
+## 7.7.0 — Private-RC Blocker Stabilization (Released)
 
-- Promote the accepted RC baseline while correcting the Discord delivery defects discovered during acceptance.
+- This shipped release promoted the accepted RC baseline while correcting Discord delivery defects discovered during acceptance. It is retained as release history, but it did not consume or replace the planned 7.7 multi-league onboarding milestone.
 - Honor Discord `retry_after`, reopen the same archived trade thread when synchronization is required, and restore terminal threads to archived/locked state.
 - Coalesce redundant pending trade synchronizations and skip retained copies already showing the authoritative workflow stamp.
 - Keep every original delivery failure and destination audit; commissioner repair targets only failed retained copies and never replays the trade or creates a replacement room.
 - Route operational alerts to the exact Commissioner Audit diagnostics and recovery control.
-- Deploy the accepted code-only candidate, invite FGC in waves, and observe key signals without manufacturing a live trade or retry.
-- Gate: owner acceptance passes on production and the observation window, release record, roadmap, support notes, and recovery evidence are complete.
+- The code-only release deployed without manufacturing a live trade or retry. Read-only Production acceptance passed; the next natural trade remains interaction acceptance rather than a prerequisite for beginning the restored onboarding scope.
 
-## 7.7.1 — Retained Schedule Identity and Import-Time Correction
+## 7.7.1 — Emergency Retained-Schedule Import Correction (Released)
 
 - Retain the failed private candidate and prove its failure read-only before changing code. The live 2027 Week 2 snapshot remains untouched.
 - Extend the verified active-to-current team identity map through exact yearly-to-active game IDs. Require one destination per source team, one source per destination team, and complete coverage of every retained schedule reference; any contradiction fails closed.
@@ -831,10 +832,20 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Keep multi-call Workflow phases outside a single enclosing durable step, and provide explicit Worker CPU headroom while every network operation remains independently checkpointed.
 - Gate: focused bridge/performance/Workflow regressions, complete repository and strict release checks, exact Main/Pages/Worker publication, and read-only Production verification. Deployment itself runs no import, activation, reset, deletion, URL rotation, season lifecycle, Discord, roster, credential, or Free Agent operation.
 
+## 7.7.2 — Multi-League Onboarding Readiness (Original 7.7 Milestone)
+
+- Build one platform-controlled onboarding path that prepares a new league as **disabled by default**. The path captures league identity, slug, branding, initial commissioner, Madden game year, feature defaults, rules state, permanent export connection, optional Discord connection, and tenant limits without activating the league publicly.
+- Make onboarding previewable and repeatable. A platform operator must be able to review the complete plan, apply it idempotently, resume an interrupted setup, and roll back an unactivated tenant without touching another league.
+- Remove remaining FGC-only assumptions from league creation, configuration lookup, routing, scheduled work, import resources, Discord installation, storage, telemetry, backup, recovery, and support evidence. FGC remains configuration and the first tenant, never a template copied as authority.
+- Prove isolation with two tenant configurations across accounts, memberships, roles, teams, seasons, snapshots, exports, Discord, jobs, rate limits, logs, audits, backups, and recovery. A user may hold different roles in each league, but no authority or data may cross the selected tenant.
+- Provide a clear readiness checklist showing what is configured, blocked, optional, and required before activation. A disabled tenant cannot import, schedule Discord threads, publish league content, or appear in public league discovery.
+- Preserve FGC exactly during this phase: no FGC import, snapshot move, roster/ownership change, Discord retry/thread action, export-URL rotation, season lifecycle operation, credential change, or Free Agent reinterpretation is part of onboarding development or acceptance.
+- Gate: local and isolated Preview tests create, interrupt, resume, inspect, and remove a disabled test tenant with zero cross-tenant changes; desktop and phone onboarding views pass; recovery evidence is complete; and the owner accepts the onboarding contract. No second real league is enabled until 8.0.0.
+
 ## 8.0.0 — Multi-League Activation
 
-- Enable controlled creation of additional leagues with isolated branding, domains, features, roles, imports, storage, jobs, rate limits, logs, backup/export, suspension, and deletion.
-- Gate: two real leagues operate concurrently and every recovery/lifecycle exercise affects only its selected tenant while FGC stays unchanged.
+- Activate the first additional real league through the accepted 7.7.2 onboarding path, then enable its approved branding, domain, features, roles, import resources, Discord configuration, operational limits, and support ownership.
+- Gate: two real leagues operate concurrently and every import, Discord action, scheduled job, backup, recovery, suspension, and lifecycle exercise affects only its selected tenant while FGC stays unchanged.
 
 ## 8.1.0 — Multi-League Administration and Operations
 
@@ -853,6 +864,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## Change log
 
+- **Revision 2.86:** Reconciled the roadmap after the 7.7 numbering drift. The pre-7.7 private-RC record explicitly named multi-league onboarding as the next work, but 7.7.0 was used for Discord blocker stabilization and 7.7.1 for an emergency retained-schedule importer correction. Both shipped releases remain immutable history and neither is relabeled as the intended product milestone. The original 7.7 scope resumes as 7.7.2 Multi-League Onboarding Readiness: a disabled-by-default, previewable, resumable, tenant-isolated setup path with FGC preservation and no second real league activation. 8.0.0 remains the separately gated first additional-league activation, and 8.1.0 remains ongoing multi-league administration and operations. This roadmap-only correction changes no runtime, database, league data, import/snapshot, Discord state, export URL, season lifecycle, credential, membership/assignment, or Free Agent authority.
 - **Revision 2.85:** Published exact 7.7.1 candidate `40bb897` through PR #129 with all checks passing and merged Main `0d897d5`. Main quality/deployment runs passed; Pages deployment `b36ac1a0` serves release 7.7.1 and Worker build `fc4d1223` deployed version `dcbc79bb`. Post-deployment read-only verification confirms active snapshot `5cee59c2` remains 2027 Week 2 with 32 teams, 2,046 players, 272 games, 939 statistics rows, and 32 standings; failed run `candidate_import_644d…` and private snapshot `cfb7d9c7…` remain retained for the commissioner’s ordinary retry. No migration, Madden export/import, snapshot activation, database write, reset/deletion, URL rotation, archive/transition, Discord action, roster/ownership mutation, credential change, or Free Agent reinterpretation ran during release.
 - **Revision 2.84:** Diagnosed retained Week 2 run `candidate_import_644d…` read-only. Its private snapshot `cfb7d9c7…` contains 32 teams and 2,046 players and no games; the live snapshot remains `5cee59c2`. The 272-game yearly schedule and active schedule match on all 272 exact game IDs and prove a complete 32-to-32 team-ID bridge with zero conflicts or unmapped teams. Began standing-authorized 7.7.1 to apply that proof, increase resumable requests from 125 to 500 records while retaining 125-statement D1 transactions, and make Workflow phases granular. No Madden export/import, snapshot activation, database write, reset/deletion, URL rotation, archive/transition, Discord action, roster/ownership mutation, credential change, or Free Agent reinterpretation ran during diagnosis or implementation.
 - **Revision 2.83:** Published exact 7.7.0 candidate `82a2eab` through PR #127 with all three pull-request checks passing and merged Main `4391efb`. Main quality run `35410456767`, Pages run `35410455878`, Pages deployment `4391efb`, and Worker build `e5e8cadd` / version `f14d368d` passed. Signed-in read-only acceptance confirmed release 7.7.0, Season 2027 Week 2, active snapshot `5cee59c2`, Free Agents unknown, and the Discord alert opening its exact Audit diagnostics. Five retained failures and two commissioner retry controls remain visible; no retry or live trade was triggered. A pre-deployment private candidate remains stopped at Build Import Snapshot and did not move the live pointer. No migration, Madden export/import, snapshot activation, reset/deletion, URL rotation, archive/transition, scheduling-thread action, roster/ownership mutation, credential change, command registration, or Free Agent reinterpretation ran during release.
