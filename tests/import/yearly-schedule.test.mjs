@@ -10,7 +10,11 @@ import {
   selectYearlyScheduleGames,
   yearlyScheduleCoverage
 } from '../../functions/_lib/yearly-schedule.js';
-import { buildTeamIdentityRebase, rebaseScheduleTeamIds } from '../../functions/_lib/team-identity-rebase.js';
+import {
+  buildTeamIdentityRebase,
+  extendTeamIdRebaseFromMatchingGames,
+  rebaseScheduleTeamIds
+} from '../../functions/_lib/team-identity-rebase.js';
 import {
   onRequestGet as getYearlySchedule,
   onRequestPost as updateYearlySchedule
@@ -187,6 +191,46 @@ test('retained schedules rebase team IDs and exact Madden game IDs remain unique
   assert.equal(merged.records[0].home_score,24);
   assert.equal(merged.records[0].home_team_external_id,'new-tb');
   assert.equal(merged.deduplicatedExternalIds,0);
+});
+
+test('retained yearly schedules bridge superseded Madden team IDs through matching game identity',()=>{
+  const baseTeamIdMap=new Map([
+    ['active-chi','current-chi'],
+    ['active-tb','current-tb']
+  ]);
+  const yearlyGames=[{
+    external_id:'game-1',season_year:2027,stage:'regular-season',week_index:1,
+    away_team_external_id:'yearly-chi',home_team_external_id:'yearly-tb'
+  }];
+  const activeGames=[{
+    external_id:'game-1',season_year:2027,stage:'regular-season',week_index:1,
+    away_team_external_id:'active-chi',home_team_external_id:'active-tb'
+  }];
+  const bridge=extendTeamIdRebaseFromMatchingGames(yearlyGames,activeGames,baseTeamIdMap);
+  assert.equal(bridge.audit.proof,'matching-game-team-identity');
+  assert.equal(bridge.audit.matchedGameCount,1);
+  assert.equal(bridge.audit.inferredTeamCount,2);
+  assert.equal(bridge.teamIdMap.get('yearly-chi'),'current-chi');
+  assert.equal(bridge.teamIdMap.get('yearly-tb'),'current-tb');
+  const rebased=rebaseScheduleTeamIds(yearlyGames,bridge.teamIdMap);
+  assert.equal(rebased.records[0].away_team_external_id,'current-chi');
+  assert.equal(rebased.records[0].home_team_external_id,'current-tb');
+});
+
+test('retained yearly schedule bridge rejects contradictory game evidence',()=>{
+  const yearlyGames=[
+    {external_id:'game-1',away_team_external_id:'yearly-a',home_team_external_id:'yearly-b'},
+    {external_id:'game-2',away_team_external_id:'yearly-a',home_team_external_id:'yearly-b'}
+  ];
+  const activeGames=[
+    {external_id:'game-1',away_team_external_id:'active-a',home_team_external_id:'active-b'},
+    {external_id:'game-2',away_team_external_id:'active-b',home_team_external_id:'active-a'}
+  ];
+  const baseTeamIdMap=new Map([['active-a','current-a'],['active-b','current-b']]);
+  assert.throws(
+    ()=>extendTeamIdRebaseFromMatchingGames(yearlyGames,activeGames,baseTeamIdMap),
+    /conflicting current teams/i
+  );
 });
 
 test('Import Yearly Schedule seals 18 weeks atomically without snapshots, Discord, URL rotation, or data deletion',async()=>{

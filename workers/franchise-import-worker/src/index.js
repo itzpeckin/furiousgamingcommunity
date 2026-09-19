@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 7.7.0 */
+/* FHQ_BUILD: 7.7.1 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='7.7.0';
+const RELEASE='7.7.1';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -78,6 +78,23 @@ async function mapStatistics(context,step){
   return{...final,mappingRun:{...(final.mappingRun||{}),id:runId}};
 }
 
+async function checkpointedPhase(context,step,id,work,summarize){
+  const startedAt=Date.now();
+  try{
+    const result=await work();
+    await step.do(`${id}-report`,()=>report(context,id,startedAt,summarize(result)||{}));
+    return result;
+  }catch(error){
+    await step.do(`${id}-failure-report`,()=>call(context,companion(context.slug,'candidate-import'),'POST',{
+      action:'report-phase',runId:context.runId,phase:id,ok:false,
+      durationMs:Math.max(0,Date.now()-startedAt),
+      totalDurationMs:Math.max(0,Date.now()-context.wallStartedAt),
+      summary:error.message,error:{message:error.message}
+    })).catch(()=>{});
+    throw error;
+  }
+}
+
 async function buildCandidate(context,step,mappingRunIds){
   let result=await step.do('build-candidate-start',()=>call(
     context,companion(context.slug,'build-snapshot'),'POST',{
@@ -91,7 +108,7 @@ async function buildCandidate(context,step,mappingRunIds){
     iteration+=1;
     result=await step.do(`build-candidate-next-${iteration}`,()=>call(
       context,companion(context.slug,'build-snapshot'),'POST',{
-        action:'next',candidateImportRunId:context.runId,snapshotId,limit:125
+        action:'next',candidateImportRunId:context.runId,snapshotId,limit:500
       }
     ));
     const job=result.buildJob||{};
@@ -208,7 +225,7 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
       warnings:payload.mappingRun?.warnings||[],scheduleMappingRunId:payload.mappingRun?.id
     }));
 
-    const statistics=await phase(context,step,'map-statistics',()=>mapStatistics(context,step),payload=>({
+    const statistics=await checkpointedPhase(context,step,'map-statistics',()=>mapStatistics(context,step),payload=>({
       summary:`${Number(payload.mappingRun?.recordCount||0)} statistics mapped`,
       counts:{statistics:Number(payload.mappingRun?.recordCount||0)},
       warnings:payload.mappingRun?.warnings||[],statisticsMappingRunId:payload.mappingRun?.id
@@ -220,14 +237,14 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
       scheduleMappingRunId:schedule.mappingRun?.id,
       statisticsMappingRunId:statistics.mappingRun?.id
     };
-    const built=await phase(context,step,'build-candidate',()=>buildCandidate(context,step,mappingRunIds),payload=>({
+    const built=await checkpointedPhase(context,step,'build-candidate',()=>buildCandidate(context,step,mappingRunIds),payload=>({
       summary:`Import snapshot ${payload.snapshot?.snapshotId||'built'}`,
       counts:payload.snapshot?.counts||{},candidateSnapshotId:payload.snapshot?.snapshotId
     }));
     const snapshotId=built.snapshot?.snapshotId;
     if(!snapshotId)throw new Error('Candidate builder did not return a snapshot ID.');
 
-    await phase(context,step,'validate-candidate',()=>validateCandidate(context,step,snapshotId),payload=>({
+    await checkpointedPhase(context,step,'validate-candidate',()=>validateCandidate(context,step,snapshotId),payload=>({
       summary:'Import validation ready',counts:payload.snapshot?.counts||{},candidateSnapshotId:snapshotId
     }));
 

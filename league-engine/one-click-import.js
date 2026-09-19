@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.7.0 */
+/* FHQ_BUILD: 7.7.1 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.7.0';
+  const VERSION = '7.7.1';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -276,7 +276,7 @@
       notice=`Build Import Snapshot · ${Number(job.processedCount||0).toLocaleString()}/${total} records · ${job.phase||'checkpoint'}`;
       rerender();
       result=await checkpointedBuildRequest({
-        action:'next',candidateImportRunId,snapshotId,limit:125
+        action:'next',candidateImportRunId,snapshotId,limit:500
       });
       const nextJob=result.buildJob||{};
       const checkpoint=String(nextJob.checkpointToken

@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 7.7.0 */
+/* FHQ_BUILD: 7.7.1 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import {
@@ -11,14 +11,19 @@ import {
 } from '../../../../_lib/candidate-import.js';
 import { scheduleAdvanceDecision, snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
 import { mergeYearlyScheduleCatalog } from '../../../../_lib/yearly-schedule.js';
-import { buildTeamIdentityRebase, rebaseScheduleTeamIds } from '../../../../_lib/team-identity-rebase.js';
+import {
+  buildTeamIdentityRebase,
+  extendTeamIdRebaseFromMatchingGames,
+  rebaseScheduleTeamIds
+} from '../../../../_lib/team-identity-rebase.js';
 
-const RELEASE='7.7.0';
+const RELEASE='7.7.1';
 const BUILD_MODE='checkpointed-domain-v3';
 const LEGACY_BUILD_MODES=Object.freeze(['checkpointed-domain-v2']);
-const BUILD_PLAN_REVISION='unique-external-id-upsert-v1';
+const BUILD_PLAN_REVISION='retained-schedule-team-bridge-v2';
 const BUILD_DOMAINS=Object.freeze(['teams','players','games','statistics','standings']);
-const BUILD_RECORD_LIMIT=125;
+const BUILD_RECORD_LIMIT=500;
+const BUILD_WRITE_BATCH_LIMIT=125;
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results||[];
 
@@ -242,12 +247,16 @@ async function domainPlan({context,db,league,candidateRun,runs,shared,domain}){
     if(activeSnapshotId&&!shared.historicalBackfill){
       const sourceTeams=sourceTeamRows.map(row=>({...(parse(row.data_json)||{}),external_id:row.external_id}));
       const {teamIdMap,audit}=buildTeamIdentityRebase(sourceTeams,destinationTeams);
-      const yearlyRebase=rebaseScheduleTeamIds(retainedYearlyGames,teamIdMap);
+      const scheduleBridge=extendTeamIdRebaseFromMatchingGames(
+        retainedYearlyGames,retainedPriorGames,teamIdMap
+      );
+      const yearlyRebase=rebaseScheduleTeamIds(retainedYearlyGames,scheduleBridge.teamIdMap);
       const priorRebase=rebaseScheduleTeamIds(retainedPriorGames,teamIdMap);
       retainedYearlyGames=yearlyRebase.records;
       retainedPriorGames=priorRebase.records;
       scheduleTeamRebase={
         ...audit,
+        retainedScheduleBridge:scheduleBridge.audit,
         remappedGameCount:yearlyRebase.remappedGameCount+priorRebase.remappedGameCount,
         remappedReferenceCount:yearlyRebase.remappedReferenceCount+priorRebase.remappedReferenceCount
       };
@@ -643,14 +652,17 @@ export async function onRequestPost(context){
     if(cursor>plan.records.length)return json({ok:false,
       error:`The pending snapshot ${domain} cursor exceeds its immutable build plan.`,release:RELEASE},409);
     const requestLimit=Math.max(1,Math.min(BUILD_RECORD_LIMIT,Math.floor(Number(body?.limit)||BUILD_RECORD_LIMIT)));
-    const pending=plan.records.slice(cursor,cursor+requestLimit).map(record=>db.prepare(`INSERT INTO league_snapshot_records
-      (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)
-      ON CONFLICT(snapshot_id,domain,external_id) DO UPDATE SET data_json=excluded.data_json`)
-      .bind(snapshot.id,league.id,record.domain,record.externalId,JSON.stringify(record.item)));
-    if(pending.length)await db.batch(pending);
+    const pendingRecords=plan.records.slice(cursor,cursor+requestLimit);
+    for(let offset=0;offset<pendingRecords.length;offset+=BUILD_WRITE_BATCH_LIMIT){
+      const statements=pendingRecords.slice(offset,offset+BUILD_WRITE_BATCH_LIMIT).map(record=>db.prepare(`INSERT INTO league_snapshot_records
+        (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)
+        ON CONFLICT(snapshot_id,domain,external_id) DO UPDATE SET data_json=excluded.data_json`)
+        .bind(snapshot.id,league.id,record.domain,record.externalId,JSON.stringify(record.item)));
+      if(statements.length)await db.batch(statements);
+    }
     const storedCount=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
       WHERE snapshot_id=? AND league_id=? AND domain=?`).bind(snapshot.id,league.id,domain).first())?.count||0);
-    const nextCursor=cursor+pending.length;
+    const nextCursor=cursor+pendingRecords.length;
     if(nextCursor===plan.records.length&&storedCount!==plan.records.length)return json({ok:false,
       error:`The pending snapshot stored ${storedCount} unique ${domain} records but its immutable build plan contains ${plan.records.length}.`,
       release:RELEASE},409);

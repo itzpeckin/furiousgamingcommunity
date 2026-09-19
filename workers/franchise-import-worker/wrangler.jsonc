@@ -8,6 +8,9 @@
   "observability": {
     "enabled": true
   },
+  "limits": {
+    "cpu_ms": 120000
+  },
   "workflows": [
     {
       "name": "franchise-hq-import-workflow",

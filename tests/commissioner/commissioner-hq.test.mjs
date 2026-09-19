@@ -229,7 +229,7 @@ test('Commissioner HQ shares feature state through one guarded settings revision
     const overview = await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'));
     const overviewPayload = await overview.json();
     assert.equal(overview.status,200,JSON.stringify(overviewPayload));
-    assert.equal(overviewPayload.release,'7.7.0');
+    assert.equal(overviewPayload.release,'7.7.1');
     assert.equal(overviewPayload.memberships.active,2);
     assert.equal(overviewPayload.settings.revision,2);
     assert.equal(overviewPayload.operations.context.authority,'server-active-snapshot');
@@ -430,7 +430,7 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   const policyFiles=await Promise.all(['privacy','terms','retention','incidents'].map(name=>
     readFile(path.join(ROOT,`support/${name}/index.html`),'utf8')));
   for(const policy of policyFiles){
-    assert.match(policy,/Release 7\.7\.0/);
+    assert.match(policy,/Release 7\.7\.1/);
     assert.match(policy,/\/support\/support\.css/);
   }
   assert.match(policyFiles[0],/does not sell personal data/i);
