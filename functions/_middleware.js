@@ -21,6 +21,10 @@ const AUTH_RATE_POLICIES = Object.freeze({
 
 const MUTATION_RATE_POLICIES = Object.freeze([
   {
+    test:path => /^\/api\/platform\//.test(path),
+    policy:{limit:60,windowMs:60*1000,bucket:"platform-mutation",useBinding:false}
+  },
+  {
     test:path => /^\/api\/leagues\/[^/]+\/companion\/(?:candidate-import|build-snapshot|map-teams|map-players|map-schedule|map-statistics|import-job|import-orchestrator|export\/[^/]+(?:\/.*)?)$/.test(path),
     policy:{limit:240,windowMs:5*60*1000,bucket:"league-import",useBinding:false}
   },
@@ -56,7 +60,7 @@ function applySecurityHeaders(response, id, request, durationMs = null) {
   headers.set("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
   headers.set("cross-origin-opener-policy", "same-origin-allow-popups");
   headers.set("content-security-policy-report-only", CSP_REPORT_ONLY);
-  headers.set("x-franchisehq-release", "7.7.1");
+  headers.set("x-franchisehq-release", "7.7.2");
   if (durationMs !== null) headers.set("server-timing", `franchisehq;dur=${Math.max(0,Math.round(durationMs))}`);
   if (new URL(request.url).protocol === "https:") {
     headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");

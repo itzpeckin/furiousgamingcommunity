@@ -164,13 +164,13 @@
       ".css": 10,
       ".example": 1,
       ".html": 8,
-      ".js": 229,
+      ".js": 232,
       ".json": 7,
       ".jsonc": 1,
       ".md": 284,
-      ".mjs": 50,
+      ".mjs": 51,
       ".png": 3,
-      ".sql": 47,
+      ".sql": 48,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -210,7 +210,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 75247,
+        "bytes": 77036,
         "file": "index.html"
       },
       {
@@ -258,7 +258,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 648
+    "total": 653
   },
   "frontend": {
     "assets": [
@@ -628,6 +628,11 @@
         "versioned": true
       },
       {
+        "path": "league-engine/platform-onboarding.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "league-engine/platform-workspace.js",
         "type": "script",
         "versioned": true
@@ -749,11 +754,11 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 95,
+    "scriptCount": 96,
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 79,
+    "routeCount": 80,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1331,6 +1336,14 @@
         "route": "/api/leagues/:leagueSlug/transactions/forward-detection"
       },
       {
+        "file": "functions/api/platform/onboarding.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/platform/onboarding"
+      },
+      {
         "file": "functions/api/platform/status.js",
         "handlers": [
           "onRequestGet"
@@ -1385,6 +1398,7 @@
         "league-engine/identity-preview.js",
         "league-engine/league-snapshot-builder.js",
         "league-engine/live-read-model.js",
+        "league-engine/platform-onboarding.js",
         "league-engine/platform-owner-identity.js",
         "league-engine/platform-workspace.js",
         "league-engine/snapshot-lifecycle.js",
@@ -1394,7 +1408,7 @@
         "platform/simulation.js",
         "trade-module.js"
       ],
-      "occurrences": 61
+      "occurrences": 62
     },
     "browserStorageCalls": {
       "files": [
@@ -1618,10 +1632,16 @@
       "recordsLedger": true,
       "sha256": "2eaf5762e0aafe956461bf779ebb3cacbfa866d0b96f28f9dc1ee1971c93c5fe",
       "version": "0045"
+    },
+    {
+      "file": "migrations/0046_platform_league_onboarding.sql",
+      "recordsLedger": true,
+      "sha256": "d341b46c4cf6070b7ae86d09e77c0500f281f677de6c74591028d58f40b9ea32",
+      "version": "0046"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.7.1",
+  "release": "7.7.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
