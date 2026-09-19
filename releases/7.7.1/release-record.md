@@ -30,7 +30,9 @@ This release performs no Madden export/import, snapshot activation, database mig
 
 ## Deployment status
 
-Publication is owner-authorized and pending the exact candidate commit, pull-request checks, Main merge, Pages deployment, import Worker deployment, and read-only Production version verification. Deployment itself performs no league-data operation.
+Exact candidate `40bb8973ec535b387b77e91d3dcd0f92f69221b5` passed every pull-request check in [PR #129](https://github.com/itzpeckin/furiousgamingcommunity/pull/129) and merged to Main as `0d897d530d0adab2b89299199c798d2440c7c706`. Main quality and deployment runs passed. Production Pages deployment `b36ac1a0-9399-476e-9299-830812e2f3c9` serves release header 7.7.1, and import Worker build `fc4d1223-4428-4672-8327-897d74e34bb5` deployed version `dcbc79bb-0628-4449-8a0a-3e61b4491dbc` from that exact merge.
+
+Post-deployment read-only verification confirms active snapshot `5cee59c2-1610-4e70-8a65-2707a40da95a` remains 2027 Week 2 with 32 teams, 2,046 players, 272 games, 939 statistics rows, and 32 standings rows. Failed run `candidate_import_644d…` and private candidate `cfb7d9c7…` remain retained and failed, ready for the commissioner’s ordinary Retry action. Deployment ran no import or league-data mutation.
 
 ## Rollback
 
