@@ -60,7 +60,7 @@ async function fixture() {
     );
   database.prepare(`INSERT INTO users
     (id,discord_user_id,discord_username,display_name) VALUES (?,?,?,?)`)
-    .run('user-1','discord-1','owner','Owner');
+    .run('user-1','100000000000000001','owner','Owner');
   database.prepare(`INSERT INTO league_memberships
     (id,league_id,user_id,role,team_id,active) VALUES (?,?,?,?,?,1)`)
     .run('membership-1','league-1','user-1','commissioner','tb');
@@ -213,6 +213,7 @@ test('desktop and mobile protected routes preserve the exact league URL with ser
         request,
         env:{
           DB,
+          OWNER_FALLBACK_DISCORD_ID:'100000000000000001',
           ASSETS:{fetch:async()=>new Response('<!doctype html><html><head></head><body>League</body></html>',{
             headers:{'content-type':'text/html'}
           })}
@@ -221,8 +222,31 @@ test('desktop and mobile protected routes preserve the exact league URL with ser
       assert.equal(response.status,200);
       const html=await response.text();
       assert.match(html,/__FHQ_AUTH_BOOTSTRAP__/);
+      assert.match(html,/"platformOwner":true/);
       assert.match(html,/league:manage/);
       assert.equal(response.headers.get('x-fhq-route-fix'),'7.7.2');
     } finally { database.close(); }
   }
+});
+
+test('league document does not grant the platform workspace to a different Discord identity', async () => {
+  const {database,DB}=await fixture();
+  try {
+    const issued=await issueBrowserSession({request:new Request('https://franchisehq.app/login'),env:{DB}},
+      'user-1',{leagueId:'league-1'});
+    const request=authRequest(issued,{url:'https://franchisehq.app/leagues/fgc',headers:{accept:'text/html'}});
+    const response=await leagueDocument({
+      request,
+      env:{
+        DB,
+        OWNER_FALLBACK_DISCORD_ID:'different-discord-user',
+        ASSETS:{fetch:async()=>new Response('<!doctype html><html><head></head><body>League</body></html>',{
+          headers:{'content-type':'text/html'}
+        })}
+      }
+    });
+    assert.equal(response.status,200);
+    const html=await response.text();
+    assert.match(html,/"platformOwner":false/);
+  } finally { database.close(); }
 });
