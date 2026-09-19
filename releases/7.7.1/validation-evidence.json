@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "7.7.1",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "productionDataChanged": false,
   "dataChanged": false,
   "credentialsChanged": false,
@@ -19,9 +19,9 @@
     "freeAgentAuthority": {"passed": true, "blockedRemainsUnknown": true, "missingRemainsUnknown": true, "interpretedAsZero": false}
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "productionChanged": true,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "databaseRowsWritten": 0,
     "leagueDataRowsWritten": 0,
@@ -41,10 +41,11 @@
     "freeAgentInterpretedAsZero": false
   },
   "external": {
-    "githubPublication": {"authorized": true, "status": "pending"},
-    "hostedChecks": {"authorized": true, "status": "pending"},
+    "githubPublication": {"authorized": true, "status": "merged", "pullRequest": 129, "candidateCommit": "40bb8973ec535b387b77e91d3dcd0f92f69221b5", "mergeCommit": "0d897d530d0adab2b89299199c798d2440c7c706"},
+    "hostedChecks": {"authorized": true, "status": "passed", "pullRequestChecks": "4/4", "mainQualityRun": 35413033743, "mainDeploymentRun": 35413033341},
     "productionMigration": {"authorized": false, "status": "not-required", "currentMigration": 45, "candidateMigration": 45},
-    "productionDeployment": {"authorized": true, "status": "pending", "currentRelease": "7.7.0", "candidateRelease": "7.7.1"},
+    "productionDeployment": {"authorized": true, "status": "passed", "currentRelease": "7.7.1", "pagesDeployment": "b36ac1a0-9399-476e-9299-830812e2f3c9", "pagesRun": 35413033341, "workerBuild": "fc4d1223-4428-4672-8327-897d74e34bb5", "workerVersion": "dcbc79bb-0628-4449-8a0a-3e61b4491dbc"},
+    "postDeploymentReadOnlyVerification": {"authorized": true, "status": "passed", "releaseHeader": "7.7.1", "activeSnapshotId": "5cee59c2-1610-4e70-8a65-2707a40da95a", "seasonYear": 2027, "week": 2, "teams": 32, "players": 2046, "games": 272, "statistics": 939, "standings": 32, "retainedFailedRunStatus": "failed", "activeSnapshotChanged": false},
     "productionReadOnlyDiagnosis": {"authorized": true, "status": "passed", "activeSnapshotId": "5cee59c2-1610-4e70-8a65-2707a40da95a", "failedCandidateSnapshotId": "cfb7d9c7-b1dd-4031-84eb-cb5bf1e5156f", "failedCandidateRetained": true, "activeSnapshotChanged": false, "freeAgents": "unknown"},
     "maddenExport": {"authorized": false, "status": "not-required"},
     "snapshotImport": {"authorized": false, "status": "not-run"}
