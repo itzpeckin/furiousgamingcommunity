@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.1",
+  "releaseType": "multi-league-shell-and-empty-tenant-membership-repair",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.0",
+    "commit": "c7cdeb5f93769367970186411b0748d2b74832da",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-8.0.1-multileague-shell",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "awaiting-publication",
+    "pullRequests": [],
+    "mainCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "awaiting-runtime-publication",
+    "currentRelease": "8.0.0",
+    "candidateRelease": "8.0.1",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Publish a code-only tenant-shell and empty-tenant membership repair. Do not activate a membership, assign a team, import Madden data, change a snapshot, create Discord state, rotate an export URL, transition a season, delete/reset data, or reinterpret unavailable Free Agents."
+  },
+  "requiredArtifacts": [
+    "app.js",
+    "index.html",
+    "styles.css",
+    "trade-module.js",
+    "functions/api/leagues/[leagueSlug]/memberships.js",
+    "tests/security/onboarding.test.mjs",
+    "releases/8.0.1/release-record.md",
+    "releases/8.0.1/validation-evidence.json"
+  ]
+}

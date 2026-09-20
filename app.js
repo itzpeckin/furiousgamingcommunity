@@ -1349,6 +1349,25 @@
   let liveTeamDirectoryLoading = false;
   const liveRosterPlayers = new Map();
 
+  function leagueShellInitials(league={}) {
+    const name=String(league.name||league.slug||'FranchiseHQ').trim();
+    const words=name.split(/\s+/).filter(Boolean);
+    return (words.length>1?words.slice(0,3).map(word=>word[0]):name.slice(0,3)).join('').toUpperCase()||'FH';
+  }
+
+  function applyTenantShell(league=window.FranchiseHQ?.leagueTenant?.current?.()) {
+    const resolved=league?.serverResolved===true;
+    const name=resolved&&String(league.name||'').trim()?String(league.name).trim():'FranchiseHQ';
+    document.querySelectorAll('[data-league-brand-name],[data-active-league-name]').forEach(node=>{node.textContent=name});
+    document.querySelectorAll('[data-active-league-logo]').forEach(node=>{node.textContent=leagueShellInitials(resolved?league:{name:'FranchiseHQ'})});
+    const switcher=document.querySelector('[data-league-switcher]');
+    if(switcher)switcher.setAttribute('aria-label',resolved?`Switch leagues. Active league: ${name}`:'Open your leagues');
+    if(resolved)document.title=`${name} — Franchise HQ`;
+  }
+
+  window.addEventListener('franchisehq:league-tenant-changed',event=>applyTenantShell(event.detail?.league));
+  applyTenantShell();
+
   function applyActiveSnapshotShell(snapshot=null,currentContext={}) {
     const contextHost=document.querySelector('[data-active-league-context]');
     const weekHost=document.querySelector('[data-live-week-chip]');
@@ -10058,7 +10077,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.0.0';
+  const VISIBLE_RELEASE = '8.0.1';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

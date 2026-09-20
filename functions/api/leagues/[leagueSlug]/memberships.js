@@ -13,7 +13,7 @@ import {
 } from "../../../_lib/league-teams.js";
 import { ownershipChangeStatements } from "../../../_lib/ownership-periods.js";
 
-const RELEASE = "8.0.0";
+const RELEASE = "8.0.1";
 const MAX_BODY_BYTES = 4 * 1024;
 const ROLES = new Set(["commissioner", "trade_committee", "team_owner"]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -197,7 +197,13 @@ export async function onRequestGet(context) {
   }
 
   const teams = await activeLeagueTeams(context.env.DB, league.id);
-  const policy = await membershipPolicy(context.env, league);
+  const configuredPolicy = await membershipPolicy(context.env, league);
+  const policy = {
+    ...configuredPolicy,
+    requireTeamAssignment:configuredPolicy.requireTeamAssignment && teams.length > 0,
+    teamAssignmentAvailable:teams.length > 0,
+    activeTeamCount:teams.length
+  };
   const assignments = await activeTeamAssignments(context.env.DB, league.id, teams);
   const memberships = (rows?.results || []).filter(member => member.status !== 'removed').map(member => {
     const team = resolveTeam(teams, member.teamId);
@@ -279,12 +285,15 @@ export async function onRequestPost(context) {
 
   const teams = await activeLeagueTeams(context.env.DB, league.id);
   const policy = await membershipPolicy(context.env, league);
-  if (policy.requireTeamAssignment && !input.teamId) {
+  if (policy.requireTeamAssignment && teams.length > 0 && !input.teamId) {
     return jsonResponse({ ok:false, error:"Every active league member requires a team assignment." }, 400);
   }
   const requestedTeam = input.teamId ? resolveTeam(teams, input.teamId) : null;
   if (input.teamId && !requestedTeam) {
-    return jsonResponse({ ok:false, error:"Choose a team from the active Madden franchise import." }, 400);
+    const error = teams.length
+      ? "Choose a team from this league's active Madden franchise import."
+      : `${league.name} does not have an active Madden team import yet. Activate this commissioner without a team or import Madden data first.`;
+    return jsonResponse({ ok:false, error }, 400);
   }
   const teamId = requestedTeam?.teamKey || null;
 

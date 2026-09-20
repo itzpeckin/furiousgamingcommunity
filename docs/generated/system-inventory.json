@@ -180,15 +180,15 @@
     },
     "largest": [
       {
-        "bytes": 651048,
+        "bytes": 652226,
         "file": "app.js"
       },
       {
-        "bytes": 558259,
+        "bytes": 558298,
         "file": "styles.css"
       },
       {
-        "bytes": 436569,
+        "bytes": 437044,
         "file": "trade-module.js"
       },
       {
@@ -212,7 +212,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77039,
+        "bytes": 77055,
         "file": "index.html"
       },
       {
@@ -1477,11 +1477,10 @@
         "config/tenant-data-contract.json",
         "functions/_lib/draft-pick-source-data.js",
         "functions/api/leagues/[leagueSlug]/ea-direct/discovery-plan.js",
-        "index.html",
         "migrations/legacy/0001_cloud_platform_foundation.sql",
         "migrations/legacy/0001_create_leagues.sql"
       ],
-      "occurrences": 12
+      "occurrences": 10
     },
     "ownerTb": {
       "files": [
@@ -1685,7 +1684,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.0",
+  "release": "8.0.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
