@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.0.2",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "released",
+  "productionChanged": true,
   "productionDataChanged": false,
   "dataChanged": false,
   "credentialsChanged": false,
@@ -46,9 +46,9 @@
     "strictGate": { "passed": true, "status": "passed", "tests": 304 }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "productionChanged": true,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "databaseRowsWritten": 0,
     "leagueDataRowsWritten": 0,
@@ -67,10 +67,41 @@
     "freeAgentInterpretedAsZero": false
   },
   "external": {
-    "githubPublication": { "authorized": true, "status": "not-run", "pullRequests": [] },
-    "hostedChecks": { "authorized": true, "status": "not-run" },
+    "githubPublication": {
+      "authorized": true,
+      "status": "merged",
+      "pullRequests": [142],
+      "mainCommit": "f77e26684f81897c574350c26b994118d26588cc"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "pullRequestChecks": 4,
+      "mainChecks": 5,
+      "qualityWorkflowRun": 35539244174,
+      "pagesWorkflowRun": 35539243812
+    },
     "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 47, "candidateMigration": 47 },
-    "productionDeployment": { "authorized": true, "status": "not-run", "currentRelease": "8.0.1.1", "candidateRelease": "8.0.2" },
-    "postDeploymentVerification": { "authorized": true, "status": "not-run" }
+    "productionDeployment": {
+      "authorized": true,
+      "status": "passed",
+      "currentRelease": "8.0.2",
+      "candidateRelease": "8.0.2",
+      "pagesWorkflowRun": 35539243812
+    },
+    "postDeploymentVerification": {
+      "authorized": true,
+      "status": "passed",
+      "p2wRelease": "8.0.2",
+      "p2wRetainedRoutes": 42,
+      "p2wObservedFranchiseId": "3138676",
+      "p2wFirstRosterRequired": true,
+      "p2wSeasonPrepared": false,
+      "fgcRelease": "8.0.2",
+      "fgcActiveWeek": 4,
+      "fgcTeams": 32,
+      "fgcRosteredPlayers": 2046,
+      "fgcYearlyScheduleGames": 272
+    }
   }
 }

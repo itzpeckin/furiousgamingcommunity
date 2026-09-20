@@ -23,7 +23,9 @@ The focused regression creates a new tenant with a retained 272-game All Weeks s
 
 ## Deployment status
 
-The owner authorized implementation, pull request, Main merge, and Production publication. Candidate deployment is pending hosted checks. No Production league-data operation is part of deployment; the P2W commissioner must confirm the exact source season in the new UI before FranchiseHQ prepares P2W.
+Published through PR #142 and merged to Main `f77e266`. All four pull-request checks and all five Main quality, build, and deployment checks passed, including quality workflow `35539244174` and Pages workflow `35539243812`.
+
+Authenticated read-only Production acceptance confirms Release 8.0.2 on both tenants. P2W shows the retained 42-route export, observed franchise `3138676`, exact source-season confirmation, and the first-roster safety block. FGC remains live on its 2027 Week 4 snapshot with 32 teams, 2,046 rostered players, and its completed 272-game yearly schedule. No Production season preparation, import, snapshot activation, Discord work, reset, deletion, URL rotation, archive, transition, credential change, or Free Agent reinterpretation occurred during deployment or acceptance.
 
 ## Rollback
 
