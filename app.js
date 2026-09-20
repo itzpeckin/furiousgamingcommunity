@@ -1352,7 +1352,7 @@
   function leagueShellInitials(league={}) {
     const name=String(league.name||league.slug||'FranchiseHQ').trim();
     const words=name.split(/\s+/).filter(Boolean);
-    return (words.length>1?words.slice(0,3).map(word=>word[0]):name.slice(0,3)).join('').toUpperCase()||'FH';
+    return (words.length>1?words.slice(0,3).map(word=>word[0]).join(''):name.slice(0,3)).toUpperCase()||'FH';
   }
 
   function applyTenantShell(league=window.FranchiseHQ?.leagueTenant?.current?.()) {
@@ -10077,7 +10077,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.0.1';
+  const VISIBLE_RELEASE = '8.0.1.1';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

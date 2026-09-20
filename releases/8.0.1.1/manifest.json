@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.1.1",
+  "releaseType": "single-word-league-shell-startup-hotfix",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.1",
+    "commit": "c32c966bb751601a6a6b77693b678945771c1a6e",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-8.0.1.1-p2w-shell-hotfix",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "awaiting-publication",
+    "pullRequests": [],
+    "mainCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "awaiting-runtime-publication",
+    "currentRelease": "8.0.1",
+    "candidateRelease": "8.0.1.1",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Publish a code-only startup hotfix for single-word tenant names. Perform no membership, team, import, snapshot, Discord, export URL, season, deletion/reset, credential, or Free Agent data operation."
+  },
+  "requiredArtifacts": [
+    "app.js",
+    "index.html",
+    "tests/security/onboarding.test.mjs",
+    "releases/8.0.1.1/release-record.md",
+    "releases/8.0.1.1/validation-evidence.json"
+  ]
+}

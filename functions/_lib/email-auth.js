@@ -1,6 +1,6 @@
 import { createId, createRandomToken } from './auth.js';
 
-export const EMAIL_AUTH_RELEASE = '8.0.1';
+export const EMAIL_AUTH_RELEASE = '8.0.1.1';
 export const EMAIL_PASSWORD_ITERATIONS = 600000;
 
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}$/;

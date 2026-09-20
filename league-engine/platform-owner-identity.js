@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.1.1';
+  const VERSION = '8.0.1.1.1';
   const OWNER_ACCOUNT_ID = String(document.querySelector('meta[name="franchise-hq-platform-owner-account-id"]')?.content || 'owner-tb').trim();
   const OWNER_DISCORD_ID = String(document.querySelector('meta[name="franchise-hq-platform-owner-discord-id"]')?.content || '').trim();
   const SERVER_PLATFORM_OWNER = window.__FHQ_AUTH_BOOTSTRAP__?.platformOwner === true;

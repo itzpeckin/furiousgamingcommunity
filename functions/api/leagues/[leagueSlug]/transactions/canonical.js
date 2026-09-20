@@ -1,10 +1,10 @@
-/* FHQ_BUILD: 8.0.1 */
+/* FHQ_BUILD: 8.0.1.1 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireActiveMembership, requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 import { createTenantAuditContext, tenantAuditStatement } from '../../../../_lib/tenant-context.js';
 
-const RELEASE='8.0.1';
+const RELEASE='8.0.1.1';
 const parse=(value,fallback=null)=>{try{return JSON.parse(value??'')}catch{return fallback}};
 const clean=value=>value==null?null:(String(value).trim()||null);
 const now=()=>new Date().toISOString();
