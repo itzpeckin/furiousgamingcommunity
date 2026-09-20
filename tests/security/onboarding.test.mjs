@@ -158,6 +158,7 @@ test('the league shell and commissioner directory never fall back to FGC brandin
   assert.match(html, /data-league-switcher[^>]+href="\/leagues"|href="\/leagues"[^>]+data-league-switcher/);
   assert.doesNotMatch(html, /data-demo-toast="League switching/);
   assert.match(app, /function applyTenantShell/);
+  assert.match(app, /map\(word=>word\[0\]\)\.join\(''\):name\.slice\(0,3\)/);
   assert.match(app, /franchisehq:league-tenant-changed/);
   const directory = trade.slice(trade.indexOf('function commissionerTeamDirectory'), trade.indexOf('function commissionerTeamById'));
   assert.match(directory, /return canonical\.map\(commissionerTeamShape\)/);
