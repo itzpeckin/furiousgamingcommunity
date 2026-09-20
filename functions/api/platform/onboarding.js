@@ -4,6 +4,7 @@ import { requirePlatformOwner } from '../../_lib/permissions.js';
 import { tenantDatabase } from '../../_lib/tenant-context.js';
 import {
   PLATFORM_ONBOARDING_RELEASE,
+  activatedLeagueStatements,
   inspectOnboardingConflicts,
   listOnboardingPlans,
   loadOnboardingPlan,
@@ -71,7 +72,7 @@ async function listPayload(db) {
     FROM users ORDER BY lower(COALESCE(display_name,discord_username,id)),id`).all();
   return {
     release:PLATFORM_ONBOARDING_RELEASE,
-    activationAvailable:false,
+    activationAvailable:true,
     plans:enriched,
     events:events?.results || [],
     users:(users?.results || []).map(user => ({
@@ -260,6 +261,7 @@ async function prepare(db, actorUserId, operationRequestId, body) {
 async function cancel(db, actorUserId, operationRequestId, body) {
   const plan = await loadOnboardingPlan(db,String(body.planId || ''));
   if (!plan) return json({ ok:false,error:'Onboarding plan not found.' },404);
+  if (plan.activatedAt) return json({ ok:false,error:'An activated league cannot be cancelled through onboarding.' },409);
   if (plan.status === 'cancelled') return json({ ok:true,contained:true,plan:await responsePlan(db,plan) });
   const expectedRevision = safeRevision(body.expectedRevision);
   if (expectedRevision !== plan.revision) {
@@ -295,6 +297,44 @@ async function cancel(db, actorUserId, operationRequestId, body) {
   return json({ ok:true,contained:true,plan:await responsePlan(db,await loadOnboardingPlan(db,plan.id)) });
 }
 
+async function activate(db, actorUserId, operationRequestId, body) {
+  let plan = await loadOnboardingPlan(db,String(body.planId || ''));
+  if (!plan) return json({ ok:false,error:'Onboarding plan not found.' },404);
+  if (plan.activatedAt) {
+    return json({ ok:true,replayed:true,plan:await responsePlan(db,plan) });
+  }
+  if (plan.status !== 'prepared') {
+    return json({ ok:false,error:'Prepare the disabled league and pass every readiness check before activation.' },409);
+  }
+  const expectedRevision = safeRevision(body.expectedRevision);
+  if (expectedRevision !== plan.revision) {
+    return json({ ok:false,error:'This plan changed in another session. Refresh it before activation.',plan:await responsePlan(db,plan) },409);
+  }
+  const readiness = await onboardingReadiness(db,plan);
+  if (!readiness.readyForActivationReview || !readiness.activationAvailable) {
+    return json({
+      ok:false,error:'The league did not pass the activation readiness gate.',
+      code:'ONBOARDING_ACTIVATION_NOT_READY',plan:{ ...plan,readiness }
+    },409);
+  }
+  try {
+    await db.batch(activatedLeagueStatements(db,plan,actorUserId,operationRequestId));
+  } catch (error) {
+    const latest = await loadOnboardingPlan(db,plan.id);
+    if (latest?.activatedAt) return json({ ok:true,replayed:true,plan:await responsePlan(db,latest) });
+    throw error;
+  }
+  plan = await loadOnboardingPlan(db,plan.id);
+  if (!plan?.activatedAt) {
+    return json({ ok:false,error:'Activation stopped without publishing the league. The disabled shell is still retained.' },409);
+  }
+  const activatedReadiness = await onboardingReadiness(db,plan);
+  if (!activatedReadiness.activated || activatedReadiness.checks.some(check => check.status === 'fail')) {
+    throw new Error('Activated tenant verification failed.');
+  }
+  return json({ ok:true,activated:true,plan:{ ...plan,readiness:activatedReadiness } });
+}
+
 export async function onRequestGet(context) {
   const operation = await authorizedContext(context);
   if (operation.response) return operation.response;
@@ -312,6 +352,7 @@ export async function onRequestPost(context) {
     if (action === 'preview') return preview(operation.db,operation.actorUserId,body);
     if (action === 'save') return save(operation.db,operation.actorUserId,operation.requestId,body);
     if (action === 'prepare' || action === 'resume') return prepare(operation.db,operation.actorUserId,operation.requestId,body);
+    if (action === 'activate') return activate(operation.db,operation.actorUserId,operation.requestId,body);
     if (action === 'cancel') return cancel(operation.db,operation.actorUserId,operation.requestId,body);
     return json({ ok:false,error:'Unsupported onboarding action.' },400);
   } catch (error) {

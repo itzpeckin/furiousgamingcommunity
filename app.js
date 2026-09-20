@@ -8876,7 +8876,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         }
         if (!access) {
           if(requestCommissionerAuthRecovery()) {
-            pageContent.innerHTML='<section class="empty-state"><strong>Restoring Commissioner session…</strong><p>Franchise HQ is restoring your persistent Discord session.</p></section>';
+            pageContent.innerHTML='<section class="empty-state"><strong>Restoring Commissioner session…</strong><p>FranchiseHQ is restoring your secure account session.</p></section>';
             break;
           }
           pageContent.innerHTML='<section class="empty-state"><strong>Commissioner access required</strong><p>This Discord account is not currently authorized as a commissioner for this league.</p></section>';
@@ -10058,7 +10058,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '7.7.2';
+  const VISIBLE_RELEASE = '8.0.0';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

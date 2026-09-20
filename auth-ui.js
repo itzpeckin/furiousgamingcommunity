@@ -271,7 +271,7 @@
 
     FranchiseHQ.ui?.toast?.(
       'Signed out',
-      'Your Discord session has been securely ended.'
+      'Your FranchiseHQ session has been securely ended.'
     );
   }
 

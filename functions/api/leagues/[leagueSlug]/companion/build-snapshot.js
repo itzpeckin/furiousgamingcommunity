@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 7.7.2 */
+/* FHQ_BUILD: 8.0.0 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import {
@@ -17,7 +17,7 @@ import {
   rebaseScheduleTeamIds
 } from '../../../../_lib/team-identity-rebase.js';
 
-const RELEASE='7.7.2';
+const RELEASE='8.0.0';
 const BUILD_MODE='checkpointed-domain-v3';
 const LEGACY_BUILD_MODES=Object.freeze(['checkpointed-domain-v2']);
 const BUILD_PLAN_REVISION='retained-schedule-team-bridge-v2';

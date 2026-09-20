@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.7.2';
+  const VERSION = '8.0.0';
   const FEATURE_LABELS = Object.freeze({
     core_browsing:'League pages',
     commissioner_hq:'Commissioner HQ',
@@ -114,7 +114,7 @@
     const year = plan?.gameYear || new Date().getFullYear();
     const features = plan?.desiredFeatures || DEFAULT_FEATURES;
     return `<article class="card platform-onboarding-form-card">
-      <div class="card-header"><div><span class="eyebrow">Owner-only · disabled by default</span><h3>${plan ? 'Edit onboarding draft' : 'Plan a new league'}</h3><p>Preview the league identity and settings before reserving anything. Preparing a plan cannot publish or activate the league.</p></div><span class="pill pill--neutral">No activation</span></div>
+      <div class="card-header"><div><span class="eyebrow">Owner-only activation · disabled by default</span><h3>${plan ? 'Edit onboarding draft' : 'Plan a new league'}</h3><p>Preview the league identity and settings before reserving anything. Preparation stays private until a separate activation confirmation.</p></div><span class="pill pill--neutral">Gated activation</span></div>
       <form data-platform-onboarding-form>
         <div class="platform-onboarding-form-grid">
           ${field('League name','name',plan?.name || '', 'text','required minlength="2" maxlength="80"')}
@@ -151,24 +151,25 @@
     return `<div class="platform-onboarding-readiness">${checks.map(item => `<div><span class="platform-onboarding-check platform-onboarding-check--${esc(item.status)}" aria-hidden="true"></span><span><strong>${esc(item.label)}</strong><small>${esc(item.detail)}</small></span></div>`).join('')}</div>`;
   }
 
-  function statusLabel(status) {
-    return ({ draft:'Draft',preparing:'Resume required',prepared:'Prepared and disabled',cancelled:'Cancelled and contained' })[status] || status;
+  function statusLabel(plan) {
+    if (plan.activatedAt) return 'Active';
+    return ({ draft:'Draft',preparing:'Resume required',prepared:'Prepared and disabled',cancelled:'Cancelled and contained' })[plan.status] || plan.status;
   }
 
   function planCard(plan) {
-    const active = plan.status === 'draft' || plan.status === 'preparing' || plan.status === 'prepared';
+    const active = !plan.activatedAt && (plan.status === 'draft' || plan.status === 'preparing' || plan.status === 'prepared');
     return `<article class="card platform-onboarding-plan" data-onboarding-plan="${esc(plan.id)}">
-      <div class="card-header"><div><span class="eyebrow">${esc(plan.slug)}</span><h3>${esc(plan.name)}</h3><p>Madden ${esc(plan.gameYear)} · ${esc(plan.timezone)} · Initial commissioner: ${esc(plan.initialCommissionerDisplayName)}</p></div><span class="pill pill--${plan.status === 'prepared' ? 'success' : plan.status === 'preparing' ? 'warning' : 'neutral'}">${esc(statusLabel(plan.status))}</span></div>
-      <div class="league-import-framework-grid"><div><span>Tenant</span><strong>${plan.status === 'prepared' ? 'Disabled' : 'Not created'}</strong></div><div><span>Public listing</span><strong>Hidden</strong></div><div><span>Memberships</span><strong>${esc(plan.readiness?.counts?.memberships || 0)}</strong></div><div><span>Snapshots</span><strong>${esc(plan.readiness?.counts?.snapshots || 0)}</strong></div><div><span>Activation</span><strong>Unavailable</strong></div><div><span>Revision</span><strong>${esc(plan.revision)}</strong></div></div>
+      <div class="card-header"><div><span class="eyebrow">${esc(plan.slug)}</span><h3>${esc(plan.name)}</h3><p>Madden ${esc(plan.gameYear)} · ${esc(plan.timezone)} · Initial commissioner: ${esc(plan.initialCommissionerDisplayName)}</p></div><span class="pill pill--${plan.activatedAt || plan.status === 'prepared' ? 'success' : plan.status === 'preparing' ? 'warning' : 'neutral'}">${esc(statusLabel(plan))}</span></div>
+      <div class="league-import-framework-grid"><div><span>Tenant</span><strong>${plan.activatedAt ? 'Enabled' : plan.status === 'prepared' ? 'Disabled' : 'Not created'}</strong></div><div><span>Public route</span><strong>${plan.activatedAt ? 'Active' : 'Hidden'}</strong></div><div><span>Memberships</span><strong>${esc(plan.readiness?.counts?.memberships || 0)}</strong></div><div><span>Snapshots</span><strong>${esc(plan.readiness?.counts?.snapshots || 0)}</strong></div><div><span>Activation</span><strong>${plan.activatedAt ? 'Recorded' : plan.readiness?.activationAvailable ? 'Owner ready' : 'Waiting'}</strong></div><div><span>Revision</span><strong>${esc(plan.revision)}</strong></div></div>
       ${readiness(plan)}
-      ${active ? `<div class="league-import-framework-actions">${plan.status === 'draft' ? `<button class="button button--ghost" data-onboarding-edit="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Edit draft</button><button class="button button--primary" data-onboarding-prepare="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Prepare disabled league</button>` : ''}${plan.status === 'preparing' ? `<button class="button button--primary" data-onboarding-resume="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Resume preparation</button>` : ''}<button class="button button--ghost" data-onboarding-cancel="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Cancel plan</button></div>` : ''}
+      ${active ? `<div class="league-import-framework-actions">${plan.status === 'draft' ? `<button class="button button--ghost" data-onboarding-edit="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Edit draft</button><button class="button button--primary" data-onboarding-prepare="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Prepare disabled league</button>` : ''}${plan.status === 'preparing' ? `<button class="button button--primary" data-onboarding-resume="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Resume preparation</button>` : ''}${plan.status === 'prepared' && plan.readiness?.activationAvailable ? `<button class="button button--primary" data-onboarding-activate="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Activate league</button>` : ''}<button class="button button--ghost" data-onboarding-cancel="${esc(plan.id)}" ${busy ? 'disabled' : ''}>Cancel plan</button></div>` : plan.activatedAt ? `<div class="league-import-framework-actions"><a class="button button--primary" href="/leagues/${encodeURIComponent(plan.slug)}">Open active league</a></div>` : ''}
     </article>`;
   }
 
   function renderPanel() {
     if (!loaded && !busy) queueMicrotask(() => refresh().catch(() => {}));
     return `<section data-platform-onboarding-panel class="platform-onboarding">
-      <article class="card platform-onboarding-safety"><div class="card-header"><div><span class="eyebrow">FranchiseHQ ${VERSION}</span><h3>League Onboarding</h3><p>Prepare the next league without changing FGC or exposing an unfinished tenant.</p></div><button class="button button--ghost" data-onboarding-refresh ${busy ? 'disabled' : ''}>${busy ? 'Working…' : 'Refresh'}</button></div><div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>Every prepared league remains disabled, absent from public discovery, unable to import, and unable to create Discord threads. Activation is a separate 8.0 release.</span></div></article>
+      <article class="card platform-onboarding-safety"><div class="card-header"><div><span class="eyebrow">FranchiseHQ ${VERSION}</span><h3>League Onboarding</h3><p>Review registrations and activate the next league without changing FGC or exposing an unfinished tenant.</p></div><button class="button button--ghost" data-onboarding-refresh ${busy ? 'disabled' : ''}>${busy ? 'Working…' : 'Refresh'}</button></div><div class="league-import-framework-note"><svg><use href="#icon-lock"></use></svg><span>Registration and preparation remain disabled by default. Only this owner workspace can grant the first commissioner membership and activate the exact reviewed tenant.</span></div></article>
       ${lastError ? `<div class="validation-errors" role="alert"><p>${esc(lastError)}</p></div>` : ''}
       ${planForm()}
       <section class="platform-onboarding-plans"><div class="section-heading"><div><span class="eyebrow">Durable plans</span><h2>Onboarding queue</h2></div><span class="pill pill--neutral">${data.plans.length} plan${data.plans.length === 1 ? '' : 's'}</span></div>${data.plans.length ? data.plans.map(planCard).join('') : `<article class="card"><p>No onboarding plans have been saved. Existing leagues and production data are unchanged.</p></article>`}</section>
@@ -202,6 +203,7 @@
     const plan = data.plans.find(item => item.id === planId);
     if (!plan) return;
     if (action === 'cancel' && !window.confirm('Cancel this onboarding plan? Its audit and any disabled tenant shell will be retained, and no data will be deleted.')) return;
+    if (action === 'activate' && !window.confirm('Activate this exact league and grant its selected account commissioner access? This will not import data, connect Discord, create schedule threads, or change any existing league.')) return;
     await request('POST',{ action,planId,expectedRevision:plan.revision });
     if (editingPlanId === planId) editingPlanId = null;
     preview = null;
@@ -209,7 +211,7 @@
   }
 
   document.addEventListener('click',event => {
-    const action = event.target.closest('[data-onboarding-preview],[data-onboarding-save],[data-onboarding-refresh],[data-onboarding-new],[data-onboarding-edit],[data-onboarding-prepare],[data-onboarding-resume],[data-onboarding-cancel]');
+    const action = event.target.closest('[data-onboarding-preview],[data-onboarding-save],[data-onboarding-refresh],[data-onboarding-new],[data-onboarding-edit],[data-onboarding-prepare],[data-onboarding-resume],[data-onboarding-activate],[data-onboarding-cancel]');
     if (!action) return;
     event.preventDefault();
     if (action.matches('[data-onboarding-preview]')) submitForm('preview').catch(() => {});
@@ -219,12 +221,13 @@
     else if (action.matches('[data-onboarding-edit]')) { editingPlanId = action.dataset.onboardingEdit;preview = null;rerender(); }
     else if (action.matches('[data-onboarding-prepare]')) planAction('prepare',action.dataset.onboardingPrepare).catch(() => {});
     else if (action.matches('[data-onboarding-resume]')) planAction('resume',action.dataset.onboardingResume).catch(() => {});
+    else if (action.matches('[data-onboarding-activate]')) planAction('activate',action.dataset.onboardingActivate).catch(() => {});
     else if (action.matches('[data-onboarding-cancel]')) planAction('cancel',action.dataset.onboardingCancel).catch(() => {});
   });
 
   function diagnostics() {
     return Object.freeze({
-      service:'platformOnboarding',version:VERSION,ownerOnly:true,activationAvailable:false,
+      service:'platformOnboarding',version:VERSION,ownerOnly:true,activationAvailable:true,
       planCount:data.plans.length,preparedCount:data.plans.filter(plan => plan.status === 'prepared').length,
       busy,lastError
     });

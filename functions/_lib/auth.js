@@ -8,6 +8,23 @@ const SESSION_TRANSFER_DURATION_SECONDS = 60 * 2;
 const SESSION_IDLE_DURATION_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_ABSOLUTE_DURATION_SECONDS = 60 * 60 * 24 * 30;
 const SESSION_ROTATION_DURATION_SECONDS = 60 * 60 * 24;
+function hasDiscordIdentity(value) {
+  const identity = String(value || '');
+  return Boolean(identity && !identity.startsWith('local_'));
+}
+
+async function emailIdentity(db,userId) {
+  try {
+    const row = await db.prepare(`SELECT normalized_email FROM user_auth_identities
+      WHERE user_id=? AND provider='email' LIMIT 1`).bind(userId).first();
+    return row?.normalized_email || null;
+  } catch {
+    // A few isolated recovery/test schemas intentionally exercise older table
+    // subsets. Their Discord sessions remain readable while the runtime schema
+    // gate still requires migration 47 before email authentication is exposed.
+    return null;
+  }
+}
 
 export const AUTH_CONSTANTS = {
   SESSION_COOKIE_NAME,
@@ -113,17 +130,20 @@ async function getImportDelegatedSession(context) {
   if (!record) {
     return null;
   }
+  const email = await emailIdentity(context.env.DB,record.user_id);
 
   return {
     sessionId: record.session_id,
     expiresAt: record.expires_at,
     user: {
       id: record.user_id,
-      discordUserId: record.discord_user_id,
-      discordUsername: record.discord_username,
+      discordUserId: hasDiscordIdentity(record.discord_user_id) ? record.discord_user_id : null,
+      discordUsername: hasDiscordIdentity(record.discord_user_id) ? record.discord_username : null,
       discordGlobalName: record.discord_global_name,
       displayName: record.display_name,
-      avatarUrl: record.avatar_url
+      avatarUrl: record.avatar_url,
+      email,
+      authProvider:email ? 'email' : 'discord'
     },
     membership: record.membership_id
       ? {
@@ -667,6 +687,7 @@ export async function getCurrentSession(context, options = {}) {
   }
 
   if (!record) return null;
+  const email = await emailIdentity(context.env.DB,record.user_id);
 
   const absoluteExpiresAt = record.absolute_expires_at || record.expires_at;
   const idleExpired = Date.parse(record.expires_at) <= Date.now();
@@ -715,11 +736,13 @@ export async function getCurrentSession(context, options = {}) {
     needsRotation:usedLegacyRecovery || !csrfValid || rotationDue,
     user: {
       id: record.user_id,
-      discordUserId: record.discord_user_id,
-      discordUsername: record.discord_username,
+      discordUserId: hasDiscordIdentity(record.discord_user_id) ? record.discord_user_id : null,
+      discordUsername: hasDiscordIdentity(record.discord_user_id) ? record.discord_username : null,
       discordGlobalName: record.discord_global_name,
       displayName: record.display_name,
-      avatarUrl: record.avatar_url
+      avatarUrl: record.avatar_url,
+      email,
+      authProvider:email ? 'email' : 'discord'
     },
     membership: record.membership_id
       ? {

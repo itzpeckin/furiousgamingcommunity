@@ -13,7 +13,7 @@ import { discordGuildInstallUrl } from '../../../../_lib/discord-installation.js
 import { canonicalAuthenticationOrigin, discordRedirectUriForOrigin } from '../../../../_lib/origin.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 
-const RELEASE = '7.7.2';
+const RELEASE = '8.0.0';
 
 export async function onRequestGet(context) {
   try {

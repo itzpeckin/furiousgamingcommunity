@@ -190,7 +190,7 @@
   function login() {
     rememberLoginRoute();
     const returnTo = currentLeagueDestination();
-    window.location.assign(api.buildUrl('/api/auth/discord/login', returnTo ? { returnTo } : null));
+    window.location.assign(api.buildUrl('/auth', returnTo ? { returnTo } : null));
   }
 
   async function logout() {

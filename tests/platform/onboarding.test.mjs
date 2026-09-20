@@ -6,6 +6,7 @@ import path from 'node:path';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import {
   ONBOARDING_FEATURE_KEYS,
+  activatedLeagueStatements,
   inspectOnboardingConflicts,
   normalizeOnboardingInput,
   onboardingPlanHash,
@@ -118,18 +119,20 @@ async function plan(overrides = {}) {
   });
 }
 
-test('7.7.2 onboarding migration adds durable plans and events without a live tenant', async () => {
+test('8.0.0 adds provider identities and a durable activation ledger without a live tenant', async () => {
   const { sqlite } = await database();
   try {
-    assert.equal(sqlite.prepare('SELECT MAX(version) version FROM schema_migrations').get().version,46);
+    assert.equal(sqlite.prepare('SELECT MAX(version) version FROM schema_migrations').get().version,47);
     assert.ok(sqlite.prepare(`SELECT name FROM sqlite_schema WHERE type='table' AND name='platform_league_onboarding_plans'`).get());
     assert.ok(sqlite.prepare(`SELECT name FROM sqlite_schema WHERE type='table' AND name='platform_league_onboarding_events'`).get());
+    assert.ok(sqlite.prepare(`SELECT name FROM sqlite_schema WHERE type='table' AND name='platform_league_activations'`).get());
+    assert.ok(sqlite.prepare(`SELECT name FROM sqlite_schema WHERE type='table' AND name='user_auth_identities'`).get());
     assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM platform_league_onboarding_plans').get().count,0);
     assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM leagues').get().count,0);
   } finally { sqlite.close(); }
 });
 
-test('onboarding validation allows only the Companion source in 7.7.2', async () => {
+test('onboarding validation allows only the Companion source in 8.0.0', async () => {
   const valid = await plan();
   assert.deepEqual(validateOnboardingInput(valid),{ ok:true,errors:[] });
   const direct = normalizeOnboardingInput({
@@ -186,7 +189,7 @@ test('preparation is idempotent, tenant-isolated, disabled, and empty', async ()
 
     const readiness = await onboardingReadiness(db,Object.freeze({ ...preparing,status:'prepared' }));
     assert.equal(readiness.readyForActivationReview,true);
-    assert.equal(readiness.activationAvailable,false);
+    assert.equal(readiness.activationAvailable,true);
     assert.ok(readiness.checks.every(item => item.status === 'pass'));
   } finally { sqlite.close(); }
 });
@@ -233,7 +236,7 @@ test('owner API saves, prepares, lists, and safely cancels one disabled plan', a
     const prepared = await prepareResponse.json();
     assert.equal(prepared.plan.status,'prepared');
     assert.equal(prepared.plan.readiness.readyForActivationReview,true);
-    assert.equal(prepared.plan.readiness.activationAvailable,false);
+    assert.equal(prepared.plan.readiness.activationAvailable,true);
 
     const getResponse = await onRequestGet(await ownerContext(sqlite,db));
     const listed = await getResponse.json();
@@ -253,7 +256,48 @@ test('owner API saves, prepares, lists, and safely cancels one disabled plan', a
   } finally { sqlite.close(); }
 });
 
-test('the private onboarding workspace is responsive, owner-routed, and exposes no activation action', async () => {
+test('activation is atomic, isolated, and grants only the reviewed commissioner', async () => {
+  const { sqlite,db } = await database();
+  try {
+    insertUser(sqlite);
+    sqlite.prepare(`INSERT INTO leagues
+      (id,name,product_name,slug,current_season,current_week,trade_start_week,trade_deadline_week,
+       discord_connected,public_status,tenant_status,timezone,branding_json,configuration_json)
+      VALUES ('league-fgc','Furious Gaming Community','FranchiseHQ','furious-gaming-community',2027,2,1,9,
+       0,'active','enabled','America/Chicago','{}','{}')`).run();
+    const existingBefore = sqlite.prepare(`SELECT * FROM leagues WHERE id='league-fgc'`).get();
+    const candidate = await plan();
+    sqlite.prepare(`INSERT INTO platform_league_onboarding_plans
+      (id,planned_league_id,slug,name,product_name,timezone,game_year,initial_commissioner_user_id,
+       source_mode,branding_json,desired_features_json,plan_hash,status,revision,
+       created_by_user_id,updated_by_user_id,prepared_by_user_id,prepared_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`).run(
+      candidate.id,candidate.plannedLeagueId,candidate.slug,candidate.name,candidate.productName,
+      candidate.timezone,candidate.gameYear,candidate.initialCommissionerUserId,candidate.sourceMode,
+      JSON.stringify(candidate.branding),JSON.stringify(candidate.desiredFeatures),candidate.planHash,
+      'prepared',3,'owner-user','owner-user','owner-user'
+    );
+    const prepared = Object.freeze({ ...candidate,status:'prepared',revision:3,preparedAt:new Date().toISOString() });
+    await db.batch(preparedLeagueStatements(db,prepared,'owner-user'));
+    assert.equal((await onboardingReadiness(db,prepared)).activationAvailable,true);
+    await db.batch(activatedLeagueStatements(db,prepared,'owner-user','request_activation_test'));
+    const row = sqlite.prepare(`SELECT revision,activated_at FROM platform_league_onboarding_plans WHERE id=?`).get(prepared.id);
+    const activated = { ...prepared,revision:row.revision,activatedAt:row.activated_at };
+    const after = await onboardingReadiness(db,activated);
+    assert.equal(after.activated,true);
+    assert.equal(after.activationAvailable,false);
+    assert.ok(after.checks.every(item => item.status === 'pass'));
+    assert.equal(sqlite.prepare(`SELECT tenant_status FROM leagues WHERE id=?`).get(prepared.plannedLeagueId).tenant_status,'enabled');
+    assert.equal(sqlite.prepare(`SELECT public_status FROM leagues WHERE id=?`).get(prepared.plannedLeagueId).public_status,'active');
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_memberships WHERE league_id=? AND user_id='owner-user' AND role='commissioner' AND active=1`).get(prepared.plannedLeagueId).count,1);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM platform_league_activations WHERE plan_id=?`).get(prepared.id).count,1);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshots WHERE league_id=?`).get(prepared.plannedLeagueId).count,0);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM discord_schedule_threads WHERE league_id=?`).get(prepared.plannedLeagueId).count,0);
+    assert.deepEqual(sqlite.prepare(`SELECT * FROM leagues WHERE id='league-fgc'`).get(),existingBefore);
+  } finally { sqlite.close(); }
+});
+
+test('the owner workspace is responsive and exposes only owner-gated activation', async () => {
   const [html,ui,workspace,identity,middleware,tradeModule] = await Promise.all([
     readFile(path.join(ROOT,'index.html'),'utf8'),
     readFile(path.join(ROOT,'league-engine/platform-onboarding.js'),'utf8'),
@@ -265,14 +309,15 @@ test('the private onboarding workspace is responsive, owner-routed, and exposes 
   assert.match(html,/platform-onboarding-form-grid[^}]+grid-template-columns:repeat\(2/);
   assert.match(html,/@media\(max-width:700px\)\{\.platform-onboarding-form-grid,\.platform-onboarding-readiness\{grid-template-columns:1fr/);
   assert.ok(html.indexOf('league-engine/platform-onboarding.js') < html.indexOf('league-engine/platform-workspace.js'));
-  assert.match(html,/platform-owner-identity\.js\?v=7\.7\.2\.1/);
-  assert.match(html,/trade-module\.js\?v=7\.7\.2\.2/);
-  assert.match(identity,/VERSION = '7\.7\.2\.1'/);
+  assert.match(html,/platform-owner-identity\.js\?v=8\.0\.0\.1/);
+  assert.match(html,/trade-module\.js\?v=8\.0\.0\.2/);
+  assert.match(identity,/VERSION = '8\.0\.0\.1'/);
   assert.match(identity,/SERVER_PLATFORM_OWNER/);
   assert.match(workspace,/\['league-onboarding','League Onboarding'\]/);
   assert.match(tradeModule,/function renderCommissionerV743\(section\)[\s\S]+requested==='platform-workspace'[\s\S]+data-platform-workspace-host[\s\S]+workspace\.renderWorkspace\(\)/);
   assert.doesNotMatch(tradeModule,/function renderCommissionerV743\(section\)\{[^}]+Platform development tools are not exposed inside production leagues/);
-  assert.match(ui,/activationAvailable:false/);
-  assert.doesNotMatch(ui,/data-onboarding-activate|action:\s*['"]activate['"]/);
+  assert.match(ui,/activationAvailable:true/);
+  assert.match(ui,/data-onboarding-activate/);
+  assert.match(ui,/planAction\('activate'/);
   assert.match(middleware,/platform-mutation/);
 });

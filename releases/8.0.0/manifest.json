@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.0",
+  "releaseType": "provider-neutral-self-service-multi-league-activation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "7.7.2",
+    "commit": "ab26888590623aaf127658d7be4db793d0a323d3",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-8.0.0",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": [],
+    "mainCommit": null
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending-publication",
+    "currentRelease": "7.7.2",
+    "candidateRelease": "8.0.0",
+    "currentMigration": 46,
+    "candidateMigration": 47,
+    "scope": "Apply additive migration 47 and publish provider-neutral email accounts, self-service disabled league registration, and the owner-only exact-plan activation gate. Deployment itself must not create an account, onboarding plan, second league, membership, import, snapshot, Discord state, export URL, season transition, or Free Agent interpretation."
+  },
+  "requiredArtifacts": [
+    "migrations/0047_provider_authentication_and_tenant_activation.sql",
+    "functions/_lib/email-auth.js",
+    "functions/api/auth/email/register.js",
+    "functions/api/auth/email/login.js",
+    "functions/api/onboarding.js",
+    "functions/auth/index.js",
+    "functions/register-league/index.js",
+    "functions/_lib/platform-onboarding.js",
+    "functions/api/platform/onboarding.js",
+    "league-engine/platform-onboarding.js",
+    "tests/security/provider-authentication.test.mjs",
+    "tests/platform/onboarding.test.mjs",
+    "releases/8.0.0/release-record.md",
+    "releases/8.0.0/validation-evidence.json"
+  ]
+}
