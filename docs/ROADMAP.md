@@ -4,21 +4,24 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 19, 2026
+**Updated:** September 20, 2026
 
-**Revision:** 2.93
+**Revision:** 2.95
 
 **Current production:** FranchiseHQ 8.0.1.1 is live from Main `56dc1e1` through Pages workflow run `35489911143` with migration 47. Signed-in read-only acceptance confirms P2W branding and initials, no cross-tenant team choices, a two-league selector containing FGC and P2W, and the safe no-team commissioner setup path. FGC remains correctly branded and isolated. No activation or league-data operation ran during acceptance.
 
-**Current work:** 8.0.1.1 is deployed and read-only accepted. P2W may now activate its invited Commissioner without a team, then import its own Madden franchise. Team Owners continue to require an imported P2W team, and normal team-assignment policy resumes automatically once P2W has active teams.
+**Current work:** 8.0.2 implementation is authorized and locally validated. The candidate adds tenant-owned First-Season Setup, explicit commissioner confirmation for unproven source-season identity, atomic game-year/season/destination preparation, retained-export reanalysis, safe retained yearly-schedule reuse, truthful first-roster blocking, and exact disabled-control explanations. No Production season or league-data record has been changed by candidate work.
 
-**Next gate:** Owner acceptance may activate the pending P2W commissioner with the Commissioner role and **No imported teams yet**, then use P2W's permanent Madden Companion connection. The next planned product milestone remains 8.1.0 multi-league administration and operations.
+**Next gate:** Publish 8.0.2 through its authorized pull request, Main merge, and Production deployment. The P2W commissioner then confirms the exact Madden source-season value in the new UI; FranchiseHQ rechecks the retained export and makes Import Yearly Schedule available without another All Weeks export. One roster-inclusive export is still required before P2W's first live snapshot. Payment-backed automatic activation follows in 8.2.0.
 
 ## Product decisions
 
 - The product is **FranchiseHQ**. FGC is configuration and the first league, never the application identity or a product-wide hard-code.
 - The owner has standing authorization for each requested release to proceed through implementation, validation, branch publication, pull request, hosted checks, Main merge, and Production deployment in one cycle. Do not pause for repeat routine release authorization. Clarifications, expanded scope, protected-data operations, and applicable safety requirements remain separate boundaries.
-- FGC launches as the only enabled production tenant. League-owned data is tenant-scoped now so adding league two later is controlled activation, not a retrofit.
+- A registered league is not complete merely because its tenant shell exists. Completion means its commissioner can sign in, pay or receive an explicit entitlement, open the league, run the first Madden export, import it, assign teams, and operate enabled features without platform-owner intervention.
+- The primary commercial entitlement is one annual subscription per league. Pricing, plan limits, discounts, trials, taxes, refunds, and provider selection remain reviewed commercial settings; tenant authority must not depend on a browser-only payment result.
+- Payment activation must be server-authoritative and idempotent. Only a verified payment-provider event or an audited owner-granted entitlement may enable a league; a checkout return page alone is never activation proof.
+- Failed, expired, disputed, or cancelled payment changes access according to an explicit grace/suspension policy. Billing actions never delete league data, rotate the Madden export URL, archive a season, move a snapshot, or reinterpret Free Agents.
 - Server data is authoritative for shared league features. Browser storage is limited to temporary UI preferences.
 - Every release must work at phone and desktop widths. Mobile is an acceptance requirement, not a later port.
 - Phone layouts must be intentionally composed for the available viewport, minimize avoidable scrolling, and never shrink or overlay the desktop presentation. Wide data may use one clearly bounded horizontal scroller, but the page itself must not overflow horizontally.
@@ -42,6 +45,8 @@
 - Madden's explicit `xbsx/742482/freeagents/roster` response failed upstream with an empty `rosterInfoList`. This is recorded as **blocked**, not as proof of zero Free Agents. It does not block safe rostered-player preview work, but FranchiseHQ cannot claim a complete player pool until a successful or explicitly empty Free Agent response is received.
 - The owner authorized the Madden 26-to-27 Production transition. Madden 26 is no longer attached to the live application: its D1 database is retained as a detached relational archive, a private 38-table/76,712-row archive was verified, and 1,295 obsolete raw R2 objects were permanently deleted. The clean Madden 27 Production database preserves the league and account plane while clearing all eight legacy team assignments. Later owner-accepted Week 10 and Week 11 imports superseded the earlier malformed All Weeks incident; the malformed and prior snapshots remain retained for explicit recovery.
 - The 7.5.4 retained-source remediation is owner accepted. Ordinary nonzero schedule routes now win over duplicate All Weeks fallback records, the current mapping revision can be recomposed exactly once, and the importer returns to **Latest Export Live** after activation without losing retained snapshots or audits.
+- P2W's September 20 first-export diagnosis is tenant-safe and retained: 42 routes reached P2W, with 32 teams plus standings, schedule, and statistics. Zero team-roster, player, Free Agent, or league-identity routes were received. Source verification passed league and week but failed Madden release and season because P2W has zero durable game years, franchise seasons, and import destinations even though onboarding retained `gameYear: 2027`.
+- FGC works because its durable foundation already exists: two franchise seasons, one game year, two import destinations, and explicit Madden NFL 27 / source-season expectations. P2W's gap is therefore a new-tenant bootstrap defect plus an independently incomplete first-export roster, not a wrong export URL or cross-tenant delivery.
 
 ## Release tracker
 
@@ -138,7 +143,11 @@
 | 8.0.0 | Production; owner accepted | Provider-independent email accounts, self-service disabled league registration, and owner-gated multi-league activation |
 | 8.0.1 | Production; superseded by 8.0.1.1 startup hotfix | Tenant-derived league shell, clickable league switching, and empty-tenant commissioner activation without cross-league teams |
 | 8.0.1.1 | Production; signed-in acceptance passed | Single-word league-name startup repair with cache-busted signed-in acceptance |
-| 8.1.0 | Planned | Multi-league administration and operations |
+| 8.0.2 | Implementation authorized; local validation passed | Repair P2W's first-season foundation, preserve its retained export, expose exact import prerequisites, and prove a new tenant can begin its first import without FGC coupling |
+| 8.1.0 | Planned | Complete self-service league readiness from registration through first successful Madden import and team assignment |
+| 8.2.0 | Planned | Annual league billing, verified entitlement, automatic activation, billing portal, and non-destructive grace/suspension lifecycle |
+| 8.3.0 | Planned | Multi-league administration, quotas, support operations, capacity controls, and custom-domain automation |
+| 9.0.0 | Planned completion | Commercial self-service launch with end-to-end signup, payment, activation, first import, operations, recovery, and support acceptance |
 
 ## Roadmap through completion
 
@@ -172,10 +181,14 @@
 | 14 | Completed stabilization | 7.7.0 | Close the Discord blockers discovered during private-RC acceptance without treating those repairs as the intended 7.7 product milestone. |
 | 14a | Production emergency repair | 7.7.1 | Resume the retained Week 2 candidate across the yearly-schedule team-ID boundary and cut build latency without another export or any deployment-time league-data operation. |
 | 14b | Production deployed; owner acceptance passed | 7.7.2 | Build a repeatable, previewable, tenant-isolated onboarding path and prove that a disabled tenant shell can be prepared without changing FGC or enabling another real league. |
-| 15 | Current implementation | 8.0.0 | Add provider-independent accounts and self-service registration, then activate a second real league through the accepted owner gate while FGC remains unchanged. |
-| 16 | Product completion | 8.1.0 | Complete multi-league administration, safe switching, lifecycle operations, quotas/billing readiness, support tooling, and custom-domain automation. |
+| 15 | Complete in Production | 8.0.0–8.0.1.1 | Add provider-independent accounts, register and activate P2W through the reviewed owner gate, and repair the tenant shell, league selector, and empty-team commissioner path while FGC remains isolated. |
+| 16 | Immediate P2W recovery | 8.0.2 | Create P2W's missing first-game-year/season/import foundation, reuse its retained export where safe, explain every disabled import control, and unlock annual-schedule collection without changing FGC. |
+| 17 | Self-service operating readiness | 8.1.0 | Make registration produce a fully prepared league whose commissioner can sign in, complete first-season setup, run the first export, import it, assign teams, and operate the league without platform-owner repair. |
+| 18 | Payment and automatic activation | 8.2.0 | Sell one annual entitlement per league through a hosted payment flow, verify payment server-side, activate idempotently without manual owner work, and provide customer billing plus safe grace/suspension recovery. |
+| 19 | Scale administration | 8.3.0 | Complete cross-tenant administration, quotas, capacity controls, support/audit tooling, scheduled-work isolation, and custom-domain automation for many concurrent leagues. |
+| 20 | Product completion | 9.0.0 | Pass commercial-launch acceptance for signup → payment → activation → first import → normal operation → renewal/failure recovery with no manual platform intervention in the ordinary path. |
 
-The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critical path unless the owner explicitly reopens it.
+The deferred 7.4.7 direct-EA and CSV/Excel adapter research and later Slack, GroupMe, and Facebook integrations are not on the critical path unless the owner explicitly reopens them.
 
 ## 7.1.0 — Database Foundation
 
@@ -858,10 +871,51 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Allow the initial Commissioner or Trade Committee member to activate without a team only while the tenant has zero imported teams; continue requiring an imported team for Team Owners.
 - Gate: P2W renders as P2W, the selector offers the user's authorized leagues, no foreign team can be assigned, and FGC data remains unchanged.
 
-## 8.1.0 — Multi-League Administration and Operations
+## 8.0.2 — P2W First-League Import Bootstrap
 
-- Support different roles/teams per account, safe league switching, platform-owner separation, lifecycle administration, quotas/billing readiness, support/audit tools, and custom-domain automation.
-- Gate: role/team/domain/lifecycle changes cannot cross tenants and platform operations are separately authorized and audited.
+- Repair P2W before expanding the general onboarding path. Materialize its saved 2027 onboarding choice into a durable Madden game year, reviewed first franchise season, and active import destination without changing FGC, rotating either export URL, discarding any capture, or manufacturing a live snapshot.
+- Bind the first-season identity to one P2W-owned observed Madden franchise. Require an explicit commissioner confirmation for any source-season value the payload cannot prove; never infer identity from FGC or another tenant.
+- Reanalyze and retain the existing 42-route P2W cohort after its expected release/season identity exists. Reuse its schedule and statistics evidence where safe, including yearly-schedule eligibility, so repair does not casually demand another full All Weeks export.
+- Keep first-live-snapshot roster safety explicit. P2W's retained export has zero roster routes and there is no active P2W roster to carry forward, so the normal live import remains blocked until one roster-inclusive export succeeds. Blocked or absent Free Agents remain unknown/null rather than zero.
+- Replace silent disabled controls with exact explanations: missing prepared season, missing first roster, source identity awaiting confirmation, yearly collection in progress, review required, or latest export already live. A commissioner must always see the next action without opening internal diagnostics.
+- Add a reusable new-tenant bootstrap regression proving zero cross-tenant reads/writes and preserving retained exports, snapshots, audits, memberships, assignments, Discord state, and Free Agent authority.
+- Gate: P2W can open **Import Yearly Schedule**, the retained export remains available and correctly classified after reviewed identity preparation, a rosterless first live import is truthfully blocked, and a complete first export can advance through ordinary candidate validation. FGC's exact active state remains unchanged.
+
+## 8.1.0 — Self-Service League Operating Readiness
+
+- Turn public league registration into a complete first-use workflow rather than an empty tenant shell. Capture league identity, URL, branding, Madden edition/year, current franchise season, initial commissioner, desired features, optional Discord setup, and the billing plan that will later entitle the tenant.
+- Prepare the tenant idempotently with its permanent export endpoint, commissioner membership, game year, first franchise season, import destination, settings, rules, limits, feature defaults, audit trail, and recovery metadata before the commissioner reaches League Data.
+- Provide one guided readiness checklist: account verified, league details complete, entitlement status, first-season identity, export URL copied, first export received, roster requirement, import result, and team assignments. Each incomplete step explains exactly what to do next.
+- Make the first valid roster-inclusive export usable immediately. It must establish teams, rosters, players, standings, schedule, statistics, and honest Free Agent state; later same-season League Info + Weekly Stats exports may use the existing protected roster carry-forward rules.
+- Keep **Import Yearly Schedule** independent from the live current period and Discord thread creation. A new commissioner can load the 18-week regular-season schedule while only a later proven current-week import advances the league and creates that week's matchup threads.
+- Support email-first and Discord-first commissioners equally. Discord remains optional for authentication and becomes an integration only when the league chooses to connect it.
+- Gate: a brand-new isolated test league completes registration through first live import and owner assignment on desktop and phone with no database repair, platform-owner activation, cross-tenant fallback, export-URL rotation, or FGC change.
+
+## 8.2.0 — Annual Billing, Entitlements, and Automatic Activation
+
+- Make one annual subscription the primary paid unit for one league. Keep price, currency, plan limits, discounts, trial rules, tax behavior, and refund policy configurable without embedding them in tenant code.
+- Use a PCI-minimized hosted checkout and customer billing portal. The final provider is selected at the start of this release; FranchiseHQ stores provider/customer/subscription references and sanitized payment state, never raw card details.
+- Create an append-only league entitlement and billing-event ledger. Verify provider webhook signatures, deduplicate provider events, tolerate out-of-order delivery, and reconcile delayed events through a scheduled recovery job.
+- Activate a fully prepared tenant only after a verified paid/trial entitlement or an explicitly audited owner-granted entitlement. Activation enables the exact reviewed features and commissioner authority idempotently; refreshing or replaying checkout cannot create duplicate leagues, memberships, or subscriptions.
+- Show clear `setup`, `payment pending`, `active`, `grace period`, `suspended`, `cancelled at renewal`, and `expired` states. Provide invoices/receipts, payment-method management, renewal date, cancellation, and recovery from a failed payment.
+- Apply non-destructive billing enforcement. Grace or suspension blocks paid operations according to policy but retains league data, history, export URL, snapshots, audits, and account access needed to pay or export data. Reactivation restores the same tenant rather than creating a replacement.
+- Gate: sandbox payment acceptance covers success, duplicate webhook, delayed webhook, failed payment, grace period, cancellation, renewal, refund/dispute policy, suspension, and reactivation. A verified successful payment activates the league without platform-owner work; an unverified browser return never does.
+
+## 8.3.0 — Multi-League Administration and Scale Operations
+
+- Support different roles and teams per account, safe league switching, platform-owner separation, tenant lifecycle administration, entitlement overrides, support impersonation boundaries, and complete audit visibility.
+- Enforce plan quotas for storage, exports, imports, Discord operations, memberships, custom domains, and scheduled work without allowing one league to degrade or read another.
+- Add platform operations for search, health, billing state, import failures, job retries, support cases, recovery evidence, and non-destructive suspension/reactivation. Every corrective action is tenant-scoped, idempotent where possible, and audited.
+- Automate custom-domain verification, certificate readiness, routing, and removal without changing canonical league identity or exposing another tenant.
+- Load-test representative concurrent leagues and size D1, R2, Workers, Queues/Workflows, Discord limits, backup, and alert thresholds from measured per-league usage rather than FGC assumptions.
+- Gate: role/team/domain/billing/lifecycle/job changes cannot cross tenants; capacity and failure testing demonstrates bounded behavior for the approved launch target; backup/recovery and support drills reconcile exact tenant state.
+
+## 9.0.0 — Commercial Self-Service Launch
+
+- Publish the final annual plan and public signup path with product, pricing, privacy, terms, refund/cancellation, data-retention, support, incident, accessibility, and onboarding guidance aligned to actual behavior.
+- Run an end-to-end launch cohort through account creation, league registration, checkout, verified automatic activation, first-season setup, first export/import, team assignment, optional Discord connection, yearly schedule, current-week operation, billing portal, renewal/failure recovery, support, and tenant-safe backup evidence.
+- Remove platform-owner work from the ordinary customer path. Manual owner tools remain exceptional audited support controls, not required activation steps.
+- Gate: no unresolved critical/high defect; payment, entitlement, import, tenant isolation, mobile, security, recovery, monitoring, support, and cancellation/grace behavior are accepted against exact Production artifacts. This is the roadmap's product-completion boundary.
 
 ## Delivery method for every version
 
@@ -875,6 +929,8 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## Change log
 
+- **Revision 2.95:** Authorized and built the 8.0.2 reusable first-season bootstrap. The candidate requires commissioner confirmation for the unproven source-season value, binds only the single franchise observed on the tenant's retained export, creates the Madden game year, franchise season, link, import destination, session expectations, and audit atomically, then reanalyzes the retained export. Import Yearly Schedule can reuse a compatible retained 18-week/272-game schedule without another All Weeks export, a live snapshot, a current-week move, or Discord threads. A rosterless first live import remains blocked with an exact first-roster explanation; missing or blocked Free Agents remain unknown. The regression proves retained captures and a separate FGC fixture remain unchanged. Candidate publication and Production deployment remain pending.
+- **Revision 2.94:** Diagnosed P2W's first import read-only and reconciled the completion roadmap. The correct P2W permanent endpoint retained 42 routes with 32 teams, standings, schedule, and statistics; no roster, player, Free Agent, or league-identity route was captured. P2W onboarding retained game year 2027 only in configuration and created zero durable game years, franchise seasons, or import destinations, so source validation lacked expected Madden release/season and both import actions were disabled. FGC remains isolated and works from its existing durable season foundation. Added 8.0.2 to repair P2W first; expanded 8.1.0 into complete self-service first-use readiness; added 8.2.0 annual billing, verified entitlement, and automatic activation; moved scale operations to 8.3.0; and established 9.0.0 as commercial product completion. No code, Production row, import, snapshot, roster, membership/assignment, Discord state, export URL, season lifecycle, credential, payment, or Free Agent authority changed during diagnosis or roadmap work.
 - **Revision 2.93:** Published exact 8.0.1.1 hotfix `7fdc697` through PR #140, passed all four pull-request checks, merged Main `56dc1e1`, and passed all five Main quality/build/deployment checks including quality run `35489911632` and Pages workflow `35489911143`. Authenticated read-only acceptance serves 8.0.1.1, renders P2W/P2W/P2W across brand, Active League, and initials, links Active League to the selector listing both FGC and P2W, shows zero imported P2W teams with no FGC choices, and retains the Commissioner-without-team guidance. FGC still renders its own name and initials. No activation, membership/assignment change, import, snapshot, Discord, reset/deletion, export URL, season, credential, or Free Agent operation ran.
 - **Revision 2.92:** Published 8.0.1 through PR #139 as Main `c32c966`; all four pull-request checks and all five Main quality/build/deployment checks passed. Authenticated read-only P2W acceptance then caught a one-line initials formatter defect: the multi-word array branch supported `.join()`, but the one-word `P2W` string branch did not. The page had already resolved and displayed P2W, proving the stored tenant identity is correct, but the error interrupted the remaining application startup. Began immediate cache-busted 8.0.1.1 from exact Main to correct that branch and repeat acceptance. No membership, assignment, import, snapshot, Discord, reset/deletion, export URL, season, credential, or Free Agent state changed.
 - **Revision 2.91:** Diagnosed the owner's first P2W commissioner assignment and league-shell report against current Production without writing data. P2W is an enabled second tenant with two memberships, one active membership, no active snapshot, and zero active teams; FGC retains 32 active teams and snapshot `0f997acd`. The client incorrectly fell back from an empty P2W team directory to the global FGC directory, producing the false Dolphins choice that the server correctly rejected. Authorized 8.0.1 removes that cross-tenant fallback, derives both sidebar league labels from the server-resolved tenant, links Active League to `/leagues`, and permits Commissioner/Trade Committee activation without a team only while the tenant has no imported teams. Team Owners remain blocked until their league imports teams. No membership, assignment, import, snapshot, Discord, reset/deletion, export URL, season, credential, or Free Agent state changed during diagnosis or local implementation.

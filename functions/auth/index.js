@@ -1,6 +1,6 @@
 import { getCurrentSession, redirectResponse } from '../_lib/auth.js';
 
-const RELEASE = '8.0.1.1';
+const RELEASE = '8.0.2';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({

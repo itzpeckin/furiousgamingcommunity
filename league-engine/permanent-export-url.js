@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 7.5.6.8 */
+/* FHQ_BUILD: 8.0.2 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '7.5.6.8';
+  const VERSION = '8.0.2';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -54,7 +54,12 @@
   async function refresh() {
     try {
       const [connection,yearly]=await Promise.all([api(),yearlyApi()]);
-      state={...connection,preparedSeason:yearly.preparedSeason||null,yearlyScheduleImport:yearly.yearlyScheduleImport||null};
+      state={
+        ...connection,
+        preparedSeason:yearly.preparedSeason||null,
+        firstSeasonPreparation:yearly.firstSeasonPreparation||null,
+        yearlyScheduleImport:yearly.yearlyScheduleImport||null
+      };
       errorMessage = '';
       if (state?.latestExport?.status === 'ready') {
         window.dispatchEvent(new CustomEvent('franchisehq:latest-export-ready',{detail:state.latestExport}));
@@ -85,6 +90,29 @@
 
   const startYearlySchedule=()=>yearlyAction('start');
   const finishYearlySchedule=()=>yearlyAction('finish');
+
+  async function prepareFirstSeason(form) {
+    if(busy)return state;
+    const preparation=state?.firstSeasonPreparation||{};
+    const sourceSeasonId=String(form?.querySelector('[data-first-season-source-season]')?.value||'').trim();
+    const confirmed=form?.querySelector('[data-first-season-confirm]')?.checked===true;
+    busy=true;errorMessage='';rerender();
+    try{
+      await yearlyApi('POST',{
+        action:'prepare-first-season',
+        sourceFranchiseId:preparation.sourceFranchiseId,
+        sourceSeasonId,
+        confirmSourceSeason:confirmed
+      });
+      await refresh();
+      return state;
+    }catch(error){
+      errorMessage=error.message;
+      throw error;
+    }finally{
+      busy=false;rerender();
+    }
+  }
 
   async function copyUrl() {
     const value = state?.endpoint?.exportUrl;
@@ -140,7 +168,12 @@
     const items=warnings.filter(value=>!routineWarning(value));
     if(!items.length)return null;
     const message=items.join(' ');
-    if(/teams?|league info|classified teams dataset/i.test(message))return{
+    if(/roster|players?/i.test(message))return{
+      title:'First roster is still required',
+      summary:'The newest export did not include a complete roster and this league does not have a compatible live roster to retain yet.',
+      action:'Run one export with Rosters and League Info selected. After the first complete snapshot is live, same-season weekly exports may omit Rosters.'
+    };
+    if(/League Info did not|classified teams dataset|complete 32-team/i.test(message))return{
       title:'League Info is missing',
       summary:'The newest export did not include a complete 32-team League Info source.',
       action:'Run the Madden export again with League Info and Weekly Stats selected, using the same league URL. Include Rosters for the season’s first snapshot.'
@@ -150,10 +183,10 @@
       summary:'The newest export is missing schedule or statistics data needed for a safe import.',
       action:'Export the missing week—or All Weeks—with Weekly Stats selected, then wait for Ready to import.'
     };
-    if(/roster|players?/i.test(message))return{
-      title:'Roster data is incomplete',
-      summary:'The newest export did not include a complete roster and no compatible live same-season roster could be retained.',
-      action:'Run the Madden export again with Rosters and League Info selected. Rosters may be omitted only after a complete snapshot for this exact season is live.'
+    if(/source identity|release|season/i.test(message))return{
+      title:'Source identity needs confirmation',
+      summary:'FranchiseHQ retained the export, but the first Madden season has not been fully confirmed for this league.',
+      action:'Complete First-Season Setup below. The retained export will be checked again automatically.'
     };
     return{
       title:'The newest export needs attention',
@@ -191,9 +224,29 @@
   function renderYearlyScheduleControls({compact=false}={}) {
     const annual=state?.yearlyScheduleImport;
     const prepared=state?.preparedSeason;
+    const preparation=state?.firstSeasonPreparation||{};
+    if(!annual&&!prepared){
+      const retained=preparation.retainedExport||{};
+      const sourceReady=preparation.canPrepare===true;
+      const suggested=preparation.suggestedSourceSeasonId||'';
+      return `<section class="commissioner-first-season${compact?' commissioner-yearly-schedule--compact':''}">
+        <div class="commissioner-first-season__intro"><div><strong>Finish First-Season Setup</strong><small>${esc(preparation.nextAction||'Confirm this league’s Madden season before importing.')}</small></div><span class="pill pill--${sourceReady?'warning':'neutral'}">${sourceReady?'Confirmation needed':'Waiting'}</span></div>
+        <div class="commissioner-first-season__evidence">
+          <span><small>Madden release</small><strong>${esc(preparation.gameRelease||'Not prepared')}</strong></span>
+          <span><small>Observed franchise</small><strong>${esc(preparation.sourceFranchiseId||'Not observed')}</strong></span>
+          <span><small>Retained routes</small><strong>${count(retained.routeCount||retained.captureCount||0)}</strong></span>
+          <span><small>First roster</small><strong>${retained.hasRoster?'Received':'Still required'}</strong></span>
+        </div>
+        ${sourceReady?`<form class="commissioner-first-season__form" data-first-season-form>
+          <label><span>Madden franchise season number</span><input class="input" data-first-season-source-season value="${esc(suggested)}" inputmode="numeric" maxlength="80" required placeholder="Example: 1"><small>Use the season number shown inside this Madden franchise. FranchiseHQ will not copy this value from another league.</small></label>
+          <label class="commissioner-first-season__confirm"><input type="checkbox" data-first-season-confirm required><span>I confirm this is the exact season for ${esc(state?.leagueSlug||'this league')}.</span></label>
+          <button class="button button--primary" type="submit" ${busy?'disabled':''}>${busy?'Preparing…':'Confirm & Prepare Season'}</button>
+        </form>`:''}
+      </section>`;
+    }
     if(!annual)return `<section class="commissioner-yearly-schedule${compact?' commissioner-yearly-schedule--compact':''}">
       <div><strong>Full regular-season schedule</strong><small>Collect Weeks 1–18 without changing the current week or creating Discord threads.</small></div>
-      <button class="button button--secondary" data-import-yearly-schedule ${busy||!prepared?'disabled':''}>${busy?'Working…':'Import Yearly Schedule'}</button>
+      <button class="button button--secondary" data-import-yearly-schedule ${busy||!prepared?'disabled':''} title="${prepared?'Start a retained, non-live schedule collection.':'Finish First-Season Setup first.'}">${busy?'Working…':'Import Yearly Schedule'}</button>
     </section>`;
     if(annual.status==='completed')return `<section class="commissioner-yearly-schedule is-complete${compact?' commissioner-yearly-schedule--compact':''}">
       <div><strong>Schedule Import Complete</strong><small>${count(annual.gameCount)} games across all 18 regular-season weeks. The next current-week export will use this schedule without changing its week.</small></div>
@@ -226,6 +279,14 @@
     const importDone = latest.importLive === true || latest.importStatus === 'live';
     const yearlyActive=['collecting','ready'].includes(state?.yearlyScheduleImport?.status);
     const importDisabled = busy || yearlyActive || status !== 'ready' || importDone;
+    const sourceIssue=readinessIssue(latest.warnings||[]);
+    const importReason=busy?'FranchiseHQ is finishing the current action.'
+      :yearlyActive?'Finish Import Yearly Schedule before publishing a live snapshot.'
+        :importDone?'The newest eligible export is already live.'
+          :status==='review-required'?(sourceIssue?.action||'Review the newest export prerequisites below.')
+            :status==='receiving'?'FranchiseHQ is still receiving and checking the export.'
+              :status==='awaiting-export'?'Run a Madden export to this league’s permanent URL.'
+                :status!=='ready'?'The newest export is not ready to import.':'';
     const tone = status === 'ready' ? 'success' : status === 'review-required' ? 'warning' : status === 'revoked' ? 'danger' : 'neutral';
     ensurePolling();
     return `<article class="card commissioner-league-export-card" data-permanent-league-export-panel>
@@ -246,9 +307,10 @@
       ${renderNotices()}
       <div class="league-import-framework-actions">
         <button class="button button--secondary" data-copy-permanent-export-url ${busy || !endpointState.exportUrl ? 'disabled' : ''}>${copied ? 'URL Copied' : 'Copy League Export URL'}</button>
-        <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''}>${busy ? 'Working…' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
+        <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''} title="${esc(importReason||'Validate and publish the newest eligible export.')}">${busy ? 'Working…' : yearlyActive ? 'Finish Yearly Schedule First' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
         <button class="button button--ghost" data-refresh-permanent-export ${busy ? 'disabled' : ''}>Refresh</button>
       </div>
+      ${importDisabled&&importReason?`<p class="commissioner-import-disabled-reason"><strong>Import unavailable:</strong> ${esc(importReason)}</p>`:''}
       ${renderSecurityControls()}
     </article>`;
   }
@@ -269,9 +331,17 @@
     if (event.target.closest('[data-cancel-export-rotation]')) { rotateArmed=false;rerender(); }
   });
 
+  document.addEventListener('submit',event=>{
+    const form=event.target.closest('[data-first-season-form]');
+    if(!form)return;
+    event.preventDefault();
+    if(!form.reportValidity())return;
+    prepareFirstSeason(form).catch(()=>{});
+  });
+
   const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,copied,rotateArmed,permanent:true,revocable:true,yearlyScheduleImport:state?.yearlyScheduleImport||null,activationPerformed:Boolean(state?.latestExport?.importLive)});
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before permanent-export-url.js.');
-  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,startYearlySchedule,finishYearlySchedule,renderPanel,renderNotices,renderSecurityControls,renderYearlyScheduleControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
+  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,prepareFirstSeason,startYearlySchedule,finishYearlySchedule,renderPanel,renderNotices,renderSecurityControls,renderYearlyScheduleControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'permanent-league-export-url',service:'leagueExportUrl',script:'league-engine/permanent-export-url.js',version:VERSION,dependencies:['auth','leagueTenant','oneClickImport'],capabilities:['permanent-url','explicit-rotation','automatic-analysis','latest-export-readiness','one-click-import']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

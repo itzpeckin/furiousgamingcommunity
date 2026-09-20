@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.2",
+  "releaseType": "first-season-import-bootstrap",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.1.1",
+    "commit": "42bdfcda0cfb0e1a501caaea8723270ce253bb9e",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-8.0.2",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "not-run",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "8.0.1.1",
+    "candidateRelease": "8.0.2",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Publish the tenant-owned first-season preparation and retained schedule reuse workflow. Do not prepare a Production season without the commissioner confirmation, publish a rosterless live snapshot, rotate an export URL, create Discord threads, delete data, archive or transition a season, change credentials, or interpret missing or blocked Free Agents as zero."
+  },
+  "requiredArtifacts": [
+    "functions/api/leagues/[leagueSlug]/companion/yearly-schedule.js",
+    "league-engine/permanent-export-url.js",
+    "styles.css",
+    "tests/import/yearly-schedule.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.2/release-record.md",
+    "releases/8.0.2/validation-evidence.json"
+  ]
+}
