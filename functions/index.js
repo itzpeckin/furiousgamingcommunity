@@ -2,7 +2,7 @@ import { getCurrentSession, redirectResponse } from "./_lib/auth.js";
 import { CANONICAL_APP_ORIGIN, isOwnerFallbackHost } from "./_lib/origin.js";
 import { isOwnerFallbackIdentity } from "./_lib/owner-fallback.js";
 
-const RELEASE = "8.0.0";
+const RELEASE = "8.0.1";
 
 function page() {
   return `<!doctype html>

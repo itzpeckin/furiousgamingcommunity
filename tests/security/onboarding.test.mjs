@@ -12,7 +12,7 @@ import {
 
 function membershipDatabase({ targetMembership = null, occupied = null, membershipRows = [], teamRows = null } = {}) {
   const preparedSql = [];
-  const canonicalTeamRows = teamRows || [
+  const canonicalTeamRows = teamRows ?? [
     { external_id:'dal-live', data_json:JSON.stringify({ external_id:'dal-live', abbreviation:'DAL', display_name:'Dallas Cowboys' }) },
     { external_id:'tb-live', data_json:JSON.stringify({ external_id:'tb-live', abbreviation:'TB', display_name:'Tampa Bay Buccaneers' }) }
   ];
@@ -114,6 +114,55 @@ test('the FGC membership policy requires a team for every active league role', a
   ));
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /every active league member requires a team/i);
+});
+
+test('an empty new tenant activates a commissioner without borrowing another league team list', async () => {
+  const targetMembership = {
+    id:'pending-1', userId:'invitee-user', role:'team_owner', teamId:null,
+    active:0, lastAccessAction:null
+  };
+  const db = membershipDatabase({ targetMembership, teamRows:[] });
+  const invalidCrossTenantTeam = await saveMembership(requestContext(
+    { userId:'invitee-user', role:'commissioner', teamId:'mia' }, db
+  ));
+  assert.equal(invalidCrossTenantTeam.status, 400);
+  assert.match((await invalidCrossTenantTeam.json()).error, /does not have an active Madden team import/i);
+
+  const activated = await saveMembership(requestContext(
+    { userId:'invitee-user', role:'commissioner', teamId:null }, db
+  ));
+  assert.equal(activated.status, 200);
+  assert.equal((await activated.json()).membership.teamId, null);
+
+  const listed = await listMemberships({
+    request:new Request('https://franchisehq.app/api/leagues/fgc/memberships', {
+      headers:{ cookie:'franchise_hq_session=valid-session-token' }
+    }),
+    params:{ leagueSlug:'fgc' },
+    env:{ DB:membershipDatabase({ targetMembership, teamRows:[], membershipRows:[] }) }
+  });
+  const payload = await listed.json();
+  assert.equal(payload.teams.length, 0);
+  assert.equal(payload.policy.teamAssignmentAvailable, false);
+  assert.equal(payload.policy.requireTeamAssignment, false);
+});
+
+test('the league shell and commissioner directory never fall back to FGC branding or teams', async () => {
+  const [html, app, trade] = await Promise.all([
+    readFile(new URL('../../index.html', import.meta.url), 'utf8'),
+    readFile(new URL('../../app.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../trade-module.js', import.meta.url), 'utf8')
+  ]);
+  assert.match(html, /data-league-brand-name/);
+  assert.match(html, /data-active-league-name/);
+  assert.match(html, /data-league-switcher[^>]+href="\/leagues"|href="\/leagues"[^>]+data-league-switcher/);
+  assert.doesNotMatch(html, /data-demo-toast="League switching/);
+  assert.match(app, /function applyTenantShell/);
+  assert.match(app, /franchisehq:league-tenant-changed/);
+  const directory = trade.slice(trade.indexOf('function commissionerTeamDirectory'), trade.indexOf('function commissionerTeamById'));
+  assert.match(directory, /return canonical\.map\(commissionerTeamShape\)/);
+  assert.doesNotMatch(directory, /canonical\.length\?canonical:teams/);
+  assert.match(trade, /No active Madden teams for this league/);
 });
 test('commissioner cannot activate a global user who did not accept the league invite', async () => {
   const response = await saveMembership(requestContext(

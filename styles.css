@@ -54,7 +54,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .brand-copy small { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .sidebar-close { display: none !important; }
 
-.league-card { width: 100%; display: grid; grid-template-columns: 42px minmax(0, 1fr) 18px; align-items: center; gap: 11px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); text-align: left; cursor: pointer; transition: border-color var(--ease), background var(--ease); }
+.league-card { width: 100%; display: grid; grid-template-columns: 42px minmax(0, 1fr) 18px; align-items: center; gap: 11px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: inherit; text-align: left; text-decoration: none; cursor: pointer; transition: border-color var(--ease), background var(--ease); }
 .league-card:hover { border-color: rgba(var(--accent-rgb), .38); background: var(--surface-2); }
 .league-card__logo { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: linear-gradient(145deg, rgba(var(--accent-rgb), .28), rgba(var(--accent-rgb), .1)); color: var(--accent); font-weight: 850; font-size: 12px; letter-spacing: -.3px; }
 .league-card__copy { display: grid; min-width: 0; }
