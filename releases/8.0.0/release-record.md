@@ -30,7 +30,11 @@ The complete local repository gate passes all 301 tests. Deployment publication 
 
 ## Deployment status
 
-The exact candidate is locally validated and authorized for additive migration 47, pull-request publication, Main merge, hosted validation, and Production deployment. External identifiers and read-only Production reconciliation will be recorded after publication.
+Exact candidate `d22405b` is published in [PR #137](https://github.com/itzpeckin/furiousgamingcommunity/pull/137); all four pull-request checks pass with quality run `35484885358`. Additive migration 47 was applied only to the registered Production database between Time Travel bookmarks `00000380-00000000-000050ec-d10c2784aaa19962857557bcb419119c` and `00000380-00000018-000050ec-835491fb5d026f6820619acd22498b1f`.
+
+Post-migration reconciliation reports schema 47, zero foreign-key violations, 1 league, 35 users, 35 memberships, 32 active team assignments, one active-snapshot pointer, zero onboarding plans/events/activations, 35 retained Discord identity records, and zero email identities. The active and previous snapshot pointers remain `0f997acd-1897-42cc-9eb8-8d1b6d3a636d` and `1735e674-2710-4606-be08-d65958f25d2f`. No account, onboarding plan, second league, membership, import, snapshot, Discord state, export URL, or season state was created or changed by the migration.
+
+Main merge, Production runtime publication, and final read-only HTTPS reconciliation remain in progress.
 
 ## Rollback
 

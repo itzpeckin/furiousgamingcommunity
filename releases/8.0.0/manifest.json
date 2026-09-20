@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.0.0",
   "releaseType": "provider-neutral-self-service-multi-league-activation",
-  "status": "validated-production-authorized",
+  "status": "production-migrated-awaiting-merge",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.7.2",
@@ -18,8 +18,8 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending",
-    "pullRequests": [],
+    "status": "pull-request-passed",
+    "pullRequests": [137],
     "mainCommit": null
   },
   "staging": {
@@ -30,11 +30,13 @@
   "production": {
     "authorized": true,
     "deployed": false,
-    "status": "pending-publication",
+    "status": "migration-applied-awaiting-runtime",
     "currentRelease": "7.7.2",
     "candidateRelease": "8.0.0",
-    "currentMigration": 46,
+    "currentMigration": 47,
     "candidateMigration": 47,
+    "preMigrationBookmark": "00000380-00000000-000050ec-d10c2784aaa19962857557bcb419119c",
+    "postMigrationBookmark": "00000380-00000018-000050ec-835491fb5d026f6820619acd22498b1f",
     "scope": "Apply additive migration 47 and publish provider-neutral email accounts, self-service disabled league registration, and the owner-only exact-plan activation gate. Deployment itself must not create an account, onboarding plan, second league, membership, import, snapshot, Discord state, export URL, season transition, or Free Agent interpretation."
   },
   "requiredArtifacts": [
