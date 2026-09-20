@@ -30,11 +30,9 @@ The complete local repository gate passes all 301 tests. Deployment publication 
 
 ## Deployment status
 
-Exact candidate `d22405b` is published in [PR #137](https://github.com/itzpeckin/furiousgamingcommunity/pull/137); all four pull-request checks pass with quality run `35484885358`. Additive migration 47 was applied only to the registered Production database between Time Travel bookmarks `00000380-00000000-000050ec-d10c2784aaa19962857557bcb419119c` and `00000380-00000018-000050ec-835491fb5d026f6820619acd22498b1f`.
+Exact final candidate `dd3e2d9` was published through [PR #137](https://github.com/itzpeckin/furiousgamingcommunity/pull/137); all four pull-request checks passed, including pull-request quality run `35485299112`. It merged as Main `73d225d784c462ec0bf262352653b9a4ae09e030`. Main quality run `35485357457` and Pages deployment run `35485357339` completed successfully, and live HTTPS serves release 8.0.0. Additive migration 47 was applied only to the registered Production database between Time Travel bookmarks `00000380-00000000-000050ec-d10c2784aaa19962857557bcb419119c` and `00000380-00000018-000050ec-835491fb5d026f6820619acd22498b1f`.
 
-Post-migration reconciliation reports schema 47, zero foreign-key violations, 1 league, 35 users, 35 memberships, 32 active team assignments, one active-snapshot pointer, zero onboarding plans/events/activations, 35 retained Discord identity records, and zero email identities. The active and previous snapshot pointers remain `0f997acd-1897-42cc-9eb8-8d1b6d3a636d` and `1735e674-2710-4606-be08-d65958f25d2f`. No account, onboarding plan, second league, membership, import, snapshot, Discord state, export URL, or season state was created or changed by the migration.
-
-Main merge, Production runtime publication, and final read-only HTTPS reconciliation remain in progress.
+Post-deployment reconciliation reports schema 47, zero foreign-key violations, 1 league, 35 users, 35 memberships, 32 active team assignments, one active-snapshot pointer, zero onboarding plans/events/activations, 35 retained Discord identity records, and zero email identities. The active and previous snapshot pointers remain `0f997acd-1897-42cc-9eb8-8d1b6d3a636d` and `1735e674-2710-4606-be08-d65958f25d2f`. The public landing page now states that a FranchiseHQ account may use email or Discord, and signed-in read-only acceptance rendered the 8.0.0 **Register your league** workflow without submitting it. No account, onboarding plan, second league, membership, import, snapshot, Discord state, export URL, or season state was created or changed during release acceptance.
 
 ## Rollback
 
