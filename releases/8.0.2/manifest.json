@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.0.2",
   "releaseType": "first-season-import-bootstrap",
-  "status": "validated-production-authorized",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.0.1.1",
@@ -18,8 +18,9 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "not-run",
-    "pullRequests": []
+    "status": "merged",
+    "pullRequests": [142],
+    "mainCommit": "f77e26684f81897c574350c26b994118d26588cc"
   },
   "staging": {
     "authorized": false,
@@ -28,12 +29,14 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "8.0.1.1",
+    "deployed": true,
+    "status": "verified",
+    "currentRelease": "8.0.2",
     "candidateRelease": "8.0.2",
     "currentMigration": 47,
     "candidateMigration": 47,
+    "pagesWorkflowRun": 35539243812,
+    "qualityWorkflowRun": 35539244174,
     "scope": "Publish the tenant-owned first-season preparation and retained schedule reuse workflow. Do not prepare a Production season without the commissioner confirmation, publish a rosterless live snapshot, rotate an export URL, create Discord threads, delete data, archive or transition a season, change credentials, or interpret missing or blocked Free Agents as zero."
   },
   "requiredArtifacts": [
