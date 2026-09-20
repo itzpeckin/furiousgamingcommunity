@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.0.0",
   "releaseType": "provider-neutral-self-service-multi-league-activation",
-  "status": "production-migrated-awaiting-merge",
+  "status": "validated-production-authorized",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "7.7.2",

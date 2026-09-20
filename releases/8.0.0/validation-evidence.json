@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.0.0",
-  "status": "production-migrated-awaiting-merge",
-  "productionChanged": true,
+  "status": "validated-production-authorized",
+  "productionChanged": false,
   "productionDataChanged": false,
   "dataChanged": false,
   "credentialsChanged": false,
