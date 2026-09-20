@@ -6,7 +6,7 @@ import {
 } from "../_lib/auth.js";
 import { isOwnerFallbackHost } from "../_lib/origin.js";
 
-const RELEASE = "7.7.2";
+const RELEASE = "8.0.0";
 
 function esc(value) {
   return String(value ?? "")
@@ -53,7 +53,7 @@ function page({ user, memberships, pendingMemberships = [], csrfToken = "" }) {
     .section{margin-top:38px}.section-title{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:13px}.section-title h2{margin:0;font-size:18px}.section-title span{color:var(--muted);font-size:12px}
     .list{display:grid;gap:12px}.league-card{display:grid;grid-template-columns:54px 1fr auto 24px;gap:16px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(17,27,41,.88),rgba(9,14,22,.9));text-decoration:none;color:inherit;transition:.15s ease}.league-card:hover{transform:translateY(-1px);border-color:rgba(44,144,255,.48);background:var(--panel2)}
     .league-mark{width:54px;height:54px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#0878ff,#00a7ff);font-weight:950}.league-meta{color:#6fbfff;text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:900}.league-copy h2{margin:4px 0 3px;font-size:18px}.league-copy p{margin:0;color:var(--muted);font-size:13px}.role{padding:7px 10px;border-radius:999px;background:rgba(8,120,255,.14);color:#8dcaff;font-size:11px;font-weight:850;text-transform:capitalize}.role--available{background:rgba(255,255,255,.06);color:#b8c3d3}.arrow{font-size:21px;color:#79bdff}
-    .empty{padding:18px;border:1px dashed rgba(147,163,186,.25);border-radius:14px;color:var(--muted);background:rgba(255,255,255,.02);line-height:1.55}
+    .empty{padding:18px;border:1px dashed rgba(147,163,186,.25);border-radius:14px;color:var(--muted);background:rgba(255,255,255,.02);line-height:1.55}.create{display:inline-flex;margin-top:18px;min-height:43px;align-items:center;padding:0 16px;border-radius:10px;background:#0878ff;color:white;text-decoration:none;font-weight:850;font-size:13px}
     footer{display:flex;justify-content:space-between;gap:16px;padding-top:20px;border-top:1px solid var(--line);color:#68778e;font-size:12px}.logout{color:#9db5d2;text-decoration:none;background:none;border:0;padding:0;font:inherit;cursor:pointer}
     @media(max-width:620px){.shell{width:min(100% - 24px,980px);padding-top:18px}header{align-items:flex-start}.account strong{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}main{padding-top:36px}.league-card{grid-template-columns:48px 1fr 20px;gap:12px}.league-mark{width:48px;height:48px}.role{grid-column:2;justify-self:start}.arrow{grid-column:3;grid-row:1 / span 2}.section-title{align-items:flex-start;flex-direction:column}}
   </style>
@@ -62,19 +62,20 @@ function page({ user, memberships, pendingMemberships = [], csrfToken = "" }) {
   <div class="shell">
     <header>
       <div class="brand">FRANCHISE<span>HQ</span></div>
-      <div class="account"><strong>${esc(user.displayName || user.discordUsername || "Discord User")}</strong><span>Signed in with Discord</span></div>
+      <div class="account"><strong>${esc(user.displayName || user.discordUsername || "FranchiseHQ User")}</strong><span>Signed in with ${user.authProvider === 'email' ? 'email' : 'Discord'}</span></div>
     </header>
     <main>
       <section class="hero">
         <div class="eyebrow">League Selection</div>
         <h1>Choose your league.</h1>
-        <p>Select the Franchise HQ league you want to enter. Your Discord session stays signed in while you move between leagues.</p>
+        <p>Select the FranchiseHQ league you want to enter. Your secure account stays signed in while you move between leagues.</p>
       </section>
       <section class="section">
         <div class="section-title"><h2>Your Leagues</h2><span>${memberships.length} connected</span></div>
         <div class="list">
           ${hasMemberships ? memberships.map((l) => leagueCard(l)).join("") : `<div class="empty"><strong>No active league access yet.</strong><br>Use the league URL your commissioner shared with you to request access.</div>`}
         </div>
+        <a class="create" href="/register-league">Register another league</a>
         ${pendingMemberships.length ? `<div class="section-title" style="margin-top:28px"><h2>Pending Approval</h2><span>${pendingMemberships.length} waiting</span></div><div class="list">${pendingMemberships.map((l)=>`<a class="league-card" href="/leagues/${encodeURIComponent(l.slug)}"><div class="league-mark">FH</div><div class="league-copy"><div class="league-meta">Waiting for commissioner</div><h2>${esc(l.name)}</h2><p>Your Discord account is connected. Team and role assignment are still pending.</p></div><span class="role">Pending</span><span class="arrow">→</span></a>`).join("")}</div>` : ""}
       </section>
     </main>

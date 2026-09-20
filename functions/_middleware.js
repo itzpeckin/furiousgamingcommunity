@@ -16,6 +16,8 @@ const CSP_REPORT_ONLY = [
 
 const AUTH_RATE_POLICIES = Object.freeze({
   "/api/auth/discord/login": { limit: 30, windowMs: 10 * 60 * 1000, bucket:"auth", useBinding:true },
+  "/api/auth/email/login": { limit: 10, windowMs: 10 * 60 * 1000, bucket:"email-login", useBinding:false },
+  "/api/auth/email/register": { limit: 5, windowMs: 60 * 60 * 1000, bucket:"email-register", useBinding:false },
   "/api/auth/session/claim": { limit: 30, windowMs: 10 * 60 * 1000, bucket:"auth", useBinding:true }
 });
 
@@ -23,6 +25,10 @@ const MUTATION_RATE_POLICIES = Object.freeze([
   {
     test:path => /^\/api\/platform\//.test(path),
     policy:{limit:60,windowMs:60*1000,bucket:"platform-mutation",useBinding:false}
+  },
+  {
+    test:path => path === "/api/onboarding",
+    policy:{limit:20,windowMs:60*60*1000,bucket:"public-onboarding",useBinding:false}
   },
   {
     test:path => /^\/api\/leagues\/[^/]+\/companion\/(?:candidate-import|build-snapshot|map-teams|map-players|map-schedule|map-statistics|import-job|import-orchestrator|export\/[^/]+(?:\/.*)?)$/.test(path),
@@ -60,7 +66,7 @@ function applySecurityHeaders(response, id, request, durationMs = null) {
   headers.set("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
   headers.set("cross-origin-opener-policy", "same-origin-allow-popups");
   headers.set("content-security-policy-report-only", CSP_REPORT_ONLY);
-  headers.set("x-franchisehq-release", "7.7.2");
+  headers.set("x-franchisehq-release", "8.0.0");
   if (durationMs !== null) headers.set("server-timing", `franchisehq;dur=${Math.max(0,Math.round(durationMs))}`);
   if (new URL(request.url).protocol === "https:") {
     headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");

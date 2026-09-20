@@ -2,7 +2,7 @@ import { getCurrentSession, redirectResponse } from "./_lib/auth.js";
 import { CANONICAL_APP_ORIGIN, isOwnerFallbackHost } from "./_lib/origin.js";
 import { isOwnerFallbackIdentity } from "./_lib/owner-fallback.js";
 
-const RELEASE = "7.7.2";
+const RELEASE = "8.0.0";
 
 function page() {
   return `<!doctype html>
@@ -138,7 +138,7 @@ function page() {
   <div class="shell">
     <header>
       <div class="brand">FRANCHISE<span>HQ</span></div>
-      <a class="top-login" href="/api/auth/discord/login">Login with Discord</a>
+      <a class="top-login" href="/auth">Sign in</a>
     </header>
     <main>
       <section class="copy">
@@ -146,10 +146,10 @@ function page() {
         <h1>Build. Manage. <span>Compete.</span></h1>
         <p class="lead">Franchise HQ gives online franchise leagues one home for teams, players, standings, statistics, trades, schedules and league management.</p>
         <div class="actions">
-          <a class="btn primary" href="/api/auth/discord/login">Login with Discord</a>
-          <a class="btn secondary" href="/api/auth/discord/login?intent=create-league">Register Your League</a>
+          <a class="btn primary" href="/auth">Sign in</a>
+          <a class="btn secondary" href="/auth?mode=register&amp;returnTo=%2Fregister-league">Register Your League</a>
         </div>
-        <div class="micro">League registration uses Discord identity first. League creation and ownership are completed in the next multi-league release.</div>
+        <div class="micro">Create a FranchiseHQ account with email or Discord. A Discord account is not required to register a league.</div>
       </section>
       <section class="visual" aria-label="Franchise HQ">
         <div class="logo-card">

@@ -224,7 +224,7 @@ test('desktop and mobile protected routes preserve the exact league URL with ser
       assert.match(html,/__FHQ_AUTH_BOOTSTRAP__/);
       assert.match(html,/"platformOwner":true/);
       assert.match(html,/league:manage/);
-      assert.equal(response.headers.get('x-fhq-route-fix'),'7.7.2');
+      assert.equal(response.headers.get('x-fhq-route-fix'),'8.0.0');
     } finally { database.close(); }
   }
 });

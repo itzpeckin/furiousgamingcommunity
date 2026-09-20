@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 18, 2026
+**Updated:** September 19, 2026
 
-**Revision:** 2.88
+**Revision:** 2.89
 
 **Current production:** FranchiseHQ 7.7.2 is live from Main `c953eab` through Pages deployment run `35419284107` with migration 46. Signed-in verification confirms the owner-only Platform Workspace and League Onboarding panel render correctly, the durable onboarding queue contains zero plans, and no activation control exists. Read-only D1 verification confirms zero foreign-key violations and unchanged protected FGC counts and snapshot pointers: active `a21862ef`, previous `5cee59c2`. No real second league, import, snapshot move, Discord action, reset/deletion, export-URL rotation, season lifecycle, credential, membership/assignment, or Free Agent reinterpretation occurred.
 
-**Current work:** 7.7.2 Multi-League Onboarding Readiness is deployed and awaiting owner acceptance. The owner-only Platform Workspace can preview, save, resume, prepare, inspect, and contain a normalized league plan. Preparation creates only a disabled/non-public tenant shell with all runtime features off, no membership, no imports or snapshots, no Discord installation or threads, and no activation path. No plan or second real league was created during release.
+**Current work:** 8.0.0 adds provider-independent FranchiseHQ email accounts, self-service league registration, and Platform Owner activation of the exact reviewed tenant. Email and Discord accounts share the same internal user, session, membership, and audit authority. Public registration can create only a disabled/non-public tenant shell; it cannot activate a tenant, grant membership, import data, connect Discord, or create schedule threads. Platform Owner activation grants exactly one commissioner membership and enables only the reviewed league and feature plan.
 
-**Next gate:** Owner acceptance of the deployed 7.7.2 onboarding contract. When the owner intentionally selects a real next league, 8.0.0 separately plans, reviews, and activates that first additional tenant while proving FGC remains isolated. Merely opening 7.7.2 does not create or activate a league.
+**Next gate:** Validate and publish 8.0.0 with additive migration 47 while proving FGC is byte-for-byte unchanged at the protected control plane. Deployment creates no account, plan, second league, membership, import, snapshot, or Discord action. After publication, a user may create the first real disabled registration and the Platform Owner may separately review and activate that exact plan.
 
 ## Product decisions
 
@@ -134,8 +134,8 @@
 | 7.6.0-rc.1 | Production private RC; commissioner accepted | Retained destination-safe Discord diagnostics, persistent Operations health, audited commissioner retry, public trust pages, and exact deployment/recovery evidence; committee and team-owner human acceptance remain |
 | 7.7.0 | Production stabilization; read-only acceptance passed | Private-RC blocker correction for archived Discord threads, rate-limit compliance, trade-sync coalescing, no-op suppression, and actionable Operations routing; this did not replace the intended 7.7 multi-league onboarding milestone |
 | 7.7.1 | Production emergency repair; commissioner retry pending | Bridge older yearly-schedule team IDs through exact game identity, reduce resumable build round trips, and preserve granular Workflow checkpoints without changing live league data during deployment; this did not replace the intended 7.7 milestone |
-| 7.7.2 | Production deployed; owner acceptance pending | Owner-only preview/save/resume/prepare/cancel path with disabled tenant shells, staged settings, readiness proof, and no activation authority |
-| 8.0.0 | Planned | Multi-league activation |
+| 7.7.2 | Production deployed; owner acceptance passed | Owner-only preview/save/resume/prepare/cancel path with disabled tenant shells, staged settings, readiness proof, and no activation authority |
+| 8.0.0 | Implementation candidate | Provider-independent email accounts, self-service disabled league registration, and owner-gated multi-league activation |
 | 8.1.0 | Planned | Multi-league administration and operations |
 
 ## Roadmap through completion
@@ -169,8 +169,8 @@
 | 13 | Release candidate | 7.6.0-rc.1 | Freeze scope, validate the complete private FGC experience, and rehearse deployment and recovery from exact artifacts. |
 | 14 | Completed stabilization | 7.7.0 | Close the Discord blockers discovered during private-RC acceptance without treating those repairs as the intended 7.7 product milestone. |
 | 14a | Production emergency repair | 7.7.1 | Resume the retained Week 2 candidate across the yearly-schedule team-ID boundary and cut build latency without another export or any deployment-time league-data operation. |
-| 14b | Production deployed; owner acceptance pending | 7.7.2 | Build a repeatable, previewable, tenant-isolated onboarding path and prove that a disabled tenant shell can be prepared without changing FGC or enabling another real league. |
-| 15 | Expansion | 8.0.0 | Activate a second real league through the accepted onboarding path and prove tenant-isolated operation and recovery while FGC remains unchanged. |
+| 14b | Production deployed; owner acceptance passed | 7.7.2 | Build a repeatable, previewable, tenant-isolated onboarding path and prove that a disabled tenant shell can be prepared without changing FGC or enabling another real league. |
+| 15 | Current implementation | 8.0.0 | Add provider-independent accounts and self-service registration, then activate a second real league through the accepted owner gate while FGC remains unchanged. |
 | 16 | Product completion | 8.1.0 | Complete multi-league administration, safe switching, lifecycle operations, quotas/billing readiness, support tooling, and custom-domain automation. |
 
 The deferred 7.4.7 direct-EA and CSV/Excel adapter research is not on the critical path unless the owner explicitly reopens it.
@@ -844,7 +844,9 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## 8.0.0 — Multi-League Activation
 
-- Activate the first additional real league through the accepted 7.7.2 onboarding path, then enable its approved branding, domain, features, roles, import resources, Discord configuration, operational limits, and support ownership.
+- Add FranchiseHQ email/password accounts so creating and operating a league does not require Discord. Passwords use salted PBKDF2-HMAC-SHA256 credentials, sessions retain the existing rotation/CSRF/revocation controls, and Discord remains an optional identity/integration.
+- Let an authenticated user register a league through a provider-neutral public flow. Self-service preparation reserves only a disabled tenant, permanent export identity, settings, and desired features; it grants no membership or live authority.
+- Activate the first additional real league through the accepted 7.7.2 onboarding path, then enable its approved branding and features and grant exactly one reviewed commissioner membership. Discord configuration remains optional and separate.
 - Gate: two real leagues operate concurrently and every import, Discord action, scheduled job, backup, recovery, suspension, and lifecycle exercise affects only its selected tenant while FGC stays unchanged.
 
 ## 8.1.0 — Multi-League Administration and Operations
@@ -864,6 +866,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## Change log
 
+- **Revision 2.89:** Began standing-authorized 8.0.0 from exact Production record `ab26888`. Additive migration 47 introduces provider-neutral identities and an append-only tenant-activation ledger while retaining every legacy Discord identity. Email registration/login uses the existing secure session framework and rate limits; self-service league registration prepares only the requesting user's disabled tenant. The owner-only activation gate atomically enables the reviewed tenant, activates only its retained desired features, grants exactly one commissioner membership, and records both onboarding and tenant audits. Local 301-test rehearsal preserves the existing FGC row exactly and creates no Madden data, snapshots, Discord state, export rotation, season transition, deletion, or Free Agent reinterpretation. Slack, GroupMe, and Facebook integrations remain later roadmap research.
 - **Revision 2.88:** Published 7.7.2 through PRs #132–#135 as final Main `c953eab`; all hosted quality and Pages runs passed and Production serves release 7.7.2. Applied additive migration 46 after retained Time Travel bookmark `0000035e-00000b0a-000050eb-47c3c2ebb7135944514dbe35b7f77797`. Read-only reconciliation confirms schema 46, zero foreign-key violations, zero onboarding plans/events, unchanged protected FGC counts, and unchanged active/previous snapshot pointers `a21862ef` / `5cee59c2`. Signed-in acceptance confirms the owner-only Platform Workspace and League Onboarding panel render correctly with a zero-plan queue and no activation control. No second real league, Madden export/import, snapshot activation, Discord operation, reset/deletion, export-URL rotation, season lifecycle, credential, membership/assignment, or Free Agent reinterpretation occurred.
 - **Revision 2.87:** Built the standing-authorized 7.7.2 onboarding candidate from exact Main `da9c1e9`. Additive migration 46 stores normalized plans and append-only events; the private Platform Workspace captures identity, branding, initial commissioner, game year, desired features, tenant limits, domain request, optional Discord request, empty rules state, and permanent Companion endpoint reservation. Guarded revisions and a durable `preparing` checkpoint support idempotent resume. Prepared shells are disabled/inactive, all runtime features remain off, and readiness requires zero memberships, snapshots, imports, Discord installations, or schedule threads. Cancellation retains the disabled shell and audit instead of deleting data. Local API and migration rehearsals preserve the existing FGC tenant exactly and prove disabled-route denial. No Production, Main, real second-league creation, activation, import/snapshot, Discord, reset/deletion, URL rotation, season lifecycle, credential, membership/assignment, or Free Agent operation has occurred.
 - **Revision 2.86:** Reconciled the roadmap after the 7.7 numbering drift. The pre-7.7 private-RC record explicitly named multi-league onboarding as the next work, but 7.7.0 was used for Discord blocker stabilization and 7.7.1 for an emergency retained-schedule importer correction. Both shipped releases remain immutable history and neither is relabeled as the intended product milestone. The original 7.7 scope resumes as 7.7.2 Multi-League Onboarding Readiness: a disabled-by-default, previewable, resumable, tenant-isolated setup path with FGC preservation and no second real league activation. 8.0.0 remains the separately gated first additional-league activation, and 8.1.0 remains ongoing multi-league administration and operations. This roadmap-only correction changes no runtime, database, league data, import/snapshot, Discord state, export URL, season lifecycle, credential, membership/assignment, or Free Agent authority.

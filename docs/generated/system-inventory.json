@@ -64,6 +64,8 @@
       "functions/_middleware.js",
       "functions/api/auth/discord/callback.js",
       "functions/api/auth/discord/login.js",
+      "functions/api/auth/email/login.js",
+      "functions/api/auth/email/register.js",
       "functions/api/auth/session/claim.js",
       "functions/api/leagues/[leagueSlug]/commissioner-hq.js",
       "functions/api/leagues/[leagueSlug]/competition.js",
@@ -164,13 +166,13 @@
       ".css": 10,
       ".example": 1,
       ".html": 8,
-      ".js": 232,
+      ".js": 238,
       ".json": 7,
       ".jsonc": 1,
       ".md": 284,
-      ".mjs": 51,
+      ".mjs": 52,
       ".png": 3,
-      ".sql": 48,
+      ".sql": 49,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -178,7 +180,7 @@
     },
     "largest": [
       {
-        "bytes": 651053,
+        "bytes": 651048,
         "file": "app.js"
       },
       {
@@ -210,7 +212,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77027,
+        "bytes": 77039,
         "file": "index.html"
       },
       {
@@ -258,7 +260,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 653
+    "total": 661
   },
   "frontend": {
     "assets": [
@@ -758,7 +760,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 80,
+    "routeCount": 85,
     "routes": [
       {
         "file": "functions/index.js",
@@ -780,6 +782,20 @@
           "onRequestGet"
         ],
         "route": "/api/auth/discord/login"
+      },
+      {
+        "file": "functions/api/auth/email/login.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/auth/email/login"
+      },
+      {
+        "file": "functions/api/auth/email/register.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/auth/email/register"
       },
       {
         "file": "functions/api/auth/logout.js",
@@ -1336,6 +1352,14 @@
         "route": "/api/leagues/:leagueSlug/transactions/forward-detection"
       },
       {
+        "file": "functions/api/onboarding.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/onboarding"
+      },
+      {
         "file": "functions/api/platform/onboarding.js",
         "handlers": [
           "onRequestGet",
@@ -1351,6 +1375,13 @@
         "route": "/api/platform/status"
       },
       {
+        "file": "functions/auth/index.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/auth"
+      },
+      {
         "file": "functions/leagues/index.js",
         "handlers": [
           "onRequestGet"
@@ -1363,6 +1394,13 @@
           "onRequest"
         ],
         "route": "/leagues/*path"
+      },
+      {
+        "file": "functions/register-league/index.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/register-league"
       }
     ]
   },
@@ -1638,10 +1676,16 @@
       "recordsLedger": true,
       "sha256": "d341b46c4cf6070b7ae86d09e77c0500f281f677de6c74591028d58f40b9ea32",
       "version": "0046"
+    },
+    {
+      "file": "migrations/0047_provider_authentication_and_tenant_activation.sql",
+      "recordsLedger": true,
+      "sha256": "e26838e3a8839430c89f32717f73af1dd5eeb4b9ce3d1fd49e591024e3bcadb7",
+      "version": "0047"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "7.7.2",
+  "release": "8.0.0",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

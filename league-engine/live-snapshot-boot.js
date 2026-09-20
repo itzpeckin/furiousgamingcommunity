@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '7.7.2';
+  const VERSION = '8.0.0';
   let running = null;
   let lastResult = null;
   let lastError = null;

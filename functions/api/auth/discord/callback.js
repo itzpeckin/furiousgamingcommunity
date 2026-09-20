@@ -33,7 +33,7 @@ import { ensureDiscordGlobalCommands, upsertDiscordGuildCommands } from "../../.
 import { DISCORD_GLOBAL_COMMANDS, DISCORD_SCHEDULE_THREAD_COMMANDS } from "../../../_lib/discord-commands.js";
 import { scheduleActiveDiscordSync } from "../../../_lib/discord-schedule.js";
 
-const RELEASE = "7.7.2";
+const RELEASE = "8.0.0";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -402,6 +402,18 @@ export async function onRequestGet(context) {
         )
         .run();
     }
+
+    // Keep Discord as an optional identity provider on the same internal user
+    // authority used by email accounts and league memberships. The legacy
+    // columns remain intact for Discord delivery compatibility.
+    await context.env.DB.prepare(`INSERT INTO user_auth_identities
+        (id,user_id,provider,provider_subject,email_verified,last_authenticated_at)
+      VALUES (?,?,'discord',?,1,CURRENT_TIMESTAMP)
+      ON CONFLICT(provider,provider_subject) DO UPDATE SET
+        last_authenticated_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE user_id=excluded.user_id`).bind(
+      createId('identity'),user.id,String(discordUser.id)
+    ).run();
 
     // Consume OAuth state only after the upstream exchange, identity lookup,
     // and local user write succeed. A transient failure no longer destroys a

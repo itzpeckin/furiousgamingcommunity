@@ -1,7 +1,7 @@
 import { normalizeTenantSlug, validTenantSlug } from './tenant-context.js';
 
-export const PLATFORM_ONBOARDING_RELEASE = '7.7.2';
-export const PLATFORM_ONBOARDING_SCHEMA_VERSION = 1;
+export const PLATFORM_ONBOARDING_RELEASE = '8.0.0';
+export const PLATFORM_ONBOARDING_SCHEMA_VERSION = 2;
 
 export const ONBOARDING_FEATURE_KEYS = Object.freeze([
   'core_browsing',
@@ -124,7 +124,7 @@ export function validateOnboardingInput(plan) {
     errors.push('An existing FranchiseHQ user is required as the initial commissioner.');
   }
   if (plan.sourceMode !== 'companion') {
-    errors.push('Only the Madden Companion connection is available for onboarding in 7.7.2.');
+    errors.push('Only the Madden Companion connection is available for onboarding in 8.0.0.');
   }
   if (plan.desiredDomain && !HOSTNAME.test(plan.desiredDomain)) {
     errors.push('Custom domain must be a hostname without a protocol, path, or port.');
@@ -270,6 +270,9 @@ export function planFromRow(row) {
     status:String(row.status),
     revision:Number(row.revision),
     preparedAt:row.prepared_at || null,
+    activatedAt:row.activated_at || null,
+    activatedByUserId:row.activated_by_user_id || null,
+    activationRequestId:row.activation_request_id || null,
     cancelledAt:row.cancelled_at || null,
     createdAt:row.created_at || null,
     updatedAt:row.updated_at || null
@@ -308,7 +311,12 @@ export async function onboardingReadiness(db, plan) {
     db.prepare(`SELECT COUNT(*) count FROM companion_candidate_import_runs WHERE league_id=?`).bind(plan.plannedLeagueId),
     db.prepare(`SELECT COUNT(*) count FROM discord_league_installations WHERE league_id=?`).bind(plan.plannedLeagueId),
     db.prepare(`SELECT COUNT(*) count FROM discord_schedule_threads WHERE league_id=?`).bind(plan.plannedLeagueId),
-    db.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints WHERE league_id=?`).bind(plan.plannedLeagueId)
+    db.prepare(`SELECT COUNT(*) count FROM companion_league_export_endpoints WHERE league_id=?`).bind(plan.plannedLeagueId),
+    db.prepare(`SELECT COUNT(*) count FROM league_memberships
+      WHERE league_id=? AND user_id=? AND role='commissioner' AND active=1`)
+      .bind(plan.plannedLeagueId,plan.initialCommissionerUserId),
+    db.prepare(`SELECT COUNT(*) count FROM platform_league_activations
+      WHERE plan_id=? AND league_id=?`).bind(plan.id,plan.plannedLeagueId)
   ]);
   const first = index => results[index]?.results?.[0] || null;
   const league = first(0);
@@ -321,28 +329,40 @@ export async function onboardingReadiness(db, plan) {
   const discordInstallationCount = Number(first(6)?.count || 0);
   const discordThreadCount = Number(first(7)?.count || 0);
   const exportEndpointCount = Number(first(8)?.count || 0);
+  const commissionerCount = Number(first(9)?.count || 0);
+  const activationCount = Number(first(10)?.count || 0);
   const leagueConfiguration = parseObject(league?.configuration_json);
+  const activated = Boolean(plan.activatedAt);
   const shellMatches = Boolean(league
     && String(league.slug).toLowerCase() === plan.slug.toLowerCase()
     && league.tenant_status === 'disabled'
     && league.public_status !== 'active'
     && leagueConfiguration?.onboarding?.planId === plan.id);
+  const activeMatches = Boolean(league
+    && String(league.slug).toLowerCase() === plan.slug.toLowerCase()
+    && league.tenant_status === 'enabled'
+    && league.public_status === 'active'
+    && leagueConfiguration?.onboarding?.planId === plan.id
+    && leagueConfiguration?.onboarding?.status === 'activated');
   const empty = membershipCount === 0 && activePointerCount === 0 && snapshotCount === 0
     && importCount === 0 && discordInstallationCount === 0 && discordThreadCount === 0;
   const prepared = plan.status === 'prepared';
+  const desiredEnabledCount = ONBOARDING_FEATURE_KEYS
+    .filter(key => plan.desiredFeatures[key] === true).length;
   const checks = [
     check('plan','Validated plan',plan.planHash ? 'pass' : 'fail','The normalized onboarding contract is retained with an integrity hash.'),
-    check('tenant-shell','Disabled tenant shell',prepared ? (shellMatches ? 'pass' : 'fail') : 'pending',prepared ? 'The reserved league exists but is not public or enabled.' : 'Created only when Prepare is selected.'),
-    check('features','Feature configuration staged',prepared ? (featureCount === ONBOARDING_FEATURE_KEYS.length && enabledFeatureCount === 0 ? 'pass' : 'fail') : 'pending','Desired features are retained while every runtime feature remains disabled.'),
-    check('commissioner','Initial commissioner staged',prepared ? (membershipCount === 0 ? 'pass' : 'fail') : 'pending','The existing user is selected, but no membership is granted before activation.'),
+    check('tenant-shell',activated ? 'Active tenant' : 'Disabled tenant shell',prepared ? ((activated ? activeMatches : shellMatches) ? 'pass' : 'fail') : 'pending',activated ? 'The league is enabled at its permanent league URL.' : (prepared ? 'The reserved league exists but is not public or enabled.' : 'Created only when Prepare is selected.')),
+    check('features',activated ? 'Feature configuration active' : 'Feature configuration staged',prepared ? (featureCount === ONBOARDING_FEATURE_KEYS.length && enabledFeatureCount === (activated ? desiredEnabledCount : 0) ? 'pass' : 'fail') : 'pending',activated ? 'Only the features retained in the reviewed plan were enabled.' : 'Desired features are retained while every runtime feature remains disabled.'),
+    check('commissioner',activated ? 'Initial commissioner active' : 'Initial commissioner staged',prepared ? (activated ? (commissionerCount === 1 && membershipCount === 1 ? 'pass' : 'fail') : (membershipCount === 0 ? 'pass' : 'fail')) : 'pending',activated ? 'The selected FranchiseHQ account has commissioner access.' : 'The existing user is selected, but no membership is granted before activation.'),
     check('export','Permanent export connection reserved',prepared ? (exportEndpointCount === 1 ? 'pass' : 'fail') : 'pending','The permanent endpoint identity is reserved but inaccessible while the tenant is disabled.'),
     check('discord','Discord connection deferred',prepared ? (discordInstallationCount === 0 && discordThreadCount === 0 ? 'pass' : 'fail') : 'pending',plan.discord.requested ? 'Requested settings are staged; no guild or thread is connected.' : 'Discord was not requested for this plan.'),
-    check('data','No live league data',prepared ? (empty ? 'pass' : 'fail') : 'pending','No membership, snapshot, import, Discord installation, or schedule thread exists.'),
-    check('activation','Activation separately gated','pass','7.7.2 contains no operation that can enable or publish this league.')
+    check('data',activated ? 'No imported league data yet' : 'No live league data',prepared ? ((activated ? (activePointerCount === 0 && snapshotCount === 0 && importCount === 0 && discordThreadCount === 0) : empty) ? 'pass' : 'fail') : 'pending',activated ? 'Activation did not import Madden data or create Discord schedule threads.' : 'No membership, snapshot, import, Discord installation, or schedule thread exists.'),
+    check('activation',activated ? 'Activation recorded' : 'Platform Owner activation required',activated ? (activationCount === 1 ? 'pass' : 'fail') : 'pass',activated ? 'The one-time activation ledger and request evidence are retained.' : 'Preparation cannot publish the league; only the Platform Owner can activate it.')
   ];
   return Object.freeze({
-    readyForActivationReview:prepared && checks.every(item => item.status !== 'fail'),
-    activationAvailable:false,
+    readyForActivationReview:prepared && !activated && checks.every(item => item.status !== 'fail'),
+    activationAvailable:prepared && !activated && checks.every(item => item.status !== 'fail'),
+    activated,
     checks:Object.freeze(checks),
     counts:Object.freeze({
       memberships:membershipCount,
@@ -404,5 +424,79 @@ export function preparedLeagueStatements(db, plan, actorUserId) {
   statements.push(db.prepare(`UPDATE companion_league_export_endpoints
     SET created_by_user_id=COALESCE(created_by_user_id,?),updated_at=CURRENT_TIMESTAMP
     WHERE league_id=?`).bind(actorUserId,plan.plannedLeagueId));
+  return statements;
+}
+
+export function activatedLeagueStatements(db, plan, actorUserId, operationRequestId) {
+  const nextRevision = plan.revision + 1;
+  const activatedAt = new Date().toISOString();
+  const configuration = {
+    onboarding:{
+      schemaVersion:PLATFORM_ONBOARDING_SCHEMA_VERSION,
+      planId:plan.id,
+      planHash:plan.planHash,
+      status:'activated',
+      activationAvailable:false,
+      activatedAt
+    },
+    sourceMode:plan.sourceMode,
+    gameYear:plan.gameYear,
+    desiredDomain:plan.desiredDomain,
+    discordRequested:plan.discord.requested,
+    discordGuildId:plan.discord.guildId,
+    desiredFeatures:plan.desiredFeatures,
+    limits:plan.limits
+  };
+  const statements = [
+    db.prepare(`INSERT INTO platform_league_activations
+      (id,plan_id,league_id,activated_by_user_id,initial_commissioner_user_id,
+       plan_hash,request_id,previous_tenant_status,previous_public_status,activated_at,detail_json)
+      VALUES (?,?,?,?,?,?,?,'disabled','inactive',?,?)`).bind(
+      `activation_${crypto.randomUUID()}`,plan.id,plan.plannedLeagueId,actorUserId,
+      plan.initialCommissionerUserId,plan.planHash,operationRequestId,activatedAt,
+      JSON.stringify({ desiredFeatures:plan.desiredFeatures,sourceMode:plan.sourceMode,discordConnected:false })
+    ),
+    db.prepare(`UPDATE platform_league_onboarding_plans SET
+      activated_by_user_id=?,activated_at=?,activation_request_id=?,revision=?,
+      updated_by_user_id=?,updated_at=CURRENT_TIMESTAMP
+      WHERE id=? AND status='prepared' AND activated_at IS NULL AND revision=?`).bind(
+      actorUserId,activatedAt,operationRequestId,nextRevision,actorUserId,plan.id,plan.revision
+    ),
+    db.prepare(`INSERT INTO league_memberships
+      (id,league_id,user_id,role,team_id,active,created_at,updated_at)
+      VALUES (?,?,?,'commissioner',NULL,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).bind(
+      `membership_${crypto.randomUUID()}`,plan.plannedLeagueId,plan.initialCommissionerUserId
+    ),
+    db.prepare(`UPDATE leagues SET tenant_status='enabled',public_status='active',
+      branding_json=?,configuration_json=?,updated_at=CURRENT_TIMESTAMP
+      WHERE id=? AND tenant_status='disabled' AND public_status<>'active'`).bind(
+      JSON.stringify(plan.branding),JSON.stringify(configuration),plan.plannedLeagueId
+    ),
+    db.prepare(`UPDATE league_settings SET revision=revision+1,settings_json=?,
+      updated_by_user_id=?,updated_at=CURRENT_TIMESTAMP WHERE league_id=?`).bind(
+      JSON.stringify({ onboarding:{ planId:plan.id,status:'activated',activatedAt } }),
+      actorUserId,plan.plannedLeagueId
+    )
+  ];
+  for (const key of ONBOARDING_FEATURE_KEYS) {
+    statements.push(db.prepare(`UPDATE league_features SET enabled=?,configuration_json=?,
+      updated_by_user_id=?,updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND feature_key=?`).bind(
+      plan.desiredFeatures[key] === true ? 1 : 0,
+      JSON.stringify({ desiredOnActivation:Boolean(plan.desiredFeatures[key]),onboardingPlanId:plan.id,activatedAt }),
+      actorUserId,plan.plannedLeagueId,key
+    ));
+  }
+  statements.push(onboardingEventStatement(db,{
+    planId:plan.id,actorUserId,action:'tenant.activated',fromStatus:'prepared',toStatus:'prepared',
+    revision:nextRevision,requestId:operationRequestId,
+    detail:{ plannedLeagueId:plan.plannedLeagueId,initialCommissionerUserId:plan.initialCommissionerUserId }
+  }));
+  statements.push(db.prepare(`INSERT INTO tenant_audit_events
+    (id,league_id,actor_user_id,request_id,action_id,action,resource_type,resource_id,outcome,detail_json)
+    VALUES (?,?,?,?,?,'tenant.activated','onboarding-plan',?,'success',?)`).bind(
+    `tenant_audit_${crypto.randomUUID()}`,plan.plannedLeagueId,actorUserId,operationRequestId,
+    `act_${crypto.randomUUID()}`,plan.id,
+    JSON.stringify({ initialCommissionerUserId:plan.initialCommissionerUserId,planHash:plan.planHash })
+  ));
   return statements;
 }
