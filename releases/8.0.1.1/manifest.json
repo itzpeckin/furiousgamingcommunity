@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.0.1.1",
   "releaseType": "single-word-league-shell-startup-hotfix",
-  "status": "validated-production-authorized",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.0.1",
@@ -18,9 +18,9 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "awaiting-publication",
-    "pullRequests": [],
-    "mainCommit": null
+    "status": "merged",
+    "pullRequests": [140],
+    "mainCommit": "56dc1e1f3c6b174dd255f4f6db71dea0f043b05e"
   },
   "staging": {
     "authorized": false,
@@ -29,12 +29,14 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "awaiting-runtime-publication",
-    "currentRelease": "8.0.1",
+    "deployed": true,
+    "status": "verified",
+    "currentRelease": "8.0.1.1",
     "candidateRelease": "8.0.1.1",
     "currentMigration": 47,
     "candidateMigration": 47,
+    "pagesWorkflowRun": 35489911143,
+    "qualityWorkflowRun": 35489911632,
     "scope": "Publish a code-only startup hotfix for single-word tenant names. Perform no membership, team, import, snapshot, Discord, export URL, season, deletion/reset, credential, or Free Agent data operation."
   },
   "requiredArtifacts": [

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.0.1.1",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "released",
+  "productionChanged": true,
   "productionDataChanged": false,
   "dataChanged": false,
   "credentialsChanged": false,
@@ -37,9 +37,9 @@
     }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "productionChanged": true,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "databaseRowsWritten": 0,
     "leagueDataRowsWritten": 0,
@@ -57,9 +57,24 @@
     "freeAgentInterpretedAsZero": false
   },
   "external": {
-    "githubPublication": { "authorized": true, "status": "pending", "pullRequests": [], "mainCommit": null },
-    "hostedChecks": { "authorized": true, "status": "pending" },
+    "githubPublication": { "authorized": true, "status": "merged", "pullRequests": [140], "mainCommit": "56dc1e1f3c6b174dd255f4f6db71dea0f043b05e" },
+    "hostedChecks": { "authorized": true, "status": "passed", "mainQualityRun": 35489911632, "mainPagesRun": 35489911143 },
     "productionMigration": { "authorized": false, "status": "not-required", "currentMigration": 47, "candidateMigration": 47 },
-    "productionDeployment": { "authorized": true, "status": "pending", "currentRelease": "8.0.1", "candidateRelease": "8.0.1.1" }
+    "productionDeployment": { "authorized": true, "status": "deployed-and-verified", "currentRelease": "8.0.1.1", "candidateRelease": "8.0.1.1", "mainCommit": "56dc1e1f3c6b174dd255f4f6db71dea0f043b05e" },
+    "postDeploymentReadOnlyVerification": {
+      "authorized": true,
+      "status": "passed",
+      "releaseMarker": "8.0.1.1",
+      "p2wBrand": "P2W",
+      "p2wActiveLeague": "P2W",
+      "p2wInitials": "P2W",
+      "p2wImportedTeamOptions": 0,
+      "p2wAssignedTeams": 0,
+      "foreignTeamOptionsVisible": 0,
+      "leagueSelectorCount": 2,
+      "fgcBrand": "Furious Gaming Community",
+      "membershipSubmitted": false,
+      "dataChanged": false
+    }
   }
 }
