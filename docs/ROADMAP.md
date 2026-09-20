@@ -6,13 +6,13 @@
 
 **Updated:** September 19, 2026
 
-**Revision:** 2.92
+**Revision:** 2.93
 
-**Current production:** FranchiseHQ 8.0.1 was published from Main `c32c966` with migration 47. Its tenant isolation and membership repair are intact, but signed-in P2W acceptance caught a client startup error limited to one-word league names before any membership or data action. FGC and P2W data remain unchanged.
+**Current production:** FranchiseHQ 8.0.1.1 is live from Main `56dc1e1` through Pages workflow run `35489911143` with migration 47. Signed-in read-only acceptance confirms P2W branding and initials, no cross-tenant team choices, a two-league selector containing FGC and P2W, and the safe no-team commissioner setup path. FGC remains correctly branded and isolated. No activation or league-data operation ran during acceptance.
 
-**Current work:** 8.0.1.1 is an immediate cache-busted hotfix for the one-word initials failure found during live 8.0.1 acceptance. It retains the tenant-derived shell, real league selector link, removal of cross-tenant team fallback, and empty-tenant Commissioner/Trade Committee activation contract. Team Owners continue to require an imported team.
+**Current work:** 8.0.1.1 is deployed and read-only accepted. P2W may now activate its invited Commissioner without a team, then import its own Madden franchise. Team Owners continue to require an imported P2W team, and normal team-assignment policy resumes automatically once P2W has active teams.
 
-**Next gate:** Publish 8.0.1.1, verify P2W renders as P2W with initials `P2W`, confirm the Active League card opens the selector containing both authorized leagues, and inspect the P2W member screen without submitting an activation. The owner may then activate the commissioner without a team and later import P2W Madden data.
+**Next gate:** Owner acceptance may activate the pending P2W commissioner with the Commissioner role and **No imported teams yet**, then use P2W's permanent Madden Companion connection. The next planned product milestone remains 8.1.0 multi-league administration and operations.
 
 ## Product decisions
 
@@ -137,7 +137,7 @@
 | 7.7.2 | Production deployed; owner acceptance passed | Owner-only preview/save/resume/prepare/cancel path with disabled tenant shells, staged settings, readiness proof, and no activation authority |
 | 8.0.0 | Production; owner accepted | Provider-independent email accounts, self-service disabled league registration, and owner-gated multi-league activation |
 | 8.0.1 | Production; superseded by 8.0.1.1 startup hotfix | Tenant-derived league shell, clickable league switching, and empty-tenant commissioner activation without cross-league teams |
-| 8.0.1.1 | Immediate Production hotfix | Single-word league-name startup repair with cache-busted signed-in acceptance |
+| 8.0.1.1 | Production; signed-in acceptance passed | Single-word league-name startup repair with cache-busted signed-in acceptance |
 | 8.1.0 | Planned | Multi-league administration and operations |
 
 ## Roadmap through completion
@@ -875,6 +875,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## Change log
 
+- **Revision 2.93:** Published exact 8.0.1.1 hotfix `7fdc697` through PR #140, passed all four pull-request checks, merged Main `56dc1e1`, and passed all five Main quality/build/deployment checks including quality run `35489911632` and Pages workflow `35489911143`. Authenticated read-only acceptance serves 8.0.1.1, renders P2W/P2W/P2W across brand, Active League, and initials, links Active League to the selector listing both FGC and P2W, shows zero imported P2W teams with no FGC choices, and retains the Commissioner-without-team guidance. FGC still renders its own name and initials. No activation, membership/assignment change, import, snapshot, Discord, reset/deletion, export URL, season, credential, or Free Agent operation ran.
 - **Revision 2.92:** Published 8.0.1 through PR #139 as Main `c32c966`; all four pull-request checks and all five Main quality/build/deployment checks passed. Authenticated read-only P2W acceptance then caught a one-line initials formatter defect: the multi-word array branch supported `.join()`, but the one-word `P2W` string branch did not. The page had already resolved and displayed P2W, proving the stored tenant identity is correct, but the error interrupted the remaining application startup. Began immediate cache-busted 8.0.1.1 from exact Main to correct that branch and repeat acceptance. No membership, assignment, import, snapshot, Discord, reset/deletion, export URL, season, credential, or Free Agent state changed.
 - **Revision 2.91:** Diagnosed the owner's first P2W commissioner assignment and league-shell report against current Production without writing data. P2W is an enabled second tenant with two memberships, one active membership, no active snapshot, and zero active teams; FGC retains 32 active teams and snapshot `0f997acd`. The client incorrectly fell back from an empty P2W team directory to the global FGC directory, producing the false Dolphins choice that the server correctly rejected. Authorized 8.0.1 removes that cross-tenant fallback, derives both sidebar league labels from the server-resolved tenant, links Active League to `/leagues`, and permits Commissioner/Trade Committee activation without a team only while the tenant has no imported teams. Team Owners remain blocked until their league imports teams. No membership, assignment, import, snapshot, Discord, reset/deletion, export URL, season, credential, or Free Agent state changed during diagnosis or local implementation.
 - **Revision 2.90:** Published 8.0.0 through PR #137 as Main `73d225d`; all four pull-request checks, Main quality run `35485357457`, and Pages deployment run `35485357339` passed. Production serves release 8.0.0. Additive migration 47 retained all existing Discord identities and added email-account plus exact-plan activation authority. Post-deployment reconciliation confirms schema 47, one unchanged FGC league, 35 users, 35 memberships, 32 active team assignments, zero onboarding plans/events/activations, zero email identities, and unchanged active/previous pointers `0f997acd` / `1735e674`. The public registration path offers email or Discord, while acceptance submitted no account or league. Slack, GroupMe, and Facebook remain deferred. No import, snapshot change, Discord action, reset/deletion, URL rotation, season lifecycle, membership/assignment change, or Free Agent reinterpretation occurred.

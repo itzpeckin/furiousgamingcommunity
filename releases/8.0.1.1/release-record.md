@@ -20,7 +20,9 @@ Authenticated read-only acceptance caught the exact JavaScript error in the depl
 
 ## Deployment status
 
-8.0.1.1 is authorized as an immediate code-only Production hotfix. No migration or data operation is required.
+Exact candidate `7fdc697` was published through [PR #140](https://github.com/itzpeckin/furiousgamingcommunity/pull/140) after all four pull-request checks passed. It merged as Main `56dc1e1f3c6b174dd255f4f6db71dea0f043b05e`; Main quality run `35489911632`, Pages workflow run `35489911143`, build, deployment, and status reporting all passed.
+
+Authenticated read-only Production acceptance serves release 8.0.1.1 and confirms P2W in both sidebar name locations, `P2W` initials, a working `/leagues` switch link, both authorized leagues in the selector, zero P2W imported teams, no foreign team choices, and the safe empty-tenant Commissioner/Trade Committee guidance. FGC continues to display as Furious Gaming Community with FGC initials. No activation was submitted and no membership, assignment, import, snapshot, Discord, export URL, season, credential, deletion/reset, or Free Agent data operation ran.
 
 ## Rollback
 
