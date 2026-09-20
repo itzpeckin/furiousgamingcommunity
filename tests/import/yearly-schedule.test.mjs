@@ -59,7 +59,7 @@ function regularSeasonGames() {
   return games;
 }
 
-async function fixture() {
+async function fixture({includeSeason=true}={}) {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON');
   const files=(await walkFiles()).filter(file=>/^migrations\/\d+_.+\.sql$/.test(file)).sort();
@@ -73,21 +73,26 @@ async function fixture() {
   const token='yearly-schedule-session';
   sqlite.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at)
     VALUES (?,?,?,'2099-01-01T00:00:00.000Z')`).run('session-1','commissioner-1',await hashToken(token));
-  sqlite.prepare(`INSERT INTO franchise_seasons
-    (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
-    VALUES (?,?,?,?,?,?,?,?,?)`).run(
-      'season-2027','league-1','ea-madden-companion','742482','2','Madden NFL 27','League 2027',2027,'preview'
-    );
-  sqlite.exec(`INSERT INTO league_game_years
-      (id,league_id,game_release,edition_year,display_name,status)
-      VALUES ('game-year-27','league-1','Madden NFL 27',27,'Madden NFL 27','active');
-    INSERT INTO game_year_franchise_seasons (game_year_id,league_id,franchise_season_id)
-      VALUES ('game-year-27','league-1','season-2027');`);
+  if(includeSeason){
+    sqlite.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(
+        'season-2027','league-1','ea-madden-companion','742482','2','Madden NFL 27','League 2027',2027,'preview'
+      );
+    sqlite.exec(`INSERT INTO league_game_years
+        (id,league_id,game_release,edition_year,display_name,status)
+        VALUES ('game-year-27','league-1','Madden NFL 27',27,'Madden NFL 27','active');
+      INSERT INTO game_year_franchise_seasons (game_year_id,league_id,franchise_season_id)
+        VALUES ('game-year-27','league-1','season-2027');`);
+  }
   const objects=new Map();
   const db=d1(sqlite);
   const env={
     DB:db,FRANCHISE_HQ_DB:db,
-    COMPANION_EXPORTS:{get:async key=>objects.has(key)?{arrayBuffer:async()=>new TextEncoder().encode(objects.get(key)).buffer}:null}
+    COMPANION_EXPORTS:{get:async key=>objects.has(key)?{
+      arrayBuffer:async()=>new TextEncoder().encode(objects.get(key)).buffer,
+      text:async()=>objects.get(key)
+    }:null}
   };
   const context=body=>({
     request:new Request('https://franchisehq.app/api/leagues/league/companion/yearly-schedule',{
@@ -98,6 +103,84 @@ async function fixture() {
     params:{leagueSlug:'league'},env
   });
   return{sqlite,objects,context};
+}
+
+function seedFirstSeasonExport(sqlite,objects) {
+  const games=regularSeasonGames();
+  const routePath='xbsx/9001/week/reg/0/schedules';
+  const objectKey='retained/first-season-schedule';
+  const statsRoute='xbsx/9001/week/reg/1/passing';
+  const statsKey='retained/first-season-passing';
+  objects.set(objectKey,JSON.stringify({gameScheduleInfoList:games}));
+  objects.set(statsKey,JSON.stringify({
+    playerPassingStatInfoList:[{playerId:'player-1',teamId:'team-1',passingYards:250}]
+  }));
+  sqlite.prepare(`INSERT INTO platform_league_onboarding_plans
+    (id,planned_league_id,slug,name,product_name,timezone,game_year,
+     initial_commissioner_user_id,source_mode,plan_hash,status,created_by_user_id,
+     updated_by_user_id,prepared_by_user_id,prepared_at,activated_by_user_id,activated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?, 'prepared',?,?,?,?,?,?)`).run(
+      'plan-1','league-1','league','League','FranchiseHQ','America/Chicago',2027,
+      'commissioner-1','companion','plan-hash-1','commissioner-1','commissioner-1',
+      'commissioner-1','2026-09-20T00:00:00.000Z','commissioner-1','2026-09-20T00:01:00.000Z'
+    );
+  sqlite.prepare(`INSERT INTO madden_discovery_sessions
+    (id,league_id,token_hash,status,expected_league_name,capture_count,expires_at,last_capture_at)
+    VALUES (?,?,?,?,?,?,?,?)`).run(
+      'session-first','league-1','token-first','review_required','League',2,
+      '2099-01-01T00:00:00.000Z','2026-09-20T00:02:00.000Z'
+    );
+  sqlite.prepare(`INSERT INTO companion_route_captures
+    (id,league_id,discovery_session_id,route_path,request_method,content_type,byte_length,
+     payload_hash,r2_object_key,received_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+      'capture-first','league-1','session-first',routePath,'POST','application/json',100,
+      'payload-first',objectKey,'2026-09-20T00:02:00.000Z'
+    );
+  sqlite.prepare(`INSERT INTO madden_discovery_session_captures
+    (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`).run(
+      'league-1','session-first','capture-first',routePath,'2026-09-20T00:02:00.000Z'
+    );
+  sqlite.prepare(`INSERT INTO companion_route_captures
+    (id,league_id,discovery_session_id,route_path,request_method,content_type,byte_length,
+     payload_hash,r2_object_key,received_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+      'capture-stats','league-1','session-first',statsRoute,'POST','application/json',100,
+      'payload-stats',statsKey,'2026-09-20T00:02:01.000Z'
+    );
+  sqlite.prepare(`INSERT INTO madden_discovery_session_captures
+    (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`).run(
+      'league-1','session-first','capture-stats',statsRoute,'2026-09-20T00:02:01.000Z'
+    );
+  const sourceMarkers={
+    sourceFranchiseId:{expected:null,observed:['9001'],status:'observed'},
+    season:{expected:null,observed:[],status:'missing'},
+    week:{expected:null,observed:Array.from({length:18},(_,index)=>String(index+1)),status:'multi-period'}
+  };
+  const requirements={
+    teams:{status:'located',recordCount:32,routes:['xbsx/9001/teams']},
+    'team-rosters':{status:'missing',recordCount:0,routes:[]},
+    players:{status:'missing',recordCount:0,routes:[]},
+    standings:{status:'located',recordCount:32,routes:['xbsx/9001/standings']},
+    schedule:{status:'located',recordCount:272,routes:[routePath]},
+    statistics:{status:'located',recordCount:100,routes:['xbsx/9001/week/reg/0/stats']},
+    'free-agents':{status:'missing',recordCount:0,routes:[]}
+  };
+  sqlite.prepare(`INSERT INTO madden_discovery_reports
+    (id,league_id,session_id,status,route_count,capture_count,total_bytes,source_markers_json,
+     source_verification_json,requirement_results_json,free_agent_evidence_json,
+     sanitized_fixture_json,report_hash,generated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      'report-first','league-1','session-first','review_required',42,1,100,
+      JSON.stringify(sourceMarkers),JSON.stringify({gameRelease:false,league:true,season:false,week:true,passed:false}),
+      JSON.stringify(requirements),JSON.stringify({status:'missing',recordCount:0}),
+      JSON.stringify({analysisPolicy:'retained-test'}),'report-hash-first','2026-09-20T00:03:00.000Z'
+    );
+  sqlite.prepare(`UPDATE companion_league_export_endpoints SET
+    latest_session_id='session-first',latest_session_token_version=token_version,
+    latest_report_id='report-first',latest_ready_report_id=NULL,
+    last_received_at='2026-09-20T00:02:00.000Z',last_analyzed_at='2026-09-20T00:03:00.000Z'
+    WHERE league_id='league-1'`).run();
 }
 
 test('yearly schedule parsing preserves ordinary route authority and limits Week 0 to payload periods',()=>{
@@ -306,6 +389,82 @@ test('Import Yearly Schedule seals 18 weeks atomically without snapshots, Discor
   }finally{sqlite.close()}
 });
 
+test('new tenant first-season confirmation prepares only its league and reuses the retained yearly schedule',async()=>{
+  const {sqlite,objects,context}=await fixture({includeSeason:false});
+  try{
+    sqlite.prepare(`INSERT INTO leagues (id,name,product_name,slug,public_status,tenant_status,timezone)
+      VALUES ('league-fgc','Furious Gaming Community','FranchiseHQ','fgc','active','enabled','America/Chicago')`).run();
+    sqlite.prepare(`INSERT INTO league_game_years
+      (id,league_id,game_release,edition_year,display_name,status)
+      VALUES ('fgc-game-year','league-fgc','Madden NFL 27',27,'Madden NFL 27','active')`).run();
+    sqlite.prepare(`INSERT INTO franchise_seasons
+      (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('fgc-season','league-fgc','ea-madden-companion','742482','2','Madden NFL 27','FGC 2027',2027,'active')`).run();
+    seedFirstSeasonExport(sqlite,objects);
+
+    let response=await getYearlySchedule(context());
+    let payload=await response.json();
+    assert.equal(response.status,200);
+    assert.equal(payload.preparedSeason,null);
+    assert.equal(payload.firstSeasonPreparation.status,'confirmation-required');
+    assert.equal(payload.firstSeasonPreparation.gameRelease,'Madden NFL 27');
+    assert.equal(payload.firstSeasonPreparation.sourceFranchiseId,'9001');
+    assert.equal(payload.firstSeasonPreparation.retainedExport.routeCount,42);
+    assert.equal(payload.firstSeasonPreparation.retainedExport.hasRoster,false);
+
+    response=await updateYearlySchedule(context({
+      action:'prepare-first-season',sourceFranchiseId:'9001',sourceSeasonId:'1',confirmSourceSeason:false
+    }));
+    payload=await response.json();
+    assert.equal(response.status,409);
+    assert.match(payload.error,/Confirm the exact Madden franchise season number/);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM franchise_seasons WHERE league_id='league-1'`).get().count,0);
+
+    response=await updateYearlySchedule(context({
+      action:'prepare-first-season',sourceFranchiseId:'9001',sourceSeasonId:'1',confirmSourceSeason:true
+    }));
+    payload=await response.json();
+    assert.equal(response.status,201,JSON.stringify(payload));
+    assert.equal(payload.prepared,true);
+    assert.equal(payload.preparedSeason.seasonYear,2027);
+    assert.equal(payload.firstSeasonPreparation.status,'prepared');
+    assert.equal(payload.reanalysis.sourceVerified,true,JSON.stringify(payload.reanalysis));
+    assert.equal(payload.reanalysis.importReady,false);
+    assert.equal(payload.reanalysis.freeAgentCount,null);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_game_years WHERE league_id='league-1'`).get().count,1);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM franchise_seasons WHERE league_id='league-1'`).get().count,1);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM companion_import_destinations WHERE league_id='league-1'`).get().count,1);
+    const preparedSession=sqlite.prepare(`SELECT expected_game_release,expected_season
+      FROM madden_discovery_sessions WHERE id='session-first'`).get();
+    assert.equal(preparedSession.expected_game_release,'Madden NFL 27');
+    assert.equal(preparedSession.expected_season,'1');
+    const reviewed=sqlite.prepare(`SELECT status,source_verification_json
+      FROM madden_discovery_reports WHERE id='report-first'`).get();
+    assert.equal(reviewed.status,'review_required');
+    assert.equal(JSON.parse(reviewed.source_verification_json).passed,true);
+
+    const fgcBefore=sqlite.prepare(`SELECT id,status FROM franchise_seasons WHERE league_id='league-fgc'`).get();
+    response=await updateYearlySchedule(context({action:'start'}));
+    payload=await response.json();
+    assert.equal(response.status,201,JSON.stringify(payload));
+    assert.equal(payload.yearlyScheduleImport.status,'ready');
+    assert.equal(payload.yearlyScheduleImport.gameCount,272);
+    assert.equal(payload.yearlyScheduleImport.captureCount,1);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM companion_route_captures
+      WHERE league_id='league-1' AND id='capture-first'`).get().count,1);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM yearly_schedule_import_captures
+      WHERE league_id='league-1'`).get().count,1);
+    assert.deepEqual(sqlite.prepare(`SELECT id,status FROM franchise_seasons WHERE league_id='league-fgc'`).get(),fgcBefore);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshots`).get().count,0);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM discord_schedule_threads`).get().count,0);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM tenant_audit_events
+      WHERE league_id='league-1' AND action='companion.first_season.prepare'`).get().count,1);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM tenant_audit_events
+      WHERE league_id='league-fgc'`).get().count,0);
+    assert.equal(sqlite.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{sqlite.close()}
+});
+
 test('runtime and commissioner UI wire collection separately from live import and Discord',async()=>{
   const [receiver,candidate,builder,ui,compact]=await Promise.all([
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js',import.meta.url),'utf8'),
@@ -326,6 +485,10 @@ test('runtime and commissioner UI wire collection separately from live import an
   assert.match(ui,/data-import-yearly-schedule/);
   assert.match(ui,/Import Yearly Schedule/);
   assert.match(ui,/Review & Finish Yearly Schedule/);
+  assert.match(ui,/Finish First-Season Setup/);
+  assert.match(ui,/Confirm & Prepare Season/);
+  assert.match(ui,/First roster is still required/);
+  assert.match(ui,/Import unavailable:/);
   assert.match(compact,/Finish Yearly Schedule First/);
   assert.doesNotMatch(ui,/Schedule Preload|preload/i);
 });
