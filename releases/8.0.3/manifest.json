@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.3",
+  "releaseType": "optional-schedule-first-import-stability",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.2",
+    "commit": "c2552c2d44763f501950123fbc70ce1f0eebe097",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "codex/franchisehq-8.0.3-stability",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "not-run",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": false,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "8.0.2",
+    "candidateRelease": "8.0.3",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Publish optional yearly-to-weekly import switching and mobile first-import clarity. Do not switch P2W's collection during deployment, import data, move a live snapshot, create Discord threads, rotate a URL, delete captures, change credentials, or interpret missing Free Agents as zero."
+  },
+  "requiredArtifacts": [
+    "functions/api/leagues/[leagueSlug]/companion/yearly-schedule.js",
+    "league-engine/permanent-export-url.js",
+    "league-engine/one-click-import.js",
+    "styles.css",
+    "tests/import/yearly-schedule.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.3/release-record.md",
+    "releases/8.0.3/validation-evidence.json"
+  ]
+}

@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 8.0.2 */
+/* FHQ_BUILD: 8.0.3 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.2';
+  const VERSION = '8.0.3';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -534,7 +534,7 @@
   }
 
   function renderPanel() {
-    const {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,runDisabled,runLabel,activePhase,phaseProgress}=importControlsState();
+    const {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,yearlyScheduleImport,runDisabled,runLabel,activePhase,phaseProgress}=importControlsState();
     const connectionService=exportUrlService();
     const resultCounts=counts();
     const faStatus=resultCounts.freeAgentStatus || source?.counts?.freeAgentStatus || 'missing';
@@ -555,6 +555,9 @@
     const activationTiming=run?.phaseState?.['atomic-activation'];
     const refreshTiming=run?.phaseState?.['browser-refresh'];
     const rosterCarryForward=resultCounts.rosterCarryForward||source?.rosterCarryForward||source?.counts?.rosterCarryForward||null;
+    const collectingSchedule=['collecting','ready'].includes(yearlyScheduleImport?.status);
+    const awaitingFirstLiveImport=(!run&&!source&&exportStatus!=='ready'||collectingSchedule&&run?.status!=='running')
+      &&!state?.activeSnapshotId&&!state?.activeSnapshotWeek&&!latestExport.activeSnapshotWeek;
     const threadTiming=threadSync?.durationMs!=null?durationLabel(threadSync.durationMs)
       :threadSync?.status==='not-required'?'Not required':threadSync?.scheduled?'Running':threadSync?.status||'—';
     const threadReview=threadSync?.reviewRequired?`Schedule threads need commissioner review (${threadSync.reason}). After verifying the current period, use /week${threadSync.weekIndex} in the connected Discord server.`
@@ -567,8 +570,8 @@
         <button class="button button--ghost" data-refresh-companion-import ${busy||connection.busy?'disabled':''}>Refresh</button>
       </div>
       ${connectionService?.renderYearlyScheduleControls?.()||''}
-      <div class="commissioner-import-progress-block commissioner-import-progress-block--modern"><div class="commissioner-import-progress-head"><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" aria-label="${esc(phaseLabel(activePhase))} ${phaseProgress}% complete"><span style="width:${phaseProgress}%"></span></div><p>${esc(notice||'Ready when the next Madden export arrives.')}</p><ol class="commissioner-import-phase-list">${phaseRows()}</ol></div>
-      <section class="commissioner-latest-snapshot" aria-labelledby="commissioner-latest-snapshot-title"><header><div><span class="eyebrow">Most recent import source</span><h4 id="commissioner-latest-snapshot-title">Latest Snapshot</h4></div><span>${endpointState.exportUrl?'Permanent URL connected':'Connection unavailable'}</span></header><div class="commissioner-import-summary">
+      ${awaitingFirstLiveImport?`<section class="commissioner-import-empty-state" aria-label="First live import pending"><span class="eyebrow">No live snapshot yet</span><h4>${collectingSchedule?'Collecting an optional full-season schedule':'Ready for a first weekly import'}</h4><p>${collectingSchedule?'Captured schedule weeks are retained, but they do not publish a live week or create threads. Finish all 18 weeks, or choose Switch to Weekly Imports above.':'Export League Info, Rosters, and Weekly Stats for the Madden week you want live, then select Import Latest Export. You do not need to collect the entire season first.'}</p><p>The first live import needs a roster baseline. Later same-season imports can carry that roster forward when Madden cannot export Rosters.</p></section>`:`<div class="commissioner-import-progress-block commissioner-import-progress-block--modern"><div class="commissioner-import-progress-head"><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" aria-label="${esc(phaseLabel(activePhase))} ${phaseProgress}% complete"><span style="width:${phaseProgress}%"></span></div><p>${esc(notice||'Ready when the next Madden export arrives.')}</p><details class="commissioner-import-phase-details" ${run?.status==='running'?'open':''}><summary>View all import steps</summary><ol class="commissioner-import-phase-list">${phaseRows()}</ol></details></div>`}
+      ${awaitingFirstLiveImport?'':`<section class="commissioner-latest-snapshot" aria-labelledby="commissioner-latest-snapshot-title"><header><div><span class="eyebrow">Most recent import source</span><h4 id="commissioner-latest-snapshot-title">Latest Snapshot</h4></div><span>${endpointState.exportUrl?'Permanent URL connected':'Connection unavailable'}</span></header><div class="commissioner-import-summary">
         <div><small>Latest export</small><strong>${esc(dateLabel(latestExport.receivedAt||source?.generatedAt))}</strong></div>
         <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
         <div><small>Season</small><strong>${esc(source?.season?.seasonYear ?? '—')}</strong></div>
@@ -583,7 +586,7 @@
         <div><small>Atomic activation</small><strong>${durationLabel(activationTiming?.durationMs)}</strong></div>
         <div><small>Browser refresh</small><strong>${durationLabel(refreshTiming?.durationMs)}</strong></div>
         <div><small>Thread readiness</small><strong>${esc(threadTiming)}</strong></div>
-      </div></section>
+      </div></section>`}
       <div class="league-import-framework-note"><svg><use href="#icon-shield"></use></svg><span><strong>Atomic safety:</strong> Validation must pass before the live pointer moves. Any failure leaves the previous live snapshot untouched; no reset or destructive replacement runs.</span></div>
       ${historicalBackfill?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Historical backfill:</strong> ${esc(retainedScope)} will be composed in one import. Active Regular Season Week ${esc(coverage.activeWeek)} teams, rosters, players, standings, and live-week position are preserved.</span></div>`:''}
       ${rosterCarryForward?`<div class="league-import-framework-note"><svg><use href="#icon-info"></use></svg><span><strong>Roster carried forward:</strong> Players, team assignments, contracts, and the ${esc(rosterCarryForward.freeAgentStatus||'unknown')} Free Agent state remain unchanged from the active snapshot. League Info, games, results, standings, and weekly statistics will update normally.</span></div>`:''}

@@ -1,6 +1,6 @@
 import { normalizeTenantSlug, validTenantSlug } from './tenant-context.js';
 
-export const PLATFORM_ONBOARDING_RELEASE = '8.0.2';
+export const PLATFORM_ONBOARDING_RELEASE = '8.0.3';
 export const PLATFORM_ONBOARDING_SCHEMA_VERSION = 2;
 
 export const ONBOARDING_FEATURE_KEYS = Object.freeze([
@@ -124,7 +124,7 @@ export function validateOnboardingInput(plan) {
     errors.push('An existing FranchiseHQ user is required as the initial commissioner.');
   }
   if (plan.sourceMode !== 'companion') {
-    errors.push('Only the Madden Companion connection is available for onboarding in 8.0.2.');
+    errors.push('Only the Madden Companion connection is available for onboarding in 8.0.3.');
   }
   if (plan.desiredDomain && !HOSTNAME.test(plan.desiredDomain)) {
     errors.push('Custom domain must be a hostname without a protocol, path, or port.');

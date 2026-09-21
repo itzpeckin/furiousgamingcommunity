@@ -184,7 +184,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 560370,
+        "bytes": 562332,
         "file": "styles.css"
       },
       {
@@ -248,7 +248,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 40184,
+        "bytes": 41470,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -1684,7 +1684,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.2",
+  "release": "8.0.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

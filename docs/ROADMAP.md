@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 20, 2026
+**Updated:** September 21, 2026
 
-**Revision:** 2.96
+**Revision:** 2.97
 
 **Current production:** FranchiseHQ 8.0.2 is live from Main `f77e266` through Pages workflow run `35539243812` with migration 47. Signed-in read-only acceptance confirms P2W's reusable First-Season Setup against its retained 42-route export and observed franchise `3138676`; the UI still requires the commissioner to confirm the source season and correctly requires one first roster export. FGC remains live and isolated on 2027 Week 4 with 32 teams, 2,046 rostered players, and its completed 272-game yearly schedule. No Production league-data operation ran during deployment or acceptance.
 
-**Current work:** 8.0.2 is complete in Production. The reusable tenant-owned first-season bootstrap, retained-schedule recovery, truthful roster safety, and disabled-action explanations are deployed and verified. P2W's source season remains intentionally unprepared until its commissioner enters and confirms the exact Madden value.
+**Current work:** 8.0.3 addresses the first-import stability issue found during P2W onboarding: full-season collection must be optional and safely escapable, the phone import workspace must show a readable first-import state, and the first-roster prerequisite must be stated plainly. This release does not publish P2W league data or change FGC.
 
-**Next gate:** The P2W commissioner confirms the exact Madden source-season value in League Data; FranchiseHQ then rechecks the retained export and makes Import Yearly Schedule available without another All Weeks export. One roster-inclusive export is still required before P2W's first live snapshot. After that operating proof, 8.1.0 completes registration-to-first-import self-service and 8.2.0 adds payment-backed automatic activation.
+**Next gate:** P2W may finish its optional 18-week schedule collection or switch to weekly imports without losing retained captures. A fresh current-week League Info + Weekly Stats + Rosters export is still required for its first complete live snapshot; League Info + Weekly Stats alone becomes eligible only after a same-season roster baseline is already live. If EA's Rosters mode remains unavailable, a separately designed restricted score/schedule-only first-import mode or approved independent roster source is needed; neither may invent roster authority or turn unknown Free Agents into zero. After P2W operating proof, 8.1.0 completes registration-to-first-import self-service and 8.2.0 adds payment-backed automatic activation.
 
 ## Product decisions
 
@@ -144,6 +144,7 @@
 | 8.0.1 | Production; superseded by 8.0.1.1 startup hotfix | Tenant-derived league shell, clickable league switching, and empty-tenant commissioner activation without cross-league teams |
 | 8.0.1.1 | Production; signed-in acceptance passed | Single-word league-name startup repair with cache-busted signed-in acceptance |
 | 8.0.2 | Production; signed-in acceptance passed | Repair P2W's first-season foundation, preserve its retained export, expose exact import prerequisites, and prove a new tenant can begin its first import without FGC coupling |
+| 8.0.3 | Validation in progress | Make full-season schedule collection optional and safely escapable; clarify first-roster authority and repair the mobile first-import workspace without changing live league data |
 | 8.1.0 | Planned | Complete self-service league readiness from registration through first successful Madden import and team assignment |
 | 8.2.0 | Planned | Annual league billing, verified entitlement, automatic activation, billing portal, and non-destructive grace/suspension lifecycle |
 | 8.3.0 | Planned | Multi-league administration, quotas, support operations, capacity controls, and custom-domain automation |
@@ -183,6 +184,7 @@
 | 14b | Production deployed; owner acceptance passed | 7.7.2 | Build a repeatable, previewable, tenant-isolated onboarding path and prove that a disabled tenant shell can be prepared without changing FGC or enabling another real league. |
 | 15 | Complete in Production | 8.0.0–8.0.1.1 | Add provider-independent accounts, register and activate P2W through the reviewed owner gate, and repair the tenant shell, league selector, and empty-team commissioner path while FGC remains isolated. |
 | 16 | Immediate P2W recovery | 8.0.2 | Create P2W's missing first-game-year/season/import foundation, reuse its retained export where safe, explain every disabled import control, and unlock annual-schedule collection without changing FGC. |
+| 16a | First-import stability | 8.0.3 | Let a commissioner safely leave an incomplete yearly collection for weekly imports, retain all captured exports, show a readable phone first-import state, and state the first-roster prerequisite. |
 | 17 | Self-service operating readiness | 8.1.0 | Make registration produce a fully prepared league whose commissioner can sign in, complete first-season setup, run the first export, import it, assign teams, and operate the league without platform-owner repair. |
 | 18 | Payment and automatic activation | 8.2.0 | Sell one annual entitlement per league through a hosted payment flow, verify payment server-side, activate idempotently without manual owner work, and provide customer billing plus safe grace/suspension recovery. |
 | 19 | Scale administration | 8.3.0 | Complete cross-tenant administration, quotas, capacity controls, support/audit tooling, scheduled-work isolation, and custom-domain automation for many concurrent leagues. |
@@ -881,6 +883,14 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Add a reusable new-tenant bootstrap regression proving zero cross-tenant reads/writes and preserving retained exports, snapshots, audits, memberships, assignments, Discord state, and Free Agent authority.
 - Gate: P2W can open **Import Yearly Schedule**, the retained export remains available and correctly classified after reviewed identity preparation, a rosterless first live import is truthfully blocked, and a complete first export can advance through ordinary candidate validation. FGC's exact active state remains unchanged.
 
+## 8.0.3 — Optional Schedule Collection and First-Import Stability
+
+- A commissioner can leave an incomplete **Import Yearly Schedule** collection and use ordinary weekly imports. Keep the collected raw routes and yearly audit; do not seal an incomplete 18-week schedule or silently publish its partial games.
+- The switch does not reset a live snapshot, change the current week, create Discord threads, rotate the permanent export URL, delete captures, or reinterpret Free Agents.
+- Replace the empty new-league 0% progress strip and zero-filled snapshot dashboard with a readable first-import explanation. Make phase details accessible and legible at phone widths.
+- The standard first full snapshot still needs a rostered-player baseline; later same-season League Info + Weekly Stats exports may carry that exact live roster forward. A separate restricted first-import mode or approved alternative roster authority is a future design decision if EA does not restore Rosters.
+- Gate: regression proves retained captures, an audited idempotent switch, no league-data side effects, responsive layout, and FGC/P2W isolation. Do not perform the switch on P2W during deployment; the commissioner chooses it in the UI.
+
 ## 8.1.0 — Self-Service League Operating Readiness
 
 - Turn public league registration into a complete first-use workflow rather than an empty tenant shell. Capture league identity, URL, branding, Madden edition/year, current franchise season, initial commissioner, desired features, optional Discord setup, and the billing plan that will later entitle the tenant.
@@ -929,6 +939,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## Change log
 
+- **Revision 2.97:** Reviewed P2W's optional annual collection and first-import UI. P2W is collecting a partial yearly schedule (5/18 weeks and 79/272 games at inspection), not a live snapshot. Implemented an audited, idempotent Switch to Weekly Imports action that retains every captured route while unblocking a fresh current-week export; it does not seal or publish the partial schedule. Replaced the misleading empty 0%/zero-filled dashboard and made phase details readable on phones. Confirmed the normal first complete snapshot still needs a roster baseline; League Info + Weekly Stats alone becomes eligible only for proven same-season roster carry-forward. An EA-hosted user bug report independently describes roster export failing before delivery while other modes reach a receiver; no current EA-staff roster-specific fix or reliable workaround was found. Release validation and publication are tracked in 8.0.3 evidence.
 - **Revision 2.96:** Published 8.0.2 through PR #142 and merged Main `f77e266`; all four pull-request checks and all five Main quality, build, and deployment checks passed, including quality workflow `35539244174` and Pages workflow `35539243812`. Authenticated read-only Production acceptance shows Release 8.0.2 on P2W and FGC. P2W retains 42 routes, shows observed franchise `3138676`, requires exact source-season confirmation, and truthfully blocks the first live snapshot until a roster-inclusive export succeeds. FGC remains live on 2027 Week 4 with 32 teams, 2,046 rostered players, and its completed 272-game schedule. No season preparation, import, snapshot activation, Discord work, reset, deletion, URL rotation, archive, transition, credential change, or Free Agent reinterpretation ran during deployment or acceptance.
 - **Revision 2.95:** Authorized and built the 8.0.2 reusable first-season bootstrap. The candidate requires commissioner confirmation for the unproven source-season value, binds only the single franchise observed on the tenant's retained export, creates the Madden game year, franchise season, link, import destination, session expectations, and audit atomically, then reanalyzes the retained export. Import Yearly Schedule can reuse a compatible retained 18-week/272-game schedule without another All Weeks export, a live snapshot, a current-week move, or Discord threads. A rosterless first live import remains blocked with an exact first-roster explanation; missing or blocked Free Agents remain unknown. The regression proves retained captures and a separate FGC fixture remain unchanged. Candidate publication and Production deployment remain pending.
 - **Revision 2.94:** Diagnosed P2W's first import read-only and reconciled the completion roadmap. The correct P2W permanent endpoint retained 42 routes with 32 teams, standings, schedule, and statistics; no roster, player, Free Agent, or league-identity route was captured. P2W onboarding retained game year 2027 only in configuration and created zero durable game years, franchise seasons, or import destinations, so source validation lacked expected Madden release/season and both import actions were disabled. FGC remains isolated and works from its existing durable season foundation. Added 8.0.2 to repair P2W first; expanded 8.1.0 into complete self-service first-use readiness; added 8.2.0 annual billing, verified entitlement, and automatic activation; moved scale operations to 8.3.0; and established 9.0.0 as commercial product completion. No code, Production row, import, snapshot, roster, membership/assignment, Discord state, export URL, season lifecycle, credential, payment, or Free Agent authority changed during diagnosis or roadmap work.

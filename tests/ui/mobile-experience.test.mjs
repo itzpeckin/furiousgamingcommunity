@@ -26,6 +26,17 @@ test('Command Center import uses the existing left column without desktop row gr
  assert.match(importer,/role="progressbar"[\s\S]*aria-valuenow/);
 });
 
+test('new-league import uses a readable empty state and phone-sized progress details', async () => {
+  const [importer,styles]=await Promise.all([source('league-engine/one-click-import.js'),source('styles.css')]);
+  const release=styles.slice(styles.lastIndexOf('/* FranchiseHQ 8.0.3 — readable first-import and optional yearly schedule controls */'));
+  assert.match(importer,/awaitingFirstLiveImport\?`<section class="commissioner-import-empty-state"/);
+  assert.match(importer,/No live snapshot yet/);
+  assert.match(importer,/View all import steps/);
+  assert.match(release,/@media\(max-width:700px\)[\s\S]*\.commissioner-import-progress-block--modern \.commissioner-import-phase-list\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);overflow:visible/);
+  assert.match(release,/@media\(max-width:460px\)[\s\S]*grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(release,/\.commissioner-yearly-schedule__actions\{display:grid!important/);
+});
+
 test('active routes share an intentional phone composition without page-wide horizontal scrolling', async () => {
   const [html, app, trade, styles] = await Promise.all([
     source('index.html'),

@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 8.0.2 */
+/* FHQ_BUILD: 8.0.3 */
 import {
   json,
   database,
@@ -11,7 +11,7 @@ import { inferMaddenContractUnit } from '../../../../_lib/live-data-experience.j
 import { rosterCarryForwardEligibility } from '../../../../_lib/permanent-league-export.js';
 import { buildTeamIdentityRebase } from '../../../../_lib/team-identity-rebase.js';
 
-const RELEASE='8.0.2';
+const RELEASE='8.0.3';
 const ROSTER_ROUTE = /\/team\/([^/]+)\/roster\/?$/i;
 const FREE_AGENT_ROUTE = /\/freeagents\/roster\/?$/i;
 
