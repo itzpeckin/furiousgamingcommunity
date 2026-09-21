@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.0.4",
   "releaseType": "command-center-and-discord-schedule-stability",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.0.3",
@@ -16,17 +16,20 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized": true, "status": "not-run", "pullRequests": []},
+  "repositoryPublication": {"authorized": true, "status": "merged", "pullRequests": [146], "mainCommit": "f3657eb9255e4fb2313edec74b8af3df94210f45"},
   "staging": {"authorized": false, "deployed": false, "status": "not-run"},
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "8.0.3",
+    "deployed": true,
+    "status": "verified-pending-owner-acceptance",
+    "currentRelease": "8.0.4",
     "candidateRelease": "8.0.4",
     "currentMigration": 47,
     "candidateMigration": 47,
-    "scope": "Correct only Command Center compact yearly-card overflow and durable, proof-gated Discord schedule rollover. Do not alter P2W captures, import, active snapshot, rosters, memberships, export URL, seasons, or Free Agent semantics. Resume only the exact proven FGC Week 3 cleanup after deployment and read-only verification."
+    "pagesDeploymentId": "12ef5c6e-f8d9-4fdf-b073-929c529defd1",
+    "workerVersionId": "68e534cc-71b0-49f9-ae74-a32b78e29009",
+    "workerDeploymentId": "b721d037-cb0a-4543-8bd7-9b51a7457eb7",
+    "scope": "Correct only Command Center compact yearly-card overflow and durable, proof-gated Discord schedule rollover. Do not alter P2W captures, import, active snapshot, rosters, memberships, export URL, seasons, or Free Agent semantics. The seven old FGC Week 3 threads remain pending a separately triggered, proof-gated retry."
   },
   "requiredArtifacts": [
     "styles.css",
