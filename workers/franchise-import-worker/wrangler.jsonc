@@ -16,6 +16,11 @@
       "name": "franchise-hq-import-workflow",
       "binding": "FRANCHISE_IMPORT_WORKFLOW",
       "class_name": "FranchiseImportWorkflow"
+    },
+    {
+      "name": "franchise-hq-schedule-workflow",
+      "binding": "FRANCHISE_SCHEDULE_WORKFLOW",
+      "class_name": "FranchiseScheduleWorkflow"
     }
   ]
 }

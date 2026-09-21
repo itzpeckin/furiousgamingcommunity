@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 8.0.0 */
+/* FHQ_BUILD: 8.0.4 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='8.0.0';
+const RELEASE='8.0.4';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -260,6 +260,32 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
   }
 }
 
+export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
+  async run(event,step){
+    const input=event.payload||{};
+    const context={slug:text(input.leagueSlug),origin:text(input.origin).replace(/\/+$/,''),
+      token:text(input.importAuthToken)};
+    const snapshotId=text(input.snapshotId),source=text(input.source);
+    if(!context.slug||!context.origin||!context.token||!snapshotId
+      ||!['candidate-import','rollover-recovery'].includes(source)){
+      throw new Error('Schedule workflow payload is incomplete.');
+    }
+    let result;
+    for(let index=0;index<80;index+=1){
+      result=await step.do(`schedule-batch-${index+1}`,{
+        retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'2 minutes'
+      },()=>call(context,companion(context.slug,'schedule-sync-job'),'POST',{
+        snapshotId,source,maxOperations:1
+      }));
+      if(result.status==='completed')return{ok:true,release:RELEASE,source,snapshotId,result};
+      if(result.status!=='running'||!result.hasMore){
+        throw new Error(`Schedule sync stopped: ${result.reason||result.errors?.[0]||result.status||'unknown state'}`);
+      }
+    }
+    throw new Error('Schedule sync exceeded the 80-batch safety limit.');
+  }
+}
+
 async function workflowId(slug,workflowKey){
   const encoded=new TextEncoder().encode(`${slug}:${workflowKey}`);
   const digest=await crypto.subtle.digest('SHA-256',encoded);
@@ -289,11 +315,36 @@ export default{
         }
         return json({ok:true,release:RELEASE,id,reusedExisting:false,retryOfFailedWorkflow:failed,workflowKey,status:await instance.status().catch(()=>null)});
       }
+      if(url.pathname==='/schedule/start'&&request.method==='POST'){
+        const body=await request.json().catch(()=>({}));
+        const slug=text(body.leagueSlug),origin=text(body.origin).replace(/\/+$/,''),token=text(body.importAuthToken);
+        const workflowKey=text(body.workflowKey),source=text(body.source),snapshotId=text(body.snapshotId);
+        if(!slug||!origin||!token||!workflowKey||!snapshotId
+          ||!['candidate-import','rollover-recovery'].includes(source)){
+          return json({ok:false,release:RELEASE,error:'Missing schedule workflow parameters.'},400);
+        }
+        const baseId=await workflowId(slug,`schedule:${workflowKey}`);
+        let status=null;
+        try{status=await(await env.FRANCHISE_SCHEDULE_WORKFLOW.get(baseId)).status();}catch{}
+        const state=String(status?.status||'').toLowerCase();
+        if(status&&!['failed','errored','error','terminated','cancelled','canceled'].includes(state)){
+          return json({ok:true,release:RELEASE,id:baseId,reusedExisting:true,workflowKey,status});
+        }
+        const id=status?`${baseId}-r${Date.now().toString(36)}`:baseId;
+        const instance=await env.FRANCHISE_SCHEDULE_WORKFLOW.create({id,params:body});
+        return json({ok:true,release:RELEASE,id,reusedExisting:false,workflowKey,status:await instance.status().catch(()=>null)});
+      }
       if(url.pathname==='/status'&&request.method==='GET'){
         const id=text(url.searchParams.get('id'));
         let status=null;
         if(id)try{status=await (await env.FRANCHISE_IMPORT_WORKFLOW.get(id)).status();}catch(error){status={status:'unknown',error:String(error?.message||error)}}
         return json({ok:true,release:RELEASE,id,workflowStatus:status,workflowState:String(status?.status||'unknown').toLowerCase(),workflowOutput:status?.output||null});
+      }
+      if(url.pathname==='/schedule/status'&&request.method==='GET'){
+        const id=text(url.searchParams.get('id'));
+        let status=null;
+        if(id)try{status=await(await env.FRANCHISE_SCHEDULE_WORKFLOW.get(id)).status();}catch(error){status={status:'unknown',error:String(error?.message||error)}}
+        return json({ok:true,release:RELEASE,id,workflowStatus:status});
       }
       return json({ok:false,release:RELEASE,error:'Not found.'},404);
     }catch(error){

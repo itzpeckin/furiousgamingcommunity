@@ -15,10 +15,13 @@ function releaseBlock(styles) {
   return styles.slice(index);
 }
 
-test('Command Center import uses the existing left column without desktop row growth', async () => {
+test('Command Center import grows with annual controls without overlap or narrow desktop text', async () => {
  const [ui,css,importer]=await Promise.all([source('trade-module.js'),source('styles.css'),source('league-engine/one-click-import.js')]);
  assert.match(ui,/commissioner-command-column[\s\S]*renderCompactPanel[\s\S]*commissioner-command-panel--attention/);
- assert.match(css,/@media\(min-width:1101px\)\{\.commissioner-command-column\{contain:size\}\}/);
+ assert.match(css,/@media\(min-width:1101px\)\{\.commissioner-command-column\{contain:layout style\}\}/);
+ assert.doesNotMatch(css,/@media\(min-width:1101px\)\{\.commissioner-command-column\{contain:size\}\}/);
+ assert.match(css,/\.commissioner-command-import \.commissioner-yearly-schedule--compact\.is-active\{grid-template-columns:minmax\(0,1fr\)/);
+ assert.match(css,/\.commissioner-command-import \.commissioner-yearly-schedule--compact \.commissioner-yearly-schedule__actions\{display:grid!important;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
  assert.match(css,/commissioner-command-column>\.commissioner-command-import\{flex-grow:1;display:flex;flex-direction:column;justify-content:space-between\}/);
  assert.match(css,/@media\(max-width:1100px\)\{\.commissioner-command-column\{grid-column:1\/-1\}\}/);
  assert.match(css,/commissioner-command-import__actions\{display:grid;grid-template-columns:minmax\(0,/);

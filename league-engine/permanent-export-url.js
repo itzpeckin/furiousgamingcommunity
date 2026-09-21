@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 8.0.3 */
+/* FHQ_BUILD: 8.0.4 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '8.0.3';
+  const VERSION = '8.0.4';
   let state = null;
   let busy = false;
   let errorMessage = '';
@@ -258,12 +258,12 @@
     </section>`;
     const ready=annual.status==='ready';
     return `<section class="commissioner-yearly-schedule is-active${compact?' commissioner-yearly-schedule--compact':''}">
-      <div><strong>Full-season schedule collection</strong><small>${count(annual.capturedWeekCount)} of ${count(annual.expectedWeekCount)} weeks · ${count(annual.gameCount)} of ${count(annual.expectedGameCount)} games captured. This has not published a live week.</small></div>
+      <div><strong>Full-season schedule collection</strong><small>${count(annual.capturedWeekCount)} of ${count(annual.expectedWeekCount)} weeks · ${count(annual.gameCount)} of ${count(annual.expectedGameCount)} games captured.${compact?' No live week published.':' This has not published a live week.'}</small></div>
       <div class="commissioner-yearly-schedule__actions">
         <button class="button ${ready?'button--primary':'button--secondary'}" data-finish-yearly-schedule ${busy||!annual.readyToFinish?'disabled':''}>${busy?'Working…':'Finish Full Schedule'}</button>
         <button class="button button--ghost" data-switch-to-weekly ${busy?'disabled':''}>Switch to Weekly Imports</button>
       </div>
-      <p class="commissioner-yearly-schedule__help">Switching keeps every captured export but ends this optional collection. Run a fresh export for the week you want to make live; the first live import of a new league still needs Rosters.</p>
+      <p class="commissioner-yearly-schedule__help">${compact?'Switching keeps captured exports. The first live import still needs Rosters.':'Switching keeps every captured export but ends this optional collection. Run a fresh export for the week you want to make live; the first live import of a new league still needs Rosters.'}</p>
     </section>`;
   }
 

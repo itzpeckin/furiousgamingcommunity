@@ -1830,6 +1830,73 @@ test('a live import creates the complete new schedule before removing prior Fran
   }finally{database.close()}
 });
 
+test('checkpointed rollover resumes after a same-week import without losing prior-thread cleanup',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    database.prepare(`UPDATE discord_league_installations SET schedule_channel_id='100000000000000055'
+      WHERE league_id='league-a'`).run();
+    const db=d1(database),league={id:'league-a',slug:'alpha',name:'Alpha League'};
+    let nextId=90;
+    const fetchImpl=async(url,options={})=>{
+      if(options.method==='DELETE')return new Response(null,{status:204});
+      if(/\/messages$/.test(String(url))){
+        nextId+=1;
+        return new Response(JSON.stringify({id:`1000000000000000${nextId}`}),
+          {status:200,headers:{'content-type':'application/json'}});
+      }
+      return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
+    };
+    const addSecondGame=(snapshotId,week)=>{
+      for(const [externalId,name,abbreviation] of [['1003','Dallas Cowboys','DAL'],['1004','New York Giants','NYG']]){
+        seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'teams',externalId,
+          data:{external_id:externalId,display_name:name,abbreviation}});
+      }
+      seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'games',externalId:`second-game-${week}`,
+        data:{external_id:`second-game-${week}`,season_year:2026,stage:'regular-season',week_index:week,
+          away_team_external_id:'1004',home_team_external_id:'1003',status:'scheduled'}});
+    };
+    const prior=seedActiveWeek(database,{leagueId:'league-a',week:13});addSecondGame(prior,13);
+    assert.equal((await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:prior,source:'discord-command',fetchImpl
+    })).threads,2);
+    const current=seedActiveWeek(database,{leagueId:'league-a',week:14});addSecondGame(current,14);
+    proveScheduleAdvance(database,prior,current);
+    const one=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:current,source:'candidate-import',maxOperations:1,fetchImpl
+    });
+    assert.equal(one.status,'running');assert.equal(one.threads,1);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM discord_schedule_threads
+      WHERE week_index=13 AND status='active'`).get().count,2);
+    const two=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:current,source:'candidate-import',maxOperations:1,fetchImpl
+    });
+    assert.equal(two.status,'running');assert.equal(two.threads,2);
+    assert.equal(two.remainingPriorThreads,1);
+    const sameWeek='snapshot-league-a-14-same-week';
+    database.prepare(`INSERT INTO league_snapshots
+      (id,league_id,status,season_year,week_index,team_count,game_count,manifest_json,validation_status)
+      VALUES (?,'league-a','active',2026,14,4,2,'{}','ready')`).run(sameWeek);
+    database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json)
+      SELECT ?,league_id,domain,external_id,data_json FROM league_snapshot_records WHERE snapshot_id=?`).run(sameWeek,current);
+    database.prepare(`UPDATE league_active_snapshots SET snapshot_id=? WHERE league_id='league-a'`).run(sameWeek);
+    proveScheduleAdvance(database,current,sameWeek);
+    const skipped=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:sameWeek,source:'candidate-import',fetchImpl
+    });
+    assert.equal(skipped.reason,'same-week');
+    const recovered=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{
+      league,snapshotId:sameWeek,source:'rollover-recovery',maxOperations:1,fetchImpl
+    });
+    assert.equal(recovered.status,'completed');assert.equal(recovered.removedPriorThreads,1);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM discord_schedule_threads
+      WHERE week_index=13 AND status='active'`).get().count,0);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM discord_schedule_threads
+      WHERE week_index=14 AND status='active'`).get().count,2);
+  }finally{database.close()}
+});
+
 test('a same-week import does no Discord or thread-inventory work even when Madden renumbers a game',async()=>{
   const database=new DatabaseSync(':memory:');
   try{

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "version": "8.0.4",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "productionDataChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {"unregisteredFailures": 0},
+  "checks": {
+    "strictMigration": {"expectedFailure": false, "passed": true, "migrationVersion": 47, "candidateRequiresMigration": false, "productionApplied": false},
+    "commandCenterLayout": {"passed": true, "fixedSizeContainmentRemoved": true, "compactAnnualActionsSingleColumn": true, "teamsOwnersUntouched": true},
+    "discordScheduleRollover": {"passed": true, "durableWorkflow": true, "boundedCheckpoint": true, "weekAdvanceProofRequired": true, "sameWeekRecovery": true, "priorThreadsRetainedUntilCurrentComplete": true},
+    "repositoryRegression": {"passed": true, "status": "passed", "tests": 307},
+    "strictGate": {"passed": true, "status": "passed", "tests": 307}
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "databaseRowsWritten": 0,
+    "leagueDataRowsWritten": 0,
+    "importExecuted": false,
+    "activeSnapshotChanged": false,
+    "discordThreadsCreated": false,
+    "dataDeleted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false,
+    "freeAgentInterpretedAsZero": false
+  },
+  "external": {
+    "githubPublication": {"authorized": true, "status": "not-run"},
+    "hostedChecks": {"authorized": true, "status": "not-run"},
+    "productionMigration": {"authorized": false, "status": "not-required", "currentMigration": 47, "candidateMigration": 47},
+    "productionDeployment": {"authorized": true, "status": "not-run", "currentRelease": "8.0.3", "candidateRelease": "8.0.4"},
+    "postDeploymentVerification": {"authorized": true, "status": "not-run"}
+  }
+}

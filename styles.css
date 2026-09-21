@@ -7930,7 +7930,8 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 .commissioner-command-import__progress b{flex-shrink:0;color:var(--accent);font-size:.75rem}
 .commissioner-command-import__progress .commissioner-import-progress-track{height:6px;margin:0;border-radius:999px;background:#07101b;overflow:hidden}
 .commissioner-command-import__progress .commissioner-import-progress-track>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#3e7ef3,#6aa5ff);transition:width .25s ease}
-@media(min-width:1101px){.commissioner-command-column{contain:size}}
+/* 8.0.4: annual-import guidance must increase the Command Center row height. */
+@media(min-width:1101px){.commissioner-command-column{contain:layout style}}
 @media(max-width:1100px){.commissioner-command-column{grid-column:1/-1}}
 @media(max-width:700px){.commissioner-command-column{gap:16px}.commissioner-command-import{padding:16px}.commissioner-command-import>header h2{font-size:.8rem}.commissioner-command-import__actions{gap:6px}}
 
@@ -7983,6 +7984,14 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 }
 @media(min-width:1101px){
   .commissioner-command-column>.commissioner-command-import{flex-grow:1;display:flex;flex-direction:column;justify-content:space-between}
+}
+/* The compact Command Center card is one readable column even on desktop.
+   The full League Data annual-import controls retain their wider layout. */
+.commissioner-command-import .commissioner-yearly-schedule--compact.is-active{grid-template-columns:minmax(0,1fr);align-items:stretch}
+.commissioner-command-import .commissioner-yearly-schedule--compact .commissioner-yearly-schedule__actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));justify-content:stretch}
+.commissioner-command-import .commissioner-yearly-schedule--compact .commissioner-yearly-schedule__help{min-width:0;overflow-wrap:anywhere}
+@media(max-width:700px){
+  .commissioner-command-import .commissioner-yearly-schedule--compact .commissioner-yearly-schedule__actions{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-height:700px){
   .roster-management-dialog{overflow-y:auto}
