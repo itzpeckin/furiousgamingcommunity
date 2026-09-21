@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "FranchiseHQ",
-  "release": "8.0.3",
+  "release": "8.0.4",
   "configurationAuthority": "Cloudflare dashboard export until a reviewed Wrangler configuration is adopted",
   "deploymentPolicy": {
     "productionBranch": "main",
@@ -50,7 +50,8 @@
   },
   "importWorker": {
     "bindings": [
-      { "name": "FRANCHISE_IMPORT_WORKFLOW", "kind": "workflow", "logicalResource": "importWorkflow", "required": true }
+      { "name": "FRANCHISE_IMPORT_WORKFLOW", "kind": "workflow", "logicalResource": "importWorkflow", "required": true },
+      { "name": "FRANCHISE_SCHEDULE_WORKFLOW", "kind": "workflow", "logicalResource": "scheduleWorkflow", "required": true }
     ],
     "secrets": []
   },
@@ -66,11 +67,12 @@
         "COMPANION_EXPORT_META": "local:companion-metadata",
         "LEAGUE_CONFIG": "local:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "local:import-worker",
-        "FRANCHISE_IMPORT_WORKFLOW": "local:import-workflow"
+        "FRANCHISE_IMPORT_WORKFLOW": "local:import-workflow",
+        "FRANCHISE_SCHEDULE_WORKFLOW": "local:schedule-workflow"
       },
       "variables": {
         "APP_ENV": "local",
-        "APP_VERSION": "8.0.3",
+        "APP_VERSION": "8.0.4",
         "DISCORD_CLIENT_ID": "local-discord-application",
         "DISCORD_REDIRECT_URI": "http://localhost:8788/api/auth/discord/callback",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
@@ -97,11 +99,12 @@
         "COMPANION_EXPORT_META": "cloudflare:staging:companion-metadata",
         "LEAGUE_CONFIG": "cloudflare:staging:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "cloudflare:staging:import-worker",
-        "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:staging:import-workflow"
+        "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:staging:import-workflow",
+        "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:staging:schedule-workflow"
       },
       "variables": {
         "APP_ENV": "staging",
-        "APP_VERSION": "8.0.3",
+        "APP_VERSION": "8.0.4",
         "DISCORD_CLIENT_ID": "staging-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-staging",
         "DISCORD_REDIRECT_URI_PUBLIC": "set-in-cloudflare-staging-public",
@@ -128,11 +131,12 @@
         "COMPANION_EXPORT_META": "cloudflare:production:companion-metadata",
         "LEAGUE_CONFIG": "cloudflare:production:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "cloudflare:production:import-worker",
-        "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:production:import-workflow"
+        "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:production:import-workflow",
+        "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:production:schedule-workflow"
       },
       "variables": {
         "APP_ENV": "production",
-        "APP_VERSION": "8.0.3",
+        "APP_VERSION": "8.0.4",
         "DISCORD_CLIENT_ID": "production-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-production",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",

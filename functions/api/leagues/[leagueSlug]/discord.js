@@ -2,7 +2,7 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireCommissioner } from '../../../_lib/permissions.js';
 import { createTenantAuditContext, tenantAuditStatement } from '../../../_lib/tenant-context.js';
 import { DISCORD_COMMAND_RELEASE, DISCORD_GLOBAL_COMMANDS } from '../../../_lib/discord-commands.js';
-import { latestDiscordScheduleSync } from '../../../_lib/discord-schedule.js';
+import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../_lib/discord-schedule.js';
 import { discordGuildRoles, discordGuildTextChannels } from '../../../_lib/discord-installation.js';
 import { upsertDiscordGlobalCommands } from '../../../_lib/discord-api.js';
 
@@ -123,6 +123,20 @@ export async function onRequestPost(context){
       const waitUntil=context.waitUntil||context.executionContext?.waitUntil;
       if(typeof waitUntil==='function')waitUntil.call(context.executionContext||context,reconcile);
       else await reconcile;
+    }else if(action==='retry-schedule-sync'){
+      const active=await c.db.prepare(`SELECT snapshot_id AS snapshotId FROM league_active_snapshots
+        WHERE league_id=? LIMIT 1`).bind(c.league.id).first();
+      if(!active?.snapshotId)return json({ok:false,error:'No live league snapshot is available.'},409);
+      const recovery=await scheduleActiveDiscordSync(context,{
+        db:c.db,league:c.league,snapshotId:active.snapshotId,
+        requestedByUserId:c.session.user.id,requestedBySessionId:c.session.sessionId,
+        source:'candidate-import'
+      });
+      if(!recovery.scheduled)return json({ok:false,error:'No proven week-advance cleanup is ready to resume.',recovery},409);
+      await tenantAuditStatement(c.db,audit,{resourceType:'discord_schedule_sync',resourceId:active.snapshotId,
+        detail:{action,workflowId:recovery.workflowId||null,source:recovery.source||'candidate-import',
+          guardedByLiveSnapshot:true,automaticTransitionProofRequired:true}}).run();
+      return json({...await state(c),scheduleRecovery:recovery});
     }else if(action==='disable'){
       await c.db.batch([
         c.db.prepare(`UPDATE discord_league_installations SET status='disabled',updated_at=CURRENT_TIMESTAMP WHERE league_id=?`)

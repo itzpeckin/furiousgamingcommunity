@@ -128,9 +128,13 @@
       "functions/_lib/tenant-context.js"
     ],
     "FRANCHISE_IMPORT_WORKER": [
+      "functions/_lib/discord-schedule.js",
       "functions/api/leagues/[leagueSlug]/companion/import-job.js"
     ],
     "FRANCHISE_IMPORT_WORKFLOW": [
+      "workers/franchise-import-worker/src/index.js"
+    ],
+    "FRANCHISE_SCHEDULE_WORKFLOW": [
       "workers/franchise-import-worker/src/index.js"
     ],
     "GAME_YEAR_ARCHIVES": [
@@ -166,7 +170,7 @@
       ".css": 10,
       ".example": 1,
       ".html": 8,
-      ".js": 238,
+      ".js": 239,
       ".json": 7,
       ".jsonc": 1,
       ".md": 284,
@@ -184,7 +188,7 @@
         "file": "app.js"
       },
       {
-        "bytes": 562332,
+        "bytes": 563222,
         "file": "styles.css"
       },
       {
@@ -196,7 +200,7 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 161955,
+        "bytes": 166256,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -236,7 +240,7 @@
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 46906,
+        "bytes": 46974,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -260,7 +264,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 661
+    "total": 662
   },
   "frontend": {
     "assets": [
@@ -760,7 +764,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 85,
+    "routeCount": 86,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1052,6 +1056,13 @@
           "onRequestPost"
         ],
         "route": "/api/leagues/:leagueSlug/companion/released-player-locator"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/companion/schedule-sync-job.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/companion/schedule-sync-job"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js",
@@ -1684,7 +1695,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.3",
+  "release": "8.0.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

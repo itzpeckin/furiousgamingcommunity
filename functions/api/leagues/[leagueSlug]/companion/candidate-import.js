@@ -26,7 +26,7 @@ import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../.
 import { observeDevelopmentTraitsStatement } from '../../../../_lib/development-traits.js';
 import { reportImportReadiness, rosterCarryForwardEligibility } from '../../../../_lib/permanent-league-export.js';
 
-const RELEASE = '8.0.3';
+const RELEASE = '8.0.4';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -769,6 +769,7 @@ export async function onRequestPost(context) {
       league:current.league,
       snapshotId:result.run.active_snapshot_id_after||result.run.candidate_snapshot_id||null,
       requestedByUserId:current.authorization.session.user.id,
+      requestedBySessionId:current.authorization.session.sessionId,
       source:'candidate-import'
     });
     return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run),tradeReconciliation:result.tradeReconciliation||null,discordScheduleSync,importPerformance:{activationMs:Number(result.activationDurationMs||0),discordScheduleSync} });
