@@ -236,7 +236,7 @@
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 46880,
+        "bytes": 46906,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -248,7 +248,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 41470,
+        "bytes": 41473,
         "file": "league-engine/one-click-import.js"
       },
       {

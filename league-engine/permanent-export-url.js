@@ -289,7 +289,7 @@
     const importDisabled = busy || yearlyActive || status !== 'ready' || importDone;
     const sourceIssue=readinessIssue(latest.warnings||[]);
     const importReason=busy?'FranchiseHQ is finishing the current action.'
-      :yearlyActive?'Finish Import Yearly Schedule before publishing a live snapshot.'
+      :yearlyActive?'Finish the full schedule or switch to weekly imports above before publishing a live snapshot.'
         :importDone?'The newest eligible export is already live.'
           :status==='review-required'?(sourceIssue?.action||'Review the newest export prerequisites below.')
             :status==='receiving'?'FranchiseHQ is still receiving and checking the export.'
@@ -315,7 +315,7 @@
       ${renderNotices()}
       <div class="league-import-framework-actions">
         <button class="button button--secondary" data-copy-permanent-export-url ${busy || !endpointState.exportUrl ? 'disabled' : ''}>${copied ? 'URL Copied' : 'Copy League Export URL'}</button>
-        <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''} title="${esc(importReason||'Validate and publish the newest eligible export.')}">${busy ? 'Working…' : yearlyActive ? 'Finish Yearly Schedule First' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
+        <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''} title="${esc(importReason||'Validate and publish the newest eligible export.')}">${busy ? 'Working…' : yearlyActive ? 'Finish or Switch Schedule First' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
         <button class="button button--ghost" data-refresh-permanent-export ${busy ? 'disabled' : ''}>Refresh</button>
       </div>
       ${importDisabled&&importReason?`<p class="commissioner-import-disabled-reason"><strong>Import unavailable:</strong> ${esc(importReason)}</p>`:''}

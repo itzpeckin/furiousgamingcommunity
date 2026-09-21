@@ -728,7 +728,7 @@ export async function onRequestPost(context) {
   if (yearlyScheduleImport && action !== 'create-destination') {
     return json({
       ok:false,
-      error:'Import Latest Export is unavailable while Import Yearly Schedule is in progress. Finish the yearly schedule, then run a fresh current-week export.',
+      error:'Import Latest Export is unavailable while Import Yearly Schedule is in progress. Finish the full schedule or switch to weekly imports, then run a fresh current-week export.',
       release:RELEASE,
       yearlyScheduleImportId:yearlyScheduleImport.id,
       activationPerformed:false,

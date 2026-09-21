@@ -538,7 +538,7 @@ test('runtime and commissioner UI wire collection separately from live import an
   assert.match(ui,/Confirm & Prepare Season/);
   assert.match(ui,/First roster is still required/);
   assert.match(ui,/Import unavailable:/);
-  assert.match(compact,/Finish Yearly Schedule First/);
+  assert.match(compact,/Finish or Switch Schedule First/);
   assert.match(compact,/No live snapshot yet/);
   assert.match(compact,/You do not need to collect the entire season first/);
   assert.doesNotMatch(ui,/Schedule Preload|preload/i);
