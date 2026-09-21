@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.0.3",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "released",
+  "productionChanged": true,
   "productionDataChanged": false,
   "dataChanged": false,
   "credentialsChanged": false,
@@ -39,9 +39,9 @@
     "strictGate": { "passed": true, "status": "passed", "tests": 306 }
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "productionChanged": true,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "databaseRowsWritten": 0,
     "leagueDataRowsWritten": 0,
@@ -52,5 +52,48 @@
     "exportUrlRotated": false,
     "credentialsChanged": false,
     "freeAgentInterpretedAsZero": false
+  },
+  "external": {
+    "githubPublication": {
+      "authorized": true,
+      "status": "merged",
+      "pullRequests": [144],
+      "mainCommit": "83b305e3d5684157331ad029354c6913e66a5bd5"
+    },
+    "hostedChecks": {
+      "authorized": true,
+      "status": "passed",
+      "pullRequestQualityWorkflowRun": 35613000554,
+      "mainQualityWorkflowRun": 35613118188,
+      "pagesWorkflowRun": 35613116925
+    },
+    "productionMigration": {
+      "authorized": false,
+      "status": "not-required",
+      "currentMigration": 47,
+      "candidateMigration": 47
+    },
+    "productionDeployment": {
+      "authorized": true,
+      "status": "passed",
+      "currentRelease": "8.0.3",
+      "candidateRelease": "8.0.3",
+      "pagesWorkflowRun": 35613116925
+    },
+    "postDeploymentVerification": {
+      "authorized": true,
+      "status": "passed",
+      "p2wRelease": "8.0.3",
+      "p2wCollectedWeeks": 5,
+      "p2wCollectedGames": 79,
+      "p2wHasLiveSnapshot": false,
+      "p2wSwitchVisibleNotExecuted": true,
+      "fgcRelease": "8.0.3",
+      "fgcActiveWeek": 4,
+      "fgcTeams": 32,
+      "fgcRosteredPlayers": 2046,
+      "fgcYearlyScheduleGames": 272,
+      "fgcFreeAgentsStatus": "blocked"
+    }
   }
 }
