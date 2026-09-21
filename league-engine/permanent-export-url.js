@@ -1,12 +1,13 @@
-/* FHQ_BUILD: 8.0.2 */
+/* FHQ_BUILD: 8.0.3 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ = window.FranchiseHQ || {};
-  const VERSION = '8.0.2';
+  const VERSION = '8.0.3';
   let state = null;
   let busy = false;
   let errorMessage = '';
+  let infoMessage = '';
   let rotateArmed = false;
   let copied = false;
   let pollTimer = null;
@@ -75,10 +76,11 @@
 
   async function yearlyAction(action) {
     if(busy)return state;
-    busy=true;errorMessage='';rerender();
+    busy=true;errorMessage='';infoMessage='';rerender();
     try{
-      await yearlyApi('POST',{action});
+      const result=await yearlyApi('POST',{action});
       await refresh();
+      if(action==='switch-to-weekly'&&result.switchedToWeekly)infoMessage='Weekly imports are available. Your collected schedule exports were retained. Make a fresh export for the Madden week you want live; a new league’s first live import still needs Rosters.';
       return state;
     }catch(error){
       errorMessage=error.message;
@@ -90,6 +92,7 @@
 
   const startYearlySchedule=()=>yearlyAction('start');
   const finishYearlySchedule=()=>yearlyAction('finish');
+  const switchToWeekly=()=>yearlyAction('switch-to-weekly');
 
   async function prepareFirstSeason(form) {
     if(busy)return state;
@@ -212,7 +215,8 @@
       title:'The action could not finish',summary:errorMessage,
       action:'Check your connection and try once more. If the same message returns, open Import Details.'
     } : null;
-    return `${sourceIssue?`<section class="commissioner-import-recovery commissioner-import-recovery--warning"><div><h3>${esc(sourceIssue.title)}</h3><p>${esc(sourceIssue.summary)}</p><p><strong>What to do:</strong> ${esc(sourceIssue.action)}</p></div></section>`:''}
+    return `${infoMessage?`<div class="league-import-framework-note" role="status"><svg><use href="#icon-check"></use></svg><span>${esc(infoMessage)}</span></div>`:''}
+      ${sourceIssue?`<section class="commissioner-import-recovery commissioner-import-recovery--warning"><div><h3>${esc(sourceIssue.title)}</h3><p>${esc(sourceIssue.summary)}</p><p><strong>What to do:</strong> ${esc(sourceIssue.action)}</p></div></section>`:''}
       ${Array.isArray(latest.readinessProblems)&&latest.readinessProblems.length?`<details class="commissioner-import-source-notes" open><summary>Latest rejected export diagnostics</summary><ul>${latest.readinessProblems.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
       ${actionIssue?`<section class="commissioner-import-recovery" role="alert"><div><h3>${esc(actionIssue.title)}</h3><p>${esc(actionIssue.summary)}</p><p><strong>What to do:</strong> ${esc(actionIssue.action)}</p></div></section>`:''}`;
   }
@@ -245,7 +249,7 @@
       </section>`;
     }
     if(!annual)return `<section class="commissioner-yearly-schedule${compact?' commissioner-yearly-schedule--compact':''}">
-      <div><strong>Full regular-season schedule</strong><small>Collect Weeks 1–18 without changing the current week or creating Discord threads.</small></div>
+      <div><strong>Want the full-season schedule?</strong><small>Optional: collect Weeks 1–18 without changing the current week or creating Discord threads. To start with only the current week, skip this and use the normal Madden export and Import Latest Export.</small></div>
       <button class="button button--secondary" data-import-yearly-schedule ${busy||!prepared?'disabled':''} title="${prepared?'Start a retained, non-live schedule collection.':'Finish First-Season Setup first.'}">${busy?'Working…':'Import Yearly Schedule'}</button>
     </section>`;
     if(annual.status==='completed')return `<section class="commissioner-yearly-schedule is-complete${compact?' commissioner-yearly-schedule--compact':''}">
@@ -254,8 +258,12 @@
     </section>`;
     const ready=annual.status==='ready';
     return `<section class="commissioner-yearly-schedule is-active${compact?' commissioner-yearly-schedule--compact':''}">
-      <div><strong>Yearly Schedule Import in Progress</strong><small>Regular Season Weeks: ${count(annual.capturedWeekCount)} of ${count(annual.expectedWeekCount)} received · ${count(annual.gameCount)} of ${count(annual.expectedGameCount)} games</small></div>
-      <button class="button ${ready?'button--primary':'button--secondary'}" data-finish-yearly-schedule ${busy||!annual.readyToFinish?'disabled':''}>${busy?'Working…':'Review & Finish Yearly Schedule'}</button>
+      <div><strong>Full-season schedule collection</strong><small>${count(annual.capturedWeekCount)} of ${count(annual.expectedWeekCount)} weeks · ${count(annual.gameCount)} of ${count(annual.expectedGameCount)} games captured. This has not published a live week.</small></div>
+      <div class="commissioner-yearly-schedule__actions">
+        <button class="button ${ready?'button--primary':'button--secondary'}" data-finish-yearly-schedule ${busy||!annual.readyToFinish?'disabled':''}>${busy?'Working…':'Finish Full Schedule'}</button>
+        <button class="button button--ghost" data-switch-to-weekly ${busy?'disabled':''}>Switch to Weekly Imports</button>
+      </div>
+      <p class="commissioner-yearly-schedule__help">Switching keeps every captured export but ends this optional collection. Run a fresh export for the week you want to make live; the first live import of a new league still needs Rosters.</p>
     </section>`;
   }
 
@@ -281,7 +289,7 @@
     const importDisabled = busy || yearlyActive || status !== 'ready' || importDone;
     const sourceIssue=readinessIssue(latest.warnings||[]);
     const importReason=busy?'FranchiseHQ is finishing the current action.'
-      :yearlyActive?'Finish Import Yearly Schedule before publishing a live snapshot.'
+      :yearlyActive?'Finish the full schedule or switch to weekly imports above before publishing a live snapshot.'
         :importDone?'The newest eligible export is already live.'
           :status==='review-required'?(sourceIssue?.action||'Review the newest export prerequisites below.')
             :status==='receiving'?'FranchiseHQ is still receiving and checking the export.'
@@ -307,7 +315,7 @@
       ${renderNotices()}
       <div class="league-import-framework-actions">
         <button class="button button--secondary" data-copy-permanent-export-url ${busy || !endpointState.exportUrl ? 'disabled' : ''}>${copied ? 'URL Copied' : 'Copy League Export URL'}</button>
-        <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''} title="${esc(importReason||'Validate and publish the newest eligible export.')}">${busy ? 'Working…' : yearlyActive ? 'Finish Yearly Schedule First' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
+        <button class="button button--primary" data-import-latest-export ${importDisabled ? 'disabled' : ''} title="${esc(importReason||'Validate and publish the newest eligible export.')}">${busy ? 'Working…' : yearlyActive ? 'Finish or Switch Schedule First' : importDone ? 'Latest Export Live' : 'Import Latest Export'}</button>
         <button class="button button--ghost" data-refresh-permanent-export ${busy ? 'disabled' : ''}>Refresh</button>
       </div>
       ${importDisabled&&importReason?`<p class="commissioner-import-disabled-reason"><strong>Import unavailable:</strong> ${esc(importReason)}</p>`:''}
@@ -327,6 +335,7 @@
     if (event.target.closest('[data-refresh-permanent-export]')) refresh().catch(()=>{});
     if (event.target.closest('[data-import-yearly-schedule]')) startYearlySchedule().catch(()=>{});
     if (event.target.closest('[data-finish-yearly-schedule]')) finishYearlySchedule().catch(()=>{});
+    if (event.target.closest('[data-switch-to-weekly]')) switchToWeekly().catch(()=>{});
     if (event.target.closest('[data-rotate-permanent-export]')) rotateUrl();
     if (event.target.closest('[data-cancel-export-rotation]')) { rotateArmed=false;rerender(); }
   });
@@ -341,7 +350,7 @@
 
   const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,copied,rotateArmed,permanent:true,revocable:true,yearlyScheduleImport:state?.yearlyScheduleImport||null,activationPerformed:Boolean(state?.latestExport?.importLive)});
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before permanent-export-url.js.');
-  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,prepareFirstSeason,startYearlySchedule,finishYearlySchedule,renderPanel,renderNotices,renderSecurityControls,renderYearlyScheduleControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
+  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,prepareFirstSeason,startYearlySchedule,finishYearlySchedule,switchToWeekly,renderPanel,renderNotices,renderSecurityControls,renderYearlyScheduleControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'permanent-league-export-url',service:'leagueExportUrl',script:'league-engine/permanent-export-url.js',version:VERSION,dependencies:['auth','leagueTenant','oneClickImport'],capabilities:['permanent-url','explicit-rotation','automatic-analysis','latest-export-readiness','one-click-import']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

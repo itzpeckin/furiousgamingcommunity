@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '8.0.2';
+export const DISCORD_COMMAND_RELEASE = '8.0.3';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after

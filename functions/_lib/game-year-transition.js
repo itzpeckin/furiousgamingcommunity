@@ -1,6 +1,6 @@
 import { sha256Hex } from './cloud-platform.js';
 
-export const GAME_YEAR_TRANSITION_RELEASE = '8.0.2';
+export const GAME_YEAR_TRANSITION_RELEASE = '8.0.3';
 export const GAME_YEAR_ARCHIVE_FORMAT = 1;
 
 export const GAME_YEAR_OPERATIONS = Object.freeze({

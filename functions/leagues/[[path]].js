@@ -4,7 +4,7 @@ import { isOwnerFallbackHost } from "../_lib/origin.js";
 import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
 import { resolveTenant } from "../_lib/tenant-context.js";
 
-const RELEASE='8.0.2';
+const RELEASE='8.0.3';
 
 const STATIC_ROOTS=new Set([
   'styles.css','auth-client.js','auth-ui.js','dev-mode.js','trade-module.js',

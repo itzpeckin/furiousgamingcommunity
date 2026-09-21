@@ -13,7 +13,7 @@ import {
 import { operationalHealth } from '../../../_lib/operational-health.js';
 import { scheduleDiscordDeliveryFlush } from '../../../_lib/discord-delivery.js';
 
-const RELEASE = '8.0.2';
+const RELEASE = '8.0.3';
 const MANAGED_FEATURES = new Map([
   ['trade_center', 'Trade Center'],
   ['trade_block', 'Trade Block'],

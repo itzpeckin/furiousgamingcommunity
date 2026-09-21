@@ -389,6 +389,52 @@ test('Import Yearly Schedule seals 18 weeks atomically without snapshots, Discor
   }finally{sqlite.close()}
 });
 
+test('switching an incomplete yearly collection to weekly imports retains captures and leaves live data untouched',async()=>{
+  const {sqlite,objects,context}=await fixture();
+  try{
+    const startedResponse=await updateYearlySchedule(context({action:'start'}));
+    const started=await startedResponse.json();
+    assert.equal(startedResponse.status,201,JSON.stringify(started));
+    const importId=started.yearlyScheduleImport.id;
+    const routePath='xbsx/742482/week/reg/1/schedules';
+    const objectKey='yearly/retained-week-1';
+    objects.set(objectKey,JSON.stringify({gameScheduleInfoList:regularSeasonGames().filter(game=>game.weekIndex===0)}));
+    sqlite.prepare(`INSERT INTO companion_route_captures
+      (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,r2_object_key)
+      VALUES ('capture-week-1','league-1','yearly-session',?,'POST',100,'hash-week-1',?)`)
+      .run(routePath,objectKey);
+    sqlite.prepare(`INSERT INTO yearly_schedule_import_captures
+      (import_id,league_id,capture_id,route_path,observed_at)
+      VALUES (?,'league-1','capture-week-1',?,CURRENT_TIMESTAMP)`).run(importId,routePath);
+    const collecting=await (await getYearlySchedule(context())).json();
+    assert.equal(collecting.yearlyScheduleImport.capturedWeekCount,1);
+
+    const before=sqlite.prepare(`SELECT token_version FROM companion_league_export_endpoints
+      WHERE league_id='league-1'`).get();
+    const switchedResponse=await updateYearlySchedule(context({action:'switch-to-weekly'}));
+    const switched=await switchedResponse.json();
+    assert.equal(switchedResponse.status,200,JSON.stringify(switched));
+    assert.equal(switched.switchedToWeekly,true);
+    assert.equal(switched.freshWeeklyExportRequired,true);
+    assert.equal(switched.yearlyScheduleImport,null);
+    assert.equal(sqlite.prepare(`SELECT status FROM yearly_schedule_imports WHERE id=?`).get(importId).status,'cancelled');
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM companion_route_captures`).get().count,1);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM yearly_schedule_import_captures`).get().count,1);
+    assert.equal(objects.has(objectKey),true);
+    assert.equal(sqlite.prepare(`SELECT token_version FROM companion_league_export_endpoints
+      WHERE league_id='league-1'`).get().token_version,before.token_version);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshots`).get().count,0);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM discord_schedule_threads`).get().count,0);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM tenant_audit_events
+      WHERE action='companion.yearly_schedule.switch_to_weekly'`).get().count,1);
+    const repeated=await (await updateYearlySchedule(context({action:'switch-to-weekly'}))).json();
+    assert.equal(repeated.reused,true);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM tenant_audit_events
+      WHERE action='companion.yearly_schedule.switch_to_weekly'`).get().count,1);
+    assert.equal(sqlite.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{sqlite.close()}
+});
+
 test('new tenant first-season confirmation prepares only its league and reuses the retained yearly schedule',async()=>{
   const {sqlite,objects,context}=await fixture({includeSeason:false});
   try{
@@ -484,11 +530,16 @@ test('runtime and commissioner UI wire collection separately from live import an
   assert.match(builder,/rebaseScheduleTeamIds/);
   assert.match(ui,/data-import-yearly-schedule/);
   assert.match(ui,/Import Yearly Schedule/);
-  assert.match(ui,/Review & Finish Yearly Schedule/);
+  assert.match(ui,/Finish Full Schedule/);
+  assert.match(ui,/Switch to Weekly Imports/);
+  assert.match(ui,/data-switch-to-weekly/);
+  assert.match(ui,/optional collection/);
   assert.match(ui,/Finish First-Season Setup/);
   assert.match(ui,/Confirm & Prepare Season/);
   assert.match(ui,/First roster is still required/);
   assert.match(ui,/Import unavailable:/);
-  assert.match(compact,/Finish Yearly Schedule First/);
+  assert.match(compact,/Finish or Switch Schedule First/);
+  assert.match(compact,/No live snapshot yet/);
+  assert.match(compact,/You do not need to collect the entire season first/);
   assert.doesNotMatch(ui,/Schedule Preload|preload/i);
 });

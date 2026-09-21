@@ -15,7 +15,7 @@ import {
   yearlyScheduleCoverage
 } from '../../../../_lib/yearly-schedule.js';
 
-const RELEASE='8.0.2';
+const RELEASE='8.0.3';
 const EXPECTED_GAME_COUNT=272;
 const SOURCE_SYSTEM='ea-madden-companion';
 const YEARLY_REGULAR_SCHEDULE_ROUTE=/^(?:xbsx|xbox|ps5|ps4|pc)\/([^/]+)\/week\/reg\/(?:0|[1-9]\d*)\/schedules\/?$/i;
@@ -546,6 +546,34 @@ async function finish(current) {
   return json({...await statePayload(current),finished:true},200);
 }
 
+async function switchToWeekly(current) {
+  const collecting=await current.db.prepare(`SELECT id,franchise_season_id,game_year_id,
+      captured_week_count,game_count FROM yearly_schedule_imports
+    WHERE league_id=? AND status='collecting' ORDER BY created_at DESC LIMIT 1`)
+    .bind(current.league.id).first();
+  if(!collecting)return json({...await statePayload(current),reused:true},200);
+  await current.db.batch([
+    current.db.prepare(`UPDATE yearly_schedule_imports SET status='cancelled',
+      finished_by_user_id=?,finished_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE id=? AND league_id=? AND status='collecting'`).bind(
+        current.authorization.session.user.id,collecting.id,current.league.id
+      ),
+    auditStatement(current,'companion.yearly_schedule.switch_to_weekly',collecting.id,{
+      franchiseSeasonId:collecting.franchise_season_id,gameYearId:collecting.game_year_id,
+      capturedWeekCount:Number(collecting.captured_week_count||0),
+      gameCount:Number(collecting.game_count||0),
+      capturesRetained:true,weeklyExportRequired:true,exportUrlRotated:false,
+      activationPerformed:false,activeSnapshotChanged:false,discordScheduleSyncPerformed:false,
+      freeAgentDataChanged:false
+    })
+  ]);
+  const result=await current.db.prepare(`SELECT status FROM yearly_schedule_imports
+    WHERE id=? AND league_id=?`).bind(collecting.id,current.league.id).first();
+  if(result?.status!=='cancelled')return json({ok:false,error:'The schedule collection changed before weekly imports could be restored.',release:RELEASE},409);
+  return json({...await statePayload(current),switchedToWeekly:true,
+    retainedScheduleImportId:collecting.id,freshWeeklyExportRequired:true},200);
+}
+
 export async function onRequestGet(context) {
   const current=await requestState(context);
   if(current.response)return current.response;
@@ -560,6 +588,7 @@ export async function onRequestPost(context) {
   if(action==='prepare-first-season')return prepareFirstSeason(current,body);
   if(action==='start')return start(current);
   if(action==='finish')return finish(current);
+  if(action==='switch-to-weekly')return switchToWeekly(current);
   if(action==='refresh')return json(await statePayload(current));
   return json({ok:false,error:`Unsupported action: ${action||'none'}.`,release:RELEASE},400);
 }

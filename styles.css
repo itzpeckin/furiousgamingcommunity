@@ -7325,6 +7325,28 @@ button.trade-detail-asset__identity:hover strong,button.trade-detail-asset__iden
 @media(max-width:460px){.commissioner-companion-workspace .commissioner-latest-snapshot .commissioner-import-summary{grid-template-columns:1fr}.commissioner-companion-workspace .commissioner-latest-snapshot .commissioner-import-summary>div:last-child:nth-child(odd){grid-column:auto}.commissioner-companion-workspace>.card-header{display:grid}.commissioner-companion-workspace>.card-header>.pill{justify-self:start}.commissioner-import-progress-block--modern .commissioner-import-progress-head{align-items:flex-start}.commissioner-import-progress-block--modern .commissioner-import-progress-head>span{min-width:0}.commissioner-import-progress-block--modern .commissioner-import-progress-head strong{overflow-wrap:anywhere}}
 
 /* FranchiseHQ 7.4.4.1 — Teams & Owners responsive management */
+/* FranchiseHQ 8.0.3 — readable first-import and optional yearly schedule controls */
+.commissioner-import-empty-state{display:grid;gap:8px;min-width:0;padding:20px;border:1px solid rgba(107,157,240,.24);border-radius:16px;background:linear-gradient(145deg,rgba(17,31,49,.94),rgba(9,17,28,.96))}
+.commissioner-import-empty-state h4,.commissioner-import-empty-state p{margin:0}
+.commissioner-import-empty-state h4{font-size:1rem;line-height:1.35}
+.commissioner-import-empty-state p{color:var(--muted);font-size:.76rem;line-height:1.55}
+.commissioner-import-phase-details{min-width:0}
+.commissioner-import-phase-details>summary{width:max-content;max-width:100%;padding:8px 0;color:#9cc2ff;cursor:pointer;font-size:.76rem;font-weight:700}
+.commissioner-yearly-schedule.is-active{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.commissioner-yearly-schedule__actions{display:flex!important;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.commissioner-yearly-schedule__help{grid-column:1/-1;margin:0;color:var(--muted);font-size:.72rem;line-height:1.5}
+@media(max-width:700px){
+  .commissioner-yearly-schedule.is-active{grid-template-columns:minmax(0,1fr)}
+  .commissioner-yearly-schedule__actions{display:grid!important;grid-template-columns:minmax(0,1fr);justify-content:stretch}
+  .commissioner-import-progress-block--modern .commissioner-import-phase-list{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;scroll-snap-type:none}
+  .commissioner-import-progress-block--modern .commissioner-import-phase-list li{min-width:0}
+  .commissioner-import-progress-block--modern .commissioner-import-phase-list strong{font-size:.7rem}
+  .commissioner-import-progress-block--modern .commissioner-import-phase-list small{font-size:.64rem}
+  .commissioner-import-empty-state{padding:16px}
+}
+@media(max-width:460px){
+  .commissioner-import-progress-block--modern .commissioner-import-phase-list{grid-template-columns:minmax(0,1fr)}
+}
 .commissioner-directory-panel>.card-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.55fr);align-items:end;gap:28px}
 .commissioner-directory-panel .commissioner-team-search{justify-self:end;width:min(420px,100%)}
 .commissioner-directory-panel .ownership-table-head,.commissioner-directory-panel .ownership-team-row{grid-template-columns:minmax(245px,1.2fr) minmax(250px,1.1fr) minmax(150px,.62fr) minmax(135px,.55fr) minmax(104px,auto);column-gap:22px}
