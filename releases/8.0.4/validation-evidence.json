@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.0.4",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "productionDataChanged": false,
   "dataChanged": false,
   "credentialsChanged": false,
@@ -15,9 +15,9 @@
     "strictGate": {"passed": true, "status": "passed", "tests": 307}
   },
   "scopeBoundaries": {
-    "productionChanged": false,
-    "gitMainChanged": false,
-    "gitRemoteChanged": false,
+    "productionChanged": true,
+    "gitMainChanged": true,
+    "gitRemoteChanged": true,
     "migrationApplied": false,
     "databaseRowsWritten": 0,
     "leagueDataRowsWritten": 0,
@@ -30,10 +30,10 @@
     "freeAgentInterpretedAsZero": false
   },
   "external": {
-    "githubPublication": {"authorized": true, "status": "not-run"},
-    "hostedChecks": {"authorized": true, "status": "not-run"},
+    "githubPublication": {"authorized": true, "status": "merged", "pullRequests": [146], "mainCommit": "f3657eb9255e4fb2313edec74b8af3df94210f45"},
+    "hostedChecks": {"authorized": true, "status": "passed", "pullRequestQualityWorkflowRun": 35626887080, "previewPagesDeploymentId": "ac9294d5-6aed-4e23-a695-34155b596dc7", "productionPagesDeploymentId": "12ef5c6e-f8d9-4fdf-b073-929c529defd1"},
     "productionMigration": {"authorized": false, "status": "not-required", "currentMigration": 47, "candidateMigration": 47},
-    "productionDeployment": {"authorized": true, "status": "not-run", "currentRelease": "8.0.3", "candidateRelease": "8.0.4"},
-    "postDeploymentVerification": {"authorized": true, "status": "not-run"}
+    "productionDeployment": {"authorized": true, "status": "verified", "currentRelease": "8.0.4", "candidateRelease": "8.0.4", "pagesDeploymentId": "12ef5c6e-f8d9-4fdf-b073-929c529defd1", "workerVersionId": "68e534cc-71b0-49f9-ae74-a32b78e29009", "workerDeploymentId": "b721d037-cb0a-4543-8bd7-9b51a7457eb7"},
+    "postDeploymentVerification": {"authorized": true, "status": "desktop-verified-phone-pending", "p2wRelease": "8.0.4", "p2wCollectedWeeks": 5, "p2wCollectedGames": 79, "p2wHasLiveSnapshot": false, "p2wCommandCenterAnnualWithinImport": true, "p2wCommandCenterNextCardGapPx": 16, "p2wPageHorizontalOverflow": false, "p2wPhoneVisualAcceptance": "not-run", "fgcActiveWeek": 4, "fgcWeek4ScheduleThreads": 16, "fgcWeek3ScheduleThreadsPendingGuardedRetry": 7, "fgcActiveSnapshotChanged": false, "blockedFreeAgentsReinterpreted": false}
   }
 }
