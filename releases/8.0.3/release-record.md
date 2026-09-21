@@ -20,7 +20,7 @@ The focused regression covers incomplete-collection switching, idempotence, reta
 
 ## Deployment status
 
-Candidate validation in progress. Main and Production publication are authorized but not yet claimed.
+Published through [PR #144](https://github.com/itzpeckin/furiousgamingcommunity/pull/144) and merged to Main `83b305e`. PR quality workflow `35613000554`, Main quality workflow `35613118188`, and Pages deployment workflow `35613116925` passed. Signed-in read-only Production acceptance shows Release 8.0.3 on P2W and FGC. P2W still has an incomplete 5-week/79-game collection with no live snapshot; the new switch is visible but was not executed. FGC remains live on Week 4 with 32 teams, 2,046 rostered players, a completed 272-game schedule, and blocked/unknown Free Agents. No Production league-data operation ran during deployment or verification.
 
 ## Rollback
 

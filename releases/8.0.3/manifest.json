@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.0.3",
   "releaseType": "optional-schedule-first-import-stability",
-  "status": "validated-production-authorized",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.0.2",
@@ -18,8 +18,9 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "not-run",
-    "pullRequests": []
+    "status": "merged",
+    "pullRequests": [144],
+    "mainCommit": "83b305e3d5684157331ad029354c6913e66a5bd5"
   },
   "staging": {
     "authorized": false,
@@ -28,12 +29,14 @@
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "8.0.2",
+    "deployed": true,
+    "status": "verified",
+    "currentRelease": "8.0.3",
     "candidateRelease": "8.0.3",
     "currentMigration": 47,
     "candidateMigration": 47,
+    "pagesWorkflowRun": 35613116925,
+    "qualityWorkflowRun": 35613118188,
     "scope": "Publish optional yearly-to-weekly import switching and mobile first-import clarity. Do not switch P2W's collection during deployment, import data, move a live snapshot, create Discord threads, rotate a URL, delete captures, change credentials, or interpret missing Free Agents as zero."
   },
   "requiredArtifacts": [
