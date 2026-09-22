@@ -1,14 +1,14 @@
-/* FHQ_BUILD: 8.0.4 */
+/* FHQ_BUILD: 8.0.5 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='8.0.4';
+const RELEASE='8.0.5';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
 });
 const companion=(slug,path)=>`/api/leagues/${encodeURIComponent(slug)}/companion/${path}`;
 
-async function call(context,path,method='GET',body){
+async function call(context,path,method='GET',body,{acceptProgress=false}={}){
   const response=await fetch(`${context.origin}${path}`,{
     method,
     headers:{
@@ -19,8 +19,11 @@ async function call(context,path,method='GET',body){
     body:body===undefined?undefined:JSON.stringify(body)
   });
   const payload=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
-  if(!response.ok||payload?.ok===false){
-    const error=new Error(payload?.detail||payload?.error||`Candidate import request failed (${response.status}).`);
+  const checkpoint=acceptProgress&&response.ok&&payload?.ok===false
+    &&payload?.status==='running'&&payload?.hasMore===true&&!payload?.errors?.length;
+  if(!response.ok||(payload?.ok===false&&!checkpoint)){
+    const error=new Error(payload?.detail||payload?.error||payload?.errors?.[0]
+      ||`Candidate import request failed (${response.status}).`);
     error.payload=payload;
     throw error;
   }
@@ -270,19 +273,26 @@ export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
       ||!['candidate-import','rollover-recovery'].includes(source)){
       throw new Error('Schedule workflow payload is incomplete.');
     }
-    let result;
-    for(let index=0;index<80;index+=1){
-      result=await step.do(`schedule-batch-${index+1}`,{
-        retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'2 minutes'
-      },()=>call(context,companion(context.slug,'schedule-sync-job'),'POST',{
-        snapshotId,source,maxOperations:1
-      }));
-      if(result.status==='completed')return{ok:true,release:RELEASE,source,snapshotId,result};
-      if(result.status!=='running'||!result.hasMore){
-        throw new Error(`Schedule sync stopped: ${result.reason||result.errors?.[0]||result.status||'unknown state'}`);
+    try{
+      let result;
+      for(let index=0;index<80;index+=1){
+        result=await step.do(`schedule-batch-${index+1}`,{
+          retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'2 minutes'
+        },()=>call(context,companion(context.slug,'schedule-sync-job'),'POST',{
+          snapshotId,source,maxOperations:1
+        },{acceptProgress:true}));
+        if(result.status==='completed')return{ok:true,release:RELEASE,source,snapshotId,result};
+        if(result.status!=='running'||!result.hasMore){
+          throw new Error(`Schedule sync stopped: ${result.reason||result.errors?.[0]||result.status||'unknown state'}`);
+        }
       }
+      throw new Error('Schedule sync exceeded the 80-batch safety limit.');
+    }catch(error){
+      await call(context,companion(context.slug,'schedule-sync-job'),'POST',{
+        action:'fail',snapshotId,source,error:String(error?.message||error).slice(0,500)
+      }).catch(()=>{});
+      throw error;
     }
-    throw new Error('Schedule sync exceeded the 80-batch safety limit.');
   }
 }
 
@@ -308,7 +318,7 @@ export default{
         if(status&&!failed)return json({ok:true,release:RELEASE,id:baseId,reusedExisting:true,workflowKey,status});
         let id=failed?`${baseId}-r${Date.now().toString(36)}`:baseId;
         let instance;
-        try{instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:body});}
+        try{instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:{...body,retry:failed||Boolean(body.retry)}});}
         catch(error){
           id=`${baseId}-r${Date.now().toString(36)}-${crypto.randomUUID().slice(0,6)}`;
           instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:{...body,retry:true}});

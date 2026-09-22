@@ -1,10 +1,10 @@
-/* FHQ_BUILD: 5.9.10.6.5.4h-p3d */
+/* FHQ_BUILD: 8.0.5 */
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 
-const RELEASE='7.4.1';
+const RELEASE='8.0.5';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,
   headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -29,7 +29,7 @@ async function createDelegation(db,session,leagueId){
   await db.prepare(`DELETE FROM server_import_delegations WHERE expires_at <= CURRENT_TIMESTAMP`).run().catch(()=>{});
   const token=createRandomToken(32);
   const tokenHash=await hashToken(token);
-  const expiresAt=new Date(Date.now()+15*60*1000).toISOString();
+  const expiresAt=new Date(Date.now()+60*60*1000).toISOString();
   await db.prepare(`INSERT INTO server_import_delegations
     (token_hash,session_id,league_id,expires_at)
     VALUES (?,?,?,?)`)
@@ -54,12 +54,12 @@ function parseJson(value,fallback={}){
   try{return JSON.parse(value||'')}catch{return fallback}
 }
 
-async function latestCaptureSession(db,leagueId){
-  return db.prepare(`SELECT discovery_session_id session_id,MAX(received_at) received_at
-    FROM companion_route_captures
-    WHERE league_id=? AND discovery_session_id IS NOT NULL AND discovery_session_id<>''
-    GROUP BY discovery_session_id
-    ORDER BY MAX(received_at) DESC LIMIT 1`).bind(leagueId).first();
+async function latestReadyReport(db,leagueId){
+  return db.prepare(`SELECT report.session_id,report.report_hash
+    FROM companion_league_export_endpoints endpoint
+    JOIN madden_discovery_reports report
+      ON report.id=endpoint.latest_ready_report_id AND report.league_id=endpoint.league_id
+    WHERE endpoint.league_id=? AND report.status='passed' LIMIT 1`).bind(leagueId).first();
 }
 
 async function latestImportRun(db,leagueId){
@@ -100,11 +100,16 @@ export async function onRequestPost(context){
   const binding=worker(context);
   if(!binding)return json({ok:false,release:RELEASE,error:'FRANCHISE_IMPORT_WORKER service binding is not configured.'},503);
 
-  const latest=await latestCaptureSession(state.db,state.league.id);
+  const latest=await latestReadyReport(state.db,state.league.id);
   if(!latest?.session_id){
     return json({ok:false,release:RELEASE,error:'No Madden Companion export is available.'},400);
   }
 
+  const body=await context.request.json().catch(()=>({}));
+  const sourceFingerprint=text(body.sourceFingerprint);
+  if(sourceFingerprint&&!/^[a-f0-9]{64}$/i.test(sourceFingerprint)){
+    return json({ok:false,release:RELEASE,error:'The selected source fingerprint is invalid.'},400);
+  }
   const delegation=await createDelegation(state.db,state.auth.session,state.league.id);
 
   const response=await binding.fetch('https://franchise-import.internal/start',{
@@ -113,7 +118,8 @@ export async function onRequestPost(context){
     body:JSON.stringify({
       leagueSlug:state.leagueSlug,
       origin:origin(context.request),
-      workflowKey:String(latest.session_id),
+      workflowKey:`${latest.session_id}:${sourceFingerprint||latest.report_hash}`,
+      retry:Boolean(body.retry),
       importAuthToken:delegation.token,
       importAuthExpiresAt:delegation.expiresAt
     })

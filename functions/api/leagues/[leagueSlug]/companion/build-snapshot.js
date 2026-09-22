@@ -303,7 +303,8 @@ async function domainPlan({context,db,league,candidateRun,runs,shared,domain}){
     const history=shared.historicalBackfill
       ?candidateHistoricalBackfill(fresh,prior,{keyName:'external_key',activeWeek:shared.activeSource.week_index,
         activePeriod:shared.coverage.activePeriod,sourceWeeks:shared.sourceWeeks,sourcePeriods:shared.sourcePeriods})
-      :candidateHistoryCarryForward(fresh,prior,{keyName:'external_key',currentWeek:shared.coverage.currentWeek});
+      :candidateHistoryCarryForward(fresh,prior,{keyName:'external_key',
+        currentWeek:shared.coverage.currentWeek,preserveEmptyCurrentWeek:true});
     const appliedKeys=new Set((history.appliedPeriods||[]).map(period=>period.key));
     const missingAppliedPeriods=shared.historicalBackfill
       ?shared.sourcePeriods.filter(period=>!appliedKeys.has(period.key)):[];
@@ -316,6 +317,7 @@ async function domainPlan({context,db,league,candidateRun,runs,shared,domain}){
       records:plannedRecords(domain,history.records,(item,index)=>item.external_key||index),
       meta:{
         retained:Number(history.retained||0),
+        retainedCurrentWeek:Number(history.retainedCurrentWeek||0),
         retainedWeeks:history.retainedWeeks||[],
         applied:Number(history.applied||0),
         appliedPeriods:history.appliedPeriods||[]

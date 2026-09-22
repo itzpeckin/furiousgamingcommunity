@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.5",
+  "releaseType": "weekly-import-integrity-and-discord-rollover-stability",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.4",
+    "commit": "dbceb78833df8d331597ae72cb1ddf102e673342",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "release/8.0.5-import-integrity",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending", "pullRequests": [], "mainCommit": null},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending-validation",
+    "currentRelease": "8.0.4",
+    "candidateRelease": "8.0.5",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Compose retained previous-week captures with a new current-week export; preserve final scores and established stats from empty captures; run import phases and Discord rollover through durable retries. Do not delete retained exports, snapshots, audits, or threads outside an exact proven rollover. No export URL, season lifecycle, roster, or Free Agent authority change."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js",
+    "functions/api/leagues/[leagueSlug]/companion/import-job.js",
+    "functions/api/leagues/[leagueSlug]/companion/schedule-sync-job.js",
+    "league-engine/one-click-import.js",
+    "workers/franchise-import-worker/src/index.js",
+    "tests/import/candidate-import.test.mjs",
+    "tests/discord/schedule-workflow.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.5/release-record.md",
+    "releases/8.0.5/validation-evidence.json"
+  ]
+}

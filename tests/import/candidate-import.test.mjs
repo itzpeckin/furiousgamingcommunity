@@ -46,7 +46,8 @@ test('compact and detailed import panels share readiness, progress, busy and liv
   assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
 });
 import { hashToken } from '../../functions/_lib/auth.js';
-import { onRequestPost as candidateImport } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
+import { onRequestPost as candidateImport, retainedPeriodBundle } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
+import { onRequestPost as startImportJob } from '../../functions/api/leagues/[leagueSlug]/companion/import-job.js';
 import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
 import { onRequestPost as mapPlayers, rebaseCarriedRoster } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { authoritativeStatisticsPeriod, statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
@@ -480,10 +481,10 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'roster-carry-forward-v8');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-week-integrity-v9');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:roster-carry-forward-v8'
+    'report:capture:identity:destination:retained-week-integrity-v9'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
 });
@@ -725,6 +726,106 @@ test('one private destination and one idempotent candidate run are enforced per 
     assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
     assert.throws(()=>db.prepare(`DELETE FROM franchise_seasons WHERE id='season-2026'`).run(),/FOREIGN KEY constraint failed/i);
   }finally{db.close()}
+});
+
+test('a forward Week 5 import composes the retained Week 4 export without advancing from Week 5 evidence', async () => {
+  const route=(week,kind)=>`xbsx/742482/week/reg/${week}/${kind}`;
+  const inventory=(path,kind,count,extra={})=>({routePath:path,
+    datasetType:kind==='schedules'?'schedule':'statistics',recordCount:count,...extra});
+  const entries=[
+    ['week4-schedule',route(0,'schedules'),'schedules',16,
+      {periodSource:'payload-sentinel',canonicalStage:'regular-season',canonicalWeek:4}],
+    ['week4-stats',route(4,'passing'),'passing',843,{}],
+    ['week5-schedule',route(5,'schedules'),'schedules',16,{}],
+    ['week5-stats',route(5,'passing'),'passing',0,{}],
+    ['future-week6',route(6,'passing'),'passing',20,{}]
+  ];
+  const captures=entries.map(([id,path,kind,count,extra])=>({
+    id,route_path:path,payload_hash:`hash-${id}`,byte_length:100,
+    collections_json:JSON.stringify([{count}]),observed_at:'2026-09-22T02:18:00.000Z',
+    dataset_inventory_json:JSON.stringify([inventory(path,kind,count,extra)])
+  }));
+  const db={prepare:()=>({bind(){return this;},async all(){return{results:captures};}})};
+  const report={generated_at:'2026-09-22T02:19:00.000Z',
+    source_markers_json:JSON.stringify({currentPeriod:{status:'proven',source:'league-info',
+      period:{stage:'regular-season',week:5}}}),
+    dataset_inventory_json:JSON.stringify([
+      inventory(route(5,'schedules'),'schedules',16),
+      inventory(route(5,'passing'),'passing',0)
+    ])};
+  const identity={source_franchise_id:'742482',season_year:2027,
+    season_created_at:'2026-09-01T00:00:00.000Z'};
+  const active={season_year:2027,week_index:4,created_at:'2026-09-21 20:42:00',
+    manifest_json:JSON.stringify({currentPeriod:{stage:'regular-season',week:4}})};
+  const bundle=await retainedPeriodBundle(db,'league-1',report,identity,active);
+  assert.equal(bundle.coverage.importMode,'forward');
+  assert.equal(bundle.coverage.currentWeek,5);
+  assert.equal(bundle.coverage.currentWeekStatus,'covered');
+  assert.deepEqual(bundle.sourcePeriods.map(period=>period.key),['regular-season:4','regular-season:5']);
+  assert.deepEqual(new Set(bundle.sourceCaptureIds),new Set([
+    'week4-schedule','week4-stats','week5-schedule','week5-stats'
+  ]));
+});
+
+test('populated re-exports replace one week, while empty re-exports preserve established stats and final scores', () => {
+  const statistic=(external_key,week_index)=>({external_key,week_index,stage:'regular-season'});
+  const prior=[1,3,4].map(week=>({external_id:`old-${week}`,
+    data_json:JSON.stringify(statistic(`old-${week}`,week))}));
+  const combined=candidateHistoryCarryForward([statistic('new-4',4)],prior,
+    {keyName:'external_key',currentWeek:5,preserveEmptyCurrentWeek:true});
+  assert.deepEqual(combined.records.map(item=>item.external_key).sort(),['new-4','old-1','old-3']);
+  const empty=candidateHistoryCarryForward([],prior,{keyName:'external_key',
+    currentWeek:4,preserveEmptyCurrentWeek:true});
+  assert.equal(empty.retainedCurrentWeek,1);
+  assert.equal(empty.records.some(item=>item.external_key==='old-4'),true);
+  const game=(status,home_score,away_score)=>({external_id:'game-4',season_year:2027,
+    stage:'regular-season',week_index:4,home_team_external_id:'H',away_team_external_id:'A',
+    status,home_score,away_score});
+  const games=candidateScheduleCarryForward([game('scheduled',0,0)],
+    [game('completed',24,17)],{seasonYear:2027});
+  assert.equal(games.records[0].status,'completed');
+  assert.equal(games.records[0].home_score,24);
+});
+
+test('durable import selects the exact latest passed report rather than an older deduplicated capture timestamp',async()=>{
+  const sqlite=await database();
+  try{
+    const token='durable-import-session';
+    sqlite.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,active)
+      VALUES (?,?,?,?,1)`).run('membership-durable','league-1','commissioner-1','commissioner');
+    sqlite.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at)
+      VALUES (?,?,?,?)`).run('session-durable','commissioner-1',await hashToken(token),
+      '2099-01-01T00:00:00.000Z');
+    sqlite.prepare(`INSERT INTO madden_discovery_sessions
+      (id,league_id,token_hash,status,expires_at,opened_by_user_id)
+      VALUES (?,?,?,?,?,?)`).run('capture-durable','league-1','durable-capture-token-hash','passed',
+      '2099-01-01T00:00:00.000Z','commissioner-1');
+    sqlite.prepare(`INSERT INTO madden_discovery_reports
+      (id,league_id,session_id,status,route_count,capture_count,total_bytes,source_markers_json,
+       source_verification_json,dataset_inventory_json,field_inventory_json,relationship_inventory_json,
+       requirement_results_json,free_agent_evidence_json,sanitized_fixture_json,report_hash,generated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run('report-durable','league-1','capture-durable',
+      'passed',10,10,1000,'{}','{}','[]','{}','{}','{}','{}','{}','report-hash-durable',
+      '2090-01-01T00:00:00.000Z');
+    sqlite.prepare(`UPDATE companion_league_export_endpoints SET
+      latest_ready_report_id='report-durable' WHERE league_id='league-1'`).run();
+    let sent=null;
+    const binding=d1(sqlite);
+    const response=await startImportJob({
+      request:new Request('https://franchisehq.app/api/leagues/fgc/companion/import-job',{
+        method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},
+        body:JSON.stringify({retry:true,sourceFingerprint:'a'.repeat(64)})
+      }),params:{leagueSlug:'fgc'},env:{DB:binding,FRANCHISE_HQ_DB:binding,
+        FRANCHISE_IMPORT_WORKER:{fetch:async(_url,options)=>{
+          sent=JSON.parse(options.body);
+          return Response.json({ok:true,id:'workflow-durable-1'});
+        }}}
+    });
+    assert.equal(response.status,200);
+    assert.equal(sent.workflowKey,`capture-durable:${'a'.repeat(64)}`);
+    assert.equal(sent.retry,true);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM server_import_delegations`).get().count,1);
+  }finally{sqlite.close();}
 });
 
 test('commissioner start accepts a fully covered older week only as an exact same-season backfill', async () => {
@@ -1074,7 +1175,7 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(app,/franchisehq:one-click-import-complete/);
   assert.match(app,/syncTradeCenterLiveBridge\(\{rerender:false,forceLive:true\}\)/);
   assert.match(app,/renderRoute\(route\)/);
-  assert.match(job,/15\*60\*1000/);
+  assert.match(job,/60\*60\*1000/);
   assert.doesNotMatch(job,/x-franchisehq-platform-owner-account-id/);
 
   // Production cold-path remediation reuses only exact immutable source-lock

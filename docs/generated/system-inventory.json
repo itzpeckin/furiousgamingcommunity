@@ -174,7 +174,7 @@
       ".json": 7,
       ".jsonc": 1,
       ".md": 284,
-      ".mjs": 52,
+      ".mjs": 53,
       ".png": 3,
       ".sql": 49,
       ".txt": 3,
@@ -216,16 +216,16 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
+        "bytes": 79977,
+        "file": "tests/import/candidate-import.test.mjs"
+      },
+      {
         "bytes": 77055,
         "file": "index.html"
       },
       {
         "bytes": 74551,
         "file": "FHQ-6126-index.html"
-      },
-      {
-        "bytes": 73767,
-        "file": "tests/import/candidate-import.test.mjs"
       },
       {
         "bytes": 65341,
@@ -236,35 +236,35 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 48894,
-        "file": "tests/trade/full-trade-center.test.mjs"
+        "bytes": 49291,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 46974,
-        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
+        "bytes": 48894,
+        "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
         "bytes": 46403,
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
+        "bytes": 45858,
+        "file": "league-engine/one-click-import.js"
+      },
+      {
         "bytes": 42997,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 41473,
-        "file": "league-engine/one-click-import.js"
+        "bytes": 39834,
+        "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       },
       {
         "bytes": 39777,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
-      },
-      {
-        "bytes": 39727,
-        "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 662
+    "total": 663
   },
   "frontend": {
     "assets": [
@@ -1695,7 +1695,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.4",
+  "release": "8.0.5",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
