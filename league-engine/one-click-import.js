@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 8.0.3 */
+/* FHQ_BUILD: 8.0.5 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.3';
+  const VERSION = '8.0.5';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -79,8 +79,8 @@
     };
     if(status>=500||/network|failed to fetch|load failed|timed out|timeout|safety limit|HTTP 5\d\d/i.test(message))return{
       ...shared,title:'The importer could not finish',
-      summary:'FranchiseHQ or the network interrupted the import before publication.',
-      action:'Check your connection and select Retry once. If it fails again, share the support code shown below.'
+      summary:'An import service request was interrupted. This does not establish a problem with your connection.',
+      action:'Select Retry to resume the retained export. If it fails again, share the support code shown below.'
     };
     return{
       ...shared,title:'The import could not finish',
@@ -336,6 +336,92 @@
   }
 
   async function runImport({retry=false}={}) {
+    if(busy)return;
+    busy=true;
+    errorMessage='';
+    notice='Starting a durable league import…';
+    lastOutcome={tone:'running',title:'Importing latest export',
+      summary:'FranchiseHQ is processing the retained export in the background.'};
+    renderImportNotification();
+    rerender();
+    const wallStartedAt=now();
+    let workflowId=null,consecutivePollFailures=0;
+    try{
+      const started=await api('import-job','POST',{
+        retry,sourceFingerprint:state?.source?.sourceFingerprint||''
+      });
+      workflowId=started.id;
+      if(!workflowId)throw new Error('The background importer did not return a workflow ID.');
+      for(let poll=0;poll<600;poll+=1){
+        let progress;
+        try{
+          progress=await api(`import-job?id=${encodeURIComponent(workflowId)}`);
+          consecutivePollFailures=0;
+        }catch(error){
+          consecutivePollFailures+=1;
+          if(consecutivePollFailures>=5)throw new Error(
+            'Import status temporarily unavailable. The background import may still be running; select Refresh before retrying.'
+          );
+          await new Promise(resolve=>window.setTimeout(resolve,1500));
+          continue;
+        }
+        const durableRun=progress?.candidate?.run||null;
+        const run=durableRun?{
+          ...state?.run,...durableRun,currentPhase:durableRun.currentStage,
+          phaseState:durableRun.stageState,candidateSnapshotId:durableRun.snapshotId,
+          progress:Math.round(Number(durableRun.stageIndex||0)/(PHASES.length-1)*100)
+        }:state?.run;
+        if(durableRun)state={...state,run};
+        notice=`${phaseLabel(run?.currentPhase)} · ${run?.progress??0}%`;
+        rerender();
+        const workflowState=String(progress.workflowState||'').toLowerCase();
+        if(run?.activationPerformed&&['complete','completed'].includes(workflowState)){
+          await refresh();
+          const clickToLiveMs=Math.max(0,Math.round(now()-wallStartedAt));
+          const refreshed=await refreshLiveApplication({runId:run.id,
+            candidateSnapshotId:run.candidateSnapshotId,durationMs:clickToLiveMs,
+            importMode:run.resultCounts?.importMode||state?.source?.coverage?.importMode});
+          await retainClientPerformance(run.id,{clickToLiveMs,browserRefreshMs:refreshed.durationMs,
+            browserRefreshOk:refreshed.refreshed});
+          notice=`League data live in ${durationLabel(clickToLiveMs)}. Discord thread delivery is tracked separately.`;
+          lastOutcome={tone:'success',title:'Import complete',summary:notice};
+          renderImportNotification();
+          return state;
+        }
+        if(['errored','failed','terminated','cancelled','canceled'].includes(workflowState)){
+          const detail=progress.workflowStatus?.error;
+          const error=new Error(run?.phaseState?.[run.currentPhase]?.summary
+            ||(typeof detail==='string'?detail:detail?.message)
+            ||'The background importer stopped before publication.');
+          error.importPhase=run?.currentPhase||null;
+          throw error;
+        }
+        if(workflowState==='complete'||workflowState==='completed'){
+          throw new Error('The background importer completed without an active validated snapshot.');
+        }
+        await new Promise(resolve=>window.setTimeout(resolve,1500));
+      }
+      throw new Error('Import is still running after 15 minutes. Refresh for its latest status; do not export again.');
+    }catch(error){
+      await refresh().catch(()=>{});
+      errorMessage=error.message;
+      const monitoringInterrupted=/Import status temporarily unavailable|still running after 15 minutes/i.test(error.message);
+      notice=monitoringInterrupted
+        ?'The background import may still be running. Refresh to see the retained progress.'
+        :'Import stopped safely. The previous live snapshot remains available.';
+      lastOutcome=monitoringInterrupted
+        ?{tone:'running',title:'Import status needs refresh',summary:notice,
+          action:'Select Refresh, then Import Latest Export to reconnect to the same background job.'}
+        :failureGuidance(error,error.importPhase||currentRun()?.currentPhase||null);
+      renderImportNotification();
+    }finally{
+      busy=false;
+      rerender();
+    }
+    return state;
+  }
+
+  async function runBrowserImport({retry=false}={}) {
     if (busy) return;
     busy = true;
     errorMessage = '';

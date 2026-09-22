@@ -13,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'roster-carry-forward-v8';
+export const CANDIDATE_MAPPING_REVISION = 'retained-week-integrity-v9';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId, rosterSourceSnapshotId = null) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`
@@ -275,21 +275,31 @@ export function candidateHistoryCarryForward(freshRecords = [], priorRows = [], 
     const normalized=candidateNormalizePeriod(item);
     return [String(normalized?.[keyName] ?? ''),normalized];
   }));
+  const freshPeriods=new Set((freshRecords||[])
+    .map(item=>recordPeriod(candidateNormalizePeriod(item))?.key).filter(Boolean));
   const retainedWeeks = new Set();
   let retained = 0;
+  let retainedCurrentWeek = 0;
   for (const row of priorRows || []) {
     const item = candidateNormalizePeriod(candidateRecord(row));
     const key = String(row?.external_id ?? item?.[keyName] ?? '');
     const week = recordWeek(item);
     if (!item || !key || output.has(key)) continue;
-    if (currentWeek !== null && week !== null && week >= currentWeek) continue;
+    const period=recordPeriod(item);
+    // A populated re-export replaces that whole period; otherwise old player
+    // rows missing from the new export would survive as stale statistics.
+    if(period&&freshPeriods.has(period.key))continue;
+    if (currentWeek !== null && week !== null && week > currentWeek) continue;
+    if (currentWeek !== null && week === currentWeek && !options.preserveEmptyCurrentWeek) continue;
     output.set(key, item);
     retained += 1;
+    if(week===currentWeek)retainedCurrentWeek+=1;
     if (week !== null) retainedWeeks.add(week);
   }
   return {
     records: [...output.values()],
     retained,
+    retainedCurrentWeek,
     retainedWeeks: [...retainedWeeks].sort((left, right) => left - right)
   };
 }
@@ -315,7 +325,11 @@ export function candidateScheduleCarryForward(freshRecords=[],priorRows=[],{seas
     const key=identity(item);
     const previous=output.get(key);
     // Keep the application's matchup ID stable for Confidence picks and GOTW.
-    output.set(key,previous?{...item,external_id:previous.external_id,source_game_external_id:item.external_id}:item);
+    // A later incomplete export must not turn an already final game into 0-0.
+    const previousFinal=String(previous?.status||'').toLowerCase()==='completed';
+    const incomingFinal=String(item?.status||'').toLowerCase()==='completed';
+    output.set(key,previousFinal&&!incomingFinal?previous
+      :previous?{...item,external_id:previous.external_id,source_game_external_id:item.external_id}:item);
     freshKeys.add(key);
   }
   let retained=0;

@@ -21,12 +21,13 @@ import {
   publicCandidateRun
 } from '../../../../_lib/candidate-import.js';
 import { normalizeGameRelease } from '../../../../_lib/game-year-transition.js';
+import { periodsFromInventoryItem } from '../../../../_lib/madden-period.js';
 import { reconcileTradeRosterOverlays } from '../../../../_lib/trade-reconciliation.js';
 import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 import { observeDevelopmentTraitsStatement } from '../../../../_lib/development-traits.js';
 import { reportImportReadiness, rosterCarryForwardEligibility } from '../../../../_lib/permanent-league-export.js';
 
-const RELEASE = '8.0.4';
+const RELEASE = '8.0.5';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -143,60 +144,95 @@ async function captureDigest(db, leagueId, sessionId) {
 }
 
 const RETAINED_PERIOD_ROUTE=/(?:^|\/)week\/(pre|reg|post)\/(\d+)\/(schedules|defense|kicking|punting|passing|receiving|rushing|team)\/?$/i;
-const canonicalStage=value=>value==='pre'?'preseason':value==='post'?'playoffs':'regular-season';
-function retainedRoutePeriod(routePath){
+function retainedRouteType(routePath){
   const match=String(routePath||'').match(RETAINED_PERIOD_ROUTE);
-  if(!match)return null;
-  const stage=canonicalStage(match[1].toLowerCase()),week=Number.parseInt(match[2],10);
-  return{stage,week,key:`${stage}:${week}`,datasetType:match[3].toLowerCase()==='schedules'?'schedule':'statistics'};
+  return match?(match[3].toLowerCase()==='schedules'?'schedule':'statistics'):null;
 }
 function retainedCaptureRecordCount(row){
   const collections=parseCandidateJson(row?.collections_json,[]);
   return Array.isArray(collections)?collections.reduce((maximum,item)=>Math.max(maximum,Number(item?.count||0)),0):0;
 }
 
-async function retainedPeriodBundle(db,leagueId,report,identity,active){
+export async function retainedPeriodBundle(db,leagueId,report,identity,active){
   const parsedBoundary=Date.parse(String(identity?.season_created_at||''));
   const sourceNotBefore=Number.isFinite(parsedBoundary)?new Date(parsedBoundary).toISOString():'1970-01-01T00:00:00.000Z';
   const anchorCoverage=candidateSourceCoverage({
     sourceMarkers:parseCandidateJson(report?.source_markers_json,{}),
     datasetInventory:parseCandidateJson(report?.dataset_inventory_json,[])
   },active,{seasonYear:identity?.season_year??null});
-  if(anchorCoverage.importMode!=='historical-backfill'||!anchorCoverage.currentPeriod){
+  if(!anchorCoverage.currentPeriod){
     const digest=report?await captureDigest(db,leagueId,report.session_id):null;
     return{coverage:anchorCoverage,digest,sourceCaptureIds:[],sourcePeriods:anchorCoverage.completePeriods||[],routeCount:Number(report?.route_count||0),captureCount:Number(report?.capture_count||0),bytes:Number(report?.total_bytes||0),notBefore:sourceNotBefore};
   }
   const franchise=String(identity?.source_franchise_id||'').trim();
   if(!franchise)return{coverage:anchorCoverage,digest:null,sourceCaptureIds:[],sourcePeriods:[],routeCount:0,captureCount:0,bytes:0,notBefore:sourceNotBefore};
-  const result=await db.prepare(`SELECT id,route_path,payload_hash,byte_length,collections_json,received_at
-    FROM companion_route_captures
-    WHERE league_id=? AND received_at>=? AND route_path LIKE ? AND route_path LIKE '%/week/%'
-    ORDER BY received_at DESC,id DESC`).bind(
-      leagueId,sourceNotBefore,`%/${franchise}/week/%`
+  // Session observations, not physical capture timestamps, determine when a
+  // deduplicated route was exported. Keep the selected report's time boundary
+  // so a later export cannot silently alter an earlier candidate on retry.
+  const activeBoundary=anchorCoverage.importMode==='historical-backfill'
+    ?sourceNotBefore:(active?.created_at||sourceNotBefore);
+  const result=await db.prepare(`SELECT c.id,c.route_path,c.payload_hash,c.byte_length,
+      c.collections_json,link.observed_at,source_report.dataset_inventory_json
+    FROM madden_discovery_session_captures link
+    JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
+    JOIN madden_discovery_reports source_report
+      ON source_report.league_id=link.league_id AND source_report.session_id=link.session_id
+    WHERE link.league_id=? AND datetime(link.observed_at)>=datetime(?)
+      AND datetime(link.observed_at)<=datetime(?)
+      AND datetime(source_report.generated_at)<=datetime(?)
+      AND c.route_path LIKE ? AND c.route_path LIKE '%/week/%'
+    ORDER BY link.observed_at DESC,c.id DESC`).bind(
+      leagueId,activeBoundary,report.generated_at,report.generated_at,`%/${franchise}/week/%`
     ).all();
+  // Historical installations may predate the session-link table. Their
+  // physical captures are still retained and remain valid backfill evidence.
+  const legacy=!(result.results||[]).length&&anchorCoverage.importMode==='historical-backfill'
+    ?await db.prepare(`SELECT id,route_path,payload_hash,byte_length,collections_json,
+        received_at observed_at,NULL dataset_inventory_json
+      FROM companion_route_captures
+      WHERE league_id=? AND datetime(received_at)>=datetime(?)
+        AND datetime(received_at)<=datetime(?) AND route_path LIKE ?
+        AND route_path LIKE '%/week/%'
+      ORDER BY received_at DESC,id DESC`)
+      .bind(leagueId,sourceNotBefore,report.generated_at,`%/${franchise}/week/%`).all()
+    :null;
   const latestByRoute=new Map();
-  for(const row of result.results||[]){
-    const period=retainedRoutePeriod(row.route_path);
-    if(!period||candidateComparePeriods(period,anchorCoverage.currentPeriod)>0)continue;
-    if(!latestByRoute.has(String(row.route_path)))latestByRoute.set(String(row.route_path),{
-      ...row,...period,recordCount:retainedCaptureRecordCount(row)
-    });
+  for(const row of (result.results||[]).length?result.results:(legacy?.results||[])){
+    const datasetType=retainedRouteType(row.route_path);
+    if(!datasetType||latestByRoute.has(String(row.route_path)))continue;
+    const inventoryItem=parseCandidateJson(row.dataset_inventory_json,[])
+      .find(item=>String(item?.routePath??item?.route_path??'')===String(row.route_path)
+        &&String(item?.datasetType??item?.dataset_type??'')===datasetType);
+    const item=inventoryItem||{routePath:row.route_path,datasetType,
+      recordCount:retainedCaptureRecordCount(row)};
+    const periods=periodsFromInventoryItem(item)
+      .filter(period=>candidateComparePeriods(period,anchorCoverage.currentPeriod)<=0);
+    if(!periods.length)continue;
+    latestByRoute.set(String(row.route_path),{...row,datasetType,inventoryItem:item,periods,
+      recordCount:Number(item.recordCount??item.record_count??retainedCaptureRecordCount(row))});
   }
   const periodDomains=new Map();
   for(const row of latestByRoute.values()){
-    if(!periodDomains.has(row.key))periodDomains.set(row.key,{schedule:0,statistics:0});
-    const domains=periodDomains.get(row.key);
-    domains[row.datasetType]+=Number(row.recordCount||0);
+    for(const period of row.periods){
+      if(!periodDomains.has(period.key))periodDomains.set(period.key,{schedule:0,statistics:0,statisticsRoute:false});
+      const domains=periodDomains.get(period.key);
+      domains[row.datasetType]+=Number(row.recordCount||0);
+      if(row.datasetType==='statistics')domains.statisticsRoute=true;
+    }
   }
   const completeKeys=new Set([...periodDomains.entries()]
-    .filter(([,domains])=>domains.schedule>0&&domains.statistics>0).map(([key])=>key));
-  const selected=[...latestByRoute.values()].filter(row=>completeKeys.has(row.key));
+    .filter(([key,domains])=>domains.schedule>0&&(
+      domains.statistics>0||(key===anchorCoverage.currentPeriod.key&&domains.statisticsRoute)
+    )).map(([key])=>key));
+  const selected=[...latestByRoute.values()].filter(row=>row.periods.some(period=>completeKeys.has(period.key)));
   if(!selected.length){
     const digest=report?await captureDigest(db,leagueId,report.session_id):null;
     return{coverage:anchorCoverage,digest,sourceCaptureIds:[],sourcePeriods:anchorCoverage.completePeriods||[],routeCount:Number(report?.route_count||0),captureCount:Number(report?.capture_count||0),bytes:Number(report?.total_bytes||0),notBefore:sourceNotBefore};
   }
-  const inventory=selected.map(row=>({datasetType:row.datasetType,routePath:row.route_path}));
-  const coverage=candidateSourceCoverage({datasetInventory:inventory},active);
+  const inventory=selected.map(row=>row.inventoryItem);
+  const coverage=candidateSourceCoverage({
+    sourceMarkers:parseCandidateJson(report.source_markers_json,{}),datasetInventory:inventory
+  },active,{seasonYear:identity?.season_year??null});
   const digest=await sha256Hex(new TextEncoder().encode(selected
     .map(row=>`${row.route_path}:${row.payload_hash}:${row.id}:${Number(row.byte_length||0)}`).sort().join('\n')));
   return{

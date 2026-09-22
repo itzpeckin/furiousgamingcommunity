@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 8.0.4 */
+/* FHQ_BUILD: 8.0.5 */
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { syncDiscordScheduleThreads } from '../../../../_lib/discord-schedule.js';
@@ -21,6 +21,15 @@ export async function onRequestPost(context){
   const source=String(body.source||'').trim();
   if(!snapshotId||!['candidate-import','rollover-recovery'].includes(source)){
     return json({ok:false,error:'Schedule checkpoint request is invalid.'},400);
+  }
+  if(body.action==='fail'){
+    const message=String(body.error||'Schedule workflow stopped before completing.').slice(0,500);
+    await db.prepare(`UPDATE discord_schedule_sync_runs
+      SET status='failed',error_count=CASE WHEN error_count>0 THEN error_count ELSE 1 END,
+        last_error=?,updated_at=CURRENT_TIMESTAMP
+      WHERE league_id=? AND snapshot_id=? AND status='running'`)
+      .bind(message,league.id,snapshotId).run();
+    return json({ok:true,status:'failed-recorded'});
   }
   const result=await syncDiscordScheduleThreads(context.env,db,{
     league,snapshotId,source,requestedByUserId:auth.session.user.id,
