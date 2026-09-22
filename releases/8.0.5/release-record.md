@@ -18,16 +18,18 @@ Production read-only evidence established that FGC's live Week 5 snapshot lacks 
 
 ## Known inherited blockers
 
-FGC still needs the retained Week 4 recovery after publication. EA's Madden Companion Rosters mode is unavailable for P2W's first complete live import. Neither condition justifies fabricating roster or Free Agent data.
+EA's Madden Companion Rosters mode is unavailable for P2W's first complete live import. That does not justify fabricating roster or Free Agent data. Automatic Discord rollover passed regression tests, but its next real week-advance event has not yet occurred in Production and remains an operational acceptance check.
 
 ## Validation evidence
 
-Focused tests reproduce the Week 4 → Week 5 retained-export sequence, empty-stat/final-score preservation, exact ready-report selection, interrupted Map Schedule retry, Discord checkpoint completion, and terminal Discord failure recording. The full strict gate passes 310/310 tests plus syntax, secrets, environment, migration, inventory, and release-contract checks. Hosted checks and Production smoke verification remain pending.
+Focused tests reproduce the Week 4 → Week 5 retained-export sequence, empty-stat/final-score preservation, exact ready-report selection, interrupted Map Schedule retry, Discord checkpoint completion, and terminal Discord failure recording. The full strict gate passed 310/310 tests plus syntax, secrets, environment, migration, inventory, and release-contract checks. PR #148 quality run `35756137272`, Main quality run `35756527727`, and Main Pages workflow `35756526816` passed. Signed-in Production showed release 8.0.5 and completed the protected retained Week 4 import in 147.55 seconds.
 
 ## Deployment status
 
-Candidate under validation; no Production publication or live-data operation has occurred yet.
+PR #148 merged exact implementation `b118d39bbb7cd93d954ab56743ea52ace779ca95` into Main `e77924337e258b2a5956722febc8573146ca051f`. Pages deployment `d60dc4e2-d3a5-42d0-9b79-7941730d5228` and Worker deployment `7ca0af36-3553-4ccc-b205-c6806274e3ee` (version `2bc6c1dd-a479-4ad3-a129-efb0fb2078ca`, 100% traffic) succeeded. No migration was added or applied.
+
+The protected FGC recovery used the already-retained Week 4 report; it did not request another export. Candidate `candidate_import_61a09980-e200-40f8-a0ae-696d02f386aa` validated and atomically activated snapshot `3dc6ae96-117a-4c54-9bb0-52e688808942` from previous live snapshot `434c2d1c-c6d1-4e62-b82f-1c7730655837`. Production now has 843 Week 4 statistics, 16 Week 4 games with nonzero final scores, 3,359 total statistics, all 272 regular-season games, and still shows 2027 Week 5. It retains 2,046 players, 32 teams, 16 active Week 5 threads, and archived Week 1–4 threads. Free Agents remain `blocked` with a null count. The prior snapshot, earlier failed candidate, captures, and audits were not deleted.
 
 ## Rollback
 
-No D1 migration, export URL rotation, season transition, roster reset, snapshot deletion, or Free Agent reinterpretation is included. The code deployment alone does not backfill FGC's already-missing Week 4 stats; that retained-source recovery is verified separately against the exact active snapshot and requires an authorized import operation. If rollback is needed, restore the previous Pages and Worker versions; all retained captures and snapshot/audit history remain available.
+No D1 migration, export URL rotation, season transition, roster reset, snapshot deletion, or Free Agent reinterpretation is included. Code rollback does not roll back the successfully activated Week 4 backfill. If runtime rollback is needed, restore the previous Pages and Worker versions while retaining the current and prior snapshots, all captures, and audit history; any live-pointer recovery is a separate reviewed operation.

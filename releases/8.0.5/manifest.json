@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.0.5",
   "releaseType": "weekly-import-integrity-and-discord-rollover-stability",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.0.4",
@@ -16,16 +16,19 @@
   "tenantContract": "config/tenant-data-contract.json",
   "qualityBaseline": "config/quality-baseline.json",
   "knownInheritedIssues": [],
-  "repositoryPublication": {"authorized": true, "status": "pending", "pullRequests": [], "mainCommit": null},
+  "repositoryPublication": {"authorized": true, "status": "merged", "pullRequests": [148], "implementationCommit": "b118d39bbb7cd93d954ab56743ea52ace779ca95", "mainCommit": "e77924337e258b2a5956722febc8573146ca051f"},
   "staging": {"authorized": false, "deployed": false, "status": "not-run"},
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending-validation",
-    "currentRelease": "8.0.4",
+    "deployed": true,
+    "status": "deployed-and-verified",
+    "currentRelease": "8.0.5",
     "candidateRelease": "8.0.5",
     "currentMigration": 47,
     "candidateMigration": 47,
+    "pagesDeploymentId": "d60dc4e2-d3a5-42d0-9b79-7941730d5228",
+    "workerDeploymentId": "7ca0af36-3553-4ccc-b205-c6806274e3ee",
+    "workerVersionId": "2bc6c1dd-a479-4ad3-a129-efb0fb2078ca",
     "scope": "Compose retained previous-week captures with a new current-week export; preserve final scores and established stats from empty captures; run import phases and Discord rollover through durable retries. Do not delete retained exports, snapshots, audits, or threads outside an exact proven rollover. No export URL, season lifecycle, roster, or Free Agent authority change."
   },
   "requiredArtifacts": [

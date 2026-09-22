@@ -40,6 +40,17 @@ const isAuthorizedProductionDataChange = (
   version === '7.5.4' && evidence.scopeBoundaries?.activationPerformed === true
 ) || (
   version === '7.5.6.2' && evidence.checks?.tampaBayPickCorrection?.productionOperationApplied === true
+) || (
+  version === '8.0.5'
+  && evidence.checks?.fgcBackfill?.passed === true
+  && evidence.checks.fgcBackfill.previousSnapshotId === '434c2d1c-c6d1-4e62-b82f-1c7730655837'
+  && evidence.checks.fgcBackfill.activeSnapshotId === '3dc6ae96-117a-4c54-9bb0-52e688808942'
+  && evidence.checks.fgcBackfill.seasonYear === 2027
+  && evidence.checks.fgcBackfill.activeWeek === 5
+  && evidence.checks.fgcBackfill.week4Games === 16
+  && evidence.checks.fgcBackfill.week4StatisticRecords === 843
+  && evidence.checks.fgcBackfill.freeAgentStatus === 'blocked'
+  && evidence.checks.fgcBackfill.freeAgentCount === null
 );
 const isAuthorizedCredentialChange = (
   version === '7.4.4.3' && evidence.scopeBoundaries?.discordCredentialsChanged === true
