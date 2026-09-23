@@ -8082,7 +8082,9 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 /* 8.0.6 — consolidated Commissioner Command Center */
 .commissioner-hq-shell>[data-league-source-selector]{margin:0;border-color:rgba(89,148,255,.28);border-radius:20px;background:linear-gradient(145deg,rgba(20,38,62,.98),rgba(10,19,31,.98));box-shadow:0 16px 40px rgba(0,0,0,.12)}
 .commissioner-hq-shell>[data-league-source-selector] .league-source-options{grid-template-columns:repeat(3,minmax(0,1fr))}
-.commissioner-command-grid--refined>.commissioner-archive-card{grid-column:1/-1}
+/* 8.0.7 — place Archive Season inside the open Command Center rail. */
+.commissioner-command-column--secondary{grid-column:span 7}
+.commissioner-command-column--secondary>.commissioner-archive-card{margin:0}
 .commissioner-import-glance{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:12px;overflow:hidden;border:1px solid rgba(126,166,230,.14);border-radius:12px;background:rgba(126,166,230,.1)}
 .commissioner-import-glance>span,.commissioner-import-detail-grid>span{display:grid;gap:4px;min-width:0;padding:10px 12px;background:rgba(7,15,25,.76)}
 .commissioner-import-glance small,.commissioner-import-detail-grid small{color:var(--muted);font-size:.5rem;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
@@ -8093,4 +8095,5 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 .commissioner-import-detail-note,.commissioner-import-detail-warning{margin:10px 0 0;padding:11px 12px;border:1px solid rgba(126,166,230,.14);border-radius:11px;background:rgba(126,166,230,.05);color:var(--muted);font-size:.6rem;line-height:1.5}
 .commissioner-import-detail-warning{border-color:rgba(245,185,66,.3);background:rgba(245,185,66,.07)}
 .commissioner-import-detail-warning ul{margin:6px 0 0;padding-left:18px}
+@media(max-width:1100px){.commissioner-command-column--secondary{grid-column:1/-1}}
 @media(max-width:760px){.commissioner-hq-shell>[data-league-source-selector] .league-source-options{grid-template-columns:1fr}.commissioner-import-glance{grid-template-columns:1fr}.commissioner-import-detail-grid{grid-template-columns:1fr}}

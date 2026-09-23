@@ -385,6 +385,9 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(ui,/renderLeagueDataSelector\(dataSourceState\)/);
   assert.match(ui,/data-command-focus-source/);
   assert.match(ui,/renderArchiveSeasonPanel\(\)/);
+  assert.match(ui,/commissioner-command-column--secondary[\s\S]*commissioner-command-panel--quick[\s\S]*renderArchiveSeasonPanel\(\)[\s\S]*<\/div>\s*<section class="commissioner-command-panel commissioner-command-panel--activity"/);
+  assert.match(styles,/\.commissioner-command-column--secondary\{grid-column:span 7\}/);
+  assert.doesNotMatch(styles,/\.commissioner-command-grid--refined>\.commissioner-archive-card\{grid-column:1\/-1\}/);
   assert.match(ui,/League operations and the items that genuinely need your attention/);
   assert.match(ui,/Teams & Owners/);
   assert.match(ui,/data-commissioner-quick-control="\$\{key\}"/);

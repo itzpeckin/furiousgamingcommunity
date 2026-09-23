@@ -27,7 +27,7 @@ import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../.
 import { observeDevelopmentTraitsStatement } from '../../../../_lib/development-traits.js';
 import { reportImportReadiness, rosterCarryForwardEligibility } from '../../../../_lib/permanent-league-export.js';
 
-const RELEASE = '8.0.6';
+const RELEASE = '8.0.7';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
