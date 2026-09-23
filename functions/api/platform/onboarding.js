@@ -64,6 +64,23 @@ async function listPayload(db) {
   const plans = await listOnboardingPlans(db);
   const enriched = [];
   for (const plan of plans) enriched.push(await responsePlan(db,plan));
+  const leagues = await db.prepare(`SELECT
+      league.id,league.slug,league.name,league.current_season,league.current_week,
+      league.tenant_status,league.public_status,league.discord_connected,
+      league.created_at,league.updated_at,
+      COUNT(DISTINCT CASE WHEN membership.active=1 THEN membership.id END) AS active_members,
+      active.snapshot_id AS active_snapshot_id,
+      snapshot.activated_at AS active_snapshot_created_at
+    FROM leagues league
+    LEFT JOIN league_memberships membership ON membership.league_id=league.id
+    LEFT JOIN league_active_snapshots active ON active.league_id=league.id
+    LEFT JOIN league_snapshots snapshot
+      ON snapshot.league_id=active.league_id AND snapshot.id=active.snapshot_id
+    GROUP BY league.id,league.slug,league.name,league.current_season,league.current_week,
+      league.tenant_status,league.public_status,league.discord_connected,
+      league.created_at,league.updated_at,active.snapshot_id,snapshot.activated_at
+    ORDER BY CASE WHEN league.tenant_status='enabled' AND league.public_status='active' THEN 0 ELSE 1 END,
+      lower(league.name),league.slug`).all();
   const events = await db.prepare(`SELECT id,plan_id,actor_user_id,action,outcome,
       from_status,to_status,revision,request_id,detail_json,created_at
     FROM platform_league_onboarding_events
@@ -73,6 +90,21 @@ async function listPayload(db) {
   return {
     release:PLATFORM_ONBOARDING_RELEASE,
     activationAvailable:true,
+    leagues:(leagues?.results || []).map(league => ({
+      id:String(league.id),
+      slug:String(league.slug),
+      name:String(league.name),
+      currentSeason:Number(league.current_season || 0) || null,
+      currentWeek:Number(league.current_week || 0) || null,
+      tenantStatus:String(league.tenant_status || 'disabled'),
+      publicStatus:String(league.public_status || 'inactive'),
+      discordConnected:Boolean(league.discord_connected),
+      activeMembers:Number(league.active_members || 0),
+      activeSnapshotId:league.active_snapshot_id ? String(league.active_snapshot_id) : null,
+      activeSnapshotCreatedAt:league.active_snapshot_created_at || null,
+      createdAt:league.created_at || null,
+      updatedAt:league.updated_at || null
+    })),
     plans:enriched,
     events:events?.results || [],
     users:(users?.results || []).map(user => ({

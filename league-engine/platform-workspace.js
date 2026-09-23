@@ -126,6 +126,7 @@
         location.hash = '#home';
         return;
       }
+      if (workspaceLink.matches('[data-platform-admin-link]')) return;
       setTimeout(() => window.FGC_TRADE?.renderPlatformWorkspace?.(), 0);
     }
     const tab = event.target.closest('[data-platform-tab]');

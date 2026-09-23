@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0e14" />
-  <meta name="franchise-hq-platform-version" content="8.0.7" />
+  <meta name="franchise-hq-platform-version" content="8.0.8" />
   <meta name="franchise-hq-platform-owner-handle" content="Peckin" />
   <meta name="franchise-hq-platform-owner-account-id" content="owner-tb" />
   <meta name="franchise-hq-platform-owner-discord-id" content="" />
   <meta name="description" content="FranchiseHQ connected-franchise league management for teams, rosters, schedules, statistics, rules, and commissioner workflows." />
-  <title>FranchiseHQ 8.0.7</title>
-  <link rel="stylesheet" href="styles.css?v=8.0.7" />
+  <title>FranchiseHQ 8.0.8</title>
+  <link rel="stylesheet" href="styles.css?v=8.0.8" />
   <link rel="stylesheet" href="release-7.0.5.css?v=8.0.3" />
 
   <style id="platform-workspace-styles">
@@ -1025,7 +1025,6 @@ html.trade-live-first-load main{visibility:hidden!important}
       <nav class="nav-list" data-nav-list>
         <div class="nav-divider nav-divider--commissioner"><span>Commissioner</span></div>
         <a class="nav-item nav-item--commissioner" href="#commissioner" data-route="commissioner" data-role-link="commissioner"><svg><use href="#icon-sliders"></use></svg><span>Commish HQ</span></a>
-        <a class="nav-item nav-item--platform" href="#commissioner/platform-workspace" data-route="commissioner/platform-workspace" data-platform-owner-only hidden><svg><use href="#icon-settings"></use></svg><span>Platform Workspace</span></a>
         <a class="nav-item" href="#home" data-route="home"><svg><use href="#icon-home"></use></svg><span>League Home</span></a>
         <a class="nav-item" href="#league-activity" data-route="league-activity"><svg><use href="#icon-activity"></use></svg><span>League Activity</span></a>
         <a class="nav-item" href="#teams" data-route="teams"><svg><use href="#icon-shield"></use></svg><span>Teams</span></a>
@@ -1052,7 +1051,7 @@ html.trade-live-first-load main{visibility:hidden!important}
           <span class="status-dot status-dot--success"></span>
           <div><strong>League connected</strong><span>Current franchise data</span></div>
         </div>
-        <span class="version-label" data-current-release>Production · Release 8.0.7</span>
+        <span class="version-label" data-current-release>Production · Release 8.0.8</span>
       </div>
     </aside>
 
@@ -1138,6 +1137,21 @@ html.trade-live-first-load main{visibility:hidden!important}
     <span class="profile-menu__section-label">
       Account
     </span>
+
+    <button data-platform-admin-link data-platform-owner-only role="menuitem" hidden>
+      <span class="menu-icon">
+        <svg><use href="#icon-settings"></use></svg>
+      </span>
+
+      <span>
+        <strong>Platform Admin</strong>
+        <small>Leagues, activation, and platform health</small>
+      </span>
+
+      <svg class="check-icon">
+        <use href="#icon-arrow"></use>
+      </svg>
+    </button>
 
     <button data-open-notifications role="menuitem">
       <span class="menu-icon">
@@ -1421,10 +1435,10 @@ html.trade-live-first-load main{visibility:hidden!important}
 <script src="league-engine/live-read-model.js?v=8.0.3"></script>
 <script src="league-engine/ownership-career.js?v=8.0.3"></script>
 <script src="league-engine/week-context.js?v=8.0.3"></script>
-<script src="league-engine/one-click-import.js?v=8.0.7"></script>
+<script src="league-engine/one-click-import.js?v=8.0.8"></script>
 <script src="league-engine/permanent-export-url.js?v=8.0.4"></script>
 <script src="league-engine/game-year-transition.js?v=8.0.3"></script>
-<script src="league-engine/platform-onboarding.js?v=8.0.3"></script>
+<script src="league-engine/platform-onboarding.js?v=8.0.8"></script>
 <script src="league-engine/platform-workspace.js?v=8.0.3"></script>
 <script src="league-engine/identity-preview.js?v=7.3.1"></script>
 <script src="league-engine/developer-mode.js?v=5.9.3.3b"></script>
@@ -1440,11 +1454,11 @@ html.trade-live-first-load main{visibility:hidden!important}
 <script src="league-engine/standings.js?v=5.6.2a"></script>
 <script src="league-engine/statistics.js?v=8.0.3"></script>
 <script src="league-engine/trade-assets.js?v=5.7.1b"></script>
-<script src="app.js?v=8.0.7"></script>
+<script src="app.js?v=8.0.8"></script>
 <script src="league-engine/news.js?v=8.0.3"></script>
 <script src="platform/domains.js?v=5.6.2a"></script>
 <script src="platform/permissions.js"></script>
-<script src="trade-module.js?v=8.0.7"></script>
+<script src="trade-module.js?v=8.0.8"></script>
 <script src="league-engine/trade-center-live.js?v=8.0.3"></script>
 <script src="league-engine/roster-management.js?v=8.0.3"></script>
 <script src="auth-ui.js"></script>

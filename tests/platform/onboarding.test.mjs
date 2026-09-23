@@ -297,25 +297,24 @@ test('activation is atomic, isolated, and grants only the reviewed commissioner'
   } finally { sqlite.close(); }
 });
 
-test('the owner workspace is responsive and exposes only owner-gated activation', async () => {
-  const [html,ui,workspace,identity,middleware,tradeModule] = await Promise.all([
+test('the owner console is responsive and exposes only owner-gated activation', async () => {
+  const [html,ui,admin,adminCss,identity,middleware] = await Promise.all([
     readFile(path.join(ROOT,'index.html'),'utf8'),
     readFile(path.join(ROOT,'league-engine/platform-onboarding.js'),'utf8'),
-    readFile(path.join(ROOT,'league-engine/platform-workspace.js'),'utf8'),
+    readFile(path.join(ROOT,'platform-admin.js'),'utf8'),
+    readFile(path.join(ROOT,'platform-admin.css'),'utf8'),
     readFile(path.join(ROOT,'league-engine/platform-owner-identity.js'),'utf8'),
-    readFile(path.join(ROOT,'functions/_middleware.js'),'utf8'),
-    readFile(path.join(ROOT,'trade-module.js'),'utf8')
+    readFile(path.join(ROOT,'functions/_middleware.js'),'utf8')
   ]);
-  assert.match(html,/platform-onboarding-form-grid[^}]+grid-template-columns:repeat\(2/);
-  assert.match(html,/@media\(max-width:700px\)\{\.platform-onboarding-form-grid,\.platform-onboarding-readiness\{grid-template-columns:1fr/);
-  assert.ok(html.indexOf('league-engine/platform-onboarding.js') < html.indexOf('league-engine/platform-workspace.js'));
+  assert.match(adminCss,/platform-onboarding-form-grid[^}]+grid-template-columns:repeat\(2/);
+  assert.match(adminCss,/@media\(max-width:700px\)[\s\S]+platform-onboarding-form-grid/);
+  assert.match(html,/data-platform-admin-link data-platform-owner-only/);
   assert.match(html,/platform-owner-identity\.js\?v=8\.0\.3\.1/);
-  assert.match(html,/trade-module\.js\?v=8\.0\.7/);
+  assert.match(html,/trade-module\.js\?v=8\.0\.8/);
   assert.match(identity,/VERSION = '8\.0\.3\.1'/);
   assert.match(identity,/SERVER_PLATFORM_OWNER/);
-  assert.match(workspace,/\['league-onboarding','League Onboarding'\]/);
-  assert.match(tradeModule,/function renderCommissionerV743\(section\)[\s\S]+requested==='platform-workspace'[\s\S]+data-platform-workspace-host[\s\S]+workspace\.renderWorkspace\(\)/);
-  assert.doesNotMatch(tradeModule,/function renderCommissionerV743\(section\)\{[^}]+Platform development tools are not exposed inside production leagues/);
+  assert.match(admin,/data-platform-onboarding-host/);
+  assert.match(admin,/Advanced Diagnostics/);
   assert.match(ui,/activationAvailable:true/);
   assert.match(ui,/data-onboarding-activate/);
   assert.match(ui,/planAction\('activate'/);

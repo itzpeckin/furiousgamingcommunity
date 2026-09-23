@@ -60,6 +60,7 @@
     ],
     "DB": [
       "functions/_lib/auth.js",
+      "functions/_lib/permissions.js",
       "functions/_lib/tenant-context.js",
       "functions/_middleware.js",
       "functions/api/auth/discord/callback.js",
@@ -167,14 +168,14 @@
   "files": {
     "byExtension": {
       ".bin": 1,
-      ".css": 10,
+      ".css": 11,
       ".example": 1,
       ".html": 8,
-      ".js": 239,
+      ".js": 241,
       ".json": 7,
       ".jsonc": 1,
       ".md": 284,
-      ".mjs": 53,
+      ".mjs": 54,
       ".png": 3,
       ".sql": 49,
       ".txt": 3,
@@ -184,7 +185,7 @@
     },
     "largest": [
       {
-        "bytes": 652545,
+        "bytes": 652707,
         "file": "app.js"
       },
       {
@@ -220,7 +221,7 @@
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 77053,
+        "bytes": 77224,
         "file": "index.html"
       },
       {
@@ -264,7 +265,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       }
     ],
-    "total": 663
+    "total": 667
   },
   "frontend": {
     "assets": [
@@ -764,7 +765,7 @@
     "stylesheetCount": 2
   },
   "functions": {
-    "routeCount": 86,
+    "routeCount": 87,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1407,6 +1408,13 @@
         "route": "/leagues/*path"
       },
       {
+        "file": "functions/platform-admin/[[path]].js",
+        "handlers": [
+          "onRequest"
+        ],
+        "route": "/platform-admin/*path"
+      },
+      {
         "file": "functions/register-league/index.js",
         "handlers": [
           "onRequestGet"
@@ -1695,7 +1703,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.7",
+  "release": "8.0.8",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
