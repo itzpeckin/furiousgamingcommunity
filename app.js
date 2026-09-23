@@ -9308,6 +9308,12 @@ function canonicalPlayerDashboardStats(playerId='') {
       return;
     }
 
+    if (event.target.closest('[data-platform-admin-link]')) {
+      event.preventDefault();
+      window.location.assign('/platform-admin');
+      return;
+    }
+
     const interactiveTarget=event.target.closest('button, a, input, select, textarea, label');
     const teamTarget=event.target.closest('[data-team-id]');
     const nestedInteractive=interactiveTarget && interactiveTarget!==teamTarget;
@@ -10081,7 +10087,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.0.7';
+  const VISIBLE_RELEASE = '8.0.8';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

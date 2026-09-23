@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "version": "8.0.8",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "productionDataChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {"unregisteredFailures": 0},
+  "checks": {
+    "strictMigration": {"expectedFailure": false, "passed": true, "migrationVersion": 47, "candidateRequiresMigration": false, "productionApplied": false},
+    "platformAdminBoundary": {"passed": true, "topLevelRoute": "/platform-admin", "serverOwnerGuard": true, "selectedLeagueRequiredForDiagnostics": true},
+    "visibleOperations": {"passed": true, "leagueDirectory": true, "crossLeagueHealth": true, "onboardingAndActivation": true, "leagueEngineeringToolsHidden": true},
+    "entryPoints": {"passed": true, "ownerAccountMenu": true, "ownerLeagueSelector": true, "commissionerSidebarRemoved": true},
+    "responsiveLayout": {"passed": true, "desktop": true, "tablet": true, "phone": true},
+    "focusedGate": {"passed": true, "tests": 14},
+    "strictGate": {"passed": true, "tests": 310, "trackedFiles": 667, "routes": 87, "status": "passed"}
+  },
+  "scopeBoundaries": {
+    "productionChanged": false,
+    "gitMainChanged": false,
+    "gitRemoteChanged": false,
+    "migrationApplied": false,
+    "databaseRowsWritten": false,
+    "leagueDataRowsWritten": false,
+    "importExecuted": false,
+    "activeSnapshotChanged": false,
+    "archiveSeasonExecuted": false,
+    "dataDeleted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false,
+    "membershipAssignmentsChanged": false,
+    "freeAgentInterpretedAsZero": false
+  }
+}

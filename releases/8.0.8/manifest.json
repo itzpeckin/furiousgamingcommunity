@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.8",
+  "releaseType": "platform-owner-console-separation",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.7",
+    "commit": "c161be61a2cff0e3cb3f4c406e469a021979bff3",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "release/8.0.8-platform-admin",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending", "pullRequests": []},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.7",
+    "candidateRelease": "8.0.8",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Create a server-protected top-level Platform Admin console, move owner entry points out of league navigation, list retained tenants and cross-league readiness, reuse gated onboarding, and isolate retained diagnostics behind an explicit tenant choice. No database migration, league-data write, import, snapshot activation, reset, deletion, archive, transition, export URL rotation, Discord operation, credential change, membership or assignment change, or Free Agent reinterpretation is included."
+  },
+  "requiredArtifacts": [
+    "functions/platform-admin/[[path]].js",
+    "platform-admin.js",
+    "platform-admin.css",
+    "functions/api/platform/onboarding.js",
+    "functions/_lib/permissions.js",
+    "tests/platform/platform-admin.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.8/release-record.md",
+    "releases/8.0.8/validation-evidence.json"
+  ]
+}

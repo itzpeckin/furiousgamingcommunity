@@ -5,6 +5,7 @@ import {
   rotateBrowserSession
 } from "../_lib/auth.js";
 import { isOwnerFallbackHost } from "../_lib/origin.js";
+import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
 
 const RELEASE = "8.0.3";
 
@@ -33,7 +34,7 @@ function leagueCard(league) {
   </a>`;
 }
 
-function page({ user, memberships, pendingMemberships = [], csrfToken = "" }) {
+function page({ user, memberships, pendingMemberships = [], csrfToken = "", platformOwner = false }) {
   const hasMemberships = memberships.length > 0;
   return `<!doctype html>
 <html lang="en">
@@ -48,21 +49,21 @@ function page({ user, memberships, pendingMemberships = [], csrfToken = "" }) {
     body{background:radial-gradient(circle at 50% 0,rgba(0,119,255,.14),transparent 34rem),#05080d}
     .shell{width:min(980px,calc(100% - 32px));margin:0 auto;padding:32px 0 48px}
     header{display:flex;align-items:center;justify-content:space-between;padding:12px 0 34px;border-bottom:1px solid var(--line)}
-    .brand{font-weight:950;letter-spacing:.04em;font-size:19px}.brand span{color:#1698ff}.account{text-align:right}.account strong{display:block;font-size:14px}.account span{color:var(--muted);font-size:12px}
+    .brand{font-weight:950;letter-spacing:.04em;font-size:19px}.brand span{color:#1698ff}.header-actions{display:flex;align-items:center;gap:13px}.admin-link{display:inline-flex;align-items:center;min-height:38px;padding:0 13px;border:1px solid rgba(83,132,247,.38);border-radius:9px;background:rgba(83,132,247,.1);color:#b9ceff;text-decoration:none;font-size:12px;font-weight:850}.account{text-align:right}.account strong{display:block;font-size:14px}.account span{color:var(--muted);font-size:12px}
     main{padding:48px 0}.eyebrow{color:#77c8ff;font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.hero h1{margin:10px 0 10px;font-size:clamp(34px,6vw,54px);letter-spacing:-.04em}.hero p{margin:0;color:var(--muted);font-size:17px;line-height:1.6;max-width:650px}
     .section{margin-top:38px}.section-title{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:13px}.section-title h2{margin:0;font-size:18px}.section-title span{color:var(--muted);font-size:12px}
     .list{display:grid;gap:12px}.league-card{display:grid;grid-template-columns:54px 1fr auto 24px;gap:16px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(17,27,41,.88),rgba(9,14,22,.9));text-decoration:none;color:inherit;transition:.15s ease}.league-card:hover{transform:translateY(-1px);border-color:rgba(44,144,255,.48);background:var(--panel2)}
     .league-mark{width:54px;height:54px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#0878ff,#00a7ff);font-weight:950}.league-meta{color:#6fbfff;text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:900}.league-copy h2{margin:4px 0 3px;font-size:18px}.league-copy p{margin:0;color:var(--muted);font-size:13px}.role{padding:7px 10px;border-radius:999px;background:rgba(8,120,255,.14);color:#8dcaff;font-size:11px;font-weight:850;text-transform:capitalize}.role--available{background:rgba(255,255,255,.06);color:#b8c3d3}.arrow{font-size:21px;color:#79bdff}
     .empty{padding:18px;border:1px dashed rgba(147,163,186,.25);border-radius:14px;color:var(--muted);background:rgba(255,255,255,.02);line-height:1.55}.create{display:inline-flex;margin-top:18px;min-height:43px;align-items:center;padding:0 16px;border-radius:10px;background:#0878ff;color:white;text-decoration:none;font-weight:850;font-size:13px}
     footer{display:flex;justify-content:space-between;gap:16px;padding-top:20px;border-top:1px solid var(--line);color:#68778e;font-size:12px}.logout{color:#9db5d2;text-decoration:none;background:none;border:0;padding:0;font:inherit;cursor:pointer}
-    @media(max-width:620px){.shell{width:min(100% - 24px,980px);padding-top:18px}header{align-items:flex-start}.account strong{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}main{padding-top:36px}.league-card{grid-template-columns:48px 1fr 20px;gap:12px}.league-mark{width:48px;height:48px}.role{grid-column:2;justify-self:start}.arrow{grid-column:3;grid-row:1 / span 2}.section-title{align-items:flex-start;flex-direction:column}}
+    @media(max-width:620px){.shell{width:min(100% - 24px,980px);padding-top:18px}header{align-items:flex-start}.header-actions{align-items:flex-end;flex-direction:column}.account strong{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}main{padding-top:36px}.league-card{grid-template-columns:48px 1fr 20px;gap:12px}.league-mark{width:48px;height:48px}.role{grid-column:2;justify-self:start}.arrow{grid-column:3;grid-row:1 / span 2}.section-title{align-items:flex-start;flex-direction:column}}
   </style>
 </head>
 <body>
   <div class="shell">
     <header>
       <div class="brand">FRANCHISE<span>HQ</span></div>
-      <div class="account"><strong>${esc(user.displayName || user.discordUsername || "FranchiseHQ User")}</strong><span>Signed in with ${user.authProvider === 'email' ? 'email' : 'Discord'}</span></div>
+      <div class="header-actions">${platformOwner ? '<a class="admin-link" href="/platform-admin">Platform Admin</a>' : ''}<div class="account"><strong>${esc(user.displayName || user.discordUsername || "FranchiseHQ User")}</strong><span>Signed in with ${user.authProvider === 'email' ? 'email' : 'Discord'}</span></div></div>
     </header>
     <main>
       <section class="hero">
@@ -136,7 +137,8 @@ export async function onRequestGet(context) {
       user:session.user,
       memberships,
       pendingMemberships,
-      csrfToken:session.rawCsrfToken || ""
+      csrfToken:session.rawCsrfToken || "",
+      platformOwner:isOwnerFallbackIdentity(context.env,session.user)
     }), { status: 200, headers });
   } catch (error) {
     console.error("League selector failed:", error);

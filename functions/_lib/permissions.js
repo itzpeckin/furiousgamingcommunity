@@ -113,18 +113,30 @@ export async function requireCommissioner(context) {
 }
 
 export async function requirePlatformOwner(context) {
-  const commissioner = await requireCommissioner(context);
-  if (!commissioner.authorized) return commissioner;
+  const authentication = await requireAuthenticatedUser(context);
+  if (!authentication.authorized) return authentication;
 
   const configuredDiscordId = String(
     context.env?.OWNER_FALLBACK_DISCORD_ID || ""
   ).trim();
   const sessionDiscordId = String(
-    commissioner.session?.user?.discordUserId || ""
+    authentication.session?.user?.discordUserId || ""
   ).trim();
 
   if (configuredDiscordId && sessionDiscordId === configuredDiscordId) {
-    return commissioner;
+    // Platform administration is intentionally independent of a selected
+    // league. The configured owner must still hold at least one current
+    // commissioner membership, but the request does not need to borrow a
+    // tenant slug just to establish platform authority.
+    const currentMembership = authentication.session?.membership;
+    if (currentMembership?.active && currentMembership.role === LEAGUE_ROLES.COMMISSIONER) {
+      return authentication;
+    }
+    const commissioner = await context.env?.DB?.prepare(`SELECT 1 AS allowed
+      FROM league_memberships
+      WHERE user_id=? AND role='commissioner' AND active=1
+      LIMIT 1`).bind(authentication.session.user.id).first();
+    if (commissioner?.allowed) return authentication;
   }
 
   // Local and isolated Preview environments may use the existing simulated
@@ -143,7 +155,8 @@ export async function requirePlatformOwner(context) {
     && configuredAccountId
     && presentedAccountId === configuredAccountId
   ) {
-    return commissioner;
+    const commissioner = await requireCommissioner(context);
+    if (commissioner.authorized) return commissioner;
   }
 
   return {

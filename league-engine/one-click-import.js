@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 8.0.7 */
+/* FHQ_BUILD: 8.0.8 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.7';
+  const VERSION = '8.0.8';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],

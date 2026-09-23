@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.3';
+  const VERSION = '8.0.8';
   const FEATURE_LABELS = Object.freeze({
     core_browsing:'League pages',
     commissioner_hq:'Commissioner HQ',
@@ -16,7 +16,7 @@
     core_browsing:true,commissioner_hq:true,madden_import:true,trade_center:true,
     confidence_pool:false,game_of_the_week:false,rules:true
   });
-  let data = { plans:[],events:[],users:[] };
+  let data = { leagues:[],plans:[],events:[],users:[] };
   let preview = null;
   let busy = false;
   let loaded = false;
@@ -26,13 +26,18 @@
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
   }[character]));
-  const account = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
-  const currentSlug = () => HQ?.leagueTenant?.getCurrentLeague?.()?.slug || null;
-  const endpoint = () => `/api/platform/onboarding?league=${encodeURIComponent(currentSlug() || '')}`;
+  const cookie = name => {
+    const prefix = `${name}=`;
+    const match = document.cookie.split(';').map(item => item.trim()).find(item => item.startsWith(prefix));
+    return match ? decodeURIComponent(match.slice(prefix.length)) : '';
+  };
+  const account = () => window.FGC_TRADE?.getCurrentAccount?.() || window.__FHQ_PLATFORM_ADMIN__?.user || null;
+  const endpoint = () => '/api/platform/onboarding';
   const headers = () => ({
     accept:'application/json',
     'content-type':'application/json',
-    'x-franchisehq-platform-owner-account-id':String(account()?.id || '')
+    'x-franchisehq-platform-owner-account-id':String(account()?.id || ''),
+    'x-franchisehq-csrf':cookie('franchise_hq_csrf')
   });
 
   async function request(method = 'GET', body = null) {
