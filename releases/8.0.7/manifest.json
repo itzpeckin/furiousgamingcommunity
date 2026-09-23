@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.7",
+  "releaseType": "commissioner-command-center-archive-layout",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.6",
+    "commit": "fe7b8babab4d5efd76f9c2e346facc2501cf8ccc",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "release/8.0.7-command-center-archive",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending", "pullRequests": []},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.6",
+    "candidateRelease": "8.0.7",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Move the existing Archive Season panel into the open right-hand Command Center rail beneath Quick Controls, keep Recent League Activity full-width below the balanced columns, and preserve phone-safe stacking. No Archive Season operation, import, snapshot change, reset, deletion, export URL rotation, credential change, season transition, or Free Agent reinterpretation is included."
+  },
+  "requiredArtifacts": [
+    "trade-module.js",
+    "styles.css",
+    "tests/commissioner/commissioner-hq.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.7/release-record.md",
+    "releases/8.0.7/validation-evidence.json"
+  ]
+}

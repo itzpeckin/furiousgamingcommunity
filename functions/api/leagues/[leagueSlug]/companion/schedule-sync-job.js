@@ -1,4 +1,4 @@
-/* FHQ_BUILD: 8.0.6 */
+/* FHQ_BUILD: 8.0.7 */
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { syncDiscordScheduleThreads } from '../../../../_lib/discord-schedule.js';

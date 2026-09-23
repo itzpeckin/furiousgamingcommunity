@@ -188,11 +188,11 @@
         "file": "app.js"
       },
       {
-        "bytes": 565459,
+        "bytes": 565673,
         "file": "styles.css"
       },
       {
-        "bytes": 437822,
+        "bytes": 437916,
         "file": "trade-module.js"
       },
       {
@@ -1695,7 +1695,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.6",
+  "release": "8.0.7",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
