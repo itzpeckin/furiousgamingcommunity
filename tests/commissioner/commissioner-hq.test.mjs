@@ -371,14 +371,20 @@ test('Rules input validation rejects empty text and duplicate identifiers', () =
 });
 
 test('Commissioner HQ exposes the complete command shell and phone-safe presentation', async () => {
-  const [ui, styles, app] = await Promise.all([
+  const [ui, styles, app, importer] = await Promise.all([
     readFile(path.join(ROOT,'trade-module.js'),'utf8'),
     readFile(path.join(ROOT,'styles.css'),'utf8'),
-    readFile(path.join(ROOT,'app.js'),'utf8')
+    readFile(path.join(ROOT,'app.js'),'utf8'),
+    readFile(path.join(ROOT,'league-engine/one-click-import.js'),'utf8')
   ]);
-  for (const workspace of ['overview','league-data','teams','controls','rules','audit']) {
+  for (const workspace of ['overview','teams','controls','rules','audit']) {
     assert.match(ui,new RegExp(`commissionerTabButton\\('${workspace}'`));
   }
+  assert.match(ui,/const COMMISSIONER_TABS=\['overview','teams','controls','rules','audit'\]/);
+  assert.match(ui,/requestedValue==='league-data'\?'overview'/);
+  assert.match(ui,/renderLeagueDataSelector\(dataSourceState\)/);
+  assert.match(ui,/data-command-focus-source/);
+  assert.match(ui,/renderArchiveSeasonPanel\(\)/);
   assert.match(ui,/League operations and the items that genuinely need your attention/);
   assert.match(ui,/Teams & Owners/);
   assert.match(ui,/data-commissioner-quick-control="\$\{key\}"/);
@@ -396,8 +402,8 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(styles,/@media\(max-width:760px\)/);
   assert.match(styles,/\.commissioner-tabs--command\{display:flex;overflow-x:auto/);
   assert.match(styles,/\.commissioner-feature-grid\{grid-template-columns:1fr\}/);
-  assert.match(ui,/league-data-workspace--unified/);
-  assert.doesNotMatch(ui,/league-data-workspace__connection">\$\{renderPermanentLeagueExportCard\(\)\}/);
+  assert.doesNotMatch(ui,/return `\$\{base\}\$\{window\.FranchiseHQ\?\.liveTradeCenter\?\.renderCommissionerManagement/);
+  assert.match(ui,/querySelector\('\.discord-command-summary'\)\?\.remove\(\)/);
   assert.match(ui,/restoreCommissionerTabViewport\(tab\)/);
   assert.match(ui,/Connect Discord/);
   assert.match(ui,/No IDs or manual mapping/);
@@ -412,7 +418,6 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(ui,/aria-label="Manage \$\{escapeHtml\(team\.fullName\)\} owner assignment"/);
   assert.match(ui,/data-open-team-trades/);
   assert.match(ui,/Trades Available/);
-  assert.match(ui,/renderCommissionerManagement/);
   assert.match(ui,/renderTeamTradeUsage/);
   assert.match(styles,/\.commissioner-directory-panel \.ownership-table-head,\.commissioner-directory-panel \.ownership-team-row\{grid-template-columns:[^}]+minmax\(104px,auto\)/);
   assert.match(styles,/@media\(max-width:1180px\)[\s\S]*?grid-template-areas:"franchise manage" "owner owner" "role status"/);
@@ -421,6 +426,13 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(styles,/grid-template-areas:"franchise franchise" "owner owner" "role status" "trades trades" "manage manage"!important/);
   assert.match(styles,/@media\(max-width:700px\)[^{]*\{[^}]*\.commissioner-operations-health/s);
   assert.match(app,/function applyLeagueFeaturePresentation\(\)/);
+  assert.match(app,/const officialFeaturedGameId=officialGotwId\(currentWeek\)/);
+  assert.match(app,/hasOfficialFeaturedGame\?'★ Game of the Week':'Featured Matchup'/);
+  const compactImporter=importer.slice(importer.indexOf('function renderCompactPanel'),importer.indexOf('function renderPanel'));
+  assert.match(compactImporter,/class="commissioner-import-glance"/);
+  assert.match(compactImporter,/View latest import details/);
+  assert.doesNotMatch(compactImporter,/<small>Click to live<\/small>/);
+  assert.doesNotMatch(compactImporter,/<small>Atomic activation<\/small>/);
   assert.match(app,/A league commissioner has turned this feature off/);
   const rulesMedia = await readFile(path.join(ROOT,'functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js'),'utf8');
   assert.match(rulesMedia,/requireActiveMembership/);
