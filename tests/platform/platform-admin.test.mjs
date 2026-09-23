@@ -47,6 +47,8 @@ test('platform admin shows only league operations and keeps diagnostics behind a
   assert.match(onboarding,/x-franchisehq-csrf/);
   assert.match(api,/COUNT\(DISTINCT CASE WHEN membership\.active=1/);
   assert.match(api,/activeSnapshotId/);
+  assert.match(api,/active_season_year \?\? league\.current_season/);
+  assert.match(api,/active_week_index \?\? league\.current_week/);
   assert.match(css,/@media\(max-width:700px\)/);
   assert.match(css,/\.admin-grid\{grid-template-columns:1fr\}/);
 });

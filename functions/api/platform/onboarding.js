@@ -70,6 +70,8 @@ async function listPayload(db) {
       league.created_at,league.updated_at,
       COUNT(DISTINCT CASE WHEN membership.active=1 THEN membership.id END) AS active_members,
       active.snapshot_id AS active_snapshot_id,
+      snapshot.season_year AS active_season_year,
+      snapshot.week_index AS active_week_index,
       snapshot.activated_at AS active_snapshot_created_at
     FROM leagues league
     LEFT JOIN league_memberships membership ON membership.league_id=league.id
@@ -78,7 +80,8 @@ async function listPayload(db) {
       ON snapshot.league_id=active.league_id AND snapshot.id=active.snapshot_id
     GROUP BY league.id,league.slug,league.name,league.current_season,league.current_week,
       league.tenant_status,league.public_status,league.discord_connected,
-      league.created_at,league.updated_at,active.snapshot_id,snapshot.activated_at
+      league.created_at,league.updated_at,active.snapshot_id,snapshot.season_year,
+      snapshot.week_index,snapshot.activated_at
     ORDER BY CASE WHEN league.tenant_status='enabled' AND league.public_status='active' THEN 0 ELSE 1 END,
       lower(league.name),league.slug`).all();
   const events = await db.prepare(`SELECT id,plan_id,actor_user_id,action,outcome,
@@ -94,8 +97,8 @@ async function listPayload(db) {
       id:String(league.id),
       slug:String(league.slug),
       name:String(league.name),
-      currentSeason:Number(league.current_season || 0) || null,
-      currentWeek:Number(league.current_week || 0) || null,
+      currentSeason:Number(league.active_season_year ?? league.current_season ?? 0) || null,
+      currentWeek:Number(league.active_week_index ?? league.current_week ?? 0) || null,
       tenantStatus:String(league.tenant_status || 'disabled'),
       publicStatus:String(league.public_status || 'inactive'),
       discordConnected:Boolean(league.discord_connected),
