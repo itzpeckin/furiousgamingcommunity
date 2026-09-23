@@ -1055,7 +1055,11 @@
         return;
       }
 
-      if(!state.featuredGameId||!availableGames.some(game=>String(game.id)===String(state.featuredGameId))){
+      const officialFeaturedGameId=officialGotwId(currentWeek);
+      const hasOfficialFeaturedGame=availableGames.some(game=>String(game.id)===String(officialFeaturedGameId));
+      if(hasOfficialFeaturedGame){
+        state.featuredGameId=officialFeaturedGameId;
+      }else if(!state.featuredGameId||!availableGames.some(game=>String(game.id)===String(state.featuredGameId))){
         state.featuredGameId=[...availableGames].sort((a,b)=>{
           const ar=Number(a.away?.wins||0)+Number(a.home?.wins||0);
           const br=Number(b.away?.wins||0)+Number(b.home?.wins||0);
@@ -1093,7 +1097,7 @@
           <div class="league-home-primary">
             <section class="featured-game featured-game--live-gotw card" data-game-id="${escapeHtml(featured.id)}" style="--away:${escapeHtml(away.primary||'#333')};--home:${escapeHtml(home.primary||'#555')};--away-secondary:${escapeHtml(away.secondary||away.primary||'#333')};--home-secondary:${escapeHtml(home.secondary||home.primary||'#555')};background:linear-gradient(135deg, ${escapeHtml(away.primary||'#333')}, ${escapeHtml(away.secondary||away.primary||'#333')}) left / 50% 100% no-repeat, linear-gradient(225deg, ${escapeHtml(home.primary||'#555')}, ${escapeHtml(home.secondary||home.primary||'#555')}) right / 50% 100% no-repeat !important;">
               <div class="featured-game-label">
-                <span>★ Game of the Week</span>
+                <span>${hasOfficialFeaturedGame?'★ Game of the Week':'Featured Matchup'}</span>
                 <small>${escapeHtml(canonicalScheduleLabel(featured))} · ${featured.completed?'Final':'Upcoming'}</small>
               </div>
               <div class="featured-split featured-split--clickable" aria-label="Open Game Center">
@@ -10077,7 +10081,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.0.5';
+  const VISIBLE_RELEASE = '8.0.6';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

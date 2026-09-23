@@ -310,7 +310,7 @@ test('the owner workspace is responsive and exposes only owner-gated activation'
   assert.match(html,/@media\(max-width:700px\)\{\.platform-onboarding-form-grid,\.platform-onboarding-readiness\{grid-template-columns:1fr/);
   assert.ok(html.indexOf('league-engine/platform-onboarding.js') < html.indexOf('league-engine/platform-workspace.js'));
   assert.match(html,/platform-owner-identity\.js\?v=8\.0\.3\.1/);
-  assert.match(html,/trade-module\.js\?v=8\.0\.3\.2/);
+  assert.match(html,/trade-module\.js\?v=8\.0\.6/);
   assert.match(identity,/VERSION = '8\.0\.3\.1'/);
   assert.match(identity,/SERVER_PLATFORM_OWNER/);
   assert.match(workspace,/\['league-onboarding','League Onboarding'\]/);

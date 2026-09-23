@@ -20,7 +20,9 @@ test('compact and detailed import panels share readiness, progress, busy and liv
   assert.doesNotMatch(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
   assert.match(service.renderCompactPanel(),/data-import-in-place/);
   assert.ok(service.renderCompactPanel().indexOf('Copy URL')<service.renderCompactPanel().indexOf('Refresh'));
-  assert.doesNotMatch(service.renderCompactPanel(),/Latest Snapshot|phase-list|security|Free Agents/);
+  assert.match(service.renderCompactPanel(),/Free Agents/);
+  assert.match(service.renderCompactPanel(),/Unavailable/);
+  assert.doesNotMatch(service.renderCompactPanel(),/Click-to-live|Source check|Atomic Activation|Browser Refresh|phase-list/);
   assert.match(service.renderPanel(),/>unknown</);
   for(const status of ['loading','receiving','review-required','revoked']){
     connection.state.latestExport.status=status;

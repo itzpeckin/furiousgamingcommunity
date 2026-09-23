@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 8.0.5 */
+/* FHQ_BUILD: 8.0.6 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.5';
+  const VERSION = '8.0.6';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -606,7 +606,16 @@
   }
 
   function renderCompactPanel() {
-    const {run,connection,endpointState,exportStatus,latestExportLive,exportStatusLabel,live,runDisabled,runLabel,activePhase,phaseProgress}=importControlsState();
+    const {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,runDisabled,runLabel,activePhase,phaseProgress}=importControlsState();
+    const resultCounts=counts(),coverage=source?.coverage||{},threadSync=state?.discordScheduleSync||null;
+    const rosterCarryForward=resultCounts.rosterCarryForward||source?.rosterCarryForward||source?.counts?.rosterCarryForward||null;
+    const freeAgentStatus=resultCounts.freeAgentStatus||source?.counts?.freeAgentStatus||'missing';
+    const freeAgentLabel=freeAgentStatus==='located'?countLabel(resultCounts.freeAgentCount??source?.counts?.freeAgentCount)
+      :freeAgentStatus==='empty-confirmed'?'0':freeAgentStatus==='blocked'?'Unavailable':'Not included';
+    const actionableSourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])].filter(value=>!routineWarning(value));
+    const historicalBackfill=coverage.importMode==='historical-backfill';
+    const threadLabel=threadSync?.reviewRequired?'Needs review':['failed','partial'].includes(threadSync?.status)?'Needs attention':threadSync?.status==='complete'?'Ready':threadSync?.status==='not-required'?'Not required':threadSync?.scheduled?'Running':'Pending';
+    const connectionService=exportUrlService();
     return `<section class="commissioner-command-panel commissioner-command-import" data-compact-import-panel aria-label="Madden Companion import">
       <header><h2>Madden Import</h2><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></header>
       <div class="commissioner-command-import__actions">
@@ -616,6 +625,23 @@
       </div>
       ${exportUrlService()?.renderYearlyScheduleControls?.({compact:true})||''}
       <div class="commissioner-command-import__progress" aria-live="polite"><div><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" role="progressbar" aria-label="${esc(phaseLabel(activePhase))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${phaseProgress}"><span style="width:${phaseProgress}%"></span></div></div>
+      <div class="commissioner-import-glance" aria-label="Latest import summary">
+        <span><small>Live week</small><strong>${esc(state?.activeSnapshotWeek??latestExport.activeSnapshotWeek??'—')}</strong></span>
+        <span><small>Captured week</small><strong>${esc(coverage.currentWeek??latestExport.capturedWeek??'—')}</strong></span>
+        <span><small>Latest export</small><strong>${esc(dateLabel(latestExport.receivedAt||source?.generatedAt))}</strong></span>
+      </div>
+      <details class="commissioner-import-details"><summary>View latest import details</summary><div class="commissioner-import-detail-grid">
+        <span><small>Season</small><strong>${esc(source?.season?.seasonYear??'—')}</strong></span>
+        <span><small>Teams</small><strong>${countLabel(resultCounts.teams??source?.counts?.teams??latestExport.counts?.teams)}</strong></span>
+        <span><small>Rostered players</small><strong>${countLabel(resultCounts.rosteredPlayers??resultCounts.players??source?.counts?.rosteredPlayers??latestExport.counts?.rosteredPlayers)}</strong></span>
+        <span><small>Games</small><strong>${countLabel(resultCounts.games??source?.counts?.games??latestExport.counts?.games)}</strong></span>
+        <span><small>Statistics</small><strong>${countLabel(resultCounts.statistics??source?.counts?.statistics??latestExport.counts?.statistics)}</strong></span>
+        <span><small>Rosters</small><strong>${rosterCarryForward?'Carried forward':'Updated from export'}</strong></span>
+        <span><small>Free Agents</small><strong>${esc(freeAgentLabel)}</strong></span>
+        <span><small>Discord threads</small><strong>${esc(threadLabel)}</strong></span>
+      </div>${historicalBackfill?'<p class="commissioner-import-detail-note"><strong>Historical backfill:</strong> completed earlier weeks are being added without moving the active week.</p>':''}${rosterCarryForward?'<p class="commissioner-import-detail-note"><strong>Roster carried forward:</strong> league info, games, results, standings, and weekly statistics can update while the retained roster remains authoritative.</p>':''}${actionableSourceWarnings.length?`<div class="commissioner-import-detail-warning"><strong>Needs attention</strong><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></div>`:''}</details>
+      ${lastOutcome?.tone==='error'?`<section class="commissioner-import-recovery" role="alert"><div><h4>${esc(lastOutcome.title)}</h4><p>${esc(lastOutcome.summary)}</p><p><strong>What to do:</strong> ${esc(lastOutcome.action)}</p></div><details><summary>Support details</summary><p>${esc(lastOutcome.detail)}</p><code>${esc(lastOutcome.supportCode)}</code></details></section>`:''}
+      ${connectionService?.renderSecurityControls?.()||''}
     </section>`;
   }
 

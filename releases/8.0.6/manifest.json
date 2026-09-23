@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.6",
+  "releaseType": "commissioner-command-center-consolidation-and-gotw-persistence",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.5",
+    "commit": "276afc3cc457b21935de86b120d975c90a1a59eb",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "release/8.0.6-command-center-rules",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending", "pullRequests": []},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.5",
+    "candidateRelease": "8.0.6",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Consolidate League Data into Command Center, simplify routine import details, relocate source and season controls, remove redundant Trade and Discord explanation cards, and make the saved official GOTW authoritative on League Home. No import, snapshot, archive, reset, deletion, export URL rotation, credential change, season transition, or Free Agent reinterpretation is included. FGC rule publication is a separate tenant-scoped operation."
+  },
+  "requiredArtifacts": [
+    "app.js",
+    "trade-module.js",
+    "styles.css",
+    "league-engine/one-click-import.js",
+    "tests/commissioner/commissioner-hq.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.6/release-record.md",
+    "releases/8.0.6/validation-evidence.json"
+  ]
+}
