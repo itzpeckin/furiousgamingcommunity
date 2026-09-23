@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const RELEASE = '8.0.8';
+  const RELEASE = '8.0.8.1';
   const root = document.querySelector('[data-platform-admin-root]');
   const loading = document.querySelector('[data-platform-admin-loading]');
   const section = document.body.dataset.platformAdminSection || 'overview';

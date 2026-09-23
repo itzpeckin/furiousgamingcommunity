@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.8.1",
+  "releaseType": "platform-admin-period-authority-correction",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.8",
+    "commit": "4cfb81104b0824d7ca796e5c97d94a9174d2d869",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "release/8.0.8.1-platform-admin-period",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending", "pullRequests": []},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.8",
+    "candidateRelease": "8.0.8.1",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Use the active snapshot as the Platform Admin league directory's canonical season/week authority, with league setup fields only as the no-snapshot fallback. No migration, league-data write, import, snapshot activation, reset, deletion, archive, transition, export URL rotation, Discord operation, credential change, membership or assignment change, or Free Agent reinterpretation is included."
+  },
+  "requiredArtifacts": [
+    "functions/api/platform/onboarding.js",
+    "tests/platform/onboarding.test.mjs",
+    "tests/platform/platform-admin.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.8.1/release-record.md",
+    "releases/8.0.8.1/validation-evidence.json"
+  ]
+}

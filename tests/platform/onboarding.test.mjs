@@ -238,10 +238,18 @@ test('owner API saves, prepares, lists, and safely cancels one disabled plan', a
     assert.equal(prepared.plan.readiness.readyForActivationReview,true);
     assert.equal(prepared.plan.readiness.activationAvailable,true);
 
+    sqlite.prepare(`INSERT INTO league_snapshots
+      (id,league_id,status,season_year,week_index,manifest_json,validation_status,activated_at)
+      VALUES ('snapshot-fgc','league-fgc','active',2027,5,'{}','ready',CURRENT_TIMESTAMP)`).run();
+    sqlite.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id)
+      VALUES ('league-fgc','snapshot-fgc')`).run();
+
     const getResponse = await onRequestGet(await ownerContext(sqlite,db));
     const listed = await getResponse.json();
     assert.equal(listed.plans.length,1);
     assert.equal(listed.users.length,1);
+    assert.equal(listed.leagues.find(league => league.slug === 'furious-gaming-community').currentSeason,2027);
+    assert.equal(listed.leagues.find(league => league.slug === 'furious-gaming-community').currentWeek,5);
 
     const cancelResponse = await onRequestPost(await ownerContext(sqlite,db,'POST',{
       action:'cancel',planId:prepared.plan.id,expectedRevision:prepared.plan.revision
