@@ -1,6 +1,6 @@
 import { normalizeTenantSlug, validTenantSlug } from './tenant-context.js';
 
-export const PLATFORM_ONBOARDING_RELEASE = '8.0.8.1';
+export const PLATFORM_ONBOARDING_RELEASE = '8.0.9';
 export const PLATFORM_ONBOARDING_SCHEMA_VERSION = 2;
 
 export const ONBOARDING_FEATURE_KEYS = Object.freeze([

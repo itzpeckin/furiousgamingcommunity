@@ -5,7 +5,7 @@ import {
 } from '../_lib/auth.js';
 import { requirePlatformOwner } from '../_lib/permissions.js';
 
-const RELEASE = '8.0.8.1';
+const RELEASE = '8.0.9';
 
 function esc(value) {
   return String(value ?? '')

@@ -185,7 +185,7 @@
     },
     "largest": [
       {
-        "bytes": 652709,
+        "bytes": 652707,
         "file": "app.js"
       },
       {
@@ -217,11 +217,11 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 80121,
+        "bytes": 83566,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 77240,
+        "bytes": 77224,
         "file": "index.html"
       },
       {
@@ -237,11 +237,11 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 49763,
+        "bytes": 49759,
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 49293,
+        "bytes": 49647,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -257,12 +257,12 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 39834,
-        "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
+        "bytes": 40946,
+        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 39777,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
+        "bytes": 39834,
+        "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
     "total": 667
@@ -1703,7 +1703,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.8.1",
+  "release": "8.0.9",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

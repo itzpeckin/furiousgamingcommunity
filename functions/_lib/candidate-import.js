@@ -13,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'retained-week-integrity-v9';
+export const CANDIDATE_MAPPING_REVISION = 'multi-week-payload-period-v10';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId, rosterSourceSnapshotId = null) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`
