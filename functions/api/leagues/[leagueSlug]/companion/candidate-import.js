@@ -27,7 +27,7 @@ import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../.
 import { observeDevelopmentTraitsStatement } from '../../../../_lib/development-traits.js';
 import { reportImportReadiness, rosterCarryForwardEligibility } from '../../../../_lib/permanent-league-export.js';
 
-const RELEASE = '8.0.8.1';
+const RELEASE = '8.0.9';
 const text = value => String(value ?? '').trim();
 
 async function state(context) {
@@ -196,10 +196,10 @@ export async function retainedPeriodBundle(db,leagueId,report,identity,active){
       ORDER BY received_at DESC,id DESC`)
       .bind(leagueId,sourceNotBefore,report.generated_at,`%/${franchise}/week/%`).all()
     :null;
-  const latestByRoute=new Map();
+  const latestByRoutePeriod=new Map();
   for(const row of (result.results||[]).length?result.results:(legacy?.results||[])){
     const datasetType=retainedRouteType(row.route_path);
-    if(!datasetType||latestByRoute.has(String(row.route_path)))continue;
+    if(!datasetType)continue;
     const inventoryItem=parseCandidateJson(row.dataset_inventory_json,[])
       .find(item=>String(item?.routePath??item?.route_path??'')===String(row.route_path)
         &&String(item?.datasetType??item?.dataset_type??'')===datasetType);
@@ -208,11 +208,16 @@ export async function retainedPeriodBundle(db,leagueId,report,identity,active){
     const periods=periodsFromInventoryItem(item)
       .filter(period=>candidateComparePeriods(period,anchorCoverage.currentPeriod)<=0);
     if(!periods.length)continue;
-    latestByRoute.set(String(row.route_path),{...row,datasetType,inventoryItem:item,periods,
+    // Madden can reuse /week/reg/0/* for consecutive exported weeks. The
+    // payload-proven period is therefore part of capture identity; collapsing
+    // by URL alone silently drops the earlier week from a multi-week import.
+    const logicalKey=`${String(row.route_path)}::${periods.map(period=>period.key).sort().join(',')}`;
+    if(latestByRoutePeriod.has(logicalKey))continue;
+    latestByRoutePeriod.set(logicalKey,{...row,datasetType,inventoryItem:item,periods,
       recordCount:Number(item.recordCount??item.record_count??retainedCaptureRecordCount(row))});
   }
   const periodDomains=new Map();
-  for(const row of latestByRoute.values()){
+  for(const row of latestByRoutePeriod.values()){
     for(const period of row.periods){
       if(!periodDomains.has(period.key))periodDomains.set(period.key,{schedule:0,statistics:0,statisticsRoute:false});
       const domains=periodDomains.get(period.key);
@@ -224,7 +229,7 @@ export async function retainedPeriodBundle(db,leagueId,report,identity,active){
     .filter(([key,domains])=>domains.schedule>0&&(
       domains.statistics>0||(key===anchorCoverage.currentPeriod.key&&domains.statisticsRoute)
     )).map(([key])=>key));
-  const selected=[...latestByRoute.values()].filter(row=>row.periods.some(period=>completeKeys.has(period.key)));
+  const selected=[...latestByRoutePeriod.values()].filter(row=>row.periods.some(period=>completeKeys.has(period.key)));
   if(!selected.length){
     const digest=report?await captureDigest(db,leagueId,report.session_id):null;
     return{coverage:anchorCoverage,digest,sourceCaptureIds:[],sourcePeriods:anchorCoverage.completePeriods||[],routeCount:Number(report?.route_count||0),captureCount:Number(report?.capture_count||0),bytes:Number(report?.total_bytes||0),notBefore:sourceNotBefore};

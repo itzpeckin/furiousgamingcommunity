@@ -2,7 +2,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.8.1';
+  const VERSION = '8.0.9';
   const FEATURE_LABELS = Object.freeze({
     core_browsing:'League pages',
     commissioner_hq:'Commissioner HQ',

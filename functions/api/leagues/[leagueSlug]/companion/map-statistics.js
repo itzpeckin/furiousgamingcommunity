@@ -1,11 +1,11 @@
-/* FHQ_BUILD: 8.0.3 */
+/* FHQ_BUILD: 8.0.9 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
 import { canonicalSchedulePeriod, compareSchedulePeriods } from '../../../../_lib/schedule-integrity.js';
 
-const RELEASE='8.0.3';
+const RELEASE='8.0.9';
 const RECORD_CHUNK_SIZE=200;
 const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;
@@ -145,13 +145,32 @@ async function capturedRouteCandidates(db,leagueId,discoverySessionId,captureIds
     ORDER BY received_at DESC`).bind(leagueId).all();
 
   const grouped=new Map();
-  for(const row of result.results||[]){
+  const candidates=[...(result.results||[])].sort((a,b)=>String(b?.received_at||'').localeCompare(String(a?.received_at||'')));
+  for(const row of candidates){
     if(!WEEKLY_ROUTE.test(row.route_path))continue;
-    const key=String(row.route_path);
+    // Exact retained bundles may legitimately contain the same Week 0 route
+    // more than once, with each payload proving a different week. Inspect each
+    // selected capture before applying logical route+period deduplication.
+    const key=captureIds.length?`${String(row.route_path)}::${String(row.capture_id)}`:String(row.route_path);
     if(!grouped.has(key))grouped.set(key,[]);
     grouped.get(key).push(row);
   }
   return grouped;
+}
+
+export function selectAuthoritativeStatisticsCaptures(captures=[]){
+  const selected=new Map();
+  const ordered=[...captures].sort((a,b)=>String(b?.received_at||'').localeCompare(String(a?.received_at||'')));
+  for(const capture of ordered){
+    const meta=routeMeta(capture?.route_path);
+    if(!meta)continue;
+    const period=authoritativeStatisticsPeriod(capture,meta);
+    const key=`${String(capture.route_path)}::${period?.key||'unresolved'}`;
+    if(!selected.has(key))selected.set(key,capture);
+  }
+  return[...selected.values()].sort((a,b)=>a.route_path.localeCompare(b.route_path)
+    ||Number(authoritativeStatisticsPeriod(a,routeMeta(a.route_path))?.week||0)
+      -Number(authoritativeStatisticsPeriod(b,routeMeta(b.route_path))?.week||0));
 }
 
 function obviousCaptureCandidate(row){
@@ -233,7 +252,7 @@ async function capturedRoutes(db,env,leagueId,discoverySessionId,captureIds=[]){
     selected.push(...batch.filter(Boolean));
   }
 
-  return selected.sort((a,b)=>a.route_path.localeCompare(b.route_path));
+  return selectAuthoritativeStatisticsCaptures(selected);
 }
 
 async function latestCompletedRegularWeek(db,leagueId){

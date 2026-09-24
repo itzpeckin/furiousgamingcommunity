@@ -50,9 +50,9 @@ test('compact and detailed import panels share readiness, progress, busy and liv
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as candidateImport, retainedPeriodBundle } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { onRequestPost as startImportJob } from '../../functions/api/leagues/[leagueSlug]/companion/import-job.js';
-import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
+import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames, selectRetainedScheduleCaptures } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
 import { onRequestPost as mapPlayers, rebaseCarriedRoster } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
-import { authoritativeStatisticsPeriod, statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
+import { authoritativeStatisticsPeriod, selectAuthoritativeStatisticsCaptures, statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
 import { onRequestPost as buildSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js';
 import { competitionState, executeCompetitionAction } from '../../functions/api/leagues/[leagueSlug]/competition.js';
 import { onRequestPost as validateSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js';
@@ -483,10 +483,10 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-week-integrity-v9');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'multi-week-payload-period-v10');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:retained-week-integrity-v9'
+    'report:capture:identity:destination:multi-week-payload-period-v10'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
 });
@@ -613,6 +613,26 @@ test('ordinary Week 10 schedule routes outrank duplicate All Weeks sentinel game
     assert.equal(selected[0].status,'completed');
     assert.match(warnings[0],/remains authoritative|in favor of authoritative/);
   }
+});
+
+test('retained mappers preserve consecutive payload periods that reuse the same Week 0 routes', () => {
+  const scheduleRoute='xbsx/742482/week/reg/0/schedules';
+  const schedule=selectRetainedScheduleCaptures([
+    {capture_id:'schedule-week-4',route_path:scheduleRoute,received_at:'2026-09-23T01:00:00.000Z'},
+    {capture_id:'schedule-week-5',route_path:scheduleRoute,received_at:'2026-09-23T02:00:00.000Z'}
+  ]);
+  assert.deepEqual(schedule.map(item=>item.capture_id),['schedule-week-5','schedule-week-4']);
+
+  const statisticsRoute='xbsx/742482/week/reg/0/passing';
+  const statistics=selectAuthoritativeStatisticsCaptures([
+    {capture_id:'stats-week-4',route_path:statisticsRoute,received_at:'2026-09-23T01:00:00.000Z',
+      resolvedPeriod:{stage:'regular-season',week:4,key:'regular-season:4',playable:true}},
+    {capture_id:'stats-week-5-old',route_path:statisticsRoute,received_at:'2026-09-23T01:30:00.000Z',
+      resolvedPeriod:{stage:'regular-season',week:5,key:'regular-season:5',playable:true}},
+    {capture_id:'stats-week-5',route_path:statisticsRoute,received_at:'2026-09-23T02:00:00.000Z',
+      resolvedPeriod:{stage:'regular-season',week:5,key:'regular-season:5',playable:true}}
+  ]);
+  assert.deepEqual(statistics.map(item=>item.capture_id),['stats-week-4','stats-week-5']);
 });
 
 test('malformed Week 0 snapshot rows resolve from retained payload provenance and are not carried into Week 10', () => {
@@ -763,6 +783,41 @@ test('a forward Week 5 import composes the retained Week 4 export without advanc
   assert.equal(bundle.coverage.importMode,'forward');
   assert.equal(bundle.coverage.currentWeek,5);
   assert.equal(bundle.coverage.currentWeekStatus,'covered');
+  assert.deepEqual(bundle.sourcePeriods.map(period=>period.key),['regular-season:4','regular-season:5']);
+  assert.deepEqual(new Set(bundle.sourceCaptureIds),new Set([
+    'week4-schedule','week4-stats','week5-schedule','week5-stats'
+  ]));
+});
+
+test('a forward import retains both weeks when Madden reuses Week 0 route URLs', async () => {
+  const route=kind=>`xbsx/742482/week/reg/0/${kind}`;
+  const inventory=(kind,week,count)=>({
+    routePath:route(kind),datasetType:kind==='schedules'?'schedule':'statistics',recordCount:count,
+    periodSource:'payload-sentinel',canonicalStage:'regular-season',canonicalWeek:week
+  });
+  const captures=[
+    ['week5-schedule','schedules',5,16,'2026-09-23T02:00:00.000Z'],
+    ['week5-stats','passing',5,125,'2026-09-23T02:00:00.000Z'],
+    ['week4-schedule','schedules',4,16,'2026-09-23T01:00:00.000Z'],
+    ['week4-stats','passing',4,843,'2026-09-23T01:00:00.000Z']
+  ].map(([id,kind,week,count,observed])=>({
+    id,route_path:route(kind),payload_hash:`hash-${id}`,byte_length:100,
+    collections_json:JSON.stringify([{count}]),observed_at:observed,
+    dataset_inventory_json:JSON.stringify([inventory(kind,week,count)])
+  }));
+  const db={prepare:()=>({bind(){return this;},async all(){return{results:captures};}})};
+  const report={generated_at:'2026-09-23T02:01:00.000Z',
+    source_markers_json:JSON.stringify({currentPeriod:{status:'proven',source:'current-state-metadata',
+      period:{stage:'regular-season',week:5}}}),
+    dataset_inventory_json:JSON.stringify([inventory('schedules',5,16),inventory('passing',5,125)])};
+  const identity={source_franchise_id:'742482',season_year:2027,
+    season_created_at:'2026-09-01T00:00:00.000Z'};
+  const active={season_year:2027,week_index:4,created_at:'2026-09-22 20:00:00',
+    manifest_json:JSON.stringify({currentPeriod:{stage:'regular-season',week:4}})};
+
+  const bundle=await retainedPeriodBundle(db,'league-1',report,identity,active);
+  assert.equal(bundle.coverage.currentPeriod.key,'regular-season:5');
+  assert.equal(bundle.coverage.importMode,'forward');
   assert.deepEqual(bundle.sourcePeriods.map(period=>period.key),['regular-season:4','regular-season:5']);
   assert.deepEqual(new Set(bundle.sourceCaptureIds),new Set([
     'week4-schedule','week4-stats','week5-schedule','week5-stats'

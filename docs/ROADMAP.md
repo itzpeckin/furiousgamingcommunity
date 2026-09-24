@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 22, 2026
+**Updated:** September 24, 2026
 
-**Revision:** 3.04
+**Revision:** 3.05
 
-**Current production:** FranchiseHQ 8.0.8 is live from Main `4cfb811` with migration 47. The protected top-level Platform Admin console is live, Platform Workspace is removed from ordinary commissioner navigation, and all Main deployment checks passed. No archive, import, reset, deletion, snapshot change, or other league-data operation ran.
+**Current production:** FranchiseHQ 8.0.8.1 is live from Main `e63dadf` with migration 47. The protected top-level Platform Admin console reads each active snapshot as the canonical season/week authority, and P2W remains correctly without active Madden data.
 
-**Current work:** 8.0.8.1 corrects the Platform Admin league directory to use each active snapshot as the canonical season/week authority. Live acceptance found the new directory showing FGC's setup defaults instead of its active 2027 Week 5 snapshot; the correction is read-only and does not modify either source.
+**Current work:** 8.0.9 corrects multi-week weekly imports when Madden reuses the same `/week/reg/0/` schedule or statistics route for consecutive exported weeks. Retained capture identity now includes the payload-proven period, so a previous completed week and the newly advanced current week are both mapped into one candidate while the newer proven period alone controls the live week.
 
-**Next gate:** Publish 8.0.8.1 and confirm the live directory reports FGC as 2027 Week 5 while P2W remains without active Madden data. Then observe the next authentic week advancement and import for retained prior-week data and Discord rollover. New-league Madden activation remains on hold while EA's Rosters export is unavailable; 8.1.0 covers self-service operating readiness and 8.2.0 payment-backed automatic activation.
+**Next gate:** Publish 8.0.9, then use the next commissioner-triggered multi-week export/import to confirm the prior week's final schedule and statistics coexist with the current week's schedule, current-period display, and one-week Discord rollover. Deployment itself does not run an import or mutate league data. New-league Madden activation remains on hold while EA's Rosters export is unavailable; 8.1.0 covers self-service operating readiness and 8.2.0 payment-backed automatic activation.
 
 ## Product decisions
 
@@ -150,7 +150,8 @@
 | 8.0.6 | Production; owner accepted | Consolidate League Data into Command Center, simplify import evidence, restore GOTW persistence, remove redundant controls, and publish the FGC rulebook without changing league data |
 | 8.0.7 | Production | Move Archive Season into the Command Center's open secondary rail and close the desktop whitespace without changing its protected behavior |
 | 8.0.8 | Production; live acceptance found stale setup period display | Replace the visible league-nested Platform Workspace with a protected top-level Platform Admin console for leagues, onboarding, cross-league health, and explicitly separated diagnostics |
-| 8.0.8.1 | Production-authorized correction | Read Platform Admin season/week from the active snapshot, with league setup values used only when no active snapshot exists |
+| 8.0.8.1 | Production; owner accepted | Read Platform Admin season/week from the active snapshot, with league setup values used only when no active snapshot exists |
+| 8.0.9 | Production-authorized importer correction | Preserve and map multiple payload-proven weeks even when Madden reuses the same Week 0 route URL; activate only the newest proven current period |
 | 8.1.0 | Planned | Complete self-service league readiness from registration through first successful Madden import and team assignment |
 | 8.2.0 | Planned | Annual league billing, verified entitlement, automatic activation, billing portal, and non-destructive grace/suspension lifecycle |
 | 8.3.0 | Planned | Multi-league administration, quotas, support operations, capacity controls, and custom-domain automation |
@@ -955,6 +956,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## Change log
 
+- **Revision 3.05:** Began owner-authorized 8.0.9 from exact Main `e63dadf`. Diagnosis found that retained-source analysis distinguished consecutive `/week/reg/0/` payload periods correctly, but retained capture selection and both schedule/statistics mappers later collapsed them by route URL. The correction keys retained captures by route plus payload-proven period, carries every exact selected capture through mapping, keeps ordinary nonzero routes authoritative, preserves empty Week 0 placeholders, and advances Discord only from the newest proven period. The candidate mapping revision is incremented so no older incomplete candidate can be reused. No deployment-time import, active-snapshot move, Discord mutation, reset, deletion, archive, season transition, export URL rotation, credential change, membership change, or Free Agent reinterpretation is included.
 - **Revision 3.02:** Published 8.0.5 through PR #148 and Main `e779243`. The protected FGC retained Week 4 recovery passed all phases and atomically activated `3dc6ae96-117a-4c54-9bb0-52e688808942` from prior Week 5 snapshot `434c2d1c-c6d1-4e62-b82f-1c7730655837`; 843 Week 4 statistic records and all 16 scored Week 4 games are now live, while 2027 Week 5 and its 16 active Discord threads remain authoritative. No new Madden export, migration, reset, deletion, URL rotation, season transition, or Free Agent reinterpretation occurred. The next authentic week advance must verify automatic thread rollover; import duration remains an optimization concern.
 - **Revision 3.01:** Added 8.0.5 after read-only Production evidence showed FGC's active 2027 Week 5 snapshot has zero Week 4 statistics while the prior Week 4 export remains captured; a newer Week 4 backfill stopped at Map Schedule with a request interruption. Corrected the roadmap's current-week and Discord thread facts to Week 5. The release gate now requires retained preceding-week composition, non-regressing results/statistics, durable import retry, and automatic Discord checkpoint completion before Production publication. P2W expansion remains on hold pending an approved first roster source; no Production league-data mutation occurred during diagnosis.
 - **Revision 3.00:** Published 8.0.4 through PR #146 and merged Main `f3657eb`; PR quality run `35626887080`, Pages preview, Production Pages deployment `12ef5c6e-f8d9-4fdf-b073-929c529defd1`, and Worker deployment `b721d037-cb0a-4543-8bd7-9b51a7457eb7` succeeded. Signed-in P2W desktop acceptance confirmed the Command Center compact Yearly Schedule card stays inside its parent with a 16-pixel gap to the next card and no horizontal page overflow. Phone visual acceptance remains pending. The P2W collection remains 5/18 weeks and 79/272 games without an active snapshot. FGC stays on Week 4 with 16 current threads; seven old Week 3 threads remain for the guarded retry and were not deleted during release. No Production Madden import, live-snapshot move, Discord thread mutation, league-data row write, reset/deletion, export-URL rotation, season lifecycle action, credential change, or Free Agent reinterpretation ran during publication or acceptance.

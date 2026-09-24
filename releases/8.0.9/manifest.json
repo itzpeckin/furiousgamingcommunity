@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.9",
+  "releaseType": "multi-week-payload-period-import-correction",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.8.1",
+    "commit": "e63dadf19ef2f06f152f4a7e9c713fa3cd15036f",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "release/8.0.9-multi-week-import",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized": true, "status": "pending", "pullRequests": []},
+  "staging": {"authorized": false, "deployed": false, "status": "not-run"},
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.8.1",
+    "candidateRelease": "8.0.9",
+    "currentMigration": 47,
+    "candidateMigration": 47,
+    "scope": "Preserve multiple weekly schedule/statistics captures when Madden reuses a Week 0 route by keying retained evidence to its payload-proven period. Map both the prior completed week and current week in one candidate, while only the newest proven period controls activation and Discord rollover. No migration, deployment-time import, snapshot activation, Discord mutation, reset, deletion, archive, transition, export URL rotation, credential change, membership change, or Free Agent reinterpretation is included."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/candidate-import.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-schedule.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+    "tests/import/candidate-import.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.9/release-record.md",
+    "releases/8.0.9/validation-evidence.json"
+  ]
+}
