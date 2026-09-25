@@ -1,11 +1,14 @@
 {
   "schemaVersion": 1,
-  "release": "8.0.9",
+  "release": "8.0.10",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 47,
+  "currentVersion": 48,
   "requiredTables": [
+    "ea_direct_connections",
+    "ea_direct_setups",
+    "ea_direct_collection_jobs",
     "commissioner_roster_movements",
     "league_player_ownership",
     "canonical_capture_lifecycle_sessions",

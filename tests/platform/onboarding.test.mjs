@@ -122,7 +122,7 @@ async function plan(overrides = {}) {
 test('8.0.0 adds provider identities and a durable activation ledger without a live tenant', async () => {
   const { sqlite } = await database();
   try {
-    assert.equal(sqlite.prepare('SELECT MAX(version) version FROM schema_migrations').get().version,47);
+    assert.equal(sqlite.prepare('SELECT MAX(version) version FROM schema_migrations').get().version,48);
     assert.ok(sqlite.prepare(`SELECT name FROM sqlite_schema WHERE type='table' AND name='platform_league_onboarding_plans'`).get());
     assert.ok(sqlite.prepare(`SELECT name FROM sqlite_schema WHERE type='table' AND name='platform_league_onboarding_events'`).get());
     assert.ok(sqlite.prepare(`SELECT name FROM sqlite_schema WHERE type='table' AND name='platform_league_activations'`).get());
@@ -318,7 +318,7 @@ test('the owner console is responsive and exposes only owner-gated activation', 
   assert.match(adminCss,/@media\(max-width:700px\)[\s\S]+platform-onboarding-form-grid/);
   assert.match(html,/data-platform-admin-link data-platform-owner-only/);
   assert.match(html,/platform-owner-identity\.js\?v=8\.0\.3\.1/);
-  assert.match(html,/trade-module\.js\?v=8\.0\.9/);
+  assert.match(html,/trade-module\.js\?v=8\.0\.10/);
   assert.match(identity,/VERSION = '8\.0\.3\.1'/);
   assert.match(identity,/SERVER_PLATFORM_OWNER/);
   assert.match(admin,/data-platform-onboarding-host/);

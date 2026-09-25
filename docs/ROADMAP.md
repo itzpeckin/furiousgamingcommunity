@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 24, 2026
+**Updated:** September 25, 2026
 
-**Revision:** 3.05
+**Revision:** 3.06
 
-**Current production:** FranchiseHQ 8.0.8.1 is live from Main `e63dadf` with migration 47. The protected top-level Platform Admin console reads each active snapshot as the canonical season/week authority, and P2W remains correctly without active Madden data.
+**Current production:** FranchiseHQ 8.0.9 is live from Main `f893f385d01056dd59406276d20a2c66a00903cf` with migration 47. The multi-week importer preserves consecutive payload-proven periods sharing Madden's Week 0 route. The protected Platform Admin console continues to read active-snapshot season/week authority.
 
-**Current work:** 8.0.9 corrects multi-week weekly imports when Madden reuses the same `/week/reg/0/` schedule or statistics route for consecutive exported weeks. Retained capture identity now includes the payload-proven period, so a previous completed week and the newly advanced current week are both mapped into one candidate while the newer proven period alone controls the live week.
+**Current work:** 8.0.10 reopens the owner-requested EA Direct gate. A Command Center connection, tenant-encrypted EA credentials, private preview, manual previous/current-week collection, and a separate yearly schedule catalog feed the existing import and schedule contracts. Live EA sign-in and direct backend/UI acceptance remain unverified until the owner connects and completes the private preview. See [EA Direct connection and acceptance guide](EA-DIRECT.md).
 
-**Next gate:** Publish 8.0.9, then use the next commissioner-triggered multi-week export/import to confirm the prior week's final schedule and statistics coexist with the current week's schedule, current-period display, and one-week Discord rollover. Deployment itself does not run an import or mutate league data. New-league Madden activation remains on hold while EA's Rosters export is unavailable; 8.1.0 covers self-service operating readiness and 8.2.0 payment-backed automatic activation.
+**Next gate:** Validate and publish 8.0.10, then complete owner-operated EA sign-in and a private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
 
 ## Product decisions
 
@@ -27,6 +27,7 @@
 - Phone layouts must be intentionally composed for the available viewport, minimize avoidable scrolling, and never shrink or overlay the desktop presentation. Wide data may use one clearly bounded horizontal scroller, but the page itself must not overflow horizontally.
 - Discord is an authenticated league interface, not a separate data authority. Bot commands must resolve the same tenant, membership capabilities, league settings, active snapshot, transactions, trades, and competition records used by the web application.
 - Madden sources feed one canonical snapshot model. Companion, approved direct-EA access, and CSV/Excel must not create separate downstream products.
+- The owner reopened EA Direct in 8.0.10 and accepts that EA may change its community-documented protocols. EA sign-in, preview, sync, and yearly collection are commissioner-operated; deployment does not exercise an EA account or publish league data. Missing rosters and Free Agents retain their existing incomplete/unknown meanings.
 - A Madden **game year** (Madden 27, Madden 28, and so on) is independent from a franchise season year. Leagues, accounts, memberships, roles, settings, rules, and audit history persist across game years; Madden-derived data is partitioned by game year so a commissioner can archive it and remove it from the active application at the next edition transition.
 - Free Agents are a required first-class dataset. A source must provide and reconcile them or explicitly prove their absence.
 - Production publication, database migration, Discord configuration, membership edits, broad resets, and destructive Madden game-year transitions remain separately authorized operations. For routine same-season updates, selecting **Import Latest Export** is the commissioner's explicit authorization to validate and atomically publish that exact eligible snapshot; there is no second activation action.
@@ -99,7 +100,7 @@
 | 7.4.4.11 | Production deployed; pending owner Discord acceptance | Schedule records, record-ceiling `/eliminated`, and portrait-backed Trade Block cards without player statistics |
 | 7.4.4.12 | Production deployed; pending owner Discord acceptance | Compact portrait-backed Discord Player Cards and unbolded playoff-state schedule indicators |
 | 7.5.8–7.5.9 | Production; signed-in acceptance passed | One canonical active-snapshot context plus tenant-safe monitoring, backups, security, recovery evidence, and commissioner operations health |
-| 7.4.7 | Deferred research gate | Approved direct-EA and CSV/Excel adapters, moved behind core platform work by owner direction |
+| 7.4.7 | EA Direct reopened in 8.0.10; CSV/Excel deferred | Shared source-adapter contract retained; the owner explicitly reopened EA connectivity after reviewing community protocol documentation |
 | 7.5.0 | Production deployed; authenticated device acceptance passed | Central public-domain authentication/session framework, migration 36, exact-route desktop/mobile refresh, rotation, CSRF, revocation, durable throttling, and privacy-minimized security events |
 | 7.5.1 | Production through cumulative 7.5.2 release | Madden-source cap provenance, unequal two-team packages, private two-owner negotiation threads, direct decision buttons, and Bot-DM fallback |
 | 7.5.2 | Production; superseded by accepted 7.5.4 result | Active-snapshot Week authority over retained All Weeks sentinel provenance without a Madden import or snapshot change |
@@ -151,7 +152,8 @@
 | 8.0.7 | Production | Move Archive Season into the Command Center's open secondary rail and close the desktop whitespace without changing its protected behavior |
 | 8.0.8 | Production; live acceptance found stale setup period display | Replace the visible league-nested Platform Workspace with a protected top-level Platform Admin console for leagues, onboarding, cross-league health, and explicitly separated diagnostics |
 | 8.0.8.1 | Production; owner accepted | Read Platform Admin season/week from the active snapshot, with league setup values used only when no active snapshot exists |
-| 8.0.9 | Production-authorized importer correction | Preserve and map multiple payload-proven weeks even when Madden reuses the same Week 0 route URL; activate only the newest proven current period |
+| 8.0.9 | Production | Preserve and map multiple payload-proven weeks even when Madden reuses the same Week 0 route URL; activate only the newest proven current period |
+| 8.0.10 | Current work; live EA acceptance pending | Command Center EA connection, encrypted tenant credentials, private preview, manual previous/current-week collection, and an independent yearly schedule catalog; no deployment-time import |
 | 8.1.0 | Planned | Complete self-service league readiness from registration through first successful Madden import and team assignment |
 | 8.2.0 | Planned | Annual league billing, verified entitlement, automatic activation, billing portal, and non-destructive grace/suspension lifecycle |
 | 8.3.0 | Planned | Multi-league administration, quotas, support operations, capacity controls, and custom-domain automation |
@@ -194,12 +196,14 @@
 | 16a | First-import stability | 8.0.3 | Let a commissioner safely leave an incomplete yearly collection for weekly imports, retain all captured exports, show a readable phone first-import state, and state the first-roster prerequisite. |
 | 16b | Command Center and schedule-rollover stability | 8.0.4 | Let the P2W Command Center grow around compact Yearly Schedule controls; use durable, bounded Discord sync checkpoints and guarded recovery of FGC's unfinished Week 3 cleanup. |
 | 16c | Weekly data and automation reliability | 8.0.5 | Include the previous-week export in a forward import; preserve known data from empty source captures; retry import phases durably; finish Discord thread rollover automatically. |
+| 16d | Production | 8.0.6–8.0.9 | Consolidate Command Center, separate Platform Admin, correct snapshot period display, and retain multiple exported weeks through the importer. |
+| 16e | Owner-reopened EA Direct gate | 8.0.10 | Add direct EA sign-in and private preview; collect previous/current-week data or the full regular-season schedule through the shared platform contracts, then prove real account and dataset access. |
 | 17 | Self-service operating readiness | 8.1.0 | Make registration produce a fully prepared league whose commissioner can sign in, complete first-season setup, run the first export, import it, assign teams, and operate the league without platform-owner repair. |
 | 18 | Payment and automatic activation | 8.2.0 | Sell one annual entitlement per league through a hosted payment flow, verify payment server-side, activate idempotently without manual owner work, and provide customer billing plus safe grace/suspension recovery. |
 | 19 | Scale administration | 8.3.0 | Complete cross-tenant administration, quotas, capacity controls, support/audit tooling, scheduled-work isolation, and custom-domain automation for many concurrent leagues. |
 | 20 | Product completion | 9.0.0 | Pass commercial-launch acceptance for signup → payment → activation → first import → normal operation → renewal/failure recovery with no manual platform intervention in the ordinary path. |
 
-The deferred 7.4.7 direct-EA and CSV/Excel adapter research and later Slack, GroupMe, and Facebook integrations are not on the critical path unless the owner explicitly reopens them.
+The owner explicitly reopened the direct-EA portion of 7.4.7 as 8.0.10. CSV/Excel and later Slack, GroupMe, and Facebook integrations remain deferred. Automatic EA polling and a verified native transaction feed follow successful manual EA collection; they are not claimed by this release.
 
 ## 7.1.0 — Database Foundation
 
@@ -591,10 +595,9 @@ The deferred 7.4.7 direct-EA and CSV/Excel adapter research and later Slack, Gro
 
 ## 7.4.7 — Additional Madden Source Adapters
 
-- Investigate policy-compliant direct-EA connectivity using documented/authorized access only.
-- Add CSV/Excel intake where commissioner exports are available.
-- Make every adapter feed the same validator and snapshot activation contract.
-- Gate: no undocumented credential exchange, prohibited scraping, or unstable private endpoint becomes a production dependency.
+- Historical research gate: originally deferred behind the core platform. The owner explicitly reopened EA Direct in 8.0.10 after reviewing community documentation and accepted that EA may change the private Companion protocols; the earlier stable-public-endpoint restriction is superseded for this requested integration.
+- Deliver the EA Direct path under the 8.0.10 scope and live-acceptance gate below. Commissioner-owned sign-in, tenant isolation, encrypted tokens, accurate unavailable-data reporting, and the common validator/snapshot contract remain required.
+- CSV/Excel intake remains deferred until a separate owner-requested release. No adapter creates a second downstream league-data authority.
 
 ## 7.5.0 — Authentication and Session Framework
 
@@ -908,6 +911,18 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Treat Discord's nonterminal running checkpoint as progress rather than a failure. Complete all new-week matchup threads before retiring prior-week threads, and mark a terminal sync failure in the audit instead of leaving it permanently “running.” Keep Discord delivery status separate from the successful league-data import.
 - Gate: Week 4 export followed by Week 5 export produces complete Week 4 data, Week 5 current-week authority, and only Week 5 scheduling threads; an interrupted Map Schedule request resumes; no cross-tenant route, roster, Free Agent, export URL, season, snapshot-history, or audit mutation is introduced by release publication. Verify FGC's retained Week 4 recovery separately against the exact active Week 5 snapshot.
 
+## 8.0.10 — Commissioner EA Direct Connection
+
+- Surface **Madden Connection** near the top of Command Center with EA Direct and Companion paths. Preserve the existing data-display selector and Companion import workflow.
+- Complete EA-owned sign-in through an expiring, state-checked loopback-code handoff. Bind setup to the league/user/session, choose only EA-returned profiles and franchises, and encrypt tenant-specific connection tokens and collector checkpoints.
+- Require a private preview before manual sync. Real sign-in, UI, backend connectivity, roster availability, and Free Agent evidence remain pending owner acceptance; deployment cannot supply that proof.
+- Collect the previous and current export periods together, verify the EA hub before completion, and publish only an eligible retained source to the existing importer. The commissioner separately runs the ordinary import to activate league data.
+- Collect all 18 regular-season weeks through **Import Yearly Schedule** and complete the separate 272-game catalog. Yearly collection does not change the live period, activate a weekly snapshot, or create future-week Discord threads.
+- Keep unavailable roster domains incomplete and Free Agents blocked/unknown. Reuse an eligible same-season roster only through the existing carry-forward rules; a first complete roster remains required for a new league.
+- Migration 48 adds EA connection, setup, and collection records. Deployment does not run a Madden import, sign in for the owner, reset/delete league data, rotate the Companion URL, or archive/transition a season.
+- Gate: protocol/tenant/security/migration/collection tests, the strict repository gate, exact hosted deployment checks, and read-only release verification. Live EA acceptance then requires the owner to connect and inspect a private preview before claiming real data access.
+- Later work: optional automatic sync after manual reliability is proven; transaction-source research remains separate because no complete native EA transaction feed is verified. [Connection and acceptance guide](EA-DIRECT.md).
+
 ## 8.1.0 — Self-Service League Operating Readiness
 
 - Turn public league registration into a complete first-use workflow rather than an empty tenant shell. Capture league identity, URL, branding, Madden edition/year, current franchise season, initial commissioner, desired features, optional Discord setup, and the billing plan that will later entitle the tenant.
@@ -956,6 +971,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 
 ## Change log
 
+- **Revision 3.06:** Recorded 8.0.9 Production at Main `f893f385d01056dd59406276d20a2c66a00903cf` and opened owner-authorized 8.0.10. This explicitly reopens EA Direct from the deferred 7.4.7 research gate while keeping CSV/Excel and non-Discord integrations deferred. The candidate adds commissioner EA sign-in, encrypted tenant credentials, private preview, manual previous/current-week collection, and a separate complete yearly schedule catalog with additive migration 48. The direct UI/backend and real Madden 27 sign-in remain unverified until owner connection and preview; no deployment-time collection/import or complete transaction feed is claimed. The self-service, billing, scale, and launch roadmap remains unchanged.
 - **Revision 3.05:** Began owner-authorized 8.0.9 from exact Main `e63dadf`. Diagnosis found that retained-source analysis distinguished consecutive `/week/reg/0/` payload periods correctly, but retained capture selection and both schedule/statistics mappers later collapsed them by route URL. The correction keys retained captures by route plus payload-proven period, carries every exact selected capture through mapping, keeps ordinary nonzero routes authoritative, preserves empty Week 0 placeholders, and advances Discord only from the newest proven period. The candidate mapping revision is incremented so no older incomplete candidate can be reused. No deployment-time import, active-snapshot move, Discord mutation, reset, deletion, archive, season transition, export URL rotation, credential change, membership change, or Free Agent reinterpretation is included.
 - **Revision 3.02:** Published 8.0.5 through PR #148 and Main `e779243`. The protected FGC retained Week 4 recovery passed all phases and atomically activated `3dc6ae96-117a-4c54-9bb0-52e688808942` from prior Week 5 snapshot `434c2d1c-c6d1-4e62-b82f-1c7730655837`; 843 Week 4 statistic records and all 16 scored Week 4 games are now live, while 2027 Week 5 and its 16 active Discord threads remain authoritative. No new Madden export, migration, reset, deletion, URL rotation, season transition, or Free Agent reinterpretation occurred. The next authentic week advance must verify automatic thread rollover; import duration remains an optimization concern.
 - **Revision 3.01:** Added 8.0.5 after read-only Production evidence showed FGC's active 2027 Week 5 snapshot has zero Week 4 statistics while the prior Week 4 export remains captured; a newer Week 4 backfill stopped at Map Schedule with a request interruption. Corrected the roadmap's current-week and Discord thread facts to Week 5. The release gate now requires retained preceding-week composition, non-regressing results/statistics, durable import retry, and automatic Discord checkpoint completion before Production publication. P2W expansion remains on hold pending an approved first roster source; no Production league-data mutation occurred during diagnosis.

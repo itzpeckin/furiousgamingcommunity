@@ -72,7 +72,8 @@ async function latestReport(db, leagueId) {
   if (endpoint) return null;
   return db.prepare(`SELECT id,session_id,status,route_count,capture_count,total_bytes,report_hash,
       source_markers_json,source_verification_json,dataset_inventory_json,requirement_results_json,free_agent_evidence_json,generated_at
-    FROM madden_discovery_reports WHERE league_id=? ORDER BY generated_at DESC,rowid DESC LIMIT 1`)
+    FROM madden_discovery_reports WHERE league_id=? AND substr(session_id,1,3)!='ea_'
+    ORDER BY generated_at DESC,rowid DESC LIMIT 1`)
     .bind(leagueId).first();
 }
 
@@ -181,18 +182,22 @@ export async function retainedPeriodBundle(db,leagueId,report,identity,active){
       AND datetime(link.observed_at)<=datetime(?)
       AND datetime(source_report.generated_at)<=datetime(?)
       AND c.route_path LIKE ? AND c.route_path LIKE '%/week/%'
+      AND ((substr(?,1,3)='ea_' AND link.session_id=?)
+        OR (substr(?,1,3)!='ea_' AND substr(link.session_id,1,3)!='ea_'))
     ORDER BY link.observed_at DESC,c.id DESC`).bind(
-      leagueId,activeBoundary,report.generated_at,report.generated_at,`%/${franchise}/week/%`
+      leagueId,activeBoundary,report.generated_at,report.generated_at,`%/${franchise}/week/%`,
+      report.session_id,report.session_id,report.session_id
     ).all();
   // Historical installations may predate the session-link table. Their
   // physical captures are still retained and remain valid backfill evidence.
-  const legacy=!(result.results||[]).length&&anchorCoverage.importMode==='historical-backfill'
+  const legacy=!(result.results||[]).length&&!String(report.session_id).startsWith('ea_')&&anchorCoverage.importMode==='historical-backfill'
     ?await db.prepare(`SELECT id,route_path,payload_hash,byte_length,collections_json,
         received_at observed_at,NULL dataset_inventory_json
       FROM companion_route_captures
       WHERE league_id=? AND datetime(received_at)>=datetime(?)
         AND datetime(received_at)<=datetime(?) AND route_path LIKE ?
         AND route_path LIKE '%/week/%'
+        AND COALESCE(json_extract(request_headers_json,'$.source'),'')!='ea-direct'
       ORDER BY received_at DESC,id DESC`)
       .bind(leagueId,sourceNotBefore,report.generated_at,`%/${franchise}/week/%`).all()
     :null;

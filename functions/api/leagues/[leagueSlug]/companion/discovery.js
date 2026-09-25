@@ -16,7 +16,7 @@ export async function onRequestGet(context) {
     return json({ ok:false, error:'Not found.' }, 404);
   }
   const latestSession = await db.prepare(`SELECT id,status,capture_count,expires_at,last_capture_at,created_at
-    FROM madden_discovery_sessions WHERE league_id=? ORDER BY created_at DESC LIMIT 1`)
+    FROM madden_discovery_sessions WHERE league_id=? AND substr(id,1,3)!='ea_' ORDER BY created_at DESC LIMIT 1`)
     .bind(league.id).first();
   const rows = latestSession
     ? await db.prepare(`SELECT c.id,link.session_id AS discovery_session_id,c.route_path,c.request_method,c.content_type,
@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
       .bind(league.id, latestSession.id).all()
     : await db.prepare(`SELECT id, discovery_session_id, route_path, request_method, content_type,
         byte_length, top_level_keys_json, collections_json, received_at
-      FROM companion_route_captures WHERE league_id = ? ORDER BY received_at DESC LIMIT 250`)
+      FROM companion_route_captures WHERE league_id = ? AND substr(discovery_session_id,1,3)!='ea_' ORDER BY received_at DESC LIMIT 250`)
       .bind(league.id).all();
   const captures = (rows.results || []).map(row => ({
     captureId:row.id, discoverySessionId:row.discovery_session_id, routePath:row.route_path,

@@ -8,3 +8,5 @@ DISCORD_REDIRECT_URI=http://localhost:8788/api/auth/discord/callback
 SESSION_SIGNING_SECRET=replace-with-at-least-32-random-bytes
 COMPANION_EXPORT_TOKEN=replace-with-at-least-32-random-bytes
 PLATFORM_OWNER_ACCOUNT_ID=replace-with-local-test-owner-id
+EA_CLIENT_SECRET=replace-with-reviewed-madden-client-secret
+EA_CREDENTIAL_KEY=replace-with-64-hex-characters-from-32-random-bytes

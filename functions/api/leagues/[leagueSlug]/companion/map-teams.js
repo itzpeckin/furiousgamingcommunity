@@ -183,7 +183,7 @@ async function latestTeamCapture(db, leagueId, discoverySessionId) {
       c.r2_object_key,c.content_type,c.received_at
     FROM companion_route_captures c
     LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id AND i.league_id=c.league_id
-    WHERE c.league_id=?
+    WHERE c.league_id=? AND substr(c.discovery_session_id,1,3)!='ea_'
     ORDER BY c.received_at DESC`).bind(leagueId).all();
   const candidates = (result.results || [])
     .filter(row => classifyMaddenRoute(row.route_path) === 'teams'

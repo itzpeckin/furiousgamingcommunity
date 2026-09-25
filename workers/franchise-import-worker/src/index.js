@@ -1,7 +1,7 @@
-/* FHQ_BUILD: 8.0.9 */
+/* FHQ_BUILD: 8.0.10 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
-const RELEASE='8.0.9';
+const RELEASE='8.0.10';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -296,6 +296,39 @@ export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
   }
 }
 
+export class FranchiseEaCollectionWorkflow extends WorkflowEntrypoint{
+  async run(event,step){
+    const input=event.payload||{},slug=text(input.leagueSlug),id=text(input.jobId);
+    const origin=text(input.origin),token=text(input.collectionToken);
+    if(!validEaOrigin(origin)||!/^eaj_[a-f0-9-]{36}$/.test(id)||!slug||!token)throw new Error('EA collection parameters are invalid.');
+    const endpoint=`${origin}/api/leagues/${encodeURIComponent(slug)}/ea-direct/collect-step`;
+    const invoke=async(body)=>{
+      const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','x-franchisehq-ea-collection-token':token},body:JSON.stringify({id,...body}),signal:AbortSignal.timeout(120000)});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok||!result.ok)throw new Error('EA collection step could not finish. Details are retained in the league connection panel.');
+      return result;
+    };
+    let cursor=0;
+    try{
+      for(let index=0;index<140;index+=1){
+        const result=await step.do(`ea-collect-${index}`,{retries:{limit:3,delay:'5 seconds',backoff:'exponential'},timeout:'3 minutes'},()=>invoke({cursor}));
+        if(result.done)return{ok:true,id,activationPerformed:false};
+        cursor=Number(result.cursor);
+        if(!Number.isSafeInteger(cursor)||cursor<0)throw new Error('EA collection checkpoint is invalid.');
+      }
+      throw new Error('EA collection exceeded its bounded request plan.');
+    }catch(error){
+      await step.do('ea-collection-failed',()=>invoke({action:'fail'})).catch(()=>{});
+      throw error;
+    }
+  }
+}
+
+function validEaOrigin(value){
+  try{const url=new URL(value);return url.origin===value&&url.protocol==='https:'
+    &&(url.hostname==='franchisehq.app'||url.hostname==='franchise-hq.pages.dev'||/^[a-z0-9-]+\.franchise-hq\.pages\.dev$/.test(url.hostname));}catch{return false;}
+}
+
 async function workflowId(slug,workflowKey){
   const encoded=new TextEncoder().encode(`${slug}:${workflowKey}`);
   const digest=await crypto.subtle.digest('SHA-256',encoded);
@@ -306,6 +339,18 @@ export default{
   async fetch(request,env){
     try{
       const url=new URL(request.url);
+      if(url.pathname==='/ea/start'&&request.method==='POST'){
+        const body=await request.json().catch(()=>({}));
+        if(!validEaOrigin(body.origin)||!/^eaj_[a-f0-9-]{36}$/.test(body.jobId||'')
+          ||!/^\w{64}$/.test(body.collectionToken||'')||!text(body.leagueSlug)){
+          return json({ok:false,error:'Invalid EA collection start.'},400);
+        }
+        if(!env.FRANCHISE_EA_COLLECTION_WORKFLOW)return json({ok:false,error:'EA collector unavailable.'},503);
+        const id=body.jobId.replace('eaj_','ea-');
+        try{await env.FRANCHISE_EA_COLLECTION_WORKFLOW.create({id,params:body});}
+        catch{const existing=await(await env.FRANCHISE_EA_COLLECTION_WORKFLOW.get(id)).status();if(!existing)throw new Error('EA collector could not start.');}
+        return json({ok:true,id});
+      }
       if(url.pathname==='/start'&&request.method==='POST'){
         const body=await request.json().catch(()=>({}));
         const slug=text(body.leagueSlug),origin=text(body.origin).replace(/\/+$/,''),token=text(body.importAuthToken);

@@ -89,7 +89,7 @@ async function latestCaptures(db, leagueId, requestedSessionId = '') {
     return { sessionId:requestedSessionId, captures:legacy.results || [] };
   }
   const session = await db.prepare(`SELECT discovery_session_id, MAX(received_at) AS latest_received
-    FROM companion_route_captures WHERE league_id = ? GROUP BY discovery_session_id
+    FROM companion_route_captures WHERE league_id = ? AND substr(discovery_session_id,1,3)!='ea_' GROUP BY discovery_session_id
     ORDER BY latest_received DESC LIMIT 1`).bind(leagueId).first();
   if (!session) return { sessionId: null, captures: [] };
   const rows = await db.prepare(`SELECT id, discovery_session_id, route_path, request_method, content_type,
