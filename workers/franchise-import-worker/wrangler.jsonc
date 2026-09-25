@@ -3,7 +3,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "franchise-hq-import-worker",
   "main": "src/index.js",
-  "compatibility_date": "2026-08-20",
+  "compatibility_date": "2026-09-25",
   "workers_dev": false,
   "observability": {
     "enabled": true
@@ -21,6 +21,11 @@
       "name": "franchise-hq-schedule-workflow",
       "binding": "FRANCHISE_SCHEDULE_WORKFLOW",
       "class_name": "FranchiseScheduleWorkflow"
+    },
+    {
+      "name": "franchise-hq-ea-collection-workflow",
+      "binding": "FRANCHISE_EA_COLLECTION_WORKFLOW",
+      "class_name": "FranchiseEaCollectionWorkflow"
     }
   ]
 }

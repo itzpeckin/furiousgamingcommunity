@@ -141,7 +141,7 @@ async function capturedRouteCandidates(db,leagueId,discoverySessionId,captureIds
     : await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,payload_hash,
       byte_length,collections_json,request_headers_json,received_at
     FROM companion_route_captures
-    WHERE league_id=? AND route_path LIKE '%/week/%'
+    WHERE league_id=? AND route_path LIKE '%/week/%' AND substr(discovery_session_id,1,3)!='ea_'
     ORDER BY received_at DESC`).bind(leagueId).all();
 
   const grouped=new Map();

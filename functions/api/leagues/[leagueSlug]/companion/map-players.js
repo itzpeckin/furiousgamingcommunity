@@ -113,7 +113,7 @@ async function rosterCaptureSet(db,leagueId,discoverySessionId){
       COALESCE(i.dataset_type,'unknown') dataset_type,COALESCE(i.record_count,0) record_count
     FROM companion_route_captures c
     LEFT JOIN companion_dataset_inspections i ON i.capture_id=c.id
-    WHERE c.league_id=? AND c.route_path LIKE '%/team/%/roster'
+    WHERE c.league_id=? AND c.route_path LIKE '%/team/%/roster' AND substr(c.discovery_session_id,1,3)!='ea_'
     ORDER BY c.received_at DESC LIMIT 512`).bind(leagueId).all();
 
   const all=(result.results||[]).filter(row=>ROSTER_ROUTE.test(String(row.route_path||'')));
@@ -192,7 +192,7 @@ async function latestFreeAgentCapture(db,env,leagueId,source,discoverySessionId)
     ORDER BY link.observed_at DESC LIMIT 20`).bind(leagueId,discoverySessionId).all()
     : await db.prepare(`SELECT id capture_id,discovery_session_id,route_path,r2_object_key,received_at,byte_length
     FROM companion_route_captures
-    WHERE league_id=? AND LOWER(route_path) LIKE '%/freeagents/roster%'
+    WHERE league_id=? AND LOWER(route_path) LIKE '%/freeagents/roster%' AND substr(discovery_session_id,1,3)!='ea_'
     ORDER BY received_at DESC LIMIT 20`).bind(leagueId).all();
 
   const attempts=[];

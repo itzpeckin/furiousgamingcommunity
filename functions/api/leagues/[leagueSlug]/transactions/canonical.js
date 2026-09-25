@@ -1847,7 +1847,7 @@ function lifecycleRetired(row={}){
 async function latestRosterCaptureCohort(db,leagueId,atOrBefore=null){
   const result=await db.prepare(`SELECT id,discovery_session_id,route_path,r2_object_key,received_at
     FROM companion_route_captures
-    WHERE league_id=? AND route_path LIKE '%/team/%/roster'
+    WHERE league_id=? AND route_path LIKE '%/team/%/roster' AND substr(discovery_session_id,1,3)!='ea_'
       ${atOrBefore?'AND received_at<=?':''}
     ORDER BY received_at DESC LIMIT 512`)
     .bind(...(atOrBefore?[leagueId,atOrBefore]:[leagueId])).all();
@@ -1942,6 +1942,7 @@ async function captureLifecyclePlan(db,leagueId){
 }
 
 async function processCaptureLifecycleSession(context,state,sessionId){
+  if(String(sessionId).startsWith('ea_'))throw new Error('EA roster collections must be imported before they can contribute to transaction history.');
   let captures=[];
   let receivedAt=null;
 

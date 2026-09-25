@@ -754,6 +754,7 @@ function renderCommissionerOverview(){
    <div class="commissioner-command-hero__season"><small>ACTIVE LEAGUE</small><strong>Season ${escapeHtml(activeSeason)}</strong><span>Week ${escapeHtml(activeWeek)}</span><em>${snapshot?'Snapshot live':'No active snapshot'}</em></div>
  </section>
  ${renderLeagueDataSelector(dataSourceState)}
+ ${window.FranchiseHQ?.eaDirect?.renderPanel?.()||''}
  <section class="commissioner-command-metrics" aria-label="League status">
    <button data-command-focus-import><span>Latest Import</span><strong>${snapshot?'Live':'Attention'}</strong><small>${snapshot?`Activated ${escapeHtml(commissionerDate(snapshot.activatedAt))}`:'No active snapshot'}</small><i class="is-${snapshot?'success':'danger'}"></i></button>
    <button data-commissioner-tab="teams"><span>Members</span><strong>${members.active||0}</strong><small>${members.online||0} online · ${members.assigned||0} teams assigned</small><i class="is-${members.pending||members.unassigned?'warning':'success'}"></i></button>

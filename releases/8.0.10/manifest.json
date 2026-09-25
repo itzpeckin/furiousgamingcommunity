@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.10",
+  "releaseType": "tenant-owned-ea-direct-connection",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.9",
+    "commit": "f893f385d01056dd59406276d20a2c66a00903cf",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "release/8.0.10-ea-direct",
+  "environmentContract": "config/environment-contract.json",
+  "databaseContract": "config/database-schema-contract.json",
+  "tenantContract": "config/tenant-data-contract.json",
+  "qualityBaseline": "config/quality-baseline.json",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.9",
+    "candidateRelease": "8.0.10",
+    "currentMigration": 47,
+    "candidateMigration": 48,
+    "scope": "EA-owned sign-in and league selection, encrypted per-tenant credentials, private preview, durable manual previous/current-week collection and yearly schedule catalog. Additive schema and new deployment secrets are authorized implementation dependencies. No deployment-time league import, live activation, Discord action, archive, reset, export URL rotation, data deletion or inferred Free Agent zero."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/ea-client.js",
+    "functions/_lib/ea-capture.js",
+    "functions/_lib/ea-collection.js",
+    "functions/_lib/ea-direct.js",
+    "migrations/0048_ea_direct_connections.sql",
+    "league-engine/ea-direct.js",
+    "tests/security/ea-direct.test.mjs",
+    "docs/EA-DIRECT.md",
+    "docs/ROADMAP.md",
+    "releases/8.0.10/release-record.md",
+    "releases/8.0.10/validation-evidence.json"
+  ]
+}

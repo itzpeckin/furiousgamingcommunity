@@ -198,7 +198,7 @@ export async function automaticSessionFor(db, league, suppliedEndpoint) {
     : previous?.status === 'review_required'
       ? AUTOMATIC_PARTIAL_COHORT_WINDOW_MS
       : AUTOMATIC_LATE_CAPTURE_WINDOW_MS;
-  if (previous && Number(endpoint.latest_session_token_version) === Number(endpoint.token_version)
+  if (previous && !String(previous.id).startsWith('ea_') && Number(endpoint.latest_session_token_version) === Number(endpoint.token_version)
     && !['expired','cancelled'].includes(previous.status)
     && Date.now()-previousActivity <= reuseWindow) return previous;
 

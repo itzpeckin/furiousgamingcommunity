@@ -1,0 +1,39 @@
+/* FranchiseHQ 8.0.10 — commissioner Madden connection */
+.ea-direct-card{min-width:0;display:grid;gap:18px;margin:0 0 22px;padding:24px;border:1px solid var(--border-color,rgba(136,160,200,.2));border-radius:20px}
+.ea-direct-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.ea-direct-header h2{margin:5px 0 6px;font-size:1.35rem}
+.ea-direct-header p,.ea-direct-content p{margin:0;line-height:1.55;color:var(--text-secondary,#a9b6cc)}
+.ea-direct-header .pill{flex-shrink:0}
+.ea-direct-paths{display:flex;gap:6px;width:fit-content;max-width:100%;padding:5px;background:rgba(7,13,24,.32);border:1px solid rgba(136,160,200,.15);border-radius:12px}
+.ea-direct-paths button{min-height:44px;border:0;border-radius:8px;padding:9px 18px;background:transparent;color:var(--text-secondary,#a9b6cc);font:inherit;font-weight:750;cursor:pointer}
+.ea-direct-paths button[aria-pressed="true"]{background:var(--accent,#527dea);color:#fff}
+.ea-direct-content,.ea-direct-connected,.ea-direct-signin{display:grid;gap:16px;min-width:0}
+.ea-direct-actions{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.ea-direct-actions p,.ea-direct-actions>span{flex-basis:100%;font-size:.85rem;color:var(--text-secondary,#a9b6cc)}
+.ea-direct-card .button{min-height:44px;white-space:normal;line-height:1.35;max-width:100%;text-align:center}
+.ea-direct-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;min-width:0}
+.ea-direct-form .field{display:grid;gap:8px;min-width:0;margin:0}
+.ea-direct-form input,.ea-direct-form select{min-height:46px;width:100%;min-width:0;background:var(--surface,#101722);color:var(--text-primary,#eef3ff);border:1px solid rgba(136,160,200,.3);border-radius:10px;padding:11px;font:inherit}
+.ea-direct-form small,.ea-direct-settings small{color:var(--text-secondary,#a9b6cc);font-size:.78rem;line-height:1.5}
+.ea-direct-form .button{align-self:center}
+.ea-direct-signin ol{display:grid;gap:12px;margin:0;padding-left:22px;line-height:1.6;color:var(--text-secondary,#a9b6cc)}
+.ea-direct-signin li>span{display:inline-block;margin-left:12px}
+.ea-direct-signin>.text-button{justify-self:start}
+.ea-direct-identity,.ea-direct-coverage{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0}
+.ea-direct-identity>div,.ea-direct-coverage>div{min-width:0;padding:13px 15px;background:rgba(11,17,29,.28);border:1px solid rgba(136,160,200,.15);border-radius:12px}
+.ea-direct-card dt{font-size:.75rem;color:var(--text-secondary,#a9b6cc);margin-bottom:5px}
+.ea-direct-card dd{margin:0;font-weight:700;overflow-wrap:anywhere;line-height:1.45}
+.ea-direct-settings{padding-top:8px}
+.ea-direct-settings summary{cursor:pointer;color:var(--text-secondary,#a9b6cc);font-size:.85rem;padding:5px 0}
+.ea-direct-settings .button{margin:12px 10px 0 0}
+.ea-direct-collection{display:grid;gap:12px;padding:18px;border:1px solid rgba(101,144,239,.3);border-radius:14px;background:rgba(50,89,168,.08)}
+.ea-direct-collection__heading{display:flex;justify-content:space-between;gap:12px}
+.ea-direct-collection__heading>span{font-size:.8rem;color:var(--text-secondary,#a9b6cc);text-transform:capitalize}
+.ea-direct-collection progress{width:100%;height:8px;accent-color:var(--accent,#527dea)}
+.ea-direct-error,.ea-direct-notice{padding:12px 14px;border-radius:10px;overflow-wrap:anywhere}
+.ea-direct-content .ea-direct-error{color:#ffc3ca;background:rgba(207,58,80,.12);border:1px solid rgba(207,58,80,.25)}
+.ea-direct-content .ea-direct-notice{color:#c2d8ff;background:rgba(73,120,217,.12);border:1px solid rgba(73,120,217,.24)}
+.ea-direct-footer{display:flex;justify-content:space-between;gap:12px;align-items:center;padding-top:14px;border-top:1px solid rgba(136,160,200,.15)}
+.ea-direct-footer small{color:var(--text-secondary,#a9b6cc);line-height:1.5}
+.ea-direct-card button:focus-visible,.ea-direct-card a:focus-visible,.ea-direct-card summary:focus-visible{outline:2px solid #a9c9ff;outline-offset:3px}
+@media(max-width:700px){.ea-direct-card{padding:18px;gap:16px}.ea-direct-header{flex-direction:column}.ea-direct-form{grid-template-columns:minmax(0,1fr)}.ea-direct-identity,.ea-direct-coverage{grid-template-columns:minmax(0,1fr)}.ea-direct-actions{display:grid;grid-template-columns:minmax(0,1fr)}.ea-direct-footer{align-items:flex-start;flex-direction:column}.ea-direct-paths{width:100%}.ea-direct-paths button{flex:1}.ea-direct-signin li>span{margin:8px 0 0}.ea-direct-collection{padding:14px}.ea-direct-collection__heading{flex-wrap:wrap}}

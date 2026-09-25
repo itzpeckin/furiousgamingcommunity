@@ -7,7 +7,7 @@ const TEAM_ROSTER_ROUTE=/\/team\/[^/]+\/roster\/?$/i;
 
 async function routeRows(db,leagueId){
   const session=await db.prepare(`SELECT id FROM madden_discovery_sessions
-    WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
+    WHERE league_id=? AND substr(id,1,3)!='ea_' ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first();
   const result=session
     ?await db.prepare(`SELECT c.id,link.session_id discovery_session_id,c.route_path,c.byte_length,c.r2_object_key,
         link.observed_at received_at FROM madden_discovery_session_captures link
@@ -15,7 +15,7 @@ async function routeRows(db,leagueId){
       WHERE link.league_id=? AND link.session_id=? ORDER BY link.observed_at DESC LIMIT 300`)
       .bind(leagueId,session.id).all()
     :await db.prepare(`SELECT id,discovery_session_id,route_path,byte_length,r2_object_key,received_at
-      FROM companion_route_captures WHERE league_id=? ORDER BY received_at DESC LIMIT 300`).bind(leagueId).all();
+      FROM companion_route_captures WHERE league_id=? AND substr(discovery_session_id,1,3)!='ea_' ORDER BY received_at DESC LIMIT 300`).bind(leagueId).all();
   return result.results||[];
 }
 

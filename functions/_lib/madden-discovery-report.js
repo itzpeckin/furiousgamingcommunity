@@ -48,7 +48,9 @@ export function maddenDiscoveryReportUsesCurrentPolicy(row) {
 
 export async function latestMaddenDiscoveryReport(db, leagueId) {
   return db.prepare(`SELECT * FROM madden_discovery_reports
-    WHERE league_id=? ORDER BY generated_at DESC,rowid DESC LIMIT 1`).bind(leagueId).first();
+    WHERE league_id=? AND (substr(session_id,1,3)!='ea_' OR id=(
+      SELECT latest_ready_report_id FROM companion_league_export_endpoints WHERE league_id=?
+    )) ORDER BY generated_at DESC,rowid DESC LIMIT 1`).bind(leagueId,leagueId).first();
 }
 
 async function sessionFor(db, leagueId, sessionId) {
@@ -123,7 +125,7 @@ export async function stitchRecentPartialMaddenCohort({
   db,env,leagueId,anchorSessionId,generatedByUserId=null
 }) {
   const anchor = await sessionFor(db,leagueId,anchorSessionId);
-  if (!anchor || !['open','review_required'].includes(String(anchor.status || ''))) {
+  if (!anchor || String(anchor.id).startsWith('ea_') || !['open','review_required'].includes(String(anchor.status || ''))) {
     return { stitched:false,ready:false,reason:'anchor-not-partial' };
   }
   const anchorAt = anchor.last_capture_at || anchor.created_at;
@@ -133,6 +135,7 @@ export async function stitchRecentPartialMaddenCohort({
     LEFT JOIN madden_discovery_reports report
       ON report.league_id=session.league_id AND report.session_id=session.id
     WHERE session.league_id=? AND session.status IN ('open','review_required')
+      AND substr(session.id,1,3)!='ea_'
       AND session.id NOT LIKE 'm27_stitched_%'
       AND datetime(COALESCE(session.last_capture_at,session.created_at))>=datetime(?,'-${PARTIAL_STITCH_WINDOW_MINUTES} minutes')
       AND datetime(COALESCE(session.last_capture_at,session.created_at))<=datetime(?,'+30 seconds')
@@ -269,6 +272,7 @@ export async function recoverMaddenDiscoveryCohort({
     FROM madden_discovery_session_captures link
     JOIN companion_route_captures c ON c.id=link.capture_id AND c.league_id=link.league_id
     WHERE link.league_id=? AND link.observed_at>=? AND link.observed_at<=?
+      AND substr(link.session_id,1,3)!='ea_'
     GROUP BY c.id ORDER BY session_observed_at ASC LIMIT ?`).bind(
       leagueId,firstReceivedAt,lastReceivedAt,MAX_CAPTURE_COUNT+1
     ).all();
@@ -387,6 +391,22 @@ export async function generateMaddenDiscoveryReport({
 }) {
   const session = await sessionFor(db,leagueId,sessionId);
   if (!session) throw Object.assign(new Error('Madden discovery session not found.'),{status:404});
+  // EA collections have a separate completion manifest and publication guard.
+  // Generic Companion analysis may read a vetted weekly report but must never
+  // regenerate one from a private preview, raw staging set, or yearly schedule.
+  if (String(session.id).startsWith('ea_')) {
+    const row = await db.prepare(`SELECT report.* FROM madden_discovery_reports report
+      WHERE report.league_id=? AND report.session_id=? AND report.status='passed'
+        AND json_extract(report.source_markers_json,'$.eaCollection.mode')='weekly'
+        AND json_extract(report.source_markers_json,'$.eaCollection.complete')=1
+        AND (report.id=(SELECT latest_ready_report_id FROM companion_league_export_endpoints WHERE league_id=?)
+          OR EXISTS (SELECT 1 FROM companion_candidate_import_runs run WHERE run.league_id=report.league_id
+            AND run.discovery_session_id=report.session_id)) LIMIT 1`).bind(leagueId,session.id,leagueId).first();
+    if (!row) throw Object.assign(new Error('EA collections must complete through EA Direct before they can be used as an import source.'),{status:409});
+    const report = publicMaddenDiscoveryReport(row);
+    const rosterCarryForward = await rosterCarryForwardEligibility(db,leagueId,report);
+    return {report,reusedExisting:true,readiness:reportImportReadiness(report,{rosterCarryForward})};
+  }
   const rows = await captureRows(db,leagueId,session.id);
   if (!rows.length) throw Object.assign(new Error('This export has not received any Madden routes yet.'),{status:422});
   const retained = reuseExisting

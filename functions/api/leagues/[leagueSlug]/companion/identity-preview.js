@@ -6,6 +6,7 @@ import {
   validLeagueSlug
 } from '../../../../_lib/cloud-platform.js';
 import { normalizeLeagueTeam } from '../../../../_lib/league-teams.js';
+import { latestMaddenDiscoveryReport } from '../../../../_lib/madden-discovery-report.js';
 import { requirePlatformOwner } from '../../../../_lib/permissions.js';
 import {
   freeAgentPreviewCount,
@@ -131,8 +132,7 @@ export async function onRequestPost(context) {
       WHERE league_id=? AND status='pending-preview' ORDER BY created_at DESC LIMIT 1`).bind(current.league.id).first(),
     current.db.prepare(`SELECT * FROM companion_player_mapping_runs
       WHERE league_id=? AND status='pending-preview' ORDER BY created_at DESC LIMIT 1`).bind(current.league.id).first(),
-    current.db.prepare(`SELECT * FROM madden_discovery_reports
-      WHERE league_id=? ORDER BY generated_at DESC LIMIT 1`).bind(current.league.id).first()
+    latestMaddenDiscoveryReport(current.db,current.league.id)
   ]);
   if (!teamRun || !playerRun || !report) {
     return json({
@@ -140,6 +140,10 @@ export async function onRequestPost(context) {
       error:'Analyze the captured export and map teams and rostered players before creating the identity preview.',
       release:RELEASE
     }, 409);
+  }
+  if (String(report.session_id).startsWith('ea_') &&
+    (teamRun.discovery_session_id !== report.session_id || playerRun.discovery_session_id !== report.session_id)) {
+    return json({ok:false,error:'Map teams and players from the selected EA weekly collection before creating its identity preview.',release:RELEASE},409);
   }
 
   const [teamResult, playerResult] = await Promise.all([

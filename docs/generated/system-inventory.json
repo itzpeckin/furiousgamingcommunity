@@ -41,6 +41,8 @@
       "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
       "functions/api/leagues/[leagueSlug]/companion/test.js",
       "functions/api/leagues/[leagueSlug]/companion/yearly-schedule.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/collect-step.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/sync.js",
       "functions/api/leagues/[leagueSlug]/game-year-transition.js",
       "functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js",
       "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
@@ -109,6 +111,16 @@
     "DISCORD_REDIRECT_URI_PUBLIC": [
       "functions/_lib/origin.js"
     ],
+    "EA_CLIENT_ID": [
+      "functions/_lib/ea-client.js"
+    ],
+    "EA_CLIENT_SECRET": [
+      "functions/_lib/ea-client.js",
+      "functions/_lib/ea-direct.js"
+    ],
+    "EA_CREDENTIAL_KEY": [
+      "functions/_lib/ea-direct.js"
+    ],
     "EA_DIRECT_ACCESS_TOKEN": [
       "functions/api/leagues/[leagueSlug]/ea-direct/auth-status.js",
       "functions/api/leagues/[leagueSlug]/ea-direct/probe.js",
@@ -121,16 +133,23 @@
       "functions/api/leagues/[leagueSlug]/ea-direct/session-test.js",
       "functions/api/leagues/[leagueSlug]/ea-direct/status.js"
     ],
+    "EA_EDITION": [
+      "functions/_lib/ea-client.js"
+    ],
     "EA_MADDEN_CLIENT_SECRET": [
       "functions/api/leagues/[leagueSlug]/ea-direct/exchange-code.js",
       "functions/api/leagues/[leagueSlug]/ea-direct/exchange-status.js"
+    ],
+    "FRANCHISE_EA_COLLECTION_WORKFLOW": [
+      "workers/franchise-import-worker/src/index.js"
     ],
     "FRANCHISE_HQ_DB": [
       "functions/_lib/tenant-context.js"
     ],
     "FRANCHISE_IMPORT_WORKER": [
       "functions/_lib/discord-schedule.js",
-      "functions/api/leagues/[leagueSlug]/companion/import-job.js"
+      "functions/api/leagues/[leagueSlug]/companion/import-job.js",
+      "functions/api/leagues/[leagueSlug]/ea-direct/sync.js"
     ],
     "FRANCHISE_IMPORT_WORKFLOW": [
       "workers/franchise-import-worker/src/index.js"
@@ -168,16 +187,16 @@
   "files": {
     "byExtension": {
       ".bin": 1,
-      ".css": 11,
+      ".css": 12,
       ".example": 1,
       ".html": 8,
-      ".js": 241,
+      ".js": 249,
       ".json": 7,
       ".jsonc": 1,
-      ".md": 284,
-      ".mjs": 54,
+      ".md": 285,
+      ".mjs": 59,
       ".png": 3,
-      ".sql": 49,
+      ".sql": 50,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -185,7 +204,7 @@
     },
     "largest": [
       {
-        "bytes": 652707,
+        "bytes": 652708,
         "file": "app.js"
       },
       {
@@ -193,7 +212,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 437916,
+        "bytes": 437970,
         "file": "trade-module.js"
       },
       {
@@ -205,7 +224,7 @@
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 130709,
+        "bytes": 130904,
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
@@ -217,11 +236,11 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 83566,
+        "bytes": 85855,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 77224,
+        "bytes": 77350,
         "file": "index.html"
       },
       {
@@ -237,12 +256,12 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 49759,
-        "file": "league-engine/one-click-import.js"
+        "bytes": 50005,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 49647,
-        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
+        "bytes": 49759,
+        "file": "league-engine/one-click-import.js"
       },
       {
         "bytes": 48894,
@@ -257,7 +276,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 40946,
+        "bytes": 40990,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
@@ -265,7 +284,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 667
+    "total": 683
   },
   "frontend": {
     "assets": [
@@ -276,6 +295,11 @@
       },
       {
         "path": "release-7.0.5.css",
+        "type": "link",
+        "versioned": true
+      },
+      {
+        "path": "ea-direct.css",
         "type": "link",
         "versioned": true
       },
@@ -625,6 +649,11 @@
         "versioned": true
       },
       {
+        "path": "league-engine/ea-direct.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "league-engine/permanent-export-url.js",
         "type": "script",
         "versioned": true
@@ -761,11 +790,11 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 96,
-    "stylesheetCount": 2
+    "scriptCount": 97,
+    "stylesheetCount": 3
   },
   "functions": {
-    "routeCount": 87,
+    "routeCount": 90,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1161,6 +1190,21 @@
         "route": "/api/leagues/:leagueSlug/ea-direct/capture"
       },
       {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/collect-step.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/collect-step"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/connection.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/connection"
+      },
+      {
         "file": "functions/api/leagues/[leagueSlug]/ea-direct/discovery-plan.js",
         "handlers": [
           "onRequestGet"
@@ -1229,6 +1273,14 @@
           "onRequestGet"
         ],
         "route": "/api/leagues/:leagueSlug/ea-direct/status"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/ea-direct/sync.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/ea-direct/sync"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/ea-direct/validate-redirect.js",
@@ -1700,10 +1752,16 @@
       "recordsLedger": true,
       "sha256": "e26838e3a8839430c89f32717f73af1dd5eeb4b9ce3d1fd49e591024e3bcadb7",
       "version": "0047"
+    },
+    {
+      "file": "migrations/0048_ea_direct_connections.sql",
+      "recordsLedger": true,
+      "sha256": "e58e21968e1d97c2acd9c9e3719794c60264742753afd1fbc2b284e51546882e",
+      "version": "0048"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.9",
+  "release": "8.0.10",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

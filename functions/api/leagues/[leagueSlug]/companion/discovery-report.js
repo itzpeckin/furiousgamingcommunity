@@ -34,7 +34,11 @@ async function sessionFor(db, leagueId, requestedSessionId) {
   if (requestedSessionId) return db.prepare(`SELECT * FROM madden_discovery_sessions
     WHERE league_id=? AND id=? LIMIT 1`).bind(leagueId,requestedSessionId).first();
   return db.prepare(`SELECT * FROM madden_discovery_sessions
-    WHERE league_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1`).bind(leagueId).first();
+    WHERE league_id=? AND (substr(id,1,3)!='ea_' OR id=(
+      SELECT report.session_id FROM companion_league_export_endpoints endpoint
+      JOIN madden_discovery_reports report ON report.id=endpoint.latest_ready_report_id AND report.league_id=endpoint.league_id
+      WHERE endpoint.league_id=?
+    )) ORDER BY created_at DESC,rowid DESC LIMIT 1`).bind(leagueId,leagueId).first();
 }
 
 export async function onRequestGet(context) {

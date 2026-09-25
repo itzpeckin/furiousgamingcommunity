@@ -48,7 +48,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
   assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
 });
 import { hashToken } from '../../functions/_lib/auth.js';
-import { onRequestPost as candidateImport, retainedPeriodBundle } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
+import { onRequestGet as getCandidateImport, onRequestPost as candidateImport, retainedPeriodBundle } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { onRequestPost as startImportJob } from '../../functions/api/leagues/[leagueSlug]/companion/import-job.js';
 import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames, selectRetainedScheduleCaptures } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
 import { onRequestPost as mapPlayers, rebaseCarriedRoster } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
@@ -883,6 +883,40 @@ test('durable import selects the exact latest passed report rather than an older
     assert.equal(sent.retry,true);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM server_import_delegations`).get().count,1);
   }finally{sqlite.close();}
+});
+
+test('missing permanent endpoint never makes a private EA report the import source',async()=>{
+  const sqlite=await database();
+  try {
+    const token='endpoint-absent-import-session';
+    sqlite.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,active)
+      VALUES ('membership-no-endpoint','league-1','commissioner-1','commissioner',1)`).run();
+    sqlite.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at)
+      VALUES ('session-no-endpoint','commissioner-1',?,'2099-01-01T00:00:00.000Z')`).run(await hashToken(token));
+    sqlite.prepare(`DELETE FROM companion_league_export_endpoints WHERE league_id='league-1'`).run();
+    for(const mode of ['preview','weekly','yearly']) {
+      const sessionId=`ea_${mode}_private`;
+      sqlite.prepare(`INSERT INTO madden_discovery_sessions (id,league_id,token_hash,status,expires_at)
+        VALUES (?,'league-1',?,'passed','2099-01-01T00:00:00.000Z')`).run(sessionId,`private-${mode}-hash`);
+      sqlite.prepare(`INSERT INTO madden_discovery_reports
+        (id,league_id,session_id,status,report_hash,generated_at)
+        VALUES (?,'league-1',?,'passed',?,'2090-01-01T00:00:00.000Z')`).run(`report-${mode}`,sessionId,`private-${mode}-report-hash`);
+    }
+    const binding=d1(sqlite);
+    const context=()=>({request:new Request('https://franchisehq.app/api/leagues/fgc/companion/candidate-import',{
+      headers:{cookie:`franchise_hq_session=${token}`}
+    }),params:{leagueSlug:'fgc'},env:{DB:binding,FRANCHISE_HQ_DB:binding}});
+    const privateOnly=await getCandidateImport(context());
+    assert.equal(privateOnly.status,200);
+    assert.equal((await privateOnly.json()).source,null);
+    sqlite.prepare(`INSERT INTO madden_discovery_reports
+      (id,league_id,session_id,status,report_hash,generated_at)
+      VALUES ('legacy-companion-report','league-1','capture-1','passed','legacy-companion-hash','2080-01-01T00:00:00.000Z')`).run();
+    const legacy=await getCandidateImport(context());
+    assert.equal(legacy.status,200);
+    assert.equal((await legacy.json()).source.reportId,'legacy-companion-report');
+    assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM companion_candidate_import_runs').get().count,0);
+  } finally {sqlite.close();}
 });
 
 test('commissioner start accepts a fully covered older week only as an exact same-season backfill', async () => {

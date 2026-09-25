@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "FranchiseHQ",
-  "release": "8.0.9",
+  "release": "8.0.10",
   "configurationAuthority": "Cloudflare dashboard export until a reviewed Wrangler configuration is adopted",
   "deploymentPolicy": {
     "productionBranch": "main",
@@ -12,17 +12,65 @@
   },
   "pages": {
     "bindings": [
-      { "name": "DB", "kind": "d1", "logicalResource": "primaryDatabase", "required": true },
-      { "name": "FRANCHISE_HQ_DB", "kind": "d1", "logicalResource": "primaryDatabase", "required": true },
-      { "name": "COMPANION_EXPORTS", "kind": "r2", "logicalResource": "companionExports", "required": true },
-      { "name": "GAME_YEAR_ARCHIVES", "kind": "r2", "logicalResource": "gameYearArchives", "required": true },
-      { "name": "COMPANION_EXPORT_META", "kind": "kv", "logicalResource": "companionMetadata", "required": true },
-      { "name": "LEAGUE_CONFIG", "kind": "kv", "logicalResource": "leagueConfiguration", "required": true },
-      { "name": "FRANCHISE_IMPORT_WORKER", "kind": "service", "logicalResource": "importWorker", "required": false },
-      { "name": "AUTH_RATE_LIMITER", "kind": "rate-limit", "logicalResource": "authenticationRateLimit", "required": false },
-      { "name": "ASSETS", "kind": "pages-assets", "logicalResource": "staticAssets", "required": true, "platformManaged": true }
+      {
+        "name": "DB",
+        "kind": "d1",
+        "logicalResource": "primaryDatabase",
+        "required": true
+      },
+      {
+        "name": "FRANCHISE_HQ_DB",
+        "kind": "d1",
+        "logicalResource": "primaryDatabase",
+        "required": true
+      },
+      {
+        "name": "COMPANION_EXPORTS",
+        "kind": "r2",
+        "logicalResource": "companionExports",
+        "required": true
+      },
+      {
+        "name": "GAME_YEAR_ARCHIVES",
+        "kind": "r2",
+        "logicalResource": "gameYearArchives",
+        "required": true
+      },
+      {
+        "name": "COMPANION_EXPORT_META",
+        "kind": "kv",
+        "logicalResource": "companionMetadata",
+        "required": true
+      },
+      {
+        "name": "LEAGUE_CONFIG",
+        "kind": "kv",
+        "logicalResource": "leagueConfiguration",
+        "required": true
+      },
+      {
+        "name": "FRANCHISE_IMPORT_WORKER",
+        "kind": "service",
+        "logicalResource": "importWorker",
+        "required": false
+      },
+      {
+        "name": "AUTH_RATE_LIMITER",
+        "kind": "rate-limit",
+        "logicalResource": "authenticationRateLimit",
+        "required": false
+      },
+      {
+        "name": "ASSETS",
+        "kind": "pages-assets",
+        "logicalResource": "staticAssets",
+        "required": true,
+        "platformManaged": true
+      }
     ],
     "variables": [
+      "EA_CLIENT_ID",
+      "EA_EDITION",
       "APP_ENV",
       "APP_VERSION",
       "DISCORD_CLIENT_ID",
@@ -37,7 +85,9 @@
       "DISCORD_PUBLIC_KEY",
       "DISCORD_BOT_TOKEN",
       "SESSION_SIGNING_SECRET",
-      "COMPANION_EXPORT_TOKEN"
+      "COMPANION_EXPORT_TOKEN",
+      "EA_CLIENT_SECRET",
+      "EA_CREDENTIAL_KEY"
     ],
     "forbiddenUntilSecurityContainment": [
       "EA_DIRECT_ACCESS_TOKEN",
@@ -50,8 +100,24 @@
   },
   "importWorker": {
     "bindings": [
-      { "name": "FRANCHISE_IMPORT_WORKFLOW", "kind": "workflow", "logicalResource": "importWorkflow", "required": true },
-      { "name": "FRANCHISE_SCHEDULE_WORKFLOW", "kind": "workflow", "logicalResource": "scheduleWorkflow", "required": true }
+      {
+        "name": "FRANCHISE_IMPORT_WORKFLOW",
+        "kind": "workflow",
+        "logicalResource": "importWorkflow",
+        "required": true
+      },
+      {
+        "name": "FRANCHISE_SCHEDULE_WORKFLOW",
+        "kind": "workflow",
+        "logicalResource": "scheduleWorkflow",
+        "required": true
+      },
+      {
+        "name": "FRANCHISE_EA_COLLECTION_WORKFLOW",
+        "kind": "workflow",
+        "logicalResource": "eaCollectionWorkflow",
+        "required": true
+      }
     ],
     "secrets": []
   },
@@ -68,11 +134,14 @@
         "LEAGUE_CONFIG": "local:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "local:import-worker",
         "FRANCHISE_IMPORT_WORKFLOW": "local:import-workflow",
-        "FRANCHISE_SCHEDULE_WORKFLOW": "local:schedule-workflow"
+        "FRANCHISE_SCHEDULE_WORKFLOW": "local:schedule-workflow",
+        "FRANCHISE_EA_COLLECTION_WORKFLOW": "local:ea-collection-workflow"
       },
       "variables": {
         "APP_ENV": "local",
-        "APP_VERSION": "8.0.9",
+        "EA_CLIENT_ID": "MCA_27_COMP_APP",
+        "EA_EDITION": "2027",
+        "APP_VERSION": "8.0.10",
         "DISCORD_CLIENT_ID": "local-discord-application",
         "DISCORD_REDIRECT_URI": "http://localhost:8788/api/auth/discord/callback",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
@@ -85,7 +154,9 @@
         "DISCORD_PUBLIC_KEY",
         "DISCORD_BOT_TOKEN",
         "SESSION_SIGNING_SECRET",
-        "COMPANION_EXPORT_TOKEN"
+        "COMPANION_EXPORT_TOKEN",
+        "EA_CLIENT_SECRET",
+        "EA_CREDENTIAL_KEY"
       ]
     },
     "staging": {
@@ -100,11 +171,14 @@
         "LEAGUE_CONFIG": "cloudflare:staging:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "cloudflare:staging:import-worker",
         "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:staging:import-workflow",
-        "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:staging:schedule-workflow"
+        "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:staging:schedule-workflow",
+        "FRANCHISE_EA_COLLECTION_WORKFLOW": "cloudflare:staging:ea-collection-workflow"
       },
       "variables": {
         "APP_ENV": "staging",
-        "APP_VERSION": "8.0.9",
+        "EA_CLIENT_ID": "MCA_27_COMP_APP",
+        "EA_EDITION": "2027",
+        "APP_VERSION": "8.0.10",
         "DISCORD_CLIENT_ID": "staging-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-staging",
         "DISCORD_REDIRECT_URI_PUBLIC": "set-in-cloudflare-staging-public",
@@ -117,7 +191,9 @@
         "DISCORD_PUBLIC_KEY",
         "DISCORD_BOT_TOKEN",
         "SESSION_SIGNING_SECRET",
-        "COMPANION_EXPORT_TOKEN"
+        "COMPANION_EXPORT_TOKEN",
+        "EA_CLIENT_SECRET",
+        "EA_CREDENTIAL_KEY"
       ]
     },
     "production": {
@@ -132,11 +208,14 @@
         "LEAGUE_CONFIG": "cloudflare:production:league-configuration",
         "FRANCHISE_IMPORT_WORKER": "cloudflare:production:import-worker",
         "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:production:import-workflow",
-        "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:production:schedule-workflow"
+        "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:production:schedule-workflow",
+        "FRANCHISE_EA_COLLECTION_WORKFLOW": "cloudflare:production:ea-collection-workflow"
       },
       "variables": {
         "APP_ENV": "production",
-        "APP_VERSION": "8.0.9",
+        "EA_CLIENT_ID": "MCA_27_COMP_APP",
+        "EA_EDITION": "2027",
+        "APP_VERSION": "8.0.10",
         "DISCORD_CLIENT_ID": "production-discord-application",
         "DISCORD_REDIRECT_URI": "set-in-cloudflare-production",
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
@@ -149,7 +228,9 @@
         "DISCORD_PUBLIC_KEY",
         "DISCORD_BOT_TOKEN",
         "SESSION_SIGNING_SECRET",
-        "COMPANION_EXPORT_TOKEN"
+        "COMPANION_EXPORT_TOKEN",
+        "EA_CLIENT_SECRET",
+        "EA_CREDENTIAL_KEY"
       ]
     }
   }
