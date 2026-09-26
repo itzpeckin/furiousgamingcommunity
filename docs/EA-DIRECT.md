@@ -1,12 +1,14 @@
 # EA Direct connection and acceptance guide
 
-Release: 8.0.10 candidate, September 25, 2026.
+Release: 8.0.10 Production; 8.0.11 corrective candidate, September 25, 2026.
 
 EA Direct adds a FranchiseHQ-owned Madden connection alongside the Companion App. The commissioner can connect an EA account, select the matching Madden franchise, collect a private preview, and then collect league updates or the yearly schedule. Both sources use the existing FranchiseHQ validation and retained-source model.
 
 ## Current acceptance status
 
-The implementation and its automated tests are reviewable, but real EA sign-in and authenticated Madden 27 collection have not yet been verified for this release. The Command Center flow and direct backend remain pending owner connection and live preview acceptance. A passing mock or protocol test does not establish live account compatibility, roster availability, or successful first-league onboarding.
+Production 8.0.10 is deployed. Owner sign-in reached EA profile discovery, but finding franchises returned a generic rejection. No EA connection or collection job was created. The 8.0.11 correction separates the initial account-token format from persona-scoped JWS tokens, preserves profile/franchise selections, and adds credential-safe failed-step diagnostics. This protocol difference is a confirmed implementation mismatch, not proof of the original rejection's exact cause. Authenticated Madden 27 franchise access and collection remain pending owner connection and live preview acceptance. Passing mock tests do not establish live compatibility, roster availability, or first-league onboarding.
+
+After 8.0.11, use **Restart EA sign-in** (or **Connect EA Account** if the setup expired) to obtain a fresh initial token; retrying an old profile setup would reuse its old token. Do not send the EA return address, password, or account tokens to support. The displayed step/support details contain only fixed FHQ step names, a numeric EA HTTP status when available, and recognized error categories; raw provider responses are never displayed or logged.
 
 Deployment does not sign into EA, collect league data, run an import, change the current week, or create scheduling threads. Those actions begin only from the commissioner's controls. Automatic scheduled sync is a later milestone.
 

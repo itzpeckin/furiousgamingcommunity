@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.11",
+  "releaseType": "ea-signin-correction",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.10",
+    "commit": "3bec0e3d6423d31aca0ec59275743bae80680c10",
+    "tag": "v7.0.0"
+  },
+  "implementationBranch": "fix/8.0.11-ea-signin",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.10",
+    "candidateRelease": "8.0.11",
+    "currentMigration": 48,
+    "candidateMigration": 48,
+    "scope": "EA account/persona token-format separation, safe step diagnostics, and selection/restart UX. No migration, secret rotation, data collection, import, snapshot, Discord, season, or export URL change."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/ea-client.js",
+    "functions/_lib/ea-direct.js",
+    "league-engine/ea-direct.js",
+    "tests/import/ea-client.test.mjs",
+    "tests/security/ea-direct.test.mjs",
+    "tests/ui/ea-direct.test.mjs",
+    "docs/EA-DIRECT.md",
+    "docs/ROADMAP.md",
+    "releases/8.0.11/release-record.md",
+    "releases/8.0.11/validation-evidence.json"
+  ]
+}

@@ -16,6 +16,7 @@ function harness() {
   const windowEvents = new Map();
   const documentEvents = new Map();
   const timers = new Map();
+  const panel = {outerHTML: ''};
   let timerId = 0;
   const hq = {
     leagueTenant: {getCurrentLeague: () => ({slug: currentSlug})},
@@ -33,7 +34,7 @@ function harness() {
   vm.runInNewContext(source, {
     window: {FranchiseHQ: hq, addEventListener: (name, listener) => windowEvents.set(name, listener)},
     document: {
-      querySelectorAll: () => [],
+      querySelectorAll: () => [panel],
       querySelector: () => ({scrollIntoView: () => { scrolled += 1; }}),
       addEventListener: (name, listener) => documentEvents.set(name, listener)
     },
@@ -55,6 +56,12 @@ function harness() {
     service, requests, timers, click,
     respond(handler) { requestHandler = handler; },
     switchLeague(value) { currentSlug = value; windowEvents.get('franchisehq:league-tenant-changed')(); },
+    changeAuth() { windowEvents.get('franchisehq:auth-changed')(); },
+    change(kind, value) {
+      const form = {dataset: {eaForm: kind}};
+      documentEvents.get('change')({target: {value, closest: () => form}});
+    },
+    markup: () => panel.outerHTML,
     submit(kind, input) {
       const form = {dataset: {eaForm: kind}, querySelector: () => input};
       documentEvents.get('submit')({preventDefault() {}, target: {closest: () => form}});
@@ -168,6 +175,104 @@ test('choosing a franchise is not masked by profiles retained in the setup respo
   assert.match(ui.service.renderPanel(), /data-ea-form="franchise"/);
   assert.doesNotMatch(ui.service.renderPanel(), /data-ea-form="persona"/);
 });
+
+const choiceStages = [
+  {kind: 'persona', status: 'choosing-profile', list: 'personas', id: 'ps5:123', action: 'select-persona', field: 'personaId'},
+  {kind: 'franchise', status: 'choosing-franchise', list: 'leagues', id: '321', action: 'connect', field: 'externalLeagueId'}
+];
+
+for (const stage of choiceStages) {
+  const setupState = (id = 'setup-1', choices = [{id: stage.id, name: 'Selected choice'}]) => ({
+    ok: true, configured: true, status: stage.status, setup: {id, [stage.list]: choices}
+  });
+  const selectedOption = new RegExp(`<option value="${stage.id}" selected>`);
+
+  test(`${stage.kind} selection survives busy, rejected request, and connection refresh`, async () => {
+    const ui = harness();
+    ui.respond(async () => setupState());
+    await ui.service.refresh();
+    let rejectAction;
+    ui.respond((_path, options) => options.method === 'POST'
+      ? new Promise((_resolve, reject) => { rejectAction = reject; }) : setupState());
+    ui.submit(stage.kind, {value: stage.id});
+    assert.match(ui.markup(), selectedOption);
+    assert.match(ui.markup(), /aria-busy="true"/);
+    assert.match(ui.markup(), /data-ea-action="begin" disabled>Restart EA sign-in/);
+    assert.equal(ui.requests.at(-1).options.body.action, stage.action);
+    assert.equal(ui.requests.at(-1).options.body[stage.field], stage.id);
+    rejectAction(new Error('EA did not accept this request.'));
+    await settle();
+    assert.match(ui.markup(), selectedOption);
+    assert.match(ui.markup(), /EA did not accept this request/);
+    await ui.service.refresh();
+    assert.match(ui.markup(), selectedOption);
+    assert.equal(ui.requests.filter(request => request.options.method === 'POST').length, 1);
+  });
+
+  test(`${stage.kind} choice is retained before submission when refreshing or switching connection methods`, async () => {
+    const ui = harness();
+    ui.respond(async () => setupState());
+    await ui.service.refresh();
+    ui.change(stage.kind, stage.id);
+    ui.click({eaPath: 'companion'});
+    ui.click({eaPath: 'ea-direct'});
+    assert.match(ui.markup(), selectedOption);
+    let resolveRefresh;
+    ui.respond(() => new Promise(resolve => { resolveRefresh = resolve; }));
+    const refreshing = ui.service.refresh();
+    assert.match(ui.markup(), selectedOption);
+    resolveRefresh(setupState());
+    await refreshing;
+    assert.match(ui.markup(), selectedOption);
+    assert.equal(ui.requests.every(request => request.options.method === 'GET'), true);
+  });
+
+  test(`${stage.kind} selection is cleared after tenant, auth, setup, or available-choice changes`, async () => {
+    const ui = harness();
+    ui.respond(async () => setupState());
+    await ui.service.refresh();
+    ui.change(stage.kind, stage.id);
+    ui.switchLeague('beta');
+    await ui.service.refresh();
+    assert.doesNotMatch(ui.markup(), selectedOption);
+    ui.change(stage.kind, stage.id);
+    ui.changeAuth();
+    await ui.service.refresh();
+    assert.doesNotMatch(ui.markup(), selectedOption);
+    ui.change(stage.kind, stage.id);
+    ui.respond(async () => setupState('setup-2'));
+    await ui.service.refresh();
+    assert.doesNotMatch(ui.markup(), selectedOption);
+    ui.change(stage.kind, stage.id);
+    ui.respond(async () => setupState('setup-2', [{id: 'replacement', name: 'Different choice'}]));
+    await ui.service.refresh();
+    assert.doesNotMatch(ui.markup(), /<option[^>]+ selected>/);
+    ui.respond(async () => setupState('setup-2'));
+    await ui.service.refresh();
+    assert.doesNotMatch(ui.markup(), selectedOption);
+  });
+
+  test(`${stage.kind} stage offers an explicit restart that returns to a fresh EA sign-in`, async () => {
+    const ui = harness();
+    ui.respond(async (_path, options) => options.method === 'GET' ? setupState() : {
+      ok: true, configured: true, status: 'not-connected', setup: {id: 'setup-new'},
+      loginUrl: 'https://accounts.ea.com/connect/auth'
+    });
+    await ui.service.refresh();
+    ui.change(stage.kind, stage.id);
+    assert.match(ui.markup(), /data-ea-action="begin"[^>]*>Restart EA sign-in/);
+    assert.equal(ui.requests.filter(request => request.options.method === 'POST').length, 0);
+    ui.click({eaAction: 'begin'});
+    await settle();
+    assert.equal(ui.requests.at(-1).options.body.action, 'begin');
+    assert.match(ui.markup(), /data-ea-form="exchange"/);
+    assert.match(ui.markup(), /Sign in on EA/);
+    assert.doesNotMatch(ui.markup(), /data-ea-form="(?:persona|franchise)"/);
+    ui.respond(async () => setupState('setup-new'));
+    await ui.service.refresh();
+    assert.doesNotMatch(ui.markup(), selectedOption);
+  });
+}
 
 test('refresh resumes a known collection using GET without creating another job', async () => {
   const ui = harness();

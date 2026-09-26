@@ -6,13 +6,13 @@
 
 **Updated:** September 25, 2026
 
-**Revision:** 3.06
+**Revision:** 3.07
 
-**Current production:** FranchiseHQ 8.0.9 is live from Main `f893f385d01056dd59406276d20a2c66a00903cf` with migration 47. The multi-week importer preserves consecutive payload-proven periods sharing Madden's Week 0 route. The protected Platform Admin console continues to read active-snapshot season/week authority.
+**Current production:** FranchiseHQ 8.0.10 is live from Main `3bec0e3d6423d31aca0ec59275743bae80680c10` with migration 48, Pages deployment `c818b61d-f2dc-4bc0-be1e-d42a32780a4d`. The owner reached EA profile discovery but franchise lookup failed before creating a connection or collecting data. The existing Week 7 snapshot remains unchanged.
 
-**Current work:** 8.0.10 reopens the owner-requested EA Direct gate. A Command Center connection, tenant-encrypted EA credentials, private preview, manual previous/current-week collection, and a separate yearly schedule catalog feed the existing import and schedule contracts. Live EA sign-in and direct backend/UI acceptance remain unverified until the owner connects and completes the private preview. See [EA Direct connection and acceptance guide](EA-DIRECT.md).
+**Current work:** 8.0.11 corrects the initial EA token-format mismatch, preserves selected profile/franchise choices, and identifies failed connection steps without exposing credentials. No schema, import, Discord, snapshot, or season change is included. See [EA Direct connection and acceptance guide](EA-DIRECT.md).
 
-**Next gate:** Validate and publish 8.0.10, then complete owner-operated EA sign-in and a private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
+**Next gate:** Validate and publish 8.0.11, then restart owner-operated EA sign-in and complete franchise selection and a private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
 
 ## Product decisions
 
@@ -153,7 +153,8 @@
 | 8.0.8 | Production; live acceptance found stale setup period display | Replace the visible league-nested Platform Workspace with a protected top-level Platform Admin console for leagues, onboarding, cross-league health, and explicitly separated diagnostics |
 | 8.0.8.1 | Production; owner accepted | Read Platform Admin season/week from the active snapshot, with league setup values used only when no active snapshot exists |
 | 8.0.9 | Production | Preserve and map multiple payload-proven weeks even when Madden reuses the same Week 0 route URL; activate only the newest proven current period |
-| 8.0.10 | Current work; live EA acceptance pending | Command Center EA connection, encrypted tenant credentials, private preview, manual previous/current-week collection, and an independent yearly schedule catalog; no deployment-time import |
+| 8.0.10 | Production; franchise lookup acceptance blocked | EA connection UI deployed; live profile discovery succeeded, then franchise lookup failed; no collection or import |
+| 8.0.11 | Corrective candidate | Separate initial/persona token formats, retain selections, expose only safe failed-step diagnostics, and support fresh sign-in recovery |
 | 8.1.0 | Planned | Complete self-service league readiness from registration through first successful Madden import and team assignment |
 | 8.2.0 | Planned | Annual league billing, verified entitlement, automatic activation, billing portal, and non-destructive grace/suspension lifecycle |
 | 8.3.0 | Planned | Multi-league administration, quotas, support operations, capacity controls, and custom-domain automation |
@@ -922,6 +923,15 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Migration 48 adds EA connection, setup, and collection records. Deployment does not run a Madden import, sign in for the owner, reset/delete league data, rotate the Companion URL, or archive/transition a season.
 - Gate: protocol/tenant/security/migration/collection tests, the strict repository gate, exact hosted deployment checks, and read-only release verification. Live EA acceptance then requires the owner to connect and inspect a private preview before claiming real data access.
 - Later work: optional automatic sync after manual reliability is proven; transaction-source research remains separate because no complete native EA transaction feed is verified. [Connection and acceptance guide](EA-DIRECT.md).
+
+## 8.0.11 — EA Sign-In Correction
+
+- Omit persona-specific JWS token formatting from the initial account-token exchange; retain it for persona-scoped exchange and refresh.
+- Keep selected profiles/franchises through submission, errors, and same-setup refreshes; clear invalid choices and all tenant/auth/setup changes.
+- Provide explicit restart sign-in at profile/franchise selection. Existing setups need fresh sign-in to receive the corrected initial token; do not mutate or erase them during deployment.
+- Identify the failed upstream step and numeric response status with safe fixed diagnostics. Never log tokens, callback URLs, provider payloads, or arbitrary provider messages.
+- Gate: regression/security tests, independent review, strict quality checks, hosted preview, Main and Production verification. Exact live EA rejection cause and full collection remain unproven until a fresh owner sign-in and preview succeed.
+- No migration, credential rotation, Madden import, snapshot activation, Discord action, archive, reset, or data deletion.
 
 ## 8.1.0 — Self-Service League Operating Readiness
 

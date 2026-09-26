@@ -23,6 +23,22 @@ const DATASETS = Object.freeze({
   roster: ['CareerMode_GetTeamRostersExport', 'rosterInfoList'],
   freeagents: ['CareerMode_GetTeamRostersExport', 'rosterInfoList']
 });
+const REQUEST_STEPS = Object.freeze({
+  'account-token': 'EA sign-in token', 'account-identity': 'EA account lookup',
+  'game-entitlements': 'Madden ownership check', 'player-profiles': 'Madden profile lookup',
+  'profile-authorize': 'EA profile authorization', 'profile-token': 'EA profile token',
+  'token-refresh': 'EA connection renewal', 'madden-login': 'Madden service sign-in',
+  'franchise-list': 'Madden franchise lookup', 'league-hub': 'Madden league information',
+  'league-data': 'Madden league data'
+});
+// Never echo arbitrary EA error strings, numeric identifiers, or response text.
+const PROVIDER_CODES = new Set(['INVALID_GRANT', 'INVALID_TOKEN', 'INVALID_REQUEST', 'INVALID_CLIENT',
+  'ACCESS_DENIED', 'UNAUTHORIZED_CLIENT', 'UNSUPPORTED_GRANT_TYPE', 'SERVER_ERROR', 'TEMPORARILY_UNAVAILABLE',
+  'ERR_TIMEOUT', 'ERR_SYSTEM', 'ERR_AUTHENTICATION_REQUIRED', 'ERR_INVALID_SESSION', 'ERR_DISCONNECTED',
+  'AUTH_ERR_INVALID_TOKEN', 'AUTH_ERR_INVALID_REQUEST', 'AUTH_ERR_INVALID_USER']);
+function providerCode(value) {
+  return typeof value === 'string' && PROVIDER_CODES.has(value.toUpperCase()) ? value.toUpperCase() : null;
+}
 
 export class EaClientError extends Error {
   constructor(code, message, { status = 502, retryable = false } = {}) {
@@ -32,6 +48,23 @@ export class EaClientError extends Error {
     this.status = status;
     this.retryable = retryable;
   }
+}
+
+export function safeEaClientDiagnostic(error) {
+  if (!(error instanceof EaClientError) || !Object.hasOwn(REQUEST_STEPS, error.diagnostic?.step)) return null;
+  const { step, httpStatus } = error.diagnostic;
+  return { step, stepLabel: REQUEST_STEPS[step],
+    httpStatus: Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599 ? httpStatus : null,
+    providerCode: providerCode(error.diagnostic.providerCode) };
+}
+
+function requestError(error, step, httpStatus = null) {
+  const safe = error instanceof EaClientError ? error
+    : new EaClientError('EA_CONNECTION_FAILED', 'FranchiseHQ could not connect to EA. Try again later.', { status: 503, retryable: true });
+  if (!safeEaClientDiagnostic(safe) && Object.hasOwn(REQUEST_STEPS, step)) {
+    safe.diagnostic = { step, httpStatus, providerCode: providerCode(safe.diagnostic?.providerCode) };
+  }
+  return safe;
 }
 
 function invalidInput() {
@@ -97,13 +130,16 @@ async function messageAuth(session, cryptoImpl) {
 
 function providerError(value, status = 502) {
   const description = [value?.error?.errorname, value?.error, value?.error_description, value?.message, value?.responseInfo?.value?.message, value?.error?.errordf?.errorString, value?.error?.errortdf?.errorString].filter(part => typeof part === 'string').join(' ').toUpperCase();
+  let error;
   if (status === 401 || /INVALID_GRANT|INVALID_TOKEN|AUTH_REQUIRED|INVALID_SESSION|SESSION_EXPIRED|AUTHENTICATION_REQUIRED/.test(description)) {
-    return new EaClientError('EA_RECONNECT_REQUIRED', 'EA needs you to reconnect your account.', { status: 401 });
+    error = new EaClientError('EA_RECONNECT_REQUIRED', 'EA needs you to reconnect your account.', { status: 401 });
+  } else if (status === 429 || /TIMEOUT|BUSY|HIGH SERVER LOAD|MODE.*DISABLED|UNAVAILABLE|RATE_LIMIT/.test(description)) {
+    error = new EaClientError('EA_TEMPORARILY_UNAVAILABLE', 'EA could not provide this data right now. Try again later.', { status: 503, retryable: true });
+  } else {
+    error = new EaClientError('EA_REQUEST_FAILED', 'EA did not accept this request. Your current league data is unchanged.', { retryable: status >= 500 });
   }
-  if (status === 429 || /TIMEOUT|BUSY|HIGH SERVER LOAD|MODE.*DISABLED|UNAVAILABLE|RATE_LIMIT/.test(description)) {
-    return new EaClientError('EA_TEMPORARILY_UNAVAILABLE', 'EA could not provide this data right now. Try again later.', { status: 503, retryable: true });
-  }
-  return new EaClientError('EA_REQUEST_FAILED', 'EA did not accept this request. Your current league data is unchanged.', { retryable: status >= 500 });
+  error.diagnostic = { providerCode: providerCode(value?.error?.errorname) || providerCode(value?.error) };
+  return error;
 }
 
 function validTarget(url) {
@@ -161,13 +197,15 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
   const deadline = integer(timeoutMs, 1, 30000);
   const commonHeaders = { Accept: 'application/json', 'Accept-Charset': 'UTF-8', 'User-Agent': USER_AGENT };
 
-  async function request(urlValue, options = {}, { redirectCode = false } = {}) {
+  async function request(urlValue, options = {}, { redirectCode = false, step, validate } = {}) {
     const url = new URL(urlValue);
     if (!validTarget(url)) throw invalidInput();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), deadline);
+    let httpStatus = null;
     try {
       const response = await fetchImpl(url.toString(), { ...options, headers: { ...commonHeaders, ...options.headers }, redirect: 'manual', signal: controller.signal });
+      httpStatus = response.status;
       if (redirectCode && [301, 302, 303, 307, 308].includes(response.status)) {
         const location = response.headers.get('location');
         await response.body?.cancel();
@@ -189,11 +227,12 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
       }
       const result = await boundedJson(response);
       if (result.error || result.success === false || result.responseInfo?.value?.success === false) throw providerError(result);
+      if (validate) validate(result);
       return result;
     } catch (error) {
-      if (error instanceof EaClientError) throw error;
-      if (controller.signal.aborted) throw new EaClientError('EA_TIMEOUT', 'EA took too long to respond. Try again later.', { status: 504, retryable: true });
-      throw new EaClientError('EA_CONNECTION_FAILED', 'FranchiseHQ could not connect to EA. Try again later.', { status: 503, retryable: true });
+      const failure = controller.signal.aborted && !(error instanceof EaClientError)
+        ? new EaClientError('EA_TIMEOUT', 'EA took too long to respond. Try again later.', { status: 504, retryable: true }) : error;
+      throw requestError(failure, step, httpStatus);
     } finally { clearTimeout(timer); }
   }
 
@@ -202,38 +241,44 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
     return { ...existing, accessToken: textValue(result.access_token), refreshToken: textValue(result.refresh_token), expiresAt: new Date(Date.now() + Math.min(Number(result.expires_in), 31536000) * 1000).toISOString() };
   }
 
-  async function tokenGrant(parameters) {
+  async function tokenGrant(parameters, step) {
     if (!env?.EA_CLIENT_SECRET) throw new EaClientError('EA_NOT_CONFIGURED', 'EA Direct has not been configured for this platform.', { status: 503 });
-    const body = new URLSearchParams({ authentication_source: AUTH_SOURCE, client_id: clientId, client_secret: textValue(env.EA_CLIENT_SECRET), release_type: 'prod', token_format: 'JWS', ...parameters });
-    return request(`${ACCOUNT_ORIGIN}/connect/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() });
+    const body = new URLSearchParams({ authentication_source: AUTH_SOURCE, client_id: clientId, client_secret: textValue(env.EA_CLIENT_SECRET), release_type: 'prod', ...parameters });
+    return request(`${ACCOUNT_ORIGIN}/connect/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() }, { step, validate: result => tokenResult(result) });
   }
 
   function maddenHeaders(platform) {
     return { 'Content-Type': 'application/json', 'X-BLAZE-ID': `madden-${edition}-${platformValue(platform)}`, 'X-BLAZE-VOID-RESP': 'XML', 'X-Application-Key': 'MADDEN-MCA' };
   }
 
-  async function command(token, session, platform, commandName, commandId, payload) {
+  async function command(token, session, platform, commandName, commandId, payload, step, validate) {
     textValue(token?.accessToken);
     const sessionKey = textValue(session?.sessionKey, 2048);
     const auth = await messageAuth(session, cryptoImpl);
     const requestInfo = { commandName, componentId: 2060, commandId, componentName: 'franchisemode', messageAuthData: auth, messageExpirationTime: Math.floor(Date.now() / 1000), deviceId: MACHINE_KEY, ipAddress: '127.0.0.1', requestPayload: JSON.stringify(payload) };
-    const result = await request(`${MADDEN_ORIGIN}/wal/mca/Process/${encodeURIComponent(sessionKey)}`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify({ apiVersion: 2, clientDevice: 3, requestInfo: JSON.stringify(requestInfo) }) });
-    if (!result.responseInfo?.value || typeof result.responseInfo.value !== 'object') throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned incomplete franchise details.');
+    const result = await request(`${MADDEN_ORIGIN}/wal/mca/Process/${encodeURIComponent(sessionKey)}`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify({ apiVersion: 2, clientDevice: 3, requestInfo: JSON.stringify(requestInfo) }) }, { step, validate: result => {
+      if (!result.responseInfo?.value || typeof result.responseInfo.value !== 'object') throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned incomplete franchise details.');
+      if (validate) validate(result.responseInfo.value);
+    } });
     return result.responseInfo.value;
   }
 
-  return {
+  const methods = {
     async exchangeCode(code) {
-      return tokenResult(await tokenGrant({ grant_type: 'authorization_code', code: textValue(code, 4096), redirect_uri: CALLBACK_URL }));
+      // EA's account token uses its default format. JWS is requested only after
+      // selecting a persona, and when renewing that persona-scoped connection.
+      return tokenResult(await tokenGrant({ grant_type: 'authorization_code', code: textValue(code, 4096), redirect_uri: CALLBACK_URL }, 'account-token'));
     },
     async personas(accessToken) {
       const token = textValue(accessToken);
       const infoUrl = new URL(`${ACCOUNT_ORIGIN}/connect/tokeninfo`);
       infoUrl.searchParams.set('access_token', token);
-      const info = await request(infoUrl, { headers: { 'X-Include-Deviceid': 'true' } });
+      const info = await request(infoUrl, { headers: { 'X-Include-Deviceid': 'true' } }, { step: 'account-identity', validate: value => integer(value.pid_id, 1) });
       const pid = integer(info.pid_id, 1);
       const identityHeaders = { Authorization: `Bearer ${token}`, 'X-Expand-Results': 'true' };
-      const entitlements = await request(`${IDENTITY_ORIGIN}/proxy/identity/pids/${pid}/entitlements/?status=ACTIVE`, { headers: identityHeaders });
+      const entitlements = await request(`${IDENTITY_ORIGIN}/proxy/identity/pids/${pid}/entitlements/?status=ACTIVE`, { headers: identityHeaders }, { step: 'game-entitlements', validate: value => {
+        if (!Array.isArray(value.entitlements?.entitlement)) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned incomplete game ownership details.');
+      } });
       const rows = entitlements.entitlements?.entitlement;
       if (!Array.isArray(rows)) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned incomplete game ownership details.');
       const choices = [];
@@ -249,7 +294,9 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
           const personaUrl = new URL(`${IDENTITY_ORIGIN}/proxy/identity/pids/${accountId}/personas`);
           personaUrl.searchParams.set('status', 'ACTIVE');
           personaUrl.searchParams.set('access_token', token);
-          const result = await request(personaUrl, { headers: identityHeaders });
+          const result = await request(personaUrl, { headers: identityHeaders }, { step: 'player-profiles', validate: value => {
+            if (!Array.isArray(value.personas?.persona)) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned incomplete player profiles.');
+          } });
           if (!Array.isArray(result.personas?.persona)) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned incomplete player profiles.');
           for (const row of result.personas.persona) {
             if (row?.namespaceName !== PLATFORMS[platform] || (row.status && row.status !== 'ACTIVE')) continue;
@@ -269,25 +316,28 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
       const url = new URL(`${ACCOUNT_ORIGIN}/connect/auth`);
       const parameters = { hide_create: 'true', release_type: 'prod', response_type: 'code', redirect_uri: CALLBACK_URL, client_id: clientId, machineProfileKey: MACHINE_KEY, authentication_source: AUTH_SOURCE, access_token: textValue(accessToken), persona_id: String(integer(persona.id, 1)), persona_namespace: persona.namespace };
       for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
-      const { code } = await request(url, { headers: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'User-Agent': BROWSER_AGENT, 'X-Requested-With': 'com.ea.gp.madden19companionapp', 'Upgrade-Insecure-Requests': '1', 'Accept-Language': 'en-US,en;q=0.9', 'Sec-Fetch-Site': 'none', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-User': '?1', 'Sec-Fetch-Dest': 'document' } }, { redirectCode: true });
-      return tokenResult(await tokenGrant({ grant_type: 'authorization_code', code: textValue(code, 4096), redirect_uri: CALLBACK_URL }));
+      const { code } = await request(url, { headers: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'User-Agent': BROWSER_AGENT, 'X-Requested-With': 'com.ea.gp.madden19companionapp', 'Upgrade-Insecure-Requests': '1', 'Accept-Language': 'en-US,en;q=0.9', 'Sec-Fetch-Site': 'none', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-User': '?1', 'Sec-Fetch-Dest': 'document' } }, { redirectCode: true, step: 'profile-authorize' });
+      return tokenResult(await tokenGrant({ grant_type: 'authorization_code', code: textValue(code, 4096), redirect_uri: CALLBACK_URL, token_format: 'JWS' }, 'profile-token'));
     },
     async refresh(token) {
-      return tokenResult(await tokenGrant({ grant_type: 'refresh_token', refresh_token: textValue(token?.refreshToken) }), token);
+      return tokenResult(await tokenGrant({ grant_type: 'refresh_token', refresh_token: textValue(token?.refreshToken), token_format: 'JWS' }, 'token-refresh'), token);
     },
     async login(token, platform) {
-      const result = await request(`${MADDEN_ORIGIN}/wal/authentication/login`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify({ accessToken: textValue(token?.accessToken), productName: `madden-${edition}-${platformValue(platform)}-mca` }) });
+      const result = await request(`${MADDEN_ORIGIN}/wal/authentication/login`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify({ accessToken: textValue(token?.accessToken), productName: `madden-${edition}-${platformValue(platform)}-mca` }) }, { step: 'madden-login', validate: value => {
+        if (!value.userLoginInfo?.sessionKey || !value.userLoginInfo?.personaDetails?.personaId) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned an incomplete Madden session.');
+      } });
       const info = result.userLoginInfo;
       if (!info?.sessionKey || !info?.personaDetails?.personaId) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned an incomplete Madden session.');
       return { sessionKey: textValue(info.sessionKey, 2048), blazeId: integer(info.personaDetails.personaId, 1), requestId: 1 };
     },
     async leagues(token, session, platform) {
-      const result = await command(token, session, platform, 'Mobile_GetMyLeagues', 801, {});
-      if (!Array.isArray(result.leagues)) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned an incomplete franchise list.');
+      const result = await command(token, session, platform, 'Mobile_GetMyLeagues', 801, {}, 'franchise-list', value => {
+        if (!Array.isArray(value.leagues)) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned an incomplete franchise list.');
+      });
       return result.leagues;
     },
     async hub(token, session, platform, leagueId) {
-      return command(token, session, platform, 'Mobile_Career_GetLeagueHub', 811, { leagueId: integer(leagueId, 1) });
+      return command(token, session, platform, 'Mobile_Career_GetLeagueHub', 811, { leagueId: integer(leagueId, 1) }, 'league-hub');
     },
     async dataset(token, session, platform, leagueId, kind, args = {}) {
       if (!Object.hasOwn(DATASETS, kind)) throw invalidInput();
@@ -301,10 +351,17 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
         payload.weekIndex = integer(args.weekIndex, 0, payload.stageIndex === 0 ? 3 : 22);
       }
       const sessionKey = textValue(session?.sessionKey, 2048);
-      const result = await request(`${MADDEN_ORIGIN}/wal/mca/${endpoint}/${encodeURIComponent(sessionKey)}`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify(payload) });
+      const result = await request(`${MADDEN_ORIGIN}/wal/mca/${endpoint}/${encodeURIComponent(sessionKey)}`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify(payload) }, { step: 'league-data', validate: value => {
+        if (value.success !== true || !Array.isArray(value[collection])) throw new EaClientError('EA_INCOMPLETE_DATASET', 'EA did not provide a complete dataset. Try again later.', { retryable: true });
+      } });
       // An unavailable roster or Free Agent request must never become an empty list.
       if (result.success !== true || !Array.isArray(result[collection])) throw new EaClientError('EA_INCOMPLETE_DATASET', 'EA did not provide a complete dataset. Try again later.', { retryable: true });
       return result;
     }
   };
+  const methodSteps = { exchangeCode: 'account-token', personas: 'player-profiles', personaToken: 'profile-authorize',
+    refresh: 'token-refresh', login: 'madden-login', leagues: 'franchise-list', hub: 'league-hub', dataset: 'league-data' };
+  return Object.fromEntries(Object.entries(methods).map(([name, method]) => [name, async (...args) => {
+    try { return await method(...args); } catch (error) { throw requestError(error, methodSteps[name]); }
+  }]));
 }
