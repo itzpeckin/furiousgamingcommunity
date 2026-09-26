@@ -84,3 +84,17 @@
 .commissioner-madden-layout .league-source-option__status{grid-column:auto;margin:0;padding:4px 6px;font-size:.6rem}
 .commissioner-madden-layout .league-source-option__icon{width:28px;height:28px;border-radius:8px}
 .commissioner-madden-layout .league-source-option__content strong{font-size:.85rem}
+
+/* Override retained source-card presentation in the narrow Command Center rail. */
+.commissioner-madden-layout .league-source-options{grid-template-columns:minmax(0,1fr)!important;gap:8px!important}
+.commissioner-madden-layout .league-source-option{min-height:48px!important;padding:10px!important}
+.commissioner-madden-layout .league-source-option.is-active:after{content:none!important}
+.commissioner-madden-layout .commissioner-command-panel--quick{padding:16px}
+.commissioner-madden-layout .commissioner-command-panel--quick>header{gap:8px;flex-wrap:wrap}
+.commissioner-madden-layout .commissioner-quick-controls{gap:6px}
+.commissioner-madden-layout .commissioner-quick-controls>label{min-height:48px;padding:8px;gap:8px}
+.commissioner-madden-layout .commissioner-quick-controls small{display:none}
+.commissioner-madden-layout .commissioner-feature-icon{width:26px;height:26px}
+.commissioner-madden-layout .commissioner-roster-control{flex-wrap:wrap;padding:12px;gap:8px;margin-top:12px}
+.commissioner-madden-layout .commissioner-roster-control .button{width:100%;min-height:44px}
+.commissioner-madden-layout .commissioner-trade-reset-controls{padding:12px;gap:10px;margin-top:12px}
