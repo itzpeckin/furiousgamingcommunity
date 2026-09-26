@@ -62,6 +62,10 @@ export async function onRequestPost(context){
     const safe=safeEaError(error);
     if(job&&db){
       await db.prepare(`UPDATE ea_direct_collection_jobs SET message=?,error_code=?,lock_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lock_until=?`).bind(safe.message,safe.code,job.id,lock||'').run();
+      if(error.periodDiagnostic&&safe.code==='EA_CURRENT_PERIOD_UNAVAILABLE'){
+        await db.prepare(`UPDATE ea_direct_collection_jobs SET result_json=? WHERE id=? AND league_id=? AND error_code=?`)
+          .bind(JSON.stringify({periodDiagnostic:error.periodDiagnostic}),job.id,job.league_id,safe.code).run();
+      }
       if(safe.code==='EA_RECONNECT_REQUIRED')await db.prepare(`UPDATE ea_direct_connections SET status='reconnect-required',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='connected'`).bind(job.connection_id).run();
     }
     return eaErrorResponse(error);

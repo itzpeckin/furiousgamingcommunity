@@ -41,12 +41,29 @@ function comparableHub(hub) {
 }
 
 function checkedHub(capture, rawHub) {
-  try { return capture.normalizeEaHub(rawHub); } catch {
+  try { return capture.normalizeEaHub(rawHub); } catch (cause) {
     const hub=rawHub?.responseInfo?.value || rawHub;
     if (hub?.careerHubInfo?.isLeagueAdvancing) {
       throw collectionError('EA_CURRENT_PERIOD_UNAVAILABLE', 'EA reports that the league is advancing. Try again after the advance finishes.');
     }
-    throw collectionError('EA_CURRENT_PERIOD_UNAVAILABLE', 'FHQ could not verify the current season and week from EA league information. Your live league data has not changed.');
+    const error=collectionError('EA_CURRENT_PERIOD_UNAVAILABLE', 'FHQ could not verify the current season and week from EA league information. Your live league data has not changed.');
+    const reasons={
+      'EA did not provide a valid export week.':'invalid-export-week',
+      'EA current-period evidence is invalid.':'invalid-current-period',
+      'EA current week does not agree with its available export weeks.':'native-week-mismatch',
+      'EA has not identified one current export week; sync is paused until the hub identifies it.':'current-week-unidentified',
+      'EA has not provided an exact franchise season identifier.':'season-unidentified'
+    };
+    const season=hub?.careerHubInfo?.seasonInfo || hub?.seasonInfo || hub || {};
+    const numeric=value=>typeof value==='number'&&Number.isInteger(value)&&value>=0&&value<=9999?value:null;
+    // Only fixed field names, bounded numbers and booleans. No provider strings,
+    // account identifiers, session material or raw response is retained here.
+    error.periodDiagnostic={reason:reasons[cause?.message]||'unsupported-hub-shape',
+      careerHubPresent:Boolean(hub?.careerHubInfo),seasonInfoPresent:Boolean(hub?.careerHubInfo?.seasonInfo||hub?.seasonInfo),
+      ...Object.fromEntries(['seasonYear','calendarYear','seasonWeek','seasonWeekType','displayWeek','stageIndex','weekIndex'].map(key=>[key,numeric(season[key])])),
+      sourceSeasonIdPresent:Boolean(hub?.sourceSeasonId??season.sourceSeasonId??hub?.seasonIndex??season.seasonIndex),
+      availableWeeks:Array.isArray(hub?.availableWeekInfoList)?hub.availableWeekInfoList.slice(0,40).map(item=>({stageIndex:numeric(item?.stageIndex),weekIndex:numeric(item?.weekIndex)})):[]};
+    throw error;
   }
 }
 

@@ -111,7 +111,9 @@ test('unverifiable week does not claim EA is advancing or expose raw provider co
   const {options,stored}=fixture('preview');
   options.client.hub=async()=>({careerHubInfo:{seasonInfo:{weekTitle:'private-provider-value'}}});
   await assert.rejects(runEaCollectionStep(options),error=>error.code==='EA_CURRENT_PERIOD_UNAVAILABLE'
-    && /could not verify/.test(error.message)&& !/advancing|private-provider-value/.test(error.message));
+    && /could not verify/.test(error.message)&& !/advancing|private-provider-value/.test(error.message)
+    && error.periodDiagnostic.reason==='current-week-unidentified'
+    && !JSON.stringify(error).includes('private-provider-value'));
   assert.equal(stored.length,0);
   options.client.hub=async()=>({careerHubInfo:{isLeagueAdvancing:true}});
   await assert.rejects(runEaCollectionStep(options),/reports that the league is advancing/);

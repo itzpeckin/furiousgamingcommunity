@@ -92,3 +92,7 @@ Live acceptance is still required; these changes do not prove the root cause of 
 ## 8.0.13 native current-week evidence
 
 The hub can report weekTitle="Week" with zero-based seasonWeek, seasonWeekType and one-based displayWeek. Require matching available export indices and consistent displayWeek before accepting preseason/regular-season native evidence. Never use the maximum schedule week. The generic unavailable-period error no longer claims the league is advancing unless that flag is present. See the release PR for live private-preview acceptance.
+
+## Live 8.0.13 follow-up
+
+Private preview still failed season/week verification after native-field support. 8.0.14 retains only a fixed parser failure category, numeric calendar/period evidence, presence flags and available export indices in the existing commissioner-only collection result; no provider text or credentials. Live activation remains blocked pending exact diagnosis.

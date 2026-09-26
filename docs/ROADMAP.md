@@ -8,11 +8,11 @@
 
 **Revision:** 3.09
 
-**Current production:** FranchiseHQ 8.0.12 is live from Main dbaf84640205b2fc677a02f7f19c215c5d261f54. Companion imports succeeded; Week 7 has 722 statistics and Week 8 has 156. EA franchise selection succeeds, but preview rejects current-week interpretation.
+**Current production:** 8.0.13 is deployed. Weeks 7 and 8 statistics are present; stale browser caches are repaired. Connected EA private preview still fails period verification.
 
-**Current work:** 8.0.13 parses native EA current-week evidence and refreshes statistics/game panels after snapshot changes. See [release record](../releases/8.0.13/release-record.md).
+**Current work:** 8.0.14 retains bounded, credential-free period evidence for the remaining live EA mismatch. No import or snapshot activation.
 
-**Next gate:** Validate and publish 8.0.13, then retry the connected account private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
+**Next gate:** Validate and publish the EA period follow-up, then retry the connected account private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
 
 ## Product decisions
 

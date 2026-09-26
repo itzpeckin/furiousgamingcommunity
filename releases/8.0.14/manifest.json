@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.14",
+  "releaseType": "ea-period-evidence",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.13",
+    "commit": "1d64bea94d7b2abe2e2e067f66c7988967dc1f65",
+    "tag": "v8.0.13"
+  },
+  "implementationBranch": "fix/8.0.14-ea-period-evidence",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.13",
+    "candidateRelease": "8.0.14",
+    "currentMigration": 48,
+    "candidateMigration": 48,
+    "scope": "Retain bounded, credential-free EA period diagnostics in the existing commissioner collection job. No activation or import."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/ea-capture.js",
+    "functions/_lib/ea-collection.js",
+    "league-engine/live-read-model.js",
+    "app.js",
+    "tests/import/ea-capture.test.mjs",
+    "tests/import/ea-collection.test.mjs",
+    "tests/import/live-data-experience.test.mjs",
+    "docs/EA-DIRECT.md",
+    "docs/ROADMAP.md",
+    "releases/8.0.14/release-record.md",
+    "releases/8.0.14/validation-evidence.json"
+  ]
+}
