@@ -5,7 +5,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import { hashToken } from '../../functions/_lib/auth.js';
-import { sealEa, openEa, parseEaRedirect, safeEaError, readEaBody, createEaSetup, loadEaSetup, lockEaSetup, setupScope } from '../../functions/_lib/ea-direct.js';
+import { sealEa, openEa, parseEaRedirect, safeEaError, eaErrorResponse, readEaBody, createEaSetup, loadEaSetup, lockEaSetup, setupScope } from '../../functions/_lib/ea-direct.js';
+import { createEaClient } from '../../functions/_lib/ea-client.js';
 import { onRequest as middleware } from '../../functions/api/leagues/[leagueSlug]/ea-direct/_middleware.js';
 import { onRequestGet as connectionGet, onRequestPost as connectionPost } from '../../functions/api/leagues/[leagueSlug]/ea-direct/connection.js';
 import { onRequestPost as syncPost } from '../../functions/api/leagues/[leagueSlug]/ea-direct/sync.js';
@@ -45,6 +46,30 @@ test('EA errors and oversized requests cannot leak upstream secrets',async()=>{
   assert.equal(JSON.stringify(safe).includes('secret-token'),false);
   await assert.rejects(readEaBody(new Request('https://test.invalid',{method:'POST',body:'x'.repeat(17000)})),/large/);
 });
+
+test('EA failure responses and support logs expose only reconstructed diagnostics',async()=>{
+  const logs=[],originalWarn=console.warn;
+  const client=createEaClient(envKey,{fetchImpl:async()=>Response.json({error:'invalid_grant',error_description:'private-access private-refresh private-code https://private.invalid'},{status:400})});
+  console.warn=value=>logs.push(value);
+  try{
+    let failure;
+    try{await client.exchangeCode('private-code');}catch(error){failure=error;}
+    failure.diagnostic.rawBody='private-access';
+    const response=eaErrorResponse(failure),body=await response.json();
+    assert.equal(response.status,409);
+    assert.match(body.message,/Failed step: EA sign-in token \(EA HTTP 400\); INVALID_GRANT/);
+    assert.equal(body.diagnostic.step,'account-token');
+    assert.ok(body.referenceId);
+    assert.equal(logs.length,1);
+    assert.equal(JSON.parse(logs[0]).referenceId,body.referenceId);
+    assert.deepEqual(Object.keys(JSON.parse(logs[0])).sort(),['event','httpStatus','providerCode','referenceId','step','stepLabel']);
+    assert.doesNotMatch(JSON.stringify(body)+logs.join(''),/private-access|private-refresh|private-code|private\.invalid|rawBody/);
+    const unknown=await eaErrorResponse(Object.assign(new Error('private-access'),{name:'EaClientError',diagnostic:{step:'account-token'}})).json();
+    assert.equal(unknown.diagnostic,undefined);
+    assert.equal(logs.length,1);
+    assert.doesNotMatch(JSON.stringify(unknown),/private-access/);
+  }finally{console.warn=originalWarn;}
+});
 test('legacy EA probes stay closed while only reviewed routes continue',async()=>{
   for(const suffix of['oauth','discovery','probe','connection/extra']){const r=await middleware({request:new Request(`https://franchisehq.app/api/leagues/a/ea-direct/${suffix}`),next(){throw new Error('Legacy route reached');}});assert.equal(r.status,404);}
   assert.equal(await middleware({request:new Request('https://franchisehq.app/api/leagues/a/ea-direct/connection'),next:()=>42}),42);
@@ -64,6 +89,31 @@ test('EA setup is tenant, commissioner, session scoped and no token reaches brow
     f.sqlite.prepare(`UPDATE ea_direct_setups SET expires_at='2000-01-01' WHERE id=?`).run(setup.id);
     await assert.rejects(loadEaSetup(f.state,setup.id),/expired/);
   }finally{f.sqlite.close();}
+});
+
+test('failed profile connection returns Madden step diagnostics and releases the setup lock without importing',async()=>{
+  const f=await fixture(),originalFetch=globalThis.fetch,originalWarn=console.warn;
+  try{
+    const setup=await createEaSetup(f.state);
+    const payload={token:{accessToken:'private-account',refreshToken:'private-refresh',expiresAt:'2099-01-01'},personas:[{id:'123',platform:'ps5',namespace:'ps3',entitlement:'MADDEN_27PS5',name:'Coach'}]};
+    f.sqlite.prepare(`UPDATE ea_direct_setups SET stage='persona',payload_cipher=? WHERE id=?`).run(await sealEa(f.env,setupScope(setup),payload),setup.id);
+    const responses=[new Response(null,{status:302,headers:{location:'http://127.0.0.1/success?code=private-code'}}),Response.json({access_token:'private-profile',refresh_token:'private-refresh',expires_in:3600}),Response.json({error:'invalid_token',error_description:'private-profile private-account'},{status:401})];
+    globalThis.fetch=async()=>{assert.ok(responses.length);return responses.shift();};
+    console.warn=()=>{};
+    const response=await connectionPost(f.context('league-a',{action:'select-persona',setupId:setup.id,personaId:'ps5:123'}));
+    const body=await response.json();
+    assert.equal(response.status,409);
+    assert.equal(body.diagnostic.step,'madden-login');
+    assert.equal(body.diagnostic.httpStatus,401);
+    assert.match(body.message,/Madden service sign-in/);
+    assert.doesNotMatch(JSON.stringify(body),/private-profile|private-account|private-refresh|private-code/);
+    assert.equal(responses.length,0);
+    const retained=await loadEaSetup(f.state,setup.id);
+    assert.equal(retained.stage,'persona');assert.equal(retained.lock_until,null);
+    const status=await (await connectionGet(f.context('league-a'))).json();
+    assert.equal(status.setup.personas[0].id,'ps5:123');
+    for(const table of ['ea_direct_connections','ea_direct_collection_jobs','league_snapshots'])assert.equal(f.sqlite.prepare(`SELECT count(*) n FROM ${table}`).get().n,0);
+  }finally{globalThis.fetch=originalFetch;console.warn=originalWarn;f.sqlite.close();}
 });
 test('beginning EA setup supersedes only that user/session and disconnect does not touch snapshots',async()=>{
   const f=await fixture();try{

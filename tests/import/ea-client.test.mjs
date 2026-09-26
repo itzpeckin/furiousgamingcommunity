@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { createEaClient, EaClientError, makeEaLoginUrl } from '../../functions/_lib/ea-client.js';
+import { createEaClient, EaClientError, makeEaLoginUrl, safeEaClientDiagnostic } from '../../functions/_lib/ea-client.js';
 
 const env = { EA_CLIENT_SECRET: 'test-client-secret' };
 const token = { accessToken: 'test-access', refreshToken: 'test-refresh', expiresAt: '2026-09-25T12:00:00.000Z' };
@@ -38,6 +38,7 @@ test('EA login and code exchange use the Madden 27 client and fixed callback', a
   assert.equal(parameters.get('code'), 'a&b=code');
   assert.equal(parameters.get('redirect_uri'), 'http://127.0.0.1/success');
   assert.equal(parameters.get('client_secret'), 'test-client-secret');
+  assert.equal(parameters.has('token_format'), false, 'initial account token must use EA default format');
   assert.equal(result.accessToken, 'access');
   assert.ok(Date.parse(result.expiresAt) > Date.now());
   assert.equal(requests[0].redirect, 'manual');
@@ -87,6 +88,7 @@ test('persona authorization reads only the fixed loopback redirect and exchanges
   assert.equal(requests[0].url.searchParams.get('persona_id'), '12345');
   assert.equal(requests[0].url.searchParams.get('persona_namespace'), 'ps3');
   assert.equal(new URLSearchParams(requests[1].body).get('code'), 'persona-code');
+  assert.equal(new URLSearchParams(requests[1].body).get('token_format'), 'JWS');
   assert.equal(result.accessToken, 'persona-access');
   assert.equal(requests.some(request => request.url.hostname === '127.0.0.1'), false);
 });
@@ -107,6 +109,7 @@ test('refresh rotates tokens and login returns the selected Madden session', asy
   const refreshed = await client.refresh(token);
   assert.equal(refreshed.refreshToken, 'new-refresh');
   assert.equal(new URLSearchParams(requests[0].body).get('refresh_token'), 'test-refresh');
+  assert.equal(new URLSearchParams(requests[0].body).get('token_format'), 'JWS');
   assert.deepEqual(await client.login(refreshed, 'ps5'), { sessionKey: 'new-session', blazeId: 12345, requestId: 1 });
   assert.equal(JSON.parse(requests[1].body).productName, 'madden-2027-ps5-mca');
   assert.equal(requests[1].headers['X-BLAZE-ID'], 'madden-2027-ps5');
@@ -220,4 +223,57 @@ test('EA requests abort on a bounded deadline with a sanitized retryable timeout
     signal.addEventListener('abort', () => reject(new Error('raw credential url')), { once: true });
   }) });
   await assert.rejects(client.exchangeCode('code'), error => error.code === 'EA_TIMEOUT' && error.retryable);
+});
+
+for (const scenario of [
+  {step:'account-token', run:c=>c.exchangeCode('code')},
+  {step:'account-identity', run:c=>c.personas(token.accessToken)},
+  {step:'game-entitlements', before:[{pid_id:'987'}], run:c=>c.personas(token.accessToken)},
+  {step:'player-profiles', before:[{pid_id:'987'}, {entitlements:{entitlement:[{entitlementTag:'ONLINE_ACCESS',groupName:'MADDEN_27PS5',pidUri:'/pids/987'}]}}], run:c=>c.personas(token.accessToken)},
+  {step:'profile-authorize', run:c=>c.personaToken(token.accessToken,persona)},
+  {step:'profile-token', before:[()=>new Response(null,{status:302,headers:{location:'http://127.0.0.1/success?code=persona-code'}})], run:c=>c.personaToken(token.accessToken,persona)},
+  {step:'token-refresh', run:c=>c.refresh(token)},
+  {step:'madden-login', run:c=>c.login(token,'ps5')},
+  {step:'franchise-list', run:c=>c.leagues(token,session(),'ps5')},
+  {step:'league-hub', run:c=>c.hub(token,session(),'ps5',700)},
+  {step:'league-data', run:c=>c.dataset(token,session(),'ps5',700,'teams')}
+]) {
+  test(`EA ${scenario.step} failures retain the exact request step and safe provider code`, async()=>{
+    const {client}=fixture([...(scenario.before||[]),()=>Response.json({error:'invalid_token',error_description:'test-access test-refresh test-client-secret'},{status:403})]);
+    await assert.rejects(scenario.run(client),error=>{
+      const diagnostic=safeEaClientDiagnostic(error);
+      assert.equal(diagnostic.step,scenario.step);
+      assert.equal(diagnostic.httpStatus,403);
+      assert.equal(diagnostic.providerCode,'INVALID_TOKEN');
+      assert.doesNotMatch(JSON.stringify(error)+error.message,/test-access|test-refresh|test-client-secret/);
+      return true;
+    });
+  });
+}
+
+test('EA diagnostics distinguish HTTP-success provider errors, malformed responses and network failures',async()=>{
+  for(const [response,status,code] of [
+    [{error:{errorname:'ERR_TIMEOUT',errordf:{errorString:'private-value'}}},200,'ERR_TIMEOUT'],
+    [{error:{errorname:'private-value'}},200,null],
+    [{responseInfo:{value:{success:false,message:'private-value'}}},200,null],
+    [()=>new Response('private-value'),200,null],
+    [{},200,null],
+    [()=>{throw new Error('private-value');},null,null]
+  ]){
+    const {client}=fixture([response]);
+    await assert.rejects(client.leagues(token,session(),'ps5'),error=>{
+      assert.deepEqual(safeEaClientDiagnostic(error),{step:'franchise-list',stepLabel:'Madden franchise lookup',httpStatus:status,providerCode:code});
+      assert.doesNotMatch(JSON.stringify(error)+error.message,/private-value/);
+      return true;
+    });
+  }
+});
+
+test('diagnostic reconstruction rejects arbitrary steps, status values and provider strings',()=>{
+  const error=new EaClientError('EA_REQUEST_FAILED','Safe message');
+  error.diagnostic={step:'franchise-list',stepLabel:'private-value',httpStatus:'private-value',providerCode:'private-value',body:'private-value'};
+  assert.deepEqual(safeEaClientDiagnostic(error),{step:'franchise-list',stepLabel:'Madden franchise lookup',httpStatus:null,providerCode:null});
+  error.diagnostic.step='private-value';
+  assert.equal(safeEaClientDiagnostic(error),null);
+  assert.equal(safeEaClientDiagnostic({name:'EaClientError',diagnostic:{step:'franchise-list'}}),null);
 });

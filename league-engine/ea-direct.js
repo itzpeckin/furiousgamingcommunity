@@ -1,9 +1,9 @@
-/* FHQ_BUILD: 8.0.10 */
+/* FHQ_BUILD: 8.0.11 */
 (() => {
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.10';
+  const VERSION = '8.0.11';
   const terminalStatuses = new Set(['complete', 'completed', 'ready', 'failed', 'cancelled']);
   let context = null;
   let generation = 0;
@@ -16,6 +16,8 @@
   let errorMessage = '';
   let notice = '';
   let selectedPath = 'ea-direct';
+  let selectedPersonaId = '';
+  let selectedLeagueId = '';
   let pollTimer = null;
   const controllers = new Set();
 
@@ -31,6 +33,13 @@
   const safeMessage = value => String(value || 'The connection request could not finish. Please try again.')
     .replace(/https?:\/\/\S+/gi, '[connection address]')
     .replace(/\b(?:access_token|refresh_token|authorization|code)\s*[:=]\s*\S+/gi, '[private sign-in information]');
+  const personaId = item => String(item.id ?? item.personaId ?? '');
+  const leagueId = item => String(item.id ?? item.externalLeagueId ?? item.leagueId ?? '');
+
+  function resetSelections() {
+    selectedPersonaId = '';
+    selectedLeagueId = '';
+  }
 
   function resetContext() {
     generation += 1;
@@ -48,6 +57,7 @@
     errorMessage = '';
     notice = '';
     selectedPath = 'ea-direct';
+    resetSelections();
   }
 
   function ensureContext() {
@@ -84,7 +94,7 @@
 
   function connectionState(payload) {
     const previous = state || {};
-    return {
+    const next = {
       configured: payload.configured ?? previous.configured,
       status: payload.status || previous.status || 'not-connected',
       connection: payload.connection === undefined ? previous.connection || null : payload.connection,
@@ -93,6 +103,12 @@
       message: payload.message ? safeMessage(payload.message) : '',
       previewVerified: payload.previewVerified ?? previous.previewVerified ?? false
     };
+    if (next.setup?.id !== previous.setup?.id) resetSelections();
+    const personas = Array.isArray(next.setup?.personas) ? next.setup.personas : [];
+    const leagues = Array.isArray(next.setup?.leagues) ? next.setup.leagues : [];
+    if (!personas.some(item => personaId(item) === selectedPersonaId)) selectedPersonaId = '';
+    if (!leagues.some(item => leagueId(item) === selectedLeagueId)) selectedLeagueId = '';
+    return next;
   }
 
   async function refresh() {
@@ -140,6 +156,7 @@
         state.setup = null;
         state.loginUrl = null;
         collection = null;
+        resetSelections();
       }
       if (action === 'disconnect') notice = 'EA account disconnected. Your imported league data remains available.';
       if (action === 'connect') notice = 'EA account connected. Collect a preview to check the available league data.';
@@ -262,10 +279,11 @@
     const disabled = busy ? 'disabled' : '';
     const personas = Array.isArray(setup?.personas) ? setup.personas : [];
     const leagues = Array.isArray(setup?.leagues) ? setup.leagues : [];
-    if (state?.status === 'choosing-profile') return `<form data-ea-form="persona" class="ea-direct-form"><label class="field"><span>Madden profile</span><select name="personaId" required ${disabled}><option value="">Choose your profile</option>${personas.map(item => `<option value="${esc(item.id ?? item.personaId)}">${esc(item.name || item.personaName || item.displayName || 'Madden profile')}${item.platform ? ` · ${esc(item.platform)}` : ''}</option>`).join('')}</select></label><button type="submit" class="button button--primary" ${disabled}>Find Franchises</button></form>`;
-    if (state?.status === 'choosing-franchise' || leagues.length) return `<form data-ea-form="franchise" class="ea-direct-form"><label class="field"><span>Madden franchise for this league</span><select name="externalLeagueId" required ${disabled}><option value="">Choose the franchise</option>${leagues.map(item => `<option value="${esc(item.id ?? item.externalLeagueId ?? item.leagueId)}">${esc(item.name || item.leagueName || 'Madden franchise')}${item.season ? ` · ${esc(item.season)}` : ''}</option>`).join('')}</select></label><button type="submit" class="button button--primary" ${disabled}>Connect Franchise</button></form>`;
+    const restart = `<button class="text-button" type="button" data-ea-action="begin" ${disabled}>Restart EA sign-in</button>`;
+    if (state?.status === 'choosing-profile') return `<form data-ea-form="persona" class="ea-direct-form"><label class="field"><span>Madden profile</span><select name="personaId" required ${disabled}><option value="">Choose your profile</option>${personas.map(item => `<option value="${esc(personaId(item))}"${personaId(item) === selectedPersonaId ? ' selected' : ''}>${esc(item.name || item.personaName || item.displayName || 'Madden profile')}${item.platform ? ` · ${esc(item.platform)}` : ''}</option>`).join('')}</select></label><button type="submit" class="button button--primary" ${disabled}>Find Franchises</button></form>${restart}`;
+    if (state?.status === 'choosing-franchise' || leagues.length) return `<form data-ea-form="franchise" class="ea-direct-form"><label class="field"><span>Madden franchise for this league</span><select name="externalLeagueId" required ${disabled}><option value="">Choose the franchise</option>${leagues.map(item => `<option value="${esc(leagueId(item))}"${leagueId(item) === selectedLeagueId ? ' selected' : ''}>${esc(item.name || item.leagueName || 'Madden franchise')}${item.season ? ` · ${esc(item.season)}` : ''}</option>`).join('')}</select></label><button type="submit" class="button button--primary" ${disabled}>Connect Franchise</button></form>${restart}`;
     const href = loginHref(state?.loginUrl);
-    if (setup?.id && href) return `<div class="ea-direct-signin"><ol><li><a class="button button--primary" href="${esc(href)}" target="_blank" rel="noopener noreferrer">Sign in on EA</a><span>Enter your EA password only on EA’s website.</span></li><li>After sign-in, EA opens a localhost address. The page may say it cannot connect. Copy the full address from that tab and paste it below.</li></ol><form data-ea-form="exchange" class="ea-direct-form"><label class="field"><span>EA return address</span><input type="text" name="redirectUrl" required autocomplete="off" spellcheck="false" placeholder="Paste the full localhost address" ${disabled}><small>This address contains a one-time sign-in code. Do not share it.</small></label><button type="submit" class="button button--primary" ${disabled}>Continue Connection</button></form><button class="text-button" type="button" data-ea-action="begin" ${disabled}>Restart EA sign-in</button></div>`;
+    if (setup?.id && href) return `<div class="ea-direct-signin"><ol><li><a class="button button--primary" href="${esc(href)}" target="_blank" rel="noopener noreferrer">Sign in on EA</a><span>Enter your EA password only on EA’s website.</span></li><li>After sign-in, EA opens a localhost address. The page may say it cannot connect. Copy the full address from that tab and paste it below.</li></ol><form data-ea-form="exchange" class="ea-direct-form"><label class="field"><span>EA return address</span><input type="text" name="redirectUrl" required autocomplete="off" spellcheck="false" placeholder="Paste the full localhost address" ${disabled}><small>This address contains a one-time sign-in code. Do not share it.</small></label><button type="submit" class="button button--primary" ${disabled}>Continue Connection</button></form>${restart}</div>`;
     return `<div class="ea-direct-actions"><button class="button button--primary" type="button" data-ea-action="begin" ${disabled}>${state?.status === 'reconnect-required' ? 'Reconnect EA Account' : 'Connect EA Account'}</button><p>Sign in with the EA account that has access to your Madden franchise.</p></div>`;
   }
 
@@ -324,12 +342,22 @@
     }
     if (form.dataset.eaForm === 'persona') {
       const personaId = form.querySelector('[name="personaId"]')?.value;
-      if (personaId) connectionAction('select-persona', {setupId, personaId});
+      if (personaId) { selectedPersonaId = personaId; connectionAction('select-persona', {setupId, personaId}); }
     }
     if (form.dataset.eaForm === 'franchise') {
       const externalLeagueId = form.querySelector('[name="externalLeagueId"]')?.value;
-      if (externalLeagueId) connectionAction('connect', {setupId, externalLeagueId});
+      if (externalLeagueId) { selectedLeagueId = externalLeagueId; connectionAction('connect', {setupId, externalLeagueId}); }
     }
+  });
+
+  document.addEventListener('change', event => {
+    const form = event.target.closest('[data-ea-form]');
+    if (!form || busy) return;
+    if (form.dataset.eaForm === 'persona') {
+      selectedPersonaId = String(event.target.value || '');
+      selectedLeagueId = '';
+    }
+    if (form.dataset.eaForm === 'franchise') selectedLeagueId = String(event.target.value || '');
   });
 
   window.addEventListener('franchisehq:league-tenant-changed', () => { resetContext(); rerender(); });

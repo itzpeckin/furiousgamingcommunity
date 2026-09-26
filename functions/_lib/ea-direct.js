@@ -1,7 +1,8 @@
-/* FHQ_BUILD: 8.0.10 */
+/* FHQ_BUILD: 8.0.11 */
 import { requireCommissioner } from './permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague, json } from './cloud-platform.js';
 import { createRandomToken } from './auth.js';
+import { EaClientError, safeEaClientDiagnostic } from './ea-client.js';
 
 export class EaDirectError extends Error {
   constructor(code,message,status=409){super(message);this.name='EaDirectError';this.code=code;this.status=status;}
@@ -48,10 +49,22 @@ export async function openEa(env,scope,value){
   }catch{fail('CREDENTIAL_UNAVAILABLE','The saved EA connection cannot be opened. Reconnect your EA account.');}
 }
 export function safeEaError(error){
-  if(error?.name==='EaDirectError'||error?.name==='EaClientError')return{code:error.code||'EA_UNAVAILABLE',message:error.message,status:error.status===401?409:Math.min(499,Math.max(400,Number(error.status)||424)),retryable:Boolean(error.retryable)};
+  if(error instanceof EaDirectError || error instanceof EaClientError){
+    const diagnostic=safeEaClientDiagnostic(error);
+    const detail=diagnostic ? ` Failed step: ${diagnostic.stepLabel}${diagnostic.httpStatus ? ` (EA HTTP ${diagnostic.httpStatus})` : ''}${diagnostic.providerCode ? `; ${diagnostic.providerCode}` : ''}.` : '';
+    return{code:error.code||'EA_UNAVAILABLE',message:error.message+detail,status:error.status===401?409:Math.min(499,Math.max(400,Number(error.status)||424)),retryable:Boolean(error.retryable),...(diagnostic?{diagnostic}:{})};
+  }
   return{code:'EA_CONNECTION_FAILED',message:'EA Direct could not finish this step. Your live league data has not changed. Try again or reconnect your EA account.',status:424,retryable:true};
 }
-export function eaErrorResponse(error){const safe=safeEaError(error);return json({ok:false,error:safe.message,message:safe.message,code:safe.code,retryable:safe.retryable},safe.status);}
+export function eaErrorResponse(error){
+  const safe=safeEaError(error);
+  const referenceId=safe.diagnostic?crypto.randomUUID():null;
+  // Log only reconstructed, allowlisted diagnostics. Never log the error,
+  // request/response, URLs, account identifiers, headers, or credentials.
+  if(referenceId)console.warn(JSON.stringify({event:'ea-direct-request-failed',referenceId,...safe.diagnostic}));
+  const message=safe.message+(referenceId?` Support reference: ${referenceId}.`:'');
+  return json({ok:false,error:message,message,code:safe.code,retryable:safe.retryable,...(referenceId?{diagnostic:safe.diagnostic,referenceId}:{})},safe.status);
+}
 export function publicConnection(row){return row?{id:row.id,platform:row.platform,personaName:row.persona_name,leagueName:row.external_league_name,externalLeagueId:row.external_league_id,lastSyncedAt:row.last_synced_at,previewVerified:Boolean(row.preview_verified)}:null;}
 export async function activeEaConnection(db,leagueId){return db.prepare(`SELECT * FROM ea_direct_connections WHERE league_id=? AND status!='disconnected' LIMIT 1`).bind(leagueId).first();}
 export function setupScope(row){return`ea-setup:${row.league_id}:${row.id}:${row.user_id}:${row.session_id}`;}
