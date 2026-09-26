@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 import {
   MADDEN_RATING_FIELDS,
   freeAgentStateFromMappingRun,
@@ -11,6 +12,87 @@ import {
   sourceSupportedContract
 } from '../../functions/_lib/live-data-experience.js';
 import { normalizePlayer, normalizeStanding, normalizeTeam } from '../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js';
+
+async function liveCacheFixture(){
+  const listeners=new Map(),stored=new Map(),events=[];
+  let service, snapshot='week6', delayed=null, slug='league-a';
+  const context={URL,Date,Map,console,location:{origin:'https://example.test'},setTimeout:()=>{},
+    CustomEvent:class {constructor(type,options){this.type=type;this.detail=options.detail;}},
+    document:{readyState:'loading',addEventListener(){},querySelector(){return null;}},
+    sessionStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)},
+    window:{FranchiseHQ:{leagueTenant:{getCurrentLeague:()=>({slug})},defineModuleService(_module,_name,value){service=value;}},
+      addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>events.push(event)},
+    fetch:async url=>{
+      const payload=new URL(url).searchParams.has('domain')?{records:[{week:snapshot}]}:{snapshot:{id:snapshot},state:'live'};
+      if(delayed&&new URL(url).searchParams.has('domain')){const wait=delayed;delayed=null;await wait;}
+      return {ok:true,json:async()=>payload};
+    }};
+  runInNewContext(await readFile(new URL('../../league-engine/live-read-model.js',import.meta.url),'utf8'),context);
+  return {service,events,stored,setSnapshot:value=>{snapshot=value;},delay:value=>{delayed=value;},changeTenant:value=>{slug=value;listeners.get('franchisehq:league-tenant-changed')();}};
+}
+
+test('active snapshot refresh replaces cached statistics and rejects an older pending read',async()=>{
+  const f=await liveCacheFixture();
+  await f.service.refresh();
+  assert.equal((await f.service.getStatistics())[0].week,'week6');
+  f.setSnapshot('week7');
+  await f.service.refresh();
+  let release;
+  f.delay(new Promise(resolve=>{release=resolve;}));
+  const old=f.service.getStatistics();
+  const rejected=assert.rejects(old,/Live data changed/);
+  await new Promise(resolve=>setImmediate(resolve));
+  f.setSnapshot('week8');
+  await f.service.refresh();
+  assert.equal((await f.service.getStatistics())[0].week,'week8');
+  release();await rejected;
+  assert.equal((await f.service.getStatistics())[0].week,'week8');
+  assert.equal(f.events.at(-1).detail.snapshotId,'week8');
+  assert.equal([...f.stored.keys()].some(key=>key.includes(':week7:statistics')),false);
+});
+
+test('tenant change cannot install statistics from the previous league',async()=>{
+  const f=await liveCacheFixture();
+  await f.service.refresh();
+  let release;f.delay(new Promise(resolve=>{release=resolve;}));
+  const rejected=assert.rejects(f.service.getStatistics(),/Live data changed/);
+  await new Promise(resolve=>setImmediate(resolve));
+  f.changeTenant('league-b');f.setSnapshot('league-b-week8');
+  await f.service.refresh();release();await rejected;
+  assert.equal((await f.service.getStatistics())[0].week,'league-b-week8');
+});
+
+test('game and player statistics refresh on snapshot change without reloading the page',async()=>{
+  const app=await readFile(new URL('../../app.js',import.meta.url),'utf8');
+  const listeners=new Map();let rows=[{week:6}],pending=null;
+  const context={window:{addEventListener:(name,fn)=>listeners.set(name,fn)},document:{querySelector:()=>null},
+    playerStatisticsState:{loaded:false,rows:[],revision:0,snapshotId:null},
+    liveReadModel:()=>({getStatistics:async()=>{if(pending){const promise=pending;pending=null;return promise;}return rows;}}),
+    matchupCompactModelCache:new Map(),matchupTeamStatsCache:new Map(),matchupPanelCache:new Map(),
+    rerenderPlayerStatHosts(){},refreshOpenPlayerGameLogs(){},rebuildCanonicalStatisticsIndexCooperative(){},activeMatchupGame:null};
+  runInNewContext(app.slice(app.indexOf('  async function hydratePlayerStatistics('),app.indexOf('  function renderLivePlayerStatistics(')),context);
+  const refresh=listeners.get('franchisehq:live-read-refreshed');
+  await refresh({detail:{snapshotId:'week6'}});
+  for(const key of ['matchupCompactModelCache','matchupTeamStatsCache','matchupPanelCache'])context[key].set('game8','No statistics');
+  let release;pending=new Promise(resolve=>{release=resolve;});
+  const old=refresh({detail:{snapshotId:'week7'}});
+  rows=[{week:7},{week:8}];
+  await refresh({detail:{snapshotId:'week8'}});
+  release([{week:6}]);await old;
+  assert.equal(context.playerStatisticsState.rows.at(-1).week,8);
+  assert.equal(context.playerStatisticsState.loaded,true);
+  for(const key of ['matchupCompactModelCache','matchupTeamStatsCache','matchupPanelCache'])assert.equal(context[key].size,0);
+  const panel={innerHTML:''};
+  const modal={querySelector:selector=>selector==='[data-matchup-tab-content]'?panel:{dataset:{matchupTab:'player'}}};
+  context.document.querySelector=()=>modal;
+  context.activeMatchupGame={id:'game8'};
+  context.hydrateMatchupTeamStatistics=async()=>{};
+  context.matchupPanelCacheKey=()=> 'game8:player';
+  context.prepareMatchupRuntime=()=>context.matchupPanelCache.set('game8:player',`Updated Week ${context.playerStatisticsState.rows.at(-1).week}`);
+  rows=[{week:8},{week:9}];
+  await refresh({detail:{snapshotId:'week9'}});
+  assert.equal(panel.innerHTML,'Updated Week 9','the already open Player Stats tab updates too');
+});
 
 test('all source-supported Madden ratings survive the member read model and unknown fields do not', () => {
   const source=Object.fromEntries(MADDEN_RATING_FIELDS.map((field,index)=>[field,45+(index%55)]));

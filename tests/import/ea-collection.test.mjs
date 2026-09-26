@@ -94,6 +94,29 @@ test('preview collects actual datasets but never requests ready-source publicati
   assert.equal(result.result.readyToImport, false);
 });
 
+test('native EA hub fields complete private preview without publishing a source',async()=>{
+  const {options,calls,finalized}=fixture('preview');
+  options.client.hub=async()=>{
+    const raw=hub(7);
+    Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeek:7,seasonWeekType:1,displayWeek:8,weekTitle:'Week'});
+    return raw;
+  };
+  const result=await finish(options);
+  assert.deepEqual(calls.filter(call=>call.kind==='schedules').map(call=>call.args.weekIndex),[6,7]);
+  assert.equal(result.result.previewVerified,true);
+  assert.equal(finalized[0].publishReady,false);
+});
+
+test('unverifiable week does not claim EA is advancing or expose raw provider content',async()=>{
+  const {options,stored}=fixture('preview');
+  options.client.hub=async()=>({careerHubInfo:{seasonInfo:{weekTitle:'private-provider-value'}}});
+  await assert.rejects(runEaCollectionStep(options),error=>error.code==='EA_CURRENT_PERIOD_UNAVAILABLE'
+    && /could not verify/.test(error.message)&& !/advancing|private-provider-value/.test(error.message));
+  assert.equal(stored.length,0);
+  options.client.hub=async()=>({careerHubInfo:{isLeagueAdvancing:true}});
+  await assert.rejects(runEaCollectionStep(options),/reports that the league is advancing/);
+});
+
 test('yearly collection requests all 18 regular schedules without roster or statistic calls', async () => {
   const { options, calls, finalized } = fixture('yearly');
   await finish(options);

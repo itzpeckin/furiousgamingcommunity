@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.13",
+  "releaseType": "ea-current-week-and-live-statistics-refresh",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.12",
+    "commit": "dbaf84640205b2fc677a02f7f19c215c5d261f54",
+    "tag": "v8.0.12"
+  },
+  "implementationBranch": "fix/8.0.13-ea-week-and-live-stats",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.12",
+    "candidateRelease": "8.0.13",
+    "currentMigration": 48,
+    "candidateMigration": 48,
+    "scope": "Pages only: parse native EA current-week evidence and refresh game/player statistics after active snapshot changes. No import, snapshot activation, credential change, migration or Discord action."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/ea-capture.js",
+    "functions/_lib/ea-collection.js",
+    "league-engine/live-read-model.js",
+    "app.js",
+    "tests/import/ea-capture.test.mjs",
+    "tests/import/ea-collection.test.mjs",
+    "tests/import/live-data-experience.test.mjs",
+    "docs/EA-DIRECT.md",
+    "docs/ROADMAP.md",
+    "releases/8.0.13/release-record.md",
+    "releases/8.0.13/validation-evidence.json"
+  ]
+}

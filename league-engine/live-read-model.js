@@ -10,6 +10,7 @@
   let busy = false;
   let lastError = null;
   let lastRefreshAt = null;
+  let revision = 0;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const account = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
@@ -23,6 +24,7 @@
   }
 
   async function request(params = {}, force = false) {
+    const requestedRevision=revision;
     const key = `${leagueSlug()}:${JSON.stringify(params)}`;
     if (!force && cache.has(key)) return cache.get(key);
     if (!force && inFlight.has(key)) return inFlight.get(key);
@@ -31,13 +33,14 @@
       const response = await fetch(endpoint(params), {credentials:'same-origin',cache:'no-store'});
       const payload = await response.json().catch(() => ({ok:false,error:`HTTP ${response.status}`}));
       if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), {payload});
+      if(requestedRevision!==revision)throw new Error('Live data changed during loading. Please retry.');
       cache.set(key,payload);
       return payload;
     })();
 
     inFlight.set(key,work);
     try{return await work}
-    finally{inFlight.delete(key)}
+    finally{if(inFlight.get(key)===work)inFlight.delete(key)}
   }
 
   function storageKey(snapshotId,domain){
@@ -63,21 +66,26 @@
   }
 
   async function refresh() {
+    const refreshRevision=++revision;
     busy = true;
     lastError = null;
     cache.clear();
     domainCache.clear();
+    inFlight.clear();
+    summary=null;
     rerender();
     try {
       summary = await request({}, true);
       lastRefreshAt = new Date().toISOString();
+      window.dispatchEvent(new CustomEvent('franchisehq:live-read-refreshed',{detail:{snapshotId:summary?.snapshot?.id || null}}));
       return summary;
     } catch (error) {
+      if(refreshRevision!==revision)throw error;
       lastError = error.message;
       console.error('[Live Read Model]', error.payload || error);
       throw error;
     } finally {
-      busy = false;
+      if(refreshRevision===revision)busy = false;
       rerender();
     }
   }
@@ -91,10 +99,12 @@
   async function getContext() { return (summary || await request({})).context; }
   async function getDataStatus() { return (summary || await request({})).dataStatus; }
   async function getDomain(domain) {
+    const requestedRevision=revision;
     const domainKey=`${leagueSlug()}:${domain}`;
     if (domainCache.has(domainKey)) return domainCache.get(domainKey);
 
     const snapshot=await getSnapshot();
+    if(requestedRevision!==revision)throw new Error('Live data changed during loading. Please retry.');
     const persisted=readPersisted(snapshot?.id,domain);
     if(persisted){
       domainCache.set(domainKey,persisted);
@@ -114,6 +124,7 @@
         if(domain==='statistics')params.compact='1';
         if(cursor)params.cursor=cursor;
         const payload=await request(params);
+        if(requestedRevision!==revision)throw new Error('Live data changed during loading. Please retry.');
         records.push(...(payload.records||[]));
         cursor=payload.nextCursor||null;
         guard++;
@@ -126,7 +137,7 @@
 
     inFlight.set(flightKey,work);
     try{return await work}
-    finally{inFlight.delete(flightKey)}
+    finally{if(inFlight.get(flightKey)===work)inFlight.delete(flightKey)}
   }
 
   async function getTeams() { return getDomain('teams'); }
@@ -221,6 +232,7 @@
   });
 
   window.addEventListener('franchisehq:league-tenant-changed',()=>{
+    revision++;
     cache.clear(); domainCache.clear(); inFlight.clear(); summary=null; lastError=null; lastRefreshAt=null;
   });
 

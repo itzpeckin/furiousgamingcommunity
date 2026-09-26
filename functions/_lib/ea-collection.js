@@ -42,7 +42,11 @@ function comparableHub(hub) {
 
 function checkedHub(capture, rawHub) {
   try { return capture.normalizeEaHub(rawHub); } catch {
-    throw collectionError('EA_CURRENT_PERIOD_UNAVAILABLE', 'EA has not provided a verifiable current season and week. Try again after the league finishes advancing.');
+    const hub=rawHub?.responseInfo?.value || rawHub;
+    if (hub?.careerHubInfo?.isLeagueAdvancing) {
+      throw collectionError('EA_CURRENT_PERIOD_UNAVAILABLE', 'EA reports that the league is advancing. Try again after the advance finishes.');
+    }
+    throw collectionError('EA_CURRENT_PERIOD_UNAVAILABLE', 'FHQ could not verify the current season and week from EA league information. Your live league data has not changed.');
   }
 }
 
