@@ -931,7 +931,7 @@ function renderLeagueDataSelector(state){
  const selected=ui.selectedLeagueSource||state?.activeMode||'empty';
  const selectedLabel=leagueDataModePresentation({...state,activeMode:selected}).label;
  return`<article class="card league-source-selector" data-league-source-selector>
-   <div class="card-header"><div><span class="eyebrow">Data Source Selector</span><h3>Choose the active league data source</h3><p>Switch freely between No Data, Demo Data, and your latest Madden Data snapshot. Stored data is never deleted when you switch.</p></div></div>
+   <div class="card-header"><div><span class="eyebrow">Data Source Selector</span><h3>Choose your data source</h3><p>Switch sources without deleting stored league data.</p></div></div>
    <div class="league-source-options" role="group" aria-label="League data sources">
      ${leagueDataSourceOption('empty',state)}
      ${leagueDataSourceOption('demo',state)}
