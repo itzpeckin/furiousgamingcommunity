@@ -230,24 +230,6 @@
     }
   }
 
-  async function reviewImport() {
-    const token = ensureContext();
-    if (busy || !collection?.readyToImport || collection.mode === 'preview') return;
-    busy = true;
-    errorMessage = '';
-    rerender();
-    try {
-      await HQ.oneClickImport?.refreshWorkspace?.();
-      if (!stillCurrent(token)) return;
-      notice = 'Your EA data has been collected. Review the import details below, then select Import Latest Export to publish it.';
-      document.querySelector('[data-compact-import-panel]')?.scrollIntoView({behavior: 'smooth', block: 'start'});
-    } catch (error) {
-      if (stillCurrent(token)) errorMessage = safeMessage(error.message);
-    } finally {
-      if (stillCurrent(token)) { busy = false; rerender(); }
-    }
-  }
-
   function coverageMarkup(coverage) {
     if (!coverage || typeof coverage !== 'object') return '';
     const labels = {leagueInfo: 'League info', teams: 'Teams', rosters: 'Rosters', freeAgents: 'Free Agents', schedules: 'Schedules', statistics: 'Weekly stats', weeks: 'Weeks collected'};
@@ -268,10 +250,11 @@
   function collectionMarkup() {
     if (!collection) return '';
     const finished = terminalStatuses.has(collection.status);
+    if (finished && collection.readyToImport && collection.mode === 'weekly') return '<p class="ea-direct-export-complete" role="status">EA export complete. Use Refresh below, then Import Latest Export.</p>';
     const progress = Number(collection.progress?.percent ?? collection.progress);
     const percent = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : null;
     const title = collection.mode === 'preview' ? 'Connection preview' : collection.mode === 'yearly' ? 'Yearly schedule collection' : 'League data collection';
-    return `<section class="ea-direct-collection" aria-label="EA collection status"><div class="ea-direct-collection__heading"><strong>${title}</strong><span>${esc(collection.status || 'Starting')}</span></div><p role="status">${esc(collection.message ? safeMessage(collection.message) : collection.step || (finished ? 'Collection finished.' : 'Collecting data from EA…'))}</p>${!finished && percent !== null ? `<progress max="100" value="${percent}" aria-label="EA collection progress">${percent}%</progress>` : ''}${coverageMarkup(collection.coverage)}<div class="ea-direct-actions">${!finished ? '<button class="button button--ghost" type="button" data-ea-action="check-collection">Check Collection</button>' : ''}${collection.readyToImport && collection.mode !== 'preview' ? `<button class="button button--primary" type="button" data-ea-action="review-import" ${busy ? 'disabled' : ''}>Continue to Step 2</button><span>Collected data is published only after you run the import.</span>` : ''}</div></section>`;
+    return `<section class="ea-direct-collection" aria-label="EA collection status"><div class="ea-direct-collection__heading"><strong>${title}</strong><span>${esc(collection.status || 'Starting')}</span></div><p role="status">${esc(collection.message ? safeMessage(collection.message) : collection.step || (finished ? 'Collection finished.' : 'Collecting data from EA…'))}</p>${!finished && percent !== null ? `<progress max="100" value="${percent}" aria-label="EA collection progress">${percent}%</progress>` : ''}${coverageMarkup(collection.coverage)}<div class="ea-direct-actions">${!finished ? '<button class="button button--ghost" type="button" data-ea-action="check-collection">Check Collection</button>' : ''}${collection.readyToImport && collection.mode !== 'preview' ? '<span>Export complete. Use Refresh below, then Import Latest Export.</span>' : ''}</div></section>`;
   }
 
   function setupMarkup() {
@@ -296,13 +279,13 @@
     const verified = previewVerified();
     const statusLabel = loading ? 'Checking connection' : connected ? 'Connected' : state?.status === 'reconnect-required' ? 'Reconnect needed' : state?.configured === false ? 'Setup required' : 'Not connected';
     const body = selectedPath === 'companion'
-      ? '<p>Export from the Madden Companion App to your league’s export URL. Use the import controls below when the export is ready.</p><button class="button button--secondary" type="button" data-ea-action="companion-import">Open Companion Import</button>'
+      ? '<p>In the Madden Companion App, export League Info, Rosters, and Weekly Stats to your league URL. Wait for all exports to finish, then click Refresh in Step 2. Need the URL? Open Companion export URL &amp; season schedule below and select Copy URL.</p>'
       : loading && !state ? '<p role="status">Checking EA Direct availability for this league…</p>'
       : state?.configured === false ? `<p>${esc(state.message || 'EA Direct is being configured for FranchiseHQ. Companion imports remain available below.')}</p><button type="button" class="button button--ghost" data-ea-action="refresh" ${disabled}>Check Availability</button>`
       : !loaded || !state ? '<p>Connection status is unavailable. Select Refresh Connection to try again.</p>'
-      : connected ? `<div class="ea-direct-connected"><dl class="ea-direct-identity"><div><dt>Madden franchise</dt><dd>${esc(state.connection?.leagueName || 'Connected franchise')}</dd></div><div><dt>EA profile</dt><dd>${esc(state.connection?.personaName || 'Connected profile')}${state.connection?.platform ? ` · ${esc(state.connection.platform)}` : ''}</dd></div><div><dt>Last collected</dt><dd>${esc(date(state.connection?.lastSyncedAt))}</dd></div></dl><div class="ea-direct-actions"><button class="button ${verified ? 'button--secondary' : 'button--primary'}" type="button" data-ea-collect="preview" ${disabled}>Test Connection &amp; Collect Preview</button>${verified ? `<button class="button button--primary" type="button" data-ea-collect="weekly" ${disabled}>Sync from EA</button><button class="button button--secondary" type="button" data-ea-collect="yearly" ${disabled}>Import Yearly Schedule</button>` : ''}</div><p>${verified ? 'Sync collects rosters, ratings, and the previous and current weeks. It does not update your live league until you run Step 2. Yearly Schedule is a separate schedule-only action.' : 'The preview checks League Info, schedules, stats, rosters, and Free Agents before you import any EA data.'}</p><details class="ea-direct-settings"><summary>Connection settings</summary><button class="button button--ghost" type="button" data-ea-action="disconnect" ${disabled}>Disconnect EA Account</button><small>Imported snapshots stay in your league.</small></details></div>${collectionMarkup()}`
+      : connected ? `<div class="ea-direct-connected"><p><strong>${esc(state.connection?.leagueName || 'Connected franchise')}</strong> · ${esc(state.connection?.personaName || 'Connected profile')}${state.connection?.platform ? ` · ${esc(state.connection.platform)}` : ''}</p><div class="ea-direct-actions">${verified ? `<button class="button button--primary" type="button" data-ea-collect="weekly" ${disabled}>Export from EA</button>` : `<button class="button button--primary" type="button" data-ea-collect="preview" ${disabled}>Test Connection &amp; Collect Preview</button>`}</div>${verified ? '<p>When the export finishes, click Refresh in Step 2 below.</p>' : '<p>Verify your connection before exporting live league data.</p>'}<details class="ea-direct-settings"><summary>Connection &amp; schedule options</summary><small>Last collected: ${esc(date(state.connection?.lastSyncedAt))}</small><div class="ea-direct-actions">${verified ? `<button class="button button--secondary" type="button" data-ea-collect="preview" ${disabled}>Test Connection &amp; Collect Preview</button><button class="button button--secondary" type="button" data-ea-collect="yearly" ${disabled}>Import Yearly Schedule</button>` : ''}<button class="button button--ghost" type="button" data-ea-action="refresh" ${disabled}>Refresh Connection</button><button class="button button--ghost" type="button" data-ea-action="disconnect" ${disabled}>Disconnect EA Account</button></div></details></div>${collectionMarkup()}`
       : setupMarkup();
-    return `<section class="card ea-direct-card" data-ea-direct-panel aria-labelledby="ea-direct-title"><div class="ea-direct-header"><div><span class="eyebrow">Step 1 · Collect</span><h3 id="ea-direct-title">Collect Madden data</h3><p>Choose EA Direct or export from the Companion App. Then continue to Step 2 below.</p></div><span class="pill pill--${connected ? 'success' : 'neutral'}">${esc(statusLabel)}</span></div><div class="ea-direct-paths" role="group" aria-label="Madden connection method"><button type="button" data-ea-path="ea-direct" aria-pressed="${selectedPath === 'ea-direct'}">EA Direct</button><button type="button" data-ea-path="companion" aria-pressed="${selectedPath === 'companion'}">Companion App</button></div><div class="ea-direct-content" aria-busy="${busy || loading}">${body}${errorMessage ? `<p class="ea-direct-error" role="alert">${esc(errorMessage)}</p>` : ''}${notice ? `<p class="ea-direct-notice" role="status">${esc(notice)}</p>` : ''}</div><div class="ea-direct-footer"><small>EA Direct is a manual connection. Sign in or collect data when you choose.</small><button type="button" class="text-button" data-ea-action="refresh" ${disabled}>Refresh Connection</button></div></section>`;
+    return `<section class="card ea-direct-card" data-ea-direct-panel aria-labelledby="ea-direct-title"><div class="ea-direct-header"><div><span class="eyebrow">Step 1 · Export</span><h3 id="ea-direct-title">Export Madden data</h3><p>Choose how to export your latest league data.</p></div><span class="pill pill--${connected ? 'success' : 'neutral'}">${esc(statusLabel)}</span></div><div class="ea-direct-paths" role="group" aria-label="Madden connection method"><button type="button" data-ea-path="ea-direct" aria-pressed="${selectedPath === 'ea-direct'}">EA Direct</button><button type="button" data-ea-path="companion" aria-pressed="${selectedPath === 'companion'}">Companion App</button></div><div class="ea-direct-content" aria-busy="${busy || loading}">${body}${errorMessage ? `<p class="ea-direct-error" role="alert">${esc(errorMessage)}</p>` : ''}${notice ? `<p class="ea-direct-notice" role="status">${esc(notice)}</p>` : ''}</div>${!connected ? `<button type="button" class="text-button" data-ea-action="refresh" ${disabled}>Refresh Connection</button>` : ''}</section>`;
   }
 
   function rerender() {
@@ -323,8 +306,6 @@
     if (action === 'disconnect') connectionAction('disconnect');
     if (action === 'refresh') refresh();
     if (action === 'check-collection') pollCollection();
-    if (action === 'review-import') reviewImport();
-    if (action === 'companion-import') document.querySelector('[data-compact-import-panel]')?.scrollIntoView({behavior: 'smooth', block: 'start'});
   });
 
   document.addEventListener('submit', event => {

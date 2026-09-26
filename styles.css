@@ -8097,3 +8097,7 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 .commissioner-import-detail-warning ul{margin:6px 0 0;padding-left:18px}
 @media(max-width:1100px){.commissioner-command-column--secondary{grid-column:1/-1}}
 @media(max-width:760px){.commissioner-hq-shell>[data-league-source-selector] .league-source-options{grid-template-columns:1fr}.commissioner-import-glance{grid-template-columns:1fr}.commissioner-import-detail-grid{grid-template-columns:1fr}}
+
+/* FranchiseHQ 8.0.18 — persistent matchup exit on both schedule paths */
+.detail-dialog:has([data-matchup-modal])>.detail-close{display:flex!important;align-items:center;justify-content:center;position:sticky;top:12px;z-index:20;width:44px;height:44px;min-width:44px;background:var(--surface,#172233);border:1px solid var(--border-color,#40516c)}
+.detail-dialog:has([data-matchup-modal]) .matchup-modal{padding-top:58px}

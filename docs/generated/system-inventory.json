@@ -190,7 +190,7 @@
       ".css": 12,
       ".example": 1,
       ".html": 8,
-      ".js": 249,
+      ".js": 250,
       ".json": 7,
       ".jsonc": 1,
       ".md": 285,
@@ -204,15 +204,15 @@
     },
     "largest": [
       {
-        "bytes": 654533,
+        "bytes": 654752,
         "file": "app.js"
       },
       {
-        "bytes": 565673,
+        "bytes": 566098,
         "file": "styles.css"
       },
       {
-        "bytes": 438715,
+        "bytes": 438768,
         "file": "trade-module.js"
       },
       {
@@ -220,7 +220,7 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 166256,
+        "bytes": 171020,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -232,7 +232,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 89829,
+        "bytes": 89983,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -240,7 +240,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77354,
+        "bytes": 77352,
         "file": "index.html"
       },
       {
@@ -252,16 +252,16 @@
         "file": "functions/_lib/discord-read-model.js"
       },
       {
-        "bytes": 61459,
+        "bytes": 60867,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
+      },
+      {
+        "bytes": 50339,
+        "file": "league-engine/one-click-import.js"
       },
       {
         "bytes": 50005,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
-      },
-      {
-        "bytes": 49984,
-        "file": "league-engine/one-click-import.js"
       },
       {
         "bytes": 48894,
@@ -284,7 +284,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 683
+    "total": 684
   },
   "frontend": {
     "assets": [
@@ -1761,7 +1761,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.17",
+  "release": "8.0.18",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 25, 2026
+**Updated:** September 26, 2026
 
-**Revision:** 3.10
+**Revision:** 3.11
 
-**Current production:** 8.0.16; Madden source startup recovery is deployed and verified. EA collection and live import are distinct commissioner actions.
+**Current production:** 8.0.17; EA/Companion collection and live import share a Madden Import workspace.
 
-**Current work:** 8.0.17 consolidates EA/Companion collection and Madden Import above the Data Source Selector, with adjacent Quick Controls and numbered collect/publish steps.
+**Current work:** 8.0.18 makes Export → Refresh → Import explicit, places the selector beneath Quick Controls, advances Discord draft choices with the season, and restores matchup exit controls.
 
-**Next gate:** Validate and publish 8.0.17; verify desktop/mobile order, panel refreshes and source availability. This presentation release performs no collection or import.
+**Next gate:** Validate and publish 8.0.18, then verify desktop/mobile layout and both schedule matchup exit paths. No live import, collection, archive or Discord messages.
 
 ## Product decisions
 

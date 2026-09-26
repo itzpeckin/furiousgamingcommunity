@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -170,4 +171,27 @@ test('Player Card and depth table retain and format canonical Madden height and 
   assert.match(app,/weight: formatRosterWeight\(player\?\.weightLbs \?\? raw\.weightLbs \?\? raw\.weight_lbs \?\? raw\.weight\)/);
   assert.match(app,/Math\.floor\(inches\/12\)/);
   assert.match(app,/\$\{escapeHtml\(player\.weight\)\} lbs/);
+});
+
+test('closing a loading matchup keeps it closed when its directory request finishes', async () => {
+  const app=await source('app.js'),styles=await source('styles.css');
+  const opening=app.slice(app.indexOf('  const matchupColdDiagnostics='),app.indexOf('  function preloadScheduleMatchupData('));
+  const detail=app.slice(app.indexOf('  function openDetail(html)'),app.indexOf('  function setRoute(route'));
+  assert.ok(opening.includes('async function openMatchupCard'));
+  let resolveDirectory,unlocked=0,opens=0;
+  const content={innerHTML:''},attributes={};
+  const context=vm.createContext({
+    performance,console:{info(){},error(){}},detailContent:content,
+    detailModal:{classList:{add(){opens++},remove(){}},setAttribute(k,v){attributes[k]=v}},
+    body:{style:{}},unlockBody(){unlocked++},showToast(){throw Error('Closed matchup must not produce an error toast')},
+    findCachedMatchupGame:()=>null,
+    loadLiveTeamDirectory:()=>new Promise(resolve=>{resolveDirectory=resolve})
+  });
+  vm.runInContext(opening+'\n'+detail,context);
+  const pending=vm.runInContext('openMatchupCard("uncached-game")',context);
+  assert.match(content.innerHTML,/Opening matchup/);
+  vm.runInContext('closeDetail()',context);
+  resolveDirectory();await pending;
+  assert.equal(opens,1);assert.equal(content.innerHTML,'');assert.equal(attributes['aria-hidden'],'true');assert.equal(unlocked,1);
+  assert.match(styles,/\.detail-dialog:has\(\[data-matchup-modal\]\)>\.detail-close\{display:flex!important/);
 });

@@ -1,3 +1,4 @@
+import { currentTradeSeason } from '../../functions/_lib/trade-season.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
@@ -2362,5 +2363,56 @@ test('trade delivery sends both owners mobile-safe divided team cards and one cl
     assert.match(fallbackRequests[2].body.content,/TRADE STATUS.*Accepted/s);
     assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE id='committee-rich'`).get().status,'sent');
     assert.equal(database.prepare(`SELECT last_error AS error FROM discord_delivery_events WHERE id='committee-rich'`).get().error,null);
+  }finally{database.close()}
+});
+
+test('Discord trade pick choices roll forward with an archived season while preserving ownership and rejecting stale picks',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    const snapshotId=seedActiveWeek(database,{leagueId:'league-a'}),db=d1(database),key=await signingKey();
+    for(const [id,year,status,franchise] of [['old',2026,'active','franchise-a'],['next',2027,'preview','franchise-a'],['unrelated',2028,'preview','another-franchise']]){
+      database.prepare(`INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+        VALUES (?,'league-a','madden-companion',?,?,'Madden NFL 27',?,?,?)`).run(id,franchise,String(year),String(year),year,status);
+    }
+    database.exec(`INSERT INTO madden_discovery_sessions (id,league_id,token_hash,status,expires_at,opened_by_user_id) VALUES ('capture-a','league-a','hash-a','review_required','2099-01-01','user-a');
+      INSERT INTO companion_import_destinations (id,league_id,franchise_season_id,label,status,created_by_user_id) VALUES ('destination-a','league-a','old','Old season','active','user-a');`);
+    database.prepare(`INSERT INTO companion_candidate_import_runs (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,candidate_snapshot_id,created_by_user_id)
+      VALUES ('run-a','league-a','destination-a','capture-a','fingerprint-a','preview-ready',?,'user-a')`).run(snapshotId);
+    const teams=[{teamKey:'tb'},{teamKey:'sf'}];
+    await ensureDraftPickHorizon(db,{leagueId:'league-a',franchiseSeasonId:'old',seasonYear:2026,gameRelease:'Madden NFL 27',teams});
+    await ensureDraftPickHorizon(db,{leagueId:'league-a',franchiseSeasonId:'next',seasonYear:2027,gameRelease:'Madden NFL 27',teams});
+    database.exec(`UPDATE league_draft_picks SET current_team_key='tb' WHERE id='pick:league-a:2028:1:sf'`);
+    let counter=200;
+    async function choices(value,name='send-1'){
+      const response=await discordInteractions(await signedContext({db,key,interaction:interaction({id:String(100000000000000000n+BigInt(counter++)),name:'trade',type:4,options:[{type:1,name:'create',options:[
+        {type:3,name:'owner',value:'owner:100000000000000012'},{type:3,name,value,focused:true}
+      ]}]})}));
+      return (await response.json()).data.choices;
+    }
+    assert.equal((await currentTradeSeason(db,'league-a')).seasonYear,2026,'unrelated and unactivated previews do not move the season');
+    assert.equal((await choices('2027')).length,7);
+    database.exec(`UPDATE franchise_seasons SET status='closed' WHERE id='old';UPDATE companion_import_destinations SET status='archived' WHERE id='destination-a';`);
+    assert.equal((await currentTradeSeason(db,'league-a')).seasonYear,2027,'prepared successor takes over while old snapshot is retained');
+    assert.deepEqual(await choices('2027'),[]);
+    for(const year of [2028,2029,2030])assert.ok((await choices(String(year))).length>=7);
+    assert.ok((await choices('2028')).some(item=>item.value==='pick:pick:league-a:2028:1:sf'),'traded pick stays with its current owner');
+    assert.ok(!(await choices('2028','receive-1')).some(item=>item.value==='pick:pick:league-a:2028:1:sf'));
+    assert.deepEqual(await choices('2027','receive-1'),[]);
+    const stale=await discordInteractions(await signedContext({db,key,interaction:interaction({id:'100000000000000299',name:'trade',options:[{type:1,name:'create',options:[
+      {type:3,name:'owner',value:'owner:100000000000000012'},
+      {type:3,name:'send-1',value:'pick:pick:league-a:2027:1:tb'},
+      {type:3,name:'receive-1',value:'pick:pick:league-a:2028:2:sf'}
+    ]}]})}));
+    assert.match((await stale.json()).data.content,/outside the current season/);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM trade_workflows').get().count,0);
+    assert.equal(database.prepare("SELECT COUNT(*) count FROM league_draft_picks WHERE draft_class=2027").get().count,14,'historical picks remain intact');
+    database.exec("DELETE FROM franchise_seasons WHERE id='unrelated'");
+    database.exec("UPDATE franchise_seasons SET source_franchise_id='different' WHERE id='next'");
+    assert.equal(await currentTradeSeason(db,'league-a'),null,'an unrelated successor is never selected');
+    assert.deepEqual(await choices('2028'),[]);
   }finally{database.close()}
 });

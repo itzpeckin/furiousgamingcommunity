@@ -5798,8 +5798,10 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   const matchupColdDiagnostics=new Map();
+  let matchupOpenRevision=0;
 
   async function openMatchupCard(gameId){
+    const openingRevision=++matchupOpenRevision;
     const gameIdText=String(gameId||'');
     const openCount=(matchupColdDiagnostics.get(gameIdText)||0)+1;
     matchupColdDiagnostics.set(gameIdText,openCount);
@@ -5821,10 +5823,12 @@ function canonicalPlayerDashboardStats(playerId='') {
       const dirStart=performance.now();
       try{
         await loadLiveTeamDirectory(false);
+        if(openingRevision!==matchupOpenRevision)return;
         log('loadLiveTeamDirectory wait',dirStart);
         game=findCachedMatchupGame(gameIdText);
         if(!game)throw new Error('Selected game is unavailable.');
       }catch(error){
+        if(openingRevision!==matchupOpenRevision)return;
         console.error('[Matchup Card]',error);
         showToast('Matchup unavailable',error?.message||'The schedule could not be loaded.');
         return;
@@ -8514,6 +8518,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
   function closeDetail() {
+    matchupOpenRevision++;
     detailModal.classList.remove('is-open');
     detailModal.setAttribute('aria-hidden','true');
     detailContent.innerHTML='';
@@ -10122,7 +10127,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.0.17';
+  const VISIBLE_RELEASE = '8.0.18';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';
