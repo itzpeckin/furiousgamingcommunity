@@ -54,7 +54,7 @@ function datasetKind(item) {
 }
 
 function isAuthenticationFailure(error) {
-  return error?.status === 401 || ['EA_RECONNECT_REQUIRED', 'EA_NOT_CONFIGURED', 'EA_INVALID_REQUEST'].includes(error?.code);
+  return error?.status === 401 || ['EA_RECONNECT_REQUIRED', 'EA_MADDEN_SESSION_REJECTED', 'EA_NOT_CONFIGURED', 'EA_INVALID_REQUEST'].includes(error?.code);
 }
 
 /** One bounded collection checkpoint. State is private and must be encrypted by the caller. */

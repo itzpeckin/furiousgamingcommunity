@@ -126,8 +126,10 @@ test('expired authorization cannot be swallowed as an optional roster outage', a
   const { options, stored } = fixture();
   const initial = await runEaCollectionStep(options);
   initial.state.cursor = initial.state.expectedRequests.findIndex(item => item.kind === 'roster');
-  options.client.dataset = async () => { throw new EaClientError('EA_RECONNECT_REQUIRED', 'Reconnect EA.', { status: 401 }); };
-  await assert.rejects(runEaCollectionStep({ ...options, state: initial.state }), error => error.code === 'EA_RECONNECT_REQUIRED');
+  for(const code of ['EA_RECONNECT_REQUIRED','EA_MADDEN_SESSION_REJECTED']){
+    options.client.dataset = async () => { throw new EaClientError(code, 'Authentication rejected.', { status: code==='EA_RECONNECT_REQUIRED'?401:424 }); };
+    await assert.rejects(runEaCollectionStep({ ...options, state: initial.state }), error => error.code === code);
+  }
   assert.equal(stored.length, 1, 'only the initial hub should be retained');
 });
 
