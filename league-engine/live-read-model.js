@@ -11,6 +11,7 @@
   let lastError = null;
   let lastRefreshAt = null;
   let revision = 0;
+  let refreshFlight = null;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const account = () => window.FGC_TRADE?.getCurrentAccount?.() || null;
@@ -33,7 +34,7 @@
       const response = await fetch(endpoint(params), {credentials:'same-origin',cache:'no-store'});
       const payload = await response.json().catch(() => ({ok:false,error:`HTTP ${response.status}`}));
       if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), {payload});
-      if(requestedRevision!==revision)throw new Error('Live data changed during loading. Please retry.');
+      if(requestedRevision!==revision)throw Object.assign(new Error('Live data changed during loading. Please retry.'),{code:'LIVE_READ_SUPERSEDED'});
       cache.set(key,payload);
       return payload;
     })();
@@ -66,18 +67,26 @@
   }
 
   async function refresh() {
+    if(refreshFlight)return refreshFlight;
+    const work=refreshSummary();
+    refreshFlight=work;
+    try{return await work;}
+    finally{if(refreshFlight===work)refreshFlight=null;}
+  }
+
+  async function refreshSummary() {
     const refreshRevision=++revision;
+    const requestedSlug=leagueSlug();
     busy = true;
     lastError = null;
     cache.clear();
     domainCache.clear();
     inFlight.clear();
-    summary=null;
     rerender();
     try {
       summary = await request({}, true);
       lastRefreshAt = new Date().toISOString();
-      window.dispatchEvent(new CustomEvent('franchisehq:live-read-refreshed',{detail:{snapshotId:summary?.snapshot?.id || null}}));
+      window.dispatchEvent(new CustomEvent('franchisehq:live-read-refreshed',{detail:{snapshotId:summary?.snapshot?.id || null,leagueSlug:requestedSlug,summary}}));
       return summary;
     } catch (error) {
       if(refreshRevision!==revision)throw error;
@@ -90,14 +99,14 @@
     }
   }
 
-  async function getSnapshot() { return (summary || await request({})).snapshot; }
-  async function getSummary() { return summary || request({}); }
-  async function getLeague() { return (summary || await request({})).league; }
-  async function getState() { return (summary || await request({})).state; }
-  async function getFreeAgentState() { return (summary || await request({})).freeAgents; }
-  async function getIntegrity() { return (summary || await request({})).integrity; }
-  async function getContext() { return (summary || await request({})).context; }
-  async function getDataStatus() { return (summary || await request({})).dataStatus; }
+  async function getSummary() { return refreshFlight || summary || request({}); }
+  async function getSnapshot() { return (await getSummary()).snapshot; }
+  async function getLeague() { return (await getSummary()).league; }
+  async function getState() { return (await getSummary()).state; }
+  async function getFreeAgentState() { return (await getSummary()).freeAgents; }
+  async function getIntegrity() { return (await getSummary()).integrity; }
+  async function getContext() { return (await getSummary()).context; }
+  async function getDataStatus() { return (await getSummary()).dataStatus; }
   async function getDomain(domain) {
     const requestedRevision=revision;
     const domainKey=`${leagueSlug()}:${domain}`;
@@ -233,6 +242,7 @@
 
   window.addEventListener('franchisehq:league-tenant-changed',()=>{
     revision++;
+    refreshFlight=null;
     cache.clear(); domainCache.clear(); inFlight.clear(); summary=null; lastError=null; lastRefreshAt=null;
   });
 
