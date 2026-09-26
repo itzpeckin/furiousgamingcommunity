@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "version": "8.0.17",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "productionDataChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 48,
+      "candidateRequiresMigration": false,
+      "productionApplied": false
+    },
+    "strictQuality": {
+      "inventoryFiles": 683,
+      "routes": 90,
+      "tests": 421,
+      "failures": 0,
+      "passed": true
+    },
+    "supplementalTests": {
+      "includesReleaseRoutes": true,
+      "tests": 9,
+      "failures": 0,
+      "passed": true
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "archiveSeasonExecuted": false,
+    "dataDeleted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false
+  }
+}

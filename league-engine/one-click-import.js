@@ -616,8 +616,9 @@
     const historicalBackfill=coverage.importMode==='historical-backfill';
     const threadLabel=threadSync?.reviewRequired?'Needs review':['failed','partial'].includes(threadSync?.status)?'Needs attention':threadSync?.status==='complete'?'Ready':threadSync?.status==='not-required'?'Not required':threadSync?.scheduled?'Running':'Pending';
     const connectionService=exportUrlService();
-    return `<section class="commissioner-command-panel commissioner-command-import" data-compact-import-panel aria-label="Madden Companion import">
-      <header><h2>Madden Import</h2><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></header>
+    return `<section class="commissioner-command-panel commissioner-command-import" data-compact-import-panel aria-label="Import collected Madden data">
+      <header><div><span class="eyebrow">Step 2 · Publish</span><h3>Import to your league</h3></div><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></header>
+      <p class="commissioner-madden-import-copy">Import the collected export to update live rosters, ratings, development traits, and game statistics.</p>
       <div class="commissioner-command-import__actions">
         <button class="button button--secondary" data-copy-permanent-export-url ${busy||connection.busy||!endpointState.exportUrl?'disabled':''}>${connection.copied?'URL Copied':'Copy URL'}</button>
         <button class="button button--ghost" data-refresh-companion-import ${busy||connection.busy?'disabled':''}>Refresh</button>

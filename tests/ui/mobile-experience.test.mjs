@@ -17,7 +17,7 @@ function releaseBlock(styles) {
 
 test('Command Center import grows with annual controls without overlap or narrow desktop text', async () => {
  const [ui,css,importer]=await Promise.all([source('trade-module.js'),source('styles.css'),source('league-engine/one-click-import.js')]);
- assert.match(ui,/commissioner-command-column[\s\S]*renderCompactPanel[\s\S]*commissioner-command-panel--attention/);
+ assert.match(ui,/commissioner-madden-workflow[\s\S]*eaDirect[\s\S]*renderCompactPanel[\s\S]*commissioner-command-panel--quick[\s\S]*renderLeagueDataSelector\(dataSourceState\)/);
  assert.match(css,/@media\(min-width:1101px\)\{\.commissioner-command-column\{contain:layout style\}\}/);
  assert.doesNotMatch(css,/@media\(min-width:1101px\)\{\.commissioner-command-column\{contain:size\}\}/);
  assert.match(css,/\.commissioner-command-import \.commissioner-yearly-schedule--compact\.is-active\{grid-template-columns:minmax\(0,1fr\)/);
