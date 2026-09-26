@@ -123,7 +123,7 @@ test('weekly and yearly collection require a server-verified preview', async () 
   assert.match(ui.service.renderPanel(), /data-ea-collect="weekly"/);
 });
 
-test('collected EA data requires an explicit review action and never publishes from polling', async () => {
+test('collected EA data directs the commissioner to Refresh and Import without a redundant collection card', async () => {
   const ui = harness();
   ui.respond(async (path, options) => path.endsWith('/connection') ? connected({previewVerified: true})
     : options.method === 'POST' ? {ok: true, id: 'collection-1', status: 'running'}
@@ -132,11 +132,9 @@ test('collected EA data requires an explicit review action and never publishes f
   await ui.service.collect('weekly');
   await ui.service.pollCollection();
   assert.deepEqual(ui.effects(), {refreshed: 0, published: 0, scrolled: 0});
-  assert.match(ui.service.renderPanel(), /Continue to Step 2/);
-  assert.match(ui.service.renderPanel(), /4, 5/);
-  ui.click({eaAction: 'review-import'});
-  await settle();
-  assert.deepEqual(ui.effects(), {refreshed: 1, published: 0, scrolled: 1});
+  assert.match(ui.service.renderPanel(), /Use Refresh below, then Import Latest Export/);
+  assert.doesNotMatch(ui.service.renderPanel(), /League data collection|Continue to Step 2|data-ea-action="review-import"/);
+  assert.deepEqual(ui.effects(), {refreshed: 0, published: 0, scrolled: 0});
 });
 
 test('EA profile and league text is escaped and login links only allow EA HTTPS hosts', async () => {
@@ -296,3 +294,5 @@ test('completed yearly schedule is shown without a regular snapshot import actio
   assert.doesNotMatch(ui.service.renderPanel(), /data-ea-action="review-import"/);
   assert.equal(ui.effects().published, 0);
 });
+
+test('Companion instructions lead directly to Refresh without an intermediate button',async()=>{const ui=harness();await ui.service.refresh();ui.click({eaPath:'companion'});assert.match(ui.service.renderPanel(),/League Info, Rosters, and Weekly Stats/);assert.match(ui.service.renderPanel(),/Refresh in Step 2/);assert.doesNotMatch(ui.service.renderPanel(),/Open Companion Import|data-ea-action="companion-import"/);});

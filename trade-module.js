@@ -755,7 +755,7 @@ function renderCommissionerOverview(){
  </section>
  <div class="commissioner-command-grid commissioner-command-grid--refined commissioner-madden-layout">
    <section class="commissioner-madden-workflow" aria-labelledby="madden-workflow-title">
-     <header class="commissioner-madden-workflow__header"><span class="eyebrow">League updates</span><h2 id="madden-workflow-title">Madden Import</h2><p>Collect your latest Madden data, then import it to update your live league.</p><div class="commissioner-madden-workflow__sequence" aria-label="Madden update steps"><span><b>1</b> Collect data</span><span aria-hidden="true">→</span><span><b>2</b> Import to league</span></div></header>
+     <header class="commissioner-madden-workflow__header"><span class="eyebrow">League updates</span><h2 id="madden-workflow-title">Madden Import</h2><p>Export first, refresh the captured data, then import it to update your league.</p><div class="commissioner-madden-workflow__sequence" aria-label="Madden update steps"><span><b>1</b> Export</span><span aria-hidden="true">→</span><span><b>2</b> Refresh</span><span aria-hidden="true">→</span><span><b>3</b> Import</span></div></header>
      ${window.FranchiseHQ?.eaDirect?.renderPanel?.()||''}
      ${window.FranchiseHQ?.oneClickImport?.renderCompactPanel?.()||''}
    </section>
@@ -763,9 +763,9 @@ function renderCommissionerOverview(){
    <section class="commissioner-command-panel commissioner-command-panel--quick"><header><div><span class="eyebrow">League switches</span><h2>Quick Controls</h2></div><button class="text-button" data-commissioner-tab="controls">Detailed values →</button></header><div class="commissioner-quick-controls">
     ${[['seasonTradeLimitEnabled','Enforce Trade Limit','Stops approvals after a team uses its season allowance.','icon-shield'],['freeTradeDesignationEnabled','Allow Free Trades','Lets eligible reviewers exempt an approved trade from the limit.','icon-star'],['calculatorEnabled','Enable Trade Calculator','Shows player, pick, package, and fairness values league-wide.','icon-chart'],['confidencePool','Enable Confidence Pool','Shows weekly picks in the League Schedule.','icon-activity']].map(([key,label,copy,icon])=>`<label><span class="commissioner-feature-icon"><svg><use href="#${icon}"></use></svg></span><span><strong>${label}</strong><small>${copy}</small></span><input type="checkbox" data-commissioner-quick-control="${key}" ${quick[key]!==false?'checked':''}><i></i></label>`).join('')}
    </div>${window.FranchiseHQ?.rosterManagement?.renderControl?.()||''}${window.FranchiseHQ?.liveTradeCenter?.renderCommissionerQuickManagement?.()||''}</section>
+   ${renderLeagueDataSelector(dataSourceState)}
    </div>
  </div>
- ${renderLeagueDataSelector(dataSourceState)}
  <section class="commissioner-command-metrics" aria-label="League status">
    <button data-command-focus-import><span>Latest Import</span><strong>${snapshot?'Live':'Attention'}</strong><small>${snapshot?`Activated ${escapeHtml(commissionerDate(snapshot.activatedAt))}`:'No active snapshot'}</small><i class="is-${snapshot?'success':'danger'}"></i></button>
    <button data-commissioner-tab="teams"><span>Members</span><strong>${members.active||0}</strong><small>${members.online||0} online · ${members.assigned||0} teams assigned</small><i class="is-${members.pending||members.unassigned?'warning':'success'}"></i></button>

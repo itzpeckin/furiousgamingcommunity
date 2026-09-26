@@ -1,3 +1,4 @@
+import { currentTradeSeason as currentSeason } from '../../../_lib/trade-season.js';
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, canonicalTeamKey, resolveTeam, publicLeagueTeams } from '../../../_lib/league-teams.js';
@@ -13,7 +14,8 @@ import {
 import {
   applyVersionedDraftPickBaseline,
   configuredDraftPickBaseline,
-  ensureDraftPickHorizon
+  ensureDraftPickHorizon,
+  draftClassesForSeason
 } from '../../../_lib/draft-pick-baselines.js';
 import {
   attachProjectedPickSlots,
@@ -59,24 +61,6 @@ async function requestContext(context) {
 
 function featureAvailable(league, featureKey) {
   return !Object.hasOwn(league?.features || {}, featureKey) || tenantFeatureEnabled(league, featureKey);
-}
-
-async function currentSeason(db, leagueId) {
-  const imported = await db.prepare(`SELECT destination.franchise_season_id AS id, season.season_year AS seasonYear,
-      season.display_name AS displayName,season.game_release AS gameRelease
-    FROM league_active_snapshots active
-    JOIN companion_candidate_import_runs run
-      ON run.league_id=active.league_id AND run.candidate_snapshot_id=active.snapshot_id
-    JOIN companion_import_destinations destination
-      ON destination.id=run.destination_id AND destination.league_id=run.league_id
-    JOIN franchise_seasons season
-      ON season.id=destination.franchise_season_id AND season.league_id=destination.league_id
-    WHERE active.league_id=?
-    ORDER BY run.completed_at DESC, run.created_at DESC LIMIT 1`).bind(leagueId).first();
-  if (imported) return imported;
-  return db.prepare(`SELECT id,season_year AS seasonYear,display_name AS displayName,game_release AS gameRelease
-      FROM franchise_seasons WHERE league_id=? AND status='active'
-      ORDER BY season_year DESC,created_at DESC LIMIT 1`).bind(leagueId).first();
 }
 
 async function activeSnapshotId(db, leagueId) {
@@ -301,10 +285,14 @@ async function validatedTransfers(c, bodyTransfers, settings) {
       const identity = await playerAsset(c,transfer.assetId,transfer.fromTeamKey);
       assets.push({...transfer,...identity});
     } else {
-      const pick = await c.db.prepare(`SELECT id,current_team_key AS currentTeamKey FROM league_draft_picks
+      const pick = await c.db.prepare(`SELECT id,current_team_key AS currentTeamKey,draft_class AS draftClass FROM league_draft_picks
         WHERE id=? AND league_id=?`).bind(transfer.assetId,c.league.id).first();
       if (!pick || canonicalTeamKey(pick.currentTeamKey) !== transfer.fromTeamKey) {
         throw Object.assign(new Error('Draft-pick ownership changed. Refresh the Trade Center and try again.'),{status:409});
+      }
+      const season = await currentSeason(c.db,c.league.id);
+      if (!season?.seasonYear || !draftClassesForSeason(season.seasonYear).includes(Number(pick.draftClass))) {
+        throw Object.assign(new Error('This draft pick is outside the current season’s available draft classes. Refresh the Trade Center and select a current pick.'),{status:409});
       }
       assets.push({...transfer,draftPickId:pick.id});
     }

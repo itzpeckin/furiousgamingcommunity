@@ -617,15 +617,12 @@
     const threadLabel=threadSync?.reviewRequired?'Needs review':['failed','partial'].includes(threadSync?.status)?'Needs attention':threadSync?.status==='complete'?'Ready':threadSync?.status==='not-required'?'Not required':threadSync?.scheduled?'Running':'Pending';
     const connectionService=exportUrlService();
     return `<section class="commissioner-command-panel commissioner-command-import" data-compact-import-panel aria-label="Import collected Madden data">
-      <header><div><span class="eyebrow">Step 2 · Publish</span><h3>Import to your league</h3></div><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></header>
-      <p class="commissioner-madden-import-copy">Import the collected export to update live rosters, ratings, development traits, and game statistics.</p>
-      <div class="commissioner-command-import__actions">
-        <button class="button button--secondary" data-copy-permanent-export-url ${busy||connection.busy||!endpointState.exportUrl?'disabled':''}>${connection.copied?'URL Copied':'Copy URL'}</button>
-        <button class="button button--ghost" data-refresh-companion-import ${busy||connection.busy?'disabled':''}>Refresh</button>
-        <button class="button button--primary" data-import-latest-export data-import-in-place ${runDisabled?'disabled':''}>${esc(runLabel)}</button>
+      <header><div><h3>Refresh &amp; import</h3></div><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></header>
+      <div class="commissioner-import-steps">
+        <section><span class="eyebrow">Step 2 · Refresh</span><p>After the export finishes, check for the latest captured data.</p><button class="button button--ghost" data-refresh-companion-import ${busy||connection.busy?'disabled':''}>Refresh</button></section>
+        <section><span class="eyebrow">Step 3 · Import</span><p>Publish the export to update rosters, ratings, traits, and game stats.</p><button class="button button--primary" data-import-latest-export data-import-in-place ${runDisabled?'disabled':''}>${esc(runLabel)}</button></section>
       </div>
-      ${exportUrlService()?.renderYearlyScheduleControls?.({compact:true})||''}
-      <div class="commissioner-command-import__progress" aria-live="polite"><div><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" role="progressbar" aria-label="${esc(phaseLabel(activePhase))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${phaseProgress}"><span style="width:${phaseProgress}%"></span></div></div>
+      ${run?.status==='running'||run?.status==='failed'?`<div class="commissioner-command-import__progress" aria-live="polite"><div><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" role="progressbar" aria-label="${esc(phaseLabel(activePhase))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${phaseProgress}"><span style="width:${phaseProgress}%"></span></div></div>`:''}
       <div class="commissioner-import-glance" aria-label="Latest import summary">
         <span><small>Live week</small><strong>${esc(state?.activeSnapshotWeek??latestExport.activeSnapshotWeek??'—')}</strong></span>
         <span><small>Captured week</small><strong>${esc(coverage.currentWeek??latestExport.capturedWeek??'—')}</strong></span>
@@ -642,7 +639,7 @@
         <span><small>Discord threads</small><strong>${esc(threadLabel)}</strong></span>
       </div>${historicalBackfill?'<p class="commissioner-import-detail-note"><strong>Historical backfill:</strong> completed earlier weeks are being added without moving the active week.</p>':''}${rosterCarryForward?'<p class="commissioner-import-detail-note"><strong>Roster carried forward:</strong> league info, games, results, standings, and weekly statistics can update while the retained roster remains authoritative.</p>':''}${actionableSourceWarnings.length?`<div class="commissioner-import-detail-warning"><strong>Needs attention</strong><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></div>`:''}</details>
       ${lastOutcome?.tone==='error'?`<section class="commissioner-import-recovery" role="alert"><div><h4>${esc(lastOutcome.title)}</h4><p>${esc(lastOutcome.summary)}</p><p><strong>What to do:</strong> ${esc(lastOutcome.action)}</p></div><details><summary>Support details</summary><p>${esc(lastOutcome.detail)}</p><code>${esc(lastOutcome.supportCode)}</code></details></section>`:''}
-      ${connectionService?.renderSecurityControls?.()||''}
+      <details class="commissioner-import-details" ${!connection.state?.preparedSeason||['collecting','ready','failed'].includes(connection.state?.yearlyScheduleImport?.status)?'open':''}><summary>Companion export URL &amp; season schedule</summary><button class="button button--secondary" data-copy-permanent-export-url ${busy||connection.busy||!endpointState.exportUrl?'disabled':''}>${connection.copied?'URL Copied':'Copy URL'}</button>${exportUrlService()?.renderYearlyScheduleControls?.({compact:true})||''}${connectionService?.renderSecurityControls?.()||''}</details>
     </section>`;
   }
 

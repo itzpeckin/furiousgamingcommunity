@@ -57,3 +57,30 @@
 .commissioner-madden-workflow .ea-direct-identity>div:last-child{grid-column:1/-1}
 @media(max-width:1100px){.commissioner-madden-layout>.commissioner-madden-workflow,.commissioner-madden-layout>.commissioner-command-column--secondary{grid-column:1/-1}}
 @media(max-width:700px){.commissioner-madden-workflow__header,.commissioner-madden-workflow>.ea-direct-card,.commissioner-madden-workflow>.commissioner-command-import{padding:18px}.commissioner-madden-workflow .ea-direct-identity{grid-template-columns:minmax(0,1fr)}.commissioner-madden-workflow__sequence{gap:10px;font-size:.75rem}}
+
+/* FranchiseHQ 8.0.18 — compact export / refresh / import and adjacent source selector */
+.commissioner-madden-workflow__header,.commissioner-madden-workflow>.ea-direct-card,.commissioner-madden-workflow>.commissioner-command-import{padding:18px}
+.commissioner-madden-workflow__header h2{margin:3px 0 6px}
+.commissioner-madden-workflow__sequence{margin-top:12px;gap:10px}
+.commissioner-madden-workflow .ea-direct-card,.commissioner-madden-workflow .ea-direct-content,.commissioner-madden-workflow .ea-direct-connected{gap:10px}
+.commissioner-madden-workflow .ea-direct-header p{font-size:.85rem}
+.commissioner-madden-workflow .ea-direct-connected>p{font-size:.85rem}
+.commissioner-madden-workflow .ea-direct-settings{padding-top:0}
+.commissioner-import-steps{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin:12px 0}
+.commissioner-import-steps>section{display:flex;flex-direction:column;gap:10px;min-width:0;padding:14px;border:1px solid var(--command-border);border-radius:12px}
+.commissioner-import-steps p{margin:0;color:var(--muted);font-size:.82rem;line-height:1.5;flex:1}
+.commissioner-import-steps .button{width:100%;min-height:44px;white-space:normal}
+.commissioner-madden-layout [data-league-source-selector]{margin:0;padding:18px;min-width:0;border:1px solid var(--command-border);border-radius:20px;background:var(--command-surface)}
+.commissioner-madden-layout .league-source-selector .card-header{align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.commissioner-madden-layout .league-source-selector h3{font-size:1.05rem;margin:6px 0}
+.commissioner-madden-layout .league-source-selector p{font-size:.8rem;line-height:1.5}
+.commissioner-madden-layout .league-source-options{grid-template-columns:minmax(0,1fr);gap:8px}
+.commissioner-madden-layout .league-source-option{padding:12px;min-height:0}
+.commissioner-madden-layout .league-source-selector__footer{align-items:stretch;flex-direction:column;gap:10px}
+@media(max-width:700px){.commissioner-madden-workflow__header,.commissioner-madden-workflow>.ea-direct-card,.commissioner-madden-workflow>.commissioner-command-import{padding:14px}.commissioner-import-steps{grid-template-columns:minmax(0,1fr)}}
+
+.commissioner-madden-layout .league-source-option{grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px}
+.commissioner-madden-layout .league-source-option__content>small,.commissioner-madden-layout .league-source-option__content>span,.commissioner-madden-layout .league-source-selector__footer span{display:none}
+.commissioner-madden-layout .league-source-option__status{grid-column:auto;margin:0;padding:4px 6px;font-size:.6rem}
+.commissioner-madden-layout .league-source-option__icon{width:28px;height:28px;border-radius:8px}
+.commissioner-madden-layout .league-source-option__content strong{font-size:.85rem}

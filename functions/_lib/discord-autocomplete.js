@@ -1,3 +1,5 @@
+import { currentTradeSeason } from './trade-season.js';
+import { draftClassesForSeason } from './draft-pick-baselines.js';
 import { discordCommandName, discordFocusedOption } from './discord-commands.js';
 import { activeLeagueTeams, activeTeamAssignments, canonicalTeamKey, resolveTeam } from './league-teams.js';
 import { normalizePlayer } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
@@ -137,9 +139,11 @@ async function tradeBlockPlayerChoices(c,query,{listedOnly=false}={}){
 async function assetChoices(c,query,{teamKey}={}){
   if(!canonicalTeamKey(teamKey))return[];
   const players=await playerChoices(c,query,{teamKey});
-  const picks=(await c.db.prepare(`SELECT id,draft_class AS draftClass,round,original_team_key AS originalTeamKey
-    FROM league_draft_picks WHERE league_id=? AND current_team_key=?
-    ORDER BY draft_class,round,original_team_key`).bind(c.league.id,canonicalTeamKey(teamKey)).all()).results||[];
+  const season=await currentTradeSeason(c.db,c.league.id);
+  const classes=season?.seasonYear ? draftClassesForSeason(season.seasonYear) : [];
+  const picks=classes.length ? (await c.db.prepare(`SELECT id,draft_class AS draftClass,round,original_team_key AS originalTeamKey
+    FROM league_draft_picks WHERE league_id=? AND current_team_key=? AND draft_class BETWEEN ? AND ? AND continuity_key IS NOT NULL
+    ORDER BY draft_class,round,original_team_key`).bind(c.league.id,canonicalTeamKey(teamKey),classes[0],classes.at(-1)).all()).results||[] : [];
   const pickChoices=picks.filter(item=>matches(`${item.draftClass} round ${item.round} ${item.originalTeamKey}`,query))
     .map(item=>choice(`Pick · ${item.draftClass} Round ${item.round} (${String(item.originalTeamKey).toUpperCase()})`,`pick:${item.id}`));
   return uniqueChoices([
