@@ -2,8 +2,9 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.3';
+  const VERSION = '8.0.16';
   let running = null;
+  let revision = 0;
   let lastResult = null;
   let lastError = null;
 
@@ -51,6 +52,8 @@
   }
 
   function rerenderCurrentRoute() {
+    const result=lastResult;
+    const tenantId=HQ?.leagueTenant?.current?.()?.id;
     const deepPath = String(location.pathname || '').match(/^\/leagues\/[^/]+\/(teams|players)\/([^/]+)\/?$/i);
     let route = '';
     if (deepPath) {
@@ -65,29 +68,25 @@
       || String(location.hash || '#home').replace(/^#\/?/, '')
       || 'home';
     setTimeout(() => {
+      if(HQ?.leagueTenant?.current?.()?.id!==tenantId)return;
       try {
         HQ?.appRouter?.render?.(route, {source:'live-snapshot-boot'});
       } catch (error) {
         console.warn('[Live Snapshot Boot] Route refresh skipped.', error);
       }
       try {
-        window.dispatchEvent(new CustomEvent('franchisehq:live-snapshot-booted', {detail:lastResult}));
+        window.dispatchEvent(new CustomEvent('franchisehq:live-snapshot-booted', {detail:result}));
       } catch (_) {}
     }, 0);
   }
 
-  async function boot({force=false} = {}) {
-    if (running && !force) return running;
-    running = (async () => {
-      lastError = null;
-      const liveData = HQ?.liveData;
+  function restoreSummary(summary) {
+      const tenant=HQ?.leagueTenant?.current?.();
+      // Never install a response into a route placeholder or another tenant.
+      if(!tenant?.serverResolved || String(tenant.id)!==String(summary?.league?.id)
+        || tenant.slug!==summary?.league?.slug)return null;
       const repository = HQ?.leagueRepository;
       const leagueData = HQ?.leagueData;
-      if (!liveData?.refresh || !repository?.install || !leagueData?.setMode) {
-        throw new Error('Live Snapshot Boot dependencies are not available.');
-      }
-
-      const summary = await liveData.refresh();
       if (String(summary?.state || '').toLowerCase() !== 'live' || !summary?.snapshot?.id) {
         lastResult = Object.freeze({
           ok: true,
@@ -107,7 +106,7 @@
       }
 
       const before = leagueData.status?.();
-      if (before?.requestedMode !== 'live' || before?.activeMode !== 'live') {
+      if ((!installedId || before?.requestedMode==='live') && before?.activeMode !== 'live') {
         leagueData.setMode('live');
       }
 
@@ -116,20 +115,33 @@
         version: VERSION,
         state: 'live',
         snapshotId: activeId,
-        changed: installedId !== activeId || before?.activeMode !== 'live',
+        changed: installedId !== activeId || before?.activeMode !== leagueData.status?.()?.activeMode,
         domains: Object.freeze({...summary.domains}),
         checkedAt: now()
       });
 
-      console.info('[Live Snapshot Boot]', lastResult);
-      rerenderCurrentRoute();
+      lastError=null;
+      if(lastResult.changed)rerenderCurrentRoute();
       return lastResult;
+  }
+
+  async function boot({force=false} = {}) {
+    if (running && !force) return running;
+    const bootRevision=++revision;
+    running = (async () => {
+      lastError = null;
+      if (!HQ?.liveData?.refresh || !HQ?.leagueRepository?.install || !HQ?.leagueData?.setMode) {
+        throw new Error('Live Snapshot Boot dependencies are not available.');
+      }
+      const summary=await HQ.liveData.refresh();
+      return bootRevision===revision?restoreSummary(summary):null;
     })().catch(error => {
-      lastError = error;
-      console.error('[Live Snapshot Boot]', error);
+      if(bootRevision!==revision || error.code==='LIVE_READ_SUPERSEDED')return null;
+      lastError=error;
+      console.error('[Live Snapshot Boot]',error);
       throw error;
     }).finally(() => {
-      running = null;
+      if(bootRevision===revision)running=null;
     });
     return running;
   }
@@ -146,6 +158,11 @@
 
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before live-snapshot-boot.js.');
   HQ.defineModuleService('league', 'liveSnapshotBoot', {boot, diagnostics}, {replace:true, alias:'liveSnapshotBoot'});
+
+  window.addEventListener('franchisehq:live-read-refreshed',event=>{
+    if(event.detail?.leagueSlug===HQ?.leagueTenant?.current?.()?.slug)restoreSummary(event.detail.summary);
+  });
+  window.addEventListener('franchisehq:league-tenant-changed',()=>{boot({force:true}).catch(()=>{});});
 
   // Do not block application startup. The remote active snapshot is restored
   // immediately in parallel, then the current route is rendered again as Live.

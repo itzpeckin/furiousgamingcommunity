@@ -8,11 +8,11 @@
 
 **Revision:** 3.09
 
-**Current production:** 8.0.14 is deployed. Bounded live EA evidence confirms Week 8 / calendar 2027 with no separate source season ID. Weeks 7/8 statistics are saved and the stale-cache repair is live.
+**Current production:** 8.0.15; EA live preview and owner weekly collection succeeded. The active Week 8 snapshot remains intact, but a reproduced browser startup race can disable Madden Data.
 
-**Current work:** 8.0.15 binds exact calendar-only EA evidence to one prepared tenant/franchise/edition season; ambiguous or foreign matches remain blocked.
+**Current work:** 8.0.16 restores browser snapshot installation after tenant resolution and competing refreshes. End-to-end source lifecycle tests and live selector verification are required.
 
-**Next gate:** Validate and publish the EA period follow-up, then retry the connected account private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
+**Next gate:** Validate and deploy 8.0.16, then verify fresh loads and navigation preserve an active, selectable Madden Data source. No re-export or database repair is required. The collected EA weekly source remains ready for a separate commissioner import.
 
 ## Product decisions
 

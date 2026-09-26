@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.16",
+  "releaseType": "madden-source-startup-recovery",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.15",
+    "commit": "6746420cdfc6016c90c68b000dcdd20c1eea664b",
+    "tag": "v8.0.15"
+  },
+  "implementationBranch": "fix/8.0.16-madden-source-recovery",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.15",
+    "candidateRelease": "8.0.16",
+    "currentMigration": 48,
+    "candidateMigration": 48,
+    "scope": "Repair browser snapshot installation after tenant resolution and competing refresh requests. Preserve Madden source availability and existing data. No EA collection, import or snapshot activation."
+  },
+  "requiredArtifacts": [
+    "league-engine/live-read-model.js",
+    "league-engine/live-snapshot-boot.js",
+    "tests/import/live-data-experience.test.mjs",
+    "docs/ROADMAP.md",
+    "releases/8.0.16/release-record.md",
+    "releases/8.0.16/validation-evidence.json"
+  ]
+}

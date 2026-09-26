@@ -13,6 +13,82 @@ import {
 } from '../../functions/_lib/live-data-experience.js';
 import { normalizePlayer, normalizeStanding, normalizeTeam } from '../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js';
 
+async function sourceLifecycleFixture(){
+  const listeners=new Map(),requests=[],stored=new Map();
+  let tenant={id:'route-placeholder',slug:'league-a',serverResolved:false};
+  const HQ={leagueTenant:{current:()=>tenant,getCurrentLeague:()=>tenant},
+    defineModuleService(_module,name,service,options){HQ[options?.alias||name]=service;return service;},
+    leagueSchema:{emptySnapshot:()=>({source:{},teams:[],players:[],games:[],stats:[]})},leagueMockAdapter:{},
+    storage:{diagnostics:()=>({localAvailable:true}),get:key=>stored.get(key),set:(key,value)=>{stored.set(key,value);return true;}},
+    appRouter:{render(){}},events:{emit(){}}};
+  const context={URL,console,structuredClone,Date,Map,setTimeout,clearTimeout,
+    CustomEvent:class{constructor(type,options={}){this.type=type;this.detail=options.detail;}},
+    location:{origin:'https://example.test',pathname:'/leagues/league-a',hash:'#commissioner'},
+    document:{readyState:'loading',addEventListener(){},querySelector:()=>null},
+    sessionStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)},
+    window:{FranchiseHQ:HQ,localStorage:{getItem:()=>null},addEventListener(name,fn){listeners.set(name,[...(listeners.get(name)||[]),fn]);},
+      dispatchEvent(event){for(const fn of listeners.get(event.type)||[])fn(event);}},
+    fetch:url=>new Promise(resolve=>requests.push({url,resolve:payload=>resolve({ok:true,json:async()=>payload})}))};
+  for(const file of ['repository','data-state','live-read-model','live-snapshot-boot']){
+    runInNewContext(await readFile(new URL(`../../league-engine/${file}.js`,import.meta.url),'utf8'),context);
+  }
+  return {HQ,requests,resolveTenant(next){tenant=next;context.window.dispatchEvent(new context.CustomEvent('franchisehq:league-tenant-changed'));},
+    summary:(id='snapshot-a',slug='league-a',leagueId='tenant-a')=>({state:'live',league:{id:leagueId,slug},snapshot:{id,seasonYear:2027,weekIndex:8},domains:{teams:32,statistics:878}})};
+}
+
+test('Madden Data becomes selectable after tenant resolution interrupts startup and concurrent refreshes',async()=>{
+  const f=await sourceLifecycleFixture();
+  assert.equal(f.HQ.leagueData.status().hasLiveSnapshot,false);
+  f.resolveTenant({id:'tenant-a',slug:'league-a',serverResolved:true});
+  const other=f.HQ.liveData.refresh();
+  assert.equal(f.requests.length,2,'same-tenant startup and page refresh share one request');
+  f.requests[0].resolve(f.summary('stale-placeholder'));
+  f.requests[1].resolve(f.summary());
+  await other;await f.HQ.liveSnapshotBoot.boot();
+  assert.equal(f.HQ.leagueData.status().hasLiveSnapshot,true);
+  assert.equal(f.HQ.leagueData.status().activeMode,'live');
+  assert.equal(f.HQ.leagueRepository.current().source.snapshotId,'snapshot-a');
+});
+
+test('source recovery preserves explicit source choices and excludes late responses from another tenant',async()=>{
+  const f=await sourceLifecycleFixture();
+  f.resolveTenant({id:'tenant-a',slug:'league-a',serverResolved:true});
+  const first=f.HQ.liveData.refresh();f.requests[1].resolve(f.summary());await first;
+  f.HQ.leagueData.setMode('empty');
+  const refresh=f.HQ.liveData.refresh();f.requests[2].resolve(f.summary());await refresh;
+  assert.equal(f.HQ.leagueData.status().activeMode,'empty','an explicit No Data choice is preserved');
+  assert.equal(f.HQ.leagueData.status().hasLiveSnapshot,true,'Madden Data remains selectable');
+  f.HQ.leagueData.setMode('live');
+  const pending=f.HQ.liveData.refresh();const rejected=assert.rejects(pending,/Live data changed/);
+  f.resolveTenant({id:'tenant-b',slug:'league-b',serverResolved:true});
+  const latest=f.HQ.liveData.refresh();
+  f.requests[4].resolve(f.summary('snapshot-b','league-b','tenant-b'));await latest;
+  f.requests[3].resolve(f.summary('late-a'));f.requests[0].resolve(f.summary('placeholder-a'));await rejected;
+  assert.equal(f.HQ.leagueRepository.current().source.snapshotId,'snapshot-b');
+  assert.equal(f.HQ.leagueData.status().activeMode,'live');
+  assert.equal(f.HQ.leagueData.status().leagueId,'tenant-b');
+});
+
+test('a successful later refresh restores a failed startup and a failed refresh preserves Madden Data',async()=>{
+  const f=await sourceLifecycleFixture();
+  f.resolveTenant({id:'tenant-a',slug:'league-a',serverResolved:true});
+  const first=f.HQ.liveSnapshotBoot.boot();
+  const failed=assert.rejects(first,/temporary outage/);
+  f.requests[1].resolve({ok:false,error:'temporary outage'});await failed;
+  assert.equal(f.HQ.leagueData.status().hasLiveSnapshot,false);
+  const recovery=f.HQ.liveData.refresh();f.requests[2].resolve(f.summary());await recovery;
+  assert.equal(f.HQ.leagueData.status().activeMode,'live');
+  const newer=f.HQ.liveData.refresh();const snapshotRead=f.HQ.liveData.getSnapshot();
+  f.requests[3].resolve(f.summary('snapshot-new'));await newer;
+  assert.equal((await snapshotRead).id,'snapshot-new','reads wait for the current refresh instead of mixing snapshots');
+  const again=f.HQ.liveData.refresh();const failedAgain=assert.rejects(again,/temporary outage/);
+  f.requests[4].resolve({ok:false,error:'temporary outage'});await failedAgain;
+  assert.equal(f.HQ.leagueData.status().hasLiveSnapshot,true);
+  assert.equal(f.HQ.leagueData.status().activeMode,'live');
+  assert.equal((await f.HQ.liveData.getSnapshot()).id,'snapshot-new');
+  f.requests[0].resolve(f.summary('old-placeholder'));
+});
+
 async function liveCacheFixture(){
   const listeners=new Map(),stored=new Map(),events=[];
   let service, snapshot='week6', delayed=null, slug='league-a';
