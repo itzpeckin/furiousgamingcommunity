@@ -212,7 +212,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 437970,
+        "bytes": 438715,
         "file": "trade-module.js"
       },
       {
@@ -260,7 +260,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 49759,
+        "bytes": 49984,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -1761,7 +1761,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.16",
+  "release": "8.0.17",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

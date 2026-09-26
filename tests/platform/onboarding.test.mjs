@@ -318,7 +318,7 @@ test('the owner console is responsive and exposes only owner-gated activation', 
   assert.match(adminCss,/@media\(max-width:700px\)[\s\S]+platform-onboarding-form-grid/);
   assert.match(html,/data-platform-admin-link data-platform-owner-only/);
   assert.match(html,/platform-owner-identity\.js\?v=8\.0\.3\.1/);
-  assert.match(html,/trade-module\.js\?v=8\.0\.10/);
+  assert.match(html,/trade-module\.js\?v=8\.0\.17/);
   assert.match(identity,/VERSION = '8\.0\.3\.1'/);
   assert.match(identity,/SERVER_PLATFORM_OWNER/);
   assert.match(admin,/data-platform-onboarding-host/);

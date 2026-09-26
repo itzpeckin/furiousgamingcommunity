@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.17",
+  "releaseType": "unified-madden-import-workspace",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.16",
+    "commit": "55a3de8cdc5908e75926106d5f2185b6657fff00",
+    "tag": "v8.0.16"
+  },
+  "implementationBranch": "feature/8.0.17-unified-madden-import",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.16",
+    "candidateRelease": "8.0.17",
+    "currentMigration": 48,
+    "candidateMigration": 48,
+    "scope": "Consolidate collection and import above the Data Source Selector, with adjacent commissioner controls and explicit collection/publish steps. Presentation only; no import or collection."
+  },
+  "requiredArtifacts": [
+    "trade-module.js",
+    "league-engine/ea-direct.js",
+    "league-engine/one-click-import.js",
+    "ea-direct.css",
+    "docs/ROADMAP.md",
+    "releases/8.0.17/release-record.md",
+    "releases/8.0.17/validation-evidence.json"
+  ]
+}

@@ -132,7 +132,7 @@ test('collected EA data requires an explicit review action and never publishes f
   await ui.service.collect('weekly');
   await ui.service.pollCollection();
   assert.deepEqual(ui.effects(), {refreshed: 0, published: 0, scrolled: 0});
-  assert.match(ui.service.renderPanel(), /Review Import/);
+  assert.match(ui.service.renderPanel(), /Continue to Step 2/);
   assert.match(ui.service.renderPanel(), /4, 5/);
   ui.click({eaAction: 'review-import'});
   await settle();

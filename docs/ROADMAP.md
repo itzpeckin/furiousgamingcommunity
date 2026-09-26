@@ -6,13 +6,13 @@
 
 **Updated:** September 25, 2026
 
-**Revision:** 3.09
+**Revision:** 3.10
 
-**Current production:** 8.0.15; EA live preview and owner weekly collection succeeded. The active Week 8 snapshot remains intact, but a reproduced browser startup race can disable Madden Data.
+**Current production:** 8.0.16; Madden source startup recovery is deployed and verified. EA collection and live import are distinct commissioner actions.
 
-**Current work:** 8.0.16 restores browser snapshot installation after tenant resolution and competing refreshes. End-to-end source lifecycle tests and live selector verification are required.
+**Current work:** 8.0.17 consolidates EA/Companion collection and Madden Import above the Data Source Selector, with adjacent Quick Controls and numbered collect/publish steps.
 
-**Next gate:** Validate and deploy 8.0.16, then verify fresh loads and navigation preserve an active, selectable Madden Data source. No re-export or database repair is required. The collected EA weekly source remains ready for a separate commissioner import.
+**Next gate:** Validate and publish 8.0.17; verify desktop/mobile order, panel refreshes and source availability. This presentation release performs no collection or import.
 
 ## Product decisions
 
