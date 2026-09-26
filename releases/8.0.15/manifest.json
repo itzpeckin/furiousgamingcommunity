@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.15",
+  "releaseType": "ea-calendar-season-binding",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.14",
+    "commit": "43bb0b04d6ae562964c2877e08ef6fec6a9adff0",
+    "tag": "v8.0.14"
+  },
+  "implementationBranch": "fix/8.0.15-ea-calendar-season",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.14",
+    "candidateRelease": "8.0.15",
+    "currentMigration": 48,
+    "candidateMigration": 48,
+    "scope": "Resolve EA calendar-only season evidence against one exact tenant, franchise, Madden edition and prepared season. No guessed season offset, import or activation."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/ea-capture.js",
+    "functions/_lib/ea-collection.js",
+    "league-engine/live-read-model.js",
+    "app.js",
+    "tests/import/ea-capture.test.mjs",
+    "tests/import/ea-collection.test.mjs",
+    "tests/import/live-data-experience.test.mjs",
+    "docs/EA-DIRECT.md",
+    "docs/ROADMAP.md",
+    "releases/8.0.15/release-record.md",
+    "releases/8.0.15/validation-evidence.json"
+  ]
+}

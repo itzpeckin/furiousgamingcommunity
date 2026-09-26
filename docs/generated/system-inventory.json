@@ -1761,7 +1761,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.14",
+  "release": "8.0.15",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

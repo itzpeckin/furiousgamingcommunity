@@ -59,9 +59,11 @@ export function normalizeEaHub(input = {}) {
   const currentPeriod = period(selected.stageIndex, selected.weekIndex);
   const sourceSeasonId = text(hub.sourceSeasonId ?? season.sourceSeasonId ?? hub.seasonIndex ?? season.seasonIndex
     ?? (integer(season.seasonYear) !== null && Number(season.seasonYear) < 1900 ? season.seasonYear : ''));
-  if (!sourceSeasonId) fail('EA has not provided an exact franchise season identifier.');
   const calendarYear = integer(season.calendarYear ?? hub.calendarYear
     ?? (Number(season.seasonYear) >= 1900 ? season.seasonYear : hub.seasonYear));
+  if (!sourceSeasonId && (calendarYear===null || calendarYear<1900 || calendarYear>9999)) {
+    fail('EA has not provided an exact franchise season identifier.');
+  }
   return {
     currentPeriod,stageIndex:Number(selected.stageIndex),weekIndex:Number(selected.weekIndex),
     sourceSeasonId,seasonIndex:integer(sourceSeasonId),seasonYear:calendarYear,
@@ -118,15 +120,19 @@ async function writeManifest(bucket, manifest) {
 }
 
 async function scopedSeason(db, leagueId, hub, externalLeagueId) {
-  const row = await db.prepare(`SELECT season.id franchise_season_id,season.season_year,season.game_release,
+  const rows = await db.prepare(`SELECT season.id franchise_season_id,season.source_season_id,season.season_year,season.game_release,
       linked.game_year_id FROM franchise_seasons season
     JOIN game_year_franchise_seasons linked ON linked.franchise_season_id=season.id AND linked.league_id=season.league_id
     JOIN league_game_years game_year ON game_year.id=linked.game_year_id AND game_year.league_id=season.league_id
-    WHERE season.league_id=? AND season.source_franchise_id=? AND season.source_season_id=?
+    WHERE season.league_id=? AND season.source_franchise_id=?
+      AND ((?<>'' AND season.source_season_id=?) OR (?='' AND season.season_year=?))
       AND season.status IN ('active','preview') AND game_year.status IN ('active','restored','preparing')
-      AND season.game_release=? ORDER BY season.created_at DESC LIMIT 1`)
-    .bind(leagueId,text(externalLeagueId),hub.sourceSeasonId,hub.gameRelease).first();
-  if (!row || (hub.seasonYear !== null && row.season_year !== null && Number(row.season_year) !== hub.seasonYear)) {
+      AND season.game_release=? LIMIT 2`)
+    .bind(leagueId,text(externalLeagueId),hub.sourceSeasonId,hub.sourceSeasonId,hub.sourceSeasonId,hub.seasonYear,hub.gameRelease).all();
+  const row=rows.results?.[0];
+  // A calendar-only hub must identify exactly one already prepared season.
+  // Never derive a source season index from a year offset or latest snapshot.
+  if (rows.results?.length!==1 || !row || (hub.seasonYear !== null && row.season_year !== null && Number(row.season_year) !== hub.seasonYear)) {
     fail('The selected EA franchise, season, and Madden edition do not match this league’s prepared season.');
   }
   return row;
@@ -153,7 +159,7 @@ export async function beginEaCapture({db,bucket,league,actorId,hub:hubInput,plat
     schemaVersion:1,source:'ea-direct',leagueId:league.id,collectionId,connectionId,mode,status:'collecting',
     sessionId,rawSessionId,platform:text(platform).toLowerCase(),externalLeagueId:text(externalLeagueId),
     gameYearId:scope.game_year_id,franchiseSeasonId:scope.franchise_season_id,gameRelease:scope.game_release,
-    sourceSeasonId:hub.sourceSeasonId,seasonYear:scope.season_year,currentPeriod:hub.currentPeriod,
+    sourceSeasonId:scope.source_season_id,seasonYear:scope.season_year,currentPeriod:hub.currentPeriod,
     actorId,createdAt:now,completedAt:null,requests:[],exportPointer:exportPointer || {},activationPerformed:false,activeSnapshotChanged:false
   };
   for (const id of [sessionId,rawSessionId]) {
@@ -161,7 +167,7 @@ export async function beginEaCapture({db,bucket,league,actorId,hub:hubInput,plat
       (id,league_id,token_hash,status,expected_game_release,expected_platform,expected_league_name,
        expected_season,expected_week,opened_by_user_id,expires_at,created_at,updated_at)
       VALUES (?,?,?,'open',?,?,?,?,?,?,?,?,?)`).bind(id,league.id,await sha256Hex(`private:${id}:${crypto.randomUUID()}`),
-        scope.game_release,manifest.platform,league.name,hub.sourceSeasonId,String(hub.currentPeriod.week),
+        scope.game_release,manifest.platform,league.name,manifest.sourceSeasonId,String(hub.currentPeriod.week),
         actorId || null,new Date(Date.now()+86_400_000).toISOString(),now,now).run();
   }
   await writeManifest(bucket,manifest);
@@ -180,7 +186,9 @@ export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,
   let canonical = payload;
   if (kind === 'hub') {
     const hub = normalizeEaHub(hubInput || payload);
-    if (hub.sourceSeasonId !== manifest.sourceSeasonId || hub.currentPeriod.key !== manifest.currentPeriod.key) fail('EA advanced during collection; start a fresh sync.');
+    const sameSeason=hub.sourceSeasonId ? hub.sourceSeasonId===manifest.sourceSeasonId
+      : hub.seasonYear!==null&&hub.seasonYear===Number(manifest.seasonYear);
+    if (!sameSeason || hub.currentPeriod.key !== manifest.currentPeriod.key) fail('EA advanced during collection; start a fresh sync.');
     canonical = {success:true,source:'ea-direct',gameRelease:manifest.gameRelease,platform:manifest.platform,
       franchiseId:manifest.externalLeagueId,seasonIndex:manifest.sourceSeasonId,
       currentWeek:manifest.currentPeriod.week,currentStage:manifest.currentPeriod.stage};
