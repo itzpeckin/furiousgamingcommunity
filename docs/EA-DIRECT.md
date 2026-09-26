@@ -96,3 +96,7 @@ The hub can report weekTitle="Week" with zero-based seasonWeek, seasonWeekType a
 ## Live 8.0.13 follow-up
 
 Private preview still failed season/week verification after native-field support. 8.0.14 retains only a fixed parser failure category, numeric calendar/period evidence, presence flags and available export indices in the existing commissioner-only collection result; no provider text or credentials. Live activation remains blocked pending exact diagnosis.
+
+## Confirmed calendar-only season evidence
+
+The live owner hub reports calendarYear 2027 and Week 8 but omits sourceSeasonId/seasonIndex/seasonYear. 8.0.15 resolves that exact calendar year to one prepared tenant/franchise/edition season and retains its existing source ID. Duplicate or absent matches remain blocked. No year offset is inferred.

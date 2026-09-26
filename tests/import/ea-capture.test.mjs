@@ -122,6 +122,52 @@ test('native preseason indices are kept separate from regular-season weeks',()=>
   assert.deepEqual(normalizeEaHub(raw).currentPeriod,{stage:'preseason',week:1,key:'preseason:1'});
 });
 
+function calendarOnlyHub(){
+  const raw=rawHub();
+  delete raw.careerHubInfo.seasonInfo.seasonYear;
+  Object.assign(raw.careerHubInfo.seasonInfo,{weekTitle:'Week',seasonWeek:4,displayWeek:5});
+  return raw;
+}
+
+test('calendar-only EA preview binds to the unique prepared franchise season without deriving an index',async()=>{
+  const raw=calendarOnlyHub();
+  assert.equal(normalizeEaHub(raw).sourceSeasonId,'');
+  const f=await fixture('preview',raw);
+  try{
+    assert.equal(f.created.sourceSeasonId,'2');
+    assert.equal(f.created.seasonYear,2027);
+    await collect(f);
+    const result=await f.finish();
+    assert.equal(result.previewVerified,true);
+    assert.equal(result.readyPointerChanged,false);
+    const session=f.sqlite.prepare('SELECT expected_season FROM madden_discovery_sessions WHERE id=?').get(f.created.sessionId);
+    assert.equal(session.expected_season,'2');
+  }finally{f.sqlite.close();}
+});
+
+test('calendar-only EA evidence fails closed for ambiguous, missing, foreign or changed seasons',async()=>{
+  const f=await fixture('preview',calendarOnlyHub());
+  const begin=hub=>beginEaCapture({db:f.db,bucket:f.bucket,league:f.league,actorId:'actor',hub,platform:'ps5',externalLeagueId:'1234',mode:'preview',connectionId:'connection-1',collectionId:'collection-preview'});
+  try{
+    const missing=calendarOnlyHub();missing.careerHubInfo.seasonInfo.calendarYear=2028;
+    await assert.rejects(begin(missing),/prepared season/);
+    delete missing.careerHubInfo.seasonInfo.calendarYear;
+    assert.throws(()=>normalizeEaHub(missing),/season identifier/);
+    const foreign=calendarOnlyHub();foreign.gameRelease='Madden NFL 26';
+    await assert.rejects(begin(foreign),/prepared season/);
+    f.sqlite.exec("UPDATE franchise_seasons SET source_franchise_id='9999' WHERE id='ea-season'");
+    await assert.rejects(begin(calendarOnlyHub()),/prepared season/);
+    f.sqlite.exec("UPDATE franchise_seasons SET source_franchise_id='1234' WHERE id='ea-season'");
+    f.sqlite.exec(`INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('ambiguous','ea-test','ea-madden-companion','1234','other','Madden NFL 27','2027 again',2027,'preview');
+      INSERT INTO game_year_franchise_seasons (game_year_id,league_id,franchise_season_id) VALUES ('ea-year','ea-test','ambiguous');`);
+    await assert.rejects(begin(calendarOnlyHub()),/prepared season/);
+    const changed=calendarOnlyHub();changed.careerHubInfo.seasonInfo.calendarYear=2028;
+    await assert.rejects(storeEaCapture({db:f.db,bucket:f.bucket,leagueId:f.league.id,sessionId:f.created.sessionId,
+      collectionId:'collection-preview',kind:'hub',args:{},payload:changed,hub:changed,platform:'ps5',externalLeagueId:'1234'}),/advanced during collection/);
+  }finally{f.sqlite.close();}
+});
+
 test('EA preview retains all data and proves both weeks without moving any import pointer',async()=>{
   const f=await fixture();
   try {
