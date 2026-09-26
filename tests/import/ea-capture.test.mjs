@@ -89,6 +89,39 @@ test('EA current period comes from the hub title, never the last available sched
   assert.throws(()=>normalizeEaHub({...rawHub(),careerHubInfo:{seasonInfo:{seasonYear:2,weekTitle:'Offseason'}}}),/current export week/);
 });
 
+test('native EA seasonWeek proves the current week even when weekTitle is only Week',()=>{
+  for(const week of [1,7,8,18]){
+    const raw=rawHub(week);
+    Object.assign(raw.careerHubInfo.seasonInfo,{weekTitle:'Week',seasonWeek:week-1,displayWeek:week});
+    const hub=normalizeEaHub({responseInfo:{value:raw}});
+    assert.equal(hub.currentPeriod.week,week);
+    assert.equal(hub.weekIndex,week-1);
+    assert.equal(hub.sourceSeasonId,'2');
+    assert.deepEqual([...new Set(eaCapturePlan(raw).filter(item=>item.kind==='schedule').map(item=>item.args.weekIndex))],
+      [...new Set([Math.max(0,week-2),week-1])]);
+  }
+});
+
+test('native EA week evidence rejects mismatches, missing export periods and advancing leagues',()=>{
+  const raw=rawHub(8);
+  Object.assign(raw.careerHubInfo.seasonInfo,{weekTitle:'Week',seasonWeek:7,displayWeek:9});
+  assert.throws(()=>normalizeEaHub(raw),/does not agree/);
+  raw.careerHubInfo.seasonInfo.displayWeek=8;
+  assert.throws(()=>normalizeEaHub({...raw,availableWeekInfoList:[]}),/does not agree/);
+  raw.careerHubInfo.isLeagueAdvancing=true;
+  assert.throws(()=>normalizeEaHub(raw),/advancing/);
+  raw.careerHubInfo.isLeagueAdvancing=false;
+  Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType:3,weekTitle:'Offseason'});
+  assert.throws(()=>normalizeEaHub(raw),/current export week/);
+});
+
+test('native preseason indices are kept separate from regular-season weeks',()=>{
+  const raw=rawHub(1);
+  Object.assign(raw.careerHubInfo.seasonInfo,{weekTitle:'Preseason Week',seasonWeek:0,displayWeek:1,seasonWeekType:0});
+  raw.availableWeekInfoList.push({stageIndex:0,weekIndex:0,weekTitle:'Preseason Week 1'});
+  assert.deepEqual(normalizeEaHub(raw).currentPeriod,{stage:'preseason',week:1,key:'preseason:1'});
+});
+
 test('EA preview retains all data and proves both weeks without moving any import pointer',async()=>{
   const f=await fixture();
   try {

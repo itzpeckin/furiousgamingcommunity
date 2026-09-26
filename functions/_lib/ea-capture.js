@@ -26,7 +26,8 @@ const period = (stageIndex, weekIndex) => {
   return {stage, week:index + 1, key:`${stage}:${index + 1}`};
 };
 
-// The available-week entry matching the hub title proves the export indices.
+// Native seasonWeek is zero-based; weekTitle may be only "Week".
+// Require a matching available export entry before using native indices.
 // No schedule maximum, season offset, or guessed offseason clock is used.
 export function normalizeEaHub(input = {}) {
   const hub = input.responseInfo?.value || input;
@@ -40,6 +41,14 @@ export function normalizeEaHub(input = {}) {
     selected = {stageIndex:{preseason:0,'regular-season':1,playoffs:2}[stage],weekIndex:week-1};
   } else if (integer(season.weekIndex) !== null && integer(season.stageIndex) !== null) {
     selected = season;
+  } else if ([0,1].includes(integer(season.seasonWeekType)) && integer(season.seasonWeek) !== null) {
+    const stageIndex=integer(season.seasonWeekType), weekIndex=integer(season.seasonWeek);
+    const matches=(hub.availableWeekInfoList || []).filter(item=>integer(item.stageIndex)===stageIndex && integer(item.weekIndex)===weekIndex);
+    if (!matches.length || weekIndex<0 || (stageIndex===0 ? weekIndex>3 : weekIndex>17)
+      || (integer(season.displayWeek)!==null && integer(season.displayWeek)!==weekIndex+1)) {
+      fail('EA current week does not agree with its available export weeks.');
+    }
+    selected=matches[0];
   } else {
     const title = text(season.weekTitle).toLowerCase();
     const matches = (hub.availableWeekInfoList || []).filter(item => title && text(item.weekTitle).toLowerCase() === title);

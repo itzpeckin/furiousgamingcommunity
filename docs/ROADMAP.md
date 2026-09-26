@@ -6,13 +6,13 @@
 
 **Updated:** September 25, 2026
 
-**Revision:** 3.08
+**Revision:** 3.09
 
-**Current production:** FranchiseHQ 8.0.11 is live from Main `0deb44daf4c35211298b9e328a14b3d8a6c75ce0`, migration 48, Pages deployment `4b09ee39-c065-429b-a035-18f9e521b62c`. EA franchise lookup still rejects the Madden session. Companion import fails at Map Statistics despite 722 saved Week 7 records; the live Week 7 snapshot remains unchanged.
+**Current production:** FranchiseHQ 8.0.12 is live from Main dbaf84640205b2fc677a02f7f19c215c5d261f54. Companion imports succeeded; Week 7 has 722 statistics and Week 8 has 156. EA franchise selection succeeds, but preview rejects current-week interpretation.
 
-**Current work:** 8.0.12 repairs retained statistics route selection, stops permanent import retries, preserves Madden session-key path punctuation and renews a rejected Madden session once. Both Pages and the import Worker require deployment. See [release record](../releases/8.0.12/release-record.md).
+**Current work:** 8.0.13 parses native EA current-week evidence and refreshes statistics/game panels after snapshot changes. See [release record](../releases/8.0.13/release-record.md).
 
-**Next gate:** Validate and publish 8.0.12, then restart owner-operated EA sign-in and complete franchise selection and a private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
+**Next gate:** Validate and publish 8.0.13, then retry the connected account private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
 
 ## Product decisions
 

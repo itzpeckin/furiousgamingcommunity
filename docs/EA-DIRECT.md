@@ -1,12 +1,12 @@
 # EA Direct connection and acceptance guide
 
-Release: 8.0.11 Production; 8.0.12 corrective candidate, September 25, 2026.
+Release: 8.0.12 Production; 8.0.13 corrective candidate, September 25, 2026.
 
 EA Direct adds a FranchiseHQ-owned Madden connection alongside the Companion App. The commissioner can connect an EA account, select the matching Madden franchise, collect a private preview, and then collect league updates or the yearly schedule. Both sources use the existing FranchiseHQ validation and retained-source model.
 
 ## Current acceptance status
 
-Production 8.0.11 is deployed. Owner sign-in reaches profile discovery and Madden login, but franchise lookup returns HTTP 200 with ERR_AUTHENTICATION_REQUIRED. The prior token-format correction did not resolve live acceptance. The 8.0.12 candidate corrects session path serialization and provides bounded Madden session recovery; its live effect still requires owner verification. Authenticated Madden 27 franchise access and collection remain pending fresh owner connection and a private preview. Passing mock tests do not establish live compatibility, roster availability, or first-league onboarding.
+Production 8.0.12 now reaches connected franchise selection. The owner private preview fails current-period interpretation. 8.0.13 supports native seasonWeek/seasonWeekType evidence validated against available export weeks; actual account preview acceptance remains pending. Passing fixtures do not establish roster availability or first-league onboarding.
 
 For fresh acceptance after 8.0.12, use **Restart EA sign-in** (or **Connect EA Account** if the setup expired) to obtain a fresh initial token; retrying an old profile setup would reuse its old token. Do not send the EA return address, password, or account tokens to support. The displayed step/support details contain only fixed FHQ step names, a numeric EA HTTP status when available, and recognized error categories; raw provider responses are never displayed or logged.
 
@@ -88,3 +88,7 @@ FranchiseHQ's integration is an independent implementation based on interoperabi
 The owner reported HTTP 200 with ERR_AUTHENTICATION_REQUIRED at franchise lookup after successful Madden login. This is a session/RPC rejection, not evidence that the EA password or account sign-in failed. FHQ preserves path-safe punctuation in the opaque session key, rejects URL delimiters/traversal, and renews the Madden session once before repeating a read. Concurrent reads share renewal. A second rejection is EA_MADDEN_SESSION_REJECTED; an OAuth invalid-token/grant still requires reconnect. No automatic collection or import begins during connection.
 
 Live acceptance is still required; these changes do not prove the root cause of the owner's original provider rejection. Protocol reference: https://github.com/snallabot/snallabot-service/blob/main/docs/madden/ea_api.md. Credential-safe diagnostic handling remains in force.
+
+## 8.0.13 native current-week evidence
+
+The hub can report weekTitle="Week" with zero-based seasonWeek, seasonWeekType and one-based displayWeek. Require matching available export indices and consistent displayWeek before accepting preseason/regular-season native evidence. Never use the maximum schedule week. The generic unavailable-period error no longer claims the league is advancing unless that flag is present. See the release PR for live private-preview acceptance.

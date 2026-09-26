@@ -204,7 +204,7 @@
     },
     "largest": [
       {
-        "bytes": 652708,
+        "bytes": 654533,
         "file": "app.js"
       },
       {
@@ -240,7 +240,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77350,
+        "bytes": 77351,
         "file": "index.html"
       },
       {
@@ -1761,7 +1761,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.12",
+  "release": "8.0.13",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -2170,7 +2170,7 @@
   });
 
 
-  const playerStatisticsState={loaded:false,loading:false,rows:[],error:null,promise:null};
+  const playerStatisticsState={loaded:false,loading:false,rows:[],error:null,promise:null,revision:0,snapshotId:null};
   const PLAYER_STAT_CATEGORIES=['passing','rushing','receiving','defense','kicking','punting'];
 
   function playerStatIdentity(row={}) {
@@ -2313,15 +2313,20 @@
   async function hydratePlayerStatistics(force=false){
     if(playerStatisticsState.loaded&&!force)return playerStatisticsState.rows;
     if(playerStatisticsState.promise&&!force)return playerStatisticsState.promise;
+    if(force)await liveReadModel()?.refresh();
+    const revision=playerStatisticsState.revision;
     playerStatisticsState.loading=true;playerStatisticsState.error=null;
     playerStatisticsState.promise=(async()=>{
       try{
         const service=liveReadModel();
         if(!service)throw new Error('Live Read Model service is unavailable.');
-        if(force)await service.refresh();
-        playerStatisticsState.rows=await service.getStatistics()||[];
+        const rows=await service.getStatistics()||[];
+        if(revision!==playerStatisticsState.revision)return [];
+        playerStatisticsState.rows=rows;
         playerStatisticsState.loaded=true;
         matchupCompactModelCache.clear();
+        matchupTeamStatsCache.clear();
+        matchupPanelCache.clear();
         // Build matchup lookup once while data is hydrating so opening/clicking
         // Matchup tabs never scans the full statistics collection.
         // Build indexes cooperatively after rows are available. Do not block
@@ -2331,14 +2336,44 @@
         rebuildCanonicalStatisticsIndexCooperative(true);
         return playerStatisticsState.rows;
       }catch(error){
+        if(revision!==playerStatisticsState.revision)return [];
         playerStatisticsState.error=error?.message||'Unable to load player statistics.';
         return [];
       }finally{
-        playerStatisticsState.loading=false;playerStatisticsState.promise=null;rerenderPlayerStatHosts();refreshOpenPlayerGameLogs();
+        if(revision===playerStatisticsState.revision){
+          playerStatisticsState.loading=false;playerStatisticsState.promise=null;rerenderPlayerStatHosts();refreshOpenPlayerGameLogs();
+        }
       }
     })();
     return playerStatisticsState.promise;
   }
+  function invalidateLiveStatistics(snapshotId=null){
+    Object.assign(playerStatisticsState,{loaded:false,loading:false,rows:[],error:null,promise:null,
+      revision:playerStatisticsState.revision+1,snapshotId});
+    matchupCompactModelCache.clear();
+    matchupTeamStatsCache.clear();
+    matchupPanelCache.clear();
+  }
+  window.addEventListener('franchisehq:league-tenant-changed',()=>invalidateLiveStatistics());
+  window.addEventListener('franchisehq:live-read-refreshed',async event=>{
+    const snapshotId=event.detail?.snapshotId || null;
+    if(snapshotId===playerStatisticsState.snapshotId&&playerStatisticsState.loaded)return;
+    invalidateLiveStatistics(snapshotId);
+    if(!snapshotId)return;
+    const revision=playerStatisticsState.revision;
+    await hydratePlayerStatistics(false);
+    if(revision!==playerStatisticsState.revision)return;
+    const modal=document.querySelector('[data-matchup-modal]');
+    const game=activeMatchupGame;
+    if(modal&&game){
+      await hydrateMatchupTeamStatistics(game);
+      if(revision!==playerStatisticsState.revision||document.querySelector('[data-matchup-modal]')!==modal)return;
+      prepareMatchupRuntime(game);
+      const tab=modal.querySelector('[data-matchup-tab].is-active')?.dataset.matchupTab||'team';
+      const target=modal.querySelector('[data-matchup-tab-content]');
+      if(target)target.innerHTML=matchupPanelCache.get(matchupPanelCacheKey(game,tab))||'';
+    }
+  });
   function renderLivePlayerStatistics(playerId=''){
     if(!playerStatisticsState.loaded&&!playerStatisticsState.loading)hydratePlayerStatistics(false);
     if(!playerStatisticsState.loaded){
@@ -10087,7 +10122,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.0.12';
+  const VISIBLE_RELEASE = '8.0.13';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';
