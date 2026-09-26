@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "version": "8.0.12",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "productionDataChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 48,
+      "candidateRequiresMigration": false,
+      "productionApplied": false
+    },
+    "liveEaAcceptance": {
+      "passed": false,
+      "status": "requires-fresh-owner-sign-in-and-preview"
+    },
+    "preDeploymentProduction": {
+      "season": 2027,
+      "exportTokenVersions": [
+        1,
+        1
+      ],
+      "activeSnapshotId": "45ead332-d556-4773-ab34-0a8fa02be4b5",
+      "eaCollectionJobs": 0,
+      "week": 7,
+      "eaConnections": 0,
+      "readOnly": true
+    },
+    "focusedRegressionTests": {
+      "passed": true,
+      "tests": 81,
+      "failures": 0,
+      "retainedStatisticsRecords": 722
+    },
+    "eaCause": {
+      "proven": false,
+      "observedStep": "franchise-list",
+      "providerCode": "ERR_AUTHENTICATION_REQUIRED",
+      "remediation": "Preserve path-safe key punctuation; renew Madden session once; distinguish persistent session rejection from OAuth failure."
+    },
+    "strictQualityGate": {
+      "passed": true,
+      "command": "node tools/run-quality.mjs --strict",
+      "tests": 408,
+      "failures": 0
+    },
+    "supplementalTests": {
+      "passed": true,
+      "tests": 6,
+      "failures": 0
+    },
+    "rollbackWorker": {
+      "deploymentId": "97a6da44-a315-4f20-9b81-53159bbe59b4",
+      "versionId": "2773647a-8051-488f-8ab7-cee018553338"
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "archiveSeasonExecuted": false,
+    "dataDeleted": false,
+    "exportUrlRotated": false,
+    "freeAgentInterpretedAsZero": false,
+    "credentialsChanged": false
+  }
+}

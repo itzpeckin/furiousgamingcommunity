@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.12",
+  "releaseType": "ea-session-and-companion-statistics-repair",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.11",
+    "commit": "0deb44daf4c35211298b9e328a14b3d8a6c75ce0",
+    "tag": "v8.0.11"
+  },
+  "implementationBranch": "fix/8.0.12-ea-and-import",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.11",
+    "candidateRelease": "8.0.12",
+    "currentMigration": 48,
+    "candidateMigration": 48,
+    "scope": "Preserve Madden session path credentials and renew rejected sessions once; map exact retained Companion statistics captures and stop permanent Workflow retries. Pages and import Worker deploy together. No migration, credential rotation, collection, activation or Discord action performed by deployment."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/ea-client.js",
+    "functions/api/leagues/[leagueSlug]/companion/map-statistics.js",
+    "workers/franchise-import-worker/src/index.js",
+    "tests/import/ea-client.test.mjs",
+    "tests/import/candidate-import.test.mjs",
+    "tests/discord/schedule-workflow.test.mjs",
+    "docs/EA-DIRECT.md",
+    "docs/ROADMAP.md",
+    "releases/8.0.12/release-record.md",
+    "releases/8.0.12/validation-evidence.json"
+  ]
+}

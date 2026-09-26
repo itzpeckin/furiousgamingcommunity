@@ -6,13 +6,13 @@
 
 **Updated:** September 25, 2026
 
-**Revision:** 3.07
+**Revision:** 3.08
 
-**Current production:** FranchiseHQ 8.0.10 is live from Main `3bec0e3d6423d31aca0ec59275743bae80680c10` with migration 48, Pages deployment `c818b61d-f2dc-4bc0-be1e-d42a32780a4d`. The owner reached EA profile discovery but franchise lookup failed before creating a connection or collecting data. The existing Week 7 snapshot remains unchanged.
+**Current production:** FranchiseHQ 8.0.11 is live from Main `0deb44daf4c35211298b9e328a14b3d8a6c75ce0`, migration 48, Pages deployment `4b09ee39-c065-429b-a035-18f9e521b62c`. EA franchise lookup still rejects the Madden session. Companion import fails at Map Statistics despite 722 saved Week 7 records; the live Week 7 snapshot remains unchanged.
 
-**Current work:** 8.0.11 corrects the initial EA token-format mismatch, preserves selected profile/franchise choices, and identifies failed connection steps without exposing credentials. No schema, import, Discord, snapshot, or season change is included. See [EA Direct connection and acceptance guide](EA-DIRECT.md).
+**Current work:** 8.0.12 repairs retained statistics route selection, stops permanent import retries, preserves Madden session-key path punctuation and renews a rejected Madden session once. Both Pages and the import Worker require deployment. See [release record](../releases/8.0.12/release-record.md).
 
-**Next gate:** Validate and publish 8.0.11, then restart owner-operated EA sign-in and complete franchise selection and a private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
+**Next gate:** Validate and publish 8.0.12, then restart owner-operated EA sign-in and complete franchise selection and a private preview proving the current period and actual dataset availability. Deployment performs no Madden collection or import. A later commissioner-triggered weekly import must confirm prior-week results/statistics, current-week schedule, and the existing one-week Discord rollover. New-league Madden activation remains on hold until a verified first roster source succeeds; EA Direct does not establish that success by itself. The 8.1.0 self-service readiness, 8.2.0 payment activation, 8.3.0 scale, and 9.0.0 launch milestones remain in order.
 
 ## Product decisions
 
@@ -154,7 +154,7 @@
 | 8.0.8.1 | Production; owner accepted | Read Platform Admin season/week from the active snapshot, with league setup values used only when no active snapshot exists |
 | 8.0.9 | Production | Preserve and map multiple payload-proven weeks even when Madden reuses the same Week 0 route URL; activate only the newest proven current period |
 | 8.0.10 | Production; franchise lookup acceptance blocked | EA connection UI deployed; live profile discovery succeeded, then franchise lookup failed; no collection or import |
-| 8.0.11 | Corrective candidate | Separate initial/persona token formats, retain selections, expose only safe failed-step diagnostics, and support fresh sign-in recovery |
+| 8.0.11 | Deployed; EA acceptance pending | Separate initial/persona token formats, retain selections, expose only safe failed-step diagnostics, and support fresh sign-in recovery |
 | 8.1.0 | Planned | Complete self-service league readiness from registration through first successful Madden import and team assignment |
 | 8.2.0 | Planned | Annual league billing, verified entitlement, automatic activation, billing portal, and non-destructive grace/suspension lifecycle |
 | 8.3.0 | Planned | Multi-league administration, quotas, support operations, capacity controls, and custom-domain automation |
@@ -1176,3 +1176,9 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - **Revision 2.51:** Began owner-authorized 8.0.7 from exact merged Main baseline `fe7b8ba`. The existing Archive Season safety card moves into the unused right-hand Command Center rail beneath Quick Controls, closing the desktop gap while preserving Needs Your Attention on the left and full-width Recent League Activity below both rails. The tablet/phone breakpoint continues to stack the rails and preserves the protected Archive Season button layout. This is a presentation-only release: it does not execute Archive Season, import data, change a snapshot, reset/delete data, rotate the export URL, change credentials, transition a season, or reinterpret blocked/null Free Agents.
 - **Revision 3.03:** Began owner-authorized 8.0.8 from exact Main `c161be6`. Platform-owner administration now lives at server-protected `/platform-admin`, independent of every league route. The normal commissioner sidebar no longer exposes Platform Workspace. Owner entry points live in the account menu and league selector; the console shows every retained tenant, activation state, membership/data/Discord summaries, and the existing gated onboarding workflow. Advanced import and mapping tools remain retained behind `/platform-admin/diagnostics` and require an explicit league choice before opening. No migration, league-data write, import, snapshot activation, reset, deletion, archive, transition, export URL rotation, Discord operation, credential change, membership/assignment change, or Free Agent reinterpretation is included.
 - **Revision 3.04:** Published 8.0.8 through PR #152 and Main `4cfb811`; every hosted build, quality, Pages, and Worker check passed. Authenticated live acceptance confirmed the owner-only console, two retained leagues, onboarding, and diagnostics separation, but also found that the new directory used immutable league setup defaults for season/week. 8.0.8.1 changes only that read model to prefer the active snapshot's `season_year` and `week_index`, retaining setup values solely for tenants without an active snapshot. No database row, snapshot, import, Discord state, membership, credential, export URL, archive, season, or Free Agent value is changed.
+
+## 8.0.12 — EA Session and Companion Statistics Repair
+
+The owner reported Madden franchise RPC ERR_AUTHENTICATION_REQUIRED after successful sign-in and a Companion import failure at 67%. Production evidence proves the statistics mapper parsed a route-plus-capture grouping identity as a route and discarded all seven selected statistics captures (722 Week 7 rows). The mapper now uses the actual route; permanent HTTP 4xx failures no longer consume Workflow retries. The mapping revision advances so old failed work is recomputed.
+
+EA session path serialization and one bounded session renewal align the client transport with the documented protocol; persistent Madden rejection is distinguished from expired OAuth. The exact live EA cause and account acceptance remain unproven until owner sign-in and private preview. No snapshot activation, export URL change, migration or Discord action occurs during deployment.

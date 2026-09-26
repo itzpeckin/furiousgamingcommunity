@@ -7,6 +7,7 @@ async function workflowWith(fetchImpl,className='FranchiseScheduleWorkflow') {
   const original=await readFile(new URL('../../workers/franchise-import-worker/src/index.js',import.meta.url),'utf8');
   const script=original
     .replace("import { WorkflowEntrypoint } from 'cloudflare:workers';",'class WorkflowEntrypoint {}')
+    .replace("import { NonRetryableError } from 'cloudflare:workflows';",'class NonRetryableError extends Error {}')
     .replaceAll('export class ','class ')
     .replace('export default{','const defaultWorker={');
   const context=vm.createContext({fetch:fetchImpl,Response,TextEncoder,crypto,console,URL,Date});
@@ -18,6 +19,26 @@ async function workflowWith(fetchImpl,className='FranchiseScheduleWorkflow') {
 const event={payload:{leagueSlug:'fgc',origin:'https://franchisehq.app',
   importAuthToken:'delegated-test-token',snapshotId:'snapshot-week-5',source:'candidate-import'}};
 const step={do:async (_name,_options,work)=>typeof _options==='function'?_options():work()};
+
+test('permanent statistics rejection reports failure without default Workflow retries or activation',async()=>{
+  let attempts=0;const reports=[];
+  const workflow=await workflowWith(async(url,options)=>{
+    const body=JSON.parse(options.body||'{}'),path=new URL(url).pathname;
+    if(path.endsWith('/map-statistics')){attempts++;return Response.json({ok:false,detail:'No weekly statistics datasets were captured.'},{status:422});}
+    if(body.action==='report-phase')reports.push(body);
+    assert.notEqual(body.action,'finalize');
+    return Response.json(body.action==='start'?{ok:true,run:{id:'candidate-1'},source:{discoverySessionId:'capture-1'}}:{ok:true});
+  },'FranchiseImportWorkflow');
+  const retryStep={do:async(_name,options,work)=>{
+    const action=typeof options==='function'?options:work;
+    for(let attempt=0;;attempt++)try{return await action();}catch(error){
+      if(error.constructor.name==='NonRetryableError'||attempt>=5)throw error;
+    }
+  }};
+  await assert.rejects(workflow.run(event,retryStep),/No weekly statistics datasets/);
+  assert.equal(attempts,1);
+  assert.ok(reports.some(r=>r.phase==='map-statistics'&&r.ok===false));
+});
 
 test('Discord Workflow continues through nonterminal running checkpoints to completed rollover',async()=>{
   const requests=[];

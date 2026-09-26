@@ -1,11 +1,11 @@
-/* FHQ_BUILD: 8.0.9 */
+/* FHQ_BUILD: 8.0.12 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
 import { resolveMaddenPeriod } from '../../../../_lib/madden-period.js';
 import { canonicalSchedulePeriod, compareSchedulePeriods } from '../../../../_lib/schedule-integrity.js';
 
-const RELEASE='8.0.9';
+const RELEASE='8.0.12';
 const RECORD_CHUNK_SIZE=200;
 const D1_LOOKUP_CHUNK_SIZE=75;
 const ROUTE_INSPECTION_CONCURRENCY=4;
@@ -214,7 +214,10 @@ async function capturedRoutes(db,env,leagueId,discoverySessionId,captureIds=[]){
   const grouped=await capturedRouteCandidates(db,leagueId,discoverySessionId,captureIds);
   const selected=[];
 
-  const inspectRoute=async([routePath,rows])=>{
+  const inspectRoute=async([,rows])=>{
+    // Retained bundles group by route + capture ID. That grouping identity is
+    // not an EA route and must never be parsed as one.
+    const routePath=rows[0]?.route_path;
     const meta=routeMeta(routePath);
     if(!meta)return null;
     let chosen=null;

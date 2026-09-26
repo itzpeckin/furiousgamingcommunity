@@ -6,6 +6,66 @@ import { createEaClient, EaClientError, makeEaLoginUrl, safeEaClientDiagnostic }
 const env = { EA_CLIENT_SECRET: 'test-client-secret' };
 const token = { accessToken: 'test-access', refreshToken: 'test-refresh', expiresAt: '2026-09-25T12:00:00.000Z' };
 const session = () => ({ sessionKey: 'test-session', blazeId: 12345, requestId: 1 });
+
+test('Madden preserves path-safe session punctuation for RPC and exports and rejects URL structure', async () => {
+  const key='opaque:key+with=padding;scope@host';
+  const {client,requests}=fixture([
+    {responseInfo:{value:{leagues:[]}}}, {success:true,leagueTeamInfoList:[]}
+  ]);
+  await client.leagues(token,{...session(),sessionKey:key},'ps5');
+  await client.dataset(token,{...session(),sessionKey:key},'ps5',700,'teams');
+  for(const request of requests)assert.equal(request.url.pathname.split('/').at(-1),key);
+  for(const unsafe of ['..','../other','key?query','key#fragment','key%2Fpath','key\\path']) {
+    await assert.rejects(client.leagues(token,{...session(),sessionKey:unsafe},'ps5'),e=>e.code==='EA_INVALID_REQUEST');
+  }
+  assert.equal(requests.length,2);
+});
+
+test('franchise lookup renews a rejected Madden session once without exchanging OAuth again', async () => {
+  const {client,requests}=fixture([
+    {error:{errorname:'ERR_AUTHENTICATION_REQUIRED'}},
+    {userLoginInfo:{sessionKey:'fresh:session+key=',personaDetails:{personaId:12345}}},
+    {responseInfo:{value:{leagues:[{leagueId:700}]}}}
+  ]);
+  const current=session();
+  assert.equal((await client.leagues(token,current,'ps5'))[0].leagueId,700);
+  assert.equal(requests.length,3);
+  assert.equal(requests[1].url.pathname,'/wal/authentication/login');
+  assert.equal(JSON.parse(requests[1].body).accessToken,token.accessToken);
+  assert.equal(requests[2].url.pathname,'/wal/mca/Process/fresh:session+key=');
+  assert.equal(current.requestId,3);
+});
+
+test('simultaneous Madden reads share one session renewal and keep the new session for exports',async()=>{
+  const denied={error:{errorname:'ERR_INVALID_SESSION'}};
+  const {client,requests}=fixture([denied,denied,
+    {userLoginInfo:{sessionKey:'renewed-key',personaDetails:{personaId:12345}}},
+    {responseInfo:{value:{leagues:[]}}},{responseInfo:{value:{leagues:[]}}},
+    {success:true,leagueTeamInfoList:[]}]);
+  const current=session();
+  await Promise.all([client.leagues(token,current,'ps5'),client.leagues(token,current,'ps5')]);
+  await client.dataset(token,current,'ps5',700,'teams');
+  assert.equal(requests.filter(r=>r.url.pathname==='/wal/authentication/login').length,1);
+  assert.equal(current.requestId,5);
+  assert.equal(requests.at(-1).url.pathname.split('/').at(-1),'renewed-key');
+});
+
+test('a second Madden rejection stops with distinct safe guidance; OAuth rejection still requires reconnect', async () => {
+  const denied={error:{errorname:'ERR_INVALID_SESSION',errordf:{errorString:'private-session-value'}}};
+  const {client,requests}=fixture([denied,
+    {userLoginInfo:{sessionKey:'fresh-session',personaDetails:{personaId:12345}}},denied]);
+  await assert.rejects(client.leagues(token,session(),'ps5'),error=>{
+    assert.equal(error.code,'EA_MADDEN_SESSION_REJECTED');
+    assert.equal(safeEaClientDiagnostic(error).step,'franchise-list');
+    assert.doesNotMatch(error.message+JSON.stringify(error),/private-session-value|test-access|fresh-session/);
+    return true;
+  });
+  assert.equal(requests.length,3);
+  const expired=fixture([denied,()=>Response.json({error:'invalid_token'},{status:401})]);
+  await assert.rejects(expired.client.leagues(token,session(),'ps5'),error=>error.code==='EA_RECONNECT_REQUIRED'
+    &&safeEaClientDiagnostic(error).step==='madden-login');
+  assert.equal(expired.requests.length,2);
+});
 const persona = { id: '12345', name: 'Coach', namespace: 'ps3', platform: 'ps5', entitlement: 'MADDEN_27PS5' };
 // Workers extends Web Crypto with MD5. Node's digest adapter verifies interoperability without changing runtime code.
 const cryptoImpl = {

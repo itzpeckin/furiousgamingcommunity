@@ -1,7 +1,8 @@
-/* FHQ_BUILD: 8.0.10 */
+/* FHQ_BUILD: 8.0.12 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
+import { NonRetryableError } from 'cloudflare:workflows';
 
-const RELEASE='8.0.10';
+const RELEASE='8.0.12';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -22,7 +23,11 @@ async function call(context,path,method='GET',body,{acceptProgress=false}={}){
   const checkpoint=acceptProgress&&response.ok&&payload?.ok===false
     &&payload?.status==='running'&&payload?.hasMore===true&&!payload?.errors?.length;
   if(!response.ok||(payload?.ok===false&&!checkpoint)){
-    const error=new Error(payload?.detail||payload?.error||payload?.errors?.[0]
+    // Repeating a rejected request cannot repair missing input or authorization.
+    // Keep retries for timeouts, throttling and server failures.
+    const Failure=response.status>=400&&response.status<500&&![408,429].includes(response.status)
+      ?NonRetryableError:Error;
+    const error=new Failure(payload?.detail||payload?.error||payload?.errors?.[0]
       ||`Candidate import request failed (${response.status}).`);
     error.payload=payload;
     throw error;

@@ -89,6 +89,16 @@ function platformValue(value) {
   return value;
 }
 
+function sessionPath(value) {
+  const key = textValue(value, 2048);
+  // Blaze consumes the opaque key in the path as supplied by login. Encoding
+  // path-safe punctuation (notably +, = and :) changes that credential.
+  // Restrict it to one literal RFC 3986 path segment, with no URL delimiters,
+  // escapes or dot-segment normalization.
+  if (!/^[A-Za-z0-9_~.!$&'()*+,;=:@-]+$/.test(key) || key === '.' || key === '..') throw invalidInput();
+  return key;
+}
+
 export function makeEaLoginUrl(env = {}, state = '') {
   const edition = integer(env.EA_EDITION || 2027, 2026, 2100);
   const url = new URL(`${ACCOUNT_ORIGIN}/connect/auth`);
@@ -253,14 +263,44 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
 
   async function command(token, session, platform, commandName, commandId, payload, step, validate) {
     textValue(token?.accessToken);
-    const sessionKey = textValue(session?.sessionKey, 2048);
+    const sessionKey = sessionPath(session?.sessionKey);
     const auth = await messageAuth(session, cryptoImpl);
     const requestInfo = { commandName, componentId: 2060, commandId, componentName: 'franchisemode', messageAuthData: auth, messageExpirationTime: Math.floor(Date.now() / 1000), deviceId: MACHINE_KEY, ipAddress: '127.0.0.1', requestPayload: JSON.stringify(payload) };
-    const result = await request(`${MADDEN_ORIGIN}/wal/mca/Process/${encodeURIComponent(sessionKey)}`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify({ apiVersion: 2, clientDevice: 3, requestInfo: JSON.stringify(requestInfo) }) }, { step, validate: result => {
+    const result = await request(`${MADDEN_ORIGIN}/wal/mca/Process/${sessionKey}`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify({ apiVersion: 2, clientDevice: 3, requestInfo: JSON.stringify(requestInfo) }) }, { step, validate: result => {
       if (!result.responseInfo?.value || typeof result.responseInfo.value !== 'object') throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned incomplete franchise details.');
       if (validate) validate(result.responseInfo.value);
     } });
     return result.responseInfo.value;
+  }
+
+  const renewals = new WeakMap();
+  const rejectedSession = error => error instanceof EaClientError
+    && ['ERR_AUTHENTICATION_REQUIRED', 'ERR_INVALID_SESSION'].includes(safeEaClientDiagnostic(error)?.providerCode);
+  async function withMaddenSession(token, session, platform, operation) {
+    const originalKey = session?.sessionKey;
+    try { return await operation(); } catch (error) {
+      if (!rejectedSession(error)) throw error;
+    }
+    // Concurrent reads share one renewal. An EA account-token rejection still
+    // propagates normally; a Blaze rejection alone does not expire OAuth.
+    if (session.sessionKey === originalKey) {
+      let renewal = renewals.get(session);
+      if (!renewal) {
+        renewal = methods.login(token, platform).then(fresh => {
+          Object.assign(session, fresh, { requestId: Math.max(session.requestId, fresh.requestId) });
+        }).finally(() => renewals.delete(session));
+        renewals.set(session, renewal);
+      }
+      await renewal;
+    }
+    try { return await operation(); } catch (error) {
+      if (!rejectedSession(error)) throw error;
+      const failure = new EaClientError('EA_MADDEN_SESSION_REJECTED',
+        'EA accepted your sign-in but rejected the renewed Madden session. Try this step again later. Your league data is unchanged.',
+        { status: 424, retryable: true });
+      failure.diagnostic = safeEaClientDiagnostic(error);
+      throw failure;
+    }
   }
 
   const methods = {
@@ -328,16 +368,16 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
       } });
       const info = result.userLoginInfo;
       if (!info?.sessionKey || !info?.personaDetails?.personaId) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned an incomplete Madden session.');
-      return { sessionKey: textValue(info.sessionKey, 2048), blazeId: integer(info.personaDetails.personaId, 1), requestId: 1 };
+      return { sessionKey: sessionPath(info.sessionKey), blazeId: integer(info.personaDetails.personaId, 1), requestId: 1 };
     },
     async leagues(token, session, platform) {
-      const result = await command(token, session, platform, 'Mobile_GetMyLeagues', 801, {}, 'franchise-list', value => {
+      const result = await withMaddenSession(token, session, platform, () => command(token, session, platform, 'Mobile_GetMyLeagues', 801, {}, 'franchise-list', value => {
         if (!Array.isArray(value.leagues)) throw new EaClientError('EA_INVALID_RESPONSE', 'EA returned an incomplete franchise list.');
-      });
+      }));
       return result.leagues;
     },
     async hub(token, session, platform, leagueId) {
-      return command(token, session, platform, 'Mobile_Career_GetLeagueHub', 811, { leagueId: integer(leagueId, 1) }, 'league-hub');
+      return withMaddenSession(token, session, platform, () => command(token, session, platform, 'Mobile_Career_GetLeagueHub', 811, { leagueId: integer(leagueId, 1) }, 'league-hub'));
     },
     async dataset(token, session, platform, leagueId, kind, args = {}) {
       if (!Object.hasOwn(DATASETS, kind)) throw invalidInput();
@@ -350,10 +390,9 @@ export function createEaClient(env, { fetchImpl = fetch, cryptoImpl = crypto, ti
         payload.stageIndex = integer(args.stageIndex, 0, 1);
         payload.weekIndex = integer(args.weekIndex, 0, payload.stageIndex === 0 ? 3 : 22);
       }
-      const sessionKey = textValue(session?.sessionKey, 2048);
-      const result = await request(`${MADDEN_ORIGIN}/wal/mca/${endpoint}/${encodeURIComponent(sessionKey)}`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify(payload) }, { step: 'league-data', validate: value => {
+      const result = await withMaddenSession(token, session, platform, () => request(`${MADDEN_ORIGIN}/wal/mca/${endpoint}/${sessionPath(session?.sessionKey)}`, { method: 'POST', headers: maddenHeaders(platform), body: JSON.stringify(payload) }, { step: 'league-data', validate: value => {
         if (value.success !== true || !Array.isArray(value[collection])) throw new EaClientError('EA_INCOMPLETE_DATASET', 'EA did not provide a complete dataset. Try again later.', { retryable: true });
-      } });
+      } }));
       // An unavailable roster or Free Agent request must never become an empty list.
       if (result.success !== true || !Array.isArray(result[collection])) throw new EaClientError('EA_INCOMPLETE_DATASET', 'EA did not provide a complete dataset. Try again later.', { retryable: true });
       return result;

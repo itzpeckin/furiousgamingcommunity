@@ -52,7 +52,7 @@ import { onRequestGet as getCandidateImport, onRequestPost as candidateImport, r
 import { onRequestPost as startImportJob } from '../../functions/api/leagues/[leagueSlug]/companion/import-job.js';
 import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames, selectRetainedScheduleCaptures } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
 import { onRequestPost as mapPlayers, rebaseCarriedRoster } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
-import { authoritativeStatisticsPeriod, selectAuthoritativeStatisticsCaptures, statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
+import { onRequestPost as mapStatistics, authoritativeStatisticsPeriod, selectAuthoritativeStatisticsCaptures, statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
 import { onRequestPost as buildSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js';
 import { competitionState, executeCompetitionAction } from '../../functions/api/leagues/[leagueSlug]/competition.js';
 import { onRequestPost as validateSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/snapshot-lifecycle.js';
@@ -127,6 +127,46 @@ async function database() {
     );
   return db;
 }
+
+test('retained export maps all 722 selected Week 7 statistics through the real start/next endpoints',async()=>{
+  const sqlite=await database();
+  try{
+    sqlite.exec(`INSERT INTO league_memberships (id,league_id,user_id,role,active) VALUES ('stats-member','league-1','commissioner-1','commissioner',1);
+      INSERT INTO companion_import_destinations (id,league_id,franchise_season_id,label,status,created_by_user_id) VALUES ('stats-destination','league-1','season-2026','Statistics fixture','active','commissioner-1');`);
+    const token='statistics-fixture-session';
+    sqlite.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at) VALUES ('stats-session','commissioner-1',?,'2099-01-01T00:00:00.000Z')`).run(await hashToken(token));
+    const objects=new Map(),ids=[],reads=[];
+    const categories={defense:335,kicking:31,punting:24,passing:27,receiving:150,rushing:129,team:26};
+    for(const [category,count] of Object.entries(categories)){
+      const id=`selected-${category}`,route=`xbsx/742482/week/reg/7/${category}`;
+      ids.push(id);
+      const payload=JSON.stringify({records:Array.from({length:count},(_,i)=>({playerId:i+1,teamId:1,playerName:`Player ${i+1}`,calendarYear:2027,weekIndex:6,stageIndex:1,yards:10,gameId:i+1}))});
+      objects.set(id,payload);
+      sqlite.prepare(`INSERT INTO companion_route_captures (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,r2_object_key) VALUES (?,'league-1','capture-1',?,'POST',?,?,?)`).run(id,route,payload.length,id,id);
+      // A newer empty capture of the same route must not replace the exact selected source.
+      sqlite.prepare(`INSERT INTO companion_route_captures (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,r2_object_key,received_at) VALUES (?,'league-1','capture-1',?,'POST',20,?,?,'2099-01-01')`).run(`empty-${category}`,route,`empty-${category}`,`empty-${category}`);
+    }
+    sqlite.prepare(`INSERT INTO companion_candidate_import_runs (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,current_phase,created_by_user_id,source_counts_json) VALUES ('stats-candidate','league-1','stats-destination','capture-1','stats-fingerprint','running','map-statistics','commissioner-1',?)`).run(JSON.stringify({sourceCaptureIds:ids}));
+    const db=d1(sqlite),env={DB:db,FRANCHISE_HQ_DB:db,COMPANION_EXPORTS:{get:async key=>{
+      reads.push(key);assert.ok(objects.has(key),`Unexpected source ${key}`);
+      return{arrayBuffer:async()=>new TextEncoder().encode(objects.get(key)).buffer};
+    }}};
+    const context=body=>({request:new Request('https://franchisehq.app/api/leagues/fgc/companion/map-statistics',{method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},body:JSON.stringify(body)}),params:{leagueSlug:'fgc'},env});
+    const started=await mapStatistics(context({action:'start',candidateImportRunId:'stats-candidate'}));
+    let result=await started.json();assert.equal(started.status,200,JSON.stringify(result));
+    assert.equal(result.deltaPlan.totalRoutes,7);assert.equal(result.deltaPlan.changedOrNewRoutes,7);
+    const runId=result.mappingRun.id;
+    for(let attempt=0;!result.complete&&attempt<10;attempt++){
+      const response=await mapStatistics(context({action:'next',runId,batches:4}));
+      result=await response.json();assert.equal(response.status,200,JSON.stringify(result));
+    }
+    assert.equal(result.complete,true);assert.equal(result.mappingRun.recordCount,722);
+    assert.equal(result.progress.failed,0);assert.equal(result.activationPerformed,false);
+    assert.deepEqual(new Set(reads),new Set(ids));
+    assert.equal(sqlite.prepare('SELECT COUNT(*) c FROM league_active_snapshots').get().c,0);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) c FROM companion_canonical_statistics_preview WHERE week_index=7').get().c,722);
+  }finally{sqlite.close()}
+});
 
 test('current-period proof ignores schedule rows and requires exact forward transitions',()=>{
   const period=(stage,week)=>canonicalSchedulePeriod({stage,week});
@@ -483,10 +523,10 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'multi-week-payload-period-v10');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-statistics-selection-v11');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:multi-week-payload-period-v10'
+    'report:capture:identity:destination:retained-statistics-selection-v11'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
 });
