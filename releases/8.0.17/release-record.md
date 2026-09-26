@@ -6,7 +6,7 @@ Place EA Direct and Madden Import inside one section above the Data Source Selec
 
 ## Added during delivery
 
-One Madden Import workspace contains Step 1: Collect Madden data (EA Direct or Companion App) and Step 2: Import to your league. Copy explains that collection alone does not update live rosters, ratings, development traits or statistics. The completed EA collection shortcut moves to Step 2. Existing event handlers, polling, access controls and publication actions are preserved.
+One Madden Import workspace contains Step 1: Collect Madden data (EA Direct or Companion App) and Step 2: Import to your league. Copy explains that collection alone does not update live rosters, ratings, development traits or statistics. The completed EA collection shortcut moves to Step 2. Existing event handlers, polling, access controls and publication actions are preserved. Desktop visual acceptance identified a narrow trade-reset description; the adjacent controls now stack its description and buttons at all widths.
 
 ## Known inherited blockers
 

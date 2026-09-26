@@ -42,6 +42,8 @@
 .commissioner-madden-layout>.commissioner-madden-workflow{grid-column:span 8;min-width:0;border:1px solid var(--command-border);border-radius:20px;background:var(--command-surface);overflow:hidden}
 .commissioner-madden-layout>.commissioner-command-column--secondary{grid-column:span 4}
 .commissioner-madden-layout .commissioner-quick-controls{grid-template-columns:minmax(0,1fr)}
+.commissioner-madden-layout .commissioner-trade-reset-controls{grid-template-columns:minmax(0,1fr)}
+.commissioner-madden-layout .commissioner-trade-reset-controls>div:last-child{display:grid;grid-template-columns:minmax(0,1fr)}
 .commissioner-madden-workflow__header{padding:24px;background:linear-gradient(120deg,rgba(var(--accent-rgb),.12),transparent)}
 .commissioner-madden-workflow__header h2{margin:6px 0 8px;font-size:1.45rem}
 .commissioner-madden-workflow__header p,.commissioner-madden-import-copy{margin:0;color:var(--muted);line-height:1.55;font-size:.85rem}
