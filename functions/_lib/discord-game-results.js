@@ -21,7 +21,7 @@ export async function syncDiscordGameResults(env,db,{league,snapshotId,maxOperat
     JOIN discord_league_installations installation ON installation.league_id=thread.league_id
       AND installation.discord_guild_id=thread.discord_guild_id AND installation.status='active'
     LEFT JOIN discord_game_results result ON result.thread_record_id=thread.id AND result.league_id=thread.league_id
-    WHERE thread.league_id=? AND thread.season_year=? AND (thread.status='active' OR result.message_id IS NOT NULL)
+    WHERE thread.league_id=? AND thread.season_year=? AND thread.status='active'
     ORDER BY thread.week_index,thread.id`,league.id,model.snapshot.season_year);
   let operations=0,hasMore=false;
   for(const thread of threads){
@@ -60,7 +60,6 @@ export async function syncDiscordGameResults(env,db,{league,snapshotId,maxOperat
         const recent=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages?limit=100`,{fetchImpl});
         messageId=Array.isArray(recent)?recent.find(item=>String(item.nonce||'')===nonce)?.id:null;
       }
-      if(thread.status==='archived')await discordBotRequest(env,`/channels/${thread.discord_thread_id}`,{method:'PATCH',body:{archived:false},fetchImpl});
       const result=messageId
         ?await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages/${messageId}`,{method:'PATCH',body:message,fetchImpl})
         :await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages`,{method:'POST',body:{...message,nonce,enforce_nonce:true},fetchImpl});
@@ -75,7 +74,6 @@ export async function syncDiscordGameResults(env,db,{league,snapshotId,maxOperat
         .bind(discordErrorText(error),thread.id,lease).run();
       throw error;
     }finally{
-      if(thread.status==='archived')await discordBotRequest(env,`/channels/${thread.discord_thread_id}`,{method:'PATCH',body:{archived:true},fetchImpl}).catch(()=>{});
       await db.prepare('UPDATE discord_game_results SET lease_token=NULL,lease_until=NULL WHERE thread_record_id=? AND lease_token=?').bind(thread.id,lease).run();
     }
   }

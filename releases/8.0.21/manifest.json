@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.21",
+  "releaseType": "week-advance-thread-cleanup",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.20",
+    "tag": "v8.0.20",
+    "commit": "61a0efd43e71eeb339b57abea7b132889835ff4d"
+  },
+  "implementationBranch": "fix/8.0.21-week-advance-cleanup",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.20",
+    "candidateRelease": "8.0.21",
+    "currentMigration": 49,
+    "candidateMigration": 49,
+    "scope": "Delete superseded matchup threads including final results after verified week advance; preserve tenant isolation and same-week delivery."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-schedule.js",
+    "functions/_lib/discord-game-results.js",
+    "tests/discord/discord-bot.test.mjs",
+    "trade-module.js",
+    "docs/ROADMAP.md",
+    "releases/8.0.21/release-record.md",
+    "releases/8.0.21/validation-evidence.json"
+  ]
+}
