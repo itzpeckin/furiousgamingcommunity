@@ -210,9 +210,9 @@ async function removeSupersededScheduleThreads(env,db,{
       continue;
     }
     try {
-      const result=await db.prepare('SELECT message_id FROM discord_game_results WHERE thread_record_id=? AND league_id=?').bind(item.id,leagueId).first();
-      await discordBotRequest(env,`/channels/${encodeURIComponent(threadId)}`,result?.message_id
-        ?{method:'PATCH',body:{archived:true},fetchImpl}:{method:'DELETE',fetchImpl});
+      // Week replacement deletes all prior tracked matchup threads, including
+      // threads with result images. The database row remains as an audit record.
+      await discordBotRequest(env,`/channels/${encodeURIComponent(threadId)}`,{method:'DELETE',fetchImpl});
       await db.prepare(`UPDATE discord_schedule_threads SET status='archived',updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND league_id=? AND status='active'`).bind(item.id,leagueId).run();
       removed+=1;

@@ -8,9 +8,9 @@
 
 **Revision:** 3.11
 
-**Current production:** 8.0.18.
+**Current production:** 8.0.20.
 
-**Current work:** 8.0.20 adds current-week Discord game images, automatic final results in matchup threads, and postgame League Home performers.
+**Current work:** 8.0.21 restores deletion of all prior matchup threads after verified week advance, including result threads. Shared Discord game functionality is verified across independent leagues.
 
 **Next gate:** Complete strict quality, preview checks, production publication and desktop/mobile acceptance.
 

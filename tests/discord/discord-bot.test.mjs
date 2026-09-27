@@ -2521,14 +2521,69 @@ test('same-week imported final posts once, edits corrections, recovers lost resp
       rollover.push({url,method:options.method,body:JSON.parse(options.body||'{}')});
       return Response.json({id:'100000000000000100',type:11});
     }});
-    assert.ok(rollover.some(call=>call.method==='PATCH'&&call.body.archived===true&&call.url.endsWith('/100000000000000088')));
-    assert.equal(rollover.some(call=>call.method==='DELETE'),false,'a thread containing a final result is retained');
+    assert.ok(rollover.some(call=>call.method==='DELETE'&&call.url.endsWith('/100000000000000088')),
+      'a completed result thread is deleted after the new week is ready');
+    assert.equal(rollover.some(call=>call.method==='PATCH'&&call.body.archived===true),false);
     database.prepare('UPDATE league_active_snapshots SET snapshot_id=? WHERE league_id=?').run(current,league.id);
     const before=calls.length;
+    database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.home_score',35) WHERE snapshot_id=? AND domain='games'").run(current);
+    await syncDiscordGameResults(env,db,{league,snapshotId:current,fetchImpl});
+    assert.equal(calls.length,before,'deleted threads are never reopened or updated by later statistics');
     assert.equal((await syncDiscordGameResults(env,db,{league,snapshotId:previous,fetchImpl})).superseded,true);
     assert.equal(calls.length,before);
     database.exec("DELETE FROM discord_game_results; UPDATE discord_schedule_threads SET snapshot_id='snapshot-result-final'");
     await syncDiscordGameResults(env,db,{league,snapshotId:current,fetchImpl});
     assert.equal(calls.length,before,'historical finals are not announced on deployment');
+  }finally{database.close();}
+});
+
+test('game results and automatic week replacement apply independently to every connected league',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    await applyMigrations(database);
+    const db=d1(database),env={DISCORD_BOT_TOKEN:'test-only-platform'},leagues=[],calls=[];
+    let sequence=200;
+    const fetchImpl=async(url,options={})=>{
+      calls.push({url:String(url),method:options.method||'GET'});
+      if(options.method==='DELETE')return new Response(null,{status:204});
+      if(String(url).includes('?limit='))return Response.json([]);
+      return Response.json({id:`100000000000000${++sequence}`,type:11});
+    };
+    for(const [index,slug] of ['alpha','beta'].entries()){
+      const league={id:`league-${slug}`,slug,name:`${slug} League`};leagues.push(league);
+      seedLeague(database,{...league,guild:`10000000000000000${index+1}`});
+      seedMember(database,{leagueId:league.id,userId:`owner-${slug}`,discordId:`10000000000000001${index+1}`});
+      database.prepare('UPDATE discord_league_installations SET schedule_channel_id=? WHERE league_id=?')
+        .run(`10000000000000005${index+1}`,league.id);
+      league.previous=seedActiveWeek(database,{leagueId:league.id,week:2});
+      await syncDiscordScheduleThreads(env,db,{league,source:'discord-command',fetchImpl});
+      league.thread=database.prepare('SELECT id,discord_thread_id FROM discord_schedule_threads WHERE league_id=?').get(league.id);
+      league.current=`final-${slug}`;
+      database.prepare("INSERT INTO league_snapshots(id,league_id,status,season_year,week_index,manifest_json,validation_status) VALUES (?,?,'active',2026,2,'{}','ready')").run(league.current,league.id);
+      database.prepare('INSERT INTO league_snapshot_records(snapshot_id,league_id,domain,external_id,data_json) SELECT ?,league_id,domain,external_id,data_json FROM league_snapshot_records WHERE snapshot_id=?').run(league.current,league.previous);
+      database.prepare('UPDATE league_active_snapshots SET snapshot_id=? WHERE league_id=?').run(league.current,league.id);
+      database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.status','final','$.home_score',31,'$.away_score',21) WHERE snapshot_id=? AND domain='games'").run(league.current);
+      const start=calls.length;
+      await syncDiscordGameResults(env,db,{league,snapshotId:league.current,fetchImpl});
+      assert.ok(calls.slice(start).some(call=>call.method==='POST'));
+      assert.ok(calls.slice(start).every(call=>call.url.includes(`/channels/${league.thread.discord_thread_id}/`)));
+      assert.match((await gameCommand({db,league,env},{matchup:'game-2'})).embeds[0].title,/Final/);
+    }
+    for(const league of leagues){
+      const other=leagues.find(item=>item.id!==league.id);
+      const otherBefore=database.prepare('SELECT id,status FROM discord_schedule_threads WHERE league_id=? ORDER BY id').all(other.id);
+      const next=seedActiveWeek(database,{leagueId:league.id,week:3});proveScheduleAdvance(database,league.current,next);
+      const start=calls.length;
+      const synced=await syncDiscordScheduleThreads(env,db,{league,snapshotId:next,source:'candidate-import',fetchImpl});
+      assert.equal(synced.ok,true);assert.equal(synced.created,1);assert.equal(synced.removedPriorThreads,1);
+      const requests=calls.slice(start),deletions=requests.filter(call=>call.method==='DELETE');
+      assert.deepEqual(deletions.map(call=>call.url.split('/').at(-1)),[league.thread.discord_thread_id]);
+      assert.ok(requests.findIndex(call=>call.url.endsWith('/threads'))<requests.findIndex(call=>call.method==='DELETE'));
+      assert.deepEqual(database.prepare('SELECT id,status FROM discord_schedule_threads WHERE league_id=? ORDER BY id').all(other.id),otherBefore);
+      const count=calls.length;
+      await syncDiscordScheduleThreads(env,db,{league,snapshotId:next,source:'candidate-import',fetchImpl});
+      await syncDiscordGameResults(env,db,{league,snapshotId:next,fetchImpl});
+      assert.equal(calls.length,count,'repeating the import does not recreate threads or revisit deleted results');
+    }
   }finally{database.close();}
 });
