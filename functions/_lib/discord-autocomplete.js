@@ -1,4 +1,5 @@
 import { currentTradeSeason } from './trade-season.js';
+import { gameAutocompleteChoices } from './discord-game.js';
 import { draftClassesForSeason } from './draft-pick-baselines.js';
 import { discordCommandName, discordFocusedOption } from './discord-commands.js';
 import { activeLeagueTeams, activeTeamAssignments, canonicalTeamKey, resolveTeam } from './league-teams.js';
@@ -222,6 +223,7 @@ export async function discordAutocompleteChoices(c){
   const {subcommand,focused,values}=discordFocusedOption(c.interaction);
   if(!focused)return [];
   const query=lower(focused.value),name=focused.name;
+  if(command==='game'&&name==='matchup')return gameAutocompleteChoices(c,query);
   if(command==='standings'&&name==='name'&&['division','conference','team'].includes(subcommand)){
     return standingsScopeChoices(c,query,subcommand);
   }

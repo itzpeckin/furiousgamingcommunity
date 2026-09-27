@@ -10,7 +10,7 @@
 
 **Current production:** 8.0.18.
 
-**Current work:** 8.0.19 unifies five-step Madden setup, enables EA-first schedules, moves priority/archive controls, adds contextual matchup navigation, and fixes OTL trade player resolution.
+**Current work:** 8.0.20 adds current-week Discord game images, automatic final results in matchup threads, and postgame League Home performers.
 
 **Next gate:** Complete strict quality, preview checks, production publication and desktop/mobile acceptance.
 

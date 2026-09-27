@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.20",
+  "releaseType": "game-summary-cards-and-results",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.19",
+    "tag": "v8.0.19",
+    "commit": "14e793c80ae77dd1b28775195456ee2ebf0e1fe0"
+  },
+  "implementationBranch": "feature/8.0.20-game-summary",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.19",
+    "candidateRelease": "8.0.20",
+    "currentMigration": 48,
+    "candidateMigration": 49,
+    "scope": "Current-week Discord /game cards, automatic import-driven thread results, and League Home postgame performers."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-game.js",
+    "functions/_lib/discord-game-results.js",
+    "functions/_lib/discord-game-card.js",
+    "functions/api/discord/game-card.js",
+    "league-engine/game-summary.js",
+    "migrations/0049_discord_game_results.sql",
+    "app.js",
+    "styles.css",
+    "docs/ROADMAP.md",
+    "releases/8.0.20/release-record.md",
+    "releases/8.0.20/validation-evidence.json"
+  ]
+}

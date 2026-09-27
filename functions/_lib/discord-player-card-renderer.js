@@ -2,6 +2,7 @@ import compiledWasm from './vendor/resvg/index_bg.wasm';
 import font from './vendor/barlow/semibold.bin';
 import { initWasm, Resvg } from './vendor/resvg/index.js';
 import { discordPlayerCardSvg, playerCardImageUrl } from './discord-player-card.js';
+import { discordGameCardSvg } from './discord-game-card.js';
 
 // Compiled-module import is supported by Pages; never dynamically compile bytes.
 const initialized = initWasm(compiledWasm);
@@ -29,4 +30,11 @@ export async function renderDiscordPlayerCard(card,env) {
   let image;
   try {image=renderer.render();return {png:image.asPng().slice(),imagesComplete:(!card.l || Boolean(logo)) && (!card.i || Boolean(portrait))};}
   finally {image?.free();renderer.free();}
+}
+export async function renderDiscordGameCard(card,env){
+  const [awayLogo,homeLogo]=await Promise.all([boundedImage(card.a.l,env),boundedImage(card.h.l,env),initialized]);
+  const renderer=new Resvg(discordGameCardSvg(card,{awayLogo,homeLogo}),{font:{fontBuffers:[new Uint8Array(font)],defaultFontFamily:'Barlow'},fitTo:{mode:'original'}});
+  let image;
+  try{image=renderer.render();return {png:image.asPng().slice(),imagesComplete:(!card.a.l||Boolean(awayLogo))&&(!card.h.l||Boolean(homeLogo))};}
+  finally{image?.free();renderer.free();}
 }

@@ -996,10 +996,11 @@
       // Teams / standings / schedule paint immediately. The large player/statistics
       // domains hydrate after first paint and never block a hard-refresh render.
       const criticalPayload=await Promise.all([
-        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule()
+        service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),
+        import('./league-engine/game-summary.js?v=8.0.20')
       ]);
 
-      const [stateValue,snapshot,teamRows,standingRows,gameRows]=criticalPayload;
+      const [stateValue,snapshot,teamRows,standingRows,gameRows,gameSummary]=criticalPayload;
       const deepCache=window.__FHQ_HOME_DEEP_CACHE__;
       const sameDeepSnapshot=deepCache&&String(deepCache.snapshotId||'')===String(snapshot?.id||'');
       const statRows=sameDeepSnapshot&&Array.isArray(deepCache.statistics)?deepCache.statistics:[];
@@ -1072,6 +1073,8 @@
       const offensePositions=['QB','HB','RB','FB','WR','TE','LT','LG','C','RG','RT','OL'];
       const defenseSet=new Set([...defensePositions,'LE','RE','DT','LOLB','MLB','ROLB','LB','CB','FS','SS','S','EDGE']);
       const topUnit=(teamId,type)=>teamPlayers(teamId).filter(player=>type==='offense'?offensePositions.includes(player.position):defenseSet.has(player.position)).slice(0,3);
+      const performers=gameSummary.gameSummaryPerformers({...featured,season:snapshot.season_year??seasonContext.season},statRows,playerRows);
+      const finalPerformers=teamId=>`<div class="featured-unit"><span class="eyebrow">Top Performers</span>${(performers[String(teamId)]||[]).map(row=>`<div class="featured-performer"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.detail)}</small></div>`).join('')}</div>`;
       const featuredPlayerRow=player=>`<button type="button" class="featured-player-row" data-player-id="${escapeHtml(player.id)}"><span><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.position)} · ${player.overall} OVR</small></span><strong>${player.overall}</strong></button>`;
 
       pageContent.innerHTML=`
@@ -1100,6 +1103,7 @@
                 <span>${hasOfficialFeaturedGame?'★ Game of the Week':'Featured Matchup'}</span>
                 <small>${escapeHtml(canonicalScheduleLabel(featured))} · ${featured.completed?'Final':'Upcoming'}</small>
               </div>
+              ${featured.completed?`<div class="featured-final-score" aria-label="Final score"><span>${escapeHtml(away.abbr)} <strong>${featured.awayScore??'—'}</strong></span><b>FINAL</b><span><strong>${featured.homeScore??'—'}</strong> ${escapeHtml(home.abbr)}</span></div>`:''}
               <div class="featured-split featured-split--clickable" aria-label="Open Game Center">
                 <div class="featured-half featured-half--away" style="background:linear-gradient(135deg, ${away.primary}, ${away.secondary||away.primary}) !important;">
                   <div class="featured-half-hero">
@@ -1112,8 +1116,8 @@
                     </div>
                   </div>
                   <div class="featured-unit-stack">
-                    <div class="featured-unit"><span class="eyebrow">Top Offense</span>${topUnit(away.id,'offense').map(featuredPlayerRow).join('')||'<p>No offensive players available.</p>'}</div>
-                    <div class="featured-unit"><span class="eyebrow">Top Defense</span>${topUnit(away.id,'defense').map(featuredPlayerRow).join('')||'<p>No defensive players available.</p>'}</div>
+                    ${featured.completed?finalPerformers(away.id):`<div class="featured-unit"><span class="eyebrow">Top Offense</span>${topUnit(away.id,'offense').map(featuredPlayerRow).join('')||'<p>No offensive players available.</p>'}</div>
+                    <div class="featured-unit"><span class="eyebrow">Top Defense</span>${topUnit(away.id,'defense').map(featuredPlayerRow).join('')||'<p>No defensive players available.</p>'}</div>`}
                   </div>
                 </div>
                 <div class="featured-half featured-half--home" style="background:linear-gradient(225deg, ${home.primary}, ${home.secondary||home.primary}) !important;">
@@ -1127,8 +1131,8 @@
                     ${renderTeamMark(home,'featured-team-logo')}
                   </div>
                   <div class="featured-unit-stack">
-                    <div class="featured-unit"><span class="eyebrow">Top Offense</span>${topUnit(home.id,'offense').map(featuredPlayerRow).join('')||'<p>No offensive players available.</p>'}</div>
-                    <div class="featured-unit"><span class="eyebrow">Top Defense</span>${topUnit(home.id,'defense').map(featuredPlayerRow).join('')||'<p>No defensive players available.</p>'}</div>
+                    ${featured.completed?finalPerformers(home.id):`<div class="featured-unit"><span class="eyebrow">Top Offense</span>${topUnit(home.id,'offense').map(featuredPlayerRow).join('')||'<p>No offensive players available.</p>'}</div>
+                    <div class="featured-unit"><span class="eyebrow">Top Defense</span>${topUnit(home.id,'defense').map(featuredPlayerRow).join('')||'<p>No defensive players available.</p>'}</div>`}
                   </div>
                 </div>
               </div>
@@ -10130,7 +10134,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.0.19';
+  const VISIBLE_RELEASE = '8.0.20';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

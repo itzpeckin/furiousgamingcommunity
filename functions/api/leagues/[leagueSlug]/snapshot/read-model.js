@@ -170,7 +170,7 @@ export function normalizeGame(raw = {}) {
   const scheduledAt = text(raw.scheduled_at ?? raw.scheduledAt);
   const routePath = text(raw.source_route_path ?? raw.sourceRoutePath ?? raw.route_path ?? raw.routePath);
   const approved = {
-    gameId:id, seasonYear:season, stage, stageName:stage,
+    gameId:id, scheduleId:text(raw.source_game_external_id ?? raw.scheduleId ?? raw.sourceGameExternalId), seasonYear:season, stage, stageName:stage,
     stageIndex:numeric(raw.stageIndex), weekIndex:week,
     homeTeamId, awayTeamId, homeScore, awayScore, status, scheduledAt,
     routePath,
@@ -195,7 +195,7 @@ export function normalizeStatistic(raw = {}) {
   };
 }
 
-function normalizeStatisticCompact(raw = {}) {
+export function normalizeStatisticCompact(raw = {}) {
   raw = sourceRecord(raw);
   const metrics=parse(raw.metrics_json) ?? raw.metrics ?? {};
   const source={

@@ -1,4 +1,5 @@
 import { resolveLiveTradePlayer } from './trade-player.js';
+import { gameCommand } from './discord-game.js';
 import { discordCommandName, discordCommandOptions, discordScheduleThreadWeek } from './discord-commands.js';
 import {
   abilitiesCommand,
@@ -295,6 +296,7 @@ async function confidenceAction(c,subcommand,values){
 export async function executeDiscordCommand(c){
   const command=discordCommandName(c.interaction);
   const {subcommandGroup,subcommand,values}=discordCommandOptions(c.interaction);
+  if(command==='game')return gameCommand(c,values);
   const legacyWeek=discordScheduleThreadWeek(command);
   if(legacyWeek){
     requireDiscordRole(c,'commissioner');

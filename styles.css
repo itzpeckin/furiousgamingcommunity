@@ -8103,3 +8103,13 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 .detail-dialog:has([data-matchup-modal]) .matchup-modal{padding-top:0}
 .matchup-backbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;min-height:52px;width:100%;padding:6px 12px;background:var(--surface,#172233);border-bottom:1px solid var(--border-color,#40516c);box-sizing:border-box}
 .matchup-backbar .button{min-height:40px;white-space:normal;text-align:left}
+
+/* Completed home matchups emphasize game-specific production. */
+.featured-final-score{display:flex;justify-content:center;align-items:center;gap:clamp(12px,3vw,40px);padding:18px 14px;background:rgba(6,17,30,.82);color:#f5f8ff}
+.featured-final-score>span{display:flex;align-items:center;gap:14px;font-size:clamp(17px,2vw,26px)}
+.featured-final-score strong{font-size:clamp(36px,5vw,64px);line-height:1}
+.featured-final-score>b{color:#9fcbff;font-size:14px;letter-spacing:.13em}
+.featured-performer{display:grid;gap:4px;padding:12px 0;border-bottom:1px solid #ffffff20;min-width:0}
+.featured-performer>span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#b9cde0}
+.featured-performer>strong{font-size:19px;color:#fff;overflow-wrap:anywhere}
+.featured-performer>small{font-size:13px;color:#d1ddea;line-height:1.5;overflow-wrap:anywhere}
