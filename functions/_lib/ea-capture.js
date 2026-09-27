@@ -1,3 +1,4 @@
+import { prepareEaFirstSeason } from './ea-season-setup.js';
 import { sha256Hex, summarizePayloadShape } from './cloud-platform.js';
 import { buildMaddenDiscoveryReport } from './madden-discovery.js';
 import { canonicalMaddenStage } from './madden-period.js';
@@ -138,10 +139,12 @@ async function scopedSeason(db, leagueId, hub, externalLeagueId) {
   return row;
 }
 
-export async function beginEaCapture({db,bucket,league,actorId,hub:hubInput,platform,externalLeagueId,mode='preview',connectionId,collectionId}) {
+export async function beginEaCapture({db,bucket,league,actorId,hub:hubInput,platform,externalLeagueId,mode='preview',connectionId,collectionId,confirmedSourceSeasonId}) {
   if (!['preview','weekly','yearly'].includes(mode)) fail('Unknown EA collection mode.');
   safeId(league?.id); safeId(collectionId); safeId(connectionId);
-  const hub = normalizeEaHub(hubInput), scope = await scopedSeason(db,league.id,hub,externalLeagueId);
+  const hub = normalizeEaHub(hubInput);
+  if (mode === 'yearly') await prepareEaFirstSeason({db,league,hub,externalLeagueId,actorId,confirmedSourceSeasonId});
+  const scope = await scopedSeason(db,league.id,hub,externalLeagueId);
   routeFor(platform,externalLeagueId,'hub');
   const key = manifestKey(league.id,collectionId), existing = await bucket.get(key);
   if (existing) {

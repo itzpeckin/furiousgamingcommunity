@@ -543,3 +543,10 @@ test('runtime and commissioner UI wire collection separately from live import an
   assert.match(compact,/You do not need to collect the entire season first/);
   assert.doesNotMatch(ui,/Schedule Preload|preload/i);
 });
+
+test('one All Weeks schedule payload provides complete 18-week coverage without individual exports',()=>{
+  const games=regularSeasonGames();
+  const result=parseYearlyScheduleCapture({routePath:'xbsx/742482/week/reg/0/schedules',seasonYear:2027,observedAt:'2026-09-26T00:00:00Z',payload:{gameScheduleInfoList:games}});
+  const selected=selectYearlyScheduleGames(result.games,[]),coverage=yearlyScheduleCoverage(selected);
+  assert.equal(selected.length,272);assert.equal(coverage.capturedWeekCount,18);assert.deepEqual(coverage.missingWeeks,[]);
+});

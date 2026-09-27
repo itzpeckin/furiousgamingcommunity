@@ -395,3 +395,31 @@ test('finalization safely replays when its R2 completion manifest write is inter
     assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM madden_discovery_reports').get().n,1);
   } finally {f.sqlite.close();}
 });
+
+test('EA first-season setup uses verified calendar and confirmed native season without Companion exports',async()=>{
+  const {prepareEaFirstSeason}=await import('../../functions/_lib/ea-season-setup.js');
+  const f=await fixture();
+  try{
+    f.sqlite.exec(`DELETE FROM game_year_franchise_seasons;DELETE FROM franchise_seasons;DELETE FROM league_game_years;
+      INSERT INTO platform_league_onboarding_plans (id,planned_league_id,slug,name,game_year,initial_commissioner_user_id,plan_hash,status,created_by_user_id,updated_by_user_id,activated_at)
+      VALUES ('plan','ea-test','ea-test','EA Test',2027,'actor','hash','prepared','actor','actor',CURRENT_TIMESTAMP);`);
+    const hub={...normalizeEaHub(rawHub()),sourceSeasonId:'',seasonIndex:null};
+    const args={db:f.db,league:f.league,hub,externalLeagueId:'1234',actorId:'actor'};
+    await assert.rejects(prepareEaFirstSeason(args),/Enter and confirm/);
+    await assert.rejects(prepareEaFirstSeason({...args,hub:{...hub,gameRelease:'Madden NFL 26'},confirmedSourceSeasonId:'2'}),/edition/);
+    await assert.rejects(prepareEaFirstSeason({...args,hub:{...hub,seasonYear:null},confirmedSourceSeasonId:'2'}),/calendar/);
+    assert.equal(f.sqlite.prepare('SELECT count(*) n FROM franchise_seasons').get().n,0);
+    await prepareEaFirstSeason({...args,confirmedSourceSeasonId:'2'});
+    await prepareEaFirstSeason({...args,confirmedSourceSeasonId:'2'});
+    const season=f.sqlite.prepare('SELECT * FROM franchise_seasons').get();
+    assert.equal(season.source_season_id,'2');assert.equal(season.season_year,2027);assert.equal(season.status,'preview');
+    assert.equal(f.sqlite.prepare('SELECT count(*) n FROM companion_import_destinations').get().n,1);
+    assert.equal(f.sqlite.prepare('SELECT count(*) n FROM league_active_snapshots').get().n,0);
+    assert.equal(f.sqlite.prepare('SELECT count(*) n FROM tenant_audit_events').get().n,1);
+    await prepareEaFirstSeason({...args,externalLeagueId:'other-franchise',confirmedSourceSeasonId:'99'});
+    assert.equal(f.sqlite.prepare('SELECT count(*) n FROM franchise_seasons').get().n,1);
+    await assert.rejects(beginEaCapture({db:f.db,bucket:f.bucket,league:f.league,actorId:'actor',hub:rawHub(),platform:'ps5',externalLeagueId:'other-franchise',mode:'yearly',connectionId:'connection-1',collectionId:'invalid-yearly'}),/prepared season/);
+    const created=await beginEaCapture({db:f.db,bucket:f.bucket,league:f.league,actorId:'actor',hub:rawHub(),platform:'ps5',externalLeagueId:'1234',mode:'yearly',connectionId:'connection-1',collectionId:'initial-yearly'});
+    assert.equal(created.franchiseSeasonId,season.id);assert.equal(created.sourceSeasonId,'2');
+  }finally{f.sqlite.close()}
+});

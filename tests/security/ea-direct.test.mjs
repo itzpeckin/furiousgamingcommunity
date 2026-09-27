@@ -199,3 +199,23 @@ test('disconnect during EA code exchange cannot restore encrypted setup credenti
     assert.equal(row.stage,'expired');assert.equal(row.payload_cipher,null);
   }finally{globalThis.fetch=originalFetch;f.sqlite.close();}
 });
+
+test('yearly setup may launch before preview and seals its explicit season confirmation',async()=>{
+  const f=await fixture();
+  try{
+    f.env.COMPANION_EXPORTS={};
+    let launches=0;
+    f.env.FRANCHISE_IMPORT_WORKER={async fetch(){launches++;return Response.json({ok:true,id:'workflow'});}};
+    f.sqlite.exec(`INSERT INTO ea_direct_connections (id,league_id,connected_by,status,platform,persona_id,persona_name,external_league_id,external_league_name,credential_cipher)
+      VALUES ('connection-a','a','user-a','connected','ps5','persona-a','Owner','1234','League A','test-cipher');`);
+    const weekly=await syncPost(f.context('league-a',{mode:'weekly'}));
+    assert.equal(weekly.status,409);assert.equal(launches,0);
+    const yearly=await syncPost(f.context('league-a',{mode:'yearly',sourceSeasonId:'2',confirmSeason:true}));
+    assert.equal(yearly.status,200);assert.equal(launches,1);
+    const publicJob=await yearly.json(),job=f.sqlite.prepare('SELECT * FROM ea_direct_collection_jobs').get();
+    assert.equal(publicJob.mode,'yearly');assert.equal(publicJob.previewVerified,false);
+    assert.equal(publicJob.state_cipher,undefined);assert.equal(publicJob.sourceSeasonId,undefined);
+    assert.deepEqual(await openEa(f.env,`ea-job:a:${job.id}`,job.state_cipher),{confirmedSourceSeasonId:'2'});
+    await assert.rejects(openEa(f.env,`ea-job:b:${job.id}`,job.state_cipher));
+  }finally{f.sqlite.close()}
+});

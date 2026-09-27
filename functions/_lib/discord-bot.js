@@ -1,3 +1,4 @@
+import { resolveLiveTradePlayer } from './trade-player.js';
 import { discordCommandName, discordCommandOptions, discordScheduleThreadWeek } from './discord-commands.js';
 import {
   abilitiesCommand,
@@ -104,13 +105,9 @@ async function resolveTradeAsset(c,token){
   if(!match)throw Object.assign(new Error(`Use player: or pick: before “${token}”.`),{status:400});
   const kind=match[1].toLowerCase(),query=clean(match[2],160);
   if(kind==='player'){
-    const row=await c.db.prepare(`SELECT identity.id,identity.public_id AS publicId,identity.display_name AS displayName
-      FROM player_identities identity
-      LEFT JOIN player_source_aliases alias ON alias.player_identity_id=identity.id AND alias.league_id=identity.league_id
-      WHERE identity.league_id=? AND (identity.id=? OR identity.public_id=? OR alias.source_player_id=? OR lower(identity.display_name)=lower(?))
-      ORDER BY alias.updated_at DESC LIMIT 1`).bind(c.league.id,query,query,query,query).first();
-    if(!row)throw Object.assign(new Error(`Player “${query}” was not found. Use the exact Player Card name or ID.`),{status:404});
-    return {assetType:'player',assetId:row.publicId||row.id,label:row.displayName};
+    const row=await resolveLiveTradePlayer(c.db,c.league.id,query);
+    if(!row)throw Object.assign(new Error('That player is no longer on the active league roster. Choose the player again from autocomplete.'),{status:404});
+    return {assetType:'player',assetId:row.publicId||row.sourcePlayerId,label:row.displayName};
   }
   const normalized=query.toLowerCase();
   let row=await c.db.prepare(`SELECT id,draft_class AS draftClass,round,original_team_key AS originalTeamKey

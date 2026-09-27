@@ -8,11 +8,11 @@
 
 **Revision:** 3.11
 
-**Current production:** 8.0.17; EA/Companion collection and live import share a Madden Import workspace.
+**Current production:** 8.0.18.
 
-**Current work:** 8.0.18 makes Export → Refresh → Import explicit, places the selector beneath Quick Controls, advances Discord draft choices with the season, and restores matchup exit controls.
+**Current work:** 8.0.19 unifies five-step Madden setup, enables EA-first schedules, moves priority/archive controls, adds contextual matchup navigation, and fixes OTL trade player resolution.
 
-**Next gate:** Validate and publish 8.0.18, then verify desktop/mobile layout and both schedule matchup exit paths. No live import, collection, archive or Discord messages.
+**Next gate:** Complete strict quality, preview checks, production publication and desktop/mobile acceptance.
 
 ## Product decisions
 

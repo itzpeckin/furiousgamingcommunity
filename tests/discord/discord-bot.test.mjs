@@ -1,4 +1,5 @@
 import { currentTradeSeason } from '../../functions/_lib/trade-season.js';
+import { resolveLiveTradePlayer, ensureLiveTradePlayerIdentity } from '../../functions/_lib/trade-player.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
@@ -2414,5 +2415,40 @@ test('Discord trade pick choices roll forward with an archived season while pres
     database.exec("UPDATE franchise_seasons SET source_franchise_id='different' WHERE id='next'");
     assert.equal(await currentTradeSeason(db,'league-a'),null,'an unrelated successor is never selected');
     assert.deepEqual(await choices('2028'),[]);
+  }finally{database.close()}
+});
+
+test('OTL-style autocomplete selections create a trade without prior identity preview and stay tenant scoped',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedLeague(database,{id:'league-b',slug:'beta',guild:'100000000000000002'});
+    seedMember(database,{leagueId:'league-a'});
+    seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
+    const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:2});
+    for(const [id,team,name] of [['555220992','1001','Israel Example'],['555220994','1002','Yasir Example']])seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'players',externalId:id,data:{external_id:id,team_external_id:team,display_name:name,position:'HB',overall:80}});
+    database.exec(`INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES ('season-a','league-a','ea-madden-companion','otlexample','1','Madden NFL 27','2027',2027,'active');`);
+    const db=d1(database),key=await signingKey();
+    const autocomplete=await discordInteractions(await signedContext({db,key,interaction:interaction({id:'100000000000000301',name:'trade',type:4,options:[{type:1,name:'create',options:[{type:3,name:'owner',value:'owner:100000000000000012'},{type:3,name:'send-1',value:'Israel',focused:true}]}]})}));
+    const choice=(await autocomplete.json()).data.choices[0];
+    assert.equal(choice.value,'player:555220992');
+    assert.equal(database.prepare('SELECT count(*) n FROM player_identities').get().n,0);
+    const response=await discordInteractions(await signedContext({db,key,interaction:interaction({id:'100000000000000302',name:'trade',options:[{type:1,name:'create',options:[{type:3,name:'owner',value:'owner:100000000000000012'},{type:3,name:'send-1',value:choice.value},{type:3,name:'receive-1',value:'player:555220994'}]}]})}));
+    assert.match((await response.json()).data.content,/sent to San Francisco 49ers/i);
+    assert.equal(database.prepare('SELECT count(*) n FROM trade_workflow_assets WHERE player_identity_id IS NOT NULL').get().n,2);
+    const identity=await resolveLiveTradePlayer(db,'league-a','555220992');
+    assert.match(identity.publicId,/^plr_[a-f0-9]{32}$/);
+    assert.equal((await ensureLiveTradePlayerIdentity(db,'league-a',identity)).playerIdentityId,identity.playerIdentityId);
+    assert.equal(await resolveLiveTradePlayer(db,'league-b',identity.publicId),null);
+    assert.equal(database.prepare('SELECT count(*) n FROM player_identities').get().n,2);
+    const wrongOwner=await discordInteractions(await signedContext({db,key,interaction:interaction({id:'100000000000000303',name:'trade',options:[{type:1,name:'create',options:[{type:3,name:'owner',value:'owner:100000000000000012'},{type:3,name:'send-1',value:'player:555220994'},{type:3,name:'receive-1',value:choice.value}]}]})}));
+    assert.match((await wrongOwner.json()).data.content,/ownership changed/i);
+    assert.equal(database.prepare('SELECT count(*) n FROM trade_workflows').get().n,1);
+    seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'players',externalId:'duplicate',data:{external_id:'duplicate',team_external_id:'1001',display_name:'Israel Example'}});
+    await assert.rejects(resolveLiveTradePlayer(db,'league-a','Israel Example'),/More than one/);
+    database.prepare(`DELETE FROM league_snapshot_records WHERE league_id='league-a' AND external_id='555220992'`).run();
+    assert.equal(await resolveLiveTradePlayer(db,'league-a',identity.publicId),null);
   }finally{database.close()}
 });

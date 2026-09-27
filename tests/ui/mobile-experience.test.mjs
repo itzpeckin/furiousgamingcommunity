@@ -181,7 +181,7 @@ test('closing a loading matchup keeps it closed when its directory request finis
   let resolveDirectory,unlocked=0,opens=0;
   const content={innerHTML:''},attributes={};
   const context=vm.createContext({
-    performance,console:{info(){},error(){}},detailContent:content,
+    performance,routeBase:route=>route.split('/')[0],currentAppRoute:()=> 'schedule',console:{info(){},error(){}},detailContent:content,
     detailModal:{classList:{add(){opens++},remove(){}},setAttribute(k,v){attributes[k]=v}},
     body:{style:{}},unlockBody(){unlocked++},showToast(){throw Error('Closed matchup must not produce an error toast')},
     findCachedMatchupGame:()=>null,
@@ -190,8 +190,9 @@ test('closing a loading matchup keeps it closed when its directory request finis
   vm.runInContext(opening+'\n'+detail,context);
   const pending=vm.runInContext('openMatchupCard("uncached-game")',context);
   assert.match(content.innerHTML,/Opening matchup/);
+  assert.match(content.innerHTML,/Back to Schedule/);
   vm.runInContext('closeDetail()',context);
   resolveDirectory();await pending;
   assert.equal(opens,1);assert.equal(content.innerHTML,'');assert.equal(attributes['aria-hidden'],'true');assert.equal(unlocked,1);
-  assert.match(styles,/\.detail-dialog:has\(\[data-matchup-modal\]\)>\.detail-close\{display:flex!important/);
+  assert.match(styles,/\.detail-dialog:has\(\[data-matchup-modal\]\)>\.detail-close\{display:none!important/);
 });

@@ -98,3 +98,23 @@
 .commissioner-madden-layout .commissioner-roster-control{flex-wrap:wrap;padding:12px;gap:8px;margin-top:12px}
 .commissioner-madden-layout .commissioner-roster-control .button{width:100%;min-height:44px}
 .commissioner-madden-layout .commissioner-trade-reset-controls{padding:12px;gap:10px;margin-top:12px}
+
+/* 8.0.19 — compact five-step workspace with follow-up controls in the left column. */
+.commissioner-madden-layout>.commissioner-command-column--import{grid-column:span 8;min-width:0;display:flex;flex-direction:column;gap:18px}
+.commissioner-command-column--import>.commissioner-madden-workflow{min-width:0;border:1px solid var(--command-border);border-radius:20px;background:var(--command-surface);overflow:hidden}
+.commissioner-madden-workflow__header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 18px}
+.commissioner-madden-workflow__header .button{min-height:40px;font-size:.8rem;padding:8px 12px}
+.madden-workflow-step{padding-top:14px;border-top:1px solid var(--command-border)}
+.commissioner-madden-workflow .madden-workflow-step h3,.commissioner-madden-workflow .ea-direct-header h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px;font-size:1rem}
+.madden-step-number{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:rgba(var(--accent-rgb),.2);font-size:.8rem;flex-shrink:0}
+.madden-workflow-step h3 small{font-size:.7rem;font-weight:500;color:var(--muted)}
+.madden-step-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.madden-step-actions>small{flex-basis:100%;font-size:.78rem;color:var(--muted);line-height:1.5}
+.commissioner-madden-workflow>.commissioner-command-import{padding-top:0}
+.commissioner-madden-workflow .commissioner-command-import>header{margin:0;min-height:0;justify-content:flex-end}
+.commissioner-import-steps{margin-top:8px}
+.commissioner-import-followups{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.commissioner-import-followups .commissioner-command-panel{padding:18px}
+.commissioner-import-followups .commissioner-archive-action{margin:0}
+@media(max-width:1100px){.commissioner-madden-layout>.commissioner-command-column--import{grid-column:1/-1}}
+@media(max-width:700px){.commissioner-madden-workflow__header{padding:14px}.madden-step-actions{align-items:stretch}.madden-step-actions>.button{flex:1 1 100%}.madden-step-actions .ea-direct-form{width:100%}.commissioner-import-followups .commissioner-command-panel{padding:14px}}

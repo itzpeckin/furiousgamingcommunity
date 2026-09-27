@@ -97,7 +97,7 @@ export async function runEaCollectionStep({ db, bucket, league, connection, job,
     if (expectedRequests.length < 3 || expectedRequests.length > MAX_REQUESTS || expectedRequests[0].kind !== 'hub') {
       throw collectionError('EA_COLLECTION_PLAN_INVALID', 'EA returned a collection plan that cannot be processed safely.');
     }
-    const manifest = await capture.beginEaCapture({ ...common, league, actorId: job.actor_id, hub: rawHub, mode: job.mode, connectionId: connection.id });
+    const manifest = await capture.beginEaCapture({ ...common, league, actorId: job.actor_id, hub: rawHub, mode: job.mode, connectionId: connection.id, confirmedSourceSeasonId: state.confirmedSourceSeasonId });
     await capture.storeEaCapture({ ...common, sessionId: manifest.sessionId, kind: 'hub', args: {}, payload: rawHub, hub: rawHub });
     const { raw: _raw, ...retainedHub } = hub;
     state = {
@@ -141,10 +141,10 @@ export async function runEaCollectionStep({ db, bucket, league, connection, job,
     throw collectionError('EA_ADVANCED_DURING_COLLECTION', 'The Madden league advanced during collection. Start a fresh sync to collect one consistent week.');
   }
   const result = await capture.finalizeEaCapture({ ...common, sessionId: state.sessionId, mode: job.mode, actorId: job.actor_id, expectedRequests: state.expectedRequests, publishReady: job.mode !== 'preview' });
-  const previewVerified = job.mode === 'preview' && result.readiness?.ready === true;
+  const previewVerified = (job.mode === 'preview' || job.mode === 'yearly' && Boolean(result.yearlyScheduleImportId)) && result.readiness?.ready === true;
   const readyToImport = job.mode === 'weekly' && result.readiness?.ready === true && result.readyPointerChanged === true;
   const complete = result.readiness?.ready === true;
-  const message = result.message || (previewVerified ? 'Private preview verified. EA Direct is ready to collect league updates.'
+  const message = result.message || (previewVerified && job.mode === 'preview' ? 'Private preview verified. EA Direct is ready to collect league updates.'
     : readyToImport ? 'EA data is ready. Select Import Latest Export to publish the update.'
       : job.mode === 'yearly' && complete ? 'The yearly schedule is available. The current league week has not changed.'
         : 'Collection finished, but the data is not ready to import. Review the missing or unavailable datasets.');

@@ -5802,6 +5802,9 @@ function canonicalPlayerDashboardStats(playerId='') {
 
   async function openMatchupCard(gameId){
     const openingRevision=++matchupOpenRevision;
+    const origin=routeBase(currentAppRoute());
+    const backLabel=origin==='schedule'?'Back to Schedule':origin==='my-team'?'Back to My Team':origin==='teams'?'Back to Team Page':origin==='home'?'Back to Home':'Back to Previous Page';
+    const backBar=`<header class="matchup-backbar"><button class="button button--ghost" data-close-detail aria-label="${backLabel}">← ${backLabel}</button></header>`;
     const gameIdText=String(gameId||'');
     const openCount=(matchupColdDiagnostics.get(gameIdText)||0)+1;
     matchupColdDiagnostics.set(gameIdText,openCount);
@@ -5817,7 +5820,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
     if(!game){
       const placeholderStart=performance.now();
-      openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal><div class="matchup-instant-placeholder"><span class="spinner"></span><strong>Opening matchup…</strong></div></div>`);
+      openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal>${backBar}<div class="matchup-instant-placeholder"><span class="spinner"></span><strong>Opening matchup…</strong></div></div>`);
       log('placeholder openDetail',placeholderStart);
 
       const dirStart=performance.now();
@@ -5858,7 +5861,7 @@ function canonicalPlayerDashboardStats(playerId='') {
     log('team logo markup',logoStart);
 
     const domStart=performance.now();
-    openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal data-matchup-shell="${escapeHtml(gameIdText)}">
+    openDetail(`<div class="matchup-modal matchup-modal--gotw matchup-modal--instant" data-matchup-modal data-matchup-shell="${escapeHtml(gameIdText)}">${backBar}
       <div class="matchup-modal__header"><span class="eyebrow matchup-modal__week">${escapeHtml(canonicalScheduleLabel(game))}</span>
       <span class="pill matchup-modal__status ${status==='final'?'pill--neutral':status==='live'?'pill--danger':'pill--accent'}">${status==='final'?'Final':status==='live'?'Live':'Upcoming'}</span></div>
       <div class="matchup-gotw-board">
@@ -10127,7 +10130,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.0.18';
+  const VISIBLE_RELEASE = '8.0.19';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';
