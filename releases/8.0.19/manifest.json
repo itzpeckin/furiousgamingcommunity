@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.19",
+  "releaseType": "unified-madden-setup-and-tenant-trades",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.18",
+    "commit": "94e90374f23479332716e3ee65a69123f718d8e4",
+    "tag": "v8.0.18"
+  },
+  "implementationBranch": "feature/8.0.19-unified-madden-workflow",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.18",
+    "candidateRelease": "8.0.19",
+    "currentMigration": 48,
+    "candidateMigration": 48,
+    "scope": "Five-step Madden import workspace, EA-first season schedule setup, Companion All Weeks coverage, in-column priority/archive controls, contextual horizontal matchup navigation, and live roster trade identities for newly imported leagues."
+  },
+  "requiredArtifacts": [
+    "trade-module.js",
+    "league-engine/ea-direct.js",
+    "league-engine/one-click-import.js",
+    "league-engine/permanent-export-url.js",
+    "ea-direct.css",
+    "app.js",
+    "styles.css",
+    "functions/_lib/trade-player.js",
+    "functions/_lib/ea-season-setup.js",
+    "support/madden-import/index.html",
+    "docs/ROADMAP.md",
+    "releases/8.0.19/release-record.md",
+    "releases/8.0.19/validation-evidence.json"
+  ]
+}

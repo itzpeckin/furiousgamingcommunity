@@ -11,6 +11,7 @@
   let rotateArmed = false;
   let copied = false;
   let pollTimer = null;
+  let draftSlug = null, seasonDraft = '', seasonConfirmed = false;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
@@ -118,7 +119,7 @@
   }
 
   async function copyUrl() {
-    const value = state?.endpoint?.exportUrl;
+    const value = state?.leagueSlug===slug()?state.endpoint?.exportUrl:null;
     if (!value) throw new Error('The permanent league export URL is not available.');
     await navigator.clipboard.writeText(value);
     copied = true;
@@ -267,6 +268,18 @@
     </section>`;
   }
 
+  function renderWorkflowScheduleControls() {
+    if(draftSlug!==slug()){draftSlug=slug();seasonDraft='';seasonConfirmed=false;}
+    if(!state||state.leagueSlug!==slug())return '<p>Loading this league’s schedule…</p>';
+    const annual=state?.yearlyScheduleImport,prepared=state?.preparedSeason,preparation=state?.firstSeasonPreparation||{};
+    const copy=`<button class="button button--secondary" data-copy-permanent-export-url ${busy||!state?.endpoint?.exportUrl?'disabled':''}>${copied?'URL Copied':'Copy URL'}</button>`;
+    if(annual?.status==='completed')return '<span class="pill pill--success">18 weeks · 272 games · Complete</span>';
+    if(!prepared)return copy+(preparation.canPrepare?`<form data-first-season-form class="commissioner-first-season__form"><label><span>Madden franchise season number</span><input class="input" data-first-season-source-season value="${esc(seasonDraft||preparation.suggestedSourceSeasonId||'')}" required maxlength="80"></label><label class="commissioner-first-season__confirm"><input type="checkbox" data-first-season-confirm ${seasonConfirmed?'checked':''} required><span>Confirm this season for ${esc(state?.leagueSlug||'this league')}.</span></label><button type="submit" class="button button--primary" ${busy?'disabled':''}>Prepare Season</button></form>`:'<small>Export League Info and All Weeks in Companion, then select Refresh below.</small>');
+    if(!annual||!['collecting','ready','failed'].includes(annual.status))return copy+`<button class="button button--primary" data-import-yearly-schedule ${busy?'disabled':''}>Import Season Schedule</button><small>Use All Weeks in Companion. Already received weeks are reused.</small>`;
+    const missing=Array.isArray(annual.missingWeeks)?annual.missingWeeks:[];
+    return copy+`<button class="button button--primary" data-finish-yearly-schedule ${busy||!annual.readyToFinish?'disabled':''}>Import Captured Schedule</button><button class="button button--ghost" data-refresh-permanent-export ${busy?'disabled':''}>Check Schedule</button><small>${count(annual.capturedWeekCount)} / 18 weeks · ${count(annual.gameCount)} / 272 games${missing.length?'. Missing weeks: '+missing.map(esc).join(', '):''}</small><details><summary>Schedule options</summary><button class="button button--ghost" data-switch-to-weekly ${busy?'disabled':''}>End Schedule Collection</button></details>`;
+  }
+
   function ensurePolling() {
     if (pollTimer || !document.querySelector('[data-permanent-league-export-panel],[data-one-click-import-panel],[data-compact-import-panel]')) return;
     const status = state?.latestExport?.status;
@@ -340,6 +353,11 @@
     if (event.target.closest('[data-cancel-export-rotation]')) { rotateArmed=false;rerender(); }
   });
 
+  document.addEventListener('input',event=>{
+    if(event.target.matches('[data-first-season-source-season]')){draftSlug=slug();seasonDraft=String(event.target.value||'');}
+    if(event.target.matches('[data-first-season-confirm]')){draftSlug=slug();seasonConfirmed=event.target.checked===true;}
+  });
+
   document.addEventListener('submit',event=>{
     const form=event.target.closest('[data-first-season-form]');
     if(!form)return;
@@ -348,9 +366,9 @@
     prepareFirstSeason(form).catch(()=>{});
   });
 
-  const diagnostics = () => ({release:VERSION,busy,state,error:errorMessage,copied,rotateArmed,permanent:true,revocable:true,yearlyScheduleImport:state?.yearlyScheduleImport||null,activationPerformed:Boolean(state?.latestExport?.importLive)});
+  const diagnostics = () => ({release:VERSION,busy,state:state?.leagueSlug===slug()?state:null,error:errorMessage,copied,rotateArmed,permanent:true,revocable:true,yearlyScheduleImport:state?.yearlyScheduleImport||null,activationPerformed:Boolean(state?.latestExport?.importLive)});
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before permanent-export-url.js.');
-  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,prepareFirstSeason,startYearlySchedule,finishYearlySchedule,switchToWeekly,renderPanel,renderNotices,renderSecurityControls,renderYearlyScheduleControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
+  HQ.defineModuleService('platform','leagueExportUrl',{refresh,copyUrl,rotateUrl,importLatest,prepareFirstSeason,startYearlySchedule,finishYearlySchedule,switchToWeekly,renderPanel,renderNotices,renderSecurityControls,renderYearlyScheduleControls,renderWorkflowScheduleControls,ensurePolling,diagnostics},{replace:true,alias:'leagueExportUrl'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'permanent-league-export-url',service:'leagueExportUrl',script:'league-engine/permanent-export-url.js',version:VERSION,dependencies:['auth','leagueTenant','oneClickImport'],capabilities:['permanent-url','explicit-rotation','automatic-analysis','latest-export-readiness','one-click-import']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();

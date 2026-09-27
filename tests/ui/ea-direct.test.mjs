@@ -53,7 +53,8 @@ function harness() {
     }}});
   }
   return {
-    service, requests, timers, click,
+    service, requests, timers, click, hq,
+    typeSeason(value) { documentEvents.get('input')({target:{value,closest:()=>({})}}); },
     respond(handler) { requestHandler = handler; },
     switchLeague(value) { currentSlug = value; windowEvents.get('franchisehq:league-tenant-changed')(); },
     changeAuth() { windowEvents.get('franchisehq:auth-changed')(); },
@@ -103,13 +104,12 @@ test('late EA connection responses cannot display data from a previous league', 
   assert.equal(ui.requests[1].path, '/api/leagues/beta/ea-direct/connection');
 });
 
-test('weekly and yearly collection require a server-verified preview', async () => {
+test('weekly collection requires verification; yearly setup can verify a new connection', async () => {
   const ui = harness();
   ui.respond(async () => connected());
   await ui.service.refresh();
-  assert.doesNotMatch(ui.service.renderPanel(), /data-ea-collect="weekly"/);
+  assert.match(ui.service.renderPanel(), /data-ea-collect="weekly" disabled/);
   await ui.service.collect('weekly');
-  await ui.service.collect('yearly');
   assert.equal(ui.requests.filter(request => request.options.method === 'POST').length, 0);
   ui.respond(async (_path, options) => options.method === 'POST'
     ? {ok: true, id: 'preview-1', status: 'complete', coverage: {freeAgents: {status: 'blocked', count: null}}}
@@ -117,7 +117,8 @@ test('weekly and yearly collection require a server-verified preview', async () 
   await ui.service.collect('preview');
   assert.equal(ui.requests.find(request => request.options.method === 'POST').options.body.mode, 'preview');
   assert.match(ui.service.renderPanel(), /blocked/);
-  assert.doesNotMatch(ui.service.renderPanel(), /blocked · 0|data-ea-collect="weekly"/);
+  assert.doesNotMatch(ui.service.renderPanel(), /blocked · 0/);
+  assert.match(ui.service.renderPanel(), /data-ea-collect="weekly" disabled/);
   ui.respond(async () => connected({previewVerified: true}));
   await ui.service.refresh();
   assert.match(ui.service.renderPanel(), /data-ea-collect="weekly"/);
@@ -295,4 +296,18 @@ test('completed yearly schedule is shown without a regular snapshot import actio
   assert.equal(ui.effects().published, 0);
 });
 
-test('Companion instructions lead directly to Refresh without an intermediate button',async()=>{const ui=harness();await ui.service.refresh();ui.click({eaPath:'companion'});assert.match(ui.service.renderPanel(),/League Info, Rosters, and Weekly Stats/);assert.match(ui.service.renderPanel(),/Refresh in Step 2/);assert.doesNotMatch(ui.service.renderPanel(),/Open Companion Import|data-ea-action="companion-import"/);});
+test('Companion instructions lead directly to Refresh without an intermediate button',async()=>{const ui=harness();await ui.service.refresh();ui.click({eaPath:'companion'});assert.match(ui.service.renderPanel(),/League Info, Rosters, and your selected weeks/);assert.match(ui.service.renderPanel(),/Collect weekly stats/);assert.doesNotMatch(ui.service.renderPanel(),/Open Companion Import|data-ea-action="companion-import"/);});
+
+test('EA-first setup preserves the typed season through status refresh and requires an explicit collection action',async()=>{
+  const ui=harness();
+  ui.hq.leagueExportUrl={diagnostics:()=>({state:{leagueSlug:'alpha',endpoint:{exportUrl:'https://example.invalid/export'}}})};
+  ui.respond(async(_path,options)=>options.method==='POST'?{ok:true,id:'yearly',mode:'yearly',status:'running'}:connected());
+  await ui.service.refresh();ui.typeSeason('2');await ui.service.refresh();
+  assert.match(ui.service.renderPanel(),/name="sourceSeasonId" value="2"/);
+  assert.equal(ui.requests.filter(r=>r.options.method==='POST').length,0);
+  await ui.service.collect('yearly',{sourceSeasonId:'2',confirmSeason:true});
+  const request=ui.requests.find(r=>r.options.method==='POST');
+  assert.equal(request.options.body.mode,'yearly');assert.equal(request.options.body.confirmSeason,true);assert.equal(request.options.body.sourceSeasonId,'2');
+  ui.switchLeague('beta');ui.hq.leagueExportUrl={diagnostics:()=>({state:{leagueSlug:'beta'}})};
+  await ui.service.refresh();assert.doesNotMatch(ui.service.renderPanel(),/name="sourceSeasonId" value="2"/);
+});

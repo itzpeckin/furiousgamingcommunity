@@ -55,7 +55,7 @@ export async function onRequestPost(context){
     if(done)statements.push(db.prepare(`UPDATE ea_direct_connections SET preview_verified=CASE WHEN ?=1 THEN 1 ELSE preview_verified END,last_synced_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
       WHERE id=? AND league_id=? AND status='connected'
         AND EXISTS(SELECT 1 FROM ea_direct_collection_jobs WHERE id=? AND status='completed' AND cursor=?)`)
-      .bind(job.mode==='preview'&&summary.previewVerified?1:0,connection.id,league.id,job.id,cursor));
+      .bind(['preview','yearly'].includes(job.mode)&&summary.previewVerified?1:0,connection.id,league.id,job.id,cursor));
     await db.batch(statements);
     return json({ok:true,done,cursor,progress:result.progress,status:done?'completed':'running'});
   }catch(error){

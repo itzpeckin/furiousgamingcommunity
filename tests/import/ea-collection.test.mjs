@@ -266,3 +266,15 @@ test('controller persists rotated credentials, renews the session once and ignor
     assert.equal(JSON.parse(requests[1].body).accessToken, 'new-access');
   } finally { globalThis.fetch = originalFetch; sqlite.close(); }
 });
+
+test('a complete published yearly schedule verifies the connection; incomplete schedules cannot',async()=>{
+  for(const ready of [false,true]){
+    const {options}=fixture('yearly');
+    let setup;
+    options.capture.beginEaCapture=async args=>{setup=args.confirmedSourceSeasonId;return{sessionId:'capture-session'}};
+    options.capture.finalizeEaCapture=async()=>({readiness:{ready},yearlyScheduleImportId:ready?'yearly-import':null});
+    const result=await finish(options,{confirmedSourceSeasonId:'2'});
+    assert.equal(setup,'2');assert.equal(result.result.previewVerified,ready);assert.equal(result.result.readyToImport,false);
+    assert.doesNotMatch(result.result.message,/Private preview verified/);
+  }
+});

@@ -18,6 +18,7 @@
   let selectedPath = 'ea-direct';
   let selectedPersonaId = '';
   let selectedLeagueId = '';
+  let seasonDraft = '';
   let pollTimer = null;
   const controllers = new Set();
 
@@ -57,6 +58,7 @@
     errorMessage = '';
     notice = '';
     selectedPath = 'ea-direct';
+    seasonDraft = '';
     resetSelections();
   }
 
@@ -159,7 +161,7 @@
         resetSelections();
       }
       if (action === 'disconnect') notice = 'EA account disconnected. Your imported league data remains available.';
-      if (action === 'connect') notice = 'EA account connected. Collect a preview to check the available league data.';
+      if (action === 'connect') notice = 'EA account connected. Import the season schedule in Step 2.';
       return state;
     } catch (error) {
       if (stillCurrent(token)) errorMessage = safeMessage(error.message);
@@ -192,6 +194,7 @@
           notice = 'Preview collected. Review the coverage below before starting a league sync.';
         }
         await refresh();
+        if (stillCurrent(token) && collection?.mode === 'yearly') await HQ.leagueExportUrl?.refresh?.();
       } else schedulePoll(token);
       rerender();
       return collection;
@@ -206,17 +209,17 @@
     }
   }
 
-  async function collect(mode) {
+  async function collect(mode, setup = {}) {
     if (!['preview', 'weekly', 'yearly'].includes(mode)) return null;
     const token = ensureContext();
     if (busy || state?.status !== 'connected' || (collection && !terminalStatuses.has(collection.status))) return null;
-    if (mode !== 'preview' && !previewVerified()) return null;
+    if (mode === 'weekly' && !previewVerified()) return null;
     busy = true;
     errorMessage = '';
     notice = '';
     rerender();
     try {
-      const payload = await api('sync', 'POST', {mode}, token);
+      const payload = await api('sync', 'POST', {mode, ...setup}, token);
       if (!payload || !stillCurrent(token)) return null;
       collection = {...payload.job, ...payload, mode: payload.mode || payload.job?.mode || mode};
       if (terminalStatuses.has(collection.status)) await refresh();
@@ -250,6 +253,7 @@
   function collectionMarkup() {
     if (!collection) return '';
     const finished = terminalStatuses.has(collection.status);
+    if (finished && collection.mode === 'yearly' && collection.previewVerified) return '<p class="ea-direct-export-complete" role="status">Season schedule complete. Collect weekly stats in Step 3.</p>';
     if (finished && collection.readyToImport && collection.mode === 'weekly') return '<p class="ea-direct-export-complete" role="status">EA export complete. Use Refresh below, then Import Latest Export.</p>';
     const progress = Number(collection.progress?.percent ?? collection.progress);
     const percent = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : null;
@@ -278,14 +282,30 @@
     const disabled = busy || loading || activeCollection ? 'disabled' : '';
     const verified = previewVerified();
     const statusLabel = loading ? 'Checking connection' : connected ? 'Connected' : state?.status === 'reconnect-required' ? 'Reconnect needed' : state?.configured === false ? 'Setup required' : 'Not connected';
-    const body = selectedPath === 'companion'
-      ? '<p>In the Madden Companion App, export League Info, Rosters, and Weekly Stats to your league URL. Wait for all exports to finish, then click Refresh in Step 2. Need the URL? Open Companion export URL &amp; season schedule below and select Copy URL.</p>'
-      : loading && !state ? '<p role="status">Checking EA Direct availability for this league…</p>'
-      : state?.configured === false ? `<p>${esc(state.message || 'EA Direct is being configured for FranchiseHQ. Companion imports remain available below.')}</p><button type="button" class="button button--ghost" data-ea-action="refresh" ${disabled}>Check Availability</button>`
-      : !loaded || !state ? '<p>Connection status is unavailable. Select Refresh Connection to try again.</p>'
-      : connected ? `<div class="ea-direct-connected"><p><strong>${esc(state.connection?.leagueName || 'Connected franchise')}</strong> · ${esc(state.connection?.personaName || 'Connected profile')}${state.connection?.platform ? ` · ${esc(state.connection.platform)}` : ''}</p><div class="ea-direct-actions">${verified ? `<button class="button button--primary" type="button" data-ea-collect="weekly" ${disabled}>Export from EA</button>` : `<button class="button button--primary" type="button" data-ea-collect="preview" ${disabled}>Test Connection &amp; Collect Preview</button>`}</div>${verified ? '<p>When the export finishes, click Refresh in Step 2 below.</p>' : '<p>Verify your connection before exporting live league data.</p>'}<details class="ea-direct-settings"><summary>Connection &amp; schedule options</summary><small>Last collected: ${esc(date(state.connection?.lastSyncedAt))}</small><div class="ea-direct-actions">${verified ? `<button class="button button--secondary" type="button" data-ea-collect="preview" ${disabled}>Test Connection &amp; Collect Preview</button><button class="button button--secondary" type="button" data-ea-collect="yearly" ${disabled}>Import Yearly Schedule</button>` : ''}<button class="button button--ghost" type="button" data-ea-action="refresh" ${disabled}>Refresh Connection</button><button class="button button--ghost" type="button" data-ea-action="disconnect" ${disabled}>Disconnect EA Account</button></div></details></div>${collectionMarkup()}`
+    const exportService = HQ.leagueExportUrl;
+    const exportInfo = exportService?.diagnostics?.() || {};
+    const exportState = exportInfo.state?.leagueSlug === token.slug ? exportInfo.state : null;
+    const annual = exportState?.yearlyScheduleImport;
+    const complete = annual?.status === 'completed';
+    const prepared = exportState?.preparedSeason;
+    const connectionMarkup = selectedPath === 'companion' ? ''
+      : loading && !state ? '<p role="status">Checking EA connection…</p>'
+      : state?.configured === false ? '<p>EA Direct is unavailable. Choose Companion App.</p>'
+      : connected ? `<details class="ea-direct-settings"><summary>${esc(state.connection?.leagueName || 'Connected franchise')} · ${esc(state.connection?.personaName || 'Connected profile')} · Connection settings</summary><small>Last collected: ${esc(date(state.connection?.lastSyncedAt))}</small><div class="ea-direct-actions"><button class="button button--ghost" data-ea-collect="preview" ${disabled}>Test Connection</button><button class="button button--ghost" data-ea-action="refresh" ${disabled}>Refresh Connection</button><button class="button button--ghost" data-ea-action="disconnect" ${disabled}>Disconnect EA Account</button></div></details>`
       : setupMarkup();
-    return `<section class="card ea-direct-card" data-ea-direct-panel aria-labelledby="ea-direct-title"><div class="ea-direct-header"><div><span class="eyebrow">Step 1 · Export</span><h3 id="ea-direct-title">Export Madden data</h3><p>Choose how to export your latest league data.</p></div><span class="pill pill--${connected ? 'success' : 'neutral'}">${esc(statusLabel)}</span></div><div class="ea-direct-paths" role="group" aria-label="Madden connection method"><button type="button" data-ea-path="ea-direct" aria-pressed="${selectedPath === 'ea-direct'}">EA Direct</button><button type="button" data-ea-path="companion" aria-pressed="${selectedPath === 'companion'}">Companion App</button></div><div class="ea-direct-content" aria-busy="${busy || loading}">${body}${errorMessage ? `<p class="ea-direct-error" role="alert">${esc(errorMessage)}</p>` : ''}${notice ? `<p class="ea-direct-notice" role="status">${esc(notice)}</p>` : ''}</div>${!connected ? `<button type="button" class="text-button" data-ea-action="refresh" ${disabled}>Refresh Connection</button>` : ''}</section>`;
+    const schedule = selectedPath === 'companion' ? exportService?.renderWorkflowScheduleControls?.() || '<p>Loading schedule…</p>'
+      : `${complete ? '<span class="pill pill--success">18 weeks · 272 games · Complete</span>' : ''}${!prepared && connected && exportState ? '<form data-ea-form="season" class="ea-direct-form"><label class="field"><span>Madden franchise season number</span><input name="sourceSeasonId" value="'+esc(seasonDraft)+'" required pattern="[A-Za-z0-9._:-]{1,80}" placeholder="Exact season number in Madden"><small>One-time confirmation for this franchise.</small></label><button type="submit" class="button button--primary" '+disabled+'>Confirm &amp; Import Season Schedule</button></form>' : '<button class="button button--secondary" data-ea-collect="yearly" '+(!connected||busy||loading||activeCollection||!exportState?'disabled':'')+'>'+(complete?'Update Season Schedule':'Import Season Schedule')+'</button>'}`;
+    const weekly = selectedPath === 'companion'
+      ? `<button class="button button--primary" data-copy-permanent-export-url ${!exportState?.endpoint?.exportUrl||exportInfo.busy?'disabled':''}>${exportInfo.copied?'URL Copied':'Copy URL'}</button><small>In Companion, export League Info, Rosters, and your selected weeks.</small>`
+      : `<button class="button button--primary" data-ea-collect="weekly" ${!connected||!verified||busy||loading||activeCollection?'disabled':''}>Collect Current + Previous Week</button><small>Includes team rosters and Free Agents.</small>`;
+    return `<section class="card ea-direct-card" data-ea-direct-panel aria-labelledby="ea-direct-title">
+      <div class="ea-direct-header"><h3 id="ea-direct-title"><span class="madden-step-number">1</span> Choose export option</h3><span class="pill pill--${connected?'success':'neutral'}">${selectedPath==='companion'?'Companion App':esc(statusLabel)}</span></div>
+      <div class="ea-direct-paths" role="group" aria-label="Madden connection method"><button type="button" data-ea-path="ea-direct" aria-pressed="${selectedPath==='ea-direct'}">EA Direct</button><button type="button" data-ea-path="companion" aria-pressed="${selectedPath==='companion'}">Companion App</button></div>
+      <div class="ea-direct-content" aria-busy="${busy||loading}">${connectionMarkup}
+      <section class="madden-workflow-step"><h3><span class="madden-step-number">2</span> Import season schedule <small>Once per season</small></h3><div class="madden-step-actions">${schedule}</div></section>
+      <section class="madden-workflow-step"><h3><span class="madden-step-number">3</span> Collect weekly stats</h3><div class="madden-step-actions">${weekly}</div></section>
+      ${selectedPath==='ea-direct'?collectionMarkup():exportService?.renderNotices?.()||''}
+      ${errorMessage?`<p class="ea-direct-error" role="alert">${esc(errorMessage)}</p>`:''}${notice?`<p class="ea-direct-notice" role="status">${esc(notice)}</p>`:''}</div></section>`;
   }
 
   function rerender() {
@@ -313,6 +333,11 @@
     if (!form) return;
     event.preventDefault();
     if (busy) return;
+    if (form.dataset.eaForm === 'season') {
+      if (!form.reportValidity()) return;
+      collect('yearly', {sourceSeasonId: String(form.querySelector('[name="sourceSeasonId"]')?.value || '').trim(), confirmSeason: true});
+      return;
+    }
     const setupId = state?.setup?.id;
     if (!setupId) return;
     if (form.dataset.eaForm === 'exchange') {
@@ -331,6 +356,10 @@
     }
   });
 
+  document.addEventListener('input', event => {
+    if (event.target.closest('[data-ea-form="season"]')) seasonDraft = String(event.target.value || '');
+  });
+
   document.addEventListener('change', event => {
     const form = event.target.closest('[data-ea-form]');
     if (!form || busy) return;
@@ -341,6 +370,7 @@
     if (form.dataset.eaForm === 'franchise') selectedLeagueId = String(event.target.value || '');
   });
 
+  window.addEventListener('franchisehq:permanent-export-updated', rerender);
   window.addEventListener('franchisehq:league-tenant-changed', () => { resetContext(); rerender(); });
   window.addEventListener('franchisehq:auth-changed', () => { resetContext(); rerender(); });
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before ea-direct.js.');

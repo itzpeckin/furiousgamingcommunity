@@ -1,7 +1,7 @@
 /* FHQ_BUILD: 8.0.10 */
 import { json } from '../../../../_lib/cloud-platform.js';
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
-import { authorizedEaState, configured, readEaBody, fail, eaErrorResponse, activeEaConnection } from '../../../../_lib/ea-direct.js';
+import { authorizedEaState, configured, readEaBody, fail, eaErrorResponse, activeEaConnection, sealEa, jobScope } from '../../../../_lib/ea-direct.js';
 
 export function publicEaJob(row){
   if(!row)return null;
@@ -30,15 +30,18 @@ export async function onRequestPost(context){
     if(!['preview','weekly','yearly'].includes(mode))fail('INVALID_MODE','Choose Preview, Weekly Update, or Yearly Schedule.',400);
     const connection=await activeEaConnection(state.db,state.league.id);
     if(connection?.status!=='connected')fail('EA_RECONNECT_REQUIRED','Connect your EA account first.');
-    if(mode!=='preview'&&!connection.preview_verified)fail('PREVIEW_REQUIRED','Complete a private preview before collecting data for import.');
+    if(mode==='weekly'&&!connection.preview_verified)fail('PREVIEW_REQUIRED','Import the season schedule in Step 2 before collecting weekly data.');
     // Expired credentials cannot drive a job; release only that abandoned job's lock.
     await state.db.prepare(`UPDATE ea_direct_collection_jobs SET status='failed',state_cipher=NULL,error_code='COLLECTION_EXPIRED',message='The collection expired. Start a new collection.',updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND status IN ('queued','running') AND julianday(expires_at)<=julianday('now')`).bind(state.league.id).run();
     const busy=await state.db.prepare(`SELECT * FROM ea_direct_collection_jobs WHERE league_id=? AND status IN ('queued','running') LIMIT 1`).bind(state.league.id).first();
     if(busy)return json({ok:true,...publicEaJob(busy),reusedExisting:true});
+    const confirmedSourceSeasonId=mode==='yearly'&&body.confirmSeason===true?String(body.sourceSeasonId||'').trim():null;
+    if(confirmedSourceSeasonId&&!/^[A-Za-z0-9._:-]{1,80}$/.test(confirmedSourceSeasonId))fail('INVALID_SEASON','Enter the exact Madden franchise season number.',400);
     const id=`eaj_${crypto.randomUUID()}`,token=createRandomToken(32),expiresAt=new Date(Date.now()+60*60*1000).toISOString();
+    const initialState=confirmedSourceSeasonId?await sealEa(state.env,jobScope({league_id:state.league.id,id}),{confirmedSourceSeasonId}):null;
     try{
-      await state.db.prepare(`INSERT INTO ea_direct_collection_jobs(id,league_id,connection_id,actor_id,session_id,mode,status,token_hash,expires_at) VALUES(?,?,?,?,?,?,'queued',?,?)`)
-        .bind(id,state.league.id,connection.id,state.session.user.id,state.session.sessionId,mode,await hashToken(token),expiresAt).run();
+      await state.db.prepare(`INSERT INTO ea_direct_collection_jobs(id,league_id,connection_id,actor_id,session_id,mode,status,token_hash,expires_at,state_cipher) VALUES(?,?,?,?,?,?,'queued',?,?,?)`)
+        .bind(id,state.league.id,connection.id,state.session.user.id,state.session.sessionId,mode,await hashToken(token),expiresAt,initialState).run();
     }catch(error){
       const winner=await state.db.prepare(`SELECT * FROM ea_direct_collection_jobs WHERE league_id=? AND status IN ('queued','running') LIMIT 1`).bind(state.league.id).first();
       if(winner)return json({ok:true,...publicEaJob(winner),reusedExisting:true});throw error;

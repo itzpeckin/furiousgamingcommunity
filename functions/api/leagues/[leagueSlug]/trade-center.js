@@ -1,3 +1,4 @@
+import { resolveLiveTradePlayer, ensureLiveTradePlayerIdentity } from '../../../_lib/trade-player.js';
 import { currentTradeSeason as currentSeason } from '../../../_lib/trade-season.js';
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../_lib/permissions.js';
@@ -252,29 +253,18 @@ export async function tradeCenterState(c) {
 }
 
 async function playerAsset(c, assetId, fromTeamKey) {
-  const identity = await c.db.prepare(`SELECT identity.id AS playerIdentityId,identity.public_id AS publicId,
-      alias.source_player_id AS sourcePlayerId
-    FROM player_identities identity JOIN player_source_aliases alias
-      ON alias.player_identity_id=identity.id AND alias.league_id=identity.league_id
-    WHERE identity.league_id=? AND (identity.id=? OR identity.public_id=? OR alias.source_player_id=?)
-    ORDER BY alias.updated_at DESC LIMIT 1`).bind(c.league.id,assetId,assetId,assetId).first();
-  if (!identity) throw Object.assign(new Error('Player identity was not found.'),{status:422});
-  const active = await c.db.prepare(`SELECT record.data_json AS dataJson
-    FROM league_active_snapshots snapshot JOIN league_snapshot_records record
-      ON record.league_id=snapshot.league_id AND record.snapshot_id=snapshot.snapshot_id
-    WHERE snapshot.league_id=? AND record.domain='players' AND record.external_id=? LIMIT 1`)
-    .bind(c.league.id,identity.sourcePlayerId).first();
-  if (!active) throw Object.assign(new Error('Player is not on the active Madden roster.'),{status:409});
-  const record = jsonParse(active.dataJson,{});
+  const identity = await resolveLiveTradePlayer(c.db,c.league.id,assetId);
+  if (!identity) throw Object.assign(new Error('Player is not on the active Madden roster.'),{status:409});
+  const record = jsonParse(identity.dataJson,{});
   const externalTeam = record.team_external_id ?? record.teamId ?? record.team_id;
   const sourceTeam = resolveTeam(c.teams,externalTeam);
   const overlay = await c.db.prepare(`SELECT current_team_key AS toTeamKey,1 AS priority FROM league_player_ownership
     WHERE league_id=? AND player_identity_id=? UNION ALL SELECT to_team_key AS toTeamKey,0 AS priority FROM trade_roster_overlays
     WHERE league_id=? AND player_identity_id=? AND internal_status='active' ORDER BY priority DESC LIMIT 1`)
-    .bind(c.league.id,identity.playerIdentityId,c.league.id,identity.playerIdentityId).first();
+    .bind(c.league.id,identity.playerIdentityId||null,c.league.id,identity.playerIdentityId||null).first();
   const effectiveTeam = overlay?.toTeamKey ? canonicalTeamKey(overlay.toTeamKey) : sourceTeam?.teamKey;
   if (!effectiveTeam || effectiveTeam !== fromTeamKey) throw Object.assign(new Error('Player ownership changed. Refresh the Trade Center and try again.'),{status:409});
-  return identity;
+  return ensureLiveTradePlayerIdentity(c.db,c.league.id,identity);
 }
 
 async function validatedTransfers(c, bodyTransfers, settings) {

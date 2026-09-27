@@ -19,7 +19,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
   const button=(html,attribute)=>html.match(new RegExp(`<button[^>]*${attribute}[^>]*>`))?.[0];
   assert.doesNotMatch(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
   assert.match(service.renderCompactPanel(),/data-import-in-place/);
-  assert.ok(service.renderCompactPanel().indexOf('Step 2 · Refresh')<service.renderCompactPanel().indexOf('Step 3 · Import'));
+  assert.ok(service.renderCompactPanel().indexOf('Step 4 · Refresh')<service.renderCompactPanel().indexOf('Step 5 · Import'));
   assert.doesNotMatch(service.renderCompactPanel(),/role="progressbar"/,'idle imports do not show a misleading 0% progress bar');
   assert.match(service.renderCompactPanel(),/Free Agents/);
   assert.match(service.renderCompactPanel(),/Unavailable/);
@@ -31,7 +31,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
     assert.match(button(service.renderPanel(),'data-import-latest-export'),/disabled/);
   }
   connection.state.latestExport.status='ready';connection.busy=true;
-  for(const attr of ['data-copy-permanent-export-url','data-refresh-companion-import','data-import-latest-export'])assert.match(button(service.renderCompactPanel(),attr),/disabled/);
+  for(const attr of ['data-refresh-companion-import','data-import-latest-export'])assert.match(button(service.renderCompactPanel(),attr),/disabled/);
   connection.busy=false;
   payload.run={status:'running',currentPhase:'map-statistics',progress:100*5.5/9};
   await service.refresh();
