@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '8.0.3';
+export const DISCORD_COMMAND_RELEASE = '8.0.20';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -39,6 +39,8 @@ export const DISCORD_SCHEDULE_THREAD_COMMANDS = Object.freeze(
 );
 
 export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
+  {name:'game',description:'Show a current-week matchup preview or final game summary image.',
+    options:[autocompleteString('matchup','Choose a game from the current imported week.',{required:true}),privateOption]},
   {
     name:'standings',description:'View league, conference, division, or team standings.',
     options:[

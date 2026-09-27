@@ -81,6 +81,8 @@
     "DISCORD_BOT_TOKEN": [
       "functions/_lib/discord-api.js",
       "functions/_lib/discord-delivery.js",
+      "functions/_lib/discord-game-card.js",
+      "functions/_lib/discord-game.js",
       "functions/_lib/discord-player-card.js",
       "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
@@ -190,13 +192,13 @@
       ".css": 12,
       ".example": 1,
       ".html": 9,
-      ".js": 252,
+      ".js": 257,
       ".json": 7,
       ".jsonc": 1,
       ".md": 285,
-      ".mjs": 59,
+      ".mjs": 60,
       ".png": 3,
-      ".sql": 50,
+      ".sql": 51,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -204,15 +206,15 @@
     },
     "largest": [
       {
-        "bytes": 655177,
+        "bytes": 656103,
         "file": "app.js"
       },
       {
-        "bytes": 566212,
+        "bytes": 567069,
         "file": "styles.css"
       },
       {
-        "bytes": 438418,
+        "bytes": 438450,
         "file": "trade-module.js"
       },
       {
@@ -220,7 +222,7 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 174916,
+        "bytes": 181423,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -284,7 +286,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 687
+    "total": 694
   },
   "frontend": {
     "assets": [
@@ -794,7 +796,7 @@
     "stylesheetCount": 3
   },
   "functions": {
-    "routeCount": 90,
+    "routeCount": 91,
     "routes": [
       {
         "file": "functions/index.js",
@@ -853,6 +855,13 @@
           "onRequestPost"
         ],
         "route": "/api/auth/session/claim"
+      },
+      {
+        "file": "functions/api/discord/game-card.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/discord/game-card"
       },
       {
         "file": "functions/api/discord/interactions.js",
@@ -1758,10 +1767,16 @@
       "recordsLedger": true,
       "sha256": "e58e21968e1d97c2acd9c9e3719794c60264742753afd1fbc2b284e51546882e",
       "version": "0048"
+    },
+    {
+      "file": "migrations/0049_discord_game_results.sql",
+      "recordsLedger": true,
+      "sha256": "59dcb286168fbd03609f53718a12fa3333e52b1f1eea9066f9eaeb345c67a637",
+      "version": "0049"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.19",
+  "release": "8.0.20",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

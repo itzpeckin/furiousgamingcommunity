@@ -3,6 +3,7 @@ import { discordLeagueReadModel } from './discord-read-model.js';
 import { activeTeamAssignments, canonicalTeamKey, resolveTeam } from './league-teams.js';
 import { scheduleAdvanceDecision, snapshotCurrentPeriod } from './schedule-integrity.js';
 import { createRandomToken, hashToken } from './auth.js';
+import { syncDiscordGameResults } from './discord-game-results.js';
 
 const SNOWFLAKE = /^[0-9]{17,20}$/;
 const clean = value => String(value ?? '').trim();
@@ -209,7 +210,9 @@ async function removeSupersededScheduleThreads(env,db,{
       continue;
     }
     try {
-      await discordBotRequest(env,`/channels/${encodeURIComponent(threadId)}`,{method:'DELETE',fetchImpl});
+      const result=await db.prepare('SELECT message_id FROM discord_game_results WHERE thread_record_id=? AND league_id=?').bind(item.id,leagueId).first();
+      await discordBotRequest(env,`/channels/${encodeURIComponent(threadId)}`,result?.message_id
+        ?{method:'PATCH',body:{archived:true},fetchImpl}:{method:'DELETE',fetchImpl});
       await db.prepare(`UPDATE discord_schedule_threads SET status='archived',updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND league_id=? AND status='active'`).bind(item.id,leagueId).run();
       removed+=1;
@@ -343,7 +346,7 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     const decision=await automaticScheduleDecision(db,league.id,active);
     if(!decision.allowed){
       if(await recoverableScheduleDecision(db,league.id,active))effectiveSource='rollover-recovery';
-      else return{scheduled:false,...decision};
+      // Same-week imports still run the durable result checkpoint.
     }
   }
   const installation = await activeInstallation(db,league.id);
@@ -365,9 +368,15 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     return response.ok&&result.ok?{scheduled:true,durable:true,workflowId:result.id,source:effectiveSource}
       :{scheduled:false,reason:'durable-schedule-start-failed',detail:result.error||`HTTP ${response.status}`};
   }
-  const work = syncDiscordScheduleThreads(context.env,db,{
+  const work = (async()=>{
+    const results=await syncDiscordGameResults(context.env,db,{league,snapshotId,maxOperations:32});
+    const active=await activeSnapshot(db,league.id);
+    const decision=active&&await automaticScheduleDecision(db,league.id,active);
+    if(source==='candidate-import'&&!decision?.allowed&&effectiveSource!=='rollover-recovery')return results;
+    return syncDiscordScheduleThreads(context.env,db,{
     league,snapshotId,week,channelId:installation.scheduleChannelId,requestedByUserId,source:effectiveSource
-  });
+    });
+  })();
   const owner=typeof context.waitUntil==='function'?context:context.executionContext;
   if (typeof owner?.waitUntil === 'function') {
     owner.waitUntil(work.catch(error=>console.error('Discord schedule sync failed:',discordErrorText(error))));

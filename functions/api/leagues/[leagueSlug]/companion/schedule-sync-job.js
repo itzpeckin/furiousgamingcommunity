@@ -2,6 +2,7 @@
 import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { syncDiscordScheduleThreads } from '../../../../_lib/discord-schedule.js';
+import { syncDiscordGameResults } from '../../../../_lib/discord-game-results.js';
 
 const json=(body,status=200)=>new Response(JSON.stringify(body),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -31,10 +32,13 @@ export async function onRequestPost(context){
       .bind(message,league.id,snapshotId).run();
     return json({ok:true,status:'failed-recorded'});
   }
+  const results=await syncDiscordGameResults(context.env,db,{league,snapshotId,maxOperations:1});
+  if(results.hasMore||results.superseded)return json(results);
   const result=await syncDiscordScheduleThreads(context.env,db,{
     league,snapshotId,source,requestedByUserId:auth.session.user.id,
     maxOperations:Math.min(2,Math.max(1,Number(body.maxOperations)||1))
   });
+  if(result.skipped&&result.ok)return json({ok:true,status:'completed',results,schedule:result});
   if(result.skipped||result.errors?.length)return json({ok:false,...result},409);
   return json(result);
 }
