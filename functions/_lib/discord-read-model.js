@@ -305,25 +305,37 @@ function discordFieldChunks(name,items,empty){
   return chunks.map((value,index)=>({name:index?`${name} (continued)`:name,value,inline:false}));
 }
 
-function rushingTeamAudit(model,game,teamId,opponentId,week,season){
+async function rushingStatisticsByWeek(c,model,season){
+  const grouped=new Map();let cursor=null;
+  do{
+    const page=await activeSnapshotDomainPage(c.db,c.league.id,model.snapshot.id,'statistics',cursor,500,true);
+    for(const stat of page.records){
+      const category=lower(stat.category);
+      if(!['rushing','team-game'].includes(category)||!sameRegularWeek(stat,stat.week,season))continue;
+      const team=resolveTeam(model.teams,stat.teamId);if(!team)continue;
+      const key=`${number(stat.week)}:${team.teamKey}`;
+      if(!grouped.has(key))grouped.set(key,{rushing:[],teamRows:[]});
+      grouped.get(key)[category==='rushing'?'rushing':'teamRows'].push(stat);
+    }
+    cursor=page.nextCursor;
+  }while(cursor);
+  return grouped;
+}
+
+function rushingTeamAudit(model,statistics,game,teamId,opponentId,week){
   const team=resolveTeam(model.teams,teamId),opponent=resolveTeam(model.teams,opponentId);
   if(!team)return null;
-  const rushing=model.statistics.filter(stat=>lower(stat.category)==='rushing'
-    &&sameRegularWeek(stat,week,season)
-    &&resolveTeam(model.teams,stat.teamId)?.teamKey===team.teamKey);
+  const {rushing=[],teamRows=[]}=statistics.get(`${number(week)}:${team.teamKey}`)||{};
   const carriesComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.rushAtt)!==null);
   const playerYardsComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.rushYds)!==null);
   const carries=carriesComplete?rushing.reduce((sum,stat)=>sum+Number(stat.metrics.rushAtt),0):null;
   const playerYards=playerYardsComplete?rushing.reduce((sum,stat)=>sum+Number(stat.metrics.rushYds),0):null;
-  const teamRows=model.statistics.filter(stat=>lower(stat.category)==='team-game'
-    &&sameRegularWeek(stat,week,season)
-    &&resolveTeam(model.teams,stat.teamId)?.teamKey===team.teamKey);
   const exactGame=teamRows.find(stat=>clean(stat.source?.gameId)===clean(game.id));
   const teamRow=exactGame||(teamRows.length===1?teamRows[0]:null);
   const teamYards=number(teamRow?.metrics?.offRushYds);
   const yardsComparable=playerYards!==null&&teamYards!==null;
   return{
-    team,opponent,carries,playerYards,teamYards,
+    team,opponent,week,carries,playerYards,teamYards,
     violation:carries!==null&&carries<RUSHING_RULE_MINIMUM,
     yardStatus:yardsComparable?(playerYards===teamYards?'match':'mismatch'):'unavailable'
   };
@@ -334,34 +346,46 @@ function rushingAuditLine(item){
   const carries=item.carries===null?'carries unavailable':`${formatMetric(item.carries)} carries`;
   const yards=item.yardStatus==='unavailable'?'player/team rushing yards unavailable'
     :`${formatMetric(item.playerYards)} player yds / ${formatMetric(item.teamYards)} team yds · ${item.yardStatus==='match'?'Match':`Mismatch (${formatMetric(item.playerYards-item.teamYards)})`}`;
-  return `${matchup} · ${carries} · ${yards}`;
+  return `W${item.week} · ${matchup} · ${carries} · ${yards}`;
 }
 
 export async function rushRuleCommand(c,values={}){
-  const model=await discordLeagueReadModel(c,{domains:['teams','games','statistics']});
+  const model=await discordLeagueReadModel(c,{domains:['teams','games']});
   const context=await currentFranchiseContext(c.db,c.league.id);
-  const requested=number(values.week),week=requested??number(context.week)??number(model.snapshot.week_index);
-  if(!Number.isInteger(week)||week<1||week>18)throw Object.assign(new Error('Choose a Regular Season week from 1 through 18.'),{status:400});
+  const week=number(values.week);
+  if(values.week!==undefined&&(!Number.isInteger(week)||week<1||week>18))throw Object.assign(new Error('Choose a Regular Season week from 1 through 18.'),{status:400});
   const season=number(model.snapshot.season_year)??number(context.seasonYear);
+  if(season===null)throw Object.assign(new Error('The current imported season could not be verified.'),{status:409});
+  const statistics=await rushingStatisticsByWeek(c,model,season);
   const games=model.games.filter(game=>gamePlayed(game)&&canonicalGameStage(game.stage)==='regular-season'
-    &&number(game.week)===week&&(number(game.season)===null||season===null||number(game.season)===season));
+    &&(week===null||number(game.week)===week)&&(number(game.season)===null||number(game.season)===season));
   const audits=games.flatMap(game=>[
-    rushingTeamAudit(model,game,game.homeTeamId,game.awayTeamId,week,season),
-    rushingTeamAudit(model,game,game.awayTeamId,game.homeTeamId,week,season)
-  ]).filter(Boolean).sort((a,b)=>a.team.displayName.localeCompare(b.team.displayName));
+    rushingTeamAudit(model,statistics,game,game.homeTeamId,game.awayTeamId,game.week),
+    rushingTeamAudit(model,statistics,game,game.awayTeamId,game.homeTeamId,game.week)
+  ]).filter(Boolean).sort((a,b)=>Number(a.week)-Number(b.week)||a.team.displayName.localeCompare(b.team.displayName));
   const violations=audits.filter(item=>item.violation).map(rushingAuditLine);
   const mismatches=audits.filter(item=>item.yardStatus==='mismatch').map(rushingAuditLine);
   const unverifiable=audits.filter(item=>item.carries===null||item.yardStatus==='unavailable').map(rushingAuditLine);
-  const fields=[
+  const allFields=[
     ...discordFieldChunks(`Below ${RUSHING_RULE_MINIMUM} carries`,violations,'No verified violations.'),
     ...discordFieldChunks('Player / team yard mismatches',mismatches,'No verified mismatches.'),
     ...discordFieldChunks('Unable to verify',unverifiable,'No data gaps for the completed games checked.')
   ];
-  return{content:`**${c.league.name} · Week ${week} Rushing Rule**`,embeds:[{
+  // A full season can exceed Discord's aggregate 6,000-character embed limit.
+  // Audit every game, then offer bounded pages without silently discarding rows.
+  const pages=[[]];let size=0;
+  for(const field of allFields){
+    const length=field.name.length+field.value.length;
+    if(size+length>4200||pages.at(-1).length===25){pages.push([]);size=0;}
+    pages.at(-1).push(field);size+=length;
+  }
+  const page=number(values.page)??1;
+  if(!Number.isInteger(page)||page<1||page>pages.length)throw Object.assign(new Error(`Choose a report page from 1 through ${pages.length}.`),{status:400});
+  return{content:`**${c.league.name} · ${season} ${week===null?'Season':`Week ${week}`} Rushing Rule**`,embeds:[{
     title:`${games.length} completed regular-season game${games.length===1?'':'s'} checked`,
-    description:`Team minimum: **${RUSHING_RULE_MINIMUM} total carries**. Carries are summed across every source-backed player row. Missing statistics stay unverified and are never treated as zero.`,
-    color:violations.length?0xef4444:mismatches.length?0xf59e0b:0x22c55e,fields:fields.slice(0,25),
-    footer:{text:`${audits.length} team result${audits.length===1?'':'s'} · Regular season only`}
+    description:`Team minimum: **${RUSHING_RULE_MINIMUM} total carries**. Carries are summed across every source-backed player row. Missing statistics stay unverified and are never treated as zero.\n**${violations.length} violations · ${mismatches.length} yard mismatches · ${unverifiable.length} unverified team results.**${pages.length>1?`\nPage ${page}/${pages.length}. Use /rush rule${week===null?'':` week:${week}`} page:<number> for the remaining results.`:''}`,
+    color:violations.length?0xef4444:mismatches.length||unverifiable.length?0xf59e0b:0x22c55e,fields:pages[page-1],
+    footer:{text:`${audits.length} team result${audits.length===1?'':'s'} · ${week===null?'All weeks in the current season':'Selected week'} · Regular season only`}
   }]};
 }
 

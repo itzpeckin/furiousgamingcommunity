@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.22",
+  "releaseType": "season-rushing-audit",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {"repository":"itzpeckin/furiousgamingcommunity","version":"8.0.21","tag":"v8.0.21","commit":"13f46e30c796b857ee5b7f1a31532abdbe9e7d98"},
+  "implementationBranch": "fix/8.0.22-season-rushing-audit",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {"authorized":true,"status":"pending","pullRequests":[]},
+  "staging": {"authorized":true,"deployed":false,"status":"pending"},
+  "production": {"authorized":true,"deployed":false,"status":"pending","currentRelease":"8.0.21","candidateRelease":"8.0.22","currentMigration":49,"candidateMigration":49,"scope":"Audit completed games across all regular-season weeks by default; retain optional week filter and paginate long reports."},
+  "requiredArtifacts": ["functions/_lib/discord-read-model.js","functions/_lib/discord-commands.js","tests/discord/discord-bot.test.mjs","releases/8.0.22/release-record.md","releases/8.0.22/validation-evidence.json"]
+}
