@@ -1,4 +1,5 @@
 import { syncDiscordGameResults } from '../../functions/_lib/discord-game-results.js';
+import { rushRuleCommand } from '../../functions/_lib/discord-read-model.js';
 import { gameCommand, gameAutocompleteChoices } from '../../functions/_lib/discord-game.js';
 import { currentTradeSeason } from '../../functions/_lib/trade-season.js';
 import { resolveLiveTradePlayer, ensureLiveTradePlayerIdentity } from '../../functions/_lib/trade-player.js';
@@ -697,6 +698,93 @@ test('a terminal archived trade thread is reopened, synchronized, and archived a
     assert.equal(database.prepare(`SELECT discord_thread_id AS threadId,status FROM discord_trade_rooms WHERE id='room-sync'`).get().threadId,
       '100000000000000077');
     assert.equal(database.prepare(`SELECT status FROM discord_trade_rooms WHERE id='room-sync'`).get().status,'archived');
+  }finally{database.close()}
+});
+
+test('/rush rule defaults to every completed regular-season week and isolates seasons and leagues',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedLeague(database,{id:'league-b',slug:'beta',guild:'100000000000000002'});
+    seedMember(database,{leagueId:'league-a'});
+    const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:8});
+    const add=(domain,id,data)=>seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain,externalId:id,data});
+    for(const [id,season,week,status,stage] of [
+      ['old-week',2026,1,'completed','regular-season'],['this-week',2026,8,'completed','regular-season'],
+      ['old-season',2025,1,'completed','regular-season'],['pre',2026,1,'completed','preseason'],
+      ['scheduled',2026,9,'scheduled','regular-season']
+    ])add('games',id,{external_id:id,season_year:season,week_index:week,stage,status,
+      home_team_external_id:'1001',away_team_external_id:'1002',home_score:21,away_score:7});
+    for(const [id,season,week,att,stage] of [
+      ['old',2026,1,7,'regular-season'],['now',2026,8,15,'regular-season'],
+      ['foreign-season',2025,1,99,'regular-season'],['pre',2026,1,99,'preseason']
+    ])add('statistics',id,{category:'rushing',team_external_id:'1001',season_year:season,
+      week_index:week,stage,metrics:{rushAtt:att,rushYds:40}});
+    const other=seedActiveWeek(database,{leagueId:'league-b',week:1});
+    seedSnapshotRecord(database,{snapshotId:other,leagueId:'league-b',domain:'statistics',externalId:'foreign',data:{
+      category:'rushing',team_external_id:'1001',season_year:2026,week_index:1,stage:'regular-season',metrics:{rushAtt:99,rushYds:99}
+    }});
+    const db=d1(database),key=await signingKey();
+    const response=await discordInteractions(await signedContext({db,key,interaction:interaction({name:'rush',options:[{type:1,name:'rule'}]})}));
+    const result=(await response.json()).data;
+    assert.match(result.content,/2026 Season Rushing Rule/);
+    assert.match(result.embeds[0].title,/2 completed/);
+    assert.match(result.embeds[0].description,/1 violations/);
+    const fields=result.embeds[0].fields.map(field=>field.value).join('\n');
+    assert.match(fields,/W1 · \*\*TB\*\* vs SF · 7 carries/);
+    assert.match(fields,/W8 · \*\*SF\*\* vs TB · carries unavailable/);
+    assert.doesNotMatch(fields,/99 carries|0 carries|W9/);
+    const c={db,league:{id:'league-a',name:'Alpha'}};
+    const week=await rushRuleCommand(c,{week:8});
+    assert.match(week.content,/Week 8/);assert.match(week.embeds[0].title,/1 completed/);
+    assert.doesNotMatch(JSON.stringify(week),/W1 ·/);
+    await assert.rejects(()=>rushRuleCommand(c,{week:19}),/1 through 18/);
+  }finally{database.close()}
+});
+
+test('/rush rule reads statistics beyond the old 20,000-row limit',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    await applyMigrations(database);seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:18});
+    database.prepare(`UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.status','completed')
+      WHERE snapshot_id=? AND domain='games'`).run(snapshotId);
+    const insert=database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,'league-a','statistics',?,?)`);
+    database.exec('BEGIN');
+    for(let i=0;i<20001;i++)insert.run(snapshotId,`a-${String(i).padStart(5,'0')}`,JSON.stringify({category:'passing',team_external_id:'1001'}));
+    insert.run(snapshotId,'z-rush',JSON.stringify({category:'rushing',team_external_id:'1001',season_year:2026,
+      week_index:18,stage:'regular-season',metrics:{rushAtt:6,rushYds:20}}));
+    database.exec('COMMIT');
+    const result=await rushRuleCommand({db:d1(database),league:{id:'league-a',name:'Alpha'}});
+    assert.match(result.embeds[0].fields[0].value,/W18 · \*\*TB\*\* vs SF · 6 carries/);
+  }finally{database.close()}
+});
+
+test('/rush rule paginates a full-season report within Discord limits without losing results',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    await applyMigrations(database);seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    const snapshotId=seedNflStandingsFixture(database,{leagueId:'league-a',week:18});
+    for(let week=1;week<=18;week++)for(let pair=0;pair<16;pair++){
+      const id=`audit-${week}-${pair}`;
+      seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain:'games',externalId:id,data:{
+        external_id:id,season_year:2026,week_index:week,stage:'regular-season',status:'completed',
+        home_team_external_id:String(1001+pair*2),away_team_external_id:String(1002+pair*2)
+      }});
+    }
+    const c={db:d1(database),league:{id:'league-a',name:'Alpha'}};
+    const first=await rushRuleCommand(c),count=Number(first.embeds[0].description.match(/Page 1\/(\d+)/)?.[1]);
+    assert.ok(count>1);let lines=0;
+    for(let page=1;page<=count;page++){
+      const result=page===1?first:await rushRuleCommand(c,{page});
+      const embed=result.embeds[0];
+      assert.ok(embed.fields.length<=25);
+      assert.ok(embed.title.length+embed.description.length+embed.footer.text.length+
+        embed.fields.reduce((sum,field)=>sum+field.name.length+field.value.length,0)<6000);
+      for(const field of embed.fields){assert.ok(field.value.length<=1024);lines+=(field.value.match(/carries unavailable/g)||[]).length;}
+    }
+    assert.equal(lines,576);await assert.rejects(()=>rushRuleCommand(c,{page:count+1}),/Choose a report page/);
   }finally{database.close()}
 });
 

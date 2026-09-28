@@ -10,7 +10,7 @@
 
 **Current production:** 8.0.20.
 
-**Current work:** 8.0.21 restores deletion of all prior matchup threads after verified week advance, including result threads. Shared Discord game functionality is verified across independent leagues.
+**Current work:** 8.0.22 makes `/rush rule` audit all completed regular-season weeks in the current season by default, with complete statistics reads and paginated reports. Coaching screenshot compliance remains under development; supplied icon-only loadouts require a verified ability reference before automatic legality can be trusted.
 
 **Next gate:** Complete strict quality, preview checks, production publication and desktop/mobile acceptance.
 

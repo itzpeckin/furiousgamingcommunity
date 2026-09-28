@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '8.0.21';
+export const DISCORD_COMMAND_RELEASE = '8.0.22';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -93,7 +93,8 @@ export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
     name:'rush',description:'Check the league team-rushing rule for completed games.',
     options:[
       {type:OPTION.SUB_COMMAND,name:'rule',description:'Find teams below 10 carries and audit team rushing yards.',options:[
-        {type:OPTION.INTEGER,name:'week',description:'Regular-season week. Defaults to the current imported week.',min_value:1,max_value:18},
+        {type:OPTION.INTEGER,name:'week',description:'Optional regular-season week. Defaults to all weeks in the current season.',min_value:1,max_value:18},
+        {type:OPTION.INTEGER,name:'page',description:'Report page for season audits with many results.',min_value:1,max_value:100},
         privateOption
       ]}
     ]
