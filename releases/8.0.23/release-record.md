@@ -25,3 +25,7 @@ Authorized under standing release approval. Migration 50 adds only coaching sett
 ## Rollback
 
 Disable the coaching scanner trigger and restore Pages deployment 98b247e4-3ffb-4460-9e9e-f222f2b68e43 (v8.0.22). Retain additive migration 50, coaching audit records, all active snapshots and existing import Worker. No data deletion is needed.
+
+## Production acceptance correction
+
+Regional Xbox share-page redirects are accepted only on the existing Xbox allowlist. The supplied public Xbox link resolved to its validated full image. Oversized multi-image submissions request new evidence rather than silently checking a subset. Command registration uses the available production metadata cache when the optional league-configuration cache is absent. Authenticated scanner diagnostics report image-reader and Message Content readiness without exposing credentials.

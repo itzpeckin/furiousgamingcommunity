@@ -56,6 +56,38 @@ test('coaching accepts known public screenshot hosts, ignores instructions and c
   }finally{f.sqlite.close();}
 });
 
+test('Xbox regional redirects resolve to a validated image and unsafe redirects fail closed',async()=>{
+  const f=await fixture();try{
+    const fetchImpl=async url=>{
+      const u=new URL(url);
+      if(u.pathname==='/play/media/example')return new Response(null,{status:307,headers:{location:'/en-US/play/media/example'}});
+      if(u.hostname==='www.xbox.com')return new Response('<meta property="og:image" content="https://images-eds-ssl.xboxlive.com/image.png">',{headers:{'content-type':'text/html'}});
+      return new Response(new Uint8Array([137,80,78,71,1,2,3]),{headers:{'content-type':'image/png'}});
+    };
+    assert.equal((await readCoachingScreenshot(f.env,['https://www.xbox.com/play/media/example'],{fetchImpl})).archetype,'offensive');
+    await assert.rejects(readCoachingScreenshot(f.env,[photo],{fetchImpl:async()=>new Response(null,{status:302,headers:{location:'https://127.0.0.1/private.png'}})}),/cannot be read/);
+    await assert.rejects(readCoachingScreenshot(f.env,Array(5).fill(photo),{fetchImpl}),/one to four/);
+  }finally{f.sqlite.close();}
+});
+
+test('scanner registers coach and rush once using the production metadata cache fallback',async()=>{
+  const f=await fixture(),original=globalThis.fetch;
+  try{
+    const cache=new Map(),posted=[];
+    globalThis.fetch=async(url,options)=>{
+      if(String(url).endsWith(`/applications/${bot}/commands`)){posted.push(JSON.parse(options.body).name);return Response.json({id:'100000000000000020'});}
+      return f.fetchImpl(url,options);
+    };
+    const env={...f.env,DB:f.db,DISCORD_CLIENT_ID:bot,COMPANION_EXPORT_META:{get:async k=>cache.get(k),put:async(k,v)=>cache.set(k,v)}};
+    const request=()=>new Request('https://example.invalid/api/internal/coaching-scan',{method:'POST',headers:{'x-fhq-coaching-scanner':env.COACHING_SCANNER_SECRET}});
+    for(let i=0;i<2;i++){
+      const response=await scannerPost({env,request:request()});const body=await response.json();
+      assert.equal(body.commandsRegistered,true);assert.equal(body.imageReaderAvailable,true);assert.equal(body.messageContentAvailable,true);
+    }
+    assert.deepEqual(posted,['coach','rush']);
+  }finally{globalThis.fetch=original;f.sqlite.close();}
+});
+
 test('archetype checks backfill, map the real author, apply league bans, and edit results on a rule change',async()=>{
   const f=await fixture();try{
     await configureCoaching(f.c,{enabled:true,sourceChannelId:source,reportChannelId:report,banned:['offensive']},{fetchImpl:f.fetchImpl});
