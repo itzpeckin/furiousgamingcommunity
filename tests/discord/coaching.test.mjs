@@ -8,6 +8,7 @@ import {coachingImageLink,canonicalArchetype,readCoachingScreenshot} from '../..
 import {eaWeeklyReady} from '../../functions/_lib/ea-direct.js';
 import {proveCurrentSchedulePeriod} from '../../functions/_lib/schedule-integrity.js';
 import {onRequestPost as scannerPost} from '../../functions/api/internal/coaching-scan.js';
+import scannerWorker from '../../workers/franchise-coaching-scanner/src/index.js';
 
 function d1(sqlite){return{prepare(sql){const statement=sqlite.prepare(sql);let args=[];const p={bind(...values){args=values;return p},async first(){return statement.get(...args)||null},async all(){return{results:statement.all(...args)}},async run(){return{meta:{changes:Number(statement.run(...args).changes)}}}};return p},async batch(statements){const result=[];for(const statement of statements)result.push(await statement.run());return result;}}}
 const guild='100000000000000001',source='100000000000000002',report='100000000000000003',author='100000000000000004',bot='100000000000000005',messageId='100000000000000006';
@@ -155,7 +156,48 @@ test('revoked history access is an operational error, not proof of missing submi
       :String(url).endsWith('/roles')?Response.json([{id:guild,permissions:'1024'}]):f.fetchImpl(url,options);
     assert.equal((await scanCoaching(f.env,f.db,{fetchImpl})).ok,false);
     assert.equal(f.sqlite.prepare('SELECT history_complete FROM discord_coaching_settings').get().history_complete,0);
-    assert.match(JSON.stringify(await coachingCommand(f.c,{missing:true})),/Still scanning history/);
+    assert.match(JSON.stringify(await coachingCommand(f.c,{missing:true})),/Scanner retrying after an error/);
+    assert.doesNotMatch(JSON.stringify(await coachingCommand(f.c,{missing:true})),/Still scanning history|Not submitted/);
+  }finally{f.sqlite.close();}
+});
+
+test('scheduled scanner uses edge-supported manual redirects and never forwards its credential',async()=>{
+  const original=globalThis.fetch,env={FHQ_ORIGIN:'https://franchisehq.app',COACHING_SCANNER_SECRET:'ab'.repeat(32)};
+  try{
+    let calls=0;
+    globalThis.fetch=async(url,options)=>{
+      calls++;
+      if(options.redirect==='error')throw new TypeError('Invalid redirect value in Workers');
+      assert.equal(url,'https://franchisehq.app/api/internal/coaching-scan');
+      assert.equal(options.redirect,'manual');assert.equal(options.headers['x-fhq-coaching-scanner'],env.COACHING_SCANNER_SECRET);
+      return Response.json(calls===1?{ok:true,processed:true}:{ok:true,idle:true});
+    };
+    await scannerWorker.scheduled({},env);assert.equal(calls,2);
+    for(const status of[301,302,307,308,401,500]){
+      calls=0;globalThis.fetch=async(_url,options)=>{calls++;assert.equal(options.redirect,'manual');return new Response(null,{status,headers:{location:'https://untrusted.invalid/'}});};
+      await assert.rejects(scannerWorker.scheduled({},env),new RegExp(`HTTP ${status}`));assert.equal(calls,1);
+    }
+    calls=0;globalThis.fetch=async()=>{calls++;return Response.json({ok:false,retry:true});};
+    await assert.rejects(scannerWorker.scheduled({},env),/could not finish/);assert.equal(calls,1);
+    calls=0;globalThis.fetch=async()=>{calls++;return Response.json({ok:true,processed:true});};
+    await scannerWorker.scheduled({},env);assert.equal(calls,8);
+  }finally{globalThis.fetch=original;}
+});
+
+test('coach status distinguishes a never-started or stalled scanner, queued checks and completed history',async()=>{
+  const f=await fixture();try{
+    await configureCoaching(f.c,{enabled:true,sourceChannelId:source,reportChannelId:report,banned:[]},{fetchImpl:f.fetchImpl});
+    f.sqlite.exec("UPDATE discord_coaching_settings SET updated_at='2026-09-29 20:57:07'");
+    let result=JSON.stringify(await coachingCommand(f.c,{now:Date.parse('2026-09-29T22:10:00Z')}));
+    assert.match(result,/Scanner stalled/);assert.match(result,/0 submissions found/);assert.doesNotMatch(result,/Still scanning history|Not submitted/);
+    result=JSON.stringify(await coachingCommand(f.c,{now:Date.parse('2026-09-29T20:58:00Z')}));
+    assert.match(result,/Scanning earlier messages/);assert.match(result,/Still scanning history/);
+    await scanCoaching(f.env,f.db,{fetchImpl:f.fetchImpl});
+    result=JSON.stringify(await coachingCommand(f.c));assert.match(result,/History scan complete/);assert.match(result,/1 submissions found · 1 checked · 0 awaiting checks/);
+    f.sqlite.exec("UPDATE discord_coaching_submissions SET status='pending'");
+    result=JSON.stringify(await coachingCommand(f.c));assert.match(result,/History read; screenshot checks are still running/);assert.match(result,/1 awaiting checks/);
+    f.sqlite.exec("UPDATE discord_coaching_settings SET updated_at='2026-09-29 20:57:07',last_scan_at='2026-09-29 21:00:00'");
+    result=JSON.stringify(await coachingCommand(f.c,{now:Date.parse('2026-09-29T22:10:00Z')}));assert.match(result,/Scanner stalled/);
   }finally{f.sqlite.close();}
 });
 
