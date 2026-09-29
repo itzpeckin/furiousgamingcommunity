@@ -1238,7 +1238,8 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(builder,/checkpointed-domain-v3/);
   assert.match(builder,/retained-schedule-team-bridge-v2/);
   assert.match(builder,/const BUILD_RECORD_LIMIT=500/);
-  assert.match(builder,/const BUILD_WRITE_BATCH_LIMIT=125/);
+  assert.match(builder,/const BUILD_WRITE_BYTES=500000/);
+  assert.match(builder,/FROM json_each\(\?\)/);
   assert.match(builder,/extendTeamIdRebaseFromMatchingGames/);
   assert.match(builder,/domain==='teams'/);
   assert.match(builder,/domain==='players'/);

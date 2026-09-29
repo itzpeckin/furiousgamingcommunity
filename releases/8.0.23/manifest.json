@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.0.23",
+  "releaseType": "coaching-archetypes-and-import-reliability",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.22",
+    "tag": "v8.0.22",
+    "commit": "567d81fd3e26f3422f7a339d7f269565f00bc794"
+  },
+  "implementationBranch": "feature/8.0.23-coaching-import-reliability",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.22",
+    "candidateRelease": "8.0.23",
+    "currentMigration": 49,
+    "candidateMigration": 50,
+    "scope": "Opt-in per-league coaching archetype checks and missing submissions; bounded snapshot writes; previous/current Companion batch handling; EA reconnect and panel stability; automatic first-week scheduling threads; richer games cards."
+  },
+  "requiredArtifacts": [
+    "functions/_lib/discord-coaching.js",
+    "functions/_lib/coaching-images.js",
+    "functions/api/internal/coaching-scan.js",
+    "workers/franchise-coaching-scanner/src/index.js",
+    "migrations/0050_coaching_archetypes.sql",
+    "tests/discord/coaching.test.mjs",
+    "releases/8.0.23/release-record.md",
+    "releases/8.0.23/validation-evidence.json"
+  ]
+}

@@ -504,10 +504,10 @@ function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000
 }
 
 test('global Discord command inventory restores legacy week commands and remains multi-league capable',()=>{
-  assert.equal(DISCORD_GLOBAL_COMMANDS.length,40);
-  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,40);
+  assert.equal(DISCORD_GLOBAL_COMMANDS.length,41);
+  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,41);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.map(command=>command.name),[
-    'game','standings','playoffs','eliminated','schedule','games','rush','abilities','leaders','player','team','trade-block','trade-history','news',
+    'coach','game','standings','playoffs','eliminated','schedule','games','rush','abilities','leaders','player','team','trade-block','trade-history','news',
     'gotw','league-site','twitch','join','gm-history','confidence','rules','trade',
     ...Array.from({length:18},(_,index)=>`week${index+1}`)
   ]);
@@ -1010,7 +1010,7 @@ test('global command registration upserts by name without bulk replacement',asyn
   assert.equal(requests.length,3);
   assert.ok(requests.every(item=>item.method==='POST'));
   assert.ok(requests.every(item=>/\/applications\/100000000000000009\/commands$/.test(item.url)));
-  assert.deepEqual(requests.map(item=>item.body.name),['game','standings','playoffs']);
+  assert.deepEqual(requests.map(item=>item.body.name),['coach','game','standings']);
 
   requests.length=0;
   await upsertDiscordGuildCommands({
@@ -1031,7 +1031,7 @@ test('global command registration upserts by name without bulk replacement',asyn
     DISCORD_CLIENT_ID:'100000000000000009',DISCORD_BOT_TOKEN:'secret'
   },DISCORD_GLOBAL_COMMANDS.slice(0,3),{fetchImpl:ensureFetch});
   assert.deepEqual(requests.map(item=>[item.method,item.body?.name||null]),[
-    ['POST','game'],['POST','standings'],['POST','playoffs']
+    ['POST','coach'],['POST','game'],['POST','standings']
   ]);
 });
 
@@ -1214,23 +1214,23 @@ test('/games separates played and unplayed matchups for the active scheduled wee
     const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000090',name:'games',options:[{type:1,name:'all'}]
     })}));
-    const content=(await response.json()).data.content;
+    const content=JSON.stringify((await response.json()).data);
     assert.match(content,/Regular Season Week 13 Games/);
-    assert.match(content,/Played \(1\).*SF 17 @ TB 24/s);
-    assert.match(content,/Unplayed \(1\).*TB @ SF/s);
+    assert.match(content,/Played \(1\).*SF 17 — TB 24/s);
+    assert.match(content,/Unplayed \(1\).*UPCOMING MATCHUP/s);
     assert.doesNotMatch(content,/Week 12/);
     const played=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000091',name:'games',options:[{type:1,name:'played'}]
     })}));
-    const playedContent=(await played.json()).data.content;
-    assert.match(playedContent,/SF 17 @ TB 24/);
-    assert.doesNotMatch(playedContent,/TB @ SF/);
+    const playedContent=JSON.stringify((await played.json()).data);
+    assert.match(playedContent,/SF 17 — TB 24/);
+    assert.doesNotMatch(playedContent,/UPCOMING MATCHUP/);
     const unplayed=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000092',name:'games',options:[{type:1,name:'unplayed'}]
     })}));
-    const unplayedContent=(await unplayed.json()).data.content;
-    assert.match(unplayedContent,/TB @ SF/);
-    assert.doesNotMatch(unplayedContent,/SF 17 @ TB 24/);
+    const unplayedContent=JSON.stringify((await unplayed.json()).data);
+    assert.match(unplayedContent,/UPCOMING MATCHUP/);
+    assert.doesNotMatch(unplayedContent,/SF 17 — TB 24/);
   }finally{database.close()}
 });
 
@@ -1847,7 +1847,7 @@ test('/week14 bootstraps one commissioner league and creates identity-driven mat
   }finally{globalThis.fetch=originalFetch;database.close()}
 });
 
-test('full-season preload performs no Discord work and a proven Week 2 advance creates only Week 2',async()=>{
+test('first live import creates only its proven current week and the next advance replaces it',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -1858,20 +1858,21 @@ test('full-season preload performs no Discord work and a proven Week 2 advance c
     const period=week=>({stage:'regular-season',week,key:`regular-season:${week}`});
     database.prepare('UPDATE league_snapshots SET manifest_json=? WHERE id=?').run(JSON.stringify({currentPeriod:period(1),currentPeriodProof:{status:'proven'},discordScheduleTransition:{sourceSnapshotId:null,from:null,to:period(1),allowed:false}}),first);
     for(let week=2;week<=18;week++)seedSnapshotRecord(database,{snapshotId:first,leagueId:'league-a',domain:'games',externalId:`future-${week}`,data:{external_id:`future-${week}`,season_year:2026,stage:'regular-season',week_index:week,away_team_external_id:'1002',home_team_external_id:'1001',status:'scheduled'}});
+    let nextId=88;
     const fetchImpl=async(url,options={})=>{
       requests.push({url:String(url),method:options.method||'GET',body:options.body?JSON.parse(options.body):null});
-      return new Response(JSON.stringify({id:'100000000000000088'}),{status:200,headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({id:`1000000000000000${nextId++}`}),{status:200,headers:{'content-type':'application/json'}});
     };
     const initial=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{league,snapshotId:first,fetchImpl});
-    assert.equal(initial.reason,'initial-import');assert.equal(initial.reviewRequired,true);
-    assert.equal(requests.length,0);assert.equal(database.prepare('SELECT COUNT(*) count FROM discord_schedule_threads').get().count,0);
+    assert.equal(initial.ok,true);assert.equal(initial.week,1);
+    assert.equal(database.prepare('SELECT COUNT(*) count FROM discord_schedule_threads').get().count,1);
     const second=seedActiveWeek(database,{leagueId:'league-a',week:2});
     database.prepare(`INSERT OR IGNORE INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json)
       SELECT ?,league_id,domain,external_id,data_json FROM league_snapshot_records WHERE snapshot_id=? AND domain='games' AND json_extract(data_json,'$.week_index')>2`).run(second,first);
     proveScheduleAdvance(database,first,second);
     const advanced=await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{league,snapshotId:second,fetchImpl});
     assert.equal(advanced.created,1);assert.equal(advanced.week,2);
-    assert.deepEqual(database.prepare('SELECT DISTINCT week_index AS week FROM discord_schedule_threads').all().map(r=>r.week),[2]);
+    assert.deepEqual(database.prepare("SELECT DISTINCT week_index AS week FROM discord_schedule_threads WHERE status='active'").all().map(r=>r.week),[2]);
     const before=requests.length;
     assert.equal((await syncDiscordScheduleThreads({DISCORD_BOT_TOKEN:'test-token'},db,{league,snapshotId:second,fetchImpl})).reused,true);
     assert.equal(requests.length,before);

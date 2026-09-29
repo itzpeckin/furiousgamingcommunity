@@ -1,5 +1,6 @@
 /* FHQ_BUILD: 8.0.10 */
 import { json } from '../../../../_lib/cloud-platform.js';
+import { eaWeeklyReady } from '../../../../_lib/ea-direct.js';
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 import { authorizedEaState, configured, readEaBody, fail, eaErrorResponse, activeEaConnection, sealEa, jobScope } from '../../../../_lib/ea-direct.js';
 
@@ -29,8 +30,8 @@ export async function onRequestPost(context){
     const body=await readEaBody(context.request),mode=String(body.mode||'');
     if(!['preview','weekly','yearly'].includes(mode))fail('INVALID_MODE','Choose Preview, Weekly Update, or Yearly Schedule.',400);
     const connection=await activeEaConnection(state.db,state.league.id);
-    if(connection?.status!=='connected')fail('EA_RECONNECT_REQUIRED','Connect your EA account first.');
-    if(mode==='weekly'&&!connection.preview_verified)fail('PREVIEW_REQUIRED','Import the season schedule in Step 2 before collecting weekly data.');
+    if(connection?.status!=='connected')fail('EA_RECONNECT_REQUIRED','In Command Center → Madden Import → EA Direct, select Reconnect EA Account and complete sign-in.');
+    if(mode==='weekly'&&!await eaWeeklyReady(state.db,state.league.id,connection))fail('PREVIEW_REQUIRED','Import the season schedule in Step 2 before collecting weekly data.');
     // Expired credentials cannot drive a job; release only that abandoned job's lock.
     await state.db.prepare(`UPDATE ea_direct_collection_jobs SET status='failed',state_cipher=NULL,error_code='COLLECTION_EXPIRED',message='The collection expired. Start a new collection.',updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND status IN ('queued','running') AND julianday(expires_at)<=julianday('now')`).bind(state.league.id).run();
     const busy=await state.db.prepare(`SELECT * FROM ea_direct_collection_jobs WHERE league_id=? AND status IN ('queued','running') LIMIT 1`).bind(state.league.id).first();

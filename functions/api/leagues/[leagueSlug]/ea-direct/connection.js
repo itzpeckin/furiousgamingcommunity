@@ -1,5 +1,6 @@
 /* FHQ_BUILD: 8.0.10 */
 import { json } from '../../../../_lib/cloud-platform.js';
+import { eaWeeklyReady } from '../../../../_lib/ea-direct.js';
 import { createEaClient, makeEaLoginUrl } from '../../../../_lib/ea-client.js';
 import { authorizedEaState, configured, readEaBody, fail, eaErrorResponse, publicConnection, activeEaConnection, createEaSetup, loadEaSetup, lockEaSetup, setupScope, connectionScope, sealEa, openEa, parseEaRedirect } from '../../../../_lib/ea-direct.js';
 
@@ -32,8 +33,8 @@ async function status(state){
   const setup=await state.db.prepare(`SELECT * FROM ea_direct_setups WHERE league_id=? AND user_id=? AND session_id=? AND julianday(expires_at)>julianday('now') AND stage IN ('code','persona','franchise') ORDER BY created_at DESC LIMIT 1`)
     .bind(state.league.id,state.session.user.id,state.session.sessionId).first();
   const payload=setup?.payload_cipher?await openEa(state.env,setupScope(setup),setup.payload_cipher):{};
-  return{ok:true,configured:configured(state.env),status:setup?.stage==='persona'?'choosing-profile':setup?.stage==='franchise'?'choosing-franchise':connection?.status||'not-connected',
-    connection:publicConnection(connection),setup:setup?publicSetup(setup,payload):null,
+  return{ok:true,configured:configured(state.env),status:setup?.stage==='persona'?'choosing-profile':setup?.stage==='franchise'?'choosing-franchise':setup?.stage==='code'?'signing-in':connection?.status||'not-connected',
+    connection:publicConnection(connection),weeklyReady:await eaWeeklyReady(state.db,state.league.id,connection),setup:setup?publicSetup(setup,payload):null,
     ...(setup?.stage==='code'?{loginUrl:makeEaLoginUrl(state.env,setup.oauth_state)}:{})};
 }
 export async function onRequestGet(context){

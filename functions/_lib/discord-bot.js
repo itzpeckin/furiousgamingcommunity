@@ -1,5 +1,6 @@
 import { resolveLiveTradePlayer } from './trade-player.js';
 import { gameCommand } from './discord-game.js';
+import { coachingCommand } from './discord-coaching.js';
 import { discordCommandName, discordCommandOptions, discordScheduleThreadWeek } from './discord-commands.js';
 import {
   abilitiesCommand,
@@ -328,6 +329,7 @@ export async function executeDiscordCommand(c){
     if(subcommand==='week')return scheduleCommand(c,{...values,view:`week:${Number(values.number)}`});
     if(subcommand==='team')return scheduleCommand(c,{...values,view:`team:${values.name}`});
   }
+  if(command==='coach'&&['status','missing'].includes(subcommand))return coachingCommand(c,{missing:subcommand==='missing'});
   if(command==='games'&&['all','played','unplayed'].includes(subcommand))return gamesCommand(c,{...values,status:subcommand});
   if(command==='rush'&&subcommand==='rule')return rushRuleCommand(c,values);
   if(command==='abilities')return abilitiesCommand(c,values);
