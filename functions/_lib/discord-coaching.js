@@ -39,7 +39,7 @@ async function verifyReadAccess(env,config,fetchImpl){
 export async function coachingSettings(db,leagueId){
   const row=await db.prepare('SELECT * FROM discord_coaching_settings WHERE league_id=?').bind(leagueId).first();
   return row?{enabled:Boolean(row.enabled),sourceChannelId:row.source_channel_id,reportChannelId:row.report_channel_id,
-    banned:parse(row.banned_json),revision:row.revision,historyComplete:Boolean(row.history_complete),lastScanAt:row.last_scan_at,lastError:row.last_error}
+    banned:parse(row.banned_json),revision:row.revision,historyComplete:Boolean(row.history_complete),lastScanAt:row.last_scan_at,lastError:row.last_error,updatedAt:row.updated_at}
     :{enabled:false,banned:[],historyComplete:false};
 }
 
@@ -231,15 +231,25 @@ export async function scanCoaching(env,db,{fetchImpl=fetch}={}){
   }
 }
 
-export async function coachingCommand(c,{missing=false}={}){
+export async function coachingCommand(c,{missing=false,now=Date.now()}={}){
   const config=await coachingSettings(c.db,c.league.id);
   if(!config.enabled)return 'Coaching archetype checks are disabled. Commissioners can enable them in League Controls → Discord Bot.';
   const teams=await activeLeagueTeams(c.db,c.league.id),assignments=await activeTeamAssignments(c.db,c.league.id,teams);
   const submissions=await rows(c.db,`SELECT * FROM discord_coaching_submissions WHERE league_id=? AND channel_id=? ORDER BY submitted_at DESC`,c.league.id,config.sourceChannelId);
+  const timestamp=value=>value?Date.parse(value.includes('T')?value:value.replace(' ','T')+'Z'):NaN;
+  const lastActivity=Math.max(timestamp(config.lastScanAt)||0,timestamp(config.updatedAt)||0);
+  const stalled=!lastActivity||now-lastActivity>7*60*1000;
+  const interrupted=Boolean(config.lastError)||stalled;
+  const pending=submissions.filter(s=>s.status==='pending').length;
+  const reporting=submissions.filter(s=>s.status!=='pending'&&(s.rule_revision!==config.revision||s.reported_revision!==config.revision)).length;
+  const progress=`${submissions.length} submissions found · ${submissions.length-pending} checked · ${pending} awaiting checks${reporting?` · ${reporting} reports awaiting update`:''}.`;
+  const scanState=config.lastError?'Scanner retrying after an error.':stalled?'Scanner stalled — no recent progress.':!config.historyComplete?'Scanning earlier messages.':pending?'History read; screenshot checks are still running.':reporting?'History read; result reports are updating.':'History scan complete.';
+  const lastScan=timestamp(config.lastScanAt);
+  const description=`${scanState}\n${progress}${Number.isFinite(lastScan)?`\nLast history check: <t:${Math.floor(lastScan/1000)}:R>.`:''}${interrupted?'\nScanning is delayed; missing submissions are not yet confirmed. Commissioners can check League Controls → Discord Bot for details.':''}`;
   const lines=[];
   for(const [key,owner] of assignments){
     const submission=submissions.find(s=>s.author_id===owner.discordUserId&&s.team_key===key);
-    const status=!submission?(config.historyComplete?'Not submitted':'Still scanning history')
+    const status=!submission?(interrupted?'Not yet verified — scan delayed':config.historyComplete?'Not submitted':'Still scanning history')
       :submission.status==='pending'?'Checking screenshot':submission.status==='unreadable'?'Clearer screenshot needed'
       :submission.archetype?(config.banned.includes(submission.archetype)?'Illegal':'Legal'):'Team assignment needed';
     if(missing&&submission?.archetype)continue;
@@ -247,6 +257,6 @@ export async function coachingCommand(c,{missing=false}={}){
   }
   const fields=[];for(let i=0;i<lines.length;i+=4)fields.push({name:i?'Continued':'Teams',value:lines.slice(i,i+4).join('\n\n'),inline:false});
   return{embeds:[{title:missing?'Coaching archetypes · Missing or incomplete':'Coaching archetypes · League status',
-    description:config.historyComplete?'Based on each GM’s latest submission.':'Existing submissions are still being scanned; missing status is provisional.',
-    fields:fields.length?fields:[{name:'All set',value:'No missing submissions.'}],color:0x5b83f5}],allowed_mentions:{parse:[]}};
+    description,
+    fields:fields.length?fields:[{name:interrupted||!config.historyComplete?'Status provisional':'All set',value:interrupted||!config.historyComplete?'Missing submissions cannot be confirmed until scanning catches up.':'No missing submissions.'}],color:interrupted?0xe9aa4a:0x5b83f5}],allowed_mentions:{parse:[]}};
 }

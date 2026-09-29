@@ -8,10 +8,13 @@ export default {
     let processed=0;
     for(let index=0;index<8;index++){
       const response=await fetch(`${origin}/api/internal/coaching-scan`,{method:'POST',
-        headers:{'x-fhq-coaching-scanner':env.COACHING_SCANNER_SECRET},redirect:'error',signal:AbortSignal.timeout(180000)});
+        headers:{'x-fhq-coaching-scanner':env.COACHING_SCANNER_SECRET},redirect:'manual',signal:AbortSignal.timeout(180000)});
+      // Workers rejects redirect:'error'. Manual mode also prevents the scanner
+      // credential being forwarded to a redirect destination; all 3xx fail below.
       if(!response.ok)throw new Error(`Coaching scanner endpoint returned HTTP ${response.status}.`);
       const result=await response.json();
-      if(!result.ok||result.idle)break;
+      if(!result.ok)throw new Error('Coaching scanner could not finish; the saved check will retry.');
+      if(result.idle)break;
       if(result.processed)processed++;
     }
     console.log(JSON.stringify({event:'coaching-scan-tick',processed}));

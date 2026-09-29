@@ -29,3 +29,9 @@ Disable the coaching scanner trigger and restore Pages deployment 98b247e4-3ffb-
 ## Production acceptance correction
 
 Regional Xbox share-page redirects are accepted only on the existing Xbox allowlist. The supplied public Xbox link resolved to its validated full image. Oversized multi-image submissions request new evidence rather than silently checking a subset. Command registration uses the available production metadata cache when the optional league-configuration cache is absent. Authenticated scanner diagnostics report image-reader and Message Content readiness without exposing credentials.
+
+## Scheduled scanner runtime correction
+
+After opt-in, the production timer failed before contacting Pages because Workers rejected `redirect: 'error'`. The scheduled request now uses manual redirects and rejects every non-success response, preserving the credential boundary. A scanner retry response also fails the invocation instead of being logged as a successful tick. Regression coverage exercises the scheduled entry point with edge request restrictions, redirect rejection, bounded work, idle completion and retry failures.
+
+Coach status now distinguishes history discovery, queued screenshot checks, report updates, recent errors and a scanner with no recent progress. It shows submission counts and the last history check; delayed scanning cannot label an unknown submission as missing. This correction needs no new migration or commissioner reconfiguration. Production acceptance must verify an actual timer invocation and saved progress, not only a manually invoked endpoint.
