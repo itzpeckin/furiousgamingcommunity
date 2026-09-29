@@ -13,7 +13,8 @@
   "environmentBindings": {
     "AI": [
       "functions/_lib/coaching-images.js",
-      "functions/_lib/discord-coaching.js"
+      "functions/_lib/discord-coaching.js",
+      "functions/api/internal/coaching-scan.js"
     ],
     "APP_ENV": [
       "functions/_lib/permissions.js",
@@ -58,6 +59,7 @@
     ],
     "COMPANION_EXPORT_META": [
       "functions/_lib/cloud-platform.js",
+      "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/companion/export.js",
       "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
       "functions/api/leagues/[leagueSlug]/companion/exports.js",

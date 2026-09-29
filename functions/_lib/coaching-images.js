@@ -6,7 +6,7 @@ export function coachingImageLink(value){
     const url=new URL(value);
     if(url.protocol!=='https:'||url.username||url.password||url.port)return null;
     if(supportedImage(url))return url.href;
-    if(['www.xbox.com','xbox.com'].includes(url.hostname)&&/^\/play\/media\/[A-Za-z0-9_-]+\/?$/.test(url.pathname))return url.href;
+    if(['www.xbox.com','xbox.com'].includes(url.hostname)&&/^\/(?:[a-z]{2}-[a-z]{2}\/)?play\/media\/[A-Za-z0-9_-]+\/?$/i.test(url.pathname))return url.href;
   }catch{}
   return null;
 }
@@ -22,7 +22,9 @@ export function coachingEvidence(message){
     const url=coachingImageLink(text.replace(/[),]+$/,''));
     if(url)found.push(url);
   }
-  return [...new Set(found)].slice(0,4);
+  // Keep one excess item so an oversized submission requests new evidence
+  // instead of silently deciding legality from only part of the message.
+  return [...new Set(found)].slice(0,5);
 }
 
 async function bounded(response,limit){
@@ -68,8 +70,13 @@ export function canonicalArchetype(value){
 
 export async function readCoachingScreenshot(env,urls,{fetchImpl=fetch}={}){
   if(!env.AI?.run)throw Object.assign(new Error('Screenshot reading is temporarily unavailable.'),{retryable:true});
-  const images=[];
-  for(const url of urls)images.push({type:'image_url',image_url:{url:await imageResponse(url,fetchImpl)}});
+  if(!urls.length||urls.length>4)throw evidenceError('Submit one to four coaching screenshots together.');
+  const images=[];let totalBytes=0;
+  for(const url of urls){
+    const data=await imageResponse(url,fetchImpl);totalBytes+=data.length;
+    if(totalBytes>16000000)throw evidenceError('Submit a smaller coaching screenshot.');
+    images.push({type:'image_url',image_url:{url:data}});
+  }
   const result=await env.AI.run('@cf/qwen/qwen3.8-27b',{
     reasoning_effort:'low',max_completion_tokens:750,temperature:0,
     response_format:{type:'json_object'},messages:[
