@@ -5,6 +5,7 @@ import { DISCORD_COMMAND_RELEASE, DISCORD_GLOBAL_COMMANDS } from '../../../_lib/
 import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../_lib/discord-schedule.js';
 import { discordGuildRoles, discordGuildTextChannels } from '../../../_lib/discord-installation.js';
 import { upsertDiscordGlobalCommands } from '../../../_lib/discord-api.js';
+import { coachingSettings, configureCoaching } from '../../../_lib/discord-coaching.js';
 
 const SNOWFLAKE=/^[0-9]{17,20}$/;
 const cleanSnowflake=(value,required=false)=>{
@@ -50,6 +51,7 @@ async function state(c){
     league:{id:c.league.id,slug:c.league.slug,name:c.league.name},
     installation:row||null,
     channels,roles,channelError,roleError,
+    coaching:await coachingSettings(c.db,c.league.id),
     scheduleSync:await latestDiscordScheduleSync(c.db,c.league.id),
     globalCommands:true,
     automaticConnection:true,
@@ -69,7 +71,11 @@ export async function onRequestPost(context){
     let body={};try{body=await context.request.json()}catch{return json({ok:false,error:'Request body must be valid JSON.'},400)}
     const action=String(body.action||'').trim();
     const audit=createTenantAuditContext(context,c.league,c.session,`discord_installation_${action||'unknown'}`);
-    if(action==='connect'||action==='update'){
+    if(action==='configure-coaching'){
+      await configureCoaching(c,body);
+      await tenantAuditStatement(c.db,audit,{resourceType:'discord_coaching_settings',resourceId:c.league.id,
+        detail:{enabled:body.enabled===true,banned:body.banned||[]}}).run();
+    }else if(action==='connect'||action==='update'){
       const guildId=cleanSnowflake(body.guildId,true);
       const committee=cleanSnowflake(body.tradeCommitteeChannelId,false);
       const committeeRole=cleanSnowflake(body.tradeCommitteeRoleId,false);

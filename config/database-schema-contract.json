@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "8.0.22",
+  "release": "8.0.23",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 49,
+  "currentVersion": 50,
   "requiredTables": [
     "ea_direct_connections",
     "ea_direct_setups",
@@ -137,7 +137,9 @@
     "users",
     "yearly_schedule_imports",
     "yearly_schedule_import_captures",
-    "discord_game_results"
+    "discord_game_results",
+    "discord_coaching_settings",
+    "discord_coaching_submissions"
   ],
   "requiredCoreColumns": {
     "league_player_ownership": [

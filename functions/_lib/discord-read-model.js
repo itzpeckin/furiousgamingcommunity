@@ -2,7 +2,7 @@ import {
   activeSnapshotDomainPage,
   activeSnapshotRecord
 } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
-import { activeLeagueTeams, resolveTeam } from './league-teams.js';
+import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-teams.js';
 import { applyRosterOverlays } from './trade-center.js';
 import { tradeCenterState } from '../api/leagues/[leagueSlug]/trade-center.js';
 import { competitionState } from '../api/leagues/[leagueSlug]/competition.js';
@@ -259,7 +259,7 @@ export async function scheduleCommand(c,values){
 }
 
 export async function gamesCommand(c,values){
-  const model=await discordLeagueReadModel(c,{domains:['teams','games']});
+  const model=await discordLeagueReadModel(c,{domains:['teams','games','standings']});
   const context=await currentFranchiseContext(c.db,c.league.id);
   const status=lower(values.status)||'all';
   const currentPeriod=model.games.filter(game=>{
@@ -272,17 +272,24 @@ export async function gamesCommand(c,values){
   const games=currentPeriod.filter(game=>canonicalGameStage(game.stage)===activeStage)
     .sort((a,b)=>clean(a.scheduledAt).localeCompare(clean(b.scheduledAt))||clean(a.id).localeCompare(clean(b.id)));
   const played=games.filter(gamePlayed),unplayed=games.filter(game=>!gamePlayed(game));
-  const items=[];
-  if(status!=='unplayed'){
-    items.push(`__Played (${played.length})__`);
-    items.push(...(played.length?played.map(game=>`✅ ${gameLine(model.teams,game)}`):['No games have finished yet.']));
-  }
-  if(status!=='played'){
-    items.push(`__Unplayed (${unplayed.length})__`);
-    items.push(...(unplayed.length?unplayed.map(game=>`⏳ ${gameLine(model.teams,game)}`):['Every scheduled game is complete.']));
-  }
   const stage=activeStage==='preseason'?'Preseason':activeStage==='playoffs'?'Postseason':'Regular Season';
-  return lines(`${c.league.name} · ${stage} Week ${context.week} Games`,items,'No games are scheduled for the active week.');
+  const assignments=await activeTeamAssignments(c.db,c.league.id,model.teams),records=standingRecords(model);
+  const safe=value=>clean(value).replace(/([\\*_~`|<>])/g,'\\$1').slice(0,90);
+  const side=(id,label)=>{
+    const team=resolveTeam(model.teams,id),owner=assignments.get(team?.teamKey);
+    const mention=/^\d{17,20}$/.test(owner?.discordUserId||'')?`<@${owner.discordUserId}>`:'Unassigned';
+    return `**${label} · ${safe(team?.displayName||id)}** · ${records.get(team?.teamKey)||'Record unavailable'}\nGM: ${mention}`;
+  };
+  const selected=status==='played'?played:status==='unplayed'?unplayed:games;
+  const fields=selected.map(game=>({
+    name:gamePlayed(game)?`FINAL · ${teamName(model.teams,game.awayTeamId)} ${game.awayScore} — ${teamName(model.teams,game.homeTeamId)} ${game.homeScore}`:'UPCOMING MATCHUP',
+    value:`${side(game.awayTeamId,'Away')}\n${side(game.homeTeamId,'Home')}`,inline:false
+  }));
+  return{content:`**${safe(c.league.name)} · ${context.seasonYear} · ${stage} Week ${context.week} Games**`,
+    embeds:[{title:`${status==='played'?'Played':status==='unplayed'?'Unplayed':'Weekly matchups'} · ${selected.length}`,
+      description:`Played (${played.length}) · Unplayed (${unplayed.length})`,color:0x5b83f5,
+      ...(fields.length?{fields:fields.slice(0,16)}:{description:'No matching games are scheduled for the active week.'})}],
+    allowed_mentions:{parse:[]}};
 }
 
 const RUSHING_RULE_MINIMUM=10;

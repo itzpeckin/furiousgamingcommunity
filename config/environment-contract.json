@@ -66,6 +66,12 @@
         "logicalResource": "staticAssets",
         "required": true,
         "platformManaged": true
+      },
+      {
+        "name": "AI",
+        "kind": "workers-ai",
+        "logicalResource": "coachingVision",
+        "required": false
       }
     ],
     "variables": [
@@ -87,7 +93,8 @@
       "SESSION_SIGNING_SECRET",
       "COMPANION_EXPORT_TOKEN",
       "EA_CLIENT_SECRET",
-      "EA_CREDENTIAL_KEY"
+      "EA_CREDENTIAL_KEY",
+      "COACHING_SCANNER_SECRET"
     ],
     "forbiddenUntilSecurityContainment": [
       "EA_DIRECT_ACCESS_TOKEN",
@@ -156,7 +163,8 @@
         "SESSION_SIGNING_SECRET",
         "COMPANION_EXPORT_TOKEN",
         "EA_CLIENT_SECRET",
-        "EA_CREDENTIAL_KEY"
+        "EA_CREDENTIAL_KEY",
+        "COACHING_SCANNER_SECRET"
       ]
     },
     "staging": {
@@ -193,7 +201,8 @@
         "SESSION_SIGNING_SECRET",
         "COMPANION_EXPORT_TOKEN",
         "EA_CLIENT_SECRET",
-        "EA_CREDENTIAL_KEY"
+        "EA_CREDENTIAL_KEY",
+        "COACHING_SCANNER_SECRET"
       ]
     },
     "production": {
@@ -230,8 +239,21 @@
         "SESSION_SIGNING_SECRET",
         "COMPANION_EXPORT_TOKEN",
         "EA_CLIENT_SECRET",
-        "EA_CREDENTIAL_KEY"
+        "EA_CREDENTIAL_KEY",
+        "COACHING_SCANNER_SECRET"
       ]
     }
+  },
+  "coachingScanner": {
+    "name": "franchise-hq-coaching-scanner",
+    "scheduled": true,
+    "secretNames": [
+      "COACHING_SCANNER_SECRET"
+    ],
+    "origin": "https://franchisehq.app",
+    "perLeagueOptIn": true,
+    "variables": [
+      "FHQ_ORIGIN"
+    ]
   }
 }

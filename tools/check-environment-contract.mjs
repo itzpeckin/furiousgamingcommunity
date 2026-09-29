@@ -12,7 +12,9 @@ const declaredBindings = new Set([
   ...(contract.pages?.forbiddenUntilSecurityContainment || []),
   ...(contract.pages?.legacyUnprovisionedBindings || []),
   ...(contract.importWorker?.bindings || []).map(binding => binding.name),
-  ...(contract.importWorker?.secrets || [])
+  ...(contract.importWorker?.secrets || []),
+  ...(contract.coachingScanner?.variables || []),
+  ...(contract.coachingScanner?.secretNames || [])
 ]);
 for (const binding of Object.keys(inventory.environmentBindings || {})) {
   if (!declaredBindings.has(binding)) errors.push(`Source references undeclared environment binding ${binding}.`);

@@ -528,7 +528,7 @@ export async function revokeBrowserSessions(context, options = {}) {
   return changed;
 }
 
-async function timingSafeTokenEqual(left, right) {
+export async function timingSafeTokenEqual(left, right) {
   const [leftHash, rightHash] = await Promise.all([hashToken(left), hashToken(right)]);
   const leftBytes = new TextEncoder().encode(leftHash);
   const rightBytes = new TextEncoder().encode(rightHash);

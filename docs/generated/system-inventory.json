@@ -11,6 +11,10 @@
     }
   },
   "environmentBindings": {
+    "AI": [
+      "functions/_lib/coaching-images.js",
+      "functions/_lib/discord-coaching.js"
+    ],
     "APP_ENV": [
       "functions/_lib/permissions.js",
       "functions/api/leagues/[leagueSlug]/companion/export-url.js"
@@ -21,6 +25,11 @@
     ],
     "AUTH_RATE_LIMITER": [
       "functions/_middleware.js"
+    ],
+    "COACHING_SCANNER_SECRET": [
+      "functions/_lib/discord-coaching.js",
+      "functions/api/internal/coaching-scan.js",
+      "workers/franchise-coaching-scanner/src/index.js"
     ],
     "COMPANION_EXPORTS": [
       "functions/_lib/cloud-platform.js",
@@ -84,6 +93,7 @@
       "functions/_lib/discord-game-card.js",
       "functions/_lib/discord-game.js",
       "functions/_lib/discord-player-card.js",
+      "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
     "DISCORD_CLIENT_ID": [
@@ -93,6 +103,7 @@
       "functions/_lib/discord-trade-sync.js",
       "functions/api/auth/discord/callback.js",
       "functions/api/auth/discord/login.js",
+      "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/discord.js",
       "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
@@ -142,6 +153,9 @@
       "functions/api/leagues/[leagueSlug]/ea-direct/exchange-code.js",
       "functions/api/leagues/[leagueSlug]/ea-direct/exchange-status.js"
     ],
+    "FHQ_ORIGIN": [
+      "workers/franchise-coaching-scanner/src/index.js"
+    ],
     "FRANCHISE_EA_COLLECTION_WORKFLOW": [
       "workers/franchise-import-worker/src/index.js"
     ],
@@ -164,6 +178,7 @@
     ],
     "LEAGUE_CONFIG": [
       "functions/_lib/cloud-platform.js",
+      "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/memberships.js"
     ],
     "OWNER_FALLBACK_DISCORD_ID": [
@@ -192,13 +207,13 @@
       ".css": 12,
       ".example": 1,
       ".html": 9,
-      ".js": 257,
+      ".js": 261,
       ".json": 7,
-      ".jsonc": 1,
+      ".jsonc": 2,
       ".md": 285,
-      ".mjs": 60,
+      ".mjs": 61,
       ".png": 3,
-      ".sql": 51,
+      ".sql": 52,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -210,11 +225,11 @@
         "file": "app.js"
       },
       {
-        "bytes": 567069,
+        "bytes": 568274,
         "file": "styles.css"
       },
       {
-        "bytes": 438502,
+        "bytes": 441875,
         "file": "trade-module.js"
       },
       {
@@ -222,7 +237,7 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 191783,
+        "bytes": 191826,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -234,7 +249,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 89950,
+        "bytes": 89995,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -250,7 +265,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 66987,
+        "bytes": 67879,
         "file": "functions/_lib/discord-read-model.js"
       },
       {
@@ -282,11 +297,11 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 39834,
+        "bytes": 40222,
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 694
+    "total": 701
   },
   "frontend": {
     "assets": [
@@ -796,7 +811,7 @@
     "stylesheetCount": 3
   },
   "functions": {
-    "routeCount": 91,
+    "routeCount": 92,
     "routes": [
       {
         "file": "functions/index.js",
@@ -884,6 +899,13 @@
           "onRequest"
         ],
         "route": "/api/health"
+      },
+      {
+        "file": "functions/api/internal/coaching-scan.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/internal/coaching-scan"
       },
       {
         "file": "functions/api/league.js",
@@ -1773,10 +1795,16 @@
       "recordsLedger": true,
       "sha256": "59dcb286168fbd03609f53718a12fa3333e52b1f1eea9066f9eaeb345c67a637",
       "version": "0049"
+    },
+    {
+      "file": "migrations/0050_coaching_archetypes.sql",
+      "recordsLedger": true,
+      "sha256": "d53c2cf88ed240dfbfcc01bd48a37887e60ad92e05e51b2b4dd570cbb240e27e",
+      "version": "0050"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.22",
+  "release": "8.0.23",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -19,6 +19,9 @@
   let selectedPersonaId = '';
   let selectedLeagueId = '';
   let seasonDraft = '';
+  let settingsOpen = false;
+  let actionRevision = 0;
+  let authScope = null;
   let pollTimer = null;
   const controllers = new Set();
 
@@ -36,6 +39,11 @@
     .replace(/\b(?:access_token|refresh_token|authorization|code)\s*[:=]\s*\S+/gi, '[private sign-in information]');
   const personaId = item => String(item.id ?? item.personaId ?? '');
   const leagueId = item => String(item.id ?? item.externalLeagueId ?? item.leagueId ?? '');
+  const currentAuthScope = () => {
+    const auth = HQ.auth?.getSnapshot?.();
+    return auth?.authenticated && auth.user?.id ? JSON.stringify([auth.user.id,auth.membership?.leagueId,
+      auth.membership?.role,auth.membership?.authorizationVersion,auth.session?.id||auth.session?.sessionId]) : null;
+  };
 
   function resetSelections() {
     selectedPersonaId = '';
@@ -59,6 +67,9 @@
     notice = '';
     selectedPath = 'ea-direct';
     seasonDraft = '';
+    settingsOpen = false;
+    actionRevision += 1;
+    authScope = currentAuthScope();
     resetSelections();
   }
 
@@ -68,7 +79,7 @@
   }
 
   const stillCurrent = token => token.slug === slug() && token.generation === generation;
-  const previewVerified = () => Boolean(state?.previewVerified || state?.connection?.previewVerified);
+  const previewVerified = () => Boolean(state?.weeklyReady || state?.previewVerified || state?.connection?.previewVerified);
 
   async function api(resource, method = 'GET', body, token = ensureContext()) {
     if (!token.slug || !stillCurrent(token)) throw new Error('Select the league before connecting Madden.');
@@ -103,7 +114,8 @@
       setup: payload.setup === undefined ? previous.setup || null : payload.setup,
       loginUrl: payload.loginUrl === undefined ? previous.loginUrl || null : loginHref(payload.loginUrl),
       message: payload.message ? safeMessage(payload.message) : '',
-      previewVerified: payload.previewVerified ?? previous.previewVerified ?? false
+      previewVerified: payload.previewVerified ?? false,
+      weeklyReady: payload.weeklyReady ?? false
     };
     if (next.setup?.id !== previous.setup?.id) resetSelections();
     const personas = Array.isArray(next.setup?.personas) ? next.setup.personas : [];
@@ -115,19 +127,20 @@
 
   async function refresh() {
     const token = ensureContext();
-    if (!token.slug || loading) return state;
+    if (!token.slug || loading || busy) return state;
+    const revision = actionRevision;
     loading = true;
     rerender();
     try {
       const payload = await api('connection', 'GET', undefined, token);
-      if (!payload || !stillCurrent(token)) return null;
+      if (!payload || !stillCurrent(token) || revision !== actionRevision) return null;
       state = connectionState(payload);
       if (payload.latestSync?.id && (!collection || collection.id === payload.latestSync.id)) {
         collection = {...collection, ...payload.latestSync};
         schedulePoll(token);
       } else if (state.status === 'connected' && !collection) {
         const latest = await api('sync', 'GET', undefined, token);
-        if (!stillCurrent(token)) return null;
+        if (!stillCurrent(token) || revision !== actionRevision) return null;
         if (latest?.id || latest?.job?.id) {
           collection = {...latest.job, ...latest};
           schedulePoll(token);
@@ -136,7 +149,7 @@
       errorMessage = '';
       return state;
     } catch (error) {
-      if (stillCurrent(token)) errorMessage = safeMessage(error.message);
+      if (stillCurrent(token) && revision === actionRevision) errorMessage = safeMessage(error.message);
       return null;
     } finally {
       if (stillCurrent(token)) { loading = false; loaded = true; rerender(); }
@@ -146,6 +159,7 @@
   async function connectionAction(action, fields = {}) {
     const token = ensureContext();
     if (busy || !token.slug) return null;
+    actionRevision += 1;
     busy = true;
     errorMessage = '';
     notice = '';
@@ -161,7 +175,9 @@
         resetSelections();
       }
       if (action === 'disconnect') notice = 'EA account disconnected. Your imported league data remains available.';
-      if (action === 'connect') notice = 'EA account connected. Import the season schedule in Step 2.';
+      if (action === 'connect') notice = previewVerified()
+        ? 'EA account connected. Your season schedule is ready; collect weekly stats in Step 3.'
+        : 'EA account connected. Import the season schedule in Step 2.';
       return state;
     } catch (error) {
       if (stillCurrent(token)) errorMessage = safeMessage(error.message);
@@ -183,9 +199,11 @@
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     polling = true;
+    const revision = actionRevision;
+    const jobId = collection.id;
     try {
-      const payload = await api(`sync?id=${encodeURIComponent(collection.id)}`, 'GET', undefined, token);
-      if (!payload || !stillCurrent(token)) return null;
+      const payload = await api(`sync?id=${encodeURIComponent(jobId)}`, 'GET', undefined, token);
+      if (!payload || !stillCurrent(token) || revision !== actionRevision || collection?.id !== jobId) return null;
       collection = {...collection, ...payload.job, ...payload};
       errorMessage = '';
       if (terminalStatuses.has(collection.status)) {
@@ -215,6 +233,7 @@
     if (busy || state?.status !== 'connected' || (collection && !terminalStatuses.has(collection.status))) return null;
     if (mode === 'weekly' && !previewVerified()) return null;
     busy = true;
+    actionRevision += 1;
     errorMessage = '';
     notice = '';
     rerender();
@@ -279,7 +298,7 @@
     if (!loaded && !loading && token.slug) setTimeout(() => { if (stillCurrent(token) && !loaded) refresh(); }, 0);
     const connected = state?.status === 'connected';
     const activeCollection = Boolean(collection && !terminalStatuses.has(collection.status));
-    const disabled = busy || loading || activeCollection ? 'disabled' : '';
+    const disabled = busy || activeCollection ? 'disabled' : '';
     const verified = previewVerified();
     const statusLabel = loading ? 'Checking connection' : connected ? 'Connected' : state?.status === 'reconnect-required' ? 'Reconnect needed' : state?.configured === false ? 'Setup required' : 'Not connected';
     const exportService = HQ.leagueExportUrl;
@@ -291,7 +310,7 @@
     const connectionMarkup = selectedPath === 'companion' ? ''
       : loading && !state ? '<p role="status">Checking EA connection…</p>'
       : state?.configured === false ? '<p>EA Direct is unavailable. Choose Companion App.</p>'
-      : connected ? `<details class="ea-direct-settings"><summary>${esc(state.connection?.leagueName || 'Connected franchise')} · ${esc(state.connection?.personaName || 'Connected profile')} · Connection settings</summary><small>Last collected: ${esc(date(state.connection?.lastSyncedAt))}</small><div class="ea-direct-actions"><button class="button button--ghost" data-ea-collect="preview" ${disabled}>Test Connection</button><button class="button button--ghost" data-ea-action="refresh" ${disabled}>Refresh Connection</button><button class="button button--ghost" data-ea-action="disconnect" ${disabled}>Disconnect EA Account</button></div></details>`
+      : connected ? `<details class="ea-direct-settings"><summary>${esc(state.connection?.leagueName || 'Connected franchise')} · ${esc(state.connection?.personaName || 'Connected profile')} · Connection settings</summary><small>Last collected: ${esc(date(state.connection?.lastSyncedAt))}</small><div class="ea-direct-actions"><button class="button button--ghost" data-ea-collect="preview" ${disabled}>Test Connection</button><button class="button button--ghost" data-ea-action="refresh" ${disabled}>Refresh Connection</button><button class="button button--ghost" data-ea-action="begin" ${disabled}>Reconnect EA Account</button><button class="button button--ghost" data-ea-action="disconnect" ${disabled}>Disconnect EA Account</button></div></details>`
       : setupMarkup();
     const schedule = selectedPath === 'companion' ? exportService?.renderWorkflowScheduleControls?.() || '<p>Loading schedule…</p>'
       : `${complete ? '<span class="pill pill--success">18 weeks · 272 games · Complete</span>' : ''}${!prepared && connected && exportState ? '<form data-ea-form="season" class="ea-direct-form"><label class="field"><span>Madden franchise season number</span><input name="sourceSeasonId" value="'+esc(seasonDraft)+'" required pattern="[A-Za-z0-9._:-]{1,80}" placeholder="Exact season number in Madden"><small>One-time confirmation for this franchise.</small></label><button type="submit" class="button button--primary" '+disabled+'>Confirm &amp; Import Season Schedule</button></form>' : '<button class="button button--secondary" data-ea-collect="yearly" '+(!connected||busy||loading||activeCollection||!exportState?'disabled':'')+'>'+(complete?'Update Season Schedule':'Import Season Schedule')+'</button>'}`;
@@ -309,7 +328,29 @@
   }
 
   function rerender() {
-    document.querySelectorAll('[data-ea-direct-panel]').forEach(node => { node.outerHTML = renderPanel(); });
+    document.querySelectorAll('[data-ea-direct-panel]').forEach(node => {
+      const details = node.querySelector?.('.ea-direct-settings');
+      if (details) settingsOpen = details.open;
+      // Background export notifications must not replace a button between
+      // pointer-down and click, or destroy the address being pasted into a form.
+      const input = node.querySelector?.('[name="redirectUrl"]');
+      const address = input?.value || '';
+      const focused = document.activeElement;
+      const name = node.contains?.(focused) ? focused?.name : null;
+      const start = focused?.selectionStart;
+      const end = focused?.selectionEnd;
+      node.outerHTML = renderPanel();
+      const replacement = document.querySelector?.('[data-ea-direct-panel]');
+      const nextDetails = replacement?.querySelector?.('.ea-direct-settings');
+      if (nextDetails) nextDetails.open = settingsOpen;
+      const nextInput = replacement?.querySelector?.('[name="redirectUrl"]');
+      if (nextInput) nextInput.value = address;
+      if (name && ['redirectUrl', 'sourceSeasonId', 'personaId', 'externalLeagueId'].includes(name)) {
+        const next = replacement?.querySelector?.(`[name="${name}"]`);
+        next?.focus?.({preventScroll: true});
+        if (typeof start === 'number') next?.setSelectionRange?.(start, end);
+      }
+    });
   }
 
   document.addEventListener('click', event => {
@@ -370,9 +411,17 @@
     if (form.dataset.eaForm === 'franchise') selectedLeagueId = String(event.target.value || '');
   });
 
-  window.addEventListener('franchisehq:permanent-export-updated', rerender);
+  window.addEventListener('franchisehq:permanent-export-updated', () => {
+    const panel = document.querySelector?.('[data-ea-direct-panel]');
+    if (panel?.querySelector?.('.ea-direct-settings[open], [data-ea-form]')) return;
+    rerender();
+  });
   window.addEventListener('franchisehq:league-tenant-changed', () => { resetContext(); rerender(); });
-  window.addEventListener('franchisehq:auth-changed', () => { resetContext(); rerender(); });
+  window.addEventListener('franchisehq:auth-changed', () => {
+    const next = currentAuthScope();
+    if (next && next === authScope) return;
+    resetContext(); rerender();
+  });
   if (!HQ?.defineModuleService) throw new Error('platform/core.js must load before ea-direct.js.');
   HQ.defineModuleService('platform', 'eaDirect', {renderPanel, refresh, collect, pollCollection}, {replace: true, alias: 'eaDirect'});
   HQ.manifest?.register?.({scope: 'module', module: 'platform', id: 'ea-direct', service: 'eaDirect', script: 'league-engine/ea-direct.js', version: VERSION, dependencies: ['auth', 'leagueTenant'], capabilities: ['commissioner-operated-ea-connection', 'private-collection-preview', 'tenant-scoped-ea-sync']});

@@ -58,6 +58,20 @@ export function proveCurrentSchedulePeriod(analyses=[]){
   const emptyKeys=new Set(clockStatistics.map(period=>period.key));
   let source='captured-statistics-period';
   let evidence=populated.length?populated:emptyKeys.size===1?clockStatistics:[];
+  // Companion's selected previous/current-week export contains a complete set
+  // of routes for both weeks, even when the new week has no played games yet.
+  // Recognize that bounded pair, without treating All Weeks placeholders or a
+  // stray empty route as the current week.
+  const periods=[...new Map(clockStatistics.map(p=>[p.key,p])).values()].sort(compareSchedulePeriods);
+  const required=['passing','rushing','receiving','defense','kicking','punting'];
+  const covered=period=>required.every(category=>clockStatistics.some(p=>p.key===period.key&&p.category===category))
+    &&analyses.some(a=>a.datasetType==='schedule'&&[a.period,...(a.periods||[])].some(p=>canonicalSchedulePeriod(p)?.key===period.key));
+  if(periods.length===2&&periods[0].stage===periods[1].stage&&periods[1].week===periods[0].week+1
+    &&periods.every(covered)&&populated.some(p=>p.key===periods[0].key)
+    &&clockStatistics.filter(p=>p.key===periods[1].key).every(p=>p.recordCount===0)){
+    evidence=clockStatistics.filter(p=>p.key===periods[1].key);
+    source='selected-previous-current-week-pair';
+  }
   if(!evidence.length&&clockStatistics.length&&populated.length===0){
     const opening=canonicalSchedulePeriod({stage:'regular-season',week:1});
     const scheduleKeys=new Set(analyses.filter(a=>a.datasetType==='schedule')

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "version": "8.0.23",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "productionDataChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 50,
+      "candidateRequiresMigration": true,
+      "productionApplied": false
+    },
+    "targeted": {
+      "passed": true,
+      "tests": 106,
+      "failures": 0
+    },
+    "previewBindings": {
+      "ai": true,
+      "scannerSecret": true,
+      "existingKeysPreserved": true
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 453,
+      "failures": 0
+    },
+    "visionSamples": {
+      "native": "Offensive Guru",
+      "phone": [
+        "Defensive Genius",
+        "Defensive Genius"
+      ],
+      "weeklyIcons": "deferred",
+      "liveDiscordPosts": 0
+    },
+    "stagingMigration": {
+      "applied": true,
+      "version": 50,
+      "bookmark": "00000035-00000000-000050f5-989a9b6830ee262d8c3817047dc61284",
+      "protectedCountsUnchanged": true,
+      "foreignKeyErrors": 0
+    },
+    "isolatedBrowser": {
+      "desktop": 1440,
+      "phone": 390,
+      "noOverflow": true,
+      "settingsOpenPreserved": true,
+      "disconnectRequests": 1,
+      "pageErrors": 0,
+      "usesLiveData": false
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "archiveSeasonExecuted": false,
+    "dataDeleted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false
+  }
+}

@@ -88,6 +88,19 @@ async function automaticScheduleDecision(db,leagueId,active){
   return decision;
 }
 
+async function canReconcileCurrent(db,leagueId,decision,active){
+  let manifest={};try{manifest=JSON.parse(active?.manifest_json||'{}');}catch{}
+  const period=snapshotCurrentPeriod(active,false);
+  if(!period||manifest.currentPeriodProof?.status!=='proven'
+    ||!(decision.reason==='initial-import'||decision.reason==='same-week'&&!decision.reviewRequired))return false;
+  const present=await db.prepare(`SELECT id FROM discord_schedule_threads WHERE league_id=?
+    AND season_year=? AND phase=? AND week_index=? AND status='active' LIMIT 1`)
+    .bind(leagueId,active.seasonYear,period.stage,period.week).first();
+  if(!present)return true;
+  return Boolean(await db.prepare(`SELECT id FROM discord_schedule_sync_runs WHERE league_id=?
+    AND snapshot_id=? AND status IN ('running','partial','failed') LIMIT 1`).bind(leagueId,active.id).first());
+}
+
 async function recoverableScheduleDecision(db,leagueId,active){
   const period=snapshotCurrentPeriod(active);
   const installation=await activeInstallation(db,leagueId);
@@ -253,7 +266,8 @@ export async function syncDiscordScheduleThreads(env,db,{
   if (snapshotId && String(active.id) !== String(snapshotId)) return {ok:false,skipped:true,reason:'snapshot-superseded'};
   const decision=await automaticScheduleDecision(db,league.id,active);
   const recoveryAllowed=source==='rollover-recovery'&&await recoverableScheduleDecision(db,league.id,active);
-  if(source==='candidate-import'&&!decision.allowed)return{ok:true,skipped:true,...decision};
+  const reconcileCurrent=await canReconcileCurrent(db,league.id,decision,active);
+  if(source==='candidate-import'&&!decision.allowed&&!reconcileCurrent)return{ok:true,skipped:true,...decision};
   if(source==='rollover-recovery'&&!recoveryAllowed)return{ok:false,skipped:true,reason:'rollover-recovery-proof-unavailable'};
   const targetWeek = Number(week ?? active.weekIndex);
   const targetPhase = canonicalDiscordSchedulePhase(phase??snapshotCurrentPeriod(active)?.stage);
@@ -372,7 +386,8 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     const results=await syncDiscordGameResults(context.env,db,{league,snapshotId,maxOperations:32});
     const active=await activeSnapshot(db,league.id);
     const decision=active&&await automaticScheduleDecision(db,league.id,active);
-    if(source==='candidate-import'&&!decision?.allowed&&effectiveSource!=='rollover-recovery')return results;
+    const reconcileCurrent=decision&&await canReconcileCurrent(db,league.id,decision,active);
+    if(source==='candidate-import'&&!decision?.allowed&&!reconcileCurrent&&effectiveSource!=='rollover-recovery')return results;
     return syncDiscordScheduleThreads(context.env,db,{
     league,snapshotId,week,channelId:installation.scheduleChannelId,requestedByUserId,source:effectiveSource
     });

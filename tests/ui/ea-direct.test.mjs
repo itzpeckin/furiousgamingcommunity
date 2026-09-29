@@ -77,6 +77,35 @@ const connected = (overrides = {}) => ({
 });
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
+test('one disconnect wins over an older background refresh', async () => {
+  const ui = harness();
+  ui.respond(async () => connected({previewVerified:true}));
+  await ui.service.refresh();
+  let resolveRefresh;
+  ui.respond(async (_path, options) => options.method === 'POST'
+    ? {ok:true,configured:true,status:'not-connected',connection:null,setup:null}
+    : new Promise(resolve => { resolveRefresh=resolve; }));
+  const pending=ui.service.refresh();
+  assert.doesNotMatch(ui.service.renderPanel(), /data-ea-action="disconnect" disabled/);
+  ui.click({eaAction:'disconnect'});
+  await settle();
+  resolveRefresh(connected({previewVerified:true}));
+  await pending;
+  assert.match(ui.service.renderPanel(), /EA account disconnected/);
+  assert.doesNotMatch(ui.service.renderPanel(), /Alpha franchise/);
+  assert.equal(ui.requests.filter(r=>r.options.body?.action==='disconnect').length,1);
+});
+
+test('server-confirmed existing season schedule permits collection after reconnect', async () => {
+  const ui=harness();
+  ui.respond(async()=>({...connected(),weeklyReady:true}));
+  await ui.service.refresh();
+  assert.doesNotMatch(ui.service.renderPanel(), /data-ea-collect="weekly" disabled/);
+  ui.respond(async()=>({id:'new-weekly',status:'running'}));
+  await ui.service.collect('weekly');
+  assert.equal(ui.requests.at(-1).options.body.mode,'weekly');
+});
+
 test('rendering EA Direct never starts sign-in or a collection', async () => {
   const ui = harness();
   ui.service.renderPanel();

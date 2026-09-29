@@ -52,7 +52,8 @@ export function safeEaError(error){
   if(error instanceof EaDirectError || error instanceof EaClientError){
     const diagnostic=safeEaClientDiagnostic(error);
     const detail=diagnostic ? ` Failed step: ${diagnostic.stepLabel}${diagnostic.httpStatus ? ` (EA HTTP ${diagnostic.httpStatus})` : ''}${diagnostic.providerCode ? `; ${diagnostic.providerCode}` : ''}.` : '';
-    return{code:error.code||'EA_UNAVAILABLE',message:error.message+detail,status:error.status===401?409:Math.min(499,Math.max(400,Number(error.status)||424)),retryable:Boolean(error.retryable),...(diagnostic?{diagnostic}:{})};
+    const guidance=error.code==='EA_RECONNECT_REQUIRED'?' Open Command Center → Madden Import → EA Direct, then select Reconnect EA Account to sign in again. Your imported schedule and league data remain available.':'';
+    return{code:error.code||'EA_UNAVAILABLE',message:error.message+detail+guidance,status:error.status===401?409:Math.min(499,Math.max(400,Number(error.status)||424)),retryable:Boolean(error.retryable),...(diagnostic?{diagnostic}:{})};
   }
   return{code:'EA_CONNECTION_FAILED',message:'EA Direct could not finish this step. Your live league data has not changed. Try again or reconnect your EA account.',status:424,retryable:true};
 }
@@ -67,6 +68,28 @@ export function eaErrorResponse(error){
 }
 export function publicConnection(row){return row?{id:row.id,platform:row.platform,personaName:row.persona_name,leagueName:row.external_league_name,externalLeagueId:row.external_league_id,lastSyncedAt:row.last_synced_at,previewVerified:Boolean(row.preview_verified)}:null;}
 export async function activeEaConnection(db,leagueId){return db.prepare(`SELECT * FROM ea_direct_connections WHERE league_id=? AND status!='disconnected' LIMIT 1`).bind(leagueId).first();}
+// Schedule readiness belongs to the prepared franchise season, not the lifetime
+// of an EA credential. The collector still verifies the fresh EA hub's period.
+export async function eaWeeklyReady(db,leagueId,connection){
+  if(connection?.status!=='connected')return false;
+  if(connection.preview_verified)return true;
+  const season=await db.prepare(`SELECT season.id,season.source_franchise_id,season.game_release,
+      COALESCE(destination.game_year_id,linked.game_year_id) game_year_id
+    FROM franchise_seasons season
+    LEFT JOIN companion_import_destinations destination ON destination.league_id=season.league_id
+      AND destination.franchise_season_id=season.id AND destination.status='active'
+    LEFT JOIN game_year_franchise_seasons linked ON linked.league_id=season.league_id AND linked.franchise_season_id=season.id
+    WHERE season.league_id=? AND season.status IN ('preview','active')
+    ORDER BY CASE season.status WHEN 'preview' THEN 0 ELSE 1 END,season.created_at DESC,season.rowid DESC LIMIT 1`)
+    .bind(leagueId).first();
+  if(!season||String(season.source_franchise_id)!==String(connection.external_league_id)
+    ||season.game_release!=='Madden NFL 27')return false;
+  return Boolean(await db.prepare(`SELECT schedule.id FROM yearly_schedule_imports schedule
+    JOIN league_game_years year ON year.id=schedule.game_year_id AND year.league_id=schedule.league_id
+    WHERE schedule.league_id=? AND schedule.franchise_season_id=? AND schedule.game_year_id=?
+      AND schedule.status='completed' AND schedule.captured_week_count=18 AND schedule.game_count=272
+      AND year.status IN ('active','restored','preparing') LIMIT 1`).bind(leagueId,season.id,season.game_year_id).first());
+}
 export function setupScope(row){return`ea-setup:${row.league_id}:${row.id}:${row.user_id}:${row.session_id}`;}
 export function connectionScope(row){return`ea-connection:${row.league_id}:${row.id}`;}
 export function jobScope(row){return`ea-job:${row.league_id}:${row.id}`;}

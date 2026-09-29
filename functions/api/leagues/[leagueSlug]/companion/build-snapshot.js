@@ -23,7 +23,7 @@ const LEGACY_BUILD_MODES=Object.freeze(['checkpointed-domain-v2']);
 const BUILD_PLAN_REVISION='retained-schedule-team-bridge-v2';
 const BUILD_DOMAINS=Object.freeze(['teams','players','games','statistics','standings']);
 const BUILD_RECORD_LIMIT=500;
-const BUILD_WRITE_BATCH_LIMIT=125;
+const BUILD_WRITE_BYTES=500000;
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results||[];
 
@@ -655,13 +655,24 @@ export async function onRequestPost(context){
       error:`The pending snapshot ${domain} cursor exceeds its immutable build plan.`,release:RELEASE},409);
     const requestLimit=Math.max(1,Math.min(BUILD_RECORD_LIMIT,Math.floor(Number(body?.limit)||BUILD_RECORD_LIMIT)));
     const pendingRecords=plan.records.slice(cursor,cursor+requestLimit);
-    for(let offset=0;offset<pendingRecords.length;offset+=BUILD_WRITE_BATCH_LIMIT){
-      const statements=pendingRecords.slice(offset,offset+BUILD_WRITE_BATCH_LIMIT).map(record=>db.prepare(`INSERT INTO league_snapshot_records
-        (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,?,?,?)
+    // One bounded SQL statement per payload replaces hundreds of serialized D1
+    // inserts. Keep the checkpoint cursor and replay-safe upsert contract intact.
+    let chunk=[],bytes=2;
+    const flush=async()=>{
+      if(!chunk.length)return;
+      await db.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json)
+        SELECT ?,?,?,json_extract(value,'$[0]'),json_extract(value,'$[1]') FROM json_each(?) WHERE 1
         ON CONFLICT(snapshot_id,domain,external_id) DO UPDATE SET data_json=excluded.data_json`)
-        .bind(snapshot.id,league.id,record.domain,record.externalId,JSON.stringify(record.item)));
-      if(statements.length)await db.batch(statements);
+        .bind(snapshot.id,league.id,domain,`[${chunk.join(',')}]`).run();
+      chunk=[];bytes=2;
+    };
+    for(const record of pendingRecords){
+      const encoded=JSON.stringify([record.externalId,record.item]);
+      const size=new TextEncoder().encode(encoded).byteLength+1;
+      if(bytes+size>BUILD_WRITE_BYTES)await flush();
+      chunk.push(encoded);bytes+=size;
     }
+    await flush();
     const storedCount=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
       WHERE snapshot_id=? AND league_id=? AND domain=?`).bind(snapshot.id,league.id,domain).first())?.count||0);
     const nextCursor=cursor+pendingRecords.length;

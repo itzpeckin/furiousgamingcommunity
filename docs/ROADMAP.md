@@ -10,7 +10,7 @@
 
 **Current production:** 8.0.20.
 
-**Current work:** 8.0.22 makes `/rush rule` audit all completed regular-season weeks in the current season by default, with complete statistics reads and paginated reports. Coaching screenshot compliance remains under development; supplied icon-only loadouts require a verified ability reference before automatic legality can be trusted.
+**Current work:** 8.0.23 coaching archetypes, import reliability, EA reconnect usability, scheduling initialization, and richer Discord games. Weekly loadout icons are deferred by the owner.
 
 **Next gate:** Complete strict quality, preview checks, production publication and desktop/mobile acceptance.
 
