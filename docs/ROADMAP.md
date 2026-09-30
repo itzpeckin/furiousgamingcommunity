@@ -8,9 +8,9 @@
 
 **Revision:** 3.11
 
-**Current production:** 8.1.0 (main ae8809ab730f7345eb8c758a0bc613ed2e6bcd10).
+**Current production:** 8.2.0 commissioner reliability and recovery (PR #174; immutable tag v8.2.0).
 
-**Current work:** 8.2.0 commissioner reliability and recovery, as redirected by the owner on September 30, 2026. Billing is deferred until the operating flow is dependable; no provider has been chosen or connected. Weekly loadout recognition remains deferred.
+**Current work:** Operating acceptance following 8.2.0 commissioner reliability and recovery, as redirected by the owner on September 30, 2026. Billing is deferred until the operating flow is dependable; no provider has been chosen or connected. Weekly loadout recognition remains deferred.
 
 **Next gate:** Complete strict quality, preview checks, production publication and desktop/mobile acceptance.
 
@@ -164,7 +164,7 @@ Before billing resumes, verify the real commissioner journey from invitation to 
 | 8.0.10 | Production; franchise lookup acceptance blocked | EA connection UI deployed; live profile discovery succeeded, then franchise lookup failed; no collection or import |
 | 8.0.11 | Deployed; EA acceptance pending | Separate initial/persona token formats, retain selections, expose only safe failed-step diagnostics, and support fresh sign-in recovery |
 | 8.1.0 | Production | Complete self-service league readiness from registration through first successful Madden import and team assignment |
-| 8.2.0 | In progress | Commissioner recovery for imports and Discord, safe background retries, accurate publication status, tenant switching, and visible coaching scan progress |
+| 8.2.0 | Production; external-provider operating acceptance remains | Commissioner recovery for imports and Discord, safe background retries, accurate publication status, tenant switching, and visible coaching scan progress |
 | 8.3.0 | Planned | Multi-league administration, quotas, support operations, capacity controls, and custom-domain automation |
 | 9.0.0 | Planned completion | Commercial self-service launch with end-to-end signup, payment, activation, first import, operations, recovery, and support acceptance |
 
