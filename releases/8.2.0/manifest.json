@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.2.0",
   "releaseType": "commissioner-reliability-and-recovery",
-  "status": "implementation-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.1.0",
@@ -14,23 +14,29 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending",
-    "pullRequests": []
+    "status": "merged",
+    "pullRequests": [
+      "https://github.com/itzpeckin/furiousgamingcommunity/pull/174"
+    ]
   },
   "staging": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending"
+    "deployed": true,
+    "status": "verified",
+    "deploymentId": "078216da-de96-4154-a043-c98625cbbb60"
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending",
+    "deployed": true,
+    "status": "verified-read-only",
     "currentRelease": "8.1.0",
     "candidateRelease": "8.2.0",
     "currentMigration": 51,
     "candidateMigration": 51,
-    "scope": "Safe import and scheduling recovery, correct publication status, commissioner recovery controls and tenant-scoped UI state."
+    "scope": "Safe import and scheduling recovery, correct publication status, commissioner recovery controls and tenant-scoped UI state.",
+    "deploymentId": "74c3b56c-9b4c-4e27-b020-5ab40df945b8",
+    "importWorkerVersion": "fd317855-8544-4b42-baa8-b2efa674b0a8",
+    "publishedCommit": "345142314ccdad66363d25da2e93a4383f49a223"
   },
   "requiredArtifacts": [
     "tests/operations/commissioner-recovery.test.mjs",

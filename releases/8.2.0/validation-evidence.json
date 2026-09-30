@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.2.0",
-  "status": "implementation-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {
@@ -58,6 +58,60 @@
       "snapshots": 79,
       "snapshotRecords": 699061,
       "foreignKeyErrors": 0
+    },
+    "ci": {
+      "passed": true,
+      "runId": 36766037633,
+      "commit": "32c482af0b6bfade72a73dbd14315f159239f588"
+    },
+    "hosted": {
+      "preview": {
+        "passed": true,
+        "checks": 17,
+        "url": "https://078216da.franchise-hq.pages.dev"
+      },
+      "production": {
+        "passed": true,
+        "checks": 17,
+        "url": "https://franchisehq.app"
+      }
+    },
+    "publicBrowser": {
+      "preview": true,
+      "production": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "pages": [
+        "account",
+        "register-league",
+        "auth"
+      ],
+      "noOverflow": true,
+      "pageErrors": 0,
+      "authenticated": false
+    },
+    "productionAfter": {
+      "leagues": 3,
+      "users": 38,
+      "memberships": 40,
+      "snapshots": 79,
+      "snapshotRecords": 699061,
+      "foreignKeyErrors": 0
+    },
+    "activeSnapshotsUnchanged": {
+      "FGC": "294ba53d-01cb-48a5-b764-88bd7e1c6d1e",
+      "OTL": "8e917ffb-2e17-4e9b-8561-d7b4c4df5dd3"
+    },
+    "importWorker": {
+      "version": "fd317855-8544-4b42-baa8-b2efa674b0a8",
+      "deployment": "92fa94e7-84f7-4971-bd69-024ef8627811",
+      "sourceVerified": true,
+      "workersDev": false,
+      "previewUrls": false,
+      "activeJobsAtDeployment": 0,
+      "liveImportExecuted": false
     }
   },
   "scopeBoundaries": {

@@ -14,11 +14,11 @@ No registered strict-gate exemptions. Actual account-email inbox confirmation an
 
 ## Validation evidence
 
-Nine focused recovery tests pass. Five Worker cases fail against 8.1.0 and pass with the repair. The real finalize handler retains atomic, idempotent publication when the scheduling service throws. Existing scheduling and coaching tests pass. Actual control rendering and action functions pass isolated desktop/phone acceptance at 1440px and 390px with one retry request per double click, queue visibility, no overflow and no JavaScript errors. The strict gate passed 478 tests and all lint, syntax, environment, asset, secret, migration, inventory and release checks. Isolated real-handler account/onboarding browser flows also passed at both widths. Hosted checks follow publication.
+Nine focused recovery tests pass. Five Worker cases fail against 8.1.0 and pass with the repair. The real finalize handler retains atomic, idempotent publication when the scheduling service throws. Existing scheduling and coaching tests pass. Actual control rendering and action functions pass isolated desktop/phone acceptance at 1440px and 390px with one retry request per double click, queue visibility, no overflow and no JavaScript errors. The strict gate passed 478 tests and all lint, syntax, environment, asset, secret, migration, inventory and release checks. Isolated real-handler account/onboarding browser flows also passed at both widths. CI 36766037633 passed. Seventeen hosted checks passed on both preview and production; fresh public account pages passed at 1440px and 390px. These checks do not claim authenticated production import or Discord delivery acceptance.
 
 ## Deployment status
 
-Candidate work only. Production deployment pending the required quality gates. No migration, billing setup, credential changes, live imports, Discord posts or thread deletions have been performed.
+PR #174 merged at main/tag v8.2.0 345142314ccdad66363d25da2e93a4383f49a223. Production Pages 74c3b56c-9b4c-4e27-b020-5ab40df945b8; preview 078216da-de96-4154-a043-c98625cbbb60. Import Worker fd317855-8544-4b42-baa8-b2efa674b0a8 deployed only after confirming zero active jobs; public Worker URLs remain disabled. Coaching and mail Workers remain unchanged. Migration 51 remains unchanged. Before/after production counts are 3 leagues, 38 users, 40 memberships, 79 snapshots and 699,061 snapshot records; both active snapshots are unchanged and foreign-key checks are clean. No billing setup, credential changes, live imports, Discord posts or thread deletions were performed.
 
 ## Rollback
 
