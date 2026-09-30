@@ -12,7 +12,7 @@ import {
 import {
   canonicalAuthenticationOrigin,
   discordRedirectUriForOrigin,
-  normalizeLeagueReturnTo
+  normalizeAccountReturnTo
 } from "../../../_lib/origin.js";
 import { resolveTenant } from "../../../_lib/tenant-context.js";
 
@@ -43,7 +43,7 @@ export async function onRequestGet(context) {
     const requestUrl = new URL(context.request.url);
     const loginOrigin = canonicalAuthenticationOrigin(requestUrl);
     const redirectUri = discordRedirectUriForOrigin(context.env, loginOrigin);
-    const safeReturnTo = normalizeLeagueReturnTo(requestUrl.searchParams.get("returnTo"));
+    const safeReturnTo = normalizeAccountReturnTo(requestUrl.searchParams.get("returnTo"));
     const returnMatch = safeReturnTo?.match(/^\/leagues\/([^/?#]+)(#[\s\S]+)?$/i) || null;
     let joinLeague = null;
     if (returnMatch) {
@@ -57,7 +57,7 @@ export async function onRequestGet(context) {
       joinLeagueSlug: joinLeague?.slug || null,
       returnTo: joinLeague
         ? `/leagues/${joinLeague.slug}${returnMatch?.[2] || ""}`
-        : null
+        : safeReturnTo
     });
     const stateId = `oauthctx.${oauthContext}.${crypto.randomUUID()}`;
     const expiresAt = addSecondsToNow(

@@ -13,6 +13,7 @@ const declaredBindings = new Set([
   ...(contract.pages?.legacyUnprovisionedBindings || []),
   ...(contract.importWorker?.bindings || []).map(binding => binding.name),
   ...(contract.importWorker?.secrets || []),
+  ...(contract.accountEmailWorker?.bindings || []).map(binding => binding.name),
   ...(contract.coachingScanner?.variables || []),
   ...(contract.coachingScanner?.secretNames || [])
 ]);

@@ -8,6 +8,7 @@ import {
   decodeOpaqueContext,
   encodeOpaqueContext,
   getCookie,
+  getCurrentSession,
   hashToken,
   issueBrowserSession,
   jsonResponse,
@@ -18,7 +19,7 @@ import {
   OWNER_FALLBACK_ORIGIN,
   canonicalAuthenticationOrigin,
   discordRedirectUriForOrigin,
-  normalizeLeagueReturnTo
+  normalizeAccountReturnTo
 } from "../../../_lib/origin.js";
 import { isOwnerFallbackIdentity } from "../../../_lib/owner-fallback.js";
 import { resolveTenant, resolveTenantById } from "../../../_lib/tenant-context.js";
@@ -32,6 +33,7 @@ import {
 import { ensureDiscordGlobalCommands, upsertDiscordGuildCommands } from "../../../_lib/discord-api.js";
 import { DISCORD_GLOBAL_COMMANDS, DISCORD_SCHEDULE_THREAD_COMMANDS } from "../../../_lib/discord-commands.js";
 import { scheduleActiveDiscordSync } from "../../../_lib/discord-schedule.js";
+import { finishDiscordLink } from "../../../_lib/account-discord-link.js";
 
 const RELEASE = "8.0.3";
 
@@ -156,6 +158,7 @@ export async function onRequestGet(context) {
     let joinLeagueSlug = null;
     let oauthReturnTo = null;
     let discordInstallContext = null;
+    let linkUserId = null;
     let sessionRecoveryMode = "standard";
     let loginOrigin = new URL(context.request.url).origin;
     let redirectUri = String(context.env.DISCORD_REDIRECT_URI || "").trim();
@@ -178,9 +181,16 @@ export async function onRequestGet(context) {
       const encoded = String(storedState.id).split(".")[1] || "";
       const oauthContext = decodeOpaqueContext(encoded);
       if (oauthContext) {
+        linkUserId = oauthContext.linkUserId || null;
+        if (linkUserId) {
+          const current = await getCurrentSession(context);
+          if (!stateCookieMatched || !current || current.user.id !== linkUserId) {
+            return jsonResponse({ ok:false,error:"Return to Account Settings in the browser where you signed in and connect Discord again." },403);
+          }
+        }
         joinLeagueId = oauthContext.joinLeagueId || null;
         joinLeagueSlug = oauthContext.joinLeagueSlug || null;
-        oauthReturnTo = normalizeLeagueReturnTo(oauthContext.returnTo);
+        oauthReturnTo = normalizeAccountReturnTo(oauthContext.returnTo);
         if (/^https:\/\//i.test(String(oauthContext.origin || ""))) {
           loginOrigin = canonicalAuthenticationOrigin(String(oauthContext.origin));
         }
@@ -276,6 +286,12 @@ export async function onRequestGet(context) {
     }
 
     const discordUser = await userResponse.json();
+
+    if (linkUserId) {
+      const linked = await finishDiscordLink(context.env.DB,{ userId:linkUserId,discordId:String(discordUser.id),stateId:storedState.id });
+      if (!linked) return jsonResponse({ ok:false,error:"This Discord identity is already linked to another account, or the connection request expired. Accounts cannot be merged automatically." },409);
+      return redirectResponse('/account',{ 'Set-Cookie':clearSecureCookie(AUTH_CONSTANTS.OAUTH_STATE_COOKIE_NAME) });
+    }
 
     if (discordInstallContext) {
       const user = await context.env.DB.prepare(`SELECT id,discord_user_id AS discordUserId,
@@ -433,7 +449,7 @@ export async function onRequestGet(context) {
     // A shared league URL creates an inactive/unassigned membership. We do NOT
     // write role='pending' because the production membership schema restricts
     // role to real league roles. Pending is a workflow state, not a permission.
-    let destination = "/leagues?auth=success";
+    let destination = ['/account','/register-league'].includes(oauthReturnTo) ? oauthReturnTo : "/leagues?auth=success";
     if (joinLeagueId || joinLeagueSlug) {
       try {
         const league = joinLeagueId

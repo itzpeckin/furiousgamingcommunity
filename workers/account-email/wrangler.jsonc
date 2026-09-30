@@ -1,0 +1,12 @@
+{
+  "name": "franchise-account-email",
+  "main": "index.mjs",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": false,
+  "preview_urls": false,
+  "send_email": [{
+    "name": "EMAIL",
+    "allowed_sender_addresses": ["accounts@franchisehq.app"]
+  }],
+  "observability": { "enabled": false }
+}

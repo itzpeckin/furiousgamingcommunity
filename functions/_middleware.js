@@ -15,6 +15,8 @@ const CSP_REPORT_ONLY = [
 ].join("; ");
 
 const AUTH_RATE_POLICIES = Object.freeze({
+  "/api/auth/account": { limit: 12, windowMs: 60 * 60 * 1000, bucket:"account-actions", useBinding:false },
+  "/api/beta-access": { limit: 20, windowMs: 60 * 60 * 1000, bucket:"beta-access", useBinding:false },
   "/api/auth/discord/login": { limit: 30, windowMs: 10 * 60 * 1000, bucket:"auth", useBinding:true },
   "/api/auth/email/login": { limit: 10, windowMs: 10 * 60 * 1000, bucket:"email-login", useBinding:false },
   "/api/auth/email/register": { limit: 5, windowMs: 60 * 60 * 1000, bucket:"email-register", useBinding:false },
@@ -47,6 +49,7 @@ export function operationalRouteTemplate(pathname) {
 }
 
 function ratePolicy(pathname, method) {
+  if (["/api/auth/account","/api/beta-access"].includes(pathname) && ["GET","HEAD","OPTIONS"].includes(String(method || 'GET').toUpperCase())) return null;
   if (AUTH_RATE_POLICIES[pathname]) return AUTH_RATE_POLICIES[pathname];
   if (["GET","HEAD","OPTIONS"].includes(String(method || 'GET').toUpperCase())) return null;
   return MUTATION_RATE_POLICIES.find(item => item.test(pathname))?.policy || null;

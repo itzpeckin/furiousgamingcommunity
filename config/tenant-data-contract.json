@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "8.0.10",
+  "release": "8.1.0",
   "resolution": {
     "source": "server",
     "requiresExplicitSlug": true,
@@ -23,7 +23,11 @@
     "session_security_events",
     "sessions",
     "user_stream_profiles",
-    "users"
+    "users",
+    "platform_beta_invitations",
+    "platform_beta_redemptions",
+    "account_action_tokens",
+    "account_email_throttles"
   ],
   "featurePolicy": {
     "unknownFeatureEnabled": false,
@@ -34,7 +38,13 @@
     "browserStorageAuthority": "ui-preferences-only"
   },
   "auditPolicy": {
-    "requiredContext": ["leagueId", "actorUserId", "requestId", "actionId", "action"]
+    "requiredContext": [
+      "leagueId",
+      "actorUserId",
+      "requestId",
+      "actionId",
+      "action"
+    ]
   },
   "production": {
     "enabledTenantCount": 1,

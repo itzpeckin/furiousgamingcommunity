@@ -276,6 +276,12 @@
   }
 
   function handleDocumentClick(event) {
+    if (event.target.closest('[data-account-settings]')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      window.location.assign('/account');
+      return;
+    }
     const loginButton = event.target.closest('[data-real-login]');
 
     if (loginButton) {

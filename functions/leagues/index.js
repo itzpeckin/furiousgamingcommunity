@@ -76,8 +76,8 @@ function page({ user, memberships, pendingMemberships = [], csrfToken = "", plat
         <div class="list">
           ${hasMemberships ? memberships.map((l) => leagueCard(l)).join("") : `<div class="empty"><strong>No active league access yet.</strong><br>Use the league URL your commissioner shared with you to request access.</div>`}
         </div>
-        <a class="create" href="/register-league">Register another league</a>
-        ${pendingMemberships.length ? `<div class="section-title" style="margin-top:28px"><h2>Pending Approval</h2><span>${pendingMemberships.length} waiting</span></div><div class="list">${pendingMemberships.map((l)=>`<a class="league-card" href="/leagues/${encodeURIComponent(l.slug)}"><div class="league-mark">FH</div><div class="league-copy"><div class="league-meta">Waiting for commissioner</div><h2>${esc(l.name)}</h2><p>Your Discord account is connected. Team and role assignment are still pending.</p></div><span class="role">Pending</span><span class="arrow">→</span></a>`).join("")}</div>` : ""}
+        <a class="create" href="/account">Account Settings</a><a class="create" href="/register-league">Register another league</a>
+        ${pendingMemberships.length ? `<div class="section-title" style="margin-top:28px"><h2>Pending Approval</h2><span>${pendingMemberships.length} waiting</span></div><div class="list">${pendingMemberships.map((l)=>`<a class="league-card" href="/leagues/${encodeURIComponent(l.slug)}"><div class="league-mark">FH</div><div class="league-copy"><div class="league-meta">Waiting for commissioner</div><h2>${esc(l.name)}</h2><p>Your account is connected. Team and role assignment are still pending.</p></div><span class="role">Pending</span><span class="arrow">→</span></a>`).join("")}</div>` : ""}
       </section>
     </main>
     <footer><span>Franchise HQ · Release ${RELEASE}</span><form method="post" action="/api/auth/logout"><input type="hidden" name="csrfToken" value="${esc(csrfToken)}"><button class="logout" type="submit">Log out</button></form></footer>
@@ -91,7 +91,7 @@ export async function onRequestGet(context) {
     let session = await getCurrentSession(context);
     if (!session) return redirectResponse("/?auth=required");
     if (isOwnerFallbackHost(new URL(context.request.url).hostname)) {
-      return redirectResponse("/api/auth/discord/login?returnTo=%2Fleagues");
+      return redirectResponse("/auth?returnTo=%2Fleagues");
     }
     if (session.kind === "browser") session = await rotateBrowserSession(context, session);
 

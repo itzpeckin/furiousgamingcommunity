@@ -65,7 +65,7 @@
     loaded = false;
     errorMessage = '';
     notice = '';
-    selectedPath = 'ea-direct';
+    selectedPath = HQ?.leagueTenant?.getCurrentLeague?.()?.preferredExportMethod === 'companion' ? 'companion' : 'ea-direct';
     seasonDraft = '';
     settingsOpen = false;
     actionRevision += 1;

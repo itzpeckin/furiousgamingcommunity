@@ -72,6 +72,12 @@
         "kind": "workers-ai",
         "logicalResource": "coachingVision",
         "required": false
+      },
+      {
+        "name": "ACCOUNT_EMAIL",
+        "kind": "service",
+        "logicalResource": "accountEmail",
+        "required": false
       }
     ],
     "variables": [
@@ -142,7 +148,8 @@
         "FRANCHISE_IMPORT_WORKER": "local:import-worker",
         "FRANCHISE_IMPORT_WORKFLOW": "local:import-workflow",
         "FRANCHISE_SCHEDULE_WORKFLOW": "local:schedule-workflow",
-        "FRANCHISE_EA_COLLECTION_WORKFLOW": "local:ea-collection-workflow"
+        "FRANCHISE_EA_COLLECTION_WORKFLOW": "local:ea-collection-workflow",
+        "ACCOUNT_EMAIL": "local:captured-account-email"
       },
       "variables": {
         "APP_ENV": "local",
@@ -218,7 +225,8 @@
         "FRANCHISE_IMPORT_WORKER": "cloudflare:production:import-worker",
         "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:production:import-workflow",
         "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:production:schedule-workflow",
-        "FRANCHISE_EA_COLLECTION_WORKFLOW": "cloudflare:production:ea-collection-workflow"
+        "FRANCHISE_EA_COLLECTION_WORKFLOW": "cloudflare:production:ea-collection-workflow",
+        "ACCOUNT_EMAIL": "franchise-account-email"
       },
       "variables": {
         "APP_ENV": "production",
@@ -254,6 +262,20 @@
     "perLeagueOptIn": true,
     "variables": [
       "FHQ_ORIGIN"
+    ]
+  },
+  "accountEmailWorker": {
+    "name": "franchise-account-email",
+    "publicUrls": false,
+    "previewSending": false,
+    "bindings": [
+      {
+        "name": "EMAIL",
+        "kind": "send_email",
+        "allowedSenderAddresses": [
+          "accounts@franchisehq.app"
+        ]
+      }
     ]
   }
 }

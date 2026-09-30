@@ -4,6 +4,7 @@ import {
   jsonResponse
 } from '../../../_lib/auth.js';
 import { requireDatabaseSchema } from '../../../_lib/database-schema.js';
+import { sendAccountAction } from '../../../_lib/account-actions.js';
 import {
   EMAIL_AUTH_RELEASE,
   createEmailCredential,
@@ -42,8 +43,11 @@ export async function onRequestPost(context) {
     });
     await context.env.DB.batch(creation.statements);
     const session = await issueBrowserSession(context,creation.userId,{ reason:'email-registration' });
+    const identity = await context.env.DB.prepare(`SELECT id,credential_version FROM user_auth_identities WHERE user_id=? AND provider='email'`).bind(creation.userId).first();
+    const verification = await sendAccountAction(context,{ userId:creation.userId,purpose:'verify-email',identity,email:registration.email }).catch(()=>({ sent:false }));
     return response({
       ok:true,authenticated:true,release:EMAIL_AUTH_RELEASE,
+      verificationSent:verification.sent,
       user:{ id:creation.userId,displayName:registration.displayName,email:registration.email,authProvider:'email' },
       next:'/register-league'
     },201,session);

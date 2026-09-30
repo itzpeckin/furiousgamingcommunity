@@ -1,6 +1,6 @@
 import { normalizeTenantSlug, validTenantSlug } from './tenant-context.js';
 
-export const PLATFORM_ONBOARDING_RELEASE = '8.0.9';
+export const PLATFORM_ONBOARDING_RELEASE = '8.1.0';
 export const PLATFORM_ONBOARDING_SCHEMA_VERSION = 2;
 
 export const ONBOARDING_FEATURE_KEYS = Object.freeze([
@@ -89,6 +89,8 @@ export function normalizeOnboardingInput(input = {}, fallbackUserId = '') {
     productName:text(input.productName || 'FranchiseHQ', 80) || 'FranchiseHQ',
     timezone:text(input.timezone || 'UTC', 100) || 'UTC',
     gameYear:Number(input.gameYear || new Date().getUTCFullYear()),
+    franchiseSeasonYear:input.franchiseSeasonYear == null ? null : Number(input.franchiseSeasonYear),
+    preferredExportMethod:input.preferredExportMethod === 'ea-direct' ? 'ea-direct' : 'companion',
     initialCommissionerUserId:text(input.initialCommissionerUserId || fallbackUserId, 128),
     sourceMode:text(input.sourceMode || 'companion', 40).toLowerCase(),
     desiredDomain:normalizeHostname(input.desiredDomain),
@@ -123,6 +125,9 @@ export function validateOnboardingInput(plan) {
   if (!SAFE_ID.test(plan.initialCommissionerUserId)) {
     errors.push('An existing FranchiseHQ user is required as the initial commissioner.');
   }
+  if (plan.franchiseSeasonYear != null && (!Number.isInteger(plan.franchiseSeasonYear) || plan.franchiseSeasonYear < 2000 || plan.franchiseSeasonYear > 2200)) {
+    errors.push('Current franchise season year must be between 2000 and 2200.');
+  }
   if (plan.sourceMode !== 'companion') {
     errors.push('Only the Madden Companion connection is currently available for onboarding.');
   }
@@ -153,6 +158,8 @@ function canonicalPlanDocument(plan) {
     productName:plan.productName,
     timezone:plan.timezone,
     gameYear:plan.gameYear,
+    franchiseSeasonYear:plan.franchiseSeasonYear,
+    preferredExportMethod:plan.preferredExportMethod,
     initialCommissionerUserId:plan.initialCommissionerUserId,
     sourceMode:plan.sourceMode,
     desiredDomain:plan.desiredDomain,
@@ -254,6 +261,8 @@ export function planFromRow(row) {
     productName:String(row.product_name || 'FranchiseHQ'),
     timezone:String(row.timezone || 'UTC'),
     gameYear:Number(row.game_year),
+    franchiseSeasonYear:configuration.franchiseSeasonYear == null ? null : Number(configuration.franchiseSeasonYear),
+    preferredExportMethod:configuration.preferredExportMethod === 'ea-direct' ? 'ea-direct' : 'companion',
     initialCommissionerUserId:String(row.initial_commissioner_user_id),
     initialCommissionerDisplayName:String(row.initial_commissioner_display_name || row.initial_commissioner_user_id),
     sourceMode:String(row.source_mode || 'companion'),
@@ -386,6 +395,8 @@ export function preparedLeagueStatements(db, plan, actorUserId) {
     },
     sourceMode:plan.sourceMode,
     gameYear:plan.gameYear,
+    franchiseSeasonYear:plan.franchiseSeasonYear,
+    preferredExportMethod:plan.preferredExportMethod,
     desiredDomain:plan.desiredDomain,
     discordRequested:plan.discord.requested,
     discordGuildId:plan.discord.guildId,
@@ -441,6 +452,8 @@ export function activatedLeagueStatements(db, plan, actorUserId, operationReques
     },
     sourceMode:plan.sourceMode,
     gameYear:plan.gameYear,
+    franchiseSeasonYear:plan.franchiseSeasonYear,
+    preferredExportMethod:plan.preferredExportMethod,
     desiredDomain:plan.desiredDomain,
     discordRequested:plan.discord.requested,
     discordGuildId:plan.discord.guildId,

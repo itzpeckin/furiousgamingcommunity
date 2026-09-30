@@ -2,9 +2,12 @@ import { jsonResponse } from '../_lib/auth.js';
 import { requireDatabaseSchema } from '../_lib/database-schema.js';
 import { requireAuthenticatedUser } from '../_lib/permissions.js';
 import { tenantDatabase } from '../_lib/tenant-context.js';
+import { accountReadiness,availableBetaInvitation } from '../_lib/beta-access.js';
+import { leagueReadiness } from '../_lib/league-readiness.js';
 import {
   DEFAULT_ONBOARDING_FEATURES,
   DEFAULT_ONBOARDING_LIMITS,
+  activatedLeagueStatements,
   PLATFORM_ONBOARDING_RELEASE,
   inspectOnboardingConflicts,
   loadOnboardingPlan,
@@ -22,6 +25,12 @@ const HEADERS = Object.freeze({ 'x-franchisehq-onboarding-release':PLATFORM_ONBO
 
 function json(body,status = 200) { return jsonResponse(body,status,HEADERS); }
 function changed(result) { return Number(result?.meta?.changes || 0); }
+
+async function readiness(db,plan) {
+  if (!plan.activatedAt) return onboardingReadiness(db,plan);
+  const league = await db.prepare('SELECT id,name,slug,tenant_status FROM leagues WHERE id=?').bind(plan.plannedLeagueId).first();
+  return leagueReadiness(db,league,plan.initialCommissionerUserId);
+}
 
 async function contextForUser(context) {
   const authorization = await requireAuthenticatedUser(context);
@@ -45,7 +54,7 @@ async function ownedPlans(db,userId) {
   const plans = [];
   for (const row of result?.results || []) {
     const plan = planFromRow(row);
-    plans.push({ ...plan,readiness:await onboardingReadiness(db,plan),
+    plans.push({ ...plan,readiness:await readiness(db,plan),
       leagueUrl:plan.activatedAt ? `/leagues/${encodeURIComponent(plan.slug)}` : null });
   }
   return plans;
@@ -62,6 +71,7 @@ function selfServiceCandidate(body,userId) {
   const supplied = body?.plan && typeof body.plan === 'object' ? body.plan : body || {};
   return normalizeOnboardingInput({
     name:supplied.name,slug:supplied.slug,timezone:supplied.timezone,gameYear:supplied.gameYear,
+    franchiseSeasonYear:supplied.franchiseSeasonYear,preferredExportMethod:supplied.preferredExportMethod,
     productName:'FranchiseHQ',sourceMode:'companion',initialCommissionerUserId:userId,
     desiredDomain:null,discord:{ requested:false,guildId:null },
     limits:DEFAULT_ONBOARDING_LIMITS,
@@ -112,7 +122,7 @@ async function prepareOwned(db,userId,operationRequestId,plan) {
   await onboardingEventStatement(db,{
     planId:plan.id,actorUserId:userId,action:'self-service.prepare.completed',
     fromStatus:'preparing',toStatus:'prepared',revision:nextRevision,
-    requestId:operationRequestId,detail:{ plannedLeagueId:plan.plannedLeagueId,activationRequiresPlatformOwner:true }
+    requestId:operationRequestId,detail:{ plannedLeagueId:plan.plannedLeagueId,activationRequiresBetaInvitation:true }
   }).run();
   return { ok:true,plan:await loadOnboardingPlan(db,plan.id) };
 }
@@ -121,6 +131,15 @@ async function submit(operation,body) {
   const candidate = selfServiceCandidate(body,operation.userId);
   const validation = validateOnboardingInput(candidate);
   if (!validation.ok) return json({ ok:false,error:'The league registration needs attention.',errors:validation.errors },422);
+  if (candidate.franchiseSeasonYear == null) return json({ ok:false,error:'Enter the current calendar year shown inside your Madden franchise.' },422);
+  const verified = await accountReadiness(operation.db,operation.userId);
+  if (!verified.verified) return json({ ok:false,error:'Verify your email in Account Settings before creating a league.',code:'ACCOUNT_VERIFICATION_REQUIRED' },403);
+  const replay = await operation.db.prepare(`SELECT id FROM platform_league_onboarding_plans
+    WHERE slug=? AND created_by_user_id=? AND initial_commissioner_user_id=?`)
+    .bind(candidate.slug,operation.userId,operation.userId).first();
+  if (replay) return finishRegistration(operation,await loadOnboardingPlan(operation.db,replay.id));
+  const invitation = await availableBetaInvitation(operation.db,operation.userId);
+  if (!invitation) return json({ ok:false,error:'An invitation is required to create a league during the beta.',code:'BETA_INVITATION_REQUIRED' },403);
   const open = await operation.db.prepare(`SELECT COUNT(*) count FROM platform_league_onboarding_plans
     WHERE created_by_user_id=? AND activated_at IS NULL AND status<>'cancelled'`).bind(operation.userId).first();
   if (Number(open?.count || 0) >= 3) {
@@ -138,13 +157,18 @@ async function submit(operation,body) {
          initial_commissioner_user_id,source_mode,desired_domain,discord_requested,
          discord_guild_id,branding_json,desired_features_json,configuration_json,
          plan_hash,status,revision,created_by_user_id,updated_by_user_id)
-        VALUES (?,?,?,?,?,?,?,?,? ,NULL,0,NULL,?,?,?,?,'draft',1,?,?)`).bind(
+        SELECT ?,?,?,?,?,?,?,?,? ,NULL,0,NULL,?,?,?,?,'draft',1,?,?
+        WHERE EXISTS (SELECT 1 FROM platform_beta_invitations WHERE id=? AND claimed_by_user_id=?
+          AND plan_id IS NULL AND revoked_at IS NULL AND datetime(expires_at)>CURRENT_TIMESTAMP)`).bind(
         id,plannedLeagueId,candidate.slug,candidate.name,candidate.productName,
         candidate.timezone,candidate.gameYear,operation.userId,candidate.sourceMode,
         JSON.stringify(candidate.branding),JSON.stringify(candidate.desiredFeatures),
-        JSON.stringify({ activationAvailable:false,activationRequiresPlatformOwner:true,limits:candidate.limits }),
-        planHash,operation.userId,operation.userId
+        JSON.stringify({ betaInvitationRequired:true,franchiseSeasonYear:candidate.franchiseSeasonYear,
+          preferredExportMethod:candidate.preferredExportMethod,limits:candidate.limits }),
+        planHash,operation.userId,operation.userId,invitation.id,operation.userId
       ),
+      operation.db.prepare(`UPDATE platform_beta_invitations SET plan_id=? WHERE id=? AND plan_id IS NULL`)
+        .bind(id,invitation.id),
       onboardingEventStatement(operation.db,{
         planId:id,actorUserId:operation.userId,action:'self-service.plan.created',
         toStatus:'draft',revision:1,requestId:operation.requestId,
@@ -157,13 +181,41 @@ async function submit(operation,body) {
     }
     throw error;
   }
-  const preparation = await prepareOwned(operation.db,operation.userId,operation.requestId,await loadOnboardingPlan(operation.db,id));
+  return finishRegistration(operation,await loadOnboardingPlan(operation.db,id),true);
+}
+
+async function finishRegistration(operation,original,created = false) {
+  const preparation = await prepareOwned(operation.db,operation.userId,operation.requestId,original);
   if (!preparation.ok) return json(preparation,preparation.status || 409);
-  const plan = preparation.plan;
+  let plan = preparation.plan;
+  if (!plan.activatedAt) {
+    if (!(await accountReadiness(operation.db,operation.userId)).verified) return json({ ok:false,error:'Verify your email in Account Settings first.' },403);
+    const invitation = await availableBetaInvitation(operation.db,operation.userId,plan.id);
+    if (!invitation) return json({ ok:false,error:'A valid beta invitation is required to activate this league.' },403);
+    try {
+      await operation.db.batch([
+        operation.db.prepare(`UPDATE platform_beta_invitations SET plan_id=NULL WHERE plan_id=? AND id<>?
+          AND (revoked_at IS NOT NULL OR datetime(expires_at)<=CURRENT_TIMESTAMP)
+          AND NOT EXISTS (SELECT 1 FROM platform_beta_redemptions WHERE plan_id=?)`)
+          .bind(plan.id,invitation.id,plan.id),
+        operation.db.prepare(`UPDATE platform_beta_invitations SET plan_id=? WHERE id=? AND (plan_id IS NULL OR plan_id=?)`)
+          .bind(plan.id,invitation.id,plan.id),
+        operation.db.prepare(`INSERT INTO platform_beta_redemptions(invitation_id,plan_id,user_id)
+          VALUES ((SELECT id FROM platform_beta_invitations WHERE id=? AND plan_id=? AND claimed_by_user_id=?
+            AND revoked_at IS NULL AND datetime(expires_at)>CURRENT_TIMESTAMP),?,?)`)
+          .bind(invitation.id,plan.id,operation.userId,plan.id,operation.userId),
+        ...activatedLeagueStatements(operation.db,plan,operation.userId,operation.requestId)
+      ]);
+    } catch (error) {
+      const latest = await loadOnboardingPlan(operation.db,plan.id);
+      if (!latest?.activatedAt) throw error;
+    }
+    plan = await loadOnboardingPlan(operation.db,plan.id);
+  }
   return json({
-    ok:true,created:true,release:PLATFORM_ONBOARDING_RELEASE,
-    plan:{ ...plan,readiness:await onboardingReadiness(operation.db,plan) }
-  },201);
+    ok:true,created,release:PLATFORM_ONBOARDING_RELEASE,
+    plan:{ ...plan,leagueUrl:`/leagues/${encodeURIComponent(plan.slug)}`,readiness:await readiness(operation.db,plan) }
+  },created ? 201 : 200);
 }
 
 export async function onRequestGet(context) {
@@ -184,9 +236,7 @@ export async function onRequestPost(context) {
     if (action === 'resume') {
       const plan = await ownedPlan(operation.db,operation.userId,body.planId);
       if (!plan) return json({ ok:false,error:'League registration not found.' },404);
-      const preparation = await prepareOwned(operation.db,operation.userId,operation.requestId,plan);
-      if (!preparation.ok) return json(preparation,preparation.status || 409);
-      return json({ ok:true,plan:{ ...preparation.plan,readiness:await onboardingReadiness(operation.db,preparation.plan) } });
+      return finishRegistration(operation,plan);
     }
     return json({ ok:false,error:'Unsupported league registration action.' },400);
   } catch (error) {

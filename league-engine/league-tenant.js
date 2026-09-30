@@ -22,6 +22,7 @@
       name:String(input.name || slug).trim(),
       status:input.status || 'resolving',
       timezone:input.timezone || 'UTC',
+      preferredExportMethod:input.preferredExportMethod || null,
       branding:freeze({...input.branding}),
       features:freeze({...input.features}),
       domains:freeze(Array.isArray(input.domains) ? input.domains.map(item=>freeze({...item})) : []),

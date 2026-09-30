@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
   const email = normalizeEmail(body?.email);
   const password = String(body?.password || '');
   const identity = email && password ? await context.env.DB.prepare(`SELECT
-      identity.user_id,identity.password_hash,identity.password_salt,identity.password_iterations,
+      identity.user_id,identity.id,identity.credential_version,identity.password_hash,identity.password_salt,identity.password_iterations,
       users.display_name
     FROM user_auth_identities identity
     INNER JOIN users ON users.id=identity.user_id
@@ -46,6 +46,11 @@ export async function onRequestPost(context) {
   if (!valid) return response({ ok:false,error:'The email address or password is incorrect.' },401);
   try {
     const session = await issueBrowserSession(context,identity.user_id,{ reason:'email-login' });
+    const current = await context.env.DB.prepare('SELECT credential_version FROM user_auth_identities WHERE id=?').bind(identity.id).first();
+    if (!current || Number(current.credential_version) !== Number(identity.credential_version)) {
+      await context.env.DB.prepare("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP,revocation_reason='credential-changed' WHERE id=?").bind(session.sessionId).run();
+      return response({ ok:false,error:'Your password changed. Sign in again with the new password.' },401);
+    }
     await context.env.DB.batch([
       context.env.DB.prepare(`UPDATE user_auth_identities
         SET last_authenticated_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
