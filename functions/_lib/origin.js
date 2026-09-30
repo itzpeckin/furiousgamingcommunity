@@ -54,6 +54,12 @@ export function normalizeLeagueReturnTo(value) {
   return `/leagues/${match[1]}${match[2] || ""}`;
 }
 
+export function normalizeAccountReturnTo(value) {
+  const raw = String(value || '');
+  if (['/account','/register-league','/leagues'].includes(raw)) return raw;
+  return normalizeLeagueReturnTo(raw);
+}
+
 export function canonicalDocumentRedirect(request) {
   const method = String(request.method || "GET").toUpperCase();
   if (method !== "GET" && method !== "HEAD") return null;

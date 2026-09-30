@@ -1,4 +1,5 @@
-import { getCurrentSession, redirectResponse } from '../_lib/auth.js';
+import { getCurrentSession, redirectResponse, appendClearedBrowserSessionCookies } from '../_lib/auth.js';
+import { normalizeAccountReturnTo } from '../_lib/origin.js';
 
 const RELEASE = '8.0.3';
 
@@ -9,8 +10,7 @@ function escapeHtml(value) {
 }
 
 function safeReturnTo(value,fallback = '/leagues') {
-  const target = String(value || fallback);
-  return target.startsWith('/') && !target.startsWith('//') ? target : fallback;
+  return normalizeAccountReturnTo(value) || fallback;
 }
 
 function page({ mode,returnTo }) {
@@ -26,7 +26,7 @@ function page({ mode,returnTo }) {
     <label class="field"><span>Email address</span><input type="email" name="email" autocomplete="email" maxlength="254" required></label>
     <label class="field"><span>Password</span><input type="password" name="password" autocomplete="${register ? 'new-password' : 'current-password'}" minlength="12" maxlength="128" required></label>
     <button class="button" type="submit">${register ? 'Create account' : 'Sign in'}</button><div class="notice" role="alert" data-auth-error></div>
-  </form><div class="divider">OR</div><a class="discord" href="/api/auth/discord/login?returnTo=${encodedReturn}${register ? '&intent=create-league' : ''}">Continue with Discord</a><p class="fine">Your league login is separate from any optional Discord server connection.</p></section><a class="back" href="/">← Back to FranchiseHQ</a></main>
+  </form><a class="back" href="/account?mode=reset">Forgot password?</a><div class="divider">OR</div><a class="discord" href="/api/auth/discord/login?returnTo=${encodedReturn}${register ? '&intent=create-league' : ''}">Continue with Discord</a><p class="fine">Your league login is separate from any optional Discord server connection.</p></section><a class="back" href="/">← Back to FranchiseHQ</a></main>
   <script>
   (()=>{const form=document.querySelector('[data-auth-form]'),error=document.querySelector('[data-auth-error]'),returnTo=${JSON.stringify(returnTo)};const csrf=()=>{const item=document.cookie.split(';').map(v=>v.trim()).find(v=>v.startsWith('franchise_hq_csrf='));return item?decodeURIComponent(item.slice(item.indexOf('=')+1)):''};form.addEventListener('submit',async event=>{event.preventDefault();if(!form.reportValidity())return;const button=form.querySelector('button');button.disabled=true;error.textContent='';const data=Object.fromEntries(new FormData(form));try{const token=csrf();const response=await fetch('/api/auth/email/'+form.dataset.mode,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json',accept:'application/json',...(token?{'x-franchisehq-csrf':token}:{})},body:JSON.stringify(data)});const payload=await response.json().catch(()=>({}));if(!response.ok||!payload.ok)throw new Error((payload.errors||[]).join(' ')||payload.error||'The account request could not be completed.');location.assign(returnTo)}catch(reason){error.textContent=reason.message}finally{button.disabled=false}})})();
   </script></body></html>`;
@@ -38,8 +38,10 @@ export async function onRequestGet(context) {
   const session = await getCurrentSession(context).catch(() => null);
   if (session) return redirectResponse(returnTo);
   const mode = url.searchParams.get('mode') === 'register' ? 'register' : 'login';
-  return new Response(page({ mode,returnTo }),{ status:200,headers:{
+  const headers=new Headers({
     'content-type':'text/html; charset=utf-8','cache-control':'no-store',
     'x-franchisehq-release':RELEASE,'x-franchisehq-surface':'provider-authentication'
-  }});
+  });
+  appendClearedBrowserSessionCookies(headers);
+  return new Response(page({ mode,returnTo }),{ status:200,headers });
 }

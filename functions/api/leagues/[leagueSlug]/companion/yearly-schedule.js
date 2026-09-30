@@ -143,6 +143,7 @@ async function firstSeasonPreparation(db,leagueId) {
     requiresCommissionerConfirmation:status==='confirmation-required',
     onboardingPlanId:plan?.id||null,
     gameYear:release?.gameYear||null,
+    franchiseSeasonYear:parse(plan?.configuration_json,{}).franchiseSeasonYear||release?.gameYear||null,
     gameRelease:release?.gameRelease||null,
     sourceFranchiseId:oneFranchise,
     observedSourceFranchiseIds:evidence.sourceFranchiseIds,
@@ -186,7 +187,9 @@ async function prepareFirstSeason(current,body) {
     current.league.id,SOURCE_SYSTEM,sourceFranchiseId,sourceSeasonId
   ]);
   const destinationId=await stableId('import_destination',[current.league.id,seasonId]);
-  const displayName=`${current.league.name} ${release.gameYear}`;
+  const seasonYear=Number(preparation.franchiseSeasonYear);
+  if(!Number.isInteger(seasonYear)||seasonYear<2000||seasonYear>2200)return json({ok:false,error:'Confirm the franchise season calendar year in your league setup.'},409);
+  const displayName=`${current.league.name} ${seasonYear}`;
   const sessionId=preparation.retainedExport?.sessionId||null;
   const auditId=`tenant_audit_${crypto.randomUUID()}`;
   const statements=[
@@ -199,7 +202,7 @@ async function prepareFirstSeason(current,body) {
       (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
       VALUES (?,?,?,?,?,?,?,?,'preview')`).bind(
         seasonId,current.league.id,SOURCE_SYSTEM,sourceFranchiseId,sourceSeasonId,
-        release.gameRelease,displayName,release.gameYear
+        release.gameRelease,displayName,seasonYear
       ),
     current.db.prepare(`INSERT OR IGNORE INTO game_year_franchise_seasons
       (game_year_id,league_id,franchise_season_id) VALUES (?,?,?)`).bind(

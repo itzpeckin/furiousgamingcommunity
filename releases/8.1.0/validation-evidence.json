@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "version": "8.1.0",
+  "status": "implementation-authorized",
+  "productionChanged": true,
+  "productionApplicationChanged": false,
+  "productionDataChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 51,
+      "candidateRequiresMigration": true,
+      "productionApplied": false
+    },
+    "regression": {
+      "passed": true,
+      "tests": 466,
+      "failures": 0,
+      "stage": "before additional browser-recovery regression"
+    },
+    "isolatedBrowser": {
+      "desktop": 1440,
+      "phone": 390,
+      "registration": true,
+      "verification": true,
+      "invitationClaim": true,
+      "activation": true,
+      "passwordResetAndLogin": true,
+      "noOverflow": true,
+      "pageErrors": 0,
+      "usesLiveData": false,
+      "ownerInvitationCreateRevoke": true
+    },
+    "emailInfrastructure": {
+      "authorized": true,
+      "sender": "accounts@franchisehq.app",
+      "domainStatus": "ready",
+      "previewsEnabled": false,
+      "providerDeliveredTest": true,
+      "testCount": 1,
+      "recipientInboxConfirmed": false,
+      "workerVersion": "e4ead0bf-3c08-451f-a56f-d4d5a9b35552",
+      "workerPublicUrls": false,
+      "productionServiceBinding": true
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 465,
+      "failures": 0
+    },
+    "targeted": {
+      "passed": true,
+      "tests": 22,
+      "failures": 0
+    },
+    "stagingMigration": {
+      "applied": true,
+      "version": 51,
+      "bookmark": "00000037-00000000-000050f6-d653b41a8258cafc8e113189536f5fc3",
+      "protectedCountsUnchanged": true,
+      "foreignKeyErrors": 0
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "archiveSeasonExecuted": false,
+    "dataDeleted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false
+  }
+}

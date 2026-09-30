@@ -83,7 +83,14 @@ if (isAtLeast(7, 1)) {
 } else if (evidence.checks?.strictMigration?.expectedFailure !== true || evidence.checks?.strictMigration?.passed !== false) {
   errors.push('Pre-7.1.0 validation evidence must preserve the expected strict migration failure.');
 }
-if (!isPostDeployment && (evidence.productionChanged !== false || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
+// 8.1 explicitly authorizes sender-domain provisioning before the application release.
+// Preserve that disclosure while keeping application/data/credential changes gated.
+const authorizedEmailPreparation = version === '8.1.0'
+  && evidence.productionChanged === true && evidence.productionApplicationChanged === false
+  && evidence.checks?.emailInfrastructure?.authorized === true
+  && evidence.checks.emailInfrastructure.sender === 'accounts@franchisehq.app'
+  && evidence.checks.emailInfrastructure.testCount === 1;
+if (!isPostDeployment && ((!authorizedEmailPreparation && evidence.productionChanged !== false) || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
   errors.push(`${version} evidence must accurately preserve unchanged production, data, and credentials during candidate work.`);
 }
 if (isPostDeployment && (

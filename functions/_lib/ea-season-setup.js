@@ -10,12 +10,14 @@ const safeSource = value => /^[A-Za-z0-9._:-]{1,80}$/.test(String(value ?? ''));
 export async function prepareEaFirstSeason({db,league,hub,externalLeagueId,actorId,confirmedSourceSeasonId}) {
   const existing = await db.prepare(`SELECT id FROM franchise_seasons WHERE league_id=? LIMIT 1`).bind(league.id).first();
   if (existing) return;
-  const plan = await db.prepare(`SELECT game_year FROM platform_league_onboarding_plans
+  const plan = await db.prepare(`SELECT game_year,configuration_json FROM platform_league_onboarding_plans
     WHERE planned_league_id=? AND status='prepared' AND activated_at IS NOT NULL
     ORDER BY activated_at DESC,updated_at DESC LIMIT 1`).bind(league.id).first();
   const release = normalizeGameRelease(`Madden NFL ${Number(plan?.game_year)%100}`);
   if (!plan || !release.ok || release.gameRelease !== hub.gameRelease) fail('The connected Madden edition does not match this league’s saved setup.');
   if (!Number.isInteger(hub.seasonYear) || hub.seasonYear < 2000 || hub.seasonYear > 2200) fail('EA must identify the calendar year before preparing this season.');
+  const plannedSeasonYear = JSON.parse(plan.configuration_json || '{}').franchiseSeasonYear;
+  if (plannedSeasonYear != null && Number(plannedSeasonYear) !== hub.seasonYear) fail('EA reports a different franchise calendar year than your league setup. Check that you selected the correct franchise.');
   const sourceSeasonId = String(hub.sourceSeasonId || confirmedSourceSeasonId || '');
   if (!safeSource(sourceSeasonId)) fail('Enter and confirm the Madden franchise season number in Step 2, then import the season schedule.');
   if (hub.sourceSeasonId && confirmedSourceSeasonId && String(confirmedSourceSeasonId) !== hub.sourceSeasonId) fail('The confirmed season number does not match EA.');

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "8.0.23",
+  "release": "8.1.0",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 50,
+  "currentVersion": 51,
   "requiredTables": [
     "ea_direct_connections",
     "ea_direct_setups",
@@ -139,7 +139,11 @@
     "yearly_schedule_import_captures",
     "discord_game_results",
     "discord_coaching_settings",
-    "discord_coaching_submissions"
+    "discord_coaching_submissions",
+    "platform_beta_invitations",
+    "platform_beta_redemptions",
+    "account_action_tokens",
+    "account_email_throttles"
   ],
   "requiredCoreColumns": {
     "league_player_ownership": [
@@ -1086,6 +1090,35 @@
       "object_count",
       "confirmation_scope",
       "removed_by_user_id"
+    ],
+    "platform_beta_invitations": [
+      "id",
+      "token_hash",
+      "claimed_by_user_id",
+      "expires_at",
+      "revoked_at",
+      "plan_id"
+    ],
+    "platform_beta_redemptions": [
+      "invitation_id",
+      "plan_id",
+      "user_id"
+    ],
+    "account_action_tokens": [
+      "id",
+      "user_id",
+      "purpose",
+      "token_hash",
+      "credential_version",
+      "consumption_id",
+      "expires_at",
+      "used_at",
+      "delivery_status"
+    ],
+    "account_email_throttles": [
+      "address_hash",
+      "window_start",
+      "attempts"
     ]
   }
 }

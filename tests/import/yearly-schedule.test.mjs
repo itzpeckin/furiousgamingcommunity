@@ -550,3 +550,16 @@ test('one All Weeks schedule payload provides complete 18-week coverage without 
   const selected=selectYearlyScheduleGames(result.games,[]),coverage=yearlyScheduleCoverage(selected);
   assert.equal(selected.length,272);assert.equal(coverage.capturedWeekCount,18);assert.deepEqual(coverage.missingWeeks,[]);
 });
+
+
+test('first season uses the chosen franchise calendar year independently of Madden edition',async()=>{
+  const {sqlite,objects,context}=await fixture({includeSeason:false});
+  try {
+    seedFirstSeasonExport(sqlite,objects);
+    sqlite.exec(`UPDATE platform_league_onboarding_plans SET configuration_json='{"franchiseSeasonYear":2031}' WHERE id='plan-1'`);
+    const response=await updateYearlySchedule(context({action:'prepare-first-season',sourceFranchiseId:'9001',sourceSeasonId:'5',confirmSourceSeason:true}));
+    const payload=await response.json();assert.equal(response.status,201,JSON.stringify(payload));
+    assert.equal(payload.preparedSeason.seasonYear,2031);
+    assert.equal(sqlite.prepare('SELECT game_release,season_year FROM franchise_seasons WHERE league_id=?').get('league-1').game_release,'Madden NFL 27');
+  }finally{sqlite.close();}
+});

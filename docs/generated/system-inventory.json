@@ -11,6 +11,11 @@
     }
   },
   "environmentBindings": {
+    "ACCOUNT_EMAIL": [
+      "functions/_lib/account-actions.js",
+      "functions/api/auth/account.js",
+      "functions/api/health.js"
+    ],
     "AI": [
       "functions/_lib/coaching-images.js",
       "functions/_lib/discord-coaching.js",
@@ -72,10 +77,13 @@
       "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
     ],
     "DB": [
+      "functions/_lib/account-actions.js",
+      "functions/_lib/account-discord-link.js",
       "functions/_lib/auth.js",
       "functions/_lib/permissions.js",
       "functions/_lib/tenant-context.js",
       "functions/_middleware.js",
+      "functions/api/auth/account.js",
       "functions/api/auth/discord/callback.js",
       "functions/api/auth/discord/login.js",
       "functions/api/auth/email/login.js",
@@ -99,6 +107,7 @@
       "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
     "DISCORD_CLIENT_ID": [
+      "functions/_lib/account-discord-link.js",
       "functions/_lib/discord-api.js",
       "functions/_lib/discord-installation.js",
       "functions/_lib/discord-security.js",
@@ -155,6 +164,9 @@
       "functions/api/leagues/[leagueSlug]/ea-direct/exchange-code.js",
       "functions/api/leagues/[leagueSlug]/ea-direct/exchange-status.js"
     ],
+    "EMAIL": [
+      "workers/account-email/index.mjs"
+    ],
     "FHQ_ORIGIN": [
       "workers/franchise-coaching-scanner/src/index.js"
     ],
@@ -206,16 +218,16 @@
   "files": {
     "byExtension": {
       ".bin": 1,
-      ".css": 12,
+      ".css": 13,
       ".example": 1,
       ".html": 9,
-      ".js": 261,
+      ".js": 277,
       ".json": 7,
-      ".jsonc": 2,
+      ".jsonc": 3,
       ".md": 285,
-      ".mjs": 61,
+      ".mjs": 62,
       ".png": 3,
-      ".sql": 52,
+      ".sql": 53,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -223,7 +235,7 @@
     },
     "largest": [
       {
-        "bytes": 656103,
+        "bytes": 656101,
         "file": "app.js"
       },
       {
@@ -235,7 +247,7 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 193303,
+        "bytes": 193856,
         "file": "tools/check-release.mjs"
       },
       {
@@ -259,7 +271,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77353,
+        "bytes": 77290,
         "file": "index.html"
       },
       {
@@ -303,7 +315,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 701
+    "total": 721
   },
   "frontend": {
     "assets": [
@@ -813,7 +825,7 @@
     "stylesheetCount": 3
   },
   "functions": {
-    "routeCount": 92,
+    "routeCount": 99,
     "routes": [
       {
         "file": "functions/index.js",
@@ -821,6 +833,21 @@
           "onRequestGet"
         ],
         "route": "/"
+      },
+      {
+        "file": "functions/account/index.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/account"
+      },
+      {
+        "file": "functions/api/auth/account.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/auth/account"
       },
       {
         "file": "functions/api/auth/discord/callback.js",
@@ -872,6 +899,14 @@
           "onRequestPost"
         ],
         "route": "/api/auth/session/claim"
+      },
+      {
+        "file": "functions/api/beta-access.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/beta-access"
       },
       {
         "file": "functions/api/discord/game-card.js",
@@ -1331,6 +1366,13 @@
         "route": "/api/leagues/:leagueSlug/game-year-transition"
       },
       {
+        "file": "functions/api/leagues/[leagueSlug]/join.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/leagues/:leagueSlug/join"
+      },
+      {
         "file": "functions/api/leagues/[leagueSlug]/memberships.js",
         "handlers": [
           "onRequestDelete",
@@ -1368,6 +1410,13 @@
           "onRequestGet"
         ],
         "route": "/api/leagues/:leagueSlug/players/free-agents"
+      },
+      {
+        "file": "functions/api/leagues/[leagueSlug]/readiness.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/readiness"
       },
       {
         "file": "functions/api/leagues/[leagueSlug]/reset-data.js",
@@ -1457,6 +1506,14 @@
         "route": "/api/onboarding"
       },
       {
+        "file": "functions/api/platform/beta-invitations.js",
+        "handlers": [
+          "onRequestGet",
+          "onRequestPost"
+        ],
+        "route": "/api/platform/beta-invitations"
+      },
+      {
         "file": "functions/api/platform/onboarding.js",
         "handlers": [
           "onRequestGet",
@@ -1498,6 +1555,13 @@
           "onRequest"
         ],
         "route": "/platform-admin/*path"
+      },
+      {
+        "file": "functions/platform/invitations.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/platform/invitations"
       },
       {
         "file": "functions/register-league/index.js",
@@ -1556,6 +1620,7 @@
       "files": [
         "FHQ-6126-index.html",
         "app.js",
+        "assets/league-registration.js",
         "auth-client.js",
         "index.html",
         "league-engine/companion-player-mapper.js",
@@ -1573,7 +1638,7 @@
         "platform/store.js",
         "trade-module.js"
       ],
-      "occurrences": 63
+      "occurrences": 66
     },
     "hardCodedFgc": {
       "files": [
@@ -1803,10 +1868,16 @@
       "recordsLedger": true,
       "sha256": "d53c2cf88ed240dfbfcc01bd48a37887e60ad92e05e51b2b4dd570cbb240e27e",
       "version": "0050"
+    },
+    {
+      "file": "migrations/0051_self_service_account_readiness.sql",
+      "recordsLedger": true,
+      "sha256": "a9ac0a898b9b798c880481b65c38aba13e829fac15e4a067c95dd1902a117c63",
+      "version": "0051"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.0.23",
+  "release": "8.1.0",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

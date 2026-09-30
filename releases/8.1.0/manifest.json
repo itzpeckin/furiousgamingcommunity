@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.1.0",
+  "releaseType": "invitation-beta-and-self-service-onboarding",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.0.23",
+    "tag": "v8.0.23",
+    "commit": "609efeaa6cb4b3ca664fa014e2cb87e3027e29bb"
+  },
+  "implementationBranch": "feature/8.1-self-service-readiness",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.0.23",
+    "candidateRelease": "8.1.0",
+    "currentMigration": 50,
+    "candidateMigration": 51,
+    "scope": "Invitation-only commissioner setup; account verification, password recovery and explicit identity linking; season preparation, import and team readiness."
+  },
+  "requiredArtifacts": [
+    "migrations/0051_self_service_account_readiness.sql",
+    "functions/_lib/account-actions.js",
+    "functions/_lib/beta-access.js",
+    "functions/_lib/league-readiness.js",
+    "workers/account-email/index.mjs",
+    "tests/security/provider-authentication.test.mjs",
+    "releases/8.1.0/release-record.md",
+    "releases/8.1.0/validation-evidence.json"
+  ]
+}

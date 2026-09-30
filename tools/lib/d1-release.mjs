@@ -151,7 +151,8 @@ export async function loadCanonicalMigrations() {
       47: 'provider_authentication_and_tenant_activation',
       48: 'ea_direct_connections',
       49: 'discord_game_results',
-      50: 'coaching_archetypes'
+      50: 'coaching_archetypes',
+      51: 'self_service_account_readiness'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);
