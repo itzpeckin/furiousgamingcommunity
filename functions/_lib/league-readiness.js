@@ -19,9 +19,9 @@ export async function leagueReadiness(db,league,userId) {
   const checks = [
     { id:'account',label:'Account verified',complete:account.verified,href:'/account',action:'Verify email' },
     { id:'access',label:'League access',complete:league.tenant_status === 'enabled',href:'/register-league',action:'Finish registration' },
-    { id:'season',label:'Season prepared',complete:Number(first(1).count)>0,href:base+'#commissioner',action:'Connect Madden',detail:'Your chosen Madden edition and franchise season.' },
-    { id:'export',label:'Export received',complete:Boolean(first(2).latest_session_id),href:base+'#commissioner',action:'Export Madden data',detail:'Use EA Direct or your permanent Companion export URL.' },
-    { id:'roster',label:'First roster imported',complete:rosterReady,href:base+'#commissioner',action:'Import latest export',detail:rosterReady ? '32 teams and '+snapshot.player_count+' players are live.' : 'Include rosters in your first export, then refresh and import.' },
+    { id:'season',label:'Season prepared',complete:Number(first(1).count)>0,href:base+'#commissioner/overview',action:'Connect Madden',detail:'Your chosen Madden edition and franchise season.' },
+    { id:'export',label:'Export received',complete:Boolean(first(2).latest_session_id),href:base+'#commissioner/overview',action:'Export Madden data',detail:'Use EA Direct or your permanent Companion export URL.' },
+    { id:'roster',label:'First roster imported',complete:rosterReady,href:base+'#commissioner/overview',action:'Import latest export',detail:rosterReady ? '32 teams and '+snapshot.player_count+' players are live.' : 'Include rosters in your first export, then refresh and import.' },
     { id:'assignments',label:'Team assignments',complete:rosterReady && Number(first(3).assigned)>0 && Number(first(3).unassigned)===0,href:base+'#commissioner/teams',action:'Assign teams',detail:'Invite members and assign their teams in People & Teams.' },
     { id:'discord',label:'Discord (optional)',optional:true,complete:Number(first(4).count)>0,href:base+'#commissioner/controls',action:'Connect Discord',detail:'Add scheduling threads and league bot commands when you want them.' }
   ];
