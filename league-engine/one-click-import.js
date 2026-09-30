@@ -22,6 +22,7 @@
   let notice = '';
   let lastOutcome = null;
   let notificationTimer = null;
+  let contextRevision = 0;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
@@ -52,10 +53,15 @@
       status:status||null,
       preserved:true
     };
-    if(status===401||status===403||/session expired|sign in|not authorized|unauthorized|forbidden/i.test(message))return{
+    if(status===403)return{
+      ...shared,title:'Commissioner access needs checking',
+      summary:'This account is not currently allowed to perform this action.',
+      action:'Confirm you are in the correct league and signed in to its commissioner account. Ask a league commissioner to check People & Teams if your role has changed.'
+    };
+    if(status===401||/session expired|sign in|not authorized|unauthorized/i.test(message))return{
       ...shared,title:'Sign in again to continue',
       summary:'Your commissioner session ended before the import could finish.',
-      action:'Sign in with Discord, return to Commissioner HQ, and select Import Latest Export again.'
+      action:'Sign in to your FHQ account again, return to Command Center, and select Import Latest Export. Your retained export does not need to be sent again.'
     };
     if(/no analyzed league export|no .*export is ready|selected ready export|exact capture session|recognized teams dataset|teams dataset|team-like record/i.test(message))return{
       ...shared,title:'The export is not ready',
@@ -105,6 +111,7 @@
   }
 
   async function api(endpoint, method='GET', body) {
+    const requestRevision=contextRevision;
     const response = await fetch(`${base()}${endpoint}`, {
       method,
       credentials:'same-origin',
@@ -113,6 +120,7 @@
       body:body === undefined ? undefined : JSON.stringify(body)
     });
     const payload = await response.json().catch(() => ({ok:false,error:`HTTP ${response.status}`}));
+    if(requestRevision!==contextRevision)throw Object.assign(new Error('The selected league changed.'),{code:'LEAGUE_CHANGED'});
     if (!response.ok || payload.ok === false) {
       const failure = new Error(payload.detail || payload.error || `Candidate import request failed (${response.status}).`);
       failure.payload = payload;
@@ -132,21 +140,23 @@
   async function refreshWorkspace() {
     if (busy) return state;
     busy = true;
+    const requestRevision=contextRevision;
     errorMessage = '';
     rerender();
     try {
       const connectionRefresh = exportUrlService()?.refresh?.();
       await Promise.all([refresh(), connectionRefresh || Promise.resolve()]);
+      if(requestRevision!==contextRevision)return null;
       notice = 'Import readiness refreshed.';
       return state;
     } catch (error) {
+      if(requestRevision!==contextRevision)return null;
       errorMessage = error.message;
       lastOutcome = failureGuidance(error,'analyze-source');
       renderImportNotification();
       throw error;
     } finally {
-      busy = false;
-      rerender();
+      if(requestRevision===contextRevision){busy = false;rerender();}
     }
   }
 
@@ -166,6 +176,7 @@
   async function createDestination() {
     if (busy) return;
     busy = true;
+    const requestRevision=contextRevision;
     errorMessage = '';
     notice = 'Preparing the franchise-season import destination…';
     rerender();
@@ -173,13 +184,13 @@
       state = await api('candidate-import','POST',{action:'create-destination'});
       notice = state.created ? 'Franchise-season import destination prepared.' : 'Existing franchise-season destination selected.';
     } catch (error) {
+      if(requestRevision!==contextRevision)return null;
       errorMessage = error.message;
       notice = '';
       lastOutcome=failureGuidance(error,'analyze-source');
       renderImportNotification();
     } finally {
-      busy = false;
-      rerender();
+      if(requestRevision===contextRevision){busy = false;rerender();}
     }
     return state;
   }
@@ -309,6 +320,7 @@
   }
 
   async function refreshLiveApplication(detail={}) {
+    const requestRevision=contextRevision;
     const startedAt=now();
     let refreshed=true;
     const liveData=HQ?.liveData || HQ?.league?.liveData || HQ?.getModuleService?.('league','liveData');
@@ -318,6 +330,7 @@
       refreshed=false;
       console.warn('[One-Click Import] Live data refresh failed after successful activation.',error);
     }
+    if(requestRevision!==contextRevision)return{refreshed:false,superseded:true};
     const eventDetail={...detail,activationPerformed:true,applicationDataRefreshed:refreshed};
     window.dispatchEvent(new CustomEvent('franchisehq:one-click-import-complete',{detail:eventDetail}));
     window.dispatchEvent(new CustomEvent('franchisehq:league-import-live',{detail:eventDetail}));
@@ -338,6 +351,7 @@
   async function runImport({retry=false}={}) {
     if(busy)return;
     busy=true;
+    const requestRevision=contextRevision;
     errorMessage='';
     notice='Starting a durable league import…';
     lastOutcome={tone:'running',title:'Importing latest export',
@@ -353,11 +367,13 @@
       workflowId=started.id;
       if(!workflowId)throw new Error('The background importer did not return a workflow ID.');
       for(let poll=0;poll<600;poll+=1){
+        if(requestRevision!==contextRevision)return null;
         let progress;
         try{
           progress=await api(`import-job?id=${encodeURIComponent(workflowId)}`);
           consecutivePollFailures=0;
         }catch(error){
+          if(requestRevision!==contextRevision)return null;
           consecutivePollFailures+=1;
           if(consecutivePollFailures>=5)throw new Error(
             'Import status temporarily unavailable. The background import may still be running; select Refresh before retrying.'
@@ -381,8 +397,10 @@
           const refreshed=await refreshLiveApplication({runId:run.id,
             candidateSnapshotId:run.candidateSnapshotId,durationMs:clickToLiveMs,
             importMode:run.resultCounts?.importMode||state?.source?.coverage?.importMode});
+          if(requestRevision!==contextRevision)return null;
           await retainClientPerformance(run.id,{clickToLiveMs,browserRefreshMs:refreshed.durationMs,
             browserRefreshOk:refreshed.refreshed});
+          if(requestRevision!==contextRevision)return null;
           notice=`League data live in ${durationLabel(clickToLiveMs)}. Discord thread delivery is tracked separately.`;
           lastOutcome={tone:'success',title:'Import complete',summary:notice};
           renderImportNotification();
@@ -403,20 +421,23 @@
       }
       throw new Error('Import is still running after 15 minutes. Refresh for its latest status; do not export again.');
     }catch(error){
+      if(requestRevision!==contextRevision)return null;
       await refresh().catch(()=>{});
+      if(requestRevision!==contextRevision)return null;
       errorMessage=error.message;
       const monitoringInterrupted=/Import status temporarily unavailable|still running after 15 minutes/i.test(error.message);
-      notice=monitoringInterrupted
+      const published=Boolean(currentRun()?.activationPerformed);
+      notice=published?'The import was published. Refresh to reload the current league data and check Discord scheduling separately.':monitoringInterrupted
         ?'The background import may still be running. Refresh to see the retained progress.'
         :'Import stopped safely. The previous live snapshot remains available.';
-      lastOutcome=monitoringInterrupted
+      lastOutcome=published?{tone:'warning',title:'Import live; follow-up needs attention',summary:notice,
+        action:'Select Refresh. For missing matchup threads, open League Controls → Discord Bot → Retry Schedule Sync.'}:monitoringInterrupted
         ?{tone:'running',title:'Import status needs refresh',summary:notice,
           action:'Select Refresh, then Import Latest Export to reconnect to the same background job.'}
         :failureGuidance(error,error.importPhase||currentRun()?.currentPhase||null);
       renderImportNotification();
     }finally{
-      busy=false;
-      rerender();
+      if(requestRevision===contextRevision){busy=false;rerender();}
     }
     return state;
   }
@@ -724,6 +745,12 @@
   });
 
   window.addEventListener('franchisehq:permanent-export-updated',()=>rerender());
+  window.addEventListener('franchisehq:league-tenant-changed',()=>{
+    contextRevision+=1;state=null;busy=false;errorMessage='';notice='';lastOutcome=null;
+    if(notificationTimer)clearTimeout(notificationTimer);
+    document.querySelector?.('[data-franchise-import-notification]')?.remove();
+    rerender();refresh().catch(()=>{});
+  });
 
   const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,outcome:lastOutcome,activationPerformed:Boolean(currentRun()?.activationPerformed),activeSnapshotChanged:Boolean(currentRun()?.activeSnapshotChanged)});
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');

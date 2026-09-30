@@ -8,9 +8,9 @@
 
 **Revision:** 3.11
 
-**Current production:** 8.0.20.
+**Current production:** 8.1.0 (main ae8809ab730f7345eb8c758a0bc613ed2e6bcd10).
 
-**Current work:** 8.0.23 coaching archetypes, import reliability, EA reconnect usability, scheduling initialization, and richer Discord games. Weekly loadout icons are deferred by the owner.
+**Current work:** 8.2.0 commissioner reliability and recovery, as redirected by the owner on September 30, 2026. Billing is deferred until the operating flow is dependable; no provider has been chosen or connected. Weekly loadout recognition remains deferred.
 
 **Next gate:** Complete strict quality, preview checks, production publication and desktop/mobile acceptance.
 
@@ -34,6 +34,14 @@
 - **Archive Season** is the commissioner's single same-edition season-close action: it freezes the completed franchise season into History Books, prepares the next franchise-season identity, and clears only the latest-export selection so a new Week 1 export is required. It does not delete history, rotate the permanent export URL, change Madden game year, or move the active snapshot.
 - Every validated release updates this roadmap with requested additions, unexpected work, defects, deferrals, evidence, and the next exact gate.
 - 7.5.0 replaced the temporary refresh/login accommodation with one centralized, revocable public-domain session framework; exact publication, migration 36, and desktop/mobile acceptance are complete.
+
+## September 30 reliability gate before billing
+
+The owner prioritizes dependable commissioner operation over payment integration. Existing beta access stays complimentary. Annual price 29.99 and no free trial remain business decisions for a later billing release; currency and provider are unconfirmed.
+
+8.2 addresses verified recovery defects: duplicate background jobs after ambiguous create responses; untracked retry successors; Discord scheduling failure incorrectly failing an already-published import; cross-league late responses in import and Discord controls; missing commissioner schedule retry controls; and coaching history completion being confused with completed image checks. See docs/8.2-reliability-review.md for evidence and remaining acceptance work. This is a bounded hardening release, not a claim that every external failure is eliminated.
+
+Before billing resumes, verify the real commissioner journey from invitation to first imported league, routine weekly update, EA reconnect, interrupted browser monitoring, Discord permission repair and season advance. Use isolated fixtures for destructive/failure scenarios; production receipts must distinguish read-only checks from real account actions. Service outages and invalid upstream data must never be described as commissioner mistakes or repaired by deleting league history.
 
 ## Current facts and accepted limitations
 
@@ -155,8 +163,8 @@
 | 8.0.9 | Production | Preserve and map multiple payload-proven weeks even when Madden reuses the same Week 0 route URL; activate only the newest proven current period |
 | 8.0.10 | Production; franchise lookup acceptance blocked | EA connection UI deployed; live profile discovery succeeded, then franchise lookup failed; no collection or import |
 | 8.0.11 | Deployed; EA acceptance pending | Separate initial/persona token formats, retain selections, expose only safe failed-step diagnostics, and support fresh sign-in recovery |
-| 8.1.0 | Planned | Complete self-service league readiness from registration through first successful Madden import and team assignment |
-| 8.2.0 | Planned | Annual league billing, verified entitlement, automatic activation, billing portal, and non-destructive grace/suspension lifecycle |
+| 8.1.0 | Production | Complete self-service league readiness from registration through first successful Madden import and team assignment |
+| 8.2.0 | In progress | Commissioner recovery for imports and Discord, safe background retries, accurate publication status, tenant switching, and visible coaching scan progress |
 | 8.3.0 | Planned | Multi-league administration, quotas, support operations, capacity controls, and custom-domain automation |
 | 9.0.0 | Planned completion | Commercial self-service launch with end-to-end signup, payment, activation, first import, operations, recovery, and support acceptance |
 
@@ -200,7 +208,7 @@
 | 16d | Production | 8.0.6–8.0.9 | Consolidate Command Center, separate Platform Admin, correct snapshot period display, and retain multiple exported weeks through the importer. |
 | 16e | Owner-reopened EA Direct gate | 8.0.10 | Add direct EA sign-in and private preview; collect previous/current-week data or the full regular-season schedule through the shared platform contracts, then prove real account and dataset access. |
 | 17 | Self-service operating readiness | 8.1.0 | Make registration produce a fully prepared league whose commissioner can sign in, complete first-season setup, run the first export, import it, assign teams, and operate the league without platform-owner repair. |
-| 18 | Payment and automatic activation | 8.2.0 | Sell one annual entitlement per league through a hosted payment flow, verify payment server-side, activate idempotently without manual owner work, and provide customer billing plus safe grace/suspension recovery. |
+| 18 | Payment and automatic activation — deferred by owner; version unassigned | Deferred | Sell one annual entitlement per league through a hosted payment flow, verify payment server-side, activate idempotently without manual owner work, and provide customer billing plus safe grace/suspension recovery. |
 | 19 | Scale administration | 8.3.0 | Complete cross-tenant administration, quotas, capacity controls, support/audit tooling, scheduled-work isolation, and custom-domain automation for many concurrent leagues. |
 | 20 | Product completion | 9.0.0 | Pass commercial-launch acceptance for signup → payment → activation → first import → normal operation → renewal/failure recovery with no manual platform intervention in the ordinary path. |
 
@@ -943,7 +951,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 - Support email-first and Discord-first commissioners equally. Discord remains optional for authentication and becomes an integration only when the league chooses to connect it.
 - Gate: a brand-new isolated test league completes registration through first live import and owner assignment on desktop and phone with no database repair, platform-owner activation, cross-tenant fallback, export-URL rotation, or FGC change.
 
-## 8.2.0 — Annual Billing, Entitlements, and Automatic Activation
+## Deferred: Annual Billing, Entitlements, and Automatic Activation
 
 - Make one annual subscription the primary paid unit for one league. Keep price, currency, plan limits, discounts, trial rules, tax behavior, and refund policy configurable without embedding them in tenant code.
 - Use a PCI-minimized hosted checkout and customer billing portal. The final provider is selected at the start of this release; FranchiseHQ stores provider/customer/subscription references and sanitized payment state, never raw card details.

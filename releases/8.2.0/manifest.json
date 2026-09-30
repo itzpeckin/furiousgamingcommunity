@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.0",
+  "releaseType": "commissioner-reliability-and-recovery",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.1.0",
+    "tag": "v8.1.0",
+    "commit": "ae8809ab730f7345eb8c758a0bc613ed2e6bcd10"
+  },
+  "implementationBranch": "feature/8.2-commissioner-reliability",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending",
+    "pullRequests": []
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.1.0",
+    "candidateRelease": "8.2.0",
+    "currentMigration": 51,
+    "candidateMigration": 51,
+    "scope": "Safe import and scheduling recovery, correct publication status, commissioner recovery controls and tenant-scoped UI state."
+  },
+  "requiredArtifacts": [
+    "tests/operations/commissioner-recovery.test.mjs",
+    "workers/franchise-import-worker/src/index.js",
+    "docs/8.2-reliability-review.md",
+    "releases/8.2.0/release-record.md",
+    "releases/8.2.0/validation-evidence.json"
+  ]
+}

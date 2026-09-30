@@ -377,7 +377,9 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
         leagueSlug:league.slug,origin,snapshotId,source:effectiveSource,
         workflowKey:`${snapshotId}:${effectiveSource}`,importAuthToken:token
       })
-    });
+    }).catch(()=>null);
+    if(!response)return{scheduled:false,reason:'durable-schedule-start-failed',
+      detail:'Discord scheduling is temporarily unavailable. In League Controls → Discord Bot, select Retry Schedule Sync.'};
     const result=await response.json().catch(()=>({}));
     return response.ok&&result.ok?{scheduled:true,durable:true,workflowId:result.id,source:effectiveSource}
       :{scheduled:false,reason:'durable-schedule-start-failed',detail:result.error||`HTTP ${response.status}`};
@@ -404,7 +406,7 @@ export async function latestDiscordScheduleSync(db,leagueId) {
   const active=await activeSnapshot(db,leagueId);
   const row = await db.prepare(`SELECT status,season_year AS seasonYear,phase,week_index AS weekIndex,
       game_count AS gameCount,thread_count AS threadCount,registered_owner_count AS registeredOwnerCount,
-      error_count AS errorCount,last_error AS lastError,completed_at AS completedAt,created_at AS createdAt
+      error_count AS errorCount,last_error AS lastError,completed_at AS completedAt,created_at AS createdAt,updated_at AS updatedAt
     FROM discord_schedule_sync_runs WHERE league_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1`)
     .bind(leagueId).first();
   if(active){
@@ -412,9 +414,10 @@ export async function latestDiscordScheduleSync(db,leagueId) {
     const period=snapshotCurrentPeriod(active);
     const currentRun=row&&Number(row.seasonYear)===Number(active.seasonYear)
       &&row.phase===period?.stage&&Number(row.weekIndex)===Number(period?.week);
-    if(!decision.allowed&&decision.reason!=='transition-proof-unavailable'&&!currentRun)return{
-      status:decision.reviewRequired?'review-required':'not-required',weekIndex:decision.to?.week,
-      phase:decision.to?.stage,reason:decision.reason,reviewRequired:decision.reviewRequired,transition:decision
+    if(!currentRun)return{
+      status:decision.reviewRequired?'review-required':'not-started',weekIndex:period?.week,
+      seasonYear:active.seasonYear,phase:period?.stage,reason:decision.reason,
+      reviewRequired:decision.reviewRequired,transition:decision
     };
   }
   if(!row)return null;

@@ -817,7 +817,8 @@ export async function onRequestPost(context) {
       requestedByUserId:current.authorization.session.user.id,
       requestedBySessionId:current.authorization.session.sessionId,
       source:'candidate-import'
-    });
+    }).catch(()=>({scheduled:false,reason:'schedule-service-unavailable',
+      detail:'Your import is live. Open League Controls → Discord Bot and select Retry Schedule Sync.'}));
     return json({ ...(await publicState(current,{discoverySessionId:result.run.discovery_session_id})),run:publicCandidateRun(result.run),tradeReconciliation:result.tradeReconciliation||null,discordScheduleSync,importPerformance:{activationMs:Number(result.activationDurationMs||0),discordScheduleSync} });
   }
   return json({ ok:false,error:`Unsupported action: ${action || 'none'}.`,release:RELEASE }, 400);

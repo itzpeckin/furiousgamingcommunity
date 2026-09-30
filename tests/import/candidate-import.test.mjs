@@ -1147,18 +1147,25 @@ test('one finalize request atomically publishes the exact validated snapshot and
         'candidate-week-9','league-1','destination-live','capture-1','week-9-fingerprint','{}',
         '["Week coverage gap after active Week 7: missing Week 8."]','snapshot-week-9','snapshot-week-7','commissioner-1'
       );
+    sqlite.prepare(`INSERT INTO discord_league_installations (id,league_id,discord_guild_id,schedule_channel_id,status)
+      VALUES ('discord-installation','league-1','123456789012345678','223456789012345678','active')`).run();
+    let schedulingAttempts=0;
     const binding=d1(sqlite);
     const invoke=()=>candidateImport({
       request:new Request('https://franchisehq.app/api/leagues/fgc/companion/candidate-import',{
         method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},
         body:JSON.stringify({action:'finalize',runId:'candidate-week-9',durationMs:45000,clientTimings:{sourceEligibilityMs:1200}})
       }),
-      params:{leagueSlug:'fgc'},env:{DB:binding,FRANCHISE_HQ_DB:binding}
+      params:{leagueSlug:'fgc'},env:{DB:binding,FRANCHISE_HQ_DB:binding,
+        FRANCHISE_IMPORT_WORKER:{fetch:async()=>{schedulingAttempts++;throw new Error('Schedule service unavailable');}}}
     });
     let response=await invoke();
     assert.equal(response.status,200);
     let payload=await response.json();
     assert.equal(payload.run.activationPerformed,true);
+    assert.equal(schedulingAttempts,1);
+    assert.equal(payload.discordScheduleSync.scheduled,false);
+    assert.equal(payload.discordScheduleSync.reason,'durable-schedule-start-failed');
     assert.equal(payload.run.activeSnapshotChanged,true);
     assert.equal(payload.run.phaseState['source-eligibility'].durationMs,1200);
     assert.equal(payload.run.phaseState['atomic-activation'].status,'complete');
