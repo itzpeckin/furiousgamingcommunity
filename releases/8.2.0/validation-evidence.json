@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.0",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 51,
+      "candidateRequiresMigration": false,
+      "productionApplied": false
+    },
+    "recoveryRegressions": {
+      "passed": true,
+      "tests": 9,
+      "baselineWorkerFailures": 5
+    },
+    "isolatedBrowser": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "retryRequestsPerDoubleClick": 1,
+      "noOverflow": true,
+      "pageErrors": 0,
+      "usesLiveData": false
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 478,
+      "failures": 0
+    },
+    "isolatedAccountBrowser": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "registration": true,
+      "emailVerification": true,
+      "invitationClaim": true,
+      "leagueActivation": true,
+      "passwordResetLogin": true,
+      "ownerInvitations": true,
+      "simulatedMail": true
+    },
+    "productionBefore": {
+      "leagues": 3,
+      "users": 38,
+      "memberships": 40,
+      "snapshots": 79,
+      "snapshotRecords": 699061,
+      "foreignKeyErrors": 0
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "archiveSeasonExecuted": false,
+    "dataDeleted": false,
+    "exportUrlRotated": false,
+    "credentialsChanged": false,
+    "billingEnabled": false
+  }
+}

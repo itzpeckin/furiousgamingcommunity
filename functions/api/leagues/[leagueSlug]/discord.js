@@ -138,7 +138,11 @@ export async function onRequestPost(context){
         requestedByUserId:c.session.user.id,requestedBySessionId:c.session.sessionId,
         source:'candidate-import'
       });
-      if(!recovery.scheduled)return json({ok:false,error:'No proven week-advance cleanup is ready to resume.',recovery},409);
+      if(!recovery.scheduled)return json({ok:false,error:recovery.reason==='not-connected'
+        ?'Choose a Schedule threads channel below and save Discord Routing, then retry.'
+        :recovery.reason==='snapshot-superseded'
+          ?'A newer import is live. Select Refresh Status, then retry for the current week.'
+          :'Scheduling could not start. Your league data is live. Wait a moment, then select Retry Schedule Sync.',recovery},409);
       await tenantAuditStatement(c.db,audit,{resourceType:'discord_schedule_sync',resourceId:active.snapshotId,
         detail:{action,workflowId:recovery.workflowId||null,source:recovery.source||'candidate-import',
           guardedByLiveSnapshot:true,automaticTransitionProofRequired:true}}).run();

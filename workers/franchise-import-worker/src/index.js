@@ -12,6 +12,7 @@ const companion=(slug,path)=>`/api/leagues/${encodeURIComponent(slug)}/companion
 async function call(context,path,method='GET',body,{acceptProgress=false}={}){
   const response=await fetch(`${context.origin}${path}`,{
     method,
+    redirect:'manual',
     headers:{
       accept:'application/json',
       'content-type':'application/json',
@@ -340,6 +341,32 @@ async function workflowId(slug,workflowKey){
   return`fhq-${Array.from(new Uint8Array(digest)).slice(0,12).map(value=>value.toString(16).padStart(2,'0')).join('')}`;
 }
 
+async function startOrResumeWorkflow(binding,baseId,params){
+  // A lost response is not proof that creation failed. Always reconcile the
+  // exact ID before retrying; concurrent callers must choose the same successor.
+  for(let attempt=0;attempt<64;attempt+=1){
+    const id=attempt?`${baseId}-retry-${attempt}`:baseId;
+    let status=null;
+    try{status=await(await binding.get(id)).status();}catch{}
+    if(status){
+      if(['failed','errored','error','terminated','cancelled','canceled'].includes(String(status.status||'').toLowerCase()))continue;
+      return{id,status,reusedExisting:true};
+    }
+    try{
+      const instance=await binding.create({id,params:{...params,retry:attempt>0||Boolean(params.retry)}});
+      return{id,status:await instance.status().catch(()=>null),reusedExisting:false,retryOfFailedWorkflow:attempt>0};
+    }catch(error){
+      // This also handles another commissioner winning the creation race.
+      try{
+        status=await(await binding.get(id)).status();
+        if(status)return{id,status,reusedExisting:true};
+      }catch{}
+      throw error;
+    }
+  }
+  throw new Error('This export has exhausted its recovery attempts. Its live data is retained; contact support with the import reference.');
+}
+
 export default{
   async fetch(request,env){
     try{
@@ -360,39 +387,22 @@ export default{
         const body=await request.json().catch(()=>({}));
         const slug=text(body.leagueSlug),origin=text(body.origin).replace(/\/+$/,''),token=text(body.importAuthToken);
         const workflowKey=text(body.workflowKey);
-        if(!slug||!origin||!token||!workflowKey)return json({ok:false,release:RELEASE,error:'Missing workflow start parameters.'},400);
+        if(!slug||!validEaOrigin(origin)||!token||!workflowKey)return json({ok:false,release:RELEASE,error:'Missing or invalid workflow start parameters.'},400);
         const baseId=await workflowId(slug,workflowKey);
-        let status=null;
-        try{status=await (await env.FRANCHISE_IMPORT_WORKFLOW.get(baseId)).status();}catch{}
-        const failed=['failed','errored','error','terminated','cancelled','canceled'].includes(String(status?.status||'').toLowerCase());
-        if(status&&!failed)return json({ok:true,release:RELEASE,id:baseId,reusedExisting:true,workflowKey,status});
-        let id=failed?`${baseId}-r${Date.now().toString(36)}`:baseId;
-        let instance;
-        try{instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:{...body,retry:failed||Boolean(body.retry)}});}
-        catch(error){
-          id=`${baseId}-r${Date.now().toString(36)}-${crypto.randomUUID().slice(0,6)}`;
-          instance=await env.FRANCHISE_IMPORT_WORKFLOW.create({id,params:{...body,retry:true}});
-        }
-        return json({ok:true,release:RELEASE,id,reusedExisting:false,retryOfFailedWorkflow:failed,workflowKey,status:await instance.status().catch(()=>null)});
+        const started=await startOrResumeWorkflow(env.FRANCHISE_IMPORT_WORKFLOW,baseId,body);
+        return json({ok:true,release:RELEASE,workflowKey,...started});
       }
       if(url.pathname==='/schedule/start'&&request.method==='POST'){
         const body=await request.json().catch(()=>({}));
         const slug=text(body.leagueSlug),origin=text(body.origin).replace(/\/+$/,''),token=text(body.importAuthToken);
         const workflowKey=text(body.workflowKey),source=text(body.source),snapshotId=text(body.snapshotId);
-        if(!slug||!origin||!token||!workflowKey||!snapshotId
+        if(!slug||!validEaOrigin(origin)||!token||!workflowKey||!snapshotId
           ||!['candidate-import','rollover-recovery'].includes(source)){
           return json({ok:false,release:RELEASE,error:'Missing schedule workflow parameters.'},400);
         }
         const baseId=await workflowId(slug,`schedule:${workflowKey}`);
-        let status=null;
-        try{status=await(await env.FRANCHISE_SCHEDULE_WORKFLOW.get(baseId)).status();}catch{}
-        const state=String(status?.status||'').toLowerCase();
-        if(status&&!['failed','errored','error','terminated','cancelled','canceled'].includes(state)){
-          return json({ok:true,release:RELEASE,id:baseId,reusedExisting:true,workflowKey,status});
-        }
-        const id=status?`${baseId}-r${Date.now().toString(36)}`:baseId;
-        const instance=await env.FRANCHISE_SCHEDULE_WORKFLOW.create({id,params:body});
-        return json({ok:true,release:RELEASE,id,reusedExisting:false,workflowKey,status:await instance.status().catch(()=>null)});
+        const started=await startOrResumeWorkflow(env.FRANCHISE_SCHEDULE_WORKFLOW,baseId,body);
+        return json({ok:true,release:RELEASE,workflowKey,...started});
       }
       if(url.pathname==='/status'&&request.method==='GET'){
         const id=text(url.searchParams.get('id'));

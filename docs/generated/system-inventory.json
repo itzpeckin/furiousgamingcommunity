@@ -224,8 +224,8 @@
       ".js": 277,
       ".json": 7,
       ".jsonc": 3,
-      ".md": 285,
-      ".mjs": 62,
+      ".md": 286,
+      ".mjs": 63,
       ".png": 3,
       ".sql": 53,
       ".txt": 3,
@@ -243,7 +243,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 441875,
+        "bytes": 446146,
         "file": "trade-module.js"
       },
       {
@@ -263,7 +263,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 89995,
+        "bytes": 90565,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -287,12 +287,12 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 50005,
-        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
+        "bytes": 51931,
+        "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 49741,
-        "file": "league-engine/one-click-import.js"
+        "bytes": 50180,
+        "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
         "bytes": 48894,
@@ -315,7 +315,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 721
+    "total": 723
   },
   "frontend": {
     "assets": [
@@ -1877,7 +1877,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.1.0",
+  "release": "8.2.0",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

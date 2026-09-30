@@ -38,8 +38,21 @@ async function verifyReadAccess(env,config,fetchImpl){
 
 export async function coachingSettings(db,leagueId){
   const row=await db.prepare('SELECT * FROM discord_coaching_settings WHERE league_id=?').bind(leagueId).first();
+  if(!row)return{enabled:false,banned:[],historyComplete:false};
+  const progress=await db.prepare(`SELECT COUNT(*) AS submissions,
+    SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending,
+    SUM(CASE WHEN status='unreadable' THEN 1 ELSE 0 END) AS unreadable,
+    SUM(CASE WHEN status='unassigned' THEN 1 ELSE 0 END) AS unassigned,
+    SUM(CASE WHEN status<>'pending' AND (rule_revision<>? OR reported_revision<>?) THEN 1 ELSE 0 END) AS reportsPending
+    FROM discord_coaching_submissions WHERE league_id=?`)
+    .bind(row.revision,row.revision,leagueId).first();
+  const observed=String(row.last_scan_at||row.updated_at||'');
+  const checkedAt=Date.parse(/(?:Z|[+-]\d\d:\d\d)$/.test(observed)?observed:observed.replace(' ','T')+'Z');
   return row?{enabled:Boolean(row.enabled),sourceChannelId:row.source_channel_id,reportChannelId:row.report_channel_id,
-    banned:parse(row.banned_json),revision:row.revision,historyComplete:Boolean(row.history_complete),lastScanAt:row.last_scan_at,lastError:row.last_error,updatedAt:row.updated_at}
+    banned:parse(row.banned_json),revision:row.revision,historyComplete:Boolean(row.history_complete),lastScanAt:row.last_scan_at,lastError:row.last_error,updatedAt:row.updated_at,
+    progress:{submissions:Number(progress?.submissions||0),pending:Number(progress?.pending||0),unreadable:Number(progress?.unreadable||0),
+      unassigned:Number(progress?.unassigned||0),reportsPending:Number(progress?.reportsPending||0)},
+    stalled:Boolean(row.enabled)&&(!Number.isFinite(checkedAt)||Date.now()-checkedAt>5*60*1000)}
     :{enabled:false,banned:[],historyComplete:false};
 }
 
