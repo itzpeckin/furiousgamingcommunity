@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** September 26, 2026
+**Updated:** October 1, 2026
 
-**Revision:** 3.11
+**Revision:** 3.12
 
-**Current production:** 8.2.0 commissioner reliability and recovery (PR #174; immutable tag v8.2.0).
+**Current production:** 8.2.1 import, EA collection and scheduling performance (PR #176; immutable tag v8.2.1).
 
-**Current work:** Operating acceptance following 8.2.0 commissioner reliability and recovery, as redirected by the owner on September 30, 2026. Billing is deferred until the operating flow is dependable; no provider has been chosen or connected. Weekly loadout recognition remains deferred.
+**Current work:** Operating acceptance following 8.2.1 performance improvements. Verified advances skip automatic recaps, scheduling uses bounded batches, and export/import checkpoints perform less repeated work. Billing is deferred until the operating flow is dependable; no provider has been chosen or connected. Weekly loadout recognition remains deferred.
 
-**Next gate:** Complete strict quality, preview checks, production publication and desktop/mobile acceptance.
+**Next gate:** Measure ordinary FGC and OTL exports/imports and a verified week advance in production. The 60–70-second average import target is not yet proven. Confirm same-week recaps and new-thread creation before old-thread deletion with external providers; retain the broader commissioner recovery acceptance tracked in docs/8.2-reliability-review.md.
 
 ## Product decisions
 
