@@ -201,7 +201,7 @@ test('current-period proof ignores schedule rows and requires exact forward tran
   });
 });
 
-test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-forward preserves Confidence identity',async()=>{
+for(const optimized of [false,true])test(`272-game full-season build and retained identity (${optimized?'server batches':'small checkpoints'})`,async(t)=>{
   const sqlite=await database();
   try{
     sqlite.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,active) VALUES ('membership-full','league-1','commissioner-1','commissioner',1)`).run();
@@ -239,11 +239,12 @@ test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-for
       (mapping_run_id,league_id,external_key,category,season_year,stage,week_index,player_external_id,
        team_external_id,player_name,metrics_json,source_route_path,source_record_json)
       VALUES ('stats-run','league-1',?,'passing',2026,'regular-season',1,?,?,?,'{}','xbsx/742482/week/reg/1/passing','{}')`);
-    for(let i=0;i<939;i++)statisticInsert.run(`stat-${i}`,`player-${i%2046}`,`team-${i%32}`,`Player ${i%2046}`);
+    const statisticCount=8271;
+    for(let i=0;i<statisticCount;i++)statisticInsert.run(`stat-${i}`,`player-${i%2046}`,`team-${i%32}`,`Player ${i%2046}`);
     const proof={status:'proven',source:'current-state-metadata',period:canonicalSchedulePeriod({stage:'reg',week:1})};
     const coverage=candidateSourceCoverage({sourceMarkers:{currentPeriod:proof},datasetInventory:[
       {datasetType:'schedule',routePath:route,recordCount:272,periodSource:'payload-schedule-aggregate',canonicalPeriods:resolveMaddenSchedulePeriods(route,payload)},
-      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing',recordCount:939}
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing',recordCount:statisticCount}
     ]});
     assert.equal(coverage.currentWeek,1);assert.equal(coverage.scheduleHorizon.week,18);
     assert.equal(coverage.futureSchedulePeriods.length,17);assert.deepEqual(candidateCoverageWarnings(coverage),[]);
@@ -261,8 +262,10 @@ test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-for
     result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
     assert.equal(result.snapshot.snapshotId,buildSnapshotId,'a repeated start must resume the durable checkpoint');
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshots WHERE id=?`).get(buildSnapshotId).count,1);
+    let buildCalls=0;
     for(let i=0;i<30&&result.buildJob.phase!=='games';i++){
-      built=await buildSnapshot(context({action:'next',limit:125,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
+      built=await buildSnapshot(context({action:'next',limit:optimized?4000:500,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
+      buildCalls++;
       result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
     }
     assert.equal(result.buildJob.phase,'games');
@@ -293,17 +296,36 @@ test('272-game full-season mapping/build keeps Week 1 clock and weekly carry-for
       WHERE snapshot_id=? AND domain='games' AND json_extract(data_json,'$.home_team_external_id') LIKE 'old-%'`)
       .get(buildSnapshotId).count,147);
     for(let i=0;i<100&&!result.complete;i++){
-      built=await buildSnapshot(context({action:'next',limit:125,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
+      built=await buildSnapshot(context({action:'next',limit:optimized?4000:500,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
+      buildCalls++;
       result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
     }
-    assert.equal(result.complete,true);assert.equal(result.buildJob.processedCount,3321);
-    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE snapshot_id=?`).get(buildSnapshotId).count,3321);
+    const totalRecords=32+2046+272+statisticCount+32;
+    assert.equal(result.complete,true);assert.equal(result.buildJob.processedCount,totalRecords);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE snapshot_id=?`).get(buildSnapshotId).count,totalRecords);
+    if(optimized)assert.ok(buildCalls<=8,`server build calls: ${buildCalls}`);
     assert.equal(result.snapshot.weekIndex,1);assert.equal(result.snapshot.counts.games,272);
     assert.equal(result.snapshot.manifest.scheduleHorizon.week,18);assert.equal(result.snapshot.manifest.discordScheduleTransition.reason,'initial-import');
     assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM league_active_snapshots').get().count,0);
+    // Compact reporting works with only this run's state; it must not need a
+    // fresh export readiness report, which this isolated fixture doesn't have.
+    const reported=await candidateImport(context({action:'report-phase',compact:true,runId:'candidate-full',
+      phase:'build-candidate',ok:true,candidateSnapshotId:buildSnapshotId}));
+    const reportBody=await reported.json();
+    assert.equal(reported.status,200,JSON.stringify(reportBody));
+    assert.equal(reportBody.run.currentPhase,'validate-candidate');
+    assert.equal(reportBody.source,undefined);
+    const crossTenant=await candidateImport(context({action:'report-phase',compact:true,runId:'another-league-run',phase:'build-candidate'}));
+    assert.equal(crossTenant.status,404);
     const snapshotId=result.snapshot.snapshotId;
     let validated=await (await validateSnapshot(context({action:'validate-start',snapshotId}))).json();
-    for(let i=0;i<20&&!validated.complete;i++)validated=await (await validateSnapshot(context({action:'validate-next',snapshotId,batches:4,limit:100}))).json();
+    let validationCalls=0;
+    for(let i=0;i<40&&!validated.complete;i++){
+      validated=await (await validateSnapshot(context({action:'validate-next',snapshotId,batches:4,limit:optimized?2000:500}))).json();
+      validationCalls++;
+    }
+    if(optimized)assert.ok(validationCalls<=3);
+    t.diagnostic(JSON.stringify({optimized,totalRecords,buildCalls,validationCalls}));
     assert.equal(validated.complete,true,JSON.stringify(validated));assert.equal(validated.report.errorCount,0);
     sqlite.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id,activated_by) VALUES ('league-1',?,'commissioner-1')`).run(snapshotId);
     const competitionContext={db,request:context({}).request,league:{id:'league-1',slug:'fgc'},session:{user:{id:'commissioner-1'},membership:{role:'commissioner'}}};
@@ -1268,7 +1290,7 @@ test('commissioner live import activates only its validated candidate and never 
   for(const source of [ui,worker])assert.match(source,/action:'next',runId,batches:4/);
   assert.match(ui,/action:'next',candidateImportRunId,snapshotId,limit:500/);
   assert.match(worker,/checkpointedPhase\(context,step,'build-candidate'/);
-  assert.match(worker,/action:'next',candidateImportRunId:context\.runId,snapshotId,limit:500/);
+  assert.match(worker,/action:'next',candidateImportRunId:context\.runId,snapshotId,limit:4000/);
   assert.match(ui,/stopped making progress at its durable checkpoint/);
   for(const source of [ui,worker])assert.match(source,/checkpointToken/);
   assert.match(ui,/action:'validate-next',snapshotId,limit:500,batches:4/);
@@ -1333,6 +1355,6 @@ test('commissioner live import activates only its validated candidate and never 
   assert.doesNotMatch(statistics,/\.slice\(0,100\)/);
   assert.match(statistics,/ROUTE_INSPECTION_CONCURRENCY=4/);
   assert.match(lifecycle,/Math\.min\(4,Number\(body\.batches\)/);
-  assert.match(worker,/limit:500,batches:4/);
+  assert.match(worker,/limit:2000,batches:4/);
   assert.match(worker,/reuseExisting:true/);
 });

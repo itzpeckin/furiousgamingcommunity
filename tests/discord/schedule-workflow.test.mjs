@@ -54,6 +54,7 @@ test('Discord Workflow continues through nonterminal running checkpoints to comp
   assert.equal(result.result.threads,16);
   assert.equal(result.result.removedPriorThreads,16);
   assert.equal(requests.length,4);
+  assert.ok(requests.every(request=>request.maxOperations===4));
   assert.equal(requests.some(request=>request.action==='fail'),false);
 });
 
@@ -75,6 +76,9 @@ test('background import retries a transient Map Schedule request and still publi
   let scheduleAttempts=0,finalizations=0;
   const workflow=await workflowWith(async (url,options)=>{
     const path=new URL(url).pathname,body=JSON.parse(options.body||'{}');
+    if(body.action==='report-phase')assert.equal(body.compact,true);
+    if(path.endsWith('/build-snapshot')&&body.action==='next')assert.equal(body.limit,4000);
+    if(path.endsWith('/snapshot-lifecycle')&&body.action==='validate-next')assert.equal(body.limit,2000);
     if(path.endsWith('/map-schedule')&&++scheduleAttempts===1)throw new Error('transient edge disconnect');
     let payload={ok:true};
     if(path.endsWith('/candidate-import')&&body.action==='start')payload={ok:true,

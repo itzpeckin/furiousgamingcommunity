@@ -5,6 +5,34 @@ const MAX_REQUESTS = 100;
 const MODES = ['preview', 'weekly', 'yearly'];
 const adapter = { normalizeEaHub, eaCapturePlan, beginEaCapture, storeEaCapture, finalizeEaCapture };
 
+/** Reuse authorization and encrypted-state work for a small sequential batch.
+ * Keep EA's mutable session/request sequence ordered and stop between datasets
+ * when the checkpoint budget is used. Failed batches replay idempotent captures.
+ */
+export async function runEaCollectionBatch(options,{batchSize=1,now=Date.now}={}){
+  const started=now(),limit=Math.max(1,Math.min(4,Math.floor(Number(batchSize)||1)));
+  const timing={...(options.state?.timing||{})};
+  let providerMs=0,providerCalls=0;
+  const client=Object.fromEntries(Object.entries(options.client).map(([name,method])=>[name,
+    typeof method!=='function'?method:async(...args)=>{
+      const before=now();
+      try{return await method(...args)}finally{providerMs+=Math.max(0,now()-before);providerCalls++}
+    }]));
+  let state=options.state||{},result;
+  for(let index=0;index<limit;index++){
+    const initialized=state.initialized;
+    result=await runEaCollectionStep({...options,client,state});
+    state=result.state;
+    if(result.done||!initialized||now()-started>=15000)break;
+  }
+  state.timing={checkpointCount:Number(timing.checkpointCount||0)+1,
+    providerCalls:Number(timing.providerCalls||0)+providerCalls,
+    providerMs:Number(timing.providerMs||0)+providerMs,
+    processingMs:Number(timing.processingMs||0)+Math.max(0,now()-started)};
+  if(result.done){state.result={...state.result,timing:state.timing};result.result=state.result;}
+  return {...result,state};
+}
+
 function collectionError(code, message) {
   return new EaClientError(code, message, { status: 409 });
 }

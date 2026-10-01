@@ -23,6 +23,7 @@ const LEGACY_BUILD_MODES=Object.freeze(['checkpointed-domain-v2']);
 const BUILD_PLAN_REVISION='retained-schedule-team-bridge-v2';
 const BUILD_DOMAINS=Object.freeze(['teams','players','games','statistics','standings']);
 const BUILD_RECORD_LIMIT=500;
+const BUILD_SERVER_RECORD_LIMIT=4000;
 const BUILD_WRITE_BYTES=500000;
 const parse=v=>{try{return JSON.parse(v||'null')}catch{return null}};
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results||[];
@@ -653,7 +654,9 @@ export async function onRequestPost(context){
     const cursor=hasCurrentCursor?Number(domainState.cursor):0;
     if(cursor>plan.records.length)return json({ok:false,
       error:`The pending snapshot ${domain} cursor exceeds its immutable build plan.`,release:RELEASE},409);
-    const requestLimit=Math.max(1,Math.min(BUILD_RECORD_LIMIT,Math.floor(Number(body?.limit)||BUILD_RECORD_LIMIT)));
+    // Larger explicit server batches reuse the domain plan; each SQL payload
+    // remains byte-bounded and the persisted cursor still supports replay.
+    const requestLimit=Math.max(1,Math.min(BUILD_SERVER_RECORD_LIMIT,Math.floor(Number(body?.limit)||BUILD_RECORD_LIMIT)));
     const pendingRecords=plan.records.slice(cursor,cursor+requestLimit);
     // One bounded SQL statement per payload replaces hundreds of serialized D1
     // inserts. Keep the checkpoint cursor and replay-safe upsert contract intact.

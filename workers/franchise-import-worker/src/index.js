@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 8.0.12 */
+/* FHQ_BUILD: 8.2.1 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { NonRetryableError } from 'cloudflare:workflows';
 
-const RELEASE='8.0.12';
+const RELEASE='8.2.1';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -38,7 +38,7 @@ async function call(context,path,method='GET',body,{acceptProgress=false}={}){
 
 async function report(context,phase,startedAt,summary={}){
   return call(context,companion(context.slug,'candidate-import'),'POST',{
-    action:'report-phase',runId:context.runId,phase,ok:true,
+    action:'report-phase',compact:true,runId:context.runId,phase,ok:true,
     durationMs:Math.max(0,Date.now()-startedAt),
     totalDurationMs:Math.max(0,Date.now()-context.wallStartedAt),
     summary:summary.summary||'Complete',counts:summary.counts||{},warnings:summary.warnings||[],
@@ -117,7 +117,7 @@ async function buildCandidate(context,step,mappingRunIds){
     iteration+=1;
     result=await step.do(`build-candidate-next-${iteration}`,()=>call(
       context,companion(context.slug,'build-snapshot'),'POST',{
-        action:'next',candidateImportRunId:context.runId,snapshotId,limit:500
+        action:'next',candidateImportRunId:context.runId,snapshotId,limit:4000
       }
     ));
     const job=result.buildJob||{};
@@ -137,7 +137,7 @@ async function validateCandidate(context,step,snapshotId){
   let guard=0;
   while(!result.complete&&guard<500){
     result=await step.do(`validate-candidate-next-${guard+1}`,()=>call(
-      context,companion(context.slug,'snapshot-lifecycle'),'POST',{action:'validate-next',snapshotId,limit:500,batches:4}
+      context,companion(context.slug,'snapshot-lifecycle'),'POST',{action:'validate-next',snapshotId,limit:2000,batches:4}
     ));
     guard+=1;
   }
@@ -285,7 +285,7 @@ export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
         result=await step.do(`schedule-batch-${index+1}`,{
           retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'2 minutes'
         },()=>call(context,companion(context.slug,'schedule-sync-job'),'POST',{
-          snapshotId,source,maxOperations:1
+          snapshotId,source,maxOperations:4
         },{acceptProgress:true}));
         if(result.status==='completed')return{ok:true,release:RELEASE,source,snapshotId,result};
         if(result.status!=='running'||!result.hasMore){
@@ -309,7 +309,7 @@ export class FranchiseEaCollectionWorkflow extends WorkflowEntrypoint{
     if(!validEaOrigin(origin)||!/^eaj_[a-f0-9-]{36}$/.test(id)||!slug||!token)throw new Error('EA collection parameters are invalid.');
     const endpoint=`${origin}/api/leagues/${encodeURIComponent(slug)}/ea-direct/collect-step`;
     const invoke=async(body)=>{
-      const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','x-franchisehq-ea-collection-token':token},body:JSON.stringify({id,...body}),signal:AbortSignal.timeout(120000)});
+      const response=await fetch(endpoint,{method:'POST',redirect:'manual',headers:{'content-type':'application/json','x-franchisehq-ea-collection-token':token},body:JSON.stringify({id,batchSize:4,...body}),signal:AbortSignal.timeout(120000)});
       const result=await response.json().catch(()=>({}));
       if(!response.ok||!result.ok)throw new Error('EA collection step could not finish. Details are retained in the league connection panel.');
       return result;

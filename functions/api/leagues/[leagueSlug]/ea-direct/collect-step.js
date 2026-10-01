@@ -2,7 +2,7 @@
 import { database, normalizeLeagueSlug, resolveLeague, json } from '../../../../_lib/cloud-platform.js';
 import { hashToken } from '../../../../_lib/auth.js';
 import { createEaClient } from '../../../../_lib/ea-client.js';
-import { runEaCollectionStep } from '../../../../_lib/ea-collection.js';
+import { runEaCollectionBatch } from '../../../../_lib/ea-collection.js';
 import { readEaBody, fail, eaErrorResponse, safeEaError, connectionScope, jobScope, openEa, sealEa } from '../../../../_lib/ea-direct.js';
 
 // This is a job-scoped server endpoint, not a browser import or general credential proxy.
@@ -47,8 +47,8 @@ export async function onRequestPost(context){
       if(!Number(updated.meta?.changes))fail('EA_RECONNECT_REQUIRED','The EA connection changed.');
       state.session=null;
     }
-    const result=await runEaCollectionStep({db,bucket:context.env.COMPANION_EXPORTS,league,connection,job,client,token:credential,state});
-    const done=Boolean(result.done),summary=result.result||{},cursor=Number(job.cursor)+1;
+    const result=await runEaCollectionBatch({db,bucket:context.env.COMPANION_EXPORTS,league,connection,job,client,token:credential,state},{batchSize:body.batchSize});
+    const done=Boolean(result.done),summary=result.result||{timing:result.state.timing},cursor=Number(job.cursor)+1;
     const statements=[db.prepare(`UPDATE ea_direct_collection_jobs SET status=?,cursor=?,step=?,progress=?,state_cipher=?,result_json=?,message=?,error_code=NULL,lock_until=NULL,updated_at=CURRENT_TIMESTAMP,completed_at=? WHERE id=? AND league_id=? AND lock_until=? AND status='running'`)
       .bind(done?'completed':'running',cursor,String(result.step||'Collecting EA data').slice(0,120),Math.max(0,Math.min(100,Number(result.progress)||0)),
         done?null:await sealEa(context.env,jobScope(job),result.state),JSON.stringify(summary),summary.message||null,done?new Date().toISOString():null,job.id,league.id,lock)];

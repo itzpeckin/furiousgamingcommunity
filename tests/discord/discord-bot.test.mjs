@@ -2662,6 +2662,15 @@ test('game results and automatic week replacement apply independently to every c
       const other=leagues.find(item=>item.id!==league.id);
       const otherBefore=database.prepare('SELECT id,status FROM discord_schedule_threads WHERE league_id=? ORDER BY id').all(other.id);
       const next=seedActiveWeek(database,{leagueId:league.id,week:3});proveScheduleAdvance(database,league.current,next);
+      // Retain a corrected final from the prior week: it would otherwise edit
+      // the old thread before deleting it. Advance must never send that recap.
+      database.prepare(`INSERT INTO league_snapshot_records(snapshot_id,league_id,domain,external_id,data_json)
+        SELECT ?,league_id,domain,external_id,json_set(data_json,'$.home_score',42)
+        FROM league_snapshot_records WHERE snapshot_id=? AND domain='games'`).run(next,league.current);
+      const beforeRecaps=calls.length;
+      const recap=await syncDiscordGameResults(env,db,{league,snapshotId:next,fetchImpl});
+      assert.equal(recap.reason,'week-advance');assert.equal(recap.resultMessages,0);
+      assert.equal(calls.length,beforeRecaps,'advancing never waits for or sends old result cards');
       const start=calls.length;
       const synced=await syncDiscordScheduleThreads(env,db,{league,snapshotId:next,source:'candidate-import',fetchImpl});
       assert.equal(synced.ok,true);assert.equal(synced.created,1);assert.equal(synced.removedPriorThreads,1);

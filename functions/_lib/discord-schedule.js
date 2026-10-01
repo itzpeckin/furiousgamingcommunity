@@ -1,7 +1,8 @@
 import { discordBotRequest, discordErrorText } from './discord-api.js';
 import { discordLeagueReadModel } from './discord-read-model.js';
 import { activeTeamAssignments, canonicalTeamKey, resolveTeam } from './league-teams.js';
-import { scheduleAdvanceDecision, snapshotCurrentPeriod } from './schedule-integrity.js';
+import { snapshotCurrentPeriod } from './schedule-integrity.js';
+import { automaticScheduleDecision } from './discord-schedule-transition.js';
 import { createRandomToken, hashToken } from './auth.js';
 import { syncDiscordGameResults } from './discord-game-results.js';
 
@@ -70,22 +71,6 @@ async function activeSnapshot(db,leagueId) {
     FROM league_active_snapshots active
     JOIN league_snapshots snapshot ON snapshot.id=active.snapshot_id AND snapshot.league_id=active.league_id
     WHERE active.league_id=? LIMIT 1`).bind(leagueId).first();
-}
-
-async function automaticScheduleDecision(db,leagueId,active){
-  let manifest={};
-  try{manifest=JSON.parse(active.manifest_json||'{}')}catch{}
-  const recorded=manifest.discordScheduleTransition;
-  const previousId=recorded?.sourceSnapshotId;
-  const previous=previousId?await db.prepare(`SELECT id,season_year,week_index,manifest_json
-    FROM league_snapshots WHERE id=? AND league_id=? LIMIT 1`).bind(previousId,leagueId).first():null;
-  const decision=scheduleAdvanceDecision(previous,{period:snapshotCurrentPeriod(active),
-    proof:manifest.currentPeriodProof,seasonYear:active.seasonYear});
-  if(!recorded||recorded.allowed!==decision.allowed
-    ||recorded.to?.key!==decision.to?.key||recorded.from?.key!==decision.from?.key){
-    return{...decision,allowed:false,reviewRequired:true,reason:'transition-proof-unavailable'};
-  }
-  return decision;
 }
 
 async function canReconcileCurrent(db,leagueId,decision,active){
@@ -318,8 +303,14 @@ export async function syncDiscordScheduleThreads(env,db,{
     return !activeThreads.some(thread=>thread.game_external_id===game.id||(teams
       &&thread.home_team_key===scheduleTeamKey(teams.home)&&thread.away_team_key===scheduleTeamKey(teams.away)));
   });
+  const batchStarted=Date.now();
   for (const game of pendingGames.slice(0,bounded)) {
     try {
+      if(String((await activeSnapshot(db,league.id))?.id)!==String(active.id)){
+        errors.push('The active snapshot changed during schedule sync; remaining threads were preserved.');
+        break;
+      }
+      if(bounded!==Number.MAX_SAFE_INTEGER&&Date.now()-batchStarted>=30000)break;
       const result = await createMatchupThread(env,db,{run,league,model,game,assignments,phase:targetPhase,week:targetWeek,fetchImpl});
       if (result.created) created += 1;
       result.owners.forEach(id=>owners.add(id));

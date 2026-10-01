@@ -32,11 +32,12 @@ export async function onRequestPost(context){
       .bind(message,league.id,snapshotId).run();
     return json({ok:true,status:'failed-recorded'});
   }
-  const results=await syncDiscordGameResults(context.env,db,{league,snapshotId,maxOperations:1});
+  const maxOperations=Math.min(4,Math.max(1,Math.floor(Number(body.maxOperations)||1)));
+  const results=await syncDiscordGameResults(context.env,db,{league,snapshotId,maxOperations});
   if(results.hasMore||results.superseded)return json(results);
   const result=await syncDiscordScheduleThreads(context.env,db,{
     league,snapshotId,source,requestedByUserId:auth.session.user.id,
-    maxOperations:Math.min(2,Math.max(1,Number(body.maxOperations)||1))
+    maxOperations
   });
   if(result.skipped&&result.ok)return json({ok:true,status:'completed',results,schedule:result});
   if(result.skipped||result.errors?.length)return json({ok:false,...result},409);
