@@ -14,11 +14,11 @@ No strict-gate exemptions. Production 60–70-second average import acceptance a
 
 ## Validation evidence
 
-The representative real-handler SQLite fixture retains 10,653 records including 8,271 statistics and the full 272-game schedule. Build calls fall from 26 to 8 and validation calls from 7 to 3. The EA fixture retains all 52 datasets in 14 checkpoints rather than 53. Retries, session refresh, unavailable datasets, tenant isolation, same-week delivery and deleted-thread protection remain tested. The strict quality gate passes all 482 tests, syntax, security, migrations, inventory and release-contract checks. Hosted verification remains pending publication.
+The representative real-handler SQLite fixture retains 10,653 records including 8,271 statistics and the full 272-game schedule. Build calls fall from 26 to 8 and validation calls from 7 to 3. The EA fixture retains all 52 datasets in 14 checkpoints rather than 53. Retries, session refresh, unavailable datasets, tenant isolation, same-week delivery and deleted-thread protection remain tested. The strict quality gate passes all 482 tests, syntax, security, migrations, inventory and release-contract checks. CI run 36887305587 passed. Seventeen hosted checks each passed preview and production. Production Worker source matches the release, all three workflow bindings are retained, and public Worker URLs remain disabled.
 
 ## Deployment status
 
-Implementation authorized under standing release approval. No production changes yet. No migration required; import Worker and Pages both require publication. Existing workflows must be checked before Worker publication.
+PR #176 merged at bd82108cf2eb7a3e8dff1b84591941117cde9884, tagged v8.2.1. Production Pages deployment 11e902ad-43ac-4c1a-a127-3d6fe63d1ede and Import Worker 8c0a6380-fc66-44ef-8e57-4719de78e89d are verified. Zero active import, EA collection or scheduling workflows were present before Worker publication. No migration, live import/export, Discord post/thread deletion, account or ownership change was performed by this release. Before/after database counts match (3 leagues, 38 users, 40 memberships, 83 snapshots, 734,717 records); foreign keys are clean. Live end-to-end timing acceptance awaits an ordinary commissioner import.
 
 ## Rollback
 
