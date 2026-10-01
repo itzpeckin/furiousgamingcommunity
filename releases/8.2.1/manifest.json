@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.2.1",
   "releaseType": "import-and-scheduling-performance",
-  "status": "implementation-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.2.0",
@@ -14,21 +14,28 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending"
+    "status": "merged",
+    "pullRequest": "https://github.com/itzpeckin/furiousgamingcommunity/pull/176",
+    "commit": "bd82108cf2eb7a3e8dff1b84591941117cde9884",
+    "tag": "v8.2.1"
   },
   "staging": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending"
+    "deployed": true,
+    "status": "hosted-checks-passed",
+    "deploymentId": "5b01e76e-fe0c-49d9-9ab8-39ec3acb2228"
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "pending",
-    "currentRelease": "8.2.0",
+    "deployed": true,
+    "status": "success-pending-owner-acceptance",
+    "currentRelease": "8.2.1",
     "candidateRelease": "8.2.1",
     "currentMigration": 51,
-    "candidateMigration": 51
+    "candidateMigration": 51,
+    "deploymentId": "11e902ad-43ac-4c1a-a127-3d6fe63d1ede",
+    "workerVersion": "8c0a6380-fc66-44ef-8e57-4719de78e89d",
+    "workerDeployment": "4699fc5b-89b1-4d5b-85dc-0b5f6898fb41"
   },
   "requiredArtifacts": [
     "releases/8.2.1/release-record.md",

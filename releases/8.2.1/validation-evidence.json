@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.2.1",
-  "status": "implementation-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {
@@ -38,6 +38,38 @@
       "passed": true,
       "tests": 482,
       "failures": 0
+    },
+    "ci": {
+      "passed": true,
+      "runId": 36887305587,
+      "head": "6810314bc067cd72388d9cf6c13538bd3a41d878"
+    },
+    "hosted": {
+      "passed": true,
+      "preview": 17,
+      "production": 17,
+      "authenticatedImportTested": false
+    },
+    "workerPublication": {
+      "passed": true,
+      "sourceMatches": true,
+      "activeWorkflowsBeforeDeployment": 0,
+      "workflowBindingsPreserved": 3,
+      "privateUrlsDisabled": true,
+      "version": "8c0a6380-fc66-44ef-8e57-4719de78e89d"
+    },
+    "productionData": {
+      "passed": true,
+      "beforeAndAfter": {
+        "leagues": 3,
+        "users": 38,
+        "memberships": 40,
+        "snapshots": 83,
+        "records": 734717
+      },
+      "foreignKeyViolations": 0,
+      "fgcSnapshot": "0db10824-b1a5-4a31-af9e-4ca0b37a3020",
+      "otlSnapshot": "951763a0-f9c0-4e74-b958-9f215fbd5b51"
     }
   },
   "scopeBoundaries": {
