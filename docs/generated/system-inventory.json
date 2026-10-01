@@ -221,7 +221,7 @@
       ".css": 13,
       ".example": 1,
       ".html": 9,
-      ".js": 277,
+      ".js": 278,
       ".json": 7,
       ".jsonc": 3,
       ".md": 286,
@@ -251,7 +251,7 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 191826,
+        "bytes": 192602,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -263,7 +263,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 90565,
+        "bytes": 91861,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -291,7 +291,7 @@
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 50180,
+        "bytes": 50564,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -311,11 +311,11 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       },
       {
-        "bytes": 40222,
+        "bytes": 40421,
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 723
+    "total": 724
   },
   "frontend": {
     "assets": [
@@ -1877,7 +1877,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.0",
+  "release": "8.2.1",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

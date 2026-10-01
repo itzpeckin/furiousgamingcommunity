@@ -37,7 +37,7 @@ export async function gameAutocompleteChoices(c,query=''){
 }
 export async function gameCardMessage(c,model,game){
   const final=summaryGameFinal(game),performers=gameSummaryPerformers(game,model.statistics,model.players);
-  const assignments=await activeTeamAssignments(c.db,c.league.id);
+  const assignments=model.gameAssignments??=await activeTeamAssignments(c.db,c.league.id);
   const side=(id,score)=>{
     const team=resolveTeam(model.teams,id)||{},owner=assignments.get(team.teamKey);
     const standing=(model.standings||[]).find(row=>String(row.teamId)===String(id))||team.record||{};

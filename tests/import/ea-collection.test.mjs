@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { EaClientError } from '../../functions/_lib/ea-client.js';
 import { normalizeEaHub, eaCapturePlan, beginEaCapture, storeEaCapture } from '../../functions/_lib/ea-capture.js';
-import { runEaCollectionStep } from '../../functions/_lib/ea-collection.js';
+import { runEaCollectionStep, runEaCollectionBatch } from '../../functions/_lib/ea-collection.js';
 import { sealEa, openEa, connectionScope, jobScope } from '../../functions/_lib/ea-direct.js';
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestPost as collectStep } from '../../functions/api/leagues/[leagueSlug]/ea-direct/collect-step.js';
@@ -83,6 +83,50 @@ test('each resumed collection step makes at most one EA request', async () => {
     result = await runEaCollectionStep({ ...options, state: JSON.parse(JSON.stringify(result.state)) });
     assert.ok(calls.length - before <= 1);
   }
+});
+
+test('batched EA collection keeps all 52 datasets and ordered session requests in 14 checkpoints',async()=>{
+  const {options,stored,calls}=fixture();
+  let state={},checkpoints=0,active=0,maxActive=0;
+  const original=options.client.dataset;
+  options.client.dataset=async(...args)=>{
+    active++;maxActive=Math.max(maxActive,active);
+    try{await Promise.resolve();return await original(...args)}finally{active--}
+  };
+  while(!state.done&&checkpoints<20){
+    const result=await runEaCollectionBatch({...options,state:structuredClone(state)},{batchSize:4});
+    state=result.state;checkpoints++;
+  }
+  assert.equal(state.done,true);assert.equal(checkpoints,14);assert.equal(maxActive,1);
+  assert.equal(stored.length,52);assert.equal(calls.filter(x=>x.kind==='roster').length,32);
+  assert.equal(state.result.timing.checkpointCount,14);
+  assert.equal(state.result.timing.providerCalls,54);
+  assert.equal(JSON.stringify(state.result.timing).includes('private'),false);
+});
+
+test('failed EA batch is replayable from its saved cursor without skipping a dataset',async()=>{
+  const {options,stored}=fixture();
+  const initial=await runEaCollectionBatch(options,{batchSize:4});
+  const saved=structuredClone(initial.state),original=options.client.dataset;
+  let calls=0;
+  options.client.dataset=async(...args)=>{if(++calls===3)throw new EaClientError('EA_TIMEOUT','timeout');return original(...args)};
+  await assert.rejects(runEaCollectionBatch({...options,state:structuredClone(saved)},{batchSize:4}),/timeout/);
+  options.client.dataset=original;
+  const retry=await runEaCollectionBatch({...options,state:structuredClone(saved)},{batchSize:4});
+  assert.equal(retry.state.cursor,5);
+  assert.deepEqual(stored.slice(1,3).map(x=>x.kind),stored.slice(3,5).map(x=>x.kind));
+  assert.equal(saved.cursor,1);
+});
+
+test('EA batching stops at the time budget between requests and caps oversized batches',async()=>{
+  const {options,calls}=fixture();
+  const initial=await runEaCollectionStep(options);let time=0;
+  const original=options.client.dataset;
+  options.client.dataset=async(...args)=>{time+=16000;return original(...args)};
+  const before=calls.length;
+  const result=await runEaCollectionBatch({...options,state:initial.state},{batchSize:999,now:()=>time});
+  assert.equal(result.state.cursor,2);assert.equal(calls.length-before,1);
+  assert.equal(result.state.timing.providerMs,16000);
 });
 
 test('preview collects actual datasets but never requests ready-source publication', async () => {

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.1",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 51,
+      "candidateRequiresMigration": false
+    },
+    "regressions": {
+      "passed": true,
+      "tests": 117
+    },
+    "representativeImport": {
+      "records": 10653,
+      "buildCallsBefore": 26,
+      "buildCallsAfter": 8,
+      "validationCallsBefore": 7,
+      "validationCallsAfter": 3,
+      "productionDurationVerified": false
+    },
+    "eaCollection": {
+      "datasets": 52,
+      "checkpointCountBefore": 53,
+      "checkpointCountAfter": 14,
+      "concurrentProviderRequests": 1,
+      "productionDurationVerified": false
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 482,
+      "failures": 0
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "billingEnabled": false
+  }
+}

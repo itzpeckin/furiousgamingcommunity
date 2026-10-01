@@ -287,7 +287,7 @@ function finalizeValidationReport(ctx){
 }
 async function nextSnapshotValidation(db,leagueId,snapshot,limit=100){
   await ensureValidationSchema(db);
-  const safeLimit=Math.max(25,Math.min(500,Number(limit)||250));
+  const safeLimit=Math.max(25,Math.min(2000,Number(limit)||250));
   let job=await db.prepare(`SELECT * FROM snapshot_validation_jobs WHERE league_id=? AND snapshot_id=?`).bind(leagueId,snapshot.id).first();
   if(!job)return startSnapshotValidation(db,leagueId,snapshot);
   if(job.status==='completed')return{job,complete:true,report:parse(job.report_json)||null};

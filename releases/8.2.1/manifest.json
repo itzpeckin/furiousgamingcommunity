@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.1",
+  "releaseType": "import-and-scheduling-performance",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.0",
+    "tag": "v8.2.0",
+    "commit": "8ef22bbf9a1f98295242d0df2b89cbea412c962a"
+  },
+  "implementationBranch": "feature/8.2.1-import-performance",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "pending",
+    "currentRelease": "8.2.0",
+    "candidateRelease": "8.2.1",
+    "currentMigration": 51,
+    "candidateMigration": 51
+  },
+  "requiredArtifacts": [
+    "releases/8.2.1/release-record.md",
+    "releases/8.2.1/validation-evidence.json",
+    "functions/_lib/discord-schedule-transition.js"
+  ]
+}

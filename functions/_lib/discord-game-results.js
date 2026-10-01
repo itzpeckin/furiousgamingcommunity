@@ -4,6 +4,7 @@ import { resolveTeam } from './league-teams.js';
 import { summaryGameFinal, summaryStage } from '../../league-engine/game-summary.js';
 import { normalizeGame } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
 import { discordBotRequest, discordErrorText } from './discord-api.js';
+import { automaticScheduleDecision } from './discord-schedule-transition.js';
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results||[];
 const hash=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(b=>b.toString(16).padStart(2,'0')).join('');
 const matches=(model,thread,game)=>Number(game.week)===Number(thread.week_index)&&summaryStage(game.stage)===thread.phase
@@ -14,6 +15,9 @@ export async function syncDiscordGameResults(env,db,{league,snapshotId,maxOperat
   const active=await db.prepare('SELECT snapshot_id FROM league_active_snapshots WHERE league_id=?').bind(league.id).first();
   if(active?.snapshot_id!==snapshotId)return {ok:true,status:'completed',superseded:true};
   const model=await discordLeagueReadModel({db,league},{domains:['teams','games']});
+  if((await automaticScheduleDecision(db,league.id,model.snapshot)).allowed){
+    return {ok:true,status:'completed',hasMore:false,resultMessages:0,skipped:true,reason:'week-advance'};
+  }
   let previousSnapshotId=null;
   try{previousSnapshotId=JSON.parse(model.snapshot.manifest_json||'{}').discordScheduleTransition?.sourceSnapshotId||null;}catch{}
   const threads=await rows(db,`SELECT thread.*,result.message_id,result.payload_hash,result.nonce,result.lease_until
@@ -39,6 +43,8 @@ export async function syncDiscordGameResults(env,db,{league,snapshotId,maxOperat
       if(!prior||summaryGameFinal(prior))continue;
     }
     await gameSummaryDetails({db,league},model,game);
+    // Ownership is identical for every game in this snapshot. Resolve it once
+    // per checkpoint, rather than repeating the same queries for each result.
     const message=await gameCardMessage({db,league,env},model,game),payloadHash=await hash(JSON.stringify(message));
     if(thread.message_id&&thread.payload_hash===payloadHash)continue;
     if(operations>=maxOperations){hasMore=true;break;}

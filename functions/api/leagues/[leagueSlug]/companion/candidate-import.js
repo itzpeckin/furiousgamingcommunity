@@ -781,6 +781,13 @@ export async function onRequestPost(context) {
       activeSnapshotChanged:false
     },409);
   }
+  // Background progress needs only its exact run. Avoid rediscovering the
+  // latest export and rebuilding the entire commissioner panel eight times.
+  if(action==='report-phase'&&body.compact===true){
+    const result=await reportPhase(current,body);
+    if(result.response)return result.response;
+    return json({ok:true,release:RELEASE,run:publicCandidateRun(result.run)});
+  }
   const identity = await identitySource(current.db,current.league.id);
   const report = await latestReport(current.db,current.league.id);
   const destinationResult = action === 'create-destination'
