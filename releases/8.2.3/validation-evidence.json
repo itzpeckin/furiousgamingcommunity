@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.3",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 52,
+      "candidateRequiresMigration": false
+    },
+    "recognitionAcceptance": {
+      "passed": false,
+      "automaticDiscordEnabled": false,
+      "console": {
+        "topCandidatesCorrect": 6,
+        "equippedSlots": 6,
+        "provisionalMatches": 4,
+        "uncertain": 2
+      },
+      "phoneResults": [
+        "Four equipped slots rank correctly; three remain uncertain.",
+        "Automatic row skips first staff slot; manual correction required.",
+        "Four of five equipped slots rank correctly; OL/DL confusion remains uncertain."
+      ],
+      "scope": "Four supplied screenshots; diagnostic experiment, not production recognition acceptance."
+    },
+    "browser": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "isolatedFixture": true,
+      "productionTested": false,
+      "pageErrors": 0,
+      "horizontalOverflow": false,
+      "imageUploads": 0,
+      "hostedPreviewAssetsTested": true,
+      "previewNavigation": "Canonical preview redirect retained; document fetched as a public asset for isolated rendering.",
+      "reportCorrections": true,
+      "invalidCropRejected": true,
+      "clearPassed": true
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 498,
+      "failures": 0
+    },
+    "hosted": {
+      "passed": true,
+      "checks": 26,
+      "deployment": "b5e1fff5-c170-4e49-95c2-03782a57afd1",
+      "scope": "candidate-preview"
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "billingEnabled": false,
+    "readerActivationChanged": false
+  }
+}
