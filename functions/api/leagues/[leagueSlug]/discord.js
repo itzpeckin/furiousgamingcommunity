@@ -6,6 +6,8 @@ import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../_
 import { discordGuildRoles, discordGuildTextChannels } from '../../../_lib/discord-installation.js';
 import { upsertDiscordGlobalCommands } from '../../../_lib/discord-api.js';
 import { coachingSettings, configureCoaching } from '../../../_lib/discord-coaching.js';
+import { loadoutSettings, configureLoadouts } from '../../../_lib/discord-loadouts.js';
+import { LOADOUT_CATALOG } from '../../../_lib/loadout-catalog.js';
 
 const SNOWFLAKE=/^[0-9]{17,20}$/;
 const cleanSnowflake=(value,required=false)=>{
@@ -52,6 +54,8 @@ async function state(c){
     installation:row||null,
     channels,roles,channelError,roleError,
     coaching:await coachingSettings(c.db,c.league.id),
+    loadouts:await loadoutSettings(c.db,c.league.id,c.env),
+    loadoutCatalog:LOADOUT_CATALOG,
     scheduleSync:await latestDiscordScheduleSync(c.db,c.league.id),
     globalCommands:true,
     automaticConnection:true,
@@ -71,6 +75,12 @@ export async function onRequestPost(context){
     let body={};try{body=await context.request.json()}catch{return json({ok:false,error:'Request body must be valid JSON.'},400)}
     const action=String(body.action||'').trim();
     const audit=createTenantAuditContext(context,c.league,c.session,`discord_installation_${action||'unknown'}`);
+    if(action==='configure-loadouts'){
+      await configureLoadouts(c,body);
+      await tenantAuditStatement(c.db,audit,{resourceType:'discord_loadout_settings',resourceId:c.league.id,
+        detail:{enabled:body.enabled,bannedCount:body.banned.length,banDuplicates:body.banDuplicates}}).run();
+      return json(await state(c));
+    }
     if(action==='configure-coaching'){
       await configureCoaching(c,body);
       await tenantAuditStatement(c.db,audit,{resourceType:'discord_coaching_settings',resourceId:c.league.id,

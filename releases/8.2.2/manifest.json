@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.2",
+  "releaseType": "weekly-staff-loadout-rules",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.1",
+    "tag": "v8.2.1",
+    "commit": "8bd6563a2aa5d61dbd9c1eb83ee9dc72ca062b88"
+  },
+  "implementationBranch": "feature/8.2.2-weekly-loadouts",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "local-candidate"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "awaiting-validation-and-deployment-access",
+    "currentRelease": "8.2.1",
+    "candidateRelease": "8.2.2",
+    "currentMigration": 51,
+    "candidateMigration": 52
+  },
+  "requiredArtifacts": [
+    "releases/8.2.2/release-record.md",
+    "releases/8.2.2/validation-evidence.json",
+    "assets/abilities/catalog.json",
+    "migrations/0052_weekly_loadouts.sql"
+  ]
+}

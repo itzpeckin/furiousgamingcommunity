@@ -504,10 +504,10 @@ function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000
 }
 
 test('global Discord command inventory restores legacy week commands and remains multi-league capable',()=>{
-  assert.equal(DISCORD_GLOBAL_COMMANDS.length,41);
-  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,41);
+  assert.equal(DISCORD_GLOBAL_COMMANDS.length,42);
+  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,42);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.map(command=>command.name),[
-    'coach','game','standings','playoffs','eliminated','schedule','games','rush','abilities','leaders','player','team','trade-block','trade-history','news',
+    'loadout','coach','game','standings','playoffs','eliminated','schedule','games','rush','abilities','leaders','player','team','trade-block','trade-history','news',
     'gotw','league-site','twitch','join','gm-history','confidence','rules','trade',
     ...Array.from({length:18},(_,index)=>`week${index+1}`)
   ]);
@@ -1010,7 +1010,7 @@ test('global command registration upserts by name without bulk replacement',asyn
   assert.equal(requests.length,3);
   assert.ok(requests.every(item=>item.method==='POST'));
   assert.ok(requests.every(item=>/\/applications\/100000000000000009\/commands$/.test(item.url)));
-  assert.deepEqual(requests.map(item=>item.body.name),['coach','game','standings']);
+  assert.deepEqual(requests.map(item=>item.body.name),['loadout','coach','game']);
 
   requests.length=0;
   await upsertDiscordGuildCommands({
@@ -1031,7 +1031,7 @@ test('global command registration upserts by name without bulk replacement',asyn
     DISCORD_CLIENT_ID:'100000000000000009',DISCORD_BOT_TOKEN:'secret'
   },DISCORD_GLOBAL_COMMANDS.slice(0,3),{fetchImpl:ensureFetch});
   assert.deepEqual(requests.map(item=>[item.method,item.body?.name||null]),[
-    ['POST','coach'],['POST','game'],['POST','standings']
+    ['POST','loadout'],['POST','coach'],['POST','game']
   ]);
 });
 

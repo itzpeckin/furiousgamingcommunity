@@ -65,7 +65,7 @@ function bucket(initial={}) {
   };
 }
 
-async function createDatabase(maxVersion=51) {
+async function createDatabase(maxVersion=52) {
   const database=new DatabaseSync(':memory:');
   database.exec('PRAGMA foreign_keys=ON');
   const files=(await walkFiles())
@@ -232,6 +232,9 @@ test('one Archive Season action freezes History Books and prepares the next seas
   const {database,token}=await fixture();
   const db=d1(database),archives=bucket(),sources=bucket();
   try{
+    database.exec(`INSERT INTO discord_loadout_settings(league_id,guild_id,banned_json,ban_duplicates,catalog_version)
+      VALUES('league-1','200000000000000001','["camp-counselor"]',1,'m27-2026-10-02')`);
+    const loadoutRulesBefore=database.prepare('SELECT * FROM discord_loadout_settings').get();
     database.prepare(`UPDATE companion_league_export_endpoints SET
       latest_session_id='capture-session-1',latest_session_token_version=1 WHERE league_id='league-1'`).run();
     const before={
@@ -292,6 +295,7 @@ test('one Archive Season action freezes History Books and prepares the next seas
     }}));
     payload=await response.json();
     assert.equal(payload.result.alreadyPrepared,true);
+    assert.deepEqual(database.prepare('SELECT * FROM discord_loadout_settings').get(),loadoutRulesBefore);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM franchise_season_closures`).get().count,1);
   }finally{database.close();}
 });

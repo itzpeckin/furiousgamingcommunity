@@ -81,6 +81,7 @@
       }
     ],
     "variables": [
+      "LOADOUT_READER_VERSION",
       "EA_CLIENT_ID",
       "EA_EDITION",
       "APP_ENV",
@@ -153,6 +154,7 @@
       },
       "variables": {
         "APP_ENV": "local",
+        "LOADOUT_READER_VERSION": "disabled",
         "EA_CLIENT_ID": "MCA_27_COMP_APP",
         "EA_EDITION": "2027",
         "APP_VERSION": "8.0.10",
@@ -191,6 +193,7 @@
       },
       "variables": {
         "APP_ENV": "staging",
+        "LOADOUT_READER_VERSION": "disabled",
         "EA_CLIENT_ID": "MCA_27_COMP_APP",
         "EA_EDITION": "2027",
         "APP_VERSION": "8.0.10",
@@ -230,6 +233,7 @@
       },
       "variables": {
         "APP_ENV": "production",
+        "LOADOUT_READER_VERSION": "disabled",
         "EA_CLIENT_ID": "MCA_27_COMP_APP",
         "EA_EDITION": "2027",
         "APP_VERSION": "8.0.10",

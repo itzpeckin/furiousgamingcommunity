@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.2",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 52,
+      "candidateRequiresMigration": true,
+      "productionApplied": false
+    },
+    "targeted": {
+      "passed": true,
+      "coachingAndLoadouts": 26,
+      "finalLoadoutAndArchiveChecks": 23
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 494,
+      "failures": 0
+    },
+    "recognitionAcceptance": {
+      "passed": false,
+      "status": "requires-hosted-provider-validation"
+    },
+    "hosted": {
+      "passed": false,
+      "status": "requires-deployment-access"
+    },
+    "browser": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "isolatedFixture": true,
+      "productionTested": false,
+      "checks": [
+        "compact grid",
+        "shared ability choices",
+        "category and text filters",
+        "one save per double click",
+        "league isolation",
+        "no horizontal overflow",
+        "no page errors"
+      ]
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "billingEnabled": false
+  }
+}

@@ -46,9 +46,9 @@ test('only missing canonical migrations are planned', () => {
 
 test('canonical migration loading includes operational recovery evidence', async () => {
   const { contract, migrations } = await loadCanonicalMigrations();
-    assert.equal(contract.currentVersion, 51);
-    assert.equal(migrations.at(-1)?.version, 51);
-    assert.equal(migrations.at(-1)?.relativePath, 'migrations/0051_self_service_account_readiness.sql');
+    assert.equal(contract.currentVersion, 52);
+    assert.equal(migrations.at(-1)?.version, 52);
+    assert.equal(migrations.at(-1)?.relativePath, 'migrations/0052_weekly_loadouts.sql');
   assert.equal(
     migrations.find(item => item.version === 43)?.relativePath,
     'migrations/0043_player_development_trait_observations.sql'

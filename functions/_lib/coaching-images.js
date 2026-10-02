@@ -37,7 +37,7 @@ async function bounded(response,limit){
   const data=new Uint8Array(size);let offset=0;for(const part of parts){data.set(part,offset);offset+=part.length;}return data;
 }
 
-async function imageResponse(value,fetchImpl,depth=0){
+export async function imageResponse(value,fetchImpl,depth=0){
   const safe=coachingImageLink(value);if(!safe||depth>3)throw evidenceError('Attach the screenshot directly; this share link cannot be read.');
   const response=await fetchImpl(safe,{redirect:'manual',signal:AbortSignal.timeout(15000)});
   if(response.status>=300&&response.status<400)return imageResponse(new URL(response.headers.get('location'),safe).href,fetchImpl,depth+1);
