@@ -14,11 +14,13 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending"
+    "status": "pr-179"
   },
   "staging": {
     "authorized": true,
-    "deployed": false
+    "deployed": true,
+    "deployment": "b5e1fff5-c170-4e49-95c2-03782a57afd1",
+    "status": "preview-assets-verified"
   },
   "production": {
     "authorized": true,

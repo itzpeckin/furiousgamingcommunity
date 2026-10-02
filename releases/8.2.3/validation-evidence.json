@@ -41,7 +41,23 @@
       "productionTested": false,
       "pageErrors": 0,
       "horizontalOverflow": false,
-      "imageUploads": 0
+      "imageUploads": 0,
+      "hostedPreviewAssetsTested": true,
+      "previewNavigation": "Canonical preview redirect retained; document fetched as a public asset for isolated rendering.",
+      "reportCorrections": true,
+      "invalidCropRejected": true,
+      "clearPassed": true
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 498,
+      "failures": 0
+    },
+    "hosted": {
+      "passed": true,
+      "checks": 26,
+      "deployment": "b5e1fff5-c170-4e49-95c2-03782a57afd1",
+      "scope": "candidate-preview"
     }
   },
   "scopeBoundaries": {
