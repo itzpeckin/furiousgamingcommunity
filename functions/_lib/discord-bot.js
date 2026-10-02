@@ -1,6 +1,7 @@
 import { resolveLiveTradePlayer } from './trade-player.js';
 import { gameCommand } from './discord-game.js';
 import { coachingCommand } from './discord-coaching.js';
+import { loadoutCommand } from './discord-loadouts.js';
 import { discordCommandName, discordCommandOptions, discordScheduleThreadWeek } from './discord-commands.js';
 import {
   abilitiesCommand,
@@ -297,6 +298,7 @@ async function confidenceAction(c,subcommand,values){
 export async function executeDiscordCommand(c){
   const command=discordCommandName(c.interaction);
   const {subcommandGroup,subcommand,values}=discordCommandOptions(c.interaction);
+  if(command==='loadout'&&['status','missing'].includes(subcommand))return loadoutCommand(c,{missing:subcommand==='missing'});
   if(command==='game')return gameCommand(c,values);
   const legacyWeek=discordScheduleThreadWeek(command);
   if(legacyWeek){

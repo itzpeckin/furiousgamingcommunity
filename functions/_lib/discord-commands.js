@@ -1,4 +1,4 @@
-export const DISCORD_COMMAND_RELEASE = '8.0.23';
+export const DISCORD_COMMAND_RELEASE = '8.2.2';
 
 // These names belong to FranchiseHQ and are replaced by the direct /player and
 // /team experiences. Registration removes only these exact legacy names after
@@ -39,6 +39,10 @@ export const DISCORD_SCHEDULE_THREAD_COMMANDS = Object.freeze(
 );
 
 export const DISCORD_GLOBAL_COMMANDS = Object.freeze([
+  {name:'loadout',description:'Check weekly staff loadout submissions against this league’s rules.',options:[
+    subcommand('status','Show current-week staff loadout checks for registered teams.'),
+    subcommand('missing','Show teams needing a current-week loadout screenshot or clearer evidence.')
+  ]},
   {name:'coach',description:'Check coaching archetype submissions against this league’s rules.',options:[
     subcommand('status','Show teams, submitters, archetypes, and legality.'),
     subcommand('missing','Show GMs who still need to submit a readable archetype screenshot.')

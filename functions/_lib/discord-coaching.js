@@ -8,7 +8,7 @@ const parse=value=>{try{return JSON.parse(value||'[]');}catch{return[];}};
 const safe=value=>String(value||'').replace(/([\\*_~`|<>])/g,'\\$1').slice(0,100);
 const fail=message=>{throw Object.assign(new Error(message),{status:409});};
 
-function channelPermissions(channel,guildId,botId,member,roles){
+export function channelPermissions(channel,guildId,botId,member,roles){
   const ids=new Set([guildId,...(member.roles||[])]);
   let permissions=roles.filter(role=>ids.has(role.id)).reduce((value,role)=>value|BigInt(role.permissions||'0'),0n);
   if(permissions&8n)return (1n<<53n)-1n;
@@ -20,7 +20,7 @@ function channelPermissions(channel,guildId,botId,member,roles){
   return permissions;
 }
 
-async function verifyReadAccess(env,config,fetchImpl){
+export async function verifyReadAccess(env,config,fetchImpl){
   const [origin,bot]=await Promise.all([
     discordBotRequest(env,`/channels/${config.source_channel_id}`,{fetchImpl,rateLimitRetries:0}),
     discordBotRequest(env,'/users/@me',{fetchImpl,rateLimitRetries:0})
@@ -105,7 +105,7 @@ export async function configureCoaching(c,body,{fetchImpl=fetch}={}){
     .bind(c.league.id,installation.guildId,source,report,JSON.stringify([...new Set(banned)]),...Array(5).fill(reset?1:0)).run();
 }
 
-async function identityFor(db,leagueId,authorId,submittedAt,teams){
+export async function identityFor(db,leagueId,authorId,submittedAt,teams){
   const membership=await db.prepare(`SELECT m.id,m.user_id,m.team_id FROM league_memberships m JOIN users u ON u.id=m.user_id
     WHERE m.league_id=? AND m.active=1 AND u.discord_user_id=? LIMIT 1`).bind(leagueId,authorId).first();
   if(!membership)return null;

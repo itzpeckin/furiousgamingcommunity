@@ -71,7 +71,7 @@ test('Xbox regional redirects resolve to a validated image and unsafe redirects 
   }finally{f.sqlite.close();}
 });
 
-test('scanner registers coach and rush once using the production metadata cache fallback',async()=>{
+test('scanner registers coach, loadout and rush once using the production metadata cache fallback',async()=>{
   const f=await fixture(),original=globalThis.fetch;
   try{
     const cache=new Map(),posted=[];
@@ -85,7 +85,7 @@ test('scanner registers coach and rush once using the production metadata cache 
       const response=await scannerPost({env,request:request()});const body=await response.json();
       assert.equal(body.commandsRegistered,true);assert.equal(body.imageReaderAvailable,true);assert.equal(body.messageContentAvailable,true);
     }
-    assert.deepEqual(posted,['coach','rush']);
+    assert.deepEqual(posted,['loadout','coach','rush']);
   }finally{globalThis.fetch=original;f.sqlite.close();}
 });
 

@@ -19,6 +19,8 @@
     "AI": [
       "functions/_lib/coaching-images.js",
       "functions/_lib/discord-coaching.js",
+      "functions/_lib/discord-loadouts.js",
+      "functions/_lib/loadout-images.js",
       "functions/api/internal/coaching-scan.js"
     ],
     "APP_ENV": [
@@ -34,6 +36,7 @@
     ],
     "COACHING_SCANNER_SECRET": [
       "functions/_lib/discord-coaching.js",
+      "functions/_lib/discord-loadouts.js",
       "functions/api/internal/coaching-scan.js",
       "workers/franchise-coaching-scanner/src/index.js"
     ],
@@ -195,6 +198,9 @@
       "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/memberships.js"
     ],
+    "LOADOUT_READER_VERSION": [
+      "functions/_lib/discord-loadouts.js"
+    ],
     "OWNER_FALLBACK_DISCORD_ID": [
       "functions/_lib/owner-fallback.js",
       "functions/_lib/permissions.js"
@@ -218,16 +224,17 @@
   "files": {
     "byExtension": {
       ".bin": 1,
-      ".css": 13,
+      ".css": 14,
       ".example": 1,
       ".html": 9,
-      ".js": 278,
-      ".json": 7,
+      ".jpg": 78,
+      ".js": 284,
+      ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 63,
-      ".png": 3,
-      ".sql": 53,
+      ".mjs": 65,
+      ".png": 5,
+      ".sql": 54,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -243,7 +250,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 446146,
+        "bytes": 446599,
         "file": "trade-module.js"
       },
       {
@@ -251,7 +258,7 @@
         "file": "tools/check-release.mjs"
       },
       {
-        "bytes": 192602,
+        "bytes": 192608,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -271,7 +278,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77290,
+        "bytes": 77406,
         "file": "index.html"
       },
       {
@@ -303,7 +310,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       },
       {
-        "bytes": 42997,
+        "bytes": 43407,
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
@@ -315,7 +322,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 724
+    "total": 815
   },
   "frontend": {
     "assets": [
@@ -326,6 +333,11 @@
       },
       {
         "path": "release-7.0.5.css",
+        "type": "link",
+        "versioned": true
+      },
+      {
+        "path": "loadout-controls.css",
         "type": "link",
         "versioned": true
       },
@@ -795,6 +807,11 @@
         "versioned": false
       },
       {
+        "path": "loadout-controls.js",
+        "type": "script",
+        "versioned": true
+      },
+      {
         "path": "trade-module.js",
         "type": "script",
         "versioned": true
@@ -821,8 +838,8 @@
       }
     ],
     "entrypoint": "index.html",
-    "scriptCount": 97,
-    "stylesheetCount": 3
+    "scriptCount": 98,
+    "stylesheetCount": 4
   },
   "functions": {
     "routeCount": 99,
@@ -1874,10 +1891,16 @@
       "recordsLedger": true,
       "sha256": "a9ac0a898b9b798c880481b65c38aba13e829fac15e4a067c95dd1902a117c63",
       "version": "0051"
+    },
+    {
+      "file": "migrations/0052_weekly_loadouts.sql",
+      "recordsLedger": true,
+      "sha256": "8408f97faba19a289dc038c87354f2aa1d665789ec1db3e9853ba195ec9d3136",
+      "version": "0052"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.1",
+  "release": "8.2.2",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
