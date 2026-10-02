@@ -12,15 +12,15 @@ Migration 52 adds three opt-in tables. No league is enabled by the migration. `L
 
 ## Known inherited blockers
 
-No registered inherited quality failures. This session lacks Cloudflare deployment/database/AI access. Real screenshot recognition, hosted migration and release acceptance remain pending; fixture AI responses are not evidence of recognition accuracy.
+Cloudflare access was restored and verified against the FHQ Pages project and Madden 27 database. Publish the approved catalog and per-league rule settings with automatic screenshot checking disabled. Do not set `LOADOUT_READER_VERSION`: the candidate Qwen reader exhausted its 1,800-token response budget on the supplied console screenshot without returning a usable result. Alternate model/prompt experiments did not establish recognition acceptance. The first experimental request had a truncated reference image and is excluded from acceptance evidence. No screenshot was sent to Discord and no league was opted in.
 
 ## Validation evidence
 
-See `validation-evidence.json`. The strict gate passed 494 tests. After adding explicit archive preservation, all 23 loadout/archive tests passed. The integrated commissioner component passed isolated desktop (1440px) and phone (390px) browser checks for layout, shared bans, filters, single-save behavior and league isolation, with no page errors or horizontal overflow. Actual image recognition and hosted acceptance remain pending.
+See `validation-evidence.json`. The strict gate passed 494 tests. After adding explicit archive preservation, all 23 loadout/archive tests passed. The integrated commissioner component passed isolated desktop (1440px) and phone (390px) browser checks for layout, shared bans, filters, single-save behavior and league isolation, with no page errors or horizontal overflow. Candidate preview d99f38d7-23ca-4342-970b-864707066c0a passed 22 hosted checks, including both reference image hashes. Staging migration 52 preserved protected counts with no foreign-key violations. Automatic recognition acceptance has not passed; its activation gate remains closed.
 
 ## Deployment status
 
-Owner authorized production publication. Candidate only: not merged, tagged or deployed. No production database change, Discord post, thread mutation, import or export has been performed.
+Owner authorized production publication. Release scope is the catalog and saved-rule controls; automatic checking is unavailable until a subsequent validated activation. Migration 52 has passed staging and production preservation checks. At this commit merge and production verification remain pending. No Discord post, thread mutation, import or export has been performed.
 
 Before merging: apply migration 52 through the existing D1 release tooling to staging and production with preservation checks; validate candidate Pages, actual screenshot recognition and commissioner controls; preserve all existing bindings and secrets. Register the new command through the existing scanner registration path. Validate hosted production after publication.
 

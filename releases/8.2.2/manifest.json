@@ -14,17 +14,18 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "local-candidate"
+    "status": "draft-pr-178"
   },
   "staging": {
     "authorized": true,
-    "deployed": false,
-    "status": "not-run"
+    "deployed": true,
+    "status": "preview-verified",
+    "deployment": "d99f38d7-23ca-4342-970b-864707066c0a"
   },
   "production": {
     "authorized": true,
     "deployed": false,
-    "status": "awaiting-validation-and-deployment-access",
+    "status": "awaiting-migration-and-publication-checker-disabled",
     "currentRelease": "8.2.1",
     "candidateRelease": "8.2.2",
     "currentMigration": 51,

@@ -14,7 +14,10 @@
       "passed": true,
       "migrationVersion": 52,
       "candidateRequiresMigration": true,
-      "productionApplied": false
+      "productionApplied": true,
+      "stagingApplied": true,
+      "foreignKeyViolations": 0,
+      "protectedCountsPreserved": true
     },
     "targeted": {
       "passed": true,
@@ -28,11 +31,15 @@
     },
     "recognitionAcceptance": {
       "passed": false,
-      "status": "requires-hosted-provider-validation"
+      "status": "activation-disabled-provider-acceptance-incomplete",
+      "candidateResult": "Qwen response exhausted its token budget without usable content",
+      "excludedExperiment": "Initial truncated reference transfer excluded from evidence"
     },
     "hosted": {
-      "passed": false,
-      "status": "requires-deployment-access"
+      "passed": true,
+      "scope": "candidate-preview",
+      "checks": 22,
+      "deployment": "d99f38d7-23ca-4342-970b-864707066c0a"
     },
     "browser": {
       "passed": true,
