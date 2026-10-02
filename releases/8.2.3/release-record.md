@@ -23,3 +23,7 @@ User requested a usable recognition test build and granted standing release auth
 ## Rollback
 
 Restore main/tag v8.2.2 at `3674ad9313d3bf42fdf901a21bbc9dde6e882a58`. Migration 52 and existing Worker versions stay unchanged. No league state restoration is needed for this static diagnostic page.
+
+## Discord-only workflow correction
+
+The owner clarified that screenshot submission and checking must happen entirely in Discord. The commissioner-facing lab link is removed, and the former test URL now explains that the web tool is retired and automatic Discord checking remains under development. It contains no image input or recognition script. Existing saved-rule controls remain available. Diagnostic implementation and prior evidence are retained for developer use; commissioners and members are not asked to crop or label screenshots. No scanner activation or Discord/league state change accompanies this correction.
