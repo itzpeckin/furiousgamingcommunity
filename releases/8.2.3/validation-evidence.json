@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.3",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 52,
+      "candidateRequiresMigration": false
+    },
+    "recognitionAcceptance": {
+      "passed": false,
+      "automaticDiscordEnabled": false,
+      "console": {
+        "topCandidatesCorrect": 6,
+        "equippedSlots": 6,
+        "provisionalMatches": 4,
+        "uncertain": 2
+      },
+      "phoneResults": [
+        "Four equipped slots rank correctly; three remain uncertain.",
+        "Automatic row skips first staff slot; manual correction required.",
+        "Four of five equipped slots rank correctly; OL/DL confusion remains uncertain."
+      ],
+      "scope": "Four supplied screenshots; diagnostic experiment, not production recognition acceptance."
+    },
+    "browser": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "isolatedFixture": true,
+      "productionTested": false,
+      "pageErrors": 0,
+      "horizontalOverflow": false,
+      "imageUploads": 0
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "billingEnabled": false,
+    "readerActivationChanged": false
+  }
+}

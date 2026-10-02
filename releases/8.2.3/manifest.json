@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.3",
+  "releaseType": "experimental-screenshot-recognition-lab",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.2",
+    "tag": "v8.2.2",
+    "commit": "3674ad9313d3bf42fdf901a21bbc9dde6e882a58"
+  },
+  "implementationBranch": "feature/loadout-recognition-lab",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.2",
+    "candidateRelease": "8.2.3",
+    "currentMigration": 52,
+    "candidateMigration": 52
+  },
+  "requiredArtifacts": [
+    "releases/8.2.3/release-record.md",
+    "releases/8.2.3/validation-evidence.json",
+    "support/loadout-lab/index.html",
+    "tests/discord/loadout-vision.test.mjs"
+  ]
+}

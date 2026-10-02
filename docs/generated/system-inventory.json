@@ -224,15 +224,15 @@
   "files": {
     "byExtension": {
       ".bin": 1,
-      ".css": 14,
+      ".css": 15,
       ".example": 1,
-      ".html": 9,
+      ".html": 10,
       ".jpg": 78,
-      ".js": 284,
+      ".js": 286,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 65,
+      ".mjs": 66,
       ".png": 5,
       ".sql": 54,
       ".txt": 3,
@@ -322,7 +322,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 815
+    "total": 820
   },
   "frontend": {
     "assets": [
@@ -1900,7 +1900,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.2",
+  "release": "8.2.3",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

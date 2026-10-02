@@ -9,7 +9,7 @@ export async function onRequest(context) {
   return new Response(
     JSON.stringify({
       ok: true,
-      release: '8.2.2',
+      release: '8.2.3',
       accountEmail,
       service: "Franchise HQ",
       environment: "Cloudflare Pages Functions"
