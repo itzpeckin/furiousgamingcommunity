@@ -4,7 +4,7 @@ import { channelPermissions, identityFor, verifyReadAccess } from './discord-coa
 import { coachingEvidence } from './coaching-images.js';
 import { snapshotCurrentPeriod } from './schedule-integrity.js';
 import { ABILITY_BY_ID, LOADOUT_CATALOG } from './loadout-catalog.js';
-import { readLoadoutScreenshot, LOADOUT_READER_VERSION } from './loadout-images.js';
+import { readLoadoutScreenshot, loadoutReaderReady as ready } from './loadout-images.js';
 import { evaluateLoadout } from './loadout-rules.js';
 
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results||[];
@@ -12,7 +12,6 @@ const snow=value=>/^\d{17,20}$/.test(String(value||''));
 const parse=(value,fallback=null)=>{try{return JSON.parse(value);}catch{return fallback;}};
 const safe=value=>String(value||'').replace(/([\\*_~`|<>])/g,'\\$1').slice(0,100);
 const fail=message=>{throw Object.assign(new Error(message),{status:409});};
-const ready=env=>Boolean(env.AI?.run&&env.COACHING_SCANNER_SECRET&&env.LOADOUT_READER_VERSION===LOADOUT_READER_VERSION);
 
 async function currentThreads(db,leagueId,guildId){
   const snapshot=await db.prepare(`SELECT s.* FROM league_snapshots s JOIN league_active_snapshots a ON a.snapshot_id=s.id

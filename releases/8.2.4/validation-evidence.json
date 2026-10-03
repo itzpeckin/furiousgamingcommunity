@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.4",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 52,
+      "candidateRequiresMigration": false
+    },
+    "recognitionAcceptance": {
+      "passed": true,
+      "scope": "Actual hosted preview reader and Cloudflare AI on supplied screenshots, with isolated rules and no Discord posts.",
+      "deployment": "f9f8a0ee-862b-4f34-ad56-a9a54dab0910",
+      "consoleEquippedIdentified": 6,
+      "phoneEquippedIdentified": [
+        4,
+        5
+      ],
+      "angledPhone": "Slot 5 uncertain; exact resubmission guidance; no legality decision.",
+      "namedBan": "Camp Counselor correctly illegal when banned.",
+      "duplicateFixture": "Synthetic duplicate of After School Tutor correctly illegal in slots 1 and 6.",
+      "negativeImages": "Clipped row unreadable; archetype and Xbox archetype screenshots ignored.",
+      "elapsedMs": [
+        5356,
+        15507,
+        6135,
+        2703,
+        6056
+      ],
+      "unauthenticatedProbeStatus": 404,
+      "productionDiscordEndToEnd": false
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 508,
+      "failures": 0
+    },
+    "previewAdapterCleanup": {
+      "sourceRemoved": true,
+      "temporaryTokenRemoved": true,
+      "testDeploymentDeleted": true
+    }
+  },
+  "scopeBoundaries": {
+    "activeSnapshotChanged": false,
+    "discordStateChanged": false,
+    "billingEnabled": false,
+    "readerActivationChanged": false,
+    "previewOnlyTemporaryToken": true
+  }
+}

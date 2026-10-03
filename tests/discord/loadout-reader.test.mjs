@@ -72,3 +72,11 @@ test('unrelated-image model output is parsed safely and truncated output retries
  env.AI.run=async()=>({choices:[{finish_reason:'length',message:{content:'{"kind":"other"}'}}]});
  await assert.rejects(readLoadoutScreenshot(env,['https://cdn.discordapp.com/attachments/1/2/x.png'],{fetchImpl,decodeImage}),/incomplete response/);
 });
+
+test('public readiness reflects the same activation switch as the scanner without running AI',async()=>{
+ const {onRequest}=await import('../../functions/api/health.js');let calls=0;
+ const env={AI:{run(){calls++;}},COACHING_SCANNER_SECRET:'test-only',LOADOUT_READER_VERSION};
+ assert.equal((await (await onRequest({env})).json()).discordLoadoutReader,'ready');
+ env.LOADOUT_READER_VERSION=LOADOUT_CATALOG.version;
+ assert.equal((await (await onRequest({env})).json()).discordLoadoutReader,'disabled');assert.equal(calls,0);
+});

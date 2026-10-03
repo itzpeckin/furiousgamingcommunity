@@ -1,3 +1,4 @@
+import {loadoutReaderReady} from '../_lib/loadout-images.js';
 export async function onRequest(context) {
   let accountEmail='unavailable';
   if (context?.env?.ACCOUNT_EMAIL?.fetch) {
@@ -9,8 +10,9 @@ export async function onRequest(context) {
   return new Response(
     JSON.stringify({
       ok: true,
-      release: '8.2.3',
+      release: '8.2.4',
       accountEmail,
+      discordLoadoutReader:loadoutReaderReady(context?.env)?'ready':'disabled',
       service: "Franchise HQ",
       environment: "Cloudflare Pages Functions"
     }),

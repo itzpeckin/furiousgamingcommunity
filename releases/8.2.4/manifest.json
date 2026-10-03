@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.4",
+  "releaseType": "discord-weekly-loadout-recognition",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.3",
+    "tag": "v8.2.3",
+    "commit": "5950f8b885b0fb5b4aae92ab35bf64e200344d4d"
+  },
+  "implementationBranch": "feature/discord-loadout-recognition",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.3",
+    "candidateRelease": "8.2.4",
+    "currentMigration": 52,
+    "candidateMigration": 52
+  },
+  "requiredArtifacts": [
+    "releases/8.2.4/release-record.md",
+    "releases/8.2.4/validation-evidence.json",
+    "tests/discord/loadout-reader.test.mjs"
+  ]
+}
