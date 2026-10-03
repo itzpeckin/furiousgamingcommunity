@@ -19,7 +19,6 @@
     "AI": [
       "functions/_lib/coaching-images.js",
       "functions/_lib/discord-coaching.js",
-      "functions/_lib/discord-loadouts.js",
       "functions/_lib/loadout-images.js",
       "functions/api/internal/coaching-scan.js"
     ],
@@ -36,7 +35,7 @@
     ],
     "COACHING_SCANNER_SECRET": [
       "functions/_lib/discord-coaching.js",
-      "functions/_lib/discord-loadouts.js",
+      "functions/_lib/loadout-images.js",
       "functions/api/internal/coaching-scan.js",
       "workers/franchise-coaching-scanner/src/index.js"
     ],
@@ -199,7 +198,7 @@
       "functions/api/leagues/[leagueSlug]/memberships.js"
     ],
     "LOADOUT_READER_VERSION": [
-      "functions/_lib/discord-loadouts.js"
+      "functions/_lib/loadout-images.js"
     ],
     "OWNER_FALLBACK_DISCORD_ID": [
       "functions/_lib/owner-fallback.js",
@@ -228,11 +227,11 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 286,
+      ".js": 290,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 66,
+      ".mjs": 68,
       ".png": 5,
       ".sql": 54,
       ".txt": 3,
@@ -252,6 +251,10 @@
       {
         "bytes": 446599,
         "file": "trade-module.js"
+      },
+      {
+        "bytes": 250590,
+        "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
         "bytes": 193856,
@@ -278,7 +281,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77408,
+        "bytes": 77406,
         "file": "index.html"
       },
       {
@@ -316,13 +319,9 @@
       {
         "bytes": 41159,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
-      },
-      {
-        "bytes": 40421,
-        "file": "functions/api/leagues/[leagueSlug]/companion/build-snapshot.js"
       }
     ],
-    "total": 820
+    "total": 826
   },
   "frontend": {
     "assets": [
@@ -1900,7 +1899,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.3",
+  "release": "8.2.4",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

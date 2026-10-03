@@ -3,10 +3,12 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
-import { configureLoadouts, scanLoadouts, loadoutCommand, loadoutSettings } from '../../functions/_lib/discord-loadouts.js';
+import { configureLoadouts, scanLoadouts as runScanLoadouts, loadoutCommand, loadoutSettings } from '../../functions/_lib/discord-loadouts.js';
 import { normalizeLoadout, evaluateLoadout } from '../../functions/_lib/loadout-rules.js';
-import { readLoadoutScreenshot } from '../../functions/_lib/loadout-images.js';
+import { readLoadoutScreenshot, LOADOUT_READER_VERSION } from '../../functions/_lib/loadout-images.js';
 import { LOADOUT_CATALOG } from '../../functions/_lib/loadout-catalog.js';
+// Scanner tests isolate Discord/tenant state; pixel/model acceptance is in loadout-reader tests.
+const scanLoadouts=(env,db,options)=>runScanLoadouts(env,db,{...options,readScreenshot:async()=>normalizeLoadout(JSON.parse((await env.AI.run()).response))});
 function d1(sqlite){return {prepare(sql){const s=sqlite.prepare(sql);let args=[];const p={bind(...a){args=a;return p;},async first(){return s.get(...args)||null;},async all(){return {results:s.all(...args)};},async run(){return {meta:{changes:Number(s.run(...args).changes)}};}};return p;}};}
 const guild='200000000000000001',parent='200000000000000002',channel='200000000000000003',author='200000000000000004',bot='200000000000000005',messageId='200000000000000006';
 const photo='https://cdn.discordapp.com/attachments/123/456/loadout.png';
@@ -27,7 +29,7 @@ async function fixture(){
     .run(key,JSON.stringify({external_id:key,abbreviation:abbr,display_name:name,team_name:name}));
   let aiCalls=0;
   const calls=[],posts=[],message={id:messageId,author:{id:author},timestamp:'2026-09-28T00:00:00Z',attachments:[{url:photo,content_type:'image/png'}]};
-  const env={DISCORD_BOT_TOKEN:'test-only',COACHING_SCANNER_SECRET:'ab'.repeat(32),LOADOUT_READER_VERSION:LOADOUT_CATALOG.version,
+  const env={DISCORD_BOT_TOKEN:'test-only',COACHING_SCANNER_SECRET:'ab'.repeat(32),LOADOUT_READER_VERSION,
     AI:{run:async()=>{aiCalls++;return {response:JSON.stringify(sample())};}}};
   const fetchImpl=async(url,options={})=>{
     const u=new URL(url),method=options.method||'GET';calls.push({path:u.pathname,method,query:u.search});
@@ -144,9 +146,8 @@ test('missing command distinguishes incomplete history, pending checks and genui
   }finally{f.sqlite.close();}
 });
 
-test('reference tampering, unsafe image redirects and missing thread permissions never enable a false check',async()=>{
+test('unsafe image redirects and missing thread permissions never enable a false check',async()=>{
   const f=await fixture();try{
-    await assert.rejects(readLoadoutScreenshot(f.env,[photo],{fetchImpl:async(url,options)=>String(url).includes('franchisehq.app')?new Response('bad',{headers:{'content-type':'image/png'}}):f.fetchImpl(url,options)}),/do not match/);
     await assert.rejects(readLoadoutScreenshot(f.env,[photo],{fetchImpl:async()=>new Response(null,{status:302,headers:{location:'https://127.0.0.1/private.png'}})}),/cannot be read/);
     const deny=async(url,options)=>String(url).endsWith('/roles')?Response.json([{id:guild,permissions:'0'}]):f.fetchImpl(url,options);
     await assert.rejects(configureLoadouts(f.c,{enabled:true,banned:[],banDuplicates:false,revision:0,catalogVersion:LOADOUT_CATALOG.version},{fetchImpl:deny}),/Send Messages in Threads/);
