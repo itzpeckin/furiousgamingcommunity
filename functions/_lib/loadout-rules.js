@@ -29,6 +29,7 @@ export function normalizeLoadout(observed){
 
 export function evaluateLoadout(observed,{banned=[],banDuplicates=false}={}){
   if(observed?.kind==='other')return {status:'ignored',reason:'This image does not show a weekly staff loadout.'};
+  if(observed?.unclearSlots?.length)return {status:'unreadable',reason:`Staff slot${observed.unclearSlots.length>1?'s':''} ${observed.unclearSlots.join(', ')} could not be identified. Post a clearer, straight-on Coach Central screenshot in this thread. No legality decision was made.`};
   if(observed?.complete!==true||observed.catalogVersion!==LOADOUT_CATALOG.version||observed.slots?.length!==6)
     return {status:'unreadable',reason:'Upload a clear, full Coach Central screenshot showing all six staff ability slots. Include ability-detail images for icons that cannot be identified.'};
   const equipped=observed.slots.filter(s=>s.state==='equipped'),bans=new Set(banned),violations=[],unclear=[];

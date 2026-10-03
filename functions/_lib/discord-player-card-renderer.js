@@ -1,11 +1,9 @@
-import compiledWasm from './vendor/resvg/index_bg.wasm';
 import font from './vendor/barlow/semibold.bin';
-import { initWasm, Resvg } from './vendor/resvg/index.js';
+import { imageRuntimeReady as initialized, Resvg } from './image-runtime.js';
 import { discordPlayerCardSvg, playerCardImageUrl } from './discord-player-card.js';
 import { discordGameCardSvg } from './discord-game-card.js';
 
 // Compiled-module import is supported by Pages; never dynamically compile bytes.
-const initialized = initWasm(compiledWasm);
 async function boundedImage(url, env) {
   const safe=playerCardImageUrl(url);
   if(!safe)return null;

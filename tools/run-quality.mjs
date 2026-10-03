@@ -28,6 +28,7 @@ const checks = [
     'tests/discord/coaching.test.mjs',
     'tests/discord/loadouts.test.mjs',
     'tests/discord/loadout-vision.test.mjs',
+    'tests/discord/loadout-reader.test.mjs',
     'tests/discord/player-card.test.mjs',
     'tests/discord/game-summary.test.mjs',
     'tests/commissioner/roster-management.test.mjs',
