@@ -457,11 +457,17 @@ async function startRun(db,env,leagueId,discoverySessionId,captureIds=[],sourceC
 }
 async function insertRows(db,runId,leagueId,rows){
   if(!rows.length)return;
-  const sql=`INSERT OR REPLACE INTO companion_canonical_statistics_preview (mapping_run_id,league_id,external_key,category,season_year,stage,week_index,player_external_id,team_external_id,player_name,position,metrics_json,source_route_path,source_record_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
-  for(let offset=0;offset<rows.length;offset+=60){
-    const statements=rows.slice(offset,offset+60).map(row=>db.prepare(sql).bind(runId,leagueId,row.externalKey,row.category,row.seasonYear,row.stage,row.weekIndex,row.playerExternalId,row.teamExternalId,row.playerName,row.position,JSON.stringify(row.metrics),row.route,JSON.stringify(row.source)));
-    await db.batch(statements);
+  const columns=['external_key','category','season_year','stage','week_index','player_external_id','team_external_id','player_name','position','metrics_json','source_route_path','source_record_json'];
+  const sql=`INSERT OR REPLACE INTO companion_canonical_statistics_preview (mapping_run_id,league_id,${columns.join(',')})
+    SELECT ?,?,${columns.map((_,i)=>`json_extract(value,'$[${i}]')`).join(',')} FROM json_each(?)`;
+  let chunk=[],bytes=2;
+  const flush=async()=>{if(chunk.length)await db.prepare(sql).bind(runId,leagueId,`[${chunk.join(',')}]`).run();chunk=[];bytes=2;};
+  for(const row of rows){
+    const value=JSON.stringify([row.externalKey,row.category,row.seasonYear,row.stage,row.weekIndex,row.playerExternalId,row.teamExternalId,row.playerName,row.position,JSON.stringify(row.metrics),row.route,JSON.stringify(row.source)]);
+    const size=new TextEncoder().encode(value).byteLength+1;
+    if(bytes+size>500000)await flush();chunk.push(value);bytes+=size;
   }
+  await flush();
 }
 async function rebuildRunSummary(db,runId){
   const categories=await db.prepare(`SELECT category,COUNT(*) count FROM companion_canonical_statistics_preview WHERE mapping_run_id=? GROUP BY category`).bind(runId).all();

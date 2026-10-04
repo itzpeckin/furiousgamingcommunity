@@ -80,6 +80,20 @@ async function collect(f,alter=(request,payload)=>payload) {
   for (const request of f.plan) await f.store(request,alter(request,payloadFor(request)));
 }
 
+test('EA checkpoints share identical raw/canonical bytes and reuse only a request-local manifest',async()=>{
+ const f=await fixture();try{
+  let reads=0,writes=0;const bucket={get:async key=>{reads++;return f.bucket.get(key);},put:async(...args)=>{writes++;return f.bucket.put(...args);}};
+  const captureCache=new Map();
+  for(const request of f.plan.slice(0,3))await storeEaCapture({db:f.db,bucket,leagueId:f.league.id,sessionId:f.created.sessionId,collectionId:'collection-preview',...request,payload:payloadFor(request),hub:f.hub,platform:'ps5',externalLeagueId:'1234',captureCache});
+  assert.equal(reads,1);assert.equal(writes,7); // 3 manifests, 2 hub representations, teams and standings once.
+  const records=f.sqlite.prepare('SELECT route_path,r2_object_key FROM companion_route_captures').all();
+  assert.ok(records.find(r=>r.route_path.endsWith('/leagueteams')).r2_object_key.includes('/raw/'));
+  assert.ok(records.find(r=>r.route_path.endsWith('/info')).r2_object_key.includes('/canonical/'));
+  const manifest=JSON.parse([...f.objects].find(([key])=>key.endsWith('/manifest.json'))[1]);
+  assert.equal(manifest.requests.length,3);
+ }finally{f.sqlite.close();}
+});
+
 test('EA current period comes from the hub title, never the last available schedule',()=>{
   const hub=normalizeEaHub(rawHub());
   assert.deepEqual(hub.currentPeriod,{stage:'regular-season',week:5,key:'regular-season:5'});

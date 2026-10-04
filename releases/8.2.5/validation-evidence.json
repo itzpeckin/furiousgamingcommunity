@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.5",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 52,
+      "candidateRequiresMigration": false
+    }
+  },
+  "scopeBoundaries": {
+    "billingEnabled": false,
+    "liveImportRun": false,
+    "liveExportRun": false
+  }
+}

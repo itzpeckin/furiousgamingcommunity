@@ -19,9 +19,10 @@ export async function runEaCollectionBatch(options,{batchSize=1,now=Date.now}={}
       try{return await method(...args)}finally{providerMs+=Math.max(0,now()-before);providerCalls++}
     }]));
   let state=options.state||{},result;
+  const captureCache=new Map();
   for(let index=0;index<limit;index++){
     const initialized=state.initialized;
-    result=await runEaCollectionStep({...options,client,state});
+    result=await runEaCollectionStep({...options,client,state,captureCache});
     state=result.state;
     if(result.done||!initialized||now()-started>=15000)break;
   }
@@ -107,12 +108,12 @@ function isAuthenticationFailure(error) {
 }
 
 /** One bounded collection checkpoint. State is private and must be encrypted by the caller. */
-export async function runEaCollectionStep({ db, bucket, league, connection, job, client, token, state = {}, capture = adapter }) {
+export async function runEaCollectionStep({ db, bucket, league, connection, job, client, token, state = {}, capture = adapter, captureCache }) {
   assertScope(league, connection, job, state);
   if (state.done) return { state, done: true, result: state.result, step: 'Collection complete', progress: 100 };
   const externalLeagueId = Number(connection.external_league_id);
   const platform = connection.platform;
-  const common = { db, bucket, leagueId: league.id, collectionId: job.id, platform, externalLeagueId: connection.external_league_id };
+  const common = { db, bucket, leagueId: league.id, collectionId: job.id, platform, externalLeagueId: connection.external_league_id, captureCache };
 
   if (!state.initialized) {
     const session = await client.login(token, platform);

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.5",
+  "releaseType": "loadout-recognition-and-import-processing",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.4",
+    "tag": "v8.2.4",
+    "commit": "8e4ef3982226d92619b59dbe0b725c49113eecb1"
+  },
+  "implementationBranch": "fix/8.2.5-reader-and-processing",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.4",
+    "candidateRelease": "8.2.5",
+    "currentMigration": 52,
+    "candidateMigration": 52
+  },
+  "requiredArtifacts": [
+    "releases/8.2.5/release-record.md",
+    "releases/8.2.5/validation-evidence.json",
+    "tests/discord/loadout-reader.test.mjs"
+  ]
+}

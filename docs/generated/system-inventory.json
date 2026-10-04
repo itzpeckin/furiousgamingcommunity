@@ -24,6 +24,7 @@
     ],
     "APP_ENV": [
       "functions/_lib/permissions.js",
+      "functions/api/internal/loadout-acceptance.js",
       "functions/api/leagues/[leagueSlug]/companion/export-url.js"
     ],
     "ASSETS": [
@@ -197,6 +198,9 @@
       "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/memberships.js"
     ],
+    "LOADOUT_ACCEPTANCE_TOKEN": [
+      "functions/api/internal/loadout-acceptance.js"
+    ],
     "LOADOUT_READER_VERSION": [
       "functions/_lib/loadout-images.js"
     ],
@@ -227,11 +231,11 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 290,
+      ".js": 294,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 68,
+      ".mjs": 69,
       ".png": 5,
       ".sql": 54,
       ".txt": 3,
@@ -317,11 +321,11 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 41159,
+        "bytes": 41468,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       }
     ],
-    "total": 826
+    "total": 831
   },
   "frontend": {
     "assets": [
@@ -841,7 +845,7 @@
     "stylesheetCount": 4
   },
   "functions": {
-    "routeCount": 99,
+    "routeCount": 100,
     "routes": [
       {
         "file": "functions/index.js",
@@ -959,6 +963,13 @@
           "onRequestPost"
         ],
         "route": "/api/internal/coaching-scan"
+      },
+      {
+        "file": "functions/api/internal/loadout-acceptance.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/internal/loadout-acceptance"
       },
       {
         "file": "functions/api/league.js",
@@ -1899,7 +1910,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.4",
+  "release": "8.2.5",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

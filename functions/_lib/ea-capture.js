@@ -1,4 +1,5 @@
 import { prepareEaFirstSeason } from './ea-season-setup.js';
+import { boundedMap } from './bounded-map.js';
 import { sha256Hex, summarizePayloadShape } from './cloud-platform.js';
 import { buildMaddenDiscoveryReport } from './madden-discovery.js';
 import { canonicalMaddenStage } from './madden-period.js';
@@ -177,15 +178,15 @@ export async function beginEaCapture({db,bucket,league,actorId,hub:hubInput,plat
   return {...manifest,manifestKey:key};
 }
 
-export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,kind,args={},payload,hub:hubInput,platform,externalLeagueId}) {
-  const manifest = await readManifest(bucket,leagueId,collectionId);
+export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,kind,args={},payload,hub:hubInput,platform,externalLeagueId,captureCache}) {
+  const cacheKey=manifestKey(leagueId,collectionId);
+  const manifest = captureCache?.get(cacheKey) || await readManifest(bucket,leagueId,collectionId);
   if (manifest.sessionId !== sessionId || manifest.status !== 'collecting'
     || manifest.platform !== text(platform).toLowerCase() || manifest.externalLeagueId !== text(externalLeagueId)) fail('EA collection is closed or belongs to another source.');
   const routePath = routeFor(platform,externalLeagueId,kind,args);
   const now = new Date().toISOString(), raw = JSON.stringify(payload), rawHash = await sha256Hex(raw);
   const rootKey = `ea-direct/by-tenant/${safeId(leagueId)}/collections/${safeId(collectionId)}`;
   const rawKey = `${rootKey}/raw/${await sha256Hex(routePath)}/${rawHash}.json`;
-  await bucket.put(rawKey,raw,{httpMetadata:{contentType:'application/json'}});
   let canonical = payload;
   if (kind === 'hub') {
     const hub = normalizeEaHub(hubInput || payload);
@@ -198,8 +199,11 @@ export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,
   }
   const serialized = JSON.stringify(canonical), payloadHash = await sha256Hex(serialized);
   const shape = summarizePayloadShape(canonical), byteLength = new TextEncoder().encode(serialized).byteLength;
-  const key = `${rootKey}/canonical/${await sha256Hex(routePath)}/${payloadHash}.json`;
-  await bucket.put(key,serialized,{httpMetadata:{contentType:'application/json'}});
+  // Most provider payloads already are canonical. One immutable object can
+  // retain both representations without copying the same bytes twice.
+  const key = rawHash===payloadHash ? rawKey : `${rootKey}/canonical/${await sha256Hex(routePath)}/${payloadHash}.json`;
+  await boundedMap(key===rawKey?[[rawKey,raw]]:[[rawKey,raw],[key,serialized]],2,
+    ([objectKey,value])=>bucket.put(objectKey,value,{httpMetadata:{contentType:'application/json'}}));
   const captureId = `ea_capture_${await sha256Hex(`${leagueId}:${routePath}:${payloadHash}`)}`;
   await db.prepare(`INSERT OR IGNORE INTO companion_route_captures
     (id,league_id,discovery_session_id,route_path,request_method,content_type,byte_length,payload_hash,
@@ -219,6 +223,7 @@ export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,
     success:canonical?.success !== false && !canonical?.error && (kind === 'hub' || hasCollection),receivedAt:now};
   manifest.requests = manifest.requests.filter(item=>item.routePath !== routePath).concat(outcome);
   await writeManifest(bucket,manifest);
+  captureCache?.set(cacheKey,manifest);
   return outcome;
 }
 
@@ -273,14 +278,13 @@ export async function finalizeEaCapture({db,bucket,leagueId,sessionId,collection
   const rosterComplete = rosterRequests.length > 0 && rosterRequests.every(item=>outcomes.get(routeFor(manifest.platform,manifest.externalLeagueId,item.kind,item.args))?.success === true);
   const selected = manifest.requests.filter(item=>item.success && !['roster','free-agents'].includes(item.kind)
     || rosterComplete && (item.kind === 'roster' || item.kind === 'free-agents'));
-  const captures = [];
-  for (const item of selected) {
+  const captures = await boundedMap(selected,4,async item => {
     const row = await db.prepare(`SELECT * FROM companion_route_captures WHERE league_id=? AND id=?`).bind(leagueId,item.captureId).first();
     const object = row?.r2_object_key ? await bucket.get(row.r2_object_key) : null;
     if (!object) fail('A retained EA payload is unavailable; publication is paused.');
-    captures.push({captureId:row.id,routePath:row.route_path,byteLength:row.byte_length,payloadHash:row.payload_hash,
-      receivedAt:item.receivedAt,payload:JSON.parse(await object.text())});
-  }
+    return {captureId:row.id,routePath:row.route_path,byteLength:row.byte_length,payloadHash:row.payload_hash,
+      receivedAt:item.receivedAt,payload:JSON.parse(await object.text())};
+  });
   const report = buildMaddenDiscoveryReport(captures,{discoverySessionId:sessionId,expected:{
     gameRelease:manifest.gameRelease,platform:manifest.platform,sourceFranchiseId:manifest.externalLeagueId,
     season:manifest.sourceSeasonId,week:String(manifest.currentPeriod.week)

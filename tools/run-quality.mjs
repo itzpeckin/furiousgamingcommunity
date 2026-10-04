@@ -35,6 +35,7 @@ const checks = [
     'tests/import/madden-discovery.test.mjs',
     'tests/import/ea-client.test.mjs',
     'tests/import/ea-capture.test.mjs',
+    'tests/import/processing-performance.test.mjs',
     'tests/import/ea-collection.test.mjs',
     'tests/security/ea-direct.test.mjs',
     'tests/ui/ea-direct.test.mjs',
