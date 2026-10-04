@@ -119,7 +119,16 @@ export async function readLoadoutScreenshot(env,urls,{fetchImpl=fetch,decodeImag
   // Read independent text while the staff layout is verified. Handle rejection
   // immediately so slower staff retries cannot leave an unhandled promise.
   const sheetRead=(async()=>{
-   const sheetImage=await image.context([0,Math.floor(image.height*.55),image.width,image.height-Math.floor(image.height*.55)]);
+   let region=[0,Math.floor(image.height*.55),image.width,image.height-Math.floor(image.height*.55)];
+   if(proposal){
+    const points=proposal.slots.flatMap(s=>s.quad),spacing=Math.hypot(...proposal.detected.spacing);
+    const x=Math.max(0,Math.ceil(Math.max(...points.map(p=>p[0]))+spacing*.15));
+    const y=Math.max(0,Math.floor(Math.min(...points.map(p=>p[1]))-spacing*.7));
+    const right=Math.min(image.width,Math.ceil(x+spacing*8));
+    const bottom=Math.min(image.height,Math.ceil(Math.max(...points.map(p=>p[1]))+spacing*1.5));
+    if(x<right&&bottom>y)region=[x,y,right-x,bottom-y];
+   }
+   const sheetImage=await image.context(region);
    return transcribedPlaysheets(await layoutCall(env,LAYOUT_MODEL,playsheetRequest(sheetImage),deadline));
   })().then(value=>({value}),error=>({error}));
   const details=[];
