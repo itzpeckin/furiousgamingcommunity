@@ -110,7 +110,9 @@ export async function readLoadoutScreenshot(env,urls,{fetchImpl=fetch,decodeImag
   const image=decode(source),references=[...glyphReferences(),...glyphVariants()];
   const fast=fastLoadout(image,references);if(fast){reads.push({...fast,readerVersion:READER_VERSION});continue;}
   let proposal=proposeLoadout(image,references);
-  if(!proposal||proposal.slots.filter(s=>s.decision.status==='matched').length<2){
+  // Phone photos can contain a convincing partial row shifted into playsheets.
+  // Verify their full-frame geometry even when a few glyphs happen to match.
+  if(Math.abs(image.width/image.height-16/9)>.015||!proposal||proposal.slots.filter(s=>s.decision.status==='matched').length<2){
    const whole=await image.context([0,0,image.width,image.height]);
    const located=await layoutCall(env,LAYOUT_MODEL,locatorRequest(whole),deadline);
    proposal=proposeLocatedLoadout(image,references,located)||proposal;
