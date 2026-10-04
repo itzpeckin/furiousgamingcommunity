@@ -91,7 +91,11 @@
       "DISCORD_REDIRECT_URI_PUBLIC",
       "DISCORD_REDIRECT_URI_OWNER",
       "OWNER_FALLBACK_DISCORD_ID",
-      "PLATFORM_OWNER_ACCOUNT_ID"
+      "PLATFORM_OWNER_ACCOUNT_ID",
+      "LOADOUT_GATEWAY_ENABLED",
+      "LOADOUT_CUSTOM_EMOJI_ENABLED",
+      "LOADOUT_PASS_EMOJI_ID",
+      "LOADOUT_FAIL_EMOJI_ID"
     ],
     "secrets": [
       "DISCORD_CLIENT_SECRET",
@@ -163,7 +167,11 @@
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
         "DISCORD_REDIRECT_URI_OWNER": "https://franchise-hq.pages.dev/api/auth/discord/callback",
         "OWNER_FALLBACK_DISCORD_ID": "100000000000000001",
-        "PLATFORM_OWNER_ACCOUNT_ID": "local-test-owner"
+        "PLATFORM_OWNER_ACCOUNT_ID": "local-test-owner",
+        "LOADOUT_GATEWAY_ENABLED": "false",
+        "LOADOUT_CUSTOM_EMOJI_ENABLED": "false",
+        "LOADOUT_PASS_EMOJI_ID": "unprovisioned",
+        "LOADOUT_FAIL_EMOJI_ID": "unprovisioned"
       },
       "secretNames": [
         "DISCORD_CLIENT_SECRET",
@@ -202,7 +210,11 @@
         "DISCORD_REDIRECT_URI_PUBLIC": "set-in-cloudflare-staging-public",
         "DISCORD_REDIRECT_URI_OWNER": "set-in-cloudflare-staging-owner",
         "OWNER_FALLBACK_DISCORD_ID": "set-to-staging-owner-discord-id",
-        "PLATFORM_OWNER_ACCOUNT_ID": "set-in-cloudflare-staging"
+        "PLATFORM_OWNER_ACCOUNT_ID": "set-in-cloudflare-staging",
+        "LOADOUT_GATEWAY_ENABLED": "false",
+        "LOADOUT_CUSTOM_EMOJI_ENABLED": "false",
+        "LOADOUT_PASS_EMOJI_ID": "unprovisioned",
+        "LOADOUT_FAIL_EMOJI_ID": "unprovisioned"
       },
       "secretNames": [
         "DISCORD_CLIENT_SECRET",
@@ -242,7 +254,11 @@
         "DISCORD_REDIRECT_URI_PUBLIC": "https://franchisehq.app/api/auth/discord/callback",
         "DISCORD_REDIRECT_URI_OWNER": "https://franchise-hq.pages.dev/api/auth/discord/callback",
         "OWNER_FALLBACK_DISCORD_ID": "set-to-justin-discord-id",
-        "PLATFORM_OWNER_ACCOUNT_ID": "set-in-cloudflare-production"
+        "PLATFORM_OWNER_ACCOUNT_ID": "set-in-cloudflare-production",
+        "LOADOUT_GATEWAY_ENABLED": "false",
+        "LOADOUT_CUSTOM_EMOJI_ENABLED": "false",
+        "LOADOUT_PASS_EMOJI_ID": "unprovisioned",
+        "LOADOUT_FAIL_EMOJI_ID": "unprovisioned"
       },
       "secretNames": [
         "DISCORD_CLIENT_SECRET",
@@ -265,7 +281,15 @@
     "origin": "https://franchisehq.app",
     "perLeagueOptIn": true,
     "variables": [
-      "FHQ_ORIGIN"
+      "FHQ_ORIGIN",
+      "LOADOUT_GATEWAY_ENABLED"
+    ],
+    "bindings": [
+      {
+        "name": "LOADOUT_GATEWAY",
+        "kind": "durable_object",
+        "className": "DiscordLoadoutGateway"
+      }
     ]
   },
   "accountEmailWorker": {

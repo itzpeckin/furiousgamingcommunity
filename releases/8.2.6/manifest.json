@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.6",
+  "releaseType": "discord-live-loadout-checks",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.5",
+    "tag": "v8.2.5",
+    "commit": "ce33546ce15ba7502cece3518bdc38c0246971e6"
+  },
+  "implementationBranch": "feature/8.2.6-realtime-loadouts",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.5",
+    "candidateRelease": "8.2.6",
+    "currentMigration": 52,
+    "candidateMigration": 53
+  },
+  "requiredArtifacts": [
+    "releases/8.2.6/release-record.md",
+    "releases/8.2.6/validation-evidence.json",
+    "tests/discord/loadout-gateway.test.mjs"
+  ]
+}

@@ -10,7 +10,7 @@ export async function onRequest(context) {
   return new Response(
     JSON.stringify({
       ok: true,
-      release: '8.2.5',
+      release: '8.2.6',
       accountEmail,
       discordLoadoutReader:loadoutReaderReady(context?.env)?'ready':'disabled',
       service: "Franchise HQ",

@@ -8,10 +8,29 @@ import {GLYPH_TEMPLATES,glyphReferences,TEMPLATE_CATALOG_VERSION} from '../../fu
 import {GLYPH_VARIANTS,glyphVariants} from '../../functions/_lib/loadout-glyph-variants.js';
 import {rankGlyph,matchDecision,detectStaffRow,corroboratePosition,proposeLocatedLoadout,SIZE} from '../../functions/_lib/loadout-glyphs.js';
 import {imageDimensions,grayPng} from '../../functions/_lib/loadout-raster.js';
-import {combineLayout,layoutRequest,readLoadoutScreenshot,LOADOUT_READER_VERSION} from '../../functions/_lib/loadout-images.js';
+import {combineLayout,layoutRequest,readLoadoutScreenshot,LOADOUT_READER_VERSION,transcribedPlaysheets} from '../../functions/_lib/loadout-images.js';
 import {evaluateLoadout} from '../../functions/_lib/loadout-rules.js';
 const layout=(count=6)=>({kind:'loadout',staffLabelVisible:true,complete:true,slots:Array.from({length:6},(_,i)=>({slot:i+1,state:i<count?'equipped':'locked',stateClear:true}))});
 const proposal=(ids=['camp-counselor','field-general'])=>({slots:Array.from({length:6},(_,i)=>({detectedCheck:i<ids.length,decision:{status:i<ids.length?'matched':'uncertain',ids:i<ids.length?[ids[i]]:[]}}))});
+
+test('playsheet transcription separates visible names from locked text without hiding unknown names',()=>{
+ const raw={kind:'loadout',topLeft:'Nickel Playsheet',topRight:'Dime Playsheet',bottomLeft:'Unlocks at Level 26',bottomRight:'Unlocks at Level 40'};
+ const result=transcribedPlaysheets(raw);
+ const cards={kind:'loadout',complete:true,names:['Nickel Playsheet','Dime Playsheet'],locked:['Unlocks at Level 26','Unlocks at Level 40'],empty:0};
+ assert.deepEqual(transcribedPlaysheets(cards),result);
+ assert.equal(transcribedPlaysheets({...cards,locked:['Unlocks at Level 26']}).complete,false);
+ assert.equal(transcribedPlaysheets({...cards,names:['Nickel Playsheet','Dime Strong Playsheet']}).complete,false);
+ assert.equal(transcribedPlaysheets({...cards,complete:false}).complete,false);
+ assert.equal(result.complete,true);assert.deepEqual(result.slots.map(s=>s.state),['equipped','equipped','locked','locked']);
+ assert.deepEqual(result.slots.slice(0,2).map(s=>s.id),['nickel','dime']);
+ assert.equal(transcribedPlaysheets({...raw,topRight:'Dime Strong Playsheet'}).complete,false);
+ assert.equal(transcribedPlaysheets({...raw,bottomRight:null}).complete,false);
+ assert.equal(transcribedPlaysheets({...raw,bottomRight:'Unlocks at Level'}).complete,false);
+ assert.equal(transcribedPlaysheets({...raw,kind:'other'}).complete,false);
+ assert.deepEqual(transcribedPlaysheets({...raw,topLeft:'Nickel Playsheet\nUnlocks at Level 26',bottomLeft:null}),result);
+ assert.equal(transcribedPlaysheets({...raw,topLeft:'Nickel Playsheet',bottomLeft:null}).complete,false);
+ assert.equal(transcribedPlaysheets({...raw,topLeft:'Nickel Playsheet Unlocks at Level',bottomLeft:null}).complete,false);
+});
 
 test('bundled glyph templates bind every approved icon to its catalog hash',async()=>{
  assert.equal(TEMPLATE_CATALOG_VERSION,LOADOUT_CATALOG.version);assert.equal(GLYPH_TEMPLATES.length,78);

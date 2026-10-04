@@ -65,7 +65,7 @@ function bucket(initial={}) {
   };
 }
 
-async function createDatabase(maxVersion=52) {
+async function createDatabase(maxVersion=53) {
   const database=new DatabaseSync(':memory:');
   database.exec('PRAGMA foreign_keys=ON');
   const files=(await walkFiles())

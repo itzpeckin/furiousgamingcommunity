@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.6",
+  "status": "implementation-authorized",
+  "productionChanged": true,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 53,
+      "candidateRequiresMigration": true,
+      "productionApplied": true,
+      "stagingApplied": true
+    },
+    "gatewayFixtures": {
+      "passed": true,
+      "tests": 6
+    },
+    "loadoutRuleAndDeliveryFixtures": {
+      "passed": true,
+      "tests": 20
+    },
+    "productionFiveSecondTarget": {
+      "verified": false
+    },
+    "hostedRecognition": {
+      "passed": false,
+      "totalUniqueScreenshots": 8,
+      "firstPassIdentified": 7,
+      "remainingPhotoPassedOnRetry": true,
+      "incorrectLegalityObserved": false,
+      "bannedPlaysheetRejected": true,
+      "blankAndClippedRejected": true,
+      "consistentUnderFiveSeconds": false,
+      "limitation": "Provider layout variability remains on angled phone photos. Uncertain reads receive no approval."
+    },
+    "gatewayPreparation": {
+      "enabled": false,
+      "workerVersion": "d90da9c2-e551-490a-bcff-d0648f11c6ed",
+      "scheduledRuntimePassed": true,
+      "successfulScheduledRuns": 10
+    },
+    "strictSuite": {
+      "passed": true,
+      "tests": 531
+    },
+    "browserFixtures": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ]
+    },
+    "focusedFinal": {
+      "passed": true,
+      "tests": 41
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveExport": false,
+    "leagueRulesChanged": false,
+    "liveDiscordTestPosts": false
+  },
+  "productionApplicationChanged": false
+}

@@ -37,7 +37,9 @@
       "functions/_lib/discord-coaching.js",
       "functions/_lib/loadout-images.js",
       "functions/api/internal/coaching-scan.js",
-      "workers/franchise-coaching-scanner/src/index.js"
+      "functions/api/internal/loadout-event.js",
+      "workers/franchise-coaching-scanner/src/gateway.js",
+      "workers/franchise-coaching-scanner/src/scheduled.js"
     ],
     "COMPANION_EXPORTS": [
       "functions/_lib/cloud-platform.js",
@@ -66,6 +68,7 @@
     ],
     "COMPANION_EXPORT_META": [
       "functions/_lib/cloud-platform.js",
+      "functions/_lib/loadout-emojis.js",
       "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/companion/export.js",
       "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js",
@@ -106,6 +109,7 @@
       "functions/_lib/discord-game.js",
       "functions/_lib/discord-player-card.js",
       "functions/api/internal/coaching-scan.js",
+      "functions/api/internal/loadout-event.js",
       "functions/api/leagues/[leagueSlug]/discord/connect.js"
     ],
     "DISCORD_CLIENT_ID": [
@@ -114,6 +118,7 @@
       "functions/_lib/discord-installation.js",
       "functions/_lib/discord-security.js",
       "functions/_lib/discord-trade-sync.js",
+      "functions/_lib/loadout-emojis.js",
       "functions/api/auth/discord/callback.js",
       "functions/api/auth/discord/login.js",
       "functions/api/internal/coaching-scan.js",
@@ -170,7 +175,8 @@
       "workers/account-email/index.mjs"
     ],
     "FHQ_ORIGIN": [
-      "workers/franchise-coaching-scanner/src/index.js"
+      "workers/franchise-coaching-scanner/src/gateway.js",
+      "workers/franchise-coaching-scanner/src/scheduled.js"
     ],
     "FRANCHISE_EA_COLLECTION_WORKFLOW": [
       "workers/franchise-import-worker/src/index.js"
@@ -194,8 +200,26 @@
     ],
     "LEAGUE_CONFIG": [
       "functions/_lib/cloud-platform.js",
+      "functions/_lib/loadout-emojis.js",
       "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/memberships.js"
+    ],
+    "LOADOUT_CUSTOM_EMOJI_ENABLED": [
+      "functions/api/internal/coaching-scan.js"
+    ],
+    "LOADOUT_FAIL_EMOJI_ID": [
+      "functions/_lib/loadout-report.js"
+    ],
+    "LOADOUT_GATEWAY": [
+      "workers/franchise-coaching-scanner/src/scheduled.js"
+    ],
+    "LOADOUT_GATEWAY_ENABLED": [
+      "functions/api/internal/loadout-event.js",
+      "workers/franchise-coaching-scanner/src/gateway.js",
+      "workers/franchise-coaching-scanner/src/scheduled.js"
+    ],
+    "LOADOUT_PASS_EMOJI_ID": [
+      "functions/_lib/loadout-report.js"
     ],
     "LOADOUT_READER_VERSION": [
       "functions/_lib/loadout-images.js"
@@ -227,13 +251,13 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 293,
+      ".js": 302,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 69,
-      ".png": 5,
-      ".sql": 54,
+      ".mjs": 70,
+      ".png": 7,
+      ".sql": 55,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -257,12 +281,16 @@
         "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
-        "bytes": 193856,
+        "bytes": 194467,
         "file": "tools/check-release.mjs"
       },
       {
         "bytes": 192608,
         "file": "tests/discord/discord-bot.test.mjs"
+      },
+      {
+        "bytes": 187081,
+        "file": "functions/_lib/loadout-fast-templates.js"
       },
       {
         "bytes": 130904,
@@ -315,13 +343,9 @@
       {
         "bytes": 43407,
         "file": "tests/import/game-year-transition.test.mjs"
-      },
-      {
-        "bytes": 41468,
-        "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       }
     ],
-    "total": 830
+    "total": 843
   },
   "frontend": {
     "assets": [
@@ -841,7 +865,7 @@
     "stylesheetCount": 4
   },
   "functions": {
-    "routeCount": 99,
+    "routeCount": 100,
     "routes": [
       {
         "file": "functions/index.js",
@@ -959,6 +983,13 @@
           "onRequestPost"
         ],
         "route": "/api/internal/coaching-scan"
+      },
+      {
+        "file": "functions/api/internal/loadout-event.js",
+        "handlers": [
+          "onRequestPost"
+        ],
+        "route": "/api/internal/loadout-event"
       },
       {
         "file": "functions/api/league.js",
@@ -1896,10 +1927,16 @@
       "recordsLedger": true,
       "sha256": "8408f97faba19a289dc038c87354f2aa1d665789ec1db3e9853ba195ec9d3136",
       "version": "0052"
+    },
+    {
+      "file": "migrations/0053_realtime_loadouts.sql",
+      "recordsLedger": true,
+      "sha256": "376552d3f0cd76cc9cd93fdfd4b2cf0de7d4196edaa687558beb3e9e9c9ca90f",
+      "version": "0053"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.5",
+  "release": "8.2.6",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
