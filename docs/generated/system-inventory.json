@@ -33,9 +33,6 @@
     "AUTH_RATE_LIMITER": [
       "functions/_middleware.js"
     ],
-    "CF_PAGES_BRANCH": [
-      "functions/api/internal/loadout-acceptance.js"
-    ],
     "COACHING_SCANNER_SECRET": [
       "functions/_lib/discord-coaching.js",
       "functions/_lib/loadout-images.js",
@@ -242,9 +239,6 @@
       "functions/api/leagues/[leagueSlug]/companion/statistics-route-alignment.js",
       "functions/api/leagues/[leagueSlug]/transactions/forward-detection.js"
     ],
-    "READER_ACCEPTANCE_TOKEN": [
-      "functions/api/internal/loadout-acceptance.js"
-    ],
     "SESSION_SIGNING_SECRET": [
       "functions/api/leagues/[leagueSlug]/companion/export-url.js",
       "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
@@ -257,7 +251,7 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 303,
+      ".js": 302,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
@@ -287,7 +281,7 @@
         "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
-        "bytes": 193856,
+        "bytes": 194467,
         "file": "tools/check-release.mjs"
       },
       {
@@ -351,7 +345,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       }
     ],
-    "total": 844
+    "total": 843
   },
   "frontend": {
     "assets": [
@@ -871,7 +865,7 @@
     "stylesheetCount": 4
   },
   "functions": {
-    "routeCount": 101,
+    "routeCount": 100,
     "routes": [
       {
         "file": "functions/index.js",
@@ -989,13 +983,6 @@
           "onRequestPost"
         ],
         "route": "/api/internal/coaching-scan"
-      },
-      {
-        "file": "functions/api/internal/loadout-acceptance.js",
-        "handlers": [
-          "onRequestPost"
-        ],
-        "route": "/api/internal/loadout-acceptance"
       },
       {
         "file": "functions/api/internal/loadout-event.js",

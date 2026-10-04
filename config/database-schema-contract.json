@@ -1128,7 +1128,6 @@
       "banned_playsheets_json"
     ],
     "discord_loadout_submissions": [
-      "id",
       "league_id",
       "processing_token",
       "processing_until",
@@ -1136,7 +1135,9 @@
       "timings_json",
       "discovered_at",
       "processing_started_at",
-      "reported_at"
+      "reported_at",
+      "thread_id",
+      "message_id"
     ]
   }
 }

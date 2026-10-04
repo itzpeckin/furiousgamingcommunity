@@ -90,7 +90,15 @@ const authorizedEmailPreparation = version === '8.1.0'
   && evidence.checks?.emailInfrastructure?.authorized === true
   && evidence.checks.emailInfrastructure.sender === 'accounts@franchisehq.app'
   && evidence.checks.emailInfrastructure.testCount === 1;
-if (!isPostDeployment && ((!authorizedEmailPreparation && evidence.productionChanged !== false) || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
+// A disabled Gateway must be installed before its Pages bootstrap can be
+// exercised. Record that infrastructure change instead of claiming no change.
+const authorizedGatewayPreparation = version === '8.2.6'
+  && manifest.production?.authorized === true
+  && evidence.productionChanged === true && evidence.productionApplicationChanged === false
+  && evidence.checks?.gatewayPreparation?.enabled === false
+  && evidence.checks.gatewayPreparation.scheduledRuntimePassed === true
+  && evidence.checks.gatewayPreparation.workerVersion === 'd90da9c2-e551-490a-bcff-d0648f11c6ed';
+if (!isPostDeployment && ((!authorizedEmailPreparation && !authorizedGatewayPreparation && evidence.productionChanged !== false) || evidence.dataChanged !== false || evidence.credentialsChanged !== false)) {
   errors.push(`${version} evidence must accurately preserve unchanged production, data, and credentials during candidate work.`);
 }
 if (isPostDeployment && (

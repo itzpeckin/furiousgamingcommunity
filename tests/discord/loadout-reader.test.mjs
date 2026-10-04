@@ -16,6 +16,11 @@ const proposal=(ids=['camp-counselor','field-general'])=>({slots:Array.from({len
 test('playsheet transcription separates visible names from locked text without hiding unknown names',()=>{
  const raw={kind:'loadout',topLeft:'Nickel Playsheet',topRight:'Dime Playsheet',bottomLeft:'Unlocks at Level 26',bottomRight:'Unlocks at Level 40'};
  const result=transcribedPlaysheets(raw);
+ const cards={kind:'loadout',complete:true,names:['Nickel Playsheet','Dime Playsheet'],locked:['Unlocks at Level 26','Unlocks at Level 40'],empty:0};
+ assert.deepEqual(transcribedPlaysheets(cards),result);
+ assert.equal(transcribedPlaysheets({...cards,locked:['Unlocks at Level 26']}).complete,false);
+ assert.equal(transcribedPlaysheets({...cards,names:['Nickel Playsheet','Dime Strong Playsheet']}).complete,false);
+ assert.equal(transcribedPlaysheets({...cards,complete:false}).complete,false);
  assert.equal(result.complete,true);assert.deepEqual(result.slots.map(s=>s.state),['equipped','equipped','locked','locked']);
  assert.deepEqual(result.slots.slice(0,2).map(s=>s.id),['nickel','dime']);
  assert.equal(transcribedPlaysheets({...raw,topRight:'Dime Strong Playsheet'}).complete,false);
