@@ -4,7 +4,7 @@ import { channelPermissions, identityFor, verifyReadAccess } from './discord-coa
 import { coachingEvidence } from './coaching-images.js';
 import { snapshotCurrentPeriod } from './schedule-integrity.js';
 import { ABILITY_BY_ID, LOADOUT_CATALOG } from './loadout-catalog.js';
-import { readLoadoutScreenshot, loadoutReaderReady as ready } from './loadout-images.js';
+import { readLoadoutScreenshot, loadoutReaderReady as ready, LOADOUT_READER_VERSION } from './loadout-images.js';
 import { evaluateLoadout } from './loadout-rules.js';
 
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results||[];
@@ -109,7 +109,7 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
   const teams=await activeLeagueTeams(db,config.league_id);
   const identity=await identityFor(db,config.league_id,submission.author_id,submission.submitted_at,teams);
   const team=identity?.teamKey;
-  if(submission.status==='pending'){
+  if(submission.status==='pending'||observed?.readerVersion&&observed.readerVersion!==LOADOUT_READER_VERSION){
     let message;
     try{message=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages/${submission.message_id}`,{fetchImpl,rateLimitRetries:0});}
     catch(error){if(Number(error.status)!==404)throw error;result={status:'removed',reason:'Submission removed. Post a new loadout screenshot.'};}
@@ -118,7 +118,7 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
       const urls=coachingEvidence(message);
       if(!urls.length)result={status:'removed',reason:'Submission no longer includes a supported screenshot. Post a new screenshot.'};
       else try{observed=await readScreenshot(env,urls,{fetchImpl});}
-      catch(error){if(error.retryable!==false)throw error;result={status:'unreadable',reason:'Attach one to four clear PNG, JPG, or WebP screenshots, or a public Xbox screenshot link.'};}
+      catch(error){if(error.retryable!==false)throw error;observed={kind:'uncertain',complete:false,slots:[],readerVersion:LOADOUT_READER_VERSION};result={status:'unreadable',reason:'Attach one to four clear PNG, JPG, or WebP screenshots, or a public Xbox screenshot link.'};}
     }
   }
   if(!result)result=evaluateLoadout(observed,{banned:parse(config.banned_json,[]),banDuplicates:Boolean(config.ban_duplicates)});
@@ -172,8 +172,10 @@ export async function scanLoadouts(env,db,{fetchImpl=fetch,readScreenshot=readLo
       await db.prepare('INSERT OR IGNORE INTO discord_loadout_threads(league_id,thread_id) VALUES(?,?)').bind(config.league_id,thread.id).run();
       await ingest(env,db,config,thread,fetchImpl);
       submission=await db.prepare(`SELECT * FROM discord_loadout_submissions WHERE league_id=? AND thread_id=?
-        AND (status='pending' OR rule_revision<>? OR reported_revision<>?) ORDER BY attempts ASC,submitted_at DESC LIMIT 1`)
-        .bind(config.league_id,thread.id,config.revision,config.revision).first();
+        AND (status='pending' OR rule_revision<>? OR reported_revision<>?
+          OR (status IN ('legal','illegal','unreadable','ignored','unassigned') AND json_extract(observed_json,'$.readerVersion') IS NOT NULL
+            AND json_extract(observed_json,'$.readerVersion')<>?)) ORDER BY attempts ASC,submitted_at DESC LIMIT 1`)
+        .bind(config.league_id,thread.id,config.revision,config.revision,LOADOUT_READER_VERSION).first();
       if(submission)await processSubmission(env,db,config,thread,submission,fetchImpl,readScreenshot);
     }
     await db.prepare(`UPDATE discord_loadout_settings SET last_scan_at=CURRENT_TIMESTAMP,last_error=NULL,next_scan_at=datetime('now',?)

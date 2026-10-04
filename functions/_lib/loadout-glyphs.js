@@ -1,5 +1,5 @@
 // Deterministic glyph proposals. A separate image-layout check must confirm all six staff slots.
-export const READER_VERSION='m27-glyph-reader-1';
+export const READER_VERSION='m27-glyph-reader-2';
 export const SIZE=48;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function segmentDistance(x,y,ax,ay,bx,by){const t=clamp(((x-ax)*(bx-ax)+(y-ay)*(by-ay))/((bx-ax)**2+(by-ay)**2),0,1);return Math.hypot(x-ax-t*(bx-ax),y-ay-t*(by-ay));}
@@ -40,21 +40,26 @@ export function slotQuad(quad,slot){
  const left=(slot+.012)/6,right=(slot+.985)/6;
  return [mix(quad[0],quad[1],left),mix(quad[0],quad[1],right),mix(quad[3],quad[2],right),mix(quad[3],quad[2],left)];
 }
-export function rankGlyph(tile,references){
+export function rankGlyph(tile,references,radius=3){
  const obs=gray(tile),n=comparisonPixels.length;
  const mean=comparisonPixels.reduce((sum,i)=>sum+obs[i],0)/n;
  const variance=comparisonPixels.reduce((sum,i)=>sum+(obs[i]-mean)**2,0);
  if(variance/n<12)return [];
- return references.map(ref=>{
+ const scored=references.map(ref=>{
   let best=-1;
-  for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){
+  for(let dy=-radius;dy<=radius;dy++)for(let dx=-radius;dx<=radius;dx++){
    let sum=0,sumSq=0,cross=0;
    for(const i of comparisonPixels){const r=ref.gray[i+dy*SIZE+dx];sum+=r;sumSq+=r*r;cross+=(obs[i]-mean)*r;}
    const score=cross/Math.sqrt(Math.max(1e-9,variance*(sumSq-sum*sum/n)));
    best=Math.max(best,score);
   }
   return {id:ref.id,score:Math.round(best*1000)/1000};
- }).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
+ });
+ return bestByIdentity(scored);
+}
+function bestByIdentity(scored){
+ const byId=new Map();for(const score of scored)if(!byId.has(score.id)||byId.get(score.id).score<score.score)byId.set(score.id,score);
+ return [...byId.values()].sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
 }
 const letterPixels=comparisonPixels.filter(i=>Math.floor(i/SIZE)>=8&&Math.floor(i/SIZE)<22&&i%SIZE>=9&&i%SIZE<39);
 export function rankPositionLetters(tile,references,firstLetter=false){
@@ -62,7 +67,7 @@ export function rankPositionLetters(tile,references,firstLetter=false){
  const obs=gray(tile),n=pixels.length,mean=pixels.reduce((s,i)=>s+obs[i],0)/n;
  const variance=pixels.reduce((s,i)=>s+(obs[i]-mean)**2,0);
  if(variance/n<16)return [];
- return references.filter(r=>r.id.startsWith('practician-')).map(ref=>{
+ return bestByIdentity(references.filter(r=>r.id.startsWith('practician-')).map(ref=>{
   let best=-1;
   for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){
    let sum=0,sq=0,cross=0;
@@ -70,7 +75,7 @@ export function rankPositionLetters(tile,references,firstLetter=false){
    best=Math.max(best,cross/Math.sqrt(Math.max(1e-9,variance*(sq-sum*sum/n))));
   }
   return {id:ref.id,score:Math.round(best*1000)/1000};
- }).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
+ }));
 }
 function quadAt(center,dx,dy,width,height){
  const len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
@@ -115,6 +120,68 @@ export function matchDecision(ranked){
  if(['trimmed-edges','all-hustle'].includes(best.id))return {status:'uncertain',ids:['trimmed-edges','all-hustle'],reason:'These two abilities share a glyph. Selected ability text is required.'};
  if(best.score<.72||margin<.10)return {status:'uncertain',ids:ranked.slice(0,3).map(r=>r.id),reason:'The image match is weak or too close to another ability.'};
  return {status:'matched',ids:[best.id],reason:'Provisional visual match. Similarity is not a probability.'};
+}
+
+// Model coordinates propose geometry only. Pixel matching and a second complete
+// row inspection must still agree before any ability can enter a rules verdict.
+export function proposeLocatedLoadout(image,references,layout){
+ if(layout?.kind!=='loadout'||layout.complete!==true||layout.slots?.length!==6)return null;
+ const boxes=layout.slots.map((s,i)=>{
+  if(s.slot!==i+1||s.box?.length!==4||s.box.some(v=>!Number.isFinite(v)||v<0||v>1000))return null;
+  const [l,t,r,b]=s.box;return r>l&&b>t?{x:(l+r)*image.width/2000,y:(t+b)*image.height/2000,w:(r-l)*image.width/1000,h:(b-t)*image.height/1000}:null;
+ });
+ if(boxes.some(b=>!b||b.w<image.width*.018||b.w>image.width*.15||b.h<image.height*.018||b.h>image.height*.18))return null;
+ const spacing=(boxes[5].x-boxes[0].x)/5;
+ if(spacing<=0||boxes.some((b,i)=>Math.abs(b.x-boxes[0].x-spacing*i)>spacing*.25||b.w>spacing*1.25))return null;
+ const slots=[];
+ for(const box of boxes){
+  let best;const geometries=[];
+  // Provider boxes often hug the glyph rather than the square frame. Search
+  // a bounded neighborhood, preserving six distinct, ordered card centers.
+  for(const scale of [.9,1,1.1])for(const ox of [-.2,-.1,0,.1,.2])for(const oy of [-.4,-.3,-.2,-.1,0,.1,.2]){
+   const width=Math.min(spacing*.97,box.w*scale),height=width;
+   const quad=quadAt([box.x+ox*box.w,box.y+oy*box.w],1,0,width,height);
+   if(quad.some(([x,y])=>x<0||y<0||x>image.width||y>image.height))continue;
+   const tile=sampleQuad(image,quad),ranked=rankGlyph(tile,references,0);
+   geometries.push({quad,tile,coarse:ranked[0]?.score||0,edge:cardEdgeScore(image,quad)});
+  }
+  geometries.sort((a,b)=>b.edge-a.edge);
+  const selected=[...geometries.slice(0,4),...geometries.toSorted((a,b)=>b.coarse-a.coarse).slice(0,8)];
+  for(const geometry of selected){
+   const tile=sampleQuad(image,geometry.quad),ranked=rankGlyph(tile,references),score=ranked[0]?.score||0;
+   if(!best||score>best.score)best={quad:geometry.quad,tile,ranked,score};
+  }
+  if(!best)return null;
+  const ranked=rankGlyph(best.tile,references);
+  slots.push({...best,ranked,letters:rankPositionLetters(best.tile,references),decision:matchDecision(ranked),detectedCheck:false});
+ }
+ return {slots,detected:{spacing:[spacing,0]},score:slots.reduce((n,s)=>n+Math.max(0,s.score-.6),0),method:'located-cards'};
+}
+
+function cardEdgeScore(image,quad){
+ const lum=(x,y)=>{const i=(clamp(Math.round(y),0,image.height-1)*image.width+clamp(Math.round(x),0,image.width-1))*4;return .299*image.data[i]+.587*image.data[i+1]+.114*image.data[i+2];};
+ const edges=[];
+ for(let side=0;side<4;side++){
+  const a=quad[side],b=quad[(side+1)%4],dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy),nx=-dy/length,ny=dx/length;
+  let sum=0;
+  for(let i=3;i<17;i++){
+   const t=i/20,x=a[0]+dx*t,y=a[1]+dy*t;
+   sum+=Math.abs(lum(x+nx*2,y+ny*2)-lum(x-nx*2,y-ny*2));
+  }
+  edges.push(sum/14);
+ }
+ return Math.min(...edges)*.6+edges.reduce((a,b)=>a+b,0)*.1;
+}
+
+export function corroboratePosition(glyph,positionText){
+ if(glyph.decision.status==='matched')return glyph.decision;
+ const positions={QB:'qb',RB:'hb',HB:'hb',FB:'fb',WR:'wr-te',TE:'wr-te','WR/TE':'wr-te',OL:'ol',DL:'dl',LB:'lb',CB:'cb',S:'s',FS:'s',SS:'s'};
+ const suffix=positions[String(positionText||'').trim().toUpperCase()];
+ if(!suffix||!glyph.ranked?.[0]?.id.startsWith('practician-'))return glyph.decision;
+ const id=`practician-${suffix}`,candidate=glyph.ranked.find(r=>r.id===id);
+ if(candidate?.score>=.74&&glyph.ranked[0].score-candidate.score<=.06)
+  return {status:'matched',ids:[id],reason:'Visible position text corroborates the reference glyph.'};
+ return glyph.decision;
 }
 export function detectStaffRow(image){
  // Bright connected checkmarks remain visible on both console and phone captures.

@@ -249,7 +249,11 @@ for(const optimized of [false,true])test(`272-game full-season build and retaine
     assert.equal(coverage.currentWeek,1);assert.equal(coverage.scheduleHorizon.week,18);
     assert.equal(coverage.futureSchedulePeriods.length,17);assert.deepEqual(candidateCoverageWarnings(coverage),[]);
     sqlite.prepare(`INSERT INTO companion_candidate_import_runs (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,current_phase,created_by_user_id,source_counts_json) VALUES ('candidate-full','league-1','destination-full','capture-1','fingerprint-full','running','build-candidate','commissioner-1',?)`).run(JSON.stringify({sourceCoverage:coverage}));
-    const db=d1(sqlite),env={DB:db,FRANCHISE_HQ_DB:db,COMPANION_EXPORTS:{get:async key=>({arrayBuffer:async()=>new TextEncoder().encode(objects.get(key)).buffer})}};
+    let planWrites=0,planReads=0;
+    const db=d1(sqlite),env={DB:db,FRANCHISE_HQ_DB:db,COMPANION_EXPORTS:{
+      get:async key=>{if(key.startsWith('snapshot-build-plans/'))planReads++;return objects.has(key)?{text:async()=>objects.get(key),arrayBuffer:async()=>new TextEncoder().encode(objects.get(key)).buffer}:null;},
+      put:async(key,value)=>{if(key.startsWith('snapshot-build-plans/'))planWrites++;objects.set(key,value);}
+    }};
     const context=body=>({request:new Request('https://franchisehq.app/api/leagues/fgc/companion/test',{method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},body:JSON.stringify(body)}),params:{leagueSlug:'fgc'},env});
     const mapped=await mapSchedule(context({discoverySessionId:'capture-1'}));
     assert.equal(mapped.status,200);const mapping=await mapped.json();assert.equal(mapping.mappingRun.gameCount,272);
@@ -304,6 +308,8 @@ for(const optimized of [false,true])test(`272-game full-season build and retaine
     assert.equal(result.complete,true);assert.equal(result.buildJob.processedCount,totalRecords);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE snapshot_id=?`).get(buildSnapshotId).count,totalRecords);
     if(optimized)assert.ok(buildCalls<=8,`server build calls: ${buildCalls}`);
+    assert.equal(planWrites,1,'Statistics are assembled and stored once across all build checkpoints.');
+    assert.ok(planReads>=3,'Later statistics checkpoints reuse the retained plan.');
     assert.equal(result.snapshot.weekIndex,1);assert.equal(result.snapshot.counts.games,272);
     assert.equal(result.snapshot.manifest.scheduleHorizon.week,18);assert.equal(result.snapshot.manifest.discordScheduleTransition.reason,'initial-import');
     assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM league_active_snapshots').get().count,0);

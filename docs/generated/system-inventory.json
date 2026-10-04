@@ -227,11 +227,11 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 290,
+      ".js": 293,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 68,
+      ".mjs": 69,
       ".png": 5,
       ".sql": 54,
       ".txt": 3,
@@ -273,7 +273,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 91861,
+        "bytes": 92324,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -317,11 +317,11 @@
         "file": "tests/import/game-year-transition.test.mjs"
       },
       {
-        "bytes": 41159,
+        "bytes": 41468,
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       }
     ],
-    "total": 826
+    "total": 830
   },
   "frontend": {
     "assets": [
@@ -1899,7 +1899,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.4",
+  "release": "8.2.5",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

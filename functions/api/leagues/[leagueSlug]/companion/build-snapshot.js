@@ -1,6 +1,7 @@
 /* FHQ_BUILD: 8.0.9 */
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { retainedBuildPlan } from '../../../../_lib/snapshot-build-plan.js';
 import {
   candidateCoverageWarnings,
   candidateHistoricalBackfill,
@@ -639,7 +640,13 @@ export async function onRequestPost(context){
     }
 
     const domain=BUILD_DOMAINS.includes(state.currentDomain)?state.currentDomain:BUILD_DOMAINS[0];
-    const plan=await domainPlan({context,db,league,candidateRun,runs,shared,domain});
+    const buildPlan=()=>domainPlan({context,db,league,candidateRun,runs,shared,domain});
+    const plan=domain==='statistics'?await retainedBuildPlan(context.env.COMPANION_EXPORTS,{
+      version:BUILD_PLAN_REVISION,leagueId:league.id,snapshotId:snapshot.id,domain,
+      candidateRunId:candidateRun?.id||null,activeSnapshotId:shared.activeSource?.id||null,
+      mappingRuns:Object.fromEntries(Object.entries(runs).map(([key,run])=>[key,run.id])),
+      coverage:shared.coverage,sourcePeriods:shared.sourcePeriods
+    },buildPlan):await buildPlan();
     if(plan.response)return plan.response;
     const existing=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
       WHERE snapshot_id=? AND league_id=? AND domain=?`).bind(snapshot.id,league.id,domain).first())?.count||0);

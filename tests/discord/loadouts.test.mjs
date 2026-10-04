@@ -8,7 +8,7 @@ import { normalizeLoadout, evaluateLoadout } from '../../functions/_lib/loadout-
 import { readLoadoutScreenshot, LOADOUT_READER_VERSION } from '../../functions/_lib/loadout-images.js';
 import { LOADOUT_CATALOG } from '../../functions/_lib/loadout-catalog.js';
 // Scanner tests isolate Discord/tenant state; pixel/model acceptance is in loadout-reader tests.
-const scanLoadouts=(env,db,options)=>runScanLoadouts(env,db,{...options,readScreenshot:async()=>normalizeLoadout(JSON.parse((await env.AI.run()).response))});
+const scanLoadouts=(env,db,options)=>runScanLoadouts(env,db,{...options,readScreenshot:options?.readScreenshot||(async()=>normalizeLoadout(JSON.parse((await env.AI.run()).response)))});
 function d1(sqlite){return {prepare(sql){const s=sqlite.prepare(sql);let args=[];const p={bind(...a){args=a;return p;},async first(){return s.get(...args)||null;},async all(){return {results:s.all(...args)};},async run(){return {meta:{changes:Number(s.run(...args).changes)}};}};return p;}};}
 const guild='200000000000000001',parent='200000000000000002',channel='200000000000000003',author='200000000000000004',bot='200000000000000005',messageId='200000000000000006';
 const photo='https://cdn.discordapp.com/attachments/123/456/loadout.png';
@@ -113,6 +113,20 @@ test('disable or week advance during image reading prevents old-week reports',as
   }
 });
 
+test('a reader upgrade rechecks an existing current-week submission and edits its existing report once',async()=>{
+ const f=await fixture();try{
+  await f.save();await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});
+  const old={...normalizeLoadout(sample(['camp-counselor'])),readerVersion:'old-reader'};
+  f.sqlite.prepare('UPDATE discord_loadout_submissions SET observed_json=?,status=?').run(JSON.stringify(old),'unreadable');
+  const {LOADOUT_READER_VERSION}=await import('../../functions/_lib/loadout-images.js');
+  let reads=0;const readScreenshot=async()=>{reads++;return {...normalizeLoadout(sample(['field-general'])),readerVersion:LOADOUT_READER_VERSION};};
+  await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl,readScreenshot});
+  assert.equal(reads,1);assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'legal');
+  assert.equal(f.calls.at(-1).method,'PATCH');assert.equal(f.posts.length,2);
+  await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl,readScreenshot});assert.equal(reads,1);assert.equal(f.posts.length,2);
+ }finally{f.sqlite.close();}
+});
+
 test('transient image errors retry without a verdict; unclear evidence requests resubmission',async()=>{
   const f=await fixture();try{
     await f.save();f.env.AI.run=async()=>{throw new Error('temporary');};
@@ -123,6 +137,17 @@ test('transient image errors retry without a verdict; unclear evidence requests 
     await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});assert.match(f.posts[0].content,/Clearer evidence needed/);
     assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'unreadable');
   }finally{f.sqlite.close();}
+});
+
+test('permanently invalid old-reader evidence is not rechecked forever after an upgrade',async()=>{
+ const f=await fixture();try{
+  await f.save();await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});
+  f.sqlite.prepare('UPDATE discord_loadout_submissions SET observed_json=?').run(JSON.stringify({kind:'uncertain',readerVersion:'old-reader'}));
+  let reads=0;const readScreenshot=async()=>{reads++;throw Object.assign(new Error('Unsupported image'),{retryable:false});};
+  await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl,readScreenshot});
+  await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl,readScreenshot});
+  assert.equal(reads,1);assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'unreadable');
+ }finally{f.sqlite.close();}
 });
 
 test('unrelated screenshots produce no bot verdict and another team cannot submit for this matchup',async()=>{

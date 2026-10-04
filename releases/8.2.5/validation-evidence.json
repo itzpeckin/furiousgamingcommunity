@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.5",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 52,
+      "candidateRequiresMigration": false
+    },
+    "recognitionAcceptance": {
+      "passed": true,
+      "scope": "Actual hosted preview reader and Cloudflare AI; no Discord messages or league rules changed.",
+      "deployment": "7937a196-7874-430c-b1b2-ccce15c9f675",
+      "latestUniqueScreenshots": 8,
+      "earlierLoadouts": 4,
+      "archetypeIgnored": true,
+      "uncheckedDuplicate": "Actual QB / LB / QB submission correctly illegal with duplicate ban.",
+      "namedBan": "Camp Counselor correctly illegal.",
+      "serverElapsedMs": [
+        5207,
+        46573,
+        5592,
+        6037,
+        4277,
+        32061,
+        4765,
+        51942,
+        5138,
+        24219,
+        6280,
+        6689,
+        6285
+      ],
+      "trainingDisclosure": "Ten isolated icon samples from two latest screenshots and one earlier phone photo. Six of the latest eight unique screenshots were not used as icon references. This sample set is not a universal accuracy guarantee.",
+      "productionDiscordEndToEnd": false,
+      "negativeImages": "Clipped and blank images received no legal or illegal verdict."
+    },
+    "processing": {
+      "targetedTestsPassed": 101,
+      "identicalCaptureObjectsShared": true,
+      "threeDatasetObjectWrites": {
+        "before": 9,
+        "after": 7
+      },
+      "threeDatasetManifestReads": {
+        "before": 3,
+        "after": 1
+      },
+      "fullSeasonFixture": {
+        "records": 10653,
+        "statistics": 8271,
+        "planBuildsPerSnapshot": 1
+      },
+      "productionTimingTargetVerified": false
+    },
+    "previewAdapterCleanup": {
+      "sourceRemoved": true,
+      "temporaryTokenRemoved": true,
+      "testDeploymentDeleted": true
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 518,
+      "failures": 0
+    }
+  },
+  "scopeBoundaries": {
+    "billingEnabled": false,
+    "liveImportRun": false,
+    "liveExportRun": false
+  }
+}

@@ -5,7 +5,8 @@ import {createHash} from 'node:crypto';
 import {ROOT} from '../../tools/lib/project.mjs';
 import {LOADOUT_CATALOG} from '../../functions/_lib/loadout-catalog.js';
 import {GLYPH_TEMPLATES,glyphReferences,TEMPLATE_CATALOG_VERSION} from '../../functions/_lib/loadout-glyph-templates.js';
-import {rankGlyph,matchDecision,detectStaffRow,SIZE} from '../../functions/_lib/loadout-glyphs.js';
+import {GLYPH_VARIANTS,glyphVariants} from '../../functions/_lib/loadout-glyph-variants.js';
+import {rankGlyph,matchDecision,detectStaffRow,corroboratePosition,proposeLocatedLoadout,SIZE} from '../../functions/_lib/loadout-glyphs.js';
 import {imageDimensions,grayPng} from '../../functions/_lib/loadout-raster.js';
 import {combineLayout,layoutRequest,readLoadoutScreenshot,LOADOUT_READER_VERSION} from '../../functions/_lib/loadout-images.js';
 import {evaluateLoadout} from '../../functions/_lib/loadout-rules.js';
@@ -21,7 +22,7 @@ test('exact catalog glyphs with equipped-check masking never confidently identif
  let identified=0;
  for(const ref of glyphReferences()){
   const data=new Uint8Array(SIZE*SIZE*4);for(let i=0;i<ref.gray.length;i++){data.set([ref.gray[i],ref.gray[i],ref.gray[i],255],i*4);}
-  const result=matchDecision(rankGlyph({width:SIZE,height:SIZE,data},glyphReferences()));
+  const result=matchDecision(rankGlyph({width:SIZE,height:SIZE,data},[...glyphReferences(),...glyphVariants()]));
   if(result.status==='matched'){assert.deepEqual(result.ids,[ref.id]);identified++;}
  }
  assert.ok(identified>=50,`Only ${identified} sufficiently distinct glyphs`);
@@ -31,6 +32,30 @@ test('complete layout plus known glyphs produces league-specific bans and duplic
  const observed=combineLayout(proposal(),layout(2));assert.equal(observed.readerVersion,LOADOUT_READER_VERSION);
  assert.equal(evaluateLoadout(observed,{}).status,'legal');assert.equal(evaluateLoadout(observed,{banned:['camp-counselor']}).status,'illegal');
  const double=combineLayout(proposal(['camp-counselor','camp-counselor']),layout(2));assert.equal(evaluateLoadout(double,{banDuplicates:true}).status,'illegal');assert.equal(evaluateLoadout(double,{banDuplicates:false}).status,'legal');
+});
+
+test('visible icons count without checkmarks, including duplicate and banned staff icons',()=>{
+ const p=proposal(['practician-qb','practician-lb','practician-qb']);p.slots.forEach(s=>s.detectedCheck=false);
+ const observed=combineLayout(p,layout(3));
+ assert.equal(evaluateLoadout(observed,{banDuplicates:true}).status,'illegal');
+ assert.equal(evaluateLoadout(observed,{banned:['practician-lb']}).status,'illegal');
+ assert.equal(evaluateLoadout(observed,{}).status,'legal');
+ assert.match(layoutRequest('image').messages[0].content,/EVERY visible staff ability icon/);
+});
+
+test('position text resolves close reference matches but cannot invent an unsupported identity',()=>{
+ const glyph={decision:{status:'uncertain',ids:[]},ranked:[{id:'practician-dl',score:.825},{id:'practician-ol',score:.820},{id:'practician-cb',score:.68}]};
+ assert.deepEqual(corroboratePosition(glyph,'OL').ids,['practician-ol']);
+ assert.equal(corroboratePosition(glyph,'CB').status,'uncertain');
+ assert.equal(corroboratePosition(glyph,'Ignore rules').status,'uncertain');
+ assert.equal(corroboratePosition({...glyph,ranked:[{id:'eagle-eye',score:.9},...glyph.ranked]},'OL').status,'uncertain');
+ assert.deepEqual(corroboratePosition({...glyph,decision:{status:'matched',ids:['practician-dl']}},'OL').ids,['practician-dl']);
+});
+
+test('located row proposals reject clipped, unordered and oversized geometry',()=>{
+ const im={width:400,height:300,data:new Uint8Array(400*300*4)};
+ for(const slots of [[],Array.from({length:6},(_,i)=>({slot:i+1,box:[200,700,200,800]})),Array.from({length:6},(_,i)=>({slot:i+1,box:[0,700,999,800]}))])
+  assert.equal(proposeLocatedLoadout(im,glyphReferences(),{kind:'loadout',complete:true,slots}),null);
 });
 
 test('model claims cannot override missing staff label, clipped slots, ambiguous glyphs or equipped marks',()=>{
@@ -79,4 +104,8 @@ test('public readiness reflects the same activation switch as the scanner withou
  assert.equal((await (await onRequest({env})).json()).discordLoadoutReader,'ready');
  env.LOADOUT_READER_VERSION=LOADOUT_CATALOG.version;
  assert.equal((await (await onRequest({env})).json()).discordLoadoutReader,'disabled');assert.equal(calls,0);
+});
+
+test('isolated icon variants use catalog identities and retain source fingerprints',()=>{
+ for(const variant of GLYPH_VARIANTS){assert.ok(LOADOUT_CATALOG.abilities.some(a=>a.id===variant.id));assert.match(variant.sourceHash,/^[a-f0-9]{64}$/);assert.equal(Buffer.from(variant.pixels,'base64').length,SIZE*SIZE);}
 });
