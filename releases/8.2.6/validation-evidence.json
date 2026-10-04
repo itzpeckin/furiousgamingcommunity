@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": "8.2.6",
-  "status": "implementation-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
@@ -59,13 +59,40 @@
     "focusedFinal": {
       "passed": true,
       "tests": 41
+    },
+    "hostedRoutes": {
+      "passed": true,
+      "checksEach": 27,
+      "environments": [
+        "preview",
+        "production"
+      ]
+    },
+    "gatewayRuntime": {
+      "ready": true,
+      "version": "e5f2fa79-d9f5-43ca-b3fe-d716f1c49424",
+      "readyAt": "2026-10-04T08:27:23.463Z",
+      "newScreenshotEndToEnd": false
+    },
+    "statusEmoji": {
+      "provisioned": true,
+      "transparent": true,
+      "pass": "1556220679433490444",
+      "fail": "1556220679911768095"
+    },
+    "cleanup": {
+      "adapterRemoved": true,
+      "temporaryDeploymentsDeleted": 10,
+      "previewTokenRemoved": true
     }
   },
   "scopeBoundaries": {
     "liveImport": false,
     "liveExport": false,
     "leagueRulesChanged": false,
-    "liveDiscordTestPosts": false
+    "liveDiscordTestPosts": false,
+    "productionChanged": true
   },
-  "productionApplicationChanged": false
+  "productionApplicationChanged": true,
+  "productionDataChanged": false
 }
