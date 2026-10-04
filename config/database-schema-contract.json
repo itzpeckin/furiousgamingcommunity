@@ -1122,6 +1122,21 @@
       "address_hash",
       "window_start",
       "attempts"
+    ],
+    "discord_loadout_settings": [
+      "league_id",
+      "banned_playsheets_json"
+    ],
+    "discord_loadout_submissions": [
+      "id",
+      "league_id",
+      "processing_token",
+      "processing_until",
+      "source_edited_at",
+      "timings_json",
+      "discovered_at",
+      "processing_started_at",
+      "reported_at"
     ]
   }
 }

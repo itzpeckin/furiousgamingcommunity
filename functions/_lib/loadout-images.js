@@ -26,6 +26,15 @@ export function playsheetRequest(data){
   {role:'user',content:[{type:'image_url',image_url:{url:data}}]}]};
 }
 export function transcribedPlaysheets(value){
+ value={...value};
+ // Some OCR responses join the two cards in one column. Split only when
+ // the response explicitly contains both texts, with a complete locked label
+ // at the end. Never invent the lower slot from the coach's level.
+ for(const [top,bottom]of [['topLeft','bottomLeft'],['topRight','bottomRight']]){
+  if(value[bottom]!=null||typeof value[top]!=='string')continue;
+  const pair=value[top].trim().match(/^(.*?Playsheet|Unlocks? at Level \d+)\s+(Unlocks? at Level \d+)$/i);
+  if(pair){value[top]=pair[1];value[bottom]=pair[2];}
+ }
  const slots=['topLeft','topRight','bottomLeft','bottomRight'].map((key,i)=>{
   const text=typeof value?.[key]==='string'?value[key].trim():'';
   const locked=/^Unlocks? at Level \d+$/i.test(text),empty=text==='EMPTY';
