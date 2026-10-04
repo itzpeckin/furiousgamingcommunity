@@ -174,6 +174,7 @@ function cardEdgeScore(image,quad){
 }
 
 export function corroboratePosition(glyph,positionText){
+ if(glyph.decision.status==='matched')return glyph.decision;
  const positions={QB:'qb',RB:'hb',HB:'hb',FB:'fb',WR:'wr-te',TE:'wr-te','WR/TE':'wr-te',OL:'ol',DL:'dl',LB:'lb',CB:'cb',S:'s',FS:'s',SS:'s'};
  const suffix=positions[String(positionText||'').trim().toUpperCase()];
  if(!suffix||!glyph.ranked?.[0]?.id.startsWith('practician-'))return glyph.decision;

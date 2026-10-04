@@ -139,6 +139,17 @@ test('transient image errors retry without a verdict; unclear evidence requests 
   }finally{f.sqlite.close();}
 });
 
+test('permanently invalid old-reader evidence is not rechecked forever after an upgrade',async()=>{
+ const f=await fixture();try{
+  await f.save();await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});
+  f.sqlite.prepare('UPDATE discord_loadout_submissions SET observed_json=?').run(JSON.stringify({kind:'uncertain',readerVersion:'old-reader'}));
+  let reads=0;const readScreenshot=async()=>{reads++;throw Object.assign(new Error('Unsupported image'),{retryable:false});};
+  await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl,readScreenshot});
+  await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl,readScreenshot});
+  assert.equal(reads,1);assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'unreadable');
+ }finally{f.sqlite.close();}
+});
+
 test('unrelated screenshots produce no bot verdict and another team cannot submit for this matchup',async()=>{
   const f=await fixture();try{
     await f.save();f.env.AI.run=async()=>({response:JSON.stringify({kind:'other'})});

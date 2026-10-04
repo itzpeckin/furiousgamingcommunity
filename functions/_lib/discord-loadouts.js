@@ -118,7 +118,7 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
       const urls=coachingEvidence(message);
       if(!urls.length)result={status:'removed',reason:'Submission no longer includes a supported screenshot. Post a new screenshot.'};
       else try{observed=await readScreenshot(env,urls,{fetchImpl});}
-      catch(error){if(error.retryable!==false)throw error;result={status:'unreadable',reason:'Attach one to four clear PNG, JPG, or WebP screenshots, or a public Xbox screenshot link.'};}
+      catch(error){if(error.retryable!==false)throw error;observed={kind:'uncertain',complete:false,slots:[],readerVersion:LOADOUT_READER_VERSION};result={status:'unreadable',reason:'Attach one to four clear PNG, JPG, or WebP screenshots, or a public Xbox screenshot link.'};}
     }
   }
   if(!result)result=evaluateLoadout(observed,{banned:parse(config.banned_json,[]),banDuplicates:Boolean(config.ban_duplicates)});

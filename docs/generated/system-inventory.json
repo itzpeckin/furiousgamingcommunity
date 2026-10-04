@@ -24,7 +24,6 @@
     ],
     "APP_ENV": [
       "functions/_lib/permissions.js",
-      "functions/api/internal/loadout-acceptance.js",
       "functions/api/leagues/[leagueSlug]/companion/export-url.js"
     ],
     "ASSETS": [
@@ -198,9 +197,6 @@
       "functions/api/internal/coaching-scan.js",
       "functions/api/leagues/[leagueSlug]/memberships.js"
     ],
-    "LOADOUT_ACCEPTANCE_TOKEN": [
-      "functions/api/internal/loadout-acceptance.js"
-    ],
     "LOADOUT_READER_VERSION": [
       "functions/_lib/loadout-images.js"
     ],
@@ -231,7 +227,7 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 294,
+      ".js": 293,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
@@ -277,7 +273,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 91861,
+        "bytes": 92324,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -325,7 +321,7 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/map-statistics.js"
       }
     ],
-    "total": 831
+    "total": 830
   },
   "frontend": {
     "assets": [
@@ -845,7 +841,7 @@
     "stylesheetCount": 4
   },
   "functions": {
-    "routeCount": 100,
+    "routeCount": 99,
     "routes": [
       {
         "file": "functions/index.js",
@@ -963,13 +959,6 @@
           "onRequestPost"
         ],
         "route": "/api/internal/coaching-scan"
-      },
-      {
-        "file": "functions/api/internal/loadout-acceptance.js",
-        "handlers": [
-          "onRequestPost"
-        ],
-        "route": "/api/internal/loadout-acceptance"
       },
       {
         "file": "functions/api/league.js",

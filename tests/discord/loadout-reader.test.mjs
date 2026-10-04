@@ -49,6 +49,7 @@ test('position text resolves close reference matches but cannot invent an unsupp
  assert.equal(corroboratePosition(glyph,'CB').status,'uncertain');
  assert.equal(corroboratePosition(glyph,'Ignore rules').status,'uncertain');
  assert.equal(corroboratePosition({...glyph,ranked:[{id:'eagle-eye',score:.9},...glyph.ranked]},'OL').status,'uncertain');
+ assert.deepEqual(corroboratePosition({...glyph,decision:{status:'matched',ids:['practician-dl']}},'OL').ids,['practician-dl']);
 });
 
 test('located row proposals reject clipped, unordered and oversized geometry',()=>{

@@ -16,7 +16,11 @@ Shared Trimmed Edges/All Hustle glyphs remain ambiguous. Poor or cropped evidenc
 
 ## Validation evidence
 
-Targeted reader, scanner, import, and EA regression checks; full strict and hosted acceptance pending.
+Hosted preview identified every visible staff ability in all eight unique new screenshots and four earlier loadout screenshots. The unchecked QB/LB/QB duplicate and named Camp Counselor ban were correctly illegal; the archetype-only image was ignored. Six latest screenshots were held out of the added icon references. Hosted sample timings varied from approximately 4 to 52 seconds; these are not an SLA.
+
+Targeted 101-test reader/scanner/EA/import suite passed. The real 10,653-record import fixture reuses one statistics plan across checkpoints and retains all 8,271 statistics. A three-dataset export fixture reduces object writes from 9 to 7 and manifest reads from 3 to 1 without losing durable checkpoints. Production import/export duration remains unmeasured.
+
+The full strict quality gate passed all 518 tests. Final preview and production verification follow publication. The temporary authenticated preview adapter, its test deployment and its token were removed. Blank and clipped images received no legality verdict.
 
 ## Deployment status
 
