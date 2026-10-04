@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.2.6",
   "releaseType": "discord-live-loadout-checks",
-  "status": "implementation-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.2.5",
@@ -14,19 +14,21 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending"
+    "status": "merged",
+    "pullRequest": 183
   },
   "staging": {
     "authorized": true,
-    "deployed": false
+    "deployed": true
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "currentRelease": "8.2.5",
+    "deployed": true,
+    "currentRelease": "8.2.6",
     "candidateRelease": "8.2.6",
-    "currentMigration": 52,
-    "candidateMigration": 53
+    "currentMigration": 53,
+    "candidateMigration": 53,
+    "pagesDeployment": "46f5c84a-d74d-4aaf-ab63-a19e3317e771"
   },
   "requiredArtifacts": [
     "releases/8.2.6/release-record.md",

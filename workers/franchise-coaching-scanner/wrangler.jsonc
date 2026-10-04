@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "observability": {"enabled": true,"head_sampling_rate": 1},
-  "vars": {"FHQ_ORIGIN": "https://franchisehq.app", "LOADOUT_GATEWAY_ENABLED": "false"},
+  "vars": {"FHQ_ORIGIN": "https://franchisehq.app", "LOADOUT_GATEWAY_ENABLED": "true"},
   "durable_objects": {"bindings":[{"name":"LOADOUT_GATEWAY","class_name":"DiscordLoadoutGateway"}]},
   "migrations": [{"tag":"loadout-gateway-v1","new_sqlite_classes":["DiscordLoadoutGateway"]}],
   "triggers": {"crons": ["* * * * *"]}
