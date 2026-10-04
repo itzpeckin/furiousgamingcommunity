@@ -1,5 +1,5 @@
 // Deterministic glyph proposals. A separate image-layout check must confirm all six staff slots.
-export const READER_VERSION='m27-glyph-reader-2';
+export const READER_VERSION='m27-glyph-reader-3';
 export const SIZE=48;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function segmentDistance(x,y,ax,ay,bx,by){const t=clamp(((x-ax)*(bx-ax)+(y-ay)*(by-ay))/((bx-ax)**2+(by-ay)**2),0,1);return Math.hypot(x-ax-t*(bx-ax),y-ay-t*(by-ay));}

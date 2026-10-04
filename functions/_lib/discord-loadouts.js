@@ -6,6 +6,10 @@ import { snapshotCurrentPeriod } from './schedule-integrity.js';
 import { ABILITY_BY_ID, LOADOUT_CATALOG } from './loadout-catalog.js';
 import { readLoadoutScreenshot, loadoutReaderReady as ready, LOADOUT_READER_VERSION } from './loadout-images.js';
 import { evaluateLoadout } from './loadout-rules.js';
+import { PLAYSHEET_BY_ID, PLAYSHEET_CATALOG } from './playsheet-catalog.js';
+import { loadoutReportLines } from './loadout-report.js';
+import { boundedMap } from './bounded-map.js';
+import { loadoutEmojiEnvironment } from './loadout-emojis.js';
 
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results||[];
 const snow=value=>/^\d{17,20}$/.test(String(value||''));
@@ -32,7 +36,7 @@ export async function loadoutSettings(db,leagueId,env={}){
   const threads=config?await currentThreads(db,leagueId,config.guild_id):[];
   const current=threads.length?await rows(db,`SELECT status,rule_revision,reported_revision FROM discord_loadout_submissions
     WHERE league_id=? AND thread_id IN (${threads.map(()=>'?').join(',')}) AND status<>'ignored'`,leagueId,...threads.map(t=>t.id)):[];
-  return {enabled:Boolean(config?.enabled),banned:parse(config?.banned_json,[]),banDuplicates:Boolean(config?.ban_duplicates),
+  return {enabled:Boolean(config?.enabled),banned:parse(config?.banned_json,[]),bannedPlaysheets:parse(config?.banned_playsheets_json,[]),playsheetCatalog:PLAYSHEET_CATALOG,banDuplicates:Boolean(config?.ban_duplicates),
     revision:config?.revision||0,catalogVersion:LOADOUT_CATALOG.version,readerReady:ready(env),
     lastScanAt:config?.last_scan_at||null,lastError:config?.last_error||null,
     progress:{threads:threads.length,historyComplete:threads.filter(t=>t.history_complete).length,submissions:current.length,
@@ -47,6 +51,9 @@ export async function configureLoadouts(c,body,{fetchImpl=fetch}={}){
   if(typeof body.enabled!=='boolean'||typeof body.banDuplicates!=='boolean'||!Number.isInteger(body.revision)||body.revision<0
     ||body.catalogVersion!==LOADOUT_CATALOG.version||!Array.isArray(body.banned)||body.banned.length>LOADOUT_CATALOG.abilities.length
     ||body.banned.some(id=>!ABILITY_BY_ID.has(id)))fail('Refresh Discord Bot settings, then choose abilities from the current catalog and save again.');
+  if(body.bannedPlaysheets!==undefined&&(!Array.isArray(body.bannedPlaysheets)||body.bannedPlaysheets.length>PLAYSHEET_CATALOG.playsheets.length||body.bannedPlaysheets.some(id=>!PLAYSHEET_BY_ID.has(id))))fail('Choose playsheets from the current catalog.');
+  const prior=await c.db.prepare('SELECT banned_playsheets_json FROM discord_loadout_settings WHERE league_id=?').bind(c.league.id).first();
+  const playsheets=JSON.stringify([...new Set(body.bannedPlaysheets??parse(prior?.banned_playsheets_json,[]))]);
   if(body.enabled){
     if(!ready(c.env))fail('Automatic loadout image checks are awaiting platform activation. You can save ability bans with automatic checks turned off.');
     if(!snow(installation.schedule_channel_id))fail('Choose a scheduling channel in Discord Routing first.');
@@ -62,15 +69,15 @@ export async function configureLoadouts(c,body,{fetchImpl=fetch}={}){
     if((channelPermissions(channel,installation.discord_guild_id,bot.id,member,roles)&mask)!==mask)
       fail('Allow the FHQ bot to View Channel, Read Message History, Embed Links, and Send Messages in Threads in the scheduling channel.');
   }
-  const result=await c.db.prepare(`INSERT INTO discord_loadout_settings(league_id,guild_id,enabled,banned_json,ban_duplicates,catalog_version)
-    SELECT ?,?,?,?,?,? WHERE ?=0 AND NOT EXISTS(SELECT 1 FROM discord_loadout_settings WHERE league_id=?)
+  const result=await c.db.prepare(`INSERT INTO discord_loadout_settings(league_id,guild_id,enabled,banned_json,ban_duplicates,catalog_version,banned_playsheets_json)
+    SELECT ?,?,?,?,?,?,? WHERE ?=0 AND NOT EXISTS(SELECT 1 FROM discord_loadout_settings WHERE league_id=?)
     ON CONFLICT(league_id) DO NOTHING`).bind(c.league.id,installation.discord_guild_id,body.enabled?1:0,
-      JSON.stringify([...new Set(body.banned)]),body.banDuplicates?1:0,LOADOUT_CATALOG.version,body.revision,c.league.id).run();
+      JSON.stringify([...new Set(body.banned)]),body.banDuplicates?1:0,LOADOUT_CATALOG.version,playsheets,body.revision,c.league.id).run();
   if(!result.meta?.changes){
     const update=await c.db.prepare(`UPDATE discord_loadout_settings SET guild_id=?,enabled=?,banned_json=?,ban_duplicates=?,
-      catalog_version=?,revision=revision+1,next_scan_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP
+      catalog_version=?,banned_playsheets_json=?,revision=revision+1,next_scan_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP
       WHERE league_id=? AND revision=?`).bind(installation.discord_guild_id,body.enabled?1:0,JSON.stringify([...new Set(body.banned)]),
-      body.banDuplicates?1:0,LOADOUT_CATALOG.version,c.league.id,body.revision).run();
+      body.banDuplicates?1:0,LOADOUT_CATALOG.version,playsheets,c.league.id,body.revision).run();
     if(!update.meta?.changes)fail('Another commissioner updated these rules. Refresh Status, review their changes, and save again.');
   }
 }
@@ -85,8 +92,8 @@ async function ingest(env,db,config,thread,fetchImpl){
   if(!live.length||history?.length===0)await verifyReadAccess(env,{source_channel_id:thread.discord_thread_id,guild_id:config.guild_id},fetchImpl);
   for(const message of new Map([...(history||[]),...live].filter(m=>snow(m.id)&&snow(m.author?.id)&&!m.author.bot).map(m=>[m.id,m])).values()){
     if(!coachingEvidence(message).length)continue;
-    await db.prepare(`INSERT OR IGNORE INTO discord_loadout_submissions(league_id,thread_id,message_id,author_id,submitted_at)
-      VALUES(?,?,?,?,?)`).bind(config.league_id,thread.id,message.id,message.author.id,message.timestamp).run();
+    await db.prepare(`INSERT OR IGNORE INTO discord_loadout_submissions(league_id,thread_id,message_id,author_id,submitted_at,discovered_at)
+      VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(config.league_id,thread.id,message.id,message.author.id,message.timestamp).run();
   }
   const sorted=list=>list.map(m=>m.id).filter(snow).sort((a,b)=>BigInt(a)<BigInt(b)?-1:1);
   const ids=sorted(live),old=history?sorted(history):[],head=thread.live_head||ids.at(-1)||thread.live_after;
@@ -98,30 +105,36 @@ async function ingest(env,db,config,thread,fetchImpl){
 }
 
 async function stillCurrent(db,config,thread){
+  if(config.claim){
+    const claimed=await db.prepare(`SELECT message_id FROM discord_loadout_submissions WHERE league_id=? AND thread_id=? AND message_id=?
+      AND processing_token=? AND COALESCE(source_edited_at,'')=?`).bind(config.league_id,thread.id,config.claim.messageId,config.claim.token,config.claim.editedAt||'').first();
+    if(!claimed)return false;
+  }
   const active=await db.prepare(`SELECT s.league_id FROM discord_loadout_settings s JOIN leagues l ON l.id=s.league_id
-    WHERE s.league_id=? AND s.enabled=1 AND s.revision=? AND s.lease_token=? AND l.tenant_status='enabled'`)
-    .bind(config.league_id,config.revision,config.lease_token).first();
+    WHERE s.league_id=? AND s.enabled=1 AND s.revision=? AND l.tenant_status='enabled'`)
+    .bind(config.league_id,config.revision).first();
   return Boolean(active&&(await currentThreads(db,config.league_id,config.guild_id)).some(t=>t.id===thread.id));
 }
 
-async function processSubmission(env,db,config,thread,submission,fetchImpl,readScreenshot){
+async function processSubmission(env,db,config,thread,submission,fetchImpl,readScreenshot,canonicalMessage){
+  const started=Date.now();let imageMs=0;
   let observed=parse(submission.observed_json),result;
-  const teams=await activeLeagueTeams(db,config.league_id);
+  const [teams,emojiEnv]=await Promise.all([activeLeagueTeams(db,config.league_id),loadoutEmojiEnvironment(env)]);
   const identity=await identityFor(db,config.league_id,submission.author_id,submission.submitted_at,teams);
   const team=identity?.teamKey;
   if(submission.status==='pending'||observed?.readerVersion&&observed.readerVersion!==LOADOUT_READER_VERSION){
     let message;
-    try{message=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages/${submission.message_id}`,{fetchImpl,rateLimitRetries:0});}
+    try{message=canonicalMessage||await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages/${submission.message_id}`,{fetchImpl,rateLimitRetries:0});}
     catch(error){if(Number(error.status)!==404)throw error;result={status:'removed',reason:'Submission removed. Post a new loadout screenshot.'};}
     if(message){
       if(message.author?.id!==submission.author_id)throw new Error('Submission author changed.');
       const urls=coachingEvidence(message);
       if(!urls.length)result={status:'removed',reason:'Submission no longer includes a supported screenshot. Post a new screenshot.'};
-      else try{observed=await readScreenshot(env,urls,{fetchImpl});}
+      else try{const reading=Date.now();observed=await readScreenshot(env,urls,{fetchImpl});imageMs=Date.now()-reading;}
       catch(error){if(error.retryable!==false)throw error;observed={kind:'uncertain',complete:false,slots:[],readerVersion:LOADOUT_READER_VERSION};result={status:'unreadable',reason:'Attach one to four clear PNG, JPG, or WebP screenshots, or a public Xbox screenshot link.'};}
     }
   }
-  if(!result)result=evaluateLoadout(observed,{banned:parse(config.banned_json,[]),banDuplicates:Boolean(config.ban_duplicates)});
+  if(!result)result=evaluateLoadout(observed,{banned:parse(config.banned_json,[]),banDuplicates:Boolean(config.ban_duplicates),bannedPlaysheets:parse(config.banned_playsheets_json,[]),requirePlaysheets:true});
   if(!['ignored','removed'].includes(result.status)&&(!team||![thread.home_team_key,thread.away_team_key].some(key=>resolveTeam(teams,key)?.teamKey===team)))
     result={status:'unassigned',reason:'Link your Discord account and team in FHQ, then post your loadout in your own matchup thread.'};
   if(!await stillCurrent(db,config,thread))return;
@@ -133,14 +146,14 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
       .bind(config.revision,config.league_id,thread.id,submission.message_id).run();return;
   }
   const marker=`loadout:${thread.discord_thread_id}:${submission.message_id}`;
-  const names=observed?.slots?.filter(s=>s.state==='equipped').map(s=>`Slot ${s.slot}: ${s.candidates?.length?s.candidates.map(id=>ABILITY_BY_ID.get(id)?.name||'Unclear').join(' / '):'Unclear — please resend'}`).join('\n');
   const label={legal:'Legal',illegal:'Illegal',unreadable:'Clearer evidence needed',unassigned:'Team link needed'}[result.status];
   const body={content:`<@${submission.author_id}> · **${safe(resolveTeam(teams,team)?.displayName||'Team not verified')}** · **${label}**\n${result.reason}`,
-    embeds:[{title:`Weekly staff loadout · Week ${thread.week_index}`,description:names||'Staff abilities could not be fully read.',
+    embeds:[{title:`Weekly loadout check · Week ${thread.week_index}`,description:loadoutReportLines(observed,result,emojiEnv),
       url:`https://discord.com/channels/${config.guild_id}/${thread.discord_thread_id}/${submission.message_id}`,
-      color:result.status==='legal'?0x5bd49d:result.status==='illegal'?0xf36d7e:0xe9aa4a,footer:{text:marker}}],allowed_mentions:{parse:[]}};
+      color:result.status==='legal'?0x22e66b:result.status==='illegal'?0xb5122b:0xe9aa4a,footer:{text:marker}}],allowed_mentions:{parse:[]}};
+  const posting=Date.now();
   let reportId=submission.report_message_id,posted;
-  if(!reportId){
+  if(!reportId&&submission.attempts>0){
     const recent=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages?limit=100`,{fetchImpl,rateLimitRetries:0});
     const bot=await discordBotRequest(env,'/users/@me',{fetchImpl,rateLimitRetries:0});
     reportId=recent.find(m=>m.author?.id===bot.id&&m.embeds?.some(e=>e.footer?.text===marker))?.id;
@@ -149,8 +162,74 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
   if(reportId)try{posted=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages/${reportId}`,{method:'PATCH',body,fetchImpl,rateLimitRetries:0});}
   catch(error){if(Number(error.status)!==404)throw error;}
   if(!posted)posted=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages`,{method:'POST',body:{...body,nonce:submission.message_id,enforce_nonce:true},fetchImpl,rateLimitRetries:0});
-  await db.prepare('UPDATE discord_loadout_submissions SET report_message_id=?,reported_revision=? WHERE league_id=? AND thread_id=? AND message_id=?')
-    .bind(posted.id,config.revision,config.league_id,thread.id,submission.message_id).run();
+  const timings={discoveryMs:submission.discovered_at?Math.max(0,Date.parse(submission.discovered_at.replace(' ','T')+'Z')-Date.parse(submission.submitted_at)):null,
+    imageMs,postMs:Date.now()-posting,processingMs:Date.now()-started,totalMs:Math.max(0,Date.now()-Date.parse(submission.submitted_at)),readerPath:observed?.readerPath||'verified'};
+  await db.prepare('UPDATE discord_loadout_submissions SET report_message_id=?,reported_revision=?,reported_at=CURRENT_TIMESTAMP,timings_json=? WHERE league_id=? AND thread_id=? AND message_id=?')
+    .bind(posted.id,config.revision,JSON.stringify(timings),config.league_id,thread.id,submission.message_id).run();
+}
+
+// Each submission owns its claim. Live events and history scans can run at
+// once without either blocking the league or publishing duplicate replies.
+async function processClaimed(env,db,config,thread,submission,fetchImpl,readScreenshot,canonicalMessage){
+  const token=crypto.randomUUID();
+  const claim=await db.prepare(`UPDATE discord_loadout_submissions SET processing_token=?,processing_until=datetime('now','+4 minutes'),processing_started_at=CURRENT_TIMESTAMP
+    WHERE league_id=? AND thread_id=? AND message_id=? AND (processing_until IS NULL OR julianday(processing_until)<julianday('now'))`)
+    .bind(token,config.league_id,thread.id,submission.message_id).run();
+  if(!claim.meta?.changes)return {ok:true,busy:true};
+  try{
+    // Re-read after claiming: another processor may have finished between our
+    // discovery and claim. A subsequent edit also invalidates cached evidence.
+    const fresh=await db.prepare('SELECT * FROM discord_loadout_submissions WHERE league_id=? AND thread_id=? AND message_id=?')
+      .bind(config.league_id,thread.id,submission.message_id).first();
+    if(!needsCheck(fresh,config))return {ok:true,processed:false};
+    if(fresh.source_edited_at!==submission.source_edited_at)canonicalMessage=undefined;
+    await processSubmission(env,db,{...config,claim:{messageId:fresh.message_id,token,editedAt:fresh.source_edited_at}},thread,fresh,fetchImpl,readScreenshot,canonicalMessage);
+    return {ok:true,processed:true};
+  }
+  catch{
+    await db.prepare('UPDATE discord_loadout_submissions SET attempts=attempts+1 WHERE league_id=? AND thread_id=? AND message_id=? AND processing_token=?')
+      .bind(config.league_id,thread.id,submission.message_id,token).run();
+    return {ok:false,retry:true};
+  }finally{
+    await db.prepare('UPDATE discord_loadout_submissions SET processing_token=NULL,processing_until=NULL WHERE league_id=? AND thread_id=? AND message_id=? AND processing_token=?')
+      .bind(config.league_id,thread.id,submission.message_id,token).run();
+  }
+}
+
+const needsCheck=(s,c)=>s.status==='pending'||s.rule_revision!==c.revision||s.reported_revision!==c.revision||parse(s.observed_json)?.readerVersion&&parse(s.observed_json).readerVersion!==LOADOUT_READER_VERSION;
+
+export async function handleLoadoutEvent(env,db,event,{fetchImpl=fetch,readScreenshot=readLoadoutScreenshot}={}){
+  if(!ready(env)||![event.guildId,event.channelId,event.messageId].every(snow))return {ok:true,ignored:true};
+  const configs=await rows(db,`SELECT s.* FROM discord_loadout_settings s JOIN leagues l ON l.id=s.league_id
+    JOIN discord_league_installations i ON i.league_id=s.league_id AND i.discord_guild_id=s.guild_id
+    WHERE s.guild_id=? AND s.enabled=1 AND l.tenant_status='enabled' AND i.status='active'`,event.guildId);
+  for(const config of configs){
+    const thread=(await currentThreads(db,config.league_id,config.guild_id)).find(t=>t.discord_thread_id===event.channelId);
+    if(!thread)continue;
+    // Fetch canonical evidence and author from Discord, never from a caller.
+    let message;try{message=await discordBotRequest(env,`/channels/${event.channelId}/messages/${event.messageId}`,{fetchImpl,rateLimitRetries:0});}
+    catch(error){if(error.status===404)return {ok:true,ignored:true};throw error;}
+    if(!snow(message.author?.id)||message.author.bot)return {ok:true,ignored:true};
+    const existing=await db.prepare('SELECT message_id FROM discord_loadout_submissions WHERE league_id=? AND thread_id=? AND message_id=?').bind(config.league_id,thread.id,message.id).first();
+    if(!existing&&!coachingEvidence(message).length)return {ok:true,ignored:true};
+    await db.prepare(`INSERT OR IGNORE INTO discord_loadout_submissions(league_id,thread_id,message_id,author_id,submitted_at,discovered_at)
+      VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(config.league_id,thread.id,message.id,message.author.id,message.timestamp).run();
+    if(message.edited_timestamp)await db.prepare(`UPDATE discord_loadout_submissions SET status='pending',observed_json=NULL,source_edited_at=?,rule_revision=0
+      WHERE league_id=? AND thread_id=? AND message_id=? AND COALESCE(source_edited_at,'')<>?`)
+      .bind(message.edited_timestamp,config.league_id,thread.id,message.id,message.edited_timestamp).run();
+    const submission=await db.prepare('SELECT * FROM discord_loadout_submissions WHERE league_id=? AND thread_id=? AND message_id=?').bind(config.league_id,thread.id,message.id).first();
+    if(!needsCheck(submission,config))return {ok:true,duplicate:true};
+    return processClaimed(env,db,config,thread,submission,fetchImpl,readScreenshot,message);
+  }
+  return {ok:true,ignored:true};
+}
+
+export async function loadoutEventRoutes(env,db){
+  if(!ready(env))return [];
+  const configs=await rows(db,`SELECT s.* FROM discord_loadout_settings s JOIN leagues l ON l.id=s.league_id
+    WHERE s.enabled=1 AND l.tenant_status='enabled'`);
+  const threads=await boundedMap(configs,4,async c=>(await currentThreads(db,c.league_id,c.guild_id)).map(t=>({guildId:c.guild_id,channelId:t.discord_thread_id})));
+  return threads.flat();
 }
 
 export async function scanLoadouts(env,db,{fetchImpl=fetch,readScreenshot=readLoadoutScreenshot}={}){
@@ -165,25 +244,27 @@ export async function scanLoadouts(env,db,{fetchImpl=fetch,readScreenshot=readLo
     WHERE league_id=? AND revision=? AND enabled=1 AND (lease_until IS NULL OR julianday(lease_until)<julianday('now'))`)
     .bind(config.lease_token,config.league_id,config.revision).run();
   if(!claim.meta?.changes)return {ok:true,idle:true};
-  let submission,thread;
+  let submissions=[],threads=[];
   try{
-    thread=(await currentThreads(db,config.league_id,config.guild_id))[0];
-    if(thread){
+    threads=await currentThreads(db,config.league_id,config.guild_id);
+    await boundedMap(threads.slice(0,4),4,async thread=>{
       await db.prepare('INSERT OR IGNORE INTO discord_loadout_threads(league_id,thread_id) VALUES(?,?)').bind(config.league_id,thread.id).run();
       await ingest(env,db,config,thread,fetchImpl);
-      submission=await db.prepare(`SELECT * FROM discord_loadout_submissions WHERE league_id=? AND thread_id=?
+    });
+    if(threads.length){
+      submissions=await rows(db,`SELECT * FROM discord_loadout_submissions WHERE league_id=? AND thread_id IN (${threads.map(()=>'?').join(',')})
+        AND (processing_until IS NULL OR julianday(processing_until)<julianday('now'))
         AND (status='pending' OR rule_revision<>? OR reported_revision<>?
           OR (status IN ('legal','illegal','unreadable','ignored','unassigned') AND json_extract(observed_json,'$.readerVersion') IS NOT NULL
-            AND json_extract(observed_json,'$.readerVersion')<>?)) ORDER BY attempts ASC,submitted_at DESC LIMIT 1`)
-        .bind(config.league_id,thread.id,config.revision,config.revision,LOADOUT_READER_VERSION).first();
-      if(submission)await processSubmission(env,db,config,thread,submission,fetchImpl,readScreenshot);
+            AND json_extract(observed_json,'$.readerVersion')<>?)) ORDER BY attempts ASC,submitted_at DESC LIMIT 3`,
+        config.league_id,...threads.map(t=>t.id),config.revision,config.revision,LOADOUT_READER_VERSION);
+      const results=await boundedMap(submissions,3,s=>processClaimed(env,db,config,threads.find(t=>t.id===s.thread_id),s,fetchImpl,readScreenshot));
+      if(results.some(r=>!r.ok))throw new Error('Check will retry.');
     }
     await db.prepare(`UPDATE discord_loadout_settings SET last_scan_at=CURRENT_TIMESTAMP,last_error=NULL,next_scan_at=datetime('now',?)
-      WHERE league_id=? AND lease_token=?`).bind(thread?'+0 seconds':'+1 minute',config.league_id,config.lease_token).run();
-    return {ok:true,processed:Boolean(submission),idle:!thread};
+      WHERE league_id=? AND lease_token=?`).bind(threads.length?'+0 seconds':'+1 minute',config.league_id,config.lease_token).run();
+    return {ok:true,processed:submissions.length>0,idle:!threads.length};
   }catch{
-    if(submission)await db.prepare('UPDATE discord_loadout_submissions SET attempts=attempts+1 WHERE league_id=? AND thread_id=? AND message_id=?')
-      .bind(config.league_id,thread.id,submission.message_id).run();
     await db.prepare(`UPDATE discord_loadout_settings SET last_error=?,next_scan_at=datetime('now','+1 minute') WHERE league_id=? AND lease_token=?`)
       .bind('A screenshot or Discord request could not finish. Checks retry automatically. Verify scheduling-channel permissions if this persists.',config.league_id,config.lease_token).run();
     return {ok:false,retry:true};

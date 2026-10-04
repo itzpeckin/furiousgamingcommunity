@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.6",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "expectedFailure": false,
+      "passed": true,
+      "migrationVersion": 53,
+      "candidateRequiresMigration": true
+    },
+    "gatewayFixtures": {
+      "passed": true,
+      "tests": 6
+    },
+    "loadoutRuleAndDeliveryFixtures": {
+      "passed": true,
+      "tests": 20
+    },
+    "productionFiveSecondTarget": {
+      "verified": false
+    },
+    "hostedRecognition": {
+      "passed": false,
+      "status": "pending"
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveExport": false,
+    "leagueRulesChanged": false,
+    "liveDiscordTestPosts": false
+  }
+}

@@ -8,7 +8,7 @@ import {coachingImageLink,canonicalArchetype,readCoachingScreenshot} from '../..
 import {eaWeeklyReady} from '../../functions/_lib/ea-direct.js';
 import {proveCurrentSchedulePeriod} from '../../functions/_lib/schedule-integrity.js';
 import {onRequestPost as scannerPost} from '../../functions/api/internal/coaching-scan.js';
-import scannerWorker from '../../workers/franchise-coaching-scanner/src/index.js';
+import scannerWorker from '../../workers/franchise-coaching-scanner/src/scheduled.js';
 
 function d1(sqlite){return{prepare(sql){const statement=sqlite.prepare(sql);let args=[];const p={bind(...values){args=values;return p},async first(){return statement.get(...args)||null},async all(){return{results:statement.all(...args)}},async run(){return{meta:{changes:Number(statement.run(...args).changes)}}}};return p},async batch(statements){const result=[];for(const statement of statements)result.push(await statement.run());return result;}}}
 const guild='100000000000000001',source='100000000000000002',report='100000000000000003',author='100000000000000004',bot='100000000000000005',messageId='100000000000000006';

@@ -3,16 +3,86 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
-import { configureLoadouts, scanLoadouts as runScanLoadouts, loadoutCommand, loadoutSettings } from '../../functions/_lib/discord-loadouts.js';
+import { configureLoadouts, scanLoadouts as runScanLoadouts, loadoutCommand, loadoutSettings,handleLoadoutEvent } from '../../functions/_lib/discord-loadouts.js';
 import { normalizeLoadout, evaluateLoadout } from '../../functions/_lib/loadout-rules.js';
 import { readLoadoutScreenshot, LOADOUT_READER_VERSION } from '../../functions/_lib/loadout-images.js';
 import { LOADOUT_CATALOG } from '../../functions/_lib/loadout-catalog.js';
+import {normalizePlaysheets,playsheetId,PLAYSHEET_CATALOG} from '../../functions/_lib/playsheet-catalog.js';
+import {loadoutReportLines} from '../../functions/_lib/loadout-report.js';
+import {onRequestPost as eventEndpoint} from '../../functions/api/internal/loadout-event.js';
 // Scanner tests isolate Discord/tenant state; pixel/model acceptance is in loadout-reader tests.
 const scanLoadouts=(env,db,options)=>runScanLoadouts(env,db,{...options,readScreenshot:options?.readScreenshot||(async()=>normalizeLoadout(JSON.parse((await env.AI.run()).response)))});
 function d1(sqlite){return {prepare(sql){const s=sqlite.prepare(sql);let args=[];const p={bind(...a){args=a;return p;},async first(){return s.get(...args)||null;},async all(){return {results:s.all(...args)};},async run(){return {meta:{changes:Number(s.run(...args).changes)}};}};return p;}};}
 const guild='200000000000000001',parent='200000000000000002',channel='200000000000000003',author='200000000000000004',bot='200000000000000005',messageId='200000000000000006';
 const photo='https://cdn.discordapp.com/attachments/123/456/loadout.png';
-const sample=(ids=['field-general','camp-counselor'])=>({kind:'loadout',complete:true,slots:Array.from({length:6},(_,i)=>({slot:i+1,state:i<ids.length?'equipped':'locked',clear:true,candidates:i<ids.length?[ids[i]]:[]}))});
+const sample=(ids=['field-general','camp-counselor'])=>({kind:'loadout',complete:true,slots:Array.from({length:6},(_,i)=>({slot:i+1,state:i<ids.length?'equipped':'locked',clear:true,candidates:i<ids.length?[ids[i]]:[]})),playsheets:{complete:true,slots:Array.from({length:4},(_,i)=>({slot:i+1,state:i===0?'equipped':'locked',clear:true,name:i===0?'Dollar Playsheet':null}))}});
+const event={guildId:guild,channelId:channel,messageId};
+const readSample=async()=>({...normalizeLoadout(sample()),readerVersion:LOADOUT_READER_VERSION});
+
+test('playsheet names are exact, catalog IDs unique, and unknown or incomplete names never pass',()=>{
+  assert.equal(new Set(PLAYSHEET_CATALOG.playsheets.map(s=>s.id)).size,67);
+  assert.equal(playsheetId('Heavy 1 Playsheet'),'heavy-i');
+  assert.notEqual(playsheetId('Run N Shoot'),playsheetId('Run N Shoot Gun'));
+  assert.equal(playsheetId('Dollar Plus'),null);
+  const raw=sample();raw.playsheets.slots[0].name='Dollar Plus';
+  assert.equal(normalizePlaysheets(raw.playsheets).complete,false);
+  assert.equal(evaluateLoadout(normalizeLoadout(raw),{requirePlaysheets:true}).status,'unreadable');
+  const partial=sample();partial.playsheets.slots.pop();
+  assert.equal(evaluateLoadout(normalizeLoadout(partial),{requirePlaysheets:true}).status,'unreadable');
+});
+
+test('playsheet bans and staff duplicates produce the correct per-slot custom marks',()=>{
+  const observed=normalizeLoadout(sample(['field-general','field-general']));
+  const result=evaluateLoadout(observed,{banDuplicates:true,bannedPlaysheets:['dollar'],requirePlaysheets:true});
+  assert.equal(result.status,'illegal');assert.equal(result.duplicateCheck,'illegal');
+  assert.equal(result.slotResults[0].status,'illegal');assert.equal(result.slotResults[1].status,'illegal');
+  assert.equal(result.playsheetResults[0].status,'illegal');
+  const report=loadoutReportLines(observed,result,{LOADOUT_PASS_EMOJI_ID:'100000000000000001',LOADOUT_FAIL_EMOJI_ID:'100000000000000002'});
+  assert.match(report,/<:fhq_fail:100000000000000002> Slot 1/);assert.doesNotMatch(report,/✅|🟢/);
+  const raw=sample(['field-general']);raw.playsheets.slots[1]={...raw.playsheets.slots[0],slot:2};
+  assert.equal(evaluateLoadout(normalizeLoadout(raw),{banDuplicates:true,requirePlaysheets:true}).status,'legal');
+});
+
+test('playsheet settings retain league scope, preserve older-client writes and reject invented bans',async()=>{
+  const f=await fixture();try{
+    await f.save({bannedPlaysheets:['dollar']});await f.save({banned:[]});
+    assert.deepEqual((await loadoutSettings(f.db,'a',f.env)).bannedPlaysheets,['dollar']);
+    assert.deepEqual((await loadoutSettings(f.db,'b',f.env)).bannedPlaysheets,[]);
+    await assert.rejects(f.save({bannedPlaysheets:['made-up']}),/current catalog/);
+  }finally{f.sqlite.close();}
+});
+
+test('live events bypass history leases, use canonical authors and deduplicate completed checks',async()=>{
+  const f=await fixture();try{
+    await f.save();f.sqlite.exec("UPDATE discord_loadout_settings SET lease_token='history',lease_until=datetime('now','+4 minutes')");
+    let reads=0;const options={fetchImpl:f.fetchImpl,readScreenshot:async()=>{reads++;return readSample();}};
+    assert.equal((await handleLoadoutEvent(f.env,f.db,event,options)).processed,true);
+    await handleLoadoutEvent(f.env,f.db,event,options);
+    assert.equal(reads,1);assert.equal(f.posts.length,1);
+    assert.equal(f.calls.filter(c=>c.path.endsWith('/messages/'+messageId)).length,2);
+    const row=f.sqlite.prepare('SELECT * FROM discord_loadout_submissions').get();
+    assert.equal(row.author_id,author);assert.ok(row.reported_at);assert.ok(JSON.parse(row.timings_json).processingMs>=0);
+    await handleLoadoutEvent(f.env,f.db,{...event,channelId:parent},options);assert.equal(reads,1);
+  }finally{f.sqlite.close();}
+});
+
+test('an edit during an in-flight check invalidates the old verdict and retries once with the new evidence',async()=>{
+  const f=await fixture();try{
+    await f.save();let unblock,reading;const started=new Promise(r=>{reading=r;});
+    const first=handleLoadoutEvent(f.env,f.db,event,{fetchImpl:f.fetchImpl,readScreenshot:async()=>{reading();await new Promise(r=>{unblock=r;});return readSample();}});
+    await started;f.message.edited_timestamp='2026-10-04T08:00:00Z';
+    const busy=await handleLoadoutEvent(f.env,f.db,event,{fetchImpl:f.fetchImpl,readScreenshot:readSample});
+    assert.equal(busy.busy,true);unblock();await first;assert.equal(f.posts.length,0);
+    await handleLoadoutEvent(f.env,f.db,event,{fetchImpl:f.fetchImpl,readScreenshot:readSample});
+    assert.equal(f.posts.length,1);assert.equal(f.sqlite.prepare('SELECT processing_token FROM discord_loadout_submissions').get().processing_token,null);
+  }finally{f.sqlite.close();}
+});
+
+test('event endpoint hides unauthenticated access and bounds event bodies',async()=>{
+  const secret='ab'.repeat(32),env={COACHING_SCANNER_SECRET:secret};
+  assert.equal((await eventEndpoint({env,request:new Request('https://test/api/internal/loadout-event',{method:'POST',body:'{}'})})).status,404);
+  assert.equal((await eventEndpoint({env,request:new Request('https://test/api/internal/loadout-event',{method:'POST',headers:{'x-fhq-coaching-scanner':secret},body:'x'.repeat(1025)})})).status,413);
+});
 async function fixture(){
   const sqlite=new DatabaseSync(':memory:');
   for(const file of (await walkFiles()).filter(f=>/^migrations\/\d+_.*\.sql$/.test(f)).sort())sqlite.exec(await readFile(`${ROOT}/${file}`,'utf8'));

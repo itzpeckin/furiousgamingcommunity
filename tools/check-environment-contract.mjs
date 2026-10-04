@@ -15,6 +15,7 @@ const declaredBindings = new Set([
   ...(contract.importWorker?.secrets || []),
   ...(contract.accountEmailWorker?.bindings || []).map(binding => binding.name),
   ...(contract.coachingScanner?.variables || []),
+  ...(contract.coachingScanner?.bindings || []).map(binding => binding.name),
   ...(contract.coachingScanner?.secretNames || [])
 ]);
 for (const binding of Object.keys(inventory.environmentBindings || {})) {

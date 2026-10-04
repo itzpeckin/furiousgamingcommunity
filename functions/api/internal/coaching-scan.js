@@ -4,6 +4,7 @@ import { scanLoadouts } from '../../_lib/discord-loadouts.js';
 import { DISCORD_COMMAND_RELEASE, DISCORD_GLOBAL_COMMANDS } from '../../_lib/discord-commands.js';
 import { discordBotRequest, upsertDiscordGlobalCommands } from '../../_lib/discord-api.js';
 import { timingSafeTokenEqual } from '../../_lib/auth.js';
+import { prepareLoadoutEmojis } from '../../_lib/loadout-emojis.js';
 
 export async function onRequestPost(context){
   const supplied=context.request.headers.get('x-fhq-coaching-scanner')||'';
@@ -27,7 +28,10 @@ export async function onRequestPost(context){
     messageContentAvailable=Boolean(Number(application.flags)&((1<<18)|(1<<19)));
   }
   const db=database(context.env);
-  const archetypes=await scanCoaching(context.env,db),loadouts=await scanLoadouts(context.env,db);
+  // Idempotent app-owned assets; provisioning never holds up a screenshot.
+  if(context.env.LOADOUT_CUSTOM_EMOJI_ENABLED==='true')try{await prepareLoadoutEmojis(context.env);}
+  catch{console.warn(JSON.stringify({event:'loadout-emoji-provision-retry'}));}
+  const [archetypes,loadouts]=await Promise.all([scanCoaching(context.env,db),scanLoadouts(context.env,db)]);
   return Response.json({ok:archetypes.ok&&loadouts.ok,idle:Boolean(archetypes.idle&&loadouts.idle),
     processed:Boolean(archetypes.processed||loadouts.processed),archetypes,loadouts,commandsRegistered,
     imageReaderAvailable:Boolean(context.env.AI?.run),messageContentAvailable},{headers:{'cache-control':'no-store'}});
