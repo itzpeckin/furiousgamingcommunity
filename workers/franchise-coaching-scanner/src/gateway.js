@@ -15,7 +15,7 @@ export class GatewayConnection {
   }
   async api(body){
     if(!['https://franchisehq.app','https://staging.franchise-hq.pages.dev'].includes(this.env.FHQ_ORIGIN))throw new Error('Invalid gateway destination');
-    const r=await fetch(`${this.env.FHQ_ORIGIN}/api/internal/loadout-event`,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(180000),headers:{'content-type':'application/json','x-fhq-coaching-scanner':this.env.COACHING_SCANNER_SECRET},body:JSON.stringify(body)});
+    const r=await fetch(`${this.env.FHQ_ORIGIN}/api/internal/loadout-event`,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(body.action?10000:180000),headers:{'content-type':'application/json','x-fhq-coaching-scanner':this.env.COACHING_SCANNER_SECRET},body:JSON.stringify(body)});
     if(!r.ok)throw new Error(`Loadout delivery HTTP ${r.status}`);
     const result=await r.json();if(!result.ok||result.busy)throw new Error('Loadout delivery will retry');return result;
   }
@@ -27,11 +27,16 @@ export class GatewayConnection {
   async start(){
     if(this.env.LOADOUT_GATEWAY_ENABLED!=='true')return {enabled:false};
     if(this.connecting)return this.connecting;
+    this.connecting=this.startConnection().finally(()=>{this.connecting=null;});return this.connecting;
+  }
+  async startConnection(){
     await this.refreshRoutes();
     if(this.socket?.readyState===1)return {connected:true};
     if(this.socket?.readyState===0)return {connecting:true};
-    if(this.stopped||await this.ctx.storage.get('fatal'))return {connected:false,attention:true};
-    this.connecting=this.connect().finally(()=>{this.connecting=null;});return this.connecting;
+    const fatal=await this.ctx.storage.get('fatal');
+    if(fatal&&Date.now()-(fatal.at||0)<600000)return {connected:false,attention:true};
+    if(fatal){await this.ctx.storage.delete('fatal');this.botToken=null;this.session=null;await this.ctx.storage.delete('session');}
+    return this.connect();
   }
   async connect(){
     const notBefore=await this.ctx.storage.get('connectAfter')||0;
@@ -61,7 +66,7 @@ export class GatewayConnection {
       if(this.socket!==ws)return;
       this.ctx.waitUntil((async()=>{
         if([4004,4010,4011,4012,4013,4014].includes(e.code)){
-          this.stopped=true;clearTimeout(this.timer);await this.ctx.storage.put('fatal',e.code);console.error(JSON.stringify({event:'loadout-gateway-configuration-error',code:e.code}));return;
+          this.socket=null;clearTimeout(this.timer);await this.ctx.storage.put('fatal',{code:e.code,at:Date.now()});await this.ctx.storage.setAlarm(Date.now()+600000);console.error(JSON.stringify({event:'loadout-gateway-configuration-error',code:e.code}));return;
         }
         if([4007,4009].includes(e.code)){this.session=null;await this.ctx.storage.delete('session');}
         await this.reconnect(ws);
