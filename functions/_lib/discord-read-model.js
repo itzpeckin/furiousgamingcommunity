@@ -1,4 +1,6 @@
-import { readGameplayRules, GAMEPLAY_STATS, gameplayRuleSummary, statRuleViolation } from './gameplay-rules.js';
+import { freeTradeRuleSummary } from './free-trade-rules.js';
+import { tradeCenterSettingsFromLeagueDocument } from './trade-center.js';
+import { readGameplayRules, GAMEPLAY_STATS, gameplayRuleSummary, statRuleViolation, abilityPositionWeight, abilityWeightSummary } from './gameplay-rules.js';
 import {
   activeSnapshotDomainPage,
   activeSnapshotRecord
@@ -401,7 +403,6 @@ async function statRuleCommand(c,values,kind){
   }]};
 }
 
-const HALF_ABILITY_POSITIONS=new Set(['FB','K','P','LT','LG','C','RG','RT','OL','LS']);
 const COUNTED_ROSTER_STATUSES=new Set(['active','injured-reserve','practice-squad','rostered']);
 
 function canonicalAbilityTrait(value){
@@ -411,9 +412,9 @@ function canonicalAbilityTrait(value){
   return null;
 }
 
-function abilityWeight(position,rule){return rule.positionWeighting==='half-specialists'&&HALF_ABILITY_POSITIONS.has(clean(position).toUpperCase())?0.5:1}
+function abilityWeight(position,rule){return abilityPositionWeight(position,rule)}
 
-function abilityTotal(value){return Number.isInteger(Number(value))?String(Number(value)):Number(value).toFixed(1)}
+function abilityTotal(value){return Number.isInteger(Number(value))?String(Number(value)):String(Number(value))}
 
 function qualifyingAbilityPlayers(model,rule){
   return model.players.map(player=>{
@@ -471,7 +472,7 @@ export async function abilitiesCommand(c,values={}){
       description:summary,
       fields:[{name:'Teams 1–16',value:teamLines.slice(0,midpoint).join('\n')||'No teams available.',inline:true},
         {name:'Teams 17–32',value:teamLines.slice(midpoint).join('\n')||'No teams available.',inline:true}],
-      footer:{text:rule.positionWeighting==='equal'?'Every position = 1':'FB, K, P, LT, LG, C, RG, RT, OL and LS = 0.5 · Every other position = 1'}
+      footer:{text:abilityWeightSummary(rule)}
     }]};
   }
   const team=resolveTeam(model.teams,selected);
@@ -1060,8 +1061,10 @@ export async function gotwCommand(c,values){
 export async function rulesCommand(c,values){
   const row=await c.db.prepare(`SELECT rules_json AS rulesJson FROM league_rules_documents WHERE league_id=?`).bind(c.league.id).first();
   let rules={categories:[]};try{rules=JSON.parse(row?.rulesJson||'{"categories":[]}')}catch{}
-  const rawQuery=lower(values.query),query=({'rule:gameplay:rushing':'rushing rule','rule:gameplay:passing':'passing rule','rule:gameplay:abilities':'roster ability allowance'})[rawQuery]||rawQuery;
-  const found=gameplayRuleSummary(await readGameplayRules(c.db,c.league.id)).filter(item=>!query||lower(item.title+' '+item.text).includes(query)).map(item=>`**${item.title}**\n${item.text}`);
+  const rawQuery=lower(values.query),query=({'rule:gameplay:rushing':'rushing rule','rule:gameplay:passing':'passing rule','rule:gameplay:abilities':'roster ability allowance','rule:gameplay:free-trades':'free trades'})[rawQuery]||rawQuery;
+  const settingsRow=await c.db.prepare('SELECT settings_json AS settingsJson FROM league_settings WHERE league_id=?').bind(c.league.id).first();
+  const freeSummary=freeTradeRuleSummary(tradeCenterSettingsFromLeagueDocument(JSON.parse(settingsRow?.settingsJson||'{}')));
+  const found=[...gameplayRuleSummary(await readGameplayRules(c.db,c.league.id)),freeSummary].filter(item=>!query||lower(item.title+' '+item.text).includes(query)).map(item=>`**${item.title}**\n${item.text}`);
   const direct=query.match(/^(category|section|rule):(\d+)(?::(\d+))?(?::(\d+))?$/);
   for(const [categoryIndex,category] of (rules.categories||[]).entries())for(const [sectionIndex,section] of (category.sections||[]).entries())for(const [ruleIndex,rule] of (section.rules||[]).entries()){
     const text=clean(rule.text||clean(rule.html).replace(/<[^>]*>/g,' '));

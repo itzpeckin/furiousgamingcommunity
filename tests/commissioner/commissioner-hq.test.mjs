@@ -1,4 +1,4 @@
-import { defaultGameplayRules } from '../../functions/_lib/gameplay-rules.js';
+import { defaultGameplayRules, ABILITY_POSITIONS, abilityPositionWeight, abilityPositionWeights, validateGameplayRules } from '../../functions/_lib/gameplay-rules.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
@@ -462,7 +462,7 @@ test('commissioners save shared gameplay rules with revisions; owners can read b
   await seedIdentity(database,{id:'commissioner',role:'commissioner',token:'commissioner-token'});
   await seedIdentity(database,{id:'owner',role:'team_owner',teamId:'tb',token:'owner-token'});
   const db=d1(database),before=await (await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'))).json();
-  const rules=defaultGameplayRules();rules.passing={enabled:true,stat:'passYds',comparison:'maximum',limit:400};rules.abilities={enabled:true,limit:5,traits:'xfactor-only',positionWeighting:'equal',policy:'strict'};
+  const rules=defaultGameplayRules();rules.passing={enabled:true,stat:'passYds',comparison:'maximum',limit:400};rules.abilities={enabled:true,limit:5.25,traits:'xfactor-only',positionWeighting:'custom',positionWeights:{...abilityPositionWeights({}),QB:2,FB:0.5,K:0.25},policy:'strict'};
   const body={action:'gameplay-rules',revision:before.settings.revision,rules};
   assert.equal((await postCommissionerHq(requestContext(db,'owner-token','commissioner-hq','POST',body))).status,403);
   const response=await postCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq','POST',body));assert.equal(response.status,200);
@@ -473,4 +473,25 @@ test('commissioners save shared gameplay rules with revisions; owners can read b
   assert.equal(database.prepare("SELECT COUNT(*) AS n FROM tenant_audit_events WHERE action='gameplay_rules_updated'").get().n,1);
   assert.equal(database.prepare('SELECT COUNT(*) AS n FROM league_setting_revisions WHERE league_id=? AND revision=?').get('league-command',saved.settings.revision).n,1);
  }finally{database.close();}
+});
+
+
+test('ability counts default to one and support arbitrary per-position league weights',()=>{
+ assert.equal(abilityPositionWeight('FB',defaultGameplayRules('other').abilities),1);
+ assert.equal(abilityPositionWeight('FB',{positionWeighting:'half-specialists'}),0.5,'explicit legacy policies remain supported');
+ const input=defaultGameplayRules();
+ input.abilities.positionWeighting='custom';
+ input.abilities.positionWeights={...abilityPositionWeights({}),QB:2,RB:0.25,LE:0.5,K:0};
+ const saved=validateGameplayRules(input);
+ assert.equal(abilityPositionWeight('QB',saved.abilities),2);
+ assert.equal(abilityPositionWeight('HB',saved.abilities),0.25);
+ assert.equal(abilityPositionWeight('LEDG',saved.abilities),0.5);
+ assert.equal(abilityPositionWeight('K',saved.abilities),0);
+ assert.equal(abilityPositionWeight('Unknown',saved.abilities),1);
+ for(const value of [-1,Infinity,NaN,0.3,11,'0.5']){
+   input.abilities.positionWeights.QB=value;assert.throws(()=>validateGameplayRules(input),/Position counts/);
+ }
+ input.abilities.positionWeights.QB=1;delete input.abilities.positionWeights.CB;
+ assert.throws(()=>validateGameplayRules(input),/Position counts/);
+ assert.ok(ABILITY_POSITIONS.includes('FS'));
 });

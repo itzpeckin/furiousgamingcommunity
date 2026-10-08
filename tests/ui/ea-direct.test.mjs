@@ -54,6 +54,7 @@ function harness() {
   }
   return {
     service, requests, timers, click, hq,
+    dispatch(name,event){documentEvents.get(name)?.(event);},
     typeSeason(value) { documentEvents.get('input')({target:{value,closest:()=>({})}}); },
     respond(handler) { requestHandler = handler; },
     switchLeague(value) { currentSlug = value; windowEvents.get('franchisehq:league-tenant-changed')(); },
@@ -339,4 +340,30 @@ test('EA-first setup preserves the typed season through status refresh and requi
   assert.equal(request.options.body.mode,'yearly');assert.equal(request.options.body.confirmSeason,true);assert.equal(request.options.body.sourceSeasonId,'2');
   ui.switchLeague('beta');ui.hq.leagueExportUrl={diagnostics:()=>({state:{leagueSlug:'beta'}})};
   await ui.service.refresh();assert.doesNotMatch(ui.service.renderPanel(),/name="sourceSeasonId" value="2"/);
+});
+
+
+test('EA recovery is available during a retained running collection and one click enters sign-in',async()=>{
+ const ui=harness();
+ ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'old-job',status:'running'}});
+ await ui.service.refresh();
+ assert.doesNotMatch(ui.service.renderPanel(),/data-ea-action="(?:begin|disconnect)" disabled/);
+ ui.respond(async()=>({ok:true,status:'signing-in',connection:null,setup:{id:'new-setup'},loginUrl:'https://accounts.ea.com/connect/auth'}));
+ ui.click({eaAction:'begin'});ui.click({eaAction:'begin'});await settle();
+ assert.equal(ui.requests.filter(r=>r.options.body?.action==='begin').length,1);
+ assert.match(ui.markup(),/Sign in on EA/);assert.doesNotMatch(ui.markup(),/Check Collection/);
+});
+
+test('pointer gesture survives a status refresh and open settings survive parent renders',async()=>{
+ const ui=harness();ui.respond(async()=>connected());await ui.service.refresh();
+ ui.dispatch('toggle',{target:{matches:()=>true,open:true}});
+ assert.match(ui.service.renderPanel(),/ea-direct-settings" open/);
+ const before=ui.markup();
+ ui.dispatch('pointerdown',{target:{closest:()=>({})}});
+ await ui.service.refresh();assert.equal(ui.markup(),before);
+ ui.dispatch('pointerup',{});
+ ui.respond(async()=>({status:'not-connected',connection:null,setup:null}));
+ ui.click({eaAction:'disconnect'});await settle();
+ assert.equal(ui.requests.filter(r=>r.options.body?.action==='disconnect').length,1);
+ assert.match(ui.markup(),/EA account disconnected/);
 });

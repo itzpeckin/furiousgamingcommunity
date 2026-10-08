@@ -1,3 +1,4 @@
+import { evaluateFreeTrade } from '../../../_lib/free-trade-rules.js';
 import { resolveLiveTradePlayer, ensureLiveTradePlayerIdentity } from '../../../_lib/trade-player.js';
 import { currentTradeSeason as currentSeason } from '../../../_lib/trade-season.js';
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
@@ -150,7 +151,25 @@ function maySeeWorkflow(row, participants, session) {
   return Boolean(ownTeam && participants.some(item => canonicalTeamKey(item.team_key) === ownTeam));
 }
 
-async function publicWorkflow(db, leagueId, row, session) {
+async function freeTradeAssessment(db,leagueId,assets,settings){
+  if(!settings.freeTradeDesignationEnabled)return {automatic:false,eligible:false,reason:'Free Trade designations are disabled.'};
+  if(settings.freeTradeRules.mode!=='automatic')return evaluateFreeTrade([],settings.freeTradeRules);
+  const enriched=[];
+  for(const a of assets){
+    const assetType=a.assetType||a.asset_type,fromTeamKey=a.fromTeamKey||a.from_team_key;
+    if(assetType==='player'){
+      const player=a.dataJson?{dataJson:a.dataJson}:await resolveLiveTradePlayer(db,leagueId,a.sourcePlayerId||a.source_player_id||a.assetId);
+      const record=jsonParse(player?.dataJson,{}),value=record.overall??record.overall_rating??record.overallRating??record.ovrRating??record.bestOverall??record.playerOverall??record.ovr??record.playerBestOvr??record.source?.playerBestOvr??record.source?.overallRating;
+      enriched.push({assetType,fromTeamKey,overall:value==null||value===''?null:Number(value)});
+    }else{
+      const pick=await db.prepare('SELECT round FROM league_draft_picks WHERE id=? AND league_id=?').bind(a.draftPickId||a.draft_pick_id||a.assetId,leagueId).first();
+      enriched.push({assetType,fromTeamKey,round:pick?.round==null?null:Number(pick.round)});
+    }
+  }
+  return evaluateFreeTrade(enriched,settings.freeTradeRules);
+}
+
+async function publicWorkflow(db, leagueId, row, session,settings) {
   const participants = await workflowParticipants(db, leagueId, row.id);
   if (!maySeeWorkflow(row, participants, session)) return null;
   const ownTeam=memberTeam(session);
@@ -174,9 +193,12 @@ async function publicWorkflow(db, leagueId, row, session) {
     : [];
   const tallyReviews=privateAccess?reviews:await resultRows(db,`SELECT reviewer_user_id,decision FROM trade_workflow_reviews
     WHERE league_id=? AND trade_id=? AND revision=?`,leagueId,row.id,row.revision);
+  const freeTradeEligibility=['draft','negotiating','committee'].includes(row.status)
+    ?await freeTradeAssessment(db,leagueId,assets,settings):null;
   return {
+    freeTradeEligibility,
     id:row.id,franchiseSeasonId:row.franchise_season_id,status:row.status,revision:Number(row.revision),proposerTeamKey:row.proposer_team_key,
-    note:privateAccess?(row.note || ''):'',freeTrade:Boolean(row.free_trade),reviewThreshold:Number(row.review_threshold),
+    note:privateAccess?(row.note || ''):'',freeTrade:freeTradeEligibility?.automatic?freeTradeEligibility.eligible:Boolean(row.free_trade),reviewThreshold:Number(row.review_threshold),
     decisionReason:privateAccess?(row.decision_reason || null):null,approvedAt:row.approved_at || null,rejectedAt:privateAccess?(row.rejected_at || null):null,
     createdAt:row.created_at,updatedAt:row.updated_at,
     participants:participants.map(item => ({teamKey:item.team_key,acceptedRevision:item.accepted_revision,acceptedAt:item.accepted_at})),
@@ -200,7 +222,7 @@ export async function tradeCenterState(c) {
     ORDER BY updated_at DESC LIMIT 250`,c.league.id);
   const workflows = [];
   for (const row of allRows) {
-    const item = await publicWorkflow(c.db,c.league.id,row,c.session);
+    const item = await publicWorkflow(c.db,c.league.id,row,c.session,settings.tradeCenter);
     if (item) workflows.push(item);
   }
   const rawPicks = season ? await resultRows(c.db, `SELECT id,draft_class AS draftClass,round,
@@ -306,12 +328,13 @@ async function propose(c, body, draft = false) {
   const settings = (await leagueSettings(c.db,c.league.id)).tradeCenter;
   const prepared = await validatedTransfers(c,body.transfers,settings);
   if (!prepared.participants.includes(ownTeam)) throw Object.assign(new Error('Your assigned team must participate in the trade.'),{status:403});
+  const automaticFree=await freeTradeAssessment(c.db,c.league.id,prepared.assets,settings);
   const tradeId=`trade_${crypto.randomUUID()}`;
   const mutationToken=`trade_mutation_${crypto.randomUUID()}`;
   const statements=[c.db.prepare(`INSERT INTO trade_workflows
-    (id,league_id,franchise_season_id,status,revision,mutation_token,proposer_user_id,proposer_team_key,note,review_threshold,created_at,updated_at)
-    VALUES (?,?,?,?,1,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).bind(
-      tradeId,c.league.id,season.id,draft?'draft':'negotiating',mutationToken,c.session.user.id,ownTeam,cleanText(body.note),settings.reviewApprovalThreshold
+    (id,league_id,franchise_season_id,status,revision,mutation_token,proposer_user_id,proposer_team_key,note,review_threshold,free_trade,created_at,updated_at)
+    VALUES (?,?,?,?,1,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).bind(
+      tradeId,c.league.id,season.id,draft?'draft':'negotiating',mutationToken,c.session.user.id,ownTeam,cleanText(body.note),settings.reviewApprovalThreshold,automaticFree.eligible?1:0
     )];
   for (const teamKey of prepared.participants) statements.push(c.db.prepare(`INSERT INTO trade_workflow_participants
     (trade_id,league_id,team_key,accepted_revision,accepted_by_user_id,accepted_at)
@@ -348,11 +371,12 @@ async function counter(c, body, row, participants) {
   const settings=(await leagueSettings(c.db,c.league.id)).tradeCenter;
   const prepared=await validatedTransfers(c,body.transfers,settings);
   if (!prepared.participants.includes(ownTeam)) throw Object.assign(new Error('Your team must remain in the trade.'),{status:403});
+  const automaticFree=await freeTradeAssessment(c.db,c.league.id,prepared.assets,settings);
   const revision=Number(row.revision)+1;
   const mutationToken=`trade_mutation_${crypto.randomUUID()}`;
-  const statements=[c.db.prepare(`UPDATE trade_workflows SET revision=?,mutation_token=?,status='negotiating',note=?,free_trade=0,
+  const statements=[c.db.prepare(`UPDATE trade_workflows SET revision=?,mutation_token=?,status='negotiating',note=?,free_trade=?,
       decision_reason=NULL,rejected_at=NULL,approved_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND revision=? AND mutation_token=?`)
-    .bind(revision,mutationToken,cleanText(body.note),row.id,c.league.id,row.revision,row.mutation_token),
+    .bind(revision,mutationToken,cleanText(body.note),automaticFree.eligible?1:0,row.id,c.league.id,row.revision,row.mutation_token),
     c.db.prepare(`DELETE FROM trade_workflow_participants WHERE trade_id=? AND league_id=?
       AND EXISTS (SELECT 1 FROM trade_workflows workflow WHERE workflow.id=? AND workflow.league_id=? AND workflow.mutation_token=?)`)
       .bind(row.id,c.league.id,row.id,c.league.id,mutationToken)];
@@ -440,8 +464,12 @@ async function review(c, row, participants, decision, reason, freeTrade) {
   if (ownTeam&&participants.some(item=>canonicalTeamKey(item.team_key)===ownTeam)) throw Object.assign(new Error('Reviewers cannot vote on a trade involving their own team.'),{status:403});
   if (!['approve','reject','abstain'].includes(decision)) throw Object.assign(new Error('A valid review decision is required.'),{status:400});
   const settings=(await leagueSettings(c.db,c.league.id)).tradeCenter;
-  const designateFree=settings.freeTradeDesignationEnabled&&(Boolean(row.free_trade)||Boolean(freeTrade));
-  if(settings.freeTradeDesignationEnabled&&freeTrade){
+  const reviewAssets=await resultRows(c.db,'SELECT * FROM trade_workflow_assets WHERE trade_id=? AND league_id=? AND revision=? ORDER BY ordinal',row.id,c.league.id,row.revision);
+  const assessment=await freeTradeAssessment(c.db,c.league.id,reviewAssets,settings);
+  const designateFree=settings.freeTradeDesignationEnabled&&(assessment.automatic?assessment.eligible:(Boolean(row.free_trade)||Boolean(freeTrade)));
+  if(assessment.automatic){
+    await c.db.prepare("UPDATE trade_workflows SET free_trade=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND status='committee' AND revision=?").bind(designateFree?1:0,row.id,c.league.id,row.revision).run();
+  }else if(settings.freeTradeDesignationEnabled&&freeTrade){
     await c.db.prepare(`UPDATE trade_workflows SET free_trade=1,updated_at=CURRENT_TIMESTAMP
       WHERE id=? AND league_id=? AND status='committee'`).bind(row.id,c.league.id).run();
   }
@@ -539,7 +567,7 @@ async function review(c, row, participants, decision, reason, freeTrade) {
     fromTeamId:item.from_team_key,
     toTeamId:item.to_team_key
   }));
-  const transactionDetails={tradeId:row.id,revision:Number(row.revision),freeTrade:designateFree};
+  const transactionDetails={tradeId:row.id,revision:Number(row.revision),freeTrade:designateFree,freeTradeAssessment:assessment};
   statements.push(c.db.prepare(`INSERT INTO canonical_transactions
     (id,league_id,event_type,status,authority,execution_status,team_ids_json,player_ids_json,workflow_trade_id,
      first_snapshot_id,last_snapshot_id,confidence,details_json,season,created_at,updated_at)

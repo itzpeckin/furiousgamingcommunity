@@ -43,7 +43,6 @@ export async function onRequestGet(context){
 export async function onRequestPost(context){
   try{
     const state=await authorizedEaState(context);if(state.response)return state.response;
-    if(!configured(state.env))fail('NOT_CONFIGURED','EA Direct is not configured yet.');
     const body=await readEaBody(context.request),action=String(body.action||'');
     if(action==='disconnect'){
       await state.db.batch([
@@ -53,9 +52,11 @@ export async function onRequestPost(context){
       ]);
       return json(await status(state));
     }
+    if(!configured(state.env))fail('NOT_CONFIGURED','EA Direct is not configured yet.');
     if(action==='begin'){
+      await state.db.prepare(`UPDATE ea_direct_collection_jobs SET status='cancelled',state_cipher=NULL,message='EA sign-in restarted.',updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND status IN ('queued','running')`).bind(state.league.id).run();
       const setup=await createEaSetup(state);
-      return json({ok:true,configured:true,status:'not-connected',setup:{id:setup.id},loginUrl:makeEaLoginUrl(state.env,setup.oauth_state)});
+      return json({ok:true,configured:true,status:'signing-in',connection:null,weeklyReady:false,setup:{id:setup.id},loginUrl:makeEaLoginUrl(state.env,setup.oauth_state)});
     }
     if(!['exchange','select-persona','connect'].includes(action))fail('INVALID_ACTION','Choose a valid EA setup action.',400);
     const setup=await loadEaSetup(state,body.setupId),lock=await lockEaSetup(state.db,setup);

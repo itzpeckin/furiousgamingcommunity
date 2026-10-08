@@ -251,7 +251,7 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 303,
+      ".js": 304,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
@@ -265,7 +265,7 @@
     },
     "largest": [
       {
-        "bytes": 656101,
+        "bytes": 657097,
         "file": "app.js"
       },
       {
@@ -273,7 +273,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 453638,
+        "bytes": 456171,
         "file": "trade-module.js"
       },
       {
@@ -281,7 +281,7 @@
         "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
-        "bytes": 198280,
+        "bytes": 198725,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -297,7 +297,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 100420,
+        "bytes": 105789,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -317,12 +317,16 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 69624,
+        "bytes": 69871,
         "file": "functions/_lib/discord-read-model.js"
       },
       {
-        "bytes": 60113,
+        "bytes": 62625,
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
+      },
+      {
+        "bytes": 58657,
+        "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
         "bytes": 51931,
@@ -333,10 +337,6 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 48894,
-        "file": "tests/trade/full-trade-center.test.mjs"
-      },
-      {
         "bytes": 46403,
         "file": "tests/import/madden-discovery.test.mjs"
       },
@@ -345,7 +345,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       }
     ],
-    "total": 844
+    "total": 845
   },
   "frontend": {
     "assets": [
@@ -1936,7 +1936,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.7",
+  "release": "8.2.8",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

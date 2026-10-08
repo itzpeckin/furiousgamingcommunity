@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.8",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 53,
+      "candidateRequiresMigration": false
+    },
+    "targetedTradeAndSchedule": {
+      "passed": true,
+      "tests": 24
+    },
+    "productionBaseline": {
+      "readOnly": true,
+      "leagues": 3,
+      "users": 40,
+      "snapshots": 100,
+      "snapshotRecords": 928919,
+      "foreignKeysClean": true,
+      "activeSnapshots": {
+        "franchise-hq-primary": "d60bc6fa-84eb-4fe8-b53a-22feb2d8b727",
+        "league_072f8b94-8851-4bbe-ae7d-b464572183d0": "6d6d4c68-bc95-469c-8a0d-1dc1313fd075"
+      },
+      "settingsRevisions": {
+        "franchise-hq-primary": 10,
+        "league_3a2f2161-6110-4dfe-8e00-db12dbfc934f": 2,
+        "league_072f8b94-8851-4bbe-ae7d-b464572183d0": 4
+      }
+    },
+    "browserFixtures": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "scope": "Actual ability renderer and bulk-save handlers plus full Trade Center module with isolated APIs. Bulk count save/reload, reset to one, free-package add/edit/remove/save, desktop/mobile layout, no page errors. Not live production mutations."
+    },
+    "recoveryRegressions": {
+      "passed": true,
+      "tests": 33,
+      "scope": "Real handlers and renderer: reconnect cancels a running job, one-click recovery, preserved dropdown, no repeated auth refresh remount, current schedule and actual standings."
+    },
+    "strictSuite": {
+      "passed": true,
+      "tests": 542
+    },
+    "releaseContract": {
+      "passed": true,
+      "note": "Rerun after correcting required release-record headings; all preceding strict gates passed."
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveDiscordMessages": false,
+    "leagueSettingsChanged": false
+  }
+}
