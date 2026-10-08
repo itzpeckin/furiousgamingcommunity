@@ -84,7 +84,8 @@
     statsSortKey: null,
     statsSortDirection: 'desc',
     statsTeamCategory: 'scoringOffense',
-    scheduleWeek: 8,
+    scheduleWeek: null,
+    scheduleContext: null,
     scheduleTeam: 'All',
     scheduleSection: 'schedule',
     confidenceWeek: 1,
@@ -997,7 +998,7 @@
       // domains hydrate after first paint and never block a hard-refresh render.
       const criticalPayload=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),
-        import('./league-engine/game-summary.js?v=8.2.7')
+        import('./league-engine/game-summary.js?v=8.2.8')
       ]);
 
       const [stateValue,snapshot,teamRows,standingRows,gameRows,gameSummary]=criticalPayload;
@@ -7599,6 +7600,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   function renderScheduleConfidenceHeader(model){if(!model)return'';const picked=Number(model.validation?.picked)||0,assigned=model.games.filter(game=>Number.isInteger(Number(model.entry.picks?.[game.id]?.confidence))).length,status=model.submitted?'Submitted':model.open?'Open':'Closed';return `<section class="card schedule-confidence-head" aria-label="Week ${model.week} Confidence Pool"><div><span class="eyebrow">Confidence Pool · ${status}</span><h2>Make picks while you read the schedule</h2><p>Select a winner and a unique confidence value inside each matchup. Only final games affect the standings.</p></div><div class="schedule-confidence-progress"><span class="pill ${model.open?'pill--success':'pill--neutral'}">${picked} / ${model.totalGames} winners</span><span class="pill ${assigned===model.totalGames?'pill--success':'pill--neutral'}">${assigned} / ${model.totalGames} confidence</span></div><div class="confidence-week-actions"><button class="button button--ghost" data-confidence-clear-week="${model.week}" ${!model.open?'disabled':''}>Clear Week</button><button class="button button--primary" data-confidence-submit-week="${model.week}" ${!model.open?'disabled':''}>${model.submitted?'Week Submitted':'Submit Week'}</button></div></section>`}
   function renderScheduleGameConfidence(game,away,home,model){if(!model?.gameIds?.has(String(game.id)))return'';const pick=model.entry.picks?.[game.id]||{},selected=String(pick.selectedTeamId||''),max=model.totalGames;const choice=(team,label)=>`<button type="button" data-confidence-team="${escapeHtml(game.id)}:${escapeHtml(team.id)}" data-confidence-game-id="${escapeHtml(game.id)}" data-confidence-team-id="${escapeHtml(team.id)}" class="${selected===String(team.id)?'is-selected':''}" ${!model.open?'disabled':''} aria-pressed="${selected===String(team.id)}" aria-label="Pick ${escapeHtml(team.fullName||team.abbr)} to win">${renderTeamMark(team,'mini-team')}<span>${escapeHtml(label)}</span></button>`;return `<div class="game-card__confidence" data-confidence-control><div class="game-card__confidence-label"><strong>Your pick</strong><span>${model.submitted?'Submitted':model.open?'Choose winner + confidence':'Picks closed'}</span></div><div class="confidence-team-choice">${choice(away,away.abbr||'Away')}${choice(home,home.abbr||'Home')}</div><label class="field confidence-value"><span>Confidence</span><select data-confidence-value="${escapeHtml(game.id)}" ${!model.open?'disabled':''} aria-label="Confidence value for ${escapeHtml(away.abbr||'away')} at ${escapeHtml(home.abbr||'home')}"><option value="">Select</option>${model.games.map((_,index)=>{const value=index+1,label=value===1?'1 · Low':value===max?`${value} · High`:String(value),usedBy=model.confidenceOwners.get(value);return `<option value="${value}" ${Number(pick.confidence)===value?'selected':''} ${usedBy&&usedBy!==String(game.id)?'disabled':''}>${label}${usedBy&&usedBy!==String(game.id)?' · Used':''}</option>`}).join('')}</select></label></div>`}
   async function renderSchedule() {
+    const scheduleTenant=window.FranchiseHQ?.leagueTenant?.getCurrentLeague?.()?.slug;
     preloadScheduleMatchupData();
     pageContent.innerHTML='<section class="empty-state"><strong>Loading schedule…</strong><p>Reading league data.</p></section>';
     try{
@@ -7609,7 +7611,9 @@ function canonicalPlayerDashboardStats(playerId='') {
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),competitionPromise
       ]);
       if(stateValue!=='live'||!snapshot) throw new Error('No active live snapshot is available.');
-      const liveTeams=teamRows.map(liveTeamUiShape);
+      if(scheduleTenant!==window.FranchiseHQ?.leagueTenant?.getCurrentLeague?.()?.slug||routeBase(currentAppRoute())!=='schedule')return;
+      const standingMap=new Map(standingRows.map(row=>[String(row.teamId),row]));
+      const liveTeams=teamRows.map(team=>liveTeamUiShape(team,standingMap.get(String(team.id))));
       const teamMap=new Map(liveTeams.map(team=>[String(team.id),team]));
       const provisional=gameRows.map(game=>liveGameShape(game,teamMap));
       const current=authoritativeSeasonContext(snapshot,standingRows,provisional);
@@ -7621,6 +7625,10 @@ function canonicalPlayerDashboardStats(playerId='') {
       // League Data / demo schedule.
       scheduleService()?.hydrateCanonicalSchedule?.(gameRows,teamRows,current);
 
+      const scheduleContext=JSON.stringify([scheduleTenant,current.seasonYear||snapshot.seasonYear||snapshot.season,current.phase,current.week]);
+      if(state.scheduleContext!==scheduleContext){
+        state.scheduleContext=scheduleContext;state.schedulePhase=current.phase;state.scheduleWeek=current.week;state.scheduleTeam='All';
+      }
       const phases=['preseason','regular','playoffs'].filter(phase=>games.some(game=>game.stage===phase));
       if(!phases.includes(state.schedulePhase)) state.schedulePhase=phases.includes(current.phase)?current.phase:(phases[0]||'regular');
       const phaseGames=games.filter(game=>game.stage===state.schedulePhase);
@@ -9766,8 +9774,12 @@ function canonicalPlayerDashboardStats(playerId='') {
     if (pageContent && !pageContent.children.length) renderRoute(route);
   });
 
+  let protectedRouteAuthScope=null;
   window.addEventListener('franchisehq:auth-changed', event=>{
     if(event.detail?.status!=='ready') return;
+    const auth=event.detail,scope=JSON.stringify([auth.authenticated,auth.user?.id,auth.membership,auth.capabilities]);
+    if(auth.source==='refresh-started'||scope===protectedRouteAuthScope)return;
+    protectedRouteAuthScope=scope;
     syncCommissionerAccess();
     const activeBase=routeBase(currentAppRoute());
     if (['commissioner','trade-center','trade-block'].includes(activeBase)) {
@@ -10134,7 +10146,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.2.7';
+  const VISIBLE_RELEASE = '8.2.8';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.8",
+  "releaseType": "commissioner-rule-controls-and-recovery",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.7",
+    "tag": "v8.2.7",
+    "commit": "ca22d20c4ad03b2f787ce7043afc14f54eafd5db"
+  },
+  "implementationBranch": "feature/8.2.8-commissioner-rule-controls",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.7",
+    "candidateRelease": "8.2.8",
+    "currentMigration": 53,
+    "candidateMigration": 53
+  },
+  "requiredArtifacts": [
+    "releases/8.2.8/release-record.md",
+    "releases/8.2.8/validation-evidence.json"
+  ]
+}

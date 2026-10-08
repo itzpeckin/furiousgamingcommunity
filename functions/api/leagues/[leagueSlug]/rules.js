@@ -1,3 +1,5 @@
+import { freeTradeRuleSummary } from '../../../_lib/free-trade-rules.js';
+import { tradeCenterSettingsFromLeagueDocument } from '../../../_lib/trade-center.js';
 import { readGameplayRules, gameplayRuleSummary } from '../../../_lib/gameplay-rules.js';
 import { jsonResponse } from "../../../_lib/auth.js";
 import {
@@ -205,7 +207,9 @@ export async function onRequestGet(context) {
   `).bind(league.id).first();
   let rules = EMPTY_RULES;
   try { if (row?.rulesJson) rules = JSON.parse(row.rulesJson); } catch {}
-  const gameplayRules=await readGameplayRules(context.env.DB,league.id),gameplaySummary=gameplayRuleSummary(gameplayRules);
+  const settingsRow=await context.env.DB.prepare('SELECT settings_json AS settingsJson FROM league_settings WHERE league_id=?').bind(league.id).first();
+  const freeTradeSummary=freeTradeRuleSummary(tradeCenterSettingsFromLeagueDocument(JSON.parse(settingsRow?.settingsJson||'{}')));
+  const gameplayRules=await readGameplayRules(context.env.DB,league.id),gameplaySummary=[...gameplayRuleSummary(gameplayRules),freeTradeSummary];
   const commissioner = authorization.session.membership?.role === 'commissioner';
   if (!commissioner) {
     return jsonResponse({ ok:true, release:RELEASE, league, rules, gameplayRules,gameplaySummary,updatedAt:row?.updatedAt || null });

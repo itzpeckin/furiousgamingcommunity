@@ -1,4 +1,4 @@
-import { gameplayRulesFromDocument, validateGameplayRules, GAMEPLAY_STATS } from '../../../_lib/gameplay-rules.js';
+import { gameplayRulesFromDocument, validateGameplayRules, GAMEPLAY_STATS, ABILITY_POSITIONS, abilityPositionWeights } from '../../../_lib/gameplay-rules.js';
 import { jsonResponse } from '../../../_lib/auth.js';
 import { requireCommissioner } from '../../../_lib/permissions.js';
 import {
@@ -182,7 +182,7 @@ async function overview(c) {
       currentWeek:Number(c.league.current_week || 1),timezone:c.league.timezone || 'UTC'
     },
     settings:{revision:settings.revision,updatedAt:settings.updatedAt},
-    gameplayRules:gameplayRulesFromDocument(settings.document),gameplayStats:GAMEPLAY_STATS,
+    gameplayRules:gameplayRulesFromDocument(settings.document,c.league.id),gameplayStats:GAMEPLAY_STATS,abilityPositions:ABILITY_POSITIONS,abilityPositionWeights:abilityPositionWeights(gameplayRulesFromDocument(settings.document,c.league.id).abilities),
     quickControls:{
       seasonTradeLimitEnabled:tradeCenterSettingsFromLeagueDocument(settings.document).seasonTradeLimitEnabled,
       freeTradeDesignationEnabled:tradeCenterSettingsFromLeagueDocument(settings.document).freeTradeDesignationEnabled,

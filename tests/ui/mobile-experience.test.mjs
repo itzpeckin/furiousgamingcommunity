@@ -196,3 +196,37 @@ test('closing a loading matchup keeps it closed when its directory request finis
   assert.equal(opens,1);assert.equal(content.innerHTML,'');assert.equal(attributes['aria-hidden'],'true');assert.equal(unlocked,1);
   assert.match(styles,/\.detail-dialog:has\(\[data-matchup-modal\]\)>\.detail-close\{display:none!important/);
 });
+
+test('live schedule follows current league week, preserves manual browsing, and displays standings records',async()=>{
+ const app=await source('app.js');
+ const shape=app.slice(app.indexOf('  function liveTeamUiShape('),app.indexOf('  function normalizeLiveDevelopment('));
+ const schedule=app.slice(app.indexOf('  async function renderSchedule()'),app.indexOf('  function renderGameCard('));
+ let slug='first',current={phase:'regular',week:15,seasonYear:2027,displayLabel:'Week 15'};
+ const state={scheduleWeek:8,schedulePhase:'regular',scheduleTeam:'All'},pageContent={innerHTML:''};
+ const teams=[{id:'1',displayName:'Dolphins',abbreviation:'MIA'},{id:'2',displayName:'Cowboys',abbreviation:'DAL'}];
+ const standings=[{teamId:'1',wins:8,losses:5,ties:1},{teamId:'2',wins:10,losses:4,ties:0}];
+ const games=[4,8,15,16].map(week=>({id:String(week),week,stage:'regular',awayTeamId:'1',homeTeamId:'2',awayScore:21,homeScore:24,status:'final'}));
+ const sandbox={state,pageContent,window:{FranchiseHQ:{leagueTenant:{getCurrentLeague:()=>({slug})}}},
+ preloadScheduleMatchupData(){},liveReadModel:()=>({getState:async()=>'live',getSnapshot:async()=>({seasonYear:2027}),getTeams:async()=>teams,getStandings:async()=>standings,getSchedule:async()=>games}),
+ authoritativeSeasonContext:()=>current,liveGameShape:x=>x,scheduleService:()=>({}),routeBase:x=>x,currentAppRoute:()=>'schedule',
+ officialRating:()=>null,firstNumericValue:()=>null,decodeTeamStreak:()=>'',safeTeamSlug:x=>x,liveTeamOwnerName:()=>'',
+ escapeHtml:String,scheduleConfidenceModel:()=>null,renderScheduleConfidenceHeader:()=>'',renderScheduleGameConfidence:()=>'',canonicalScheduleLabel:()=>'',renderTeamMark:()=>'',liveMatchupGames:new Map()};
+ vm.createContext(sandbox);vm.runInContext(shape+schedule+';globalThis.render=renderSchedule;',sandbox);
+ await sandbox.render();assert.equal(state.scheduleWeek,15);assert.match(pageContent.innerHTML,/>8-5-1</);assert.match(pageContent.innerHTML,/>10-4</);
+ state.scheduleWeek=8;await sandbox.render();assert.equal(state.scheduleWeek,8);
+ current={...current,week:16};await sandbox.render();assert.equal(state.scheduleWeek,16);
+ slug='second';current={...current,week:4};await sandbox.render();assert.equal(state.scheduleWeek,4);
+});
+
+test('unchanged authentication refreshes cannot repeatedly replace commissioner controls',async()=>{
+ const app=await source('app.js');
+ const handler=app.slice(app.indexOf('  let protectedRouteAuthScope='),app.indexOf("  window.addEventListener('franchisehq:trade-ready'"));
+ let listener,renders=0;
+ const sandbox={window:{addEventListener:(_name,fn)=>listener=fn},syncCommissionerAccess(){},routeBase:x=>x,currentAppRoute:()=>'commissioner',renderRoute:()=>renders++};
+ vm.createContext(sandbox);vm.runInContext(handler,sandbox);
+ const auth={status:'ready',authenticated:true,user:{id:'owner'},membership:{role:'commissioner',leagueId:'a'},capabilities:['manage']};
+ listener({detail:{...auth,source:'refresh-succeeded'}});assert.equal(renders,1);
+ for(let i=0;i<3;i++){listener({detail:{...auth,source:'refresh-started'}});listener({detail:{...auth,source:'refresh-succeeded'}});}
+ assert.equal(renders,1);
+ listener({detail:{...auth,membership:{role:'commissioner',leagueId:'b'},source:'refresh-succeeded'}});assert.equal(renders,2);
+});

@@ -1,3 +1,4 @@
+import {evaluateFreeTrade,normalizeFreeTradeRules} from '../../functions/_lib/free-trade-rules.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
@@ -543,4 +544,106 @@ test('Trade Review renders compact player and pick fields with team colors and o
       assert.equal(page.innerHTML.includes('Multi-Team Fairness')||page.innerHTML.includes('Package balance'),calculatorEnabled);
     }
   }
+});
+
+const freePackages={mode:'automatic',packages:[
+ {name:'Low rated player',minPlayers:1,maxPlayers:1,minPicks:0,maxPicks:0,overallComparison:'under',overall:70,roundLimits:{1:0,2:0,3:0,4:0,5:0,6:0,7:0}},
+ {name:'One second',minPlayers:0,maxPlayers:0,minPicks:1,maxPicks:1,overallComparison:'under',overall:70,roundLimits:{1:0,2:1,3:0,4:0,5:0,6:0,7:0}},
+ {name:'Later package',minPlayers:0,maxPlayers:0,minPicks:1,maxPicks:3,overallComparison:'under',overall:70,roundLimits:{1:0,2:0,3:1,4:1,5:1,6:1,7:1}}
+]};
+test('free trade alternatives evaluate complete outgoing packages with strict overall and round limits',()=>{
+ const player=(overall=69)=>({assetType:'player',fromTeamKey:'tb',overall});
+ const picks=(...rounds)=>rounds.map(round=>({assetType:'draft-pick',fromTeamKey:'gb',round}));
+ const qualifies=(overall,...rounds)=>evaluateFreeTrade([player(overall),...picks(...rounds)],freePackages).eligible;
+ assert.equal(qualifies(69,2),true);
+ assert.equal(qualifies(70,2),false);
+ assert.equal(qualifies(69,2,3),false);
+ assert.equal(qualifies(69,3,4,5),true);
+ assert.equal(qualifies(69,3,4,5,6),false);
+ assert.equal(qualifies(69,3,3),false);
+ assert.equal(qualifies(null,2),false);
+ assert.equal(qualifies(69,1),false);
+ assert.equal(evaluateFreeTrade([player()],freePackages).eligible,false);
+ const custom=structuredClone(freePackages);custom.packages[0].overallComparison='at-most';custom.packages[0].overall=70;
+ assert.equal(evaluateFreeTrade([player(70),...picks(2)],custom).eligible,true);
+ assert.equal(evaluateFreeTrade([player(),...picks(2)],{mode:'manual',packages:[]}).automatic,false);
+ assert.throws(()=>normalizeFreeTradeRules({mode:'automatic',packages:[]}),/at least one/);
+ assert.throws(()=>normalizeFreeTradeRules({...freePackages,packages:[{...freePackages.packages[0],minPlayers:2}]}),/minimum/);
+});
+test('automatic free trades use authoritative ratings and recheck revised packages and final approval',async()=>{
+ const database=new DatabaseSync(':memory:');
+ try{
+    database.exec('PRAGMA foreign_keys=ON');await migrate(database);
+    database.prepare(`INSERT INTO leagues (id,name,product_name,slug,public_status,tenant_status) VALUES (?,?,?,?,?,?)`).run('league-1','League','FranchiseHQ','league','active','enabled');
+    for(const [id,discord,name,role,team] of [
+      ['owner-tb','d-tb','TB Owner','team_owner','1'],
+      ['owner-gb','d-gb','GB Owner','team_owner','2'],
+      ['owner-kc','d-kc','KC Owner','team_owner','3'],
+      ['commissioner','d-c','Commissioner','commissioner',null],
+      ['reviewer-2','d-r2','Reviewer Two','commissioner',null],
+      ['reviewer-3','d-r3','Reviewer Three','commissioner',null]
+    ]){
+      database.prepare(`INSERT INTO users (id,discord_user_id,discord_username,display_name) VALUES (?,?,?,?)`).run(id,discord,id,name);
+      database.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,team_id,active) VALUES (?,?,?,?,?,1)`).run(`membership-${id}`,'league-1',id,role,team);
+    }
+    const tokens={tb:'session-token-tb',gb:'session-token-gb',kc:'session-token-kc',commissioner:'session-token-commissioner',reviewer2:'session-token-reviewer-2',reviewer3:'session-token-reviewer-3'};
+    for(const [key,userId] of [['tb','owner-tb'],['gb','owner-gb'],['kc','owner-kc'],['commissioner','commissioner'],['reviewer2','reviewer-2'],['reviewer3','reviewer-3']])database.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at) VALUES (?,?,?,?)`).run(`session-${key}`,userId,await hashToken(tokens[key]),'2099-01-01T00:00:00.000Z');
+    database.prepare(`INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status) VALUES (?,?,?,?,?,?,?,?,?)`).run('season-1','league-1','madden-companion','franchise-1','2026','Madden NFL 27','2026',2026,'active');
+    database.prepare(`INSERT INTO league_snapshots (id,league_id,status,manifest_json,validation_status) VALUES (?,?,?,'{}','ready')`).run('snapshot-1','league-1','active');
+    database.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id) VALUES (?,?)`).run('league-1','snapshot-1');
+    for(const [externalId,abbr] of [['1','TB'],['2','GB'],['3','KC']])database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','teams',?,?)`).run(externalId,JSON.stringify({external_id:externalId,abbreviation:abbr,display_name:abbr}));
+    for(const [externalId,wins,losses] of [['1',0,11],['2',2,9],['3',7,4]])database.prepare(`INSERT INTO league_snapshot_records
+      (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','standings',?,?)`)
+      .run(externalId,JSON.stringify({teamId:externalId,totalWins:wins,totalLosses:losses,weekIndex:11}));
+    for(const [sourceId,teamId,identityId,publicId,name] of [
+      ['player-tb','1','identity-tb','player-tb-public','TB Player'],
+      ['player-gb','2','identity-gb','player-gb-public','GB Player'],
+      ['player-tb-cancel','1','identity-tb-cancel','player-tb-cancel-public','TB Cancel Player'],
+      ['player-kc-cancel','3','identity-kc-cancel','player-kc-cancel-public','KC Cancel Player']
+    ]){
+      database.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES ('snapshot-1','league-1','players',?,?)`).run(sourceId,JSON.stringify({external_id:sourceId,team_external_id:teamId,display_name:name}));
+      database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,?,?,?)`).run(identityId,'league-1',publicId,name);
+      database.prepare(`INSERT INTO player_source_aliases (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id) VALUES (?,?,?,?,?,?,?)`).run('league-1','madden-companion','franchise-1',sourceId,identityId,'season-1','season-1');
+    }
+    const db=d1(database);
+    const context=(token,method='GET',body=null)=>({
+      params:{leagueSlug:'league'},env:{DB:db},
+      request:new Request('https://franchisehq.app/api/leagues/league/trade-center',{method,headers:{Cookie:`${AUTH_CONSTANTS.SESSION_COOKIE_NAME}=${token}`,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})})
+    });
+
+    database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.overall',69) WHERE domain='players'").run();
+    const read=async()=>await(await getTradeCenter(context(tokens.commissioner))).json();
+    let base=await read();
+    const settings={...base.settings,maxPicksPerTeam:5,reviewApprovalThreshold:1,freeTradeRules:freePackages};
+    const saved=await postTradeCenter(context(tokens.commissioner,'POST',{action:'settings',revision:settings.revision,settings}));
+    assert.equal(saved.status,200,JSON.stringify(await saved.clone().json()));
+    base=await read();
+    const pick=round=>base.picks.find(p=>p.currentTeamKey==='gb'&&p.round===round&&p.draftClass===2027)||base.picks.find(p=>p.currentTeamKey==='gb'&&p.round===round);
+    const transfers=rounds=>[{type:'player',assetId:'player-tb',fromTeamId:'tb',toTeamId:'gb'},...rounds.map(round=>({type:'draft-pick',assetId:pick(round).id,fromTeamId:'gb',toTeamId:'tb'}))];
+    const act=async(token,body)=>{const response=await postTradeCenter(context(token,'POST',body));const data=await response.json();assert.equal(response.status,200,JSON.stringify(data));return data;};
+    let data=await act(tokens.tb,{action:'propose',transfers:transfers([2])});
+    const tradeId=data.tradeId;
+    assert.equal(data.workflows.find(w=>w.id===tradeId).freeTrade,true);
+    data=await act(tokens.tb,{action:'counter',tradeId,revision:1,transfers:transfers([2,3])});
+    assert.equal(data.workflows.find(w=>w.id===tradeId).freeTrade,false);
+    data=await act(tokens.tb,{action:'counter',tradeId,revision:2,transfers:transfers([3,4,5])});
+    assert.equal(data.workflows.find(w=>w.id===tradeId).freeTrade,true);
+    await act(tokens.gb,{action:'accept',tradeId,revision:3});
+    // New roster evidence before approval must defeat stale qualification, even with a forged client flag.
+    database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.overall',70) WHERE domain='players' AND external_id='player-tb'").run();
+    data=await act(tokens.commissioner,{action:'review',tradeId,revision:3,decision:'approve',freeTrade:true});
+    assert.equal(data.workflows.find(w=>w.id===tradeId).freeTrade,false);
+    assert.equal(data.tradeManagement.teams.find(t=>t.teamKey==='tb').used,1);
+    // A qualifying trade retains free status through approval and does not consume another slot.
+    const low=base.picks.find(p=>p.currentTeamKey==='kc'&&p.round===2);
+    data=await act(tokens.tb,{action:'propose',transfers:[{type:'player',assetId:'player-tb-cancel',fromTeamId:'tb',toTeamId:'kc'},{type:'draft-pick',assetId:low.id,fromTeamId:'kc',toTeamId:'tb'}]});
+    const freeId=data.tradeId;
+    await act(tokens.kc,{action:'accept',tradeId:freeId,revision:1});
+    data=await act(tokens.commissioner,{action:'review',tradeId:freeId,revision:1,decision:'approve'});
+    assert.equal(data.workflows.find(w=>w.id===freeId).freeTrade,true);
+    assert.equal(data.tradeManagement.teams.find(t=>t.teamKey==='tb').used,1);
+    assert.equal(data.tradeManagement.teams.find(t=>t.teamKey==='kc').used,0);
+    database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.overall',99) WHERE domain='players'").run();
+    assert.equal((await read()).workflows.find(w=>w.id===freeId).freeTrade,true,'approved history stays fixed');
+ }finally{database.close();}
 });

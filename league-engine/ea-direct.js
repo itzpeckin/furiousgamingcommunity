@@ -10,6 +10,9 @@
   let state = null;
   let collection = null;
   let busy = false;
+  let activeAction = '';
+  let pointerHeld = false;
+  let renderPending = false;
   let loading = false;
   let polling = false;
   let loaded = false;
@@ -60,6 +63,9 @@
     state = null;
     collection = null;
     busy = false;
+    activeAction = '';
+    pointerHeld = false;
+    renderPending = false;
     loading = false;
     polling = false;
     loaded = false;
@@ -152,7 +158,7 @@
       if (stillCurrent(token) && revision === actionRevision) errorMessage = safeMessage(error.message);
       return null;
     } finally {
-      if (stillCurrent(token)) { loading = false; loaded = true; rerender(); }
+      if (stillCurrent(token) && revision === actionRevision) { loading = false; loaded = true; rerender(); }
     }
   }
 
@@ -160,7 +166,17 @@
     const token = ensureContext();
     if (busy || !token.slug) return null;
     actionRevision += 1;
+    if(action==='disconnect'||action==='begin'){
+      if(pollTimer)clearTimeout(pollTimer);
+      pollTimer=null;
+      collection=null;
+      // Old reads must not consume time or reinstall a prior connection.
+      controllers.forEach(controller=>controller.abort());
+      controllers.clear();
+      loading=false;
+    }
     busy = true;
+    activeAction = action;
     errorMessage = '';
     notice = '';
     rerender();
@@ -183,7 +199,7 @@
       if (stillCurrent(token)) errorMessage = safeMessage(error.message);
       return null;
     } finally {
-      if (stillCurrent(token)) { busy = false; rerender(); }
+      if (stillCurrent(token)) { busy = false; activeAction = ''; rerender(); }
     }
   }
 
@@ -217,7 +233,7 @@
       rerender();
       return collection;
     } catch (error) {
-      if (stillCurrent(token)) {
+      if (stillCurrent(token) && revision === actionRevision) {
         errorMessage = 'Collection status could not be checked. Select Check Collection to reconnect to its progress.';
         rerender();
       }
@@ -248,7 +264,7 @@
       if (stillCurrent(token)) errorMessage = safeMessage(error.message);
       return null;
     } finally {
-      if (stillCurrent(token)) { busy = false; rerender(); }
+      if (stillCurrent(token)) { busy = false; activeAction = ''; rerender(); }
     }
   }
 
@@ -310,7 +326,7 @@
     const connectionMarkup = selectedPath === 'companion' ? ''
       : loading && !state ? '<p role="status">Checking EA connection…</p>'
       : state?.configured === false ? '<p>EA Direct is unavailable. Choose Companion App.</p>'
-      : connected ? `<details class="ea-direct-settings"><summary>${esc(state.connection?.leagueName || 'Connected franchise')} · ${esc(state.connection?.personaName || 'Connected profile')} · Connection settings</summary><small>Last collected: ${esc(date(state.connection?.lastSyncedAt))}</small><div class="ea-direct-actions"><button class="button button--ghost" data-ea-collect="preview" ${disabled}>Test Connection</button><button class="button button--ghost" data-ea-action="refresh" ${disabled}>Refresh Connection</button><button class="button button--ghost" data-ea-action="begin" ${disabled}>Reconnect EA Account</button><button class="button button--ghost" data-ea-action="disconnect" ${disabled}>Disconnect EA Account</button></div></details>`
+      : connected ? `<details class="ea-direct-settings" ${settingsOpen?'open':''}><summary>${esc(state.connection?.leagueName || 'Connected franchise')} · ${esc(state.connection?.personaName || 'Connected profile')} · Connection settings</summary><small>Last collected: ${esc(date(state.connection?.lastSyncedAt))}</small><div class="ea-direct-actions"><button class="button button--ghost" data-ea-collect="preview" ${disabled}>Test Connection</button><button class="button button--ghost" data-ea-action="refresh" ${disabled}>Refresh Connection</button><button class="button button--ghost" data-ea-action="begin" ${busy?'disabled':''}>${activeAction==='begin'?'Starting EA sign-in…':'Reconnect EA Account'}</button><button class="button button--ghost" data-ea-action="disconnect" ${busy?'disabled':''}>${activeAction==='disconnect'?'Disconnecting…':'Disconnect EA Account'}</button></div></details>`
       : setupMarkup();
     const schedule = selectedPath === 'companion' ? exportService?.renderWorkflowScheduleControls?.() || '<p>Loading schedule…</p>'
       : `${complete ? '<span class="pill pill--success">18 weeks · 272 games · Complete</span>' : ''}${!prepared && connected && exportState ? '<form data-ea-form="season" class="ea-direct-form"><label class="field"><span>Madden franchise season number</span><input name="sourceSeasonId" value="'+esc(seasonDraft)+'" required pattern="[A-Za-z0-9._:-]{1,80}" placeholder="Exact season number in Madden"><small>One-time confirmation for this franchise.</small></label><button type="submit" class="button button--primary" '+disabled+'>Confirm &amp; Import Season Schedule</button></form>' : '<button class="button button--secondary" data-ea-collect="yearly" '+(!connected||busy||loading||activeCollection||!exportState?'disabled':'')+'>'+(complete?'Update Season Schedule':'Import Season Schedule')+'</button>'}`;
@@ -328,6 +344,8 @@
   }
 
   function rerender() {
+    if(pointerHeld){renderPending=true;return;}
+    renderPending=false;
     document.querySelectorAll('[data-ea-direct-panel]').forEach(node => {
       const details = node.querySelector?.('.ea-direct-settings');
       if (details) settingsOpen = details.open;
@@ -353,6 +371,20 @@
     });
   }
 
+  document.addEventListener('toggle',event=>{
+    if(event.target.matches?.('.ea-direct-settings'))settingsOpen=event.target.open;
+  },true);
+  document.addEventListener('pointerdown',event=>{
+    if(event.target.closest?.('[data-ea-direct-panel]'))pointerHeld=true;
+  },true);
+  const finishPointer=()=>{
+    pointerHeld=false;
+    // Let the browser dispatch click against the original node first.
+    setTimeout(()=>{if(renderPending)rerender();},0);
+  };
+  document.addEventListener('pointerup',finishPointer,true);
+  document.addEventListener('pointercancel',finishPointer,true);
+
   document.addEventListener('click', event => {
     const panel = event.target.closest('[data-ea-direct-panel]');
     if (!panel) return;
@@ -362,6 +394,7 @@
     if (collectButton && !collectButton.disabled) { collect(collectButton.dataset.eaCollect); return; }
     const button = event.target.closest('[data-ea-action]');
     if (!button || button.disabled) return;
+    event.preventDefault?.();
     const action = button.dataset.eaAction;
     if (action === 'begin') connectionAction('begin');
     if (action === 'disconnect') connectionAction('disconnect');

@@ -134,6 +134,21 @@ test('collection cannot start without configuration/connection and internal step
   }finally{f.sqlite.close();}
 });
 
+test('reconnect cancels the old EA collection before starting fresh sign-in without changing league data',async()=>{
+  const f=await fixture();try{
+    await franchiseSetup(f);
+    f.sqlite.exec("INSERT INTO ea_direct_collection_jobs(id,league_id,connection_id,actor_id,session_id,mode,status,token_hash,expires_at,state_cipher) VALUES('stuck-job','a','old','user-a','session-a','weekly','running','test-hash','2099-01-01','old-state')");
+    const before=f.sqlite.prepare('SELECT * FROM companion_league_export_endpoints ORDER BY league_id').all();
+    const response=await connectionPost(f.context('league-a',{action:'begin'}));
+    assert.equal(response.status,200);
+    const body=await response.json();assert.equal(body.status,'signing-in');assert.ok(body.setup.id);assert.equal(body.connection,null);
+    const job=f.sqlite.prepare("SELECT status,state_cipher FROM ea_direct_collection_jobs WHERE id='stuck-job'").get();
+    assert.equal(job.status,'cancelled');assert.equal(job.state_cipher,null);
+    assert.deepEqual(f.sqlite.prepare('SELECT * FROM companion_league_export_endpoints ORDER BY league_id').all(),before);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM league_snapshots').get().n,0);
+  }finally{f.sqlite.close();}
+});
+
 async function franchiseSetup(f){
   const setup=await createEaSetup(f.state);
   const payload={token:{accessToken:'test-only-token',refreshToken:'test-only-refresh',expiresAt:'2099-01-01'},

@@ -854,10 +854,14 @@ test('/rush rule verifies team carries and yard mismatches while /abilities appl
     assert.doesNotMatch(rushFields,/\*\*SF\*\* vs TB · 12 carries.*Unable to verify/s);
     assert.match(rush.embeds[0].description,/never treated as zero/);
 
+    const defaultSummary=await run('100000000000000189','abilities');
+    assert.match(defaultSummary.embeds[0].fields.map(f=>f.value).join('\n'),/\*\*TB\*\* · 4 · 1 XF \/ 3 SS/);
+    const legacyRules=defaultGameplayRules();legacyRules.abilities.positionWeighting='half-specialists';
+    database.prepare("INSERT INTO league_settings (league_id,revision,settings_json) VALUES ('league-a',1,?)").run(JSON.stringify({gameplayRules:legacyRules}));
     const summary=await run('100000000000000192','abilities');
     const summaryText=summary.embeds[0].fields.map(field=>field.value).join('\n');
     assert.match(summaryText,/\*\*TB\*\* · 3 · 1 XF \/ 3 SS/);
-    assert.match(summary.embeds[0].footer.text,/FB, K, P, LT, LG, C, RG, RT, OL and LS = 0.5/);
+    assert.match(summary.embeds[0].footer.text,/FB, LT, LG, C, RG, RT, OL, K, P, LS = 0.5/);
     const team=await run('100000000000000193','abilities',[{type:3,name:'team',value:'tb'}]);
     assert.match(team.embeds[0].title,/3 weighted/);
     assert.match(team.embeds[0].description,/Rookie Fullback.*FB.*X-Factor.*0.5.*Rookie.*First observed Week 3/s);

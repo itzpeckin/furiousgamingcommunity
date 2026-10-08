@@ -190,7 +190,7 @@ async function gmChoices(c,query){
 async function ruleChoices(c,query,type=null){
   const row=await c.db.prepare(`SELECT rules_json AS rulesJson FROM league_rules_documents WHERE league_id=?`).bind(c.league.id).first();
   let document={categories:[]};try{document=JSON.parse(row?.rulesJson||'{"categories":[]}')}catch{}
-  const candidates=[choice('Rule · Rushing rule','rule:gameplay:rushing'),choice('Rule · Passing rule','rule:gameplay:passing'),choice('Rule · Roster ability allowance','rule:gameplay:abilities')];
+  const candidates=[choice('Rule · Rushing rule','rule:gameplay:rushing'),choice('Rule · Passing rule','rule:gameplay:passing'),choice('Rule · Roster ability allowance','rule:gameplay:abilities'),choice('Rule · Free Trades','rule:gameplay:free-trades')];
   for(const [categoryIndex,category] of (document.categories||[]).entries()){
     candidates.push(choice(`Category · ${category.title}`,`category:${categoryIndex}`));
     for(const [sectionIndex,section] of (category.sections||[]).entries()){

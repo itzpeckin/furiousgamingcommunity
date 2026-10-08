@@ -1,3 +1,4 @@
+import { normalizeFreeTradeRules } from './free-trade-rules.js';
 import { canonicalTeamKey } from './league-teams.js';
 export { stableDraftPickId } from './draft-pick-baselines.js';
 
@@ -64,6 +65,7 @@ export function normalizeTradeCenterSettings(value = {}) {
     maxPlayersPerTeam: integer(source.maxPlayersPerTeam, 3, 1, 12),
     maxPicksPerTeam: integer(source.maxPicksPerTeam, 3, 1, 21),
     freeTradeDesignationEnabled: source.freeTradeDesignationEnabled !== false,
+    freeTradeRules:normalizeFreeTradeRules(source.freeTradeRules),
     calculatorEnabled: source.calculatorEnabled !== false,
     reviewApprovalThreshold: integer(source.reviewApprovalThreshold, 3, 1, 12),
     valueModel: {

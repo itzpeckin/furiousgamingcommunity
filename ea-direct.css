@@ -118,3 +118,15 @@
 .commissioner-import-followups .commissioner-archive-action{margin:0}
 @media(max-width:1100px){.commissioner-madden-layout>.commissioner-command-column--import{grid-column:1/-1}}
 @media(max-width:700px){.commissioner-madden-workflow__header{padding:14px}.madden-step-actions{align-items:stretch}.madden-step-actions>.button{flex:1 1 100%}.madden-step-actions .ea-direct-form{width:100%}.commissioner-import-followups .commissioner-command-panel{padding:14px}}
+
+/* League-defined ability counts: compact on desktop, two columns on phones. */
+.ability-position-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin:16px 0}
+.ability-position-grid>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--border,#29364b);border-radius:10px}
+.ability-position-grid label{display:flex;align-items:center;gap:5px}
+.ability-position-grid input[type=number]{width:64px;min-width:0;background:var(--surface,#0e141e);color:inherit;border:1px solid var(--border,#29364b);border-radius:8px;padding:8px}
+.ability-position-editor .heading-actions{flex-wrap:wrap}
+.ability-position-editor input[type=checkbox]{width:auto}
+
+.free-package-rule{min-width:0;border:1px solid var(--border,#29364b);border-radius:12px;padding:16px;margin:16px 0}
+.free-package-rule .trade-setting-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.free-package-rule .field{min-width:0}.free-package-rule input,.free-package-rule select{width:100%;min-width:0}
