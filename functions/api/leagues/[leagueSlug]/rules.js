@@ -1,3 +1,4 @@
+import { readGameplayRules, gameplayRuleSummary } from '../../../_lib/gameplay-rules.js';
 import { jsonResponse } from "../../../_lib/auth.js";
 import {
   requireActiveMembership,
@@ -204,9 +205,10 @@ export async function onRequestGet(context) {
   `).bind(league.id).first();
   let rules = EMPTY_RULES;
   try { if (row?.rulesJson) rules = JSON.parse(row.rulesJson); } catch {}
+  const gameplayRules=await readGameplayRules(context.env.DB,league.id),gameplaySummary=gameplayRuleSummary(gameplayRules);
   const commissioner = authorization.session.membership?.role === 'commissioner';
   if (!commissioner) {
-    return jsonResponse({ ok:true, release:RELEASE, league, rules, updatedAt:row?.updatedAt || null });
+    return jsonResponse({ ok:true, release:RELEASE, league, rules, gameplayRules,gameplaySummary,updatedAt:row?.updatedAt || null });
   }
   const [workspace, publication] = await Promise.all([
     context.env.DB.prepare(`SELECT revision,base_publication_revision AS basePublicationRevision,
@@ -219,7 +221,7 @@ export async function onRequestGet(context) {
   let draft = rules;
   try { if (workspace?.draftRulesJson) draft = JSON.parse(workspace.draftRulesJson); } catch {}
   return jsonResponse({
-    ok:true,release:RELEASE,league,rules,updatedAt:row?.updatedAt || null,
+    ok:true,release:RELEASE,league,rules,gameplayRules,gameplaySummary,updatedAt:row?.updatedAt || null,
     workspace:{
       draft,
       revision:Number(workspace?.revision || 0),

@@ -1190,3 +1190,7 @@ The 7.5.6.1 intervening patch makes every committee vote refresh all known curre
 The owner reported Madden franchise RPC ERR_AUTHENTICATION_REQUIRED after successful sign-in and a Companion import failure at 67%. Production evidence proves the statistics mapper parsed a route-plus-capture grouping identity as a route and discarded all seven selected statistics captures (722 Week 7 rows). The mapper now uses the actual route; permanent HTTP 4xx failures no longer consume Workflow retries. The mapping revision advances so old failed work is recomputed.
 
 EA session path serialization and one bounded session renewal align the client transport with the documented protocol; persistent Madden rejection is distinguished from expired OAuth. The exact live EA cause and account acceptance remain unproven until owner sign-in and private preview. No snapshot activation, export URL change, migration or Discord action occurs during deployment.
+
+
+## 8.2.7 — Configurable gameplay rules
+Requested: per-league rushing/passing stat selection, minimum/maximum values, and roster ability allowances in League Controls shared with Discord and League Rules. Implementation and fixture acceptance complete; strict gate and hosted release acceptance pending. Billing remains deferred.

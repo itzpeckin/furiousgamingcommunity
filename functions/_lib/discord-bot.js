@@ -17,6 +17,7 @@ import {
   playoffsCommand,
   rulesCommand,
   rushRuleCommand,
+  passRuleCommand,
   scheduleCommand,
   standingsCommand,
   statsCommand,
@@ -334,6 +335,7 @@ export async function executeDiscordCommand(c){
   if(command==='coach'&&['status','missing'].includes(subcommand))return coachingCommand(c,{missing:subcommand==='missing'});
   if(command==='games'&&['all','played','unplayed'].includes(subcommand))return gamesCommand(c,{...values,status:subcommand});
   if(command==='rush'&&subcommand==='rule')return rushRuleCommand(c,values);
+  if(command==='pass'&&subcommand==='rule')return passRuleCommand(c,values);
   if(command==='abilities')return abilitiesCommand(c,values);
   if(command==='stats')return statsCommand(c,values);
   if(command==='player-stats')return playerStatsCommand(c,values);

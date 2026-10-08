@@ -1,3 +1,4 @@
+import { readGameplayRules, GAMEPLAY_STATS, gameplayRuleSummary, statRuleViolation } from './gameplay-rules.js';
 import {
   activeSnapshotDomainPage,
   activeSnapshotRecord
@@ -292,7 +293,7 @@ export async function gamesCommand(c,values){
     allowed_mentions:{parse:[]}};
 }
 
-const RUSHING_RULE_MINIMUM=10;
+
 
 function sameRegularWeek(stat,week,season){
   return canonicalGameStage(stat?.stage)==='regular-season'
@@ -312,70 +313,74 @@ function discordFieldChunks(name,items,empty){
   return chunks.map((value,index)=>({name:index?`${name} (continued)`:name,value,inline:false}));
 }
 
-async function rushingStatisticsByWeek(c,model,season){
+async function rushingStatisticsByWeek(c,model,season,kind='rushing'){
   const grouped=new Map();let cursor=null;
   do{
     const page=await activeSnapshotDomainPage(c.db,c.league.id,model.snapshot.id,'statistics',cursor,500,true);
     for(const stat of page.records){
       const category=lower(stat.category);
-      if(!['rushing','team-game'].includes(category)||!sameRegularWeek(stat,stat.week,season))continue;
+      if(![kind,'team-game'].includes(category)||!sameRegularWeek(stat,stat.week,season))continue;
       const team=resolveTeam(model.teams,stat.teamId);if(!team)continue;
       const key=`${number(stat.week)}:${team.teamKey}`;
       if(!grouped.has(key))grouped.set(key,{rushing:[],teamRows:[]});
-      grouped.get(key)[category==='rushing'?'rushing':'teamRows'].push(stat);
+      grouped.get(key)[category===kind?'rushing':'teamRows'].push(stat);
     }
     cursor=page.nextCursor;
   }while(cursor);
   return grouped;
 }
 
-function rushingTeamAudit(model,statistics,game,teamId,opponentId,week){
+function rushingTeamAudit(model,statistics,game,teamId,opponentId,week,rule,kind){
   const team=resolveTeam(model.teams,teamId),opponent=resolveTeam(model.teams,opponentId);
   if(!team)return null;
   const {rushing=[],teamRows=[]}=statistics.get(`${number(week)}:${team.teamKey}`)||{};
-  const carriesComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.rushAtt)!==null);
+  const carriesComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.[rule.stat])!==null);
   const playerYardsComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.rushYds)!==null);
-  const carries=carriesComplete?rushing.reduce((sum,stat)=>sum+Number(stat.metrics.rushAtt),0):null;
+  const carries=carriesComplete?rushing.reduce((sum,stat)=>sum+Number(stat.metrics[rule.stat]),0):null;
   const playerYards=playerYardsComplete?rushing.reduce((sum,stat)=>sum+Number(stat.metrics.rushYds),0):null;
   const exactGame=teamRows.find(stat=>clean(stat.source?.gameId)===clean(game.id));
   const teamRow=exactGame||(teamRows.length===1?teamRows[0]:null);
   const teamYards=number(teamRow?.metrics?.offRushYds);
   const yardsComparable=playerYards!==null&&teamYards!==null;
   return{
-    team,opponent,week,carries,playerYards,teamYards,
-    violation:carries!==null&&carries<RUSHING_RULE_MINIMUM,
+    team,opponent,week,carries,playerYards,teamYards,metricLabel:GAMEPLAY_STATS[kind][rule.stat],kind,
+    violation:carries!==null&&statRuleViolation(carries,rule),
     yardStatus:yardsComparable?(playerYards===teamYards?'match':'mismatch'):'unavailable'
   };
 }
 
 function rushingAuditLine(item){
   const matchup=`**${item.team.abbreviation||item.team.displayName}** vs ${item.opponent?.abbreviation||item.opponent?.displayName||'Unknown'}`;
-  const carries=item.carries===null?'carries unavailable':`${formatMetric(item.carries)} carries`;
+  const carries=item.carries===null?`${item.metricLabel} unavailable`:`${formatMetric(item.carries)} ${item.metricLabel}`;
   const yards=item.yardStatus==='unavailable'?'player/team rushing yards unavailable'
     :`${formatMetric(item.playerYards)} player yds / ${formatMetric(item.teamYards)} team yds · ${item.yardStatus==='match'?'Match':`Mismatch (${formatMetric(item.playerYards-item.teamYards)})`}`;
-  return `W${item.week} · ${matchup} · ${carries} · ${yards}`;
+  return `W${item.week} · ${matchup} · ${carries}${item.kind==='rushing'?` · ${yards}`:''}`;
 }
 
-export async function rushRuleCommand(c,values={}){
+export const rushRuleCommand=(c,values={})=>statRuleCommand(c,values,'rushing');
+export const passRuleCommand=(c,values={})=>statRuleCommand(c,values,'passing');
+async function statRuleCommand(c,values,kind){
+  const rule=(await readGameplayRules(c.db,c.league.id))[kind],label=kind==='rushing'?'Rushing':'Passing',command=kind==='rushing'?'rush':'pass';
+  if(!rule.enabled)return {content:`**${c.league.name} · ${label} Rule**\nThis rule is disabled. Commissioners can enable it in Commish HQ → League Controls → Gameplay Rules.`};
   const model=await discordLeagueReadModel(c,{domains:['teams','games']});
   const context=await currentFranchiseContext(c.db,c.league.id);
   const week=number(values.week);
   if(values.week!==undefined&&(!Number.isInteger(week)||week<1||week>18))throw Object.assign(new Error('Choose a Regular Season week from 1 through 18.'),{status:400});
   const season=number(model.snapshot.season_year)??number(context.seasonYear);
   if(season===null)throw Object.assign(new Error('The current imported season could not be verified.'),{status:409});
-  const statistics=await rushingStatisticsByWeek(c,model,season);
+  const statistics=await rushingStatisticsByWeek(c,model,season,kind);
   const games=model.games.filter(game=>gamePlayed(game)&&canonicalGameStage(game.stage)==='regular-season'
     &&(week===null||number(game.week)===week)&&(number(game.season)===null||number(game.season)===season));
   const audits=games.flatMap(game=>[
-    rushingTeamAudit(model,statistics,game,game.homeTeamId,game.awayTeamId,game.week),
-    rushingTeamAudit(model,statistics,game,game.awayTeamId,game.homeTeamId,game.week)
+    rushingTeamAudit(model,statistics,game,game.homeTeamId,game.awayTeamId,game.week,rule,kind),
+    rushingTeamAudit(model,statistics,game,game.awayTeamId,game.homeTeamId,game.week,rule,kind)
   ]).filter(Boolean).sort((a,b)=>Number(a.week)-Number(b.week)||a.team.displayName.localeCompare(b.team.displayName));
   const violations=audits.filter(item=>item.violation).map(rushingAuditLine);
-  const mismatches=audits.filter(item=>item.yardStatus==='mismatch').map(rushingAuditLine);
-  const unverifiable=audits.filter(item=>item.carries===null||item.yardStatus==='unavailable').map(rushingAuditLine);
+  const mismatches=audits.filter(item=>kind==='rushing'&&item.yardStatus==='mismatch').map(rushingAuditLine);
+  const unverifiable=audits.filter(item=>item.carries===null||(kind==='rushing'&&item.yardStatus==='unavailable')).map(rushingAuditLine);
   const allFields=[
-    ...discordFieldChunks(`Below ${RUSHING_RULE_MINIMUM} carries`,violations,'No verified violations.'),
-    ...discordFieldChunks('Player / team yard mismatches',mismatches,'No verified mismatches.'),
+    ...discordFieldChunks(`${rule.comparison==='minimum'?'Below':'Above'} ${rule.limit} ${GAMEPLAY_STATS[kind][rule.stat]}`,violations,'No verified violations.'),
+    ...(kind==='rushing'?discordFieldChunks('Player / team yard mismatches',mismatches,'No verified mismatches.'):[]),
     ...discordFieldChunks('Unable to verify',unverifiable,'No data gaps for the completed games checked.')
   ];
   // A full season can exceed Discord's aggregate 6,000-character embed limit.
@@ -388,9 +393,9 @@ export async function rushRuleCommand(c,values={}){
   }
   const page=number(values.page)??1;
   if(!Number.isInteger(page)||page<1||page>pages.length)throw Object.assign(new Error(`Choose a report page from 1 through ${pages.length}.`),{status:400});
-  return{content:`**${c.league.name} · ${season} ${week===null?'Season':`Week ${week}`} Rushing Rule**`,embeds:[{
+  return{content:`**${c.league.name} · ${season} ${week===null?'Season':`Week ${week}`} ${label} Rule**`,embeds:[{
     title:`${games.length} completed regular-season game${games.length===1?'':'s'} checked`,
-    description:`Team minimum: **${RUSHING_RULE_MINIMUM} total carries**. Carries are summed across every source-backed player row. Missing statistics stay unverified and are never treated as zero.\n**${violations.length} violations · ${mismatches.length} yard mismatches · ${unverifiable.length} unverified team results.**${pages.length>1?`\nPage ${page}/${pages.length}. Use /rush rule${week===null?'':` week:${week}`} page:<number> for the remaining results.`:''}`,
+    description:`Team ${rule.comparison}: **${rule.limit} ${GAMEPLAY_STATS[kind][rule.stat]}**. Team totals are summed across every source-backed player row. Missing statistics stay unverified and are never treated as zero.\n**${violations.length} violations · ${mismatches.length} yard mismatches · ${unverifiable.length} unverified team results.**${pages.length>1?`\nPage ${page}/${pages.length}. Use /${command} rule${week===null?'':` week:${week}`} page:<number> for the remaining results.`:''}`,
     color:violations.length?0xef4444:mismatches.length||unverifiable.length?0xf59e0b:0x22c55e,fields:pages[page-1],
     footer:{text:`${audits.length} team result${audits.length===1?'':'s'} · ${week===null?'All weeks in the current season':'Selected week'} · Regular season only`}
   }]};
@@ -406,16 +411,16 @@ function canonicalAbilityTrait(value){
   return null;
 }
 
-function abilityWeight(position){return HALF_ABILITY_POSITIONS.has(clean(position).toUpperCase())?0.5:1}
+function abilityWeight(position,rule){return rule.positionWeighting==='half-specialists'&&HALF_ABILITY_POSITIONS.has(clean(position).toUpperCase())?0.5:1}
 
 function abilityTotal(value){return Number.isInteger(Number(value))?String(Number(value)):Number(value).toFixed(1)}
 
-function qualifyingAbilityPlayers(model){
+function qualifyingAbilityPlayers(model,rule){
   return model.players.map(player=>{
     const trait=canonicalAbilityTrait(player.devTrait),team=resolveTeam(model.teams,player.teamId);
     const rosterStatus=lower(player.rosterStatus||player.source?.rosterStatus||'active');
-    return trait&&team&&COUNTED_ROSTER_STATUSES.has(rosterStatus)
-      ?{...player,team,trait,weight:abilityWeight(player.position)}:null;
+    return trait&&(rule.traits!=='xfactor-only'||trait==='X-Factor')&&team&&COUNTED_ROSTER_STATUSES.has(rosterStatus)
+      ?{...player,team,trait,weight:abilityWeight(player.position,rule)}:null;
   }).filter(Boolean);
 }
 
@@ -447,8 +452,10 @@ async function abilityHistory(c,franchiseSeasonId,players){
 }
 
 export async function abilitiesCommand(c,values={}){
+  const rules=await readGameplayRules(c.db,c.league.id),rule=rules.abilities,summary=gameplayRuleSummary(rules)[2].text;
+  if(!rule.enabled)return {content:`**${c.league.name} · Roster Ability Rule**\nThis rule is disabled. Commissioners can enable it in Commish HQ → League Controls → Gameplay Rules.`};
   const model=await discordLeagueReadModel(c,{domains:['teams','players']});
-  const players=qualifyingAbilityPlayers(model),selected=clean(values.team);
+  const players=qualifyingAbilityPlayers(model,rule),selected=clean(values.team);
   if(!selected){
     const byTeam=new Map(model.teams.map(team=>[team.teamKey,{team,total:0,superstars:0,xFactors:0}]));
     for(const player of players){
@@ -457,14 +464,14 @@ export async function abilitiesCommand(c,values={}){
       if(player.trait==='X-Factor')row.xFactors+=1;else row.superstars+=1;
     }
     const ranked=[...byTeam.values()].sort((a,b)=>b.total-a.total||a.team.displayName.localeCompare(b.team.displayName));
-    const teamLines=ranked.map(item=>`**${item.team.abbreviation||item.team.displayName}** · ${abilityTotal(item.total)} · ${item.xFactors} XF / ${item.superstars} SS`);
+    const teamLines=ranked.map(item=>`**${item.team.abbreviation||item.team.displayName}** · ${abilityTotal(item.total)} · ${item.xFactors} XF / ${item.superstars} SS${item.total>rule.limit?rule.policy==='strict'?' · VIOLATION':' · Above benchmark':''}`);
     const midpoint=Math.ceil(teamLines.length/2);
     return{content:`**${c.league.name} · Superstar / X-Factor Counts**`,embeds:[{
       title:'All team rosters',color:0x4f8cff,
-      description:'Weighted current roster totals. **7.5** is the season-opening and trade-acquisition benchmark; development gains can place a team above it.',
+      description:summary,
       fields:[{name:'Teams 1–16',value:teamLines.slice(0,midpoint).join('\n')||'No teams available.',inline:true},
         {name:'Teams 17–32',value:teamLines.slice(midpoint).join('\n')||'No teams available.',inline:true}],
-      footer:{text:'FB, K, P, LT, LG, C, RG, RT, OL and LS = 0.5 · Every other position = 1'}
+      footer:{text:rule.positionWeighting==='equal'?'Every position = 1':'FB, K, P, LT, LG, C, RG, RT, OL and LS = 0.5 · Every other position = 1'}
     }]};
   }
   const team=resolveTeam(model.teams,selected);
@@ -481,9 +488,7 @@ export async function abilitiesCommand(c,values={}){
   return{content:`**${c.league.name} · ${team.displayName} Abilities**`,embeds:[{
     title:`${abilityTotal(total)} weighted Superstar / X-Factor players`,color:embedColor(team.primaryColor),
     description:playerLines.join('\n')||'No Superstar or X-Factor players are on this active roster.',
-    fields:[{name:'Benchmark',value:total>7.5
-      ?'Above 7.5. Development gains are allowed; this is not labeled a roster violation.'
-      :'At or below the 7.5 season-opening and trade-acquisition benchmark.',inline:false}],
+    fields:[{name:rule.policy==='strict'?'Roster allowance':'Benchmark',value:`${summary}\n${total>rule.limit?(rule.policy==='strict'?'VIOLATION: above the allowance.':'Above benchmark; development gains are allowed. Acquisition history is needed before determining a violation.'):'At or below the allowance.'}`,inline:false}],
     footer:{text:'First observed is source-backed and does not claim an exact earn week across import gaps.'}
   }]};
 }
@@ -1055,8 +1060,8 @@ export async function gotwCommand(c,values){
 export async function rulesCommand(c,values){
   const row=await c.db.prepare(`SELECT rules_json AS rulesJson FROM league_rules_documents WHERE league_id=?`).bind(c.league.id).first();
   let rules={categories:[]};try{rules=JSON.parse(row?.rulesJson||'{"categories":[]}')}catch{}
-  const query=lower(values.query);
-  const found=[];
+  const rawQuery=lower(values.query),query=({'rule:gameplay:rushing':'rushing rule','rule:gameplay:passing':'passing rule','rule:gameplay:abilities':'roster ability allowance'})[rawQuery]||rawQuery;
+  const found=gameplayRuleSummary(await readGameplayRules(c.db,c.league.id)).filter(item=>!query||lower(item.title+' '+item.text).includes(query)).map(item=>`**${item.title}**\n${item.text}`);
   const direct=query.match(/^(category|section|rule):(\d+)(?::(\d+))?(?::(\d+))?$/);
   for(const [categoryIndex,category] of (rules.categories||[]).entries())for(const [sectionIndex,section] of (category.sections||[]).entries())for(const [ruleIndex,rule] of (section.rules||[]).entries()){
     const text=clean(rule.text||clean(rule.html).replace(/<[^>]*>/g,' '));

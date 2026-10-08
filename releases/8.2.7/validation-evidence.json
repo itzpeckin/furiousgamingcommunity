@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.7",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 53,
+      "candidateRequiresMigration": false
+    },
+    "browserFixtures": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "scope": "Actual extracted renderer and event handler with isolated API fixtures; not production acceptance."
+    },
+    "strictSuite": {
+      "passed": true,
+      "tests": 534
+    },
+    "productionBaseline": {
+      "readOnly": true,
+      "leagues": 3,
+      "users": 39,
+      "snapshots": 98,
+      "snapshotRecords": 903196,
+      "configuredGameplayRules": 0,
+      "foreignKeysClean": true,
+      "activeSnapshots": {
+        "franchise-hq-primary": "22643000-ab5d-4aea-960b-c2b57b06d590",
+        "league_072f8b94-8851-4bbe-ae7d-b464572183d0": "91878a64-e6c9-45a0-83e6-3e0eabc74133"
+      }
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveDiscordMessages": false,
+    "leagueSettingsChanged": false
+  }
+}
