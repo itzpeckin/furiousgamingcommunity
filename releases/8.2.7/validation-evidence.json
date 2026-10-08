@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.2.7",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "released",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {
@@ -39,6 +39,28 @@
         "franchise-hq-primary": "22643000-ab5d-4aea-960b-c2b57b06d590",
         "league_072f8b94-8851-4bbe-ae7d-b464572183d0": "91878a64-e6c9-45a0-83e6-3e0eabc74133"
       }
+    },
+    "hosted": {
+      "passed": true,
+      "previewChecks": 29,
+      "productionChecks": 29
+    },
+    "githubCI": {
+      "passed": true,
+      "runId": 37711083885
+    },
+    "liveBrowser": {
+      "passed": true,
+      "scope": "Authenticated FGC desktop read-only: Gameplay Rules controls and generated Rules Studio summary. No live save performed."
+    },
+    "discordRegistration": {
+      "passed": true,
+      "evidence": "Scheduled scanner registration flag platform:discord:coaching-commands:8.2.7 is registered. Live command invocation not performed."
+    },
+    "productionPreservation": {
+      "passed": true,
+      "activeSnapshotsUnchanged": true,
+      "leagueGameplaySettingsUnchanged": true
     }
   },
   "scopeBoundaries": {

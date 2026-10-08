@@ -1193,4 +1193,4 @@ EA session path serialization and one bounded session renewal align the client t
 
 
 ## 8.2.7 — Configurable gameplay rules
-Requested: per-league rushing/passing stat selection, minimum/maximum values, and roster ability allowances in League Controls shared with Discord and League Rules. Implementation and fixture acceptance complete; strict gate and hosted release acceptance pending. Billing remains deferred.
+Requested: per-league rushing/passing stat selection, minimum/maximum values, and roster ability allowances in League Controls shared with Discord and League Rules. Released in 8.2.7 through PR #185. Strict 534-test gate, hosted preview/production checks, desktop/mobile fixtures and authenticated FGC desktop read-only acceptance passed. Discord command registration verified; live command invocation remains untested. Existing league settings preserved. Billing remains deferred.

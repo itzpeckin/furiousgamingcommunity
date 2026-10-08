@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.2.7",
   "releaseType": "league-gameplay-rules",
-  "status": "validated-review-candidate",
+  "status": "released",
   "sourceBaseline": {
     "repository": "itzpeckin/furiousgamingcommunity",
     "version": "8.2.6",
@@ -14,19 +14,23 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending"
+    "status": "merged",
+    "pullRequest": 185,
+    "mainCommit": "33a2a9e1fcb2340e5a5a242a8a89df88a118177c"
   },
   "staging": {
     "authorized": true,
-    "deployed": false
+    "deployed": true,
+    "deploymentId": "7422b239-48c7-4997-b942-27f7f0222ccd"
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "currentRelease": "8.2.6",
+    "deployed": true,
+    "currentRelease": "8.2.7",
     "candidateRelease": "8.2.7",
     "currentMigration": 53,
-    "candidateMigration": 53
+    "candidateMigration": 53,
+    "deploymentId": "ad27487d-c157-40c7-89a2-098def5b9ccb"
   },
   "requiredArtifacts": [
     "releases/8.2.7/release-record.md",
