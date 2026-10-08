@@ -71,8 +71,11 @@
   async function load(force=false){
     if(state&&!force)return state;
     if(loading)return loading;
-    loading=request().catch(error=>{lastError=error.message;throw error}).finally(()=>{loading=null});
-    return loading;
+    const epoch=requestEpoch;
+    lastError=null;
+    const pending=request().catch(error=>{if(epoch===requestEpoch)lastError=error.message;throw error}).finally(()=>{if(loading===pending)loading=null});
+    loading=pending;
+    return pending;
   }
 
   function rerender(){

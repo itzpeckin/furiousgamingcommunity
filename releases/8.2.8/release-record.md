@@ -8,6 +8,8 @@ Commissioners can bulk assign roster ability counts by position and configure au
 
 EA recovery is available during unfinished collection, cancels stale reads and collection on reconnect, keeps settings open, and prevents background authentication refreshes from repeatedly remounting controls. Schedule initial/current-context selection follows the league week and joins actual standings into team cards; manual browsing is retained until league/season/week changes.
 
+A live acceptance check found a superseded Trade Center read could briefly display an error and clear the newer request. The follow-up preserves the active loading promise and ignores obsolete errors; a real request/load regression covers the race.
+
 ## Known inherited blockers
 
 None registered. Development exceptions still need acquisition history to confirm a violation; current roster counts alone cannot establish one. Automatic Free Trades require commissioners to save package rules; this release does not configure individual leagues.
@@ -16,9 +18,11 @@ None registered. Development exceptions still need acquisition history to confir
 
 542 automated tests passed, including authenticated trade handlers, authoritative rating rechecks, complete-package alternatives, preserved approval history, per-position setting persistence, reconnect job cancellation, click recovery, authentication refresh guards and actual schedule rendering. Browser fixtures at 1440px/390px verified bulk counts, save/reload, package add/edit/remove/save, no overflow or page errors. Other strict gates passed; required release-record headings were corrected and the release contract rerun. These are isolated tests, not live EA account changes or Discord trade acceptance.
 
+Implementation CI 37716998559 passed. Preview and production each passed 32 hosted checks. Authenticated read-only FGC acceptance confirmed current Week 15, actual team records, bulk-position controls and Free Trade Rules. The follow-up trade suite passed all 14 tests. Active snapshot pointers and settings revisions match the pre-release baseline.
+
 ## Deployment status
 
-Candidate work. No live settings, imports, EA account actions, trades or Discord messages were performed. Schema remains 53; Workers and credentials unchanged. Targeted trade handler and schedule renderer tests pass; full quality, hosted and browser checks are recorded as completed in validation evidence. Production publication is authorized but not yet performed.
+PR #187 merged and v8.2.8 is published at Main 199a1b0e89e73dea11810494a405ee7da4c970a7. Production Pages deployment 97910748-3537-4280-b702-2c859a4aeace; preview b8c2f5be-bd92-4dc2-8651-57f7995f12af. The immutable tag remains at this implementation Main. This follow-up contains the narrow stale-loading correction and release evidence. No live settings, imports, EA account actions, trades or Discord messages were performed. Schema remains 53; Workers and credentials unchanged.
 
 ## Rollback
 

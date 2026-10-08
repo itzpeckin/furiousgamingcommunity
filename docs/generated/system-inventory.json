@@ -297,7 +297,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 105789,
+        "bytes": 105911,
         "file": "league-engine/trade-center-live.js"
       },
       {
@@ -325,7 +325,7 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 58657,
+        "bytes": 59881,
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
