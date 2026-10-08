@@ -551,6 +551,19 @@ const freePackages={mode:'automatic',packages:[
  {name:'One second',minPlayers:0,maxPlayers:0,minPicks:1,maxPicks:1,overallComparison:'under',overall:70,roundLimits:{1:0,2:1,3:0,4:0,5:0,6:0,7:0}},
  {name:'Later package',minPlayers:0,maxPlayers:0,minPicks:1,maxPicks:3,overallComparison:'under',overall:70,roundLimits:{1:0,2:0,3:1,4:1,5:1,6:1,7:1}}
 ]};
+
+test('superseded Trade Center reads cannot replace the active loading state with a stale error',async()=>{
+ const source=await readFile(path.join(ROOT,'league-engine/trade-center-live.js'),'utf8');
+ const code=source.slice(source.indexOf('  async function request('),source.indexOf('  function rerender('));
+ const pending=[];
+ const sandbox={fetch:()=>new Promise(resolve=>pending.push(resolve)),endpoint:()=>'/fixture',slug:()=>'same-league',renderNotificationMenu(){},badges(){},rebuildBlockLookup(){},HQ:{}};
+ vm.createContext(sandbox);vm.runInContext('let state=null,loading=null,lastError=null,requestEpoch=0;'+code+';globalThis.load=load;globalThis.reset=()=>{requestEpoch++;state=null;loading=null;};globalThis.status=()=>({loading:Boolean(loading),lastError,state});',sandbox);
+ const old=sandbox.load();sandbox.reset();const current=sandbox.load();
+ pending[0]({ok:true,json:async()=>({ok:true,id:'old'})});await assert.rejects(old,/League changed/);
+ assert.equal(sandbox.status().loading,true);assert.equal(sandbox.status().lastError,null);
+ pending[1]({ok:true,json:async()=>({ok:true,id:'new'})});await current;
+ assert.equal(sandbox.status().loading,false);assert.equal(sandbox.status().state.id,'new');
+});
 test('free trade alternatives evaluate complete outgoing packages with strict overall and round limits',()=>{
  const player=(overall=69)=>({assetType:'player',fromTeamKey:'tb',overall});
  const picks=(...rounds)=>rounds.map(round=>({assetType:'draft-pick',fromTeamKey:'gb',round}));

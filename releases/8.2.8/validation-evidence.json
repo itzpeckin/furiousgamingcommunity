@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.2.8",
-  "status": "validated-review-candidate",
-  "productionChanged": false,
+  "status": "released",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {
@@ -56,6 +56,32 @@
     "releaseContract": {
       "passed": true,
       "note": "Rerun after correcting required release-record headings; all preceding strict gates passed."
+    },
+    "implementationCI": {
+      "passed": true,
+      "runId": 37716998559
+    },
+    "hostedPreview": {
+      "passed": true,
+      "checks": 32
+    },
+    "hostedProduction": {
+      "passed": true,
+      "checks": 32
+    },
+    "liveBrowser": {
+      "passed": true,
+      "readOnly": true,
+      "scope": "Authenticated FGC production: current Week 15 selected, actual team records, ability bulk-position controls and Free Trade Rules available. No settings saved or EA account action performed. A transient stale load error was found and corrected with a regression in this follow-up."
+    },
+    "followupTradeTests": {
+      "passed": true,
+      "tests": 14
+    },
+    "productionPreservation": {
+      "passed": true,
+      "activeSnapshotPointersUnchanged": true,
+      "settingsRevisionsUnchanged": true
     }
   },
   "scopeBoundaries": {
