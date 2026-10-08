@@ -1,3 +1,4 @@
+import { defaultGameplayRules } from '../../functions/_lib/gameplay-rules.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
@@ -451,4 +452,25 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(policyFiles[0],/does not sell personal data/i);
   assert.match(policyFiles[2],/No automatic deletion timetable is promised today/);
   assert.match(policyFiles[3],/Retry Failed Copies/);
+});
+
+
+test('commissioners save shared gameplay rules with revisions; owners can read but cannot change them',async()=>{
+ const database=new DatabaseSync(':memory:');
+ try{
+  await applyFiles(database,await migrationFiles());seedLeague(database);
+  await seedIdentity(database,{id:'commissioner',role:'commissioner',token:'commissioner-token'});
+  await seedIdentity(database,{id:'owner',role:'team_owner',teamId:'tb',token:'owner-token'});
+  const db=d1(database),before=await (await getCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq'))).json();
+  const rules=defaultGameplayRules();rules.passing={enabled:true,stat:'passYds',comparison:'maximum',limit:400};rules.abilities={enabled:true,limit:5,traits:'xfactor-only',positionWeighting:'equal',policy:'strict'};
+  const body={action:'gameplay-rules',revision:before.settings.revision,rules};
+  assert.equal((await postCommissionerHq(requestContext(db,'owner-token','commissioner-hq','POST',body))).status,403);
+  const response=await postCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq','POST',body));assert.equal(response.status,200);
+  const saved=await response.json();assert.deepEqual(saved.gameplayRules,rules);
+  assert.equal((await postCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq','POST',body))).status,409);
+  const published=await (await getRules(requestContext(db,'owner-token','rules'))).json();assert.deepEqual(published.gameplayRules,rules);assert.match(published.gameplaySummary[1].text,/maximum: 400 passing yards/);
+  const bad=structuredClone(body);bad.revision=saved.settings.revision;bad.rules.passing.stat='rushAtt';assert.equal((await postCommissionerHq(requestContext(db,'commissioner-token','commissioner-hq','POST',bad))).status,400);
+  assert.equal(database.prepare("SELECT COUNT(*) AS n FROM tenant_audit_events WHERE action='gameplay_rules_updated'").get().n,1);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM league_setting_revisions WHERE league_id=? AND revision=?').get('league-command',saved.settings.revision).n,1);
+ }finally{database.close();}
 });

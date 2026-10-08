@@ -1,3 +1,5 @@
+import { defaultGameplayRules, validateGameplayRules, statRuleViolation } from '../../functions/_lib/gameplay-rules.js';
+import { passRuleCommand, abilitiesCommand, rulesCommand } from '../../functions/_lib/discord-read-model.js';
 import { syncDiscordGameResults } from '../../functions/_lib/discord-game-results.js';
 import { rushRuleCommand } from '../../functions/_lib/discord-read-model.js';
 import { gameCommand, gameAutocompleteChoices } from '../../functions/_lib/discord-game.js';
@@ -504,10 +506,10 @@ function leagueApiContext(db,{slug,token,method='GET',body=null,clientId='100000
 }
 
 test('global Discord command inventory restores legacy week commands and remains multi-league capable',()=>{
-  assert.equal(DISCORD_GLOBAL_COMMANDS.length,42);
-  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,42);
+  assert.equal(DISCORD_GLOBAL_COMMANDS.length,43);
+  assert.equal(new Set(DISCORD_GLOBAL_COMMANDS.map(command=>command.name)).size,43);
   assert.deepEqual(DISCORD_GLOBAL_COMMANDS.map(command=>command.name),[
-    'loadout','coach','game','standings','playoffs','eliminated','schedule','games','rush','abilities','leaders','player','team','trade-block','trade-history','news',
+    'loadout','coach','game','standings','playoffs','eliminated','schedule','games','rush','pass','abilities','leaders','player','team','trade-block','trade-history','news',
     'gotw','league-site','twitch','join','gm-history','confidence','rules','trade',
     ...Array.from({length:18},(_,index)=>`week${index+1}`)
   ]);
@@ -861,6 +863,14 @@ test('/rush rule verifies team carries and yard mismatches while /abilities appl
     assert.match(team.embeds[0].description,/Rookie Fullback.*FB.*X-Factor.*0.5.*Rookie.*First observed Week 3/s);
     assert.match(team.embeds[0].description,/Line Star.*LT.*Superstar.*0.5.*Season opening/s);
     assert.match(team.embeds[0].description,/Tight End Star.*TE.*Superstar.*1.*First observed Week 2/s);
+    const rules=defaultGameplayRules();rules.abilities={enabled:true,limit:0.5,traits:'xfactor-only',positionWeighting:'equal',policy:'strict'};
+    const persist=()=>database.prepare("INSERT INTO league_settings (league_id,revision,settings_json) VALUES ('league-a',1,?) ON CONFLICT(league_id) DO UPDATE SET settings_json=excluded.settings_json").run(JSON.stringify({gameplayRules:rules}));persist();
+    const c={db,league:{id:'league-a',name:'Alpha'}};
+    let configured=await abilitiesCommand(c,{team:'tb'});
+    assert.match(configured.embeds[0].title,/1 weighted/);assert.match(configured.embeds[0].fields[0].value,/VIOLATION/);assert.doesNotMatch(configured.embeds[0].description,/Line Star|Tight End Star/);
+    rules.abilities.positionWeighting='half-specialists';persist();configured=await abilitiesCommand(c,{team:'tb'});assert.match(configured.embeds[0].title,/0.5 weighted/);assert.doesNotMatch(configured.embeds[0].fields[0].value,/VIOLATION/);
+    rules.abilities.limit=0;rules.abilities.policy='development-exempt';persist();configured=await abilitiesCommand(c,{team:'tb'});assert.match(configured.embeds[0].fields[0].value,/Acquisition history is needed/);assert.doesNotMatch(configured.embeds[0].fields[0].value,/VIOLATION/);
+
   }finally{database.close()}
 });
 
@@ -2684,4 +2694,52 @@ test('game results and automatic week replacement apply independently to every c
       assert.equal(calls.length,count,'repeating the import does not recreate threads or revisit deleted results');
     }
   }finally{database.close();}
+});
+
+
+test('gameplay rule validation rejects malformed options and includes equality at either boundary',()=>{
+ for(const kind of ['rushing','passing'])for(const comparison of ['minimum','maximum']){
+  const r={enabled:true,comparison,limit:10};
+  assert.equal(statRuleViolation(10,r),false);assert.equal(statRuleViolation(null,r),false);
+  assert.equal(statRuleViolation(comparison==='minimum'?9:11,r),true);
+  assert.equal(statRuleViolation(10,{...r,enabled:false}),false);
+  const input=defaultGameplayRules();input[kind].comparison=comparison;
+  assert.equal(validateGameplayRules(input)[kind].comparison,comparison);
+  input[kind].stat='madeUp';assert.throws(()=>validateGameplayRules(input),/options/);
+ }
+ for(const limit of [-1,0.5,NaN,Infinity,'10',null]){
+  const input=defaultGameplayRules();input.passing.limit=limit;assert.throws(()=>validateGameplayRules(input),/whole number/);
+ }
+});
+
+test('configurable team rules use each league statistic and direction across the current season',async()=>{
+ const database=new DatabaseSync(':memory:');
+ try{
+  await applyMigrations(database);seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+  seedLeague(database,{id:'league-b',slug:'beta',guild:'100000000000000002'});seedMember(database,{leagueId:'league-a'});
+  const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:8});
+  const add=(domain,id,data)=>seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain,externalId:id,data});
+  for(const week of [1,8]){
+   add('games','rule-game-'+week,{external_id:'rule-game-'+week,season_year:2026,week_index:week,stage:'regular-season',status:'completed',home_team_external_id:'1001',away_team_external_id:'1002',home_score:21,away_score:7});
+   for(const [category,metrics] of [['passing',{passAtt:week===1?31:30,passYds:250,passTDs:2,passComp:20,passInts:1}],['rushing',{rushAtt:12,rushYds:week===1?99:100,rushTDs:1,rushFum:0}]]){
+    add('statistics',category+week,{category,team_external_id:'1001',season_year:2026,week_index:week,stage:'regular-season',metrics});
+   }
+  }
+  const rules=defaultGameplayRules();rules.passing={enabled:true,stat:'passAtt',comparison:'maximum',limit:30};rules.rushing={enabled:true,stat:'rushYds',comparison:'minimum',limit:100};
+  const save=()=>database.prepare("INSERT INTO league_settings (league_id,revision,settings_json) VALUES ('league-a',1,?) ON CONFLICT(league_id) DO UPDATE SET settings_json=excluded.settings_json").run(JSON.stringify({gameplayRules:rules}));save();
+  const c={db:d1(database),league:{id:'league-a',name:'Alpha'}};
+  let report=await passRuleCommand(c,{});
+  assert.match(report.embeds[0].description,/1 violations/);assert.equal(report.embeds[0].fields[0].name,'Above 30 passing attempts');
+  assert.match(report.embeds[0].fields[0].value,/W1 .*31 passing attempts/);assert.doesNotMatch(report.embeds[0].fields[0].value,/W8/);
+  assert.match(report.embeds[0].fields.at(-1).value,/passing attempts unavailable/);
+  report=await rushRuleCommand(c,{});assert.equal(report.embeds[0].fields[0].name,'Below 100 rushing yards');assert.match(report.embeds[0].description,/1 violations/);
+  assert.equal((await passRuleCommand(c,{week:8})).embeds[0].fields[0].value,'No verified violations.');
+  rules.passing.stat='passTDs';rules.passing.limit=1;save();assert.match((await passRuleCommand(c,{})).embeds[0].description,/2 violations/);
+  // The real signed Discord dispatcher accepts the newly registered command.
+  const key=await signingKey();const response=await discordInteractions(await signedContext({db:c.db,key,interaction:interaction({name:'pass',options:[{type:1,name:'rule'}]})}));assert.match(JSON.stringify(await response.json()),/Passing Rule/);
+  assert.match(await rulesCommand(c,{query:'rule:gameplay:passing'}),/Team maximum: 1 passing touchdowns/);
+  rules.passing.enabled=false;rules.rushing.enabled=false;rules.abilities.enabled=false;save();
+  for(const command of [passRuleCommand,rushRuleCommand,abilitiesCommand])assert.match((await command(c,{})).content,/disabled/);
+  assert.match((await passRuleCommand({db:c.db,league:{id:'league-b',name:'Beta'}},{})).content,/disabled/);
+ }finally{database.close();}
 });

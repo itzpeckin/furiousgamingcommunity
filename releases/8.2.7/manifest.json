@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.7",
+  "releaseType": "league-gameplay-rules",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.6",
+    "tag": "v8.2.6",
+    "commit": "6b8b669f9947262f05cf7962ac495cea5d264cb1"
+  },
+  "implementationBranch": "feature/8.2.7-gameplay-rules",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.6",
+    "candidateRelease": "8.2.7",
+    "currentMigration": 53,
+    "candidateMigration": 53
+  },
+  "requiredArtifacts": [
+    "releases/8.2.7/release-record.md",
+    "releases/8.2.7/validation-evidence.json"
+  ]
+}

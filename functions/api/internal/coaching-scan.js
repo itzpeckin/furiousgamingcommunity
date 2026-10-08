@@ -11,14 +11,14 @@ export async function onRequestPost(context){
   const expected=context.env.COACHING_SCANNER_SECRET||'';
   if(!/^[a-f0-9]{64}$/.test(expected)||!/^[a-f0-9]{64}$/.test(supplied))return new Response('Not found',{status:404});
   if(!await timingSafeTokenEqual(supplied,expected))return new Response('Not found',{status:404});
-  // Publish the two new/changed command definitions without requiring a
+  // Publish new/changed command definitions without requiring a
   // commissioner to resave unrelated routing or delete any other command.
   const cache=context.env.LEAGUE_CONFIG||context.env.COMPANION_EXPORT_META,key=`platform:discord:coaching-commands:${DISCORD_COMMAND_RELEASE}`;
   let commandsRegistered=false;
   if(context.env.DISCORD_BOT_TOKEN&&context.env.DISCORD_CLIENT_ID&&cache){
     commandsRegistered=await cache.get(key)==='registered';
     if(!commandsRegistered){
-      await upsertDiscordGlobalCommands(context.env,DISCORD_GLOBAL_COMMANDS.filter(command=>['coach','rush','loadout'].includes(command.name)));
+      await upsertDiscordGlobalCommands(context.env,DISCORD_GLOBAL_COMMANDS.filter(command=>['coach','rush','pass','loadout'].includes(command.name)));
       await cache.put(key,'registered');commandsRegistered=true;
     }
   }

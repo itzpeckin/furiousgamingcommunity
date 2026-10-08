@@ -251,7 +251,7 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 302,
+      ".js": 303,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
@@ -269,11 +269,11 @@
         "file": "app.js"
       },
       {
-        "bytes": 568274,
+        "bytes": 569014,
         "file": "styles.css"
       },
       {
-        "bytes": 446599,
+        "bytes": 453638,
         "file": "trade-module.js"
       },
       {
@@ -281,12 +281,12 @@
         "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
-        "bytes": 194467,
-        "file": "tools/check-release.mjs"
+        "bytes": 198280,
+        "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 192608,
-        "file": "tests/discord/discord-bot.test.mjs"
+        "bytes": 194467,
+        "file": "tools/check-release.mjs"
       },
       {
         "bytes": 187081,
@@ -317,7 +317,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 67879,
+        "bytes": 69624,
         "file": "functions/_lib/discord-read-model.js"
       },
       {
@@ -345,7 +345,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       }
     ],
-    "total": 843
+    "total": 844
   },
   "frontend": {
     "assets": [
@@ -1936,7 +1936,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.6",
+  "release": "8.2.7",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

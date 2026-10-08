@@ -8125,3 +8125,12 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 .coaching-archetypes .discord-channel-routing__grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .coaching-archetypes>p{color:var(--muted);line-height:1.5}
 @media(max-width:600px){.coaching-archetypes{padding:18px}.coaching-archetypes fieldset,.coaching-archetypes .discord-channel-routing__grid{grid-template-columns:minmax(0,1fr)}.coaching-archetypes .card-header{flex-wrap:wrap}}
+
+/* Commissioner gameplay rules must fit a narrow phone column. */
+[data-gameplay-controls] fieldset { min-width: 0; margin: 0; padding: 18px; border: 1px solid var(--border, #29364b); border-radius: 12px; }
+[data-gameplay-controls] input, [data-gameplay-controls] select { max-width: 100%; min-width: 0; }
+[data-gameplay-controls] .field { min-width: 0; }
+[data-gameplay-controls] legend { padding: 0 8px; font-weight: 700; }
+
+[data-gameplay-controls] input[type="checkbox"] { width: 20px; height: 20px; min-height: 0; padding: 0; margin: 0 8px 0 0; vertical-align: middle; }
+[data-gameplay-controls] fieldset > .field > span { display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: none; letter-spacing: normal; }

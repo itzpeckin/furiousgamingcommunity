@@ -1,3 +1,4 @@
+import { gameplayRulesFromDocument, validateGameplayRules, GAMEPLAY_STATS } from '../../../_lib/gameplay-rules.js';
 import { jsonResponse } from '../../../_lib/auth.js';
 import { requireCommissioner } from '../../../_lib/permissions.js';
 import {
@@ -181,6 +182,7 @@ async function overview(c) {
       currentWeek:Number(c.league.current_week || 1),timezone:c.league.timezone || 'UTC'
     },
     settings:{revision:settings.revision,updatedAt:settings.updatedAt},
+    gameplayRules:gameplayRulesFromDocument(settings.document),gameplayStats:GAMEPLAY_STATS,
     quickControls:{
       seasonTradeLimitEnabled:tradeCenterSettingsFromLeagueDocument(settings.document).seasonTradeLimitEnabled,
       freeTradeDesignationEnabled:tradeCenterSettingsFromLeagueDocument(settings.document).freeTradeDesignationEnabled,
@@ -211,6 +213,31 @@ async function overview(c) {
     attention,
     operations
   };
+}
+
+async function updateGameplayRules(c,body){
+  const rules=validateGameplayRules(body.rules),current=await settingsState(c.db,c.league.id);
+  if(!Number.isInteger(body.revision)||body.revision!==current.revision){
+    throw Object.assign(new Error('League settings changed. Refresh League Controls before saving.'),{status:409});
+  }
+  const revision=current.revision+1,document=JSON.stringify({...current.document,gameplayRules:rules});
+  const audit=createTenantAuditContext({request:c.request},c.league,c.session,'gameplay_rules_updated');
+  try{
+    // The unique (league_id,revision) ledger claim makes concurrent writes roll back together.
+    await c.db.batch([
+      c.db.prepare(`INSERT INTO league_setting_revisions
+        (id,league_id,revision,settings_json,changed_by_user_id,change_reason)
+        VALUES (?,?,?,?,?,'Gameplay rules updated')`).bind(`setting_revision_${crypto.randomUUID()}`,c.league.id,revision,document,c.session.user.id),
+      c.db.prepare(`INSERT INTO league_settings (league_id,revision,settings_json,updated_by_user_id)
+        VALUES (?,?,?,?) ON CONFLICT(league_id) DO UPDATE SET revision=excluded.revision,
+        settings_json=excluded.settings_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP`)
+        .bind(c.league.id,revision,document,c.session.user.id),
+      tenantAuditStatement(c.db,audit,{resourceType:'league_settings',resourceId:c.league.id,detail:{revision,scope:'gameplayRules',rules}})
+    ]);
+  }catch(error){
+    if(/UNIQUE constraint failed: league_setting_revisions/.test(error.message||''))throw Object.assign(new Error('League settings changed. Refresh League Controls before saving.'),{status:409});
+    throw error;
+  }
 }
 
 async function updateQuickControl(c, body) {
@@ -356,6 +383,10 @@ export async function onRequestPost(context) {
     const c = await requestContext(context);
     if (c.response) return c.response;
     const body = await context.request.json();
+    if(body?.action==='gameplay-rules'){
+      await updateGameplayRules(c,body);
+      return jsonResponse({...await overview(c),action:'gameplay-rules'});
+    }
     if (body?.action === 'quick-control') {
       await updateQuickControl(c,body);
       return jsonResponse({...await overview(c),action:'quick-control'});
