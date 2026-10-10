@@ -1,6 +1,6 @@
 {
   "name": "franchisehq",
-  "version": "8.2.8",
+  "version": "8.2.9",
   "private": true,
   "type": "module",
   "description": "FranchiseHQ league-management platform",

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "8.2.8",
+  "release": "8.2.9",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 53,
+  "currentVersion": 54,
   "requiredTables": [
     "ea_direct_connections",
     "ea_direct_setups",
@@ -492,7 +492,8 @@
       "away_discord_user_id",
       "status",
       "created_at",
-      "updated_at"
+      "updated_at",
+      "presentation_json"
     ],
     "discord_trade_rooms": [
       "id",
