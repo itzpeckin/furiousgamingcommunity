@@ -144,7 +144,7 @@ test('game and player statistics refresh on snapshot change without reloading th
   const context={window:{addEventListener:(name,fn)=>listeners.set(name,fn)},document:{querySelector:()=>null},
     playerStatisticsState:{loaded:false,rows:[],revision:0,snapshotId:null},
     liveReadModel:()=>({getStatistics:async()=>{if(pending){const promise=pending;pending=null;return promise;}return rows;}}),
-    matchupCompactModelCache:new Map(),matchupTeamStatsCache:new Map(),matchupPanelCache:new Map(),
+    playerCareerCache:new Map(),matchupCompactModelCache:new Map(),matchupTeamStatsCache:new Map(),matchupPanelCache:new Map(),
     rerenderPlayerStatHosts(){},refreshOpenPlayerGameLogs(){},rebuildCanonicalStatisticsIndexCooperative(){},activeMatchupGame:null};
   runInNewContext(app.slice(app.indexOf('  async function hydratePlayerStatistics('),app.indexOf('  function renderLivePlayerStatistics(')),context);
   const refresh=listeners.get('franchisehq:live-read-refreshed');

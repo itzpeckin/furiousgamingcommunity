@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.10",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 54,
+      "candidateRequiresMigration": false
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 556,
+      "failures": 0,
+      "log": "outputs/fhq8210-strict.txt"
+    },
+    "focusedRegression": {
+      "passed": true,
+      "tests": 32,
+      "newCareerTests": 5
+    }
+  },
+  "scopeBoundaries": {
+    "archivedStatsSurface": "Player Card > Statistics only",
+    "detailsCurrentSeasonOnly": true,
+    "discordChanged": false,
+    "liveImport": false,
+    "leagueSettingsChanged": false
+  }
+}

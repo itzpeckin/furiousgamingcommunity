@@ -998,7 +998,7 @@
       // domains hydrate after first paint and never block a hard-refresh render.
       const criticalPayload=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),
-        import('./league-engine/game-summary.js?v=8.2.9')
+        import('./league-engine/game-summary.js?v=8.2.10')
       ]);
 
       const [stateValue,snapshot,teamRows,standingRows,gameRows,gameSummary]=criticalPayload;
@@ -2176,6 +2176,7 @@
 
 
   const playerStatisticsState={loaded:false,loading:false,rows:[],error:null,promise:null,revision:0,snapshotId:null};
+  const playerCareerCache=new Map();
   const PLAYER_STAT_CATEGORIES=['passing','rushing','receiving','defense','kicking','punting'];
 
   function playerStatIdentity(row={}) {
@@ -2353,6 +2354,7 @@
     return playerStatisticsState.promise;
   }
   function invalidateLiveStatistics(snapshotId=null){
+    playerCareerCache.clear();
     Object.assign(playerStatisticsState,{loaded:false,loading:false,rows:[],error:null,promise:null,
       revision:playerStatisticsState.revision+1,snapshotId});
     matchupCompactModelCache.clear();
@@ -4044,6 +4046,8 @@
     const historical=modal.querySelector(`[data-player-game-log-content="${CSS.escape(playerId)}"]`);
     const season=Number(modal.querySelector(`[data-player-game-log-season="${CSS.escape(playerId)}"]`)?.value);
     if(historical)historical.innerHTML=canonicalGameLog(playerId,Number.isFinite(season)?season:null);
+    const career=modal.querySelector('[data-player-career-host]');
+    if(career&&career.closest('[data-canonical-player-panel]')?.classList.contains('is-active'))refreshPlayerCareerStatistics(playerId,career);
     return true;
   }
 
@@ -4181,7 +4185,49 @@
     return {age,exp};
   }
 
-    function canonicalPlayerSeasonHistory(playerId='') {
+  function playerCareerScope(playerId){
+    const slug=window.FranchiseHQ?.leagueTenant?.getCurrentLeague?.()?.slug;
+    const snapshotId=liveTeamDirectory?.snapshot?.id;
+    return {slug,snapshotId,key:JSON.stringify([slug,snapshotId,String(playerId)])};
+  }
+  async function refreshPlayerCareerStatistics(playerId,host,force=false){
+    const scope=playerCareerScope(playerId),revision=playerStatisticsState.revision;
+    const valid=()=>host.isConnected&&host.dataset.playerCareerHost===String(playerId)
+      &&scope.key===playerCareerScope(playerId).key&&revision===playerStatisticsState.revision;
+    if(!scope.slug||!scope.snapshotId)return;
+    let state=playerCareerCache.get(scope.key);
+    if(force&&!state?.promise){playerCareerCache.delete(scope.key);state=null;}
+    if(!state){
+      state={seasons:[],loaded:false,error:null,promise:null};playerCareerCache.set(scope.key,state);
+      state.promise=(async()=>{
+        try{
+          const url=new URL(`/api/leagues/${encodeURIComponent(scope.slug)}/player-career`,location.origin);
+          url.searchParams.set('playerId',playerId);url.searchParams.set('snapshotId',scope.snapshotId);
+          const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+          const payload=await response.json();
+          if(!response.ok||payload.ok!==true)throw new Error(payload.error||'Archived statistics could not be loaded.');
+          if(payload.snapshotId!==scope.snapshotId||String(payload.playerId)!==String(playerId))throw new Error('League data changed. Reopen the player card.');
+          state.seasons=payload.seasons||[];state.loaded=true;
+        }catch(error){state.error=error.message||'Archived statistics could not be loaded.';}
+        finally{state.promise=null;}
+      })();
+    }
+    host.innerHTML=renderCanonicalHistoricalStatistics(playerId);
+    await Promise.all([state.promise,hydratePlayerStatistics(false)]);
+    if(valid())host.innerHTML=renderCanonicalHistoricalStatistics(playerId);
+  }
+  function playerCareerCategoryTotals(rows,category){
+    const totals=playerStatCategoryTotals(rows,category);
+    // A career rating is calculated from combined attempts, not an average of
+    // one archived-season rating and individual current-game ratings.
+    if(category==='passing'){
+      const att=totals.ATT,clamp=value=>Math.max(0,Math.min(2.375,value));
+      totals.RTG=att&&[totals.CMP,totals.YDS,totals.TD,totals.INT].every(value=>value!==null)
+        ? (clamp((totals.CMP/att-.3)*5)+clamp((totals.YDS/att-3)*.25)+clamp(totals.TD/att*20)+clamp(2.375-totals.INT/att*25))/6*100:null;
+    }
+    return totals;
+  }
+  function canonicalPlayerSeasonHistory(playerId='') {
     const model=window.FranchiseHQ?.playerStatistics?.get?.(playerId);
     const rows=model?.rows||[];
     const seasons=new Map();
@@ -4189,6 +4235,7 @@
     rows.forEach(row=>{
       const source=row.source||{};
       const year=Number(row.seasonYear??source.seasonYear??source.calendarYear??canonicalCurrentSeasonYear());
+      if(year!==Number(canonicalCurrentSeasonYear())||canonicalStatStage(row)==='preseason')return;
       const category=String(row.category||'').toLowerCase();
       if(!seasons.has(year))seasons.set(year,{year,categories:{}});
       const season=seasons.get(year);
@@ -4196,6 +4243,13 @@
       season.categories[category].push(row);
     });
 
+    const archived=playerCareerCache.get(playerCareerScope(playerId).key)?.seasons||[];
+    for(const season of archived){
+      if(Number(season.year)>=Number(canonicalCurrentSeasonYear())||seasons.has(Number(season.year)))continue;
+      seasons.set(Number(season.year),{year:Number(season.year),categories:Object.fromEntries(
+        Object.entries(season.categories||{}).filter(([category])=>PLAYER_STAT_CATEGORIES.includes(category))
+          .map(([category,metrics])=>[category,[{category,metrics,seasonYear:Number(season.year)}]]))});
+    }
     return [...seasons.values()].sort((a,b)=>b.year-a.year);
   }
 
@@ -4244,8 +4298,11 @@
 
   function renderCanonicalHistoricalStatistics(playerId='') {
     const seasons=canonicalPlayerSeasonHistory(playerId),player=liveRosterPlayers.get(String(playerId))||rosterService()?.findPlayer?.(playerId),view=player?rosterPlayerView(player):{},rawAvailable=[...new Set(seasons.flatMap(s=>Object.keys(s.categories||{})))].filter(c=>PLAYER_STAT_CATEGORIES.includes(c)),available=playerStatCategoryOrderForPosition(view.position,rawAvailable);
-    if(!available.length)return `<div class="canonical-player-empty">No franchise career statistics are available.</div>`;
-    return `<div class="canonical-career-stats"><div class="player-live-stat-nav canonical-career-stat-nav">${available.map((category,index)=>`<button type="button" class="player-live-stat-tab ${index===0?'is-active':''}" data-player-career-stat-tab="${category}">${playerStatLabel(category)}</button>`).join('')}</div>${available.map((category,index)=>{const cols=CANONICAL_STAT_COLUMNS[category]||[],allRows=seasons.flatMap(season=>season.categories?.[category]||[]),career=playerStatCategoryTotals(allRows,category),careerTiles=cols.map(([label])=>`<div><span>${label}</span><strong>${playerStatFormat(label,career[label])}</strong></div>`).join(''),seasonRows=seasons.filter(s=>(s.categories?.[category]||[]).length).map(season=>{const totals=playerStatCategoryTotals(season.categories[category],category);return [season.year,...cols.map(([label])=>playerStatFormat(label,totals[label]))];});return `<section class="canonical-career-stat-panel ${index===0?'is-active':''}" data-player-career-stat-panel="${category}"><div class="canonical-career-stat-tiles">${careerTiles}</div>${canonicalSortableTable(`season-stats-${String(playerId).replace(/\W/g,'')}-${category}`,['Year',...cols.map(c=>c[0])],seasonRows)}</section>`;}).join('')}</div>`;
+    const state=playerCareerCache.get(playerCareerScope(playerId).key);
+    const historyError=state?.error||playerStatisticsState.error;
+    const notice=historyError?`<div role="alert" class="canonical-player-empty">${escapeHtml(historyError)} <button type="button" data-retry-player-career>Retry statistics</button></div>`:!state?.loaded||!playerStatisticsState.loaded?'<div role="status" class="canonical-player-empty">Loading career statistics…</div>':'';
+    if(!available.length)return notice|| `<div class="canonical-player-empty">No franchise career statistics are available.</div>`;
+    return `${notice}<div class="canonical-career-stats"><div class="player-live-stat-nav canonical-career-stat-nav">${available.map((category,index)=>`<button type="button" class="player-live-stat-tab ${index===0?'is-active':''}" data-player-career-stat-tab="${category}">${playerStatLabel(category)}</button>`).join('')}</div>${available.map((category,index)=>{const cols=CANONICAL_STAT_COLUMNS[category]||[],allRows=seasons.flatMap(season=>season.categories?.[category]||[]),career=playerCareerCategoryTotals(allRows,category),careerTiles=cols.map(([label])=>`<div><span>${label}</span><strong>${playerStatFormat(label,career[label])}</strong></div>`).join(''),seasonRows=seasons.filter(s=>(s.categories?.[category]||[]).length).map(season=>{const totals=playerCareerCategoryTotals(season.categories[category],category);return [season.year,...cols.map(([label])=>playerStatFormat(label,totals[label]))];});return `<section class="canonical-career-stat-panel ${index===0?'is-active':''}" data-player-career-stat-panel="${category}"><div class="canonical-career-stat-tiles">${careerTiles}</div>${canonicalSortableTable(`season-stats-${String(playerId).replace(/\W/g,'')}-${category}`,['Year',...cols.map(c=>c[0])],seasonRows)}</section>`;}).join('')}</div>`;
   }
 
   const PLAYER_DETAILS_GAMELOG_COLUMNS={
@@ -4540,7 +4597,7 @@ function canonicalPlayerDashboardStats(playerId='') {
 
       <div class="canonical-player-panels canonical-player-panels--approved">
         <section class="canonical-player-panel is-active" data-canonical-player-panel="ratings"><div class="canonical-player-dashboard"><div class="canonical-player-dashboard__ratings"><section class="canonical-dashboard-card canonical-dashboard-card--ratings"><div class="canonical-dashboard-card__head"><h3>Ratings</h3></div>${renderCanonicalRatings(player)}</section></div><div class="canonical-player-dashboard__center">${canonicalPlayerDashboardStats(player.id)}</div><aside class="canonical-player-dashboard__rail">${canonicalPlayerSideRail(player)}</aside></div></section>
-        <section class="canonical-player-panel" data-canonical-player-panel="statistics"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Franchise Career Statistics</h3></div>${renderCanonicalHistoricalStatistics(player.id)}</section></section>
+        <section class="canonical-player-panel" data-canonical-player-panel="statistics"><section class="canonical-dashboard-card canonical-full-tab-card"><div class="canonical-dashboard-card__head"><h3>Franchise Career Statistics</h3></div><div data-player-career-host="${escapeHtml(String(player.id))}"><div class="canonical-player-empty">Select Statistics to load career history.</div></div></section></section>
         <section class="canonical-player-panel" data-canonical-player-panel="game-log">
           <section class="canonical-dashboard-card canonical-full-tab-card">
             <div class="canonical-dashboard-card__head"><h3>Game Logs</h3></div>
@@ -4560,6 +4617,13 @@ function canonicalPlayerDashboardStats(playerId='') {
     return true;
   }
 
+  document.addEventListener('click',event=>{
+    const retry=event.target.closest('[data-retry-player-career]');
+    if(!retry)return;
+    const host=retry.closest('[data-player-career-host]');
+    if(host)refreshPlayerCareerStatistics(host.dataset.playerCareerHost,host,true);
+  });
+
   function playerReturnLabel(route='players'){
     const base=routeBase(String(route||'players'));
     return ({home:'Back to League Home','league-activity':'Back to League Activity',teams:'Back to Team Roster','my-team':'Back to My Team',players:'Back to Players',stats:'Back to Stats & Leaders',schedule:'Back to Schedule',standings:'Back to Standings',transactions:'Back to Transactions','trade-center':'Back to Trade Center','trade-block':'Back to Trade Block',commissioner:'Back to Commissioner HQ'})[base]||'Back to Previous Page';
@@ -4574,6 +4638,10 @@ function canonicalPlayerDashboardStats(playerId='') {
     const target=tab.getAttribute('data-canonical-player-tab');
     root.querySelectorAll('[data-canonical-player-tab]').forEach(button=>button.classList.toggle('is-active',button===tab));
     root.querySelectorAll('[data-canonical-player-panel]').forEach(panel=>panel.classList.toggle('is-active',panel.getAttribute('data-canonical-player-panel')===target));
+    if(target==='statistics'){
+      const host=root.querySelector('[data-player-career-host]');
+      if(host)refreshPlayerCareerStatistics(host.dataset.playerCareerHost,host);
+    }
     if(target==='transactions'){
       const host=root.querySelector('[data-canonical-player-transaction-history]');
       if(host)refreshCanonicalPlayerTransactionHistory(host.dataset.canonicalPlayerTransactionHistory,root);
@@ -10146,7 +10214,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.2.9';
+  const VISIBLE_RELEASE = '8.2.10';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

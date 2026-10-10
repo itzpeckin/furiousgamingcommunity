@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.10",
+  "releaseType": "player-card-career-history",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.9",
+    "tag": "v8.2.9",
+    "commit": "beccb32a3173586d17fa3c14ea2ad75a8b99f5c3"
+  },
+  "implementationBranch": "fix/8.2.10-player-career-history",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.9",
+    "candidateRelease": "8.2.10",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.10/release-record.md",
+    "releases/8.2.10/validation-evidence.json"
+  ]
+}

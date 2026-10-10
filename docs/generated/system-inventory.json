@@ -251,11 +251,11 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 304,
+      ".js": 305,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 70,
+      ".mjs": 71,
       ".png": 7,
       ".sql": 56,
       ".txt": 3,
@@ -265,7 +265,7 @@
     },
     "largest": [
       {
-        "bytes": 657097,
+        "bytes": 661713,
         "file": "app.js"
       },
       {
@@ -309,7 +309,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77406,
+        "bytes": 77421,
         "file": "index.html"
       },
       {
@@ -345,7 +345,7 @@
         "file": "tests/import/game-year-transition.test.mjs"
       }
     ],
-    "total": 846
+    "total": 848
   },
   "frontend": {
     "assets": [
@@ -865,7 +865,7 @@
     "stylesheetCount": 4
   },
   "functions": {
-    "routeCount": 100,
+    "routeCount": 101,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1445,6 +1445,13 @@
         "route": "/api/leagues/:leagueSlug/ownership-career"
       },
       {
+        "file": "functions/api/leagues/[leagueSlug]/player-career.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/api/leagues/:leagueSlug/player-career"
+      },
+      {
         "file": "functions/api/leagues/[leagueSlug]/players/[publicPlayerId].js",
         "handlers": [
           "onRequestGet"
@@ -1942,7 +1949,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.9",
+  "release": "8.2.10",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
