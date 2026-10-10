@@ -38,7 +38,7 @@ import {
   discordGuildRoles,
   discordGuildPermissionAllowsInstall
 } from '../../functions/_lib/discord-installation.js';
-import { syncDiscordScheduleThreads } from '../../functions/_lib/discord-schedule.js';
+import { syncDiscordScheduleThreads, scheduleActiveDiscordSync } from '../../functions/_lib/discord-schedule.js';
 import { ensureDraftPickHorizon } from '../../functions/_lib/draft-pick-baselines.js';
 import { activeLeagueTeams } from '../../functions/_lib/league-teams.js';
 import { executeTradeCenterAction } from '../../functions/api/leagues/[leagueSlug]/trade-center.js';
@@ -1893,7 +1893,7 @@ test('first live import creates only its proven current week and the next advanc
   }finally{database.close()}
 });
 
-test('a live import creates the complete new schedule before removing prior FranchiseHQ threads',async()=>{
+test('a live import creates the complete new schedule before archiving prior FranchiseHQ threads',async()=>{
   const database=new DatabaseSync(':memory:');
   try{
     database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
@@ -1905,7 +1905,7 @@ test('a live import creates the complete new schedule before removing prior Fran
     const db=d1(database),requests=[];
     let starter=87;
     const fetchImpl=async(url,options={})=>{
-      const request={url:String(url),method:options.method||'GET'};requests.push(request);
+      const request={url:String(url),method:options.method||'GET',body:JSON.parse(options.body||'{}')};requests.push(request);
       if(request.method==='DELETE')return new Response(null,{status:204});
       if(/\/messages$/.test(request.url)){
         starter+=1;
@@ -1929,7 +1929,8 @@ test('a live import creates the complete new schedule before removing prior Fran
     assert.equal(second.ok,true);
     assert.equal(second.created,1);
     assert.equal(second.removedPriorThreads,1);
-    assert.equal(requests.filter(request=>request.method==='DELETE').length,1);
+    assert.equal(requests.filter(request=>request.method==='DELETE').length,0);
+    assert.equal(requests.filter(request=>request.method==='PATCH'&&request.body.archived&&request.body.locked).length,1);
     assert.deepEqual(database.prepare(`SELECT week_index AS week,status FROM discord_schedule_threads
       WHERE league_id='league-a' ORDER BY week_index`).all().map(row=>({...row})),[
       {week:13,status:'archived'},{week:14,status:'active'}
@@ -2099,7 +2100,7 @@ test('a failed replacement schedule leaves the prior active threads untouched',a
       league,snapshotId:week14,source:'discord-command',fetchImpl:retryFetch
     });
     assert.equal(retried.ok,true);assert.equal(retried.removedPriorThreads,1);
-    assert.equal(retryRequests.at(-1).method,'DELETE');
+    assert.equal(retryRequests.at(-1).method,'PATCH');
   }finally{database.close()}
 });
 
@@ -2624,14 +2625,14 @@ test('same-week imported final posts once, edits corrections, recovers lost resp
       rollover.push({url,method:options.method,body:JSON.parse(options.body||'{}')});
       return Response.json({id:'100000000000000100',type:11});
     }});
-    assert.ok(rollover.some(call=>call.method==='DELETE'&&call.url.endsWith('/100000000000000088')),
-      'a completed result thread is deleted after the new week is ready');
-    assert.equal(rollover.some(call=>call.method==='PATCH'&&call.body.archived===true),false);
+    assert.ok(rollover.some(call=>call.method==='PATCH'&&call.body.archived===true&&call.body.locked===true&&call.url.endsWith('/100000000000000088')),
+      'a completed result thread is archived and locked after the new week is ready');
+    assert.equal(rollover.some(call=>call.method==='DELETE'),false);
     database.prepare('UPDATE league_active_snapshots SET snapshot_id=? WHERE league_id=?').run(current,league.id);
     const before=calls.length;
     database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.home_score',35) WHERE snapshot_id=? AND domain='games'").run(current);
     await syncDiscordGameResults(env,db,{league,snapshotId:current,fetchImpl});
-    assert.equal(calls.length,before,'deleted threads are never reopened or updated by later statistics');
+    assert.equal(calls.length,before,'archived threads are never reopened or updated by later statistics');
     assert.equal((await syncDiscordGameResults(env,db,{league,snapshotId:previous,fetchImpl})).superseded,true);
     assert.equal(calls.length,before);
     database.exec("DELETE FROM discord_game_results; UPDATE discord_schedule_threads SET snapshot_id='snapshot-result-final'");
@@ -2647,7 +2648,7 @@ test('game results and automatic week replacement apply independently to every c
     const db=d1(database),env={DISCORD_BOT_TOKEN:'test-only-platform'},leagues=[],calls=[];
     let sequence=200;
     const fetchImpl=async(url,options={})=>{
-      calls.push({url:String(url),method:options.method||'GET'});
+      calls.push({url:String(url),method:options.method||'GET',body:JSON.parse(options.body||'{}')});
       if(options.method==='DELETE')return new Response(null,{status:204});
       if(String(url).includes('?limit='))return Response.json([]);
       return Response.json({id:`100000000000000${++sequence}`,type:11});
@@ -2677,7 +2678,7 @@ test('game results and automatic week replacement apply independently to every c
       const otherBefore=database.prepare('SELECT id,status FROM discord_schedule_threads WHERE league_id=? ORDER BY id').all(other.id);
       const next=seedActiveWeek(database,{leagueId:league.id,week:3});proveScheduleAdvance(database,league.current,next);
       // Retain a corrected final from the prior week: it would otherwise edit
-      // the old thread before deleting it. Advance must never send that recap.
+      // the old thread before archiving it. Advance must never send that recap.
       database.prepare(`INSERT INTO league_snapshot_records(snapshot_id,league_id,domain,external_id,data_json)
         SELECT ?,league_id,domain,external_id,json_set(data_json,'$.home_score',42)
         FROM league_snapshot_records WHERE snapshot_id=? AND domain='games'`).run(next,league.current);
@@ -2688,14 +2689,15 @@ test('game results and automatic week replacement apply independently to every c
       const start=calls.length;
       const synced=await syncDiscordScheduleThreads(env,db,{league,snapshotId:next,source:'candidate-import',fetchImpl});
       assert.equal(synced.ok,true);assert.equal(synced.created,1);assert.equal(synced.removedPriorThreads,1);
-      const requests=calls.slice(start),deletions=requests.filter(call=>call.method==='DELETE');
-      assert.deepEqual(deletions.map(call=>call.url.split('/').at(-1)),[league.thread.discord_thread_id]);
-      assert.ok(requests.findIndex(call=>call.url.endsWith('/threads'))<requests.findIndex(call=>call.method==='DELETE'));
+      const requests=calls.slice(start),archives=requests.filter(call=>call.method==='PATCH'&&call.body.archived===true&&call.body.locked===true);
+      assert.equal(requests.some(call=>call.method==='DELETE'),false);
+      assert.deepEqual(archives.map(call=>call.url.split('/').at(-1)),[league.thread.discord_thread_id]);
+      assert.ok(requests.findIndex(call=>call.url.endsWith('/threads'))<requests.findIndex(call=>call.body.archived===true));
       assert.deepEqual(database.prepare('SELECT id,status FROM discord_schedule_threads WHERE league_id=? ORDER BY id').all(other.id),otherBefore);
       const count=calls.length;
       await syncDiscordScheduleThreads(env,db,{league,snapshotId:next,source:'candidate-import',fetchImpl});
       await syncDiscordGameResults(env,db,{league,snapshotId:next,fetchImpl});
-      assert.equal(calls.length,count,'repeating the import does not recreate threads or revisit deleted results');
+      assert.equal(calls.length,count,'repeating the import does not recreate threads or revisit archived results');
     }
   }finally{database.close();}
 });
@@ -2746,4 +2748,155 @@ test('configurable team rules use each league statistic and direction across the
   for(const command of [passRuleCommand,rushRuleCommand,abilitiesCommand])assert.match((await command(c,{})).content,/disabled/);
   assert.match((await passRuleCommand({db:c.db,league:{id:'league-b',name:'Beta'}},{})).content,/disabled/);
  }finally{database.close();}
+});
+
+
+async function schedulePresentationFixture(){
+  const database=new DatabaseSync(':memory:');database.exec('PRAGMA foreign_keys=ON');await applyMigrations(database);
+  const league={id:'league-a',slug:'alpha',name:'Alpha League'};
+  seedLeague(database,{...league,guild:'100000000000000001'});
+  database.prepare("UPDATE discord_league_installations SET schedule_channel_id='100000000000000055' WHERE league_id=?").run(league.id);
+  const snapshotId=seedActiveWeek(database,{leagueId:league.id,week:14});
+  const calls=[];let sequence=300,intercept=null;
+  const fetchImpl=async(url,options={})=>{
+    const call={url:String(url),method:options.method||'GET',body:JSON.parse(options.body||'{}')};calls.push(call);
+    const response=intercept&&await intercept(call);if(response)return response;
+    return call.method==='PUT'?new Response(null,{status:204}):Response.json({id:`100000000000000${++sequence}`,type:11});
+  };
+  const db=d1(database),env={DISCORD_BOT_TOKEN:'test-only-token'};
+  const sync=(options={})=>syncDiscordScheduleThreads(env,db,{league,snapshotId,source:'discord-command',fetchImpl,...options});
+  return {database,db,env,league,snapshotId,calls,sync,fetchImpl,intercept(fn){intercept=fn}};
+}
+
+test('schedule titles follow imported completion, including zero-score finals, without duplicate threads or needless writes',async()=>{
+  const f=await schedulePresentationFixture();try{
+    assert.equal((await f.sync()).ok,true);
+    assert.equal(f.calls.find(c=>c.url.endsWith('/threads')).body.name,'🆚 Week 14 - San Francisco 49ers vs. Tampa Bay Buccaneers');
+    const record=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
+    let count=f.calls.length;
+    assert.equal((await f.sync()).ok,true);assert.equal(f.calls.length,count);
+    for(const [status,home,away,emoji] of [['in-progress',7,0,'🆚'],['final',0,0,'✅'],['scheduled',0,0,'🆚']]){
+      f.database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.status',?,'$.home_score',?,'$.away_score',?) WHERE snapshot_id=? AND domain='games'").run(status,home,away,f.snapshotId);
+      await f.sync({source:'candidate-import'});
+      const stored=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
+      assert.ok(JSON.parse(stored.presentation_json).name.startsWith(emoji));assert.equal(stored.id,record.id);
+      assert.equal(stored.snapshot_id,record.snapshot_id,'presentation cannot overwrite recap comparison evidence');
+      count=f.calls.length;await f.sync({source:'candidate-import'});assert.equal(f.calls.length,count);
+    }
+    assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,1);
+    assert.equal(f.calls.filter(c=>c.method==='DELETE').length,0);
+  }finally{f.database.close()}
+});
+
+test('all linked active commissioners join every current thread, including commissioners without teams, with tenant isolation',async()=>{
+  const f=await schedulePresentationFixture();try{
+    seedMember(f.database,{leagueId:f.league.id,userId:'comm',discordId:'100000000000000011',role:'commissioner',teamId:null});
+    seedMember(f.database,{leagueId:f.league.id,userId:'owner',discordId:'100000000000000012',teamId:'sf'});
+    seedMember(f.database,{leagueId:f.league.id,userId:'inactive',discordId:'100000000000000013',role:'commissioner',active:0,teamId:null});
+    seedLeague(f.database,{id:'other',slug:'other',guild:'100000000000000002'});
+    seedMember(f.database,{leagueId:'other',userId:'outsider',discordId:'100000000000000014',role:'commissioner',teamId:null});
+    seedSnapshotRecord(f.database,{snapshotId:f.snapshotId,leagueId:f.league.id,domain:'games',externalId:'reverse',data:{external_id:'reverse',season_year:2026,week_index:14,stage:'regular-season',home_team_external_id:'1002',away_team_external_id:'1001',status:'scheduled'}});
+    assert.equal((await f.sync()).threads,2);
+    const puts=f.calls.filter(c=>c.method==='PUT');assert.equal(puts.length,4);
+    assert.equal(puts.filter(c=>c.url.endsWith('/100000000000000011')).length,2);
+    assert.ok(puts.every(c=>/012$|011$/.test(c.url)));
+    seedMember(f.database,{leagueId:f.league.id,userId:'new-comm',discordId:'100000000000000015',role:'commissioner',teamId:null});
+    const start=f.calls.length;await f.sync();
+    assert.equal(f.calls.slice(start).filter(c=>c.method==='PUT').length,2);
+    assert.ok(f.calls.slice(start).filter(c=>c.method==='PUT').every(c=>c.url.endsWith('/100000000000000015')));
+    assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,2);
+    const count=f.calls.length;await f.sync();assert.equal(f.calls.length,count);
+  }finally{f.database.close()}
+});
+
+test('a failed commissioner join retains successful work and retries with actionable permissions guidance',async()=>{
+  const f=await schedulePresentationFixture();try{
+    seedMember(f.database,{leagueId:f.league.id,userId:'comm',discordId:'100000000000000011',role:'commissioner',teamId:null});
+    f.intercept(c=>c.method==='PUT'?Response.json({message:'Missing Permissions'},{status:403}):null);
+    const failed=await f.sync();assert.equal(failed.status,'partial');assert.match(failed.errors[0],/View Channel.*Retry Schedule Sync/);
+    const record=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
+    assert.ok(JSON.parse(record.presentation_json).name.startsWith('🆚'));
+    assert.deepEqual(JSON.parse(record.presentation_json).members,[]);
+    f.intercept(null);assert.equal((await f.sync()).ok,true);
+    assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,1);
+    assert.deepEqual(JSON.parse(f.database.prepare('SELECT presentation_json FROM discord_schedule_threads').get().presentation_json).members,['100000000000000011']);
+  }finally{f.database.close()}
+});
+
+test('advance archives and locks existing conversations, sets final labels, and never recreates historical threads',async()=>{
+  const f=await schedulePresentationFixture();try{
+    await f.sync();const old=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
+    const next=seedActiveWeek(f.database,{leagueId:f.league.id,week:15});proveScheduleAdvance(f.database,f.snapshotId,next);
+    f.database.prepare("INSERT INTO league_snapshot_records(snapshot_id,league_id,domain,external_id,data_json) SELECT ?,league_id,domain,external_id,json_set(data_json,'$.status','final','$.home_score',21,'$.away_score',14) FROM league_snapshot_records WHERE snapshot_id=? AND domain='games'").run(next,f.snapshotId);
+    const start=f.calls.length;assert.equal((await f.sync({snapshotId:next,source:'candidate-import'})).archivedPriorThreads,1);
+    const calls=f.calls.slice(start),archive=calls.find(c=>c.body.archived===true);
+    assert.ok(archive);assert.equal(archive.body.locked,true);assert.ok(archive.body.name.startsWith('✅ Week 14'));
+    assert.ok(calls.findIndex(c=>c.url.endsWith('/threads'))<calls.indexOf(archive));
+    const retired=f.database.prepare('SELECT * FROM discord_schedule_threads WHERE id=?').get(old.id);
+    assert.equal(retired.discord_thread_id,old.discord_thread_id);assert.equal(retired.status,'archived');
+    assert.equal(JSON.parse(retired.presentation_json).retirement,'archived');
+    const count=f.calls.length;const history=await f.sync({snapshotId:next,week:14});
+    assert.equal(history.reason,'historical-schedule-read-only');assert.equal(f.calls.length,count);
+    assert.equal(f.calls.some(c=>c.method==='DELETE'),false);
+  }finally{f.database.close()}
+});
+
+test('failed archival is retryable and a thread already deleted externally is recorded as missing',async()=>{
+  const f=await schedulePresentationFixture();try{
+    await f.sync();const next=seedActiveWeek(f.database,{leagueId:f.league.id,week:15});proveScheduleAdvance(f.database,f.snapshotId,next);
+    f.intercept(c=>c.body.archived===true?Response.json({message:'Missing Permissions'},{status:403}):null);
+    const result=await f.sync({snapshotId:next,source:'candidate-import'});assert.equal(result.status,'partial');
+    assert.equal(f.database.prepare('SELECT status FROM discord_schedule_threads WHERE week_index=14').get().status,'active');
+    f.intercept(c=>c.body.archived===true?Response.json({message:'Unknown Channel'},{status:404}):null);
+    const retry=await f.sync({snapshotId:next,source:'candidate-import'});assert.equal(retry.ok,true);
+    const stored=f.database.prepare('SELECT * FROM discord_schedule_threads WHERE week_index=14').get();
+    assert.equal(stored.status,'archived');assert.equal(JSON.parse(stored.presentation_json).retirement,'missing');
+    assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,2);
+  }finally{f.database.close()}
+});
+
+test('a superseded snapshot stops commissioner membership changes and preserves thread history',async()=>{
+  const f=await schedulePresentationFixture();try{
+    await f.sync();seedMember(f.database,{leagueId:f.league.id,userId:'comm',role:'commissioner',teamId:null});
+    f.intercept(c=>{if(c.method==='PATCH'&&c.body.archived===false)seedActiveWeek(f.database,{leagueId:f.league.id,week:15});return null});
+    const start=f.calls.length,result=await f.sync();assert.equal(result.ok,false);assert.match(result.errors[0],/active snapshot changed/);
+    assert.equal(f.calls.slice(start).some(c=>c.method==='PUT'||c.body.archived===true),false);
+  }finally{f.database.close()}
+});
+
+test('import synchronization updates final thread labels before delivering recap messages and preserves first-final evidence',async()=>{
+  const f=await schedulePresentationFixture(),originalFetch=globalThis.fetch;
+  try{
+    await f.sync();const next='same-week-final';
+    f.database.prepare("INSERT INTO league_snapshots(id,league_id,status,season_year,week_index,manifest_json,validation_status) VALUES (?,?,'active',2026,14,'{}','ready')").run(next,f.league.id);
+    f.database.prepare('INSERT INTO league_snapshot_records(snapshot_id,league_id,domain,external_id,data_json) SELECT ?,league_id,domain,external_id,data_json FROM league_snapshot_records WHERE snapshot_id=?').run(next,f.snapshotId);
+    f.database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.status','final','$.home_score',31,'$.away_score',21) WHERE snapshot_id=? AND domain='games'").run(next);
+    f.database.prepare('UPDATE league_active_snapshots SET snapshot_id=? WHERE league_id=?').run(next,f.league.id);
+    const start=f.calls.length;globalThis.fetch=f.fetchImpl;
+    await scheduleActiveDiscordSync({env:{...f.env,DISCORD_CLIENT_SECRET:'test-only-image-signing'},request:new Request('https://franchisehq.app')},
+      {db:f.db,league:f.league,snapshotId:next});
+    const calls=f.calls.slice(start),rename=calls.findIndex(c=>c.method==='PATCH'&&c.body.name?.startsWith('✅'));
+    const recap=calls.findIndex(c=>c.method==='POST'&&c.url.endsWith('/messages'));
+    assert.ok(rename>=0);assert.ok(recap>rename,'final detection survives schedule reconciliation and follows its label update');
+    assert.equal(f.database.prepare('SELECT COUNT(*) AS n FROM discord_game_results').get().n,1);
+  }finally{globalThis.fetch=originalFetch;f.database.close()}
+});
+
+test('durable schedule identity upgrades completed old jobs and changes only when routing or linked memberships change',async()=>{
+  const f=await schedulePresentationFixture();try{
+    seedMember(f.database,{leagueId:f.league.id,userId:'comm',role:'commissioner',teamId:null});
+    await seedSession(f.database,{userId:'comm',token:'test-session'});
+    const starts=[],context={env:{FRANCHISE_IMPORT_WORKER:{fetch:async(_url,options)=>{
+      starts.push(JSON.parse(options.body));return Response.json({ok:true,id:'workflow'});
+    }}},request:new Request('https://franchisehq.app')};
+    const start=()=>scheduleActiveDiscordSync(context,{db:f.db,league:f.league,snapshotId:f.snapshotId,requestedBySessionId:'session-comm'});
+    await start();await start();assert.equal(starts[0].workflowKey,starts[1].workflowKey);
+    assert.match(starts[0].workflowKey,/:thread-history-v1:/);
+    assert.notEqual(starts[0].workflowKey,`${f.snapshotId}:candidate-import`);
+    seedMember(f.database,{leagueId:f.league.id,userId:'comm2',discordId:'100000000000000022',role:'commissioner',teamId:null});
+    await start();assert.notEqual(starts[2].workflowKey,starts[0].workflowKey);
+    seedLeague(f.database,{id:'other',slug:'other',guild:'100000000000000002'});
+    seedMember(f.database,{leagueId:'other',userId:'other-comm',discordId:'100000000000000023',role:'commissioner',teamId:null});
+    await start();assert.equal(starts[2].workflowKey,starts[3].workflowKey);
+  }finally{f.database.close()}
 });

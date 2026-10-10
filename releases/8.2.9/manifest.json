@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.9",
+  "releaseType": "discord-scheduling-history",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.8",
+    "tag": "v8.2.8",
+    "commit": "37d03089f1c4e025b04604b67b14b6fd904bcc9a"
+  },
+  "implementationBranch": "feature/8.2.9-scheduling-thread-history",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.8",
+    "candidateRelease": "8.2.9",
+    "currentMigration": 53,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.9/release-record.md",
+    "releases/8.2.9/validation-evidence.json"
+  ]
+}

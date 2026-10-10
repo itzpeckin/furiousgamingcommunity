@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.9",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 54,
+      "candidateRequiresMigration": true,
+      "stagingApplied": true,
+      "stagingBookmark": "0000003e-00000000-00005100-d763734dd37406008e99924b4059face",
+      "productionPreMigrationBookmark": "000004e9-0002f990-00005100-84331908dbf743c4e9b4669da4cf553f"
+    },
+    "discordSchedule": {
+      "passed": true,
+      "tests": 77,
+      "isolated": true
+    },
+    "productionBaseline": {
+      "readOnly": true,
+      "migration": 53,
+      "activeSnapshots": {
+        "franchise-hq-primary": "000088e2-80dc-4bdf-aa1e-7d1dedc164af",
+        "league_072f8b94-8851-4bbe-ae7d-b464572183d0": "518c5dc0-46dd-4037-9df8-947775bc565d"
+      },
+      "activeThreads": {
+        "FGC": 16,
+        "OTL": 14
+      },
+      "linkedCommissioners": {
+        "FGC": 7,
+        "OTL": 3
+      },
+      "counts": {
+        "leagues": 3,
+        "users": 40,
+        "memberships": 42,
+        "snapshots": 110,
+        "scheduleThreads": 491
+      },
+      "foreignKeysClean": true
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 551,
+      "failures": 0
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveDiscordMessages": false,
+    "leagueSettingsChanged": false
+  }
+}
