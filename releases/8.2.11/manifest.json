@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.11",
+  "releaseType": "ea-postseason-week-detection",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.10",
+    "tag": "v8.2.10",
+    "commit": "190634e9fe17c48d6ff88392c21ca4399bc89b61"
+  },
+  "implementationBranch": "fix/8.2.11-ea-postseason",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.10",
+    "candidateRelease": "8.2.11",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.11/release-record.md",
+    "releases/8.2.11/validation-evidence.json"
+  ]
+}
