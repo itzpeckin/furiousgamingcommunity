@@ -136,6 +136,68 @@ test('native preseason indices are kept separate from regular-season weeks',()=>
   assert.deepEqual(normalizeEaHub(raw).currentPeriod,{stage:'preseason',week:1,key:'preseason:1'});
 });
 
+function postseasonHub(weekIndex=18) {
+  // Numeric shape retained from FGC's failed 2027 Wild Card collection.
+  // Export indices remain in SEASON (1), not native seasonWeekType (2).
+  return {careerHubInfo:{seasonInfo:{calendarYear:2027,seasonWeekType:2,seasonWeek:weekIndex,displayWeek:0,weekTitle:'Week'}},
+    availableWeekInfoList:[...Array.from({length:4},(_,weekIndex)=>({stageIndex:0,weekIndex})),
+      ...[...Array.from({length:21},(_,index)=>index),22].map(weekIndex=>({stageIndex:1,weekIndex}))]};
+}
+
+test('native postseason hub selects the exact season export for each playable playoff round',()=>{
+  for(const weekIndex of [18,19,20,22]) {
+    const raw=postseasonHub(weekIndex),hub=normalizeEaHub({responseInfo:{value:raw}});
+    assert.deepEqual(hub.currentPeriod,{stage:'regular-season',week:weekIndex+1,key:`regular-season:${weekIndex+1}`});
+    assert.equal(hub.stageIndex,1);
+    assert.equal(hub.weekIndex,weekIndex);
+    assert.equal(hub.seasonYear,2027);
+    assert.equal(hub.sourceSeasonId,'','calendar-only evidence must not invent a source season');
+    const plan=eaCapturePlan(raw,{includeRosters:false});
+    assert.deepEqual(plan.filter(item=>item.kind==='schedule').map(item=>item.args),
+      [weekIndex===22?20:weekIndex-1,weekIndex].map(weekIndex=>({stageIndex:1,weekIndex})));
+    assert.equal(plan.filter(item=>item.kind==='statistics').length,14);
+    assert.ok(plan.filter(item=>item.kind==='statistics').every(item=>item.args.stageIndex===1&&item.args.weekIndex!==21));
+  }
+});
+
+test('native postseason evidence rejects unsupported weeks, contradictory display weeks and missing export entries',()=>{
+  for(const weekIndex of [-1,0,17,21,23]) {
+    const raw=postseasonHub(weekIndex);
+    raw.availableWeekInfoList.push({stageIndex:1,weekIndex});
+    assert.throws(()=>normalizeEaHub(raw),/does not agree/);
+  }
+  for(const displayWeek of [1,18,20]) {
+    const raw=postseasonHub();raw.careerHubInfo.seasonInfo.displayWeek=displayWeek;
+    assert.throws(()=>normalizeEaHub(raw),/does not agree/);
+  }
+  const raw=postseasonHub();
+  raw.availableWeekInfoList=raw.availableWeekInfoList.filter(item=>item.weekIndex!==18);
+  raw.availableWeekInfoList.push({stageIndex:2,weekIndex:18,weekTitle:'Week'});
+  assert.throws(()=>normalizeEaHub(raw),/does not agree/,'must not guess a playoff export stage or fall back to a title');
+  raw.availableWeekInfoList=[];
+  assert.throws(()=>normalizeEaHub(raw),/does not agree/);
+  const advancing=postseasonHub();advancing.careerHubInfo.isLeagueAdvancing=true;
+  assert.throws(()=>normalizeEaHub(advancing),/advancing/);
+});
+
+test('postseason normalization preserves calendar binding and Companion reg week routes',async()=>{
+  const raw=postseasonHub(),f=await fixture('weekly',raw);
+  try {
+    assert.equal(f.created.sourceSeasonId,'2');
+    for(const request of f.plan.filter(item=>['hub','schedule','statistics'].includes(item.kind))) {
+      await f.store(request,request.kind==='hub'?raw:payloadFor(request));
+    }
+    const routes=f.sqlite.prepare('SELECT route_path FROM companion_route_captures').all().map(row=>row.route_path);
+    assert.ok(routes.some(route=>route.endsWith('/week/reg/18/schedules')));
+    assert.ok(routes.some(route=>route.endsWith('/week/reg/19/schedules')));
+    assert.ok(routes.some(route=>route.endsWith('/week/reg/19/passing')));
+    assert.ok(routes.every(route=>!route.includes('/week/post/')));
+    const advanced=postseasonHub(19);
+    await assert.rejects(storeEaCapture({db:f.db,bucket:f.bucket,leagueId:f.league.id,sessionId:f.created.sessionId,
+      collectionId:'collection-weekly',kind:'hub',args:{},payload:advanced,hub:advanced,platform:'ps5',externalLeagueId:'1234'}),/advanced during collection/);
+  } finally {f.sqlite.close();}
+});
+
 function calendarOnlyHub(){
   const raw=rawHub();
   delete raw.careerHubInfo.seasonInfo.seasonYear;

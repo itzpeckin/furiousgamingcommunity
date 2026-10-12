@@ -100,3 +100,8 @@ Private preview still failed season/week verification after native-field support
 ## Confirmed calendar-only season evidence
 
 The live owner hub reports calendarYear 2027 and Week 8 but omits sourceSeasonId/seasonIndex/seasonYear. 8.0.15 resolves that exact calendar year to one prepared tenant/franchise/edition season and retains its existing source ID. Duplicate or absent matches remain blocked. No year offset is inferred.
+
+
+## Native postseason period (8.2.11)
+
+The hub's `seasonWeekType=2` is not export `stageIndex=2`. For native postseason indices 18, 19, 20 and 22, require the exact available `stageIndex=1` export and preserve its index. The observed postseason `displayWeek=0` is a placeholder; a positive display week must agree with the export index plus one. Reject unavailable periods, Pro Bowl index 21, offseason indices and advancing leagues. Keep Companion-compatible `reg` routes, exact season binding and the final hub recheck. This does not require reconnecting EA or refreshing a verified yearly schedule.

@@ -85,6 +85,26 @@ test('each resumed collection step makes at most one EA request', async () => {
   }
 });
 
+test('native postseason collection completes both weeks through season exports and refuses a mid-collection advance',async()=>{
+  const nativeHub=weekIndex=>({careerHubInfo:{seasonInfo:{calendarYear:2027,seasonWeekType:2,seasonWeek:weekIndex,displayWeek:0}},
+    availableWeekInfoList:[17,18,19,20,22].map(weekIndex=>({stageIndex:1,weekIndex})),
+    teamIdInfoList:[{teamId:1},{teamId:2}]});
+  for(const weekIndex of [18,19,20,22]) {
+    const {options,calls,finalized}=fixture();
+    let reads=0;
+    options.client.hub=async()=>{reads++;return nativeHub(weekIndex);};
+    const result=await finish(options);
+    assert.equal(result.done,true);assert.equal(reads,2);assert.equal(finalized.length,1);
+    assert.deepEqual(calls.filter(call=>call.kind==='schedules').map(call=>call.args),
+      [weekIndex===22?20:weekIndex-1,weekIndex].map(weekIndex=>({stageIndex:1,weekIndex})));
+    assert.equal(calls.filter(call=>call.kind==='passing').length,2);
+  }
+  const {options,finalized}=fixture();let reads=0;
+  options.client.hub=async()=>nativeHub(reads++===0?18:19);
+  await assert.rejects(finish(options),/advanced|changed/i);
+  assert.equal(finalized.length,0,'changed playoff week must not publish collected data');
+});
+
 test('batched EA collection keeps all 52 datasets and ordered session requests in 14 checkpoints',async()=>{
   const {options,stored,calls}=fixture();
   let state={},checkpoints=0,active=0,maxActive=0;

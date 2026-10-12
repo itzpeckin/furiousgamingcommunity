@@ -43,6 +43,18 @@ export function normalizeEaHub(input = {}) {
     selected = {stageIndex:{preseason:0,'regular-season':1,playoffs:2}[stage],weekIndex:week-1};
   } else if (integer(season.weekIndex) !== null && integer(season.stageIndex) !== null) {
     selected = season;
+  } else if (integer(season.seasonWeekType) === 2 && integer(season.seasonWeek) !== null) {
+    // Native hub postseason type is NOT an export stage. Madden exposes
+    // playoff games through SEASON (1): 18/19/20/22, skipping the Pro Bowl.
+    // FGC's native playoff hub has displayWeek=0; keep its exact seasonWeek
+    // and require the corresponding available export, never the latest one.
+    const weekIndex=integer(season.seasonWeek), displayWeek=integer(season.displayWeek);
+    const matches=(hub.availableWeekInfoList || []).filter(item=>integer(item.stageIndex)===1 && integer(item.weekIndex)===weekIndex);
+    if (![18,19,20,22].includes(weekIndex) || !matches.length
+      || (displayWeek!==null && displayWeek!==0 && displayWeek!==weekIndex+1)) {
+      fail('EA current week does not agree with its available export weeks.');
+    }
+    selected=matches[0];
   } else if ([0,1].includes(integer(season.seasonWeekType)) && integer(season.seasonWeek) !== null) {
     const stageIndex=integer(season.seasonWeekType), weekIndex=integer(season.seasonWeek);
     const matches=(hub.availableWeekInfoList || []).filter(item=>integer(item.stageIndex)===stageIndex && integer(item.weekIndex)===weekIndex);
