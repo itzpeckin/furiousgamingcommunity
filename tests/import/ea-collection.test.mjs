@@ -86,7 +86,7 @@ test('each resumed collection step makes at most one EA request', async () => {
 });
 
 test('native postseason collection completes both weeks through season exports and refuses a mid-collection advance',async()=>{
-  const nativeHub=weekIndex=>({careerHubInfo:{seasonInfo:{calendarYear:2027,seasonWeekType:2,seasonWeek:weekIndex,displayWeek:0}},
+  const nativeHub=weekIndex=>({careerHubInfo:{seasonInfo:{calendarYear:2027,seasonWeekType:({18:2,19:3,20:4,22:5})[weekIndex],seasonWeek:weekIndex,displayWeek:0}},
     availableWeekInfoList:[17,18,19,20,22].map(weekIndex=>({stageIndex:1,weekIndex})),
     teamIdInfoList:[{teamId:1},{teamId:2}]});
   for(const weekIndex of [18,19,20,22]) {

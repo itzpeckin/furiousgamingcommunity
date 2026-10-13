@@ -1949,7 +1949,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.11",
+  "release": "8.2.12",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
