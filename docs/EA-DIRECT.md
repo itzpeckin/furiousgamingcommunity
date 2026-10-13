@@ -105,3 +105,14 @@ The live owner hub reports calendarYear 2027 and Week 8 but omits sourceSeasonId
 ## Native postseason period (8.2.11)
 
 The hub's `seasonWeekType=2` is not export `stageIndex=2`. For native postseason indices 18, 19, 20 and 22, require the exact available `stageIndex=1` export and preserve its index. The observed postseason `displayWeek=0` is a placeholder; a positive display week must agree with the export index plus one. Reject unavailable periods, Pro Bowl index 21, offseason indices and advancing leagues. Keep Companion-compatible `reg` routes, exact season binding and the final hub recheck. This does not require reconnecting EA or refreshing a verified yearly schedule.
+
+
+## All native playoff round types (8.2.12)
+
+The Divisional failure retained seasonWeekType=3, seasonWeek=19, displayWeek=0 and the exact available stageIndex=1/weekIndex=19 export. The 8.2.11 fixtures incorrectly used type 2 for every round. Accept reference-supported postseason types 2, 3, 4, 5 and 6, independently of their export index. Preserve the exact available seasonWeek 18/19/20/22 (Wild Card/Divisional/Conference/Super Bowl); do not calculate a week from the native type. Super Bowl still requests export index 22 and predecessor 20, skipping Pro Bowl 21. The compact playable week sequence 19-22 is not the raw export numbering and must not replace source indices or stored Companion routes.
+
+Explicit unsupported/offseason native types cannot fall back to an old playoff title. Missing available exports, contradictory displayWeek and an advancing hub remain blocked. Types 2 and 3 come from production diagnostics; all supported types are tested against all playable indices, with end-to-end fixture collections and a final hub advance check. Conference/Super Bowl production acceptance still awaits normal commissioner activity.
+
+Reference: https://github.com/snallabot/snallabot-service/blob/b135dfb3afc94f85d19d02f21855e98ea2c369e1/src/dashboard/ea_constants.ts (seasonType) and src/dashboard/ea_client.ts (CURRENT/SURROUNDING export selection).
+
+Additional round reference: https://github.com/bep713/madden-franchise-editor/blob/94b09375549e7c931e2782818c0724d5aed361c3/data/seasonWeekData.json lists Conference Championship schedule type 4 and Super Bowl type 5. The reader accepts postseason types 2 through 6 only with a playable matching export index; Pro Bowl index 21 is always rejected. This avoids relying on the incomplete seasonType switch in the other reference.

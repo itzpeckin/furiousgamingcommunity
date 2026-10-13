@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.12",
+  "releaseType": "ea-all-playoff-rounds",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.11",
+    "tag": "v8.2.11",
+    "commit": "1d08296e2e9838b0c7abc74d65352ab52655c5c1"
+  },
+  "implementationBranch": "fix/8.2.12-all-playoff-rounds",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.11",
+    "candidateRelease": "8.2.12",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.12/release-record.md",
+    "releases/8.2.12/validation-evidence.json"
+  ]
+}

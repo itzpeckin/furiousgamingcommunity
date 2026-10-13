@@ -125,7 +125,7 @@ test('native EA week evidence rejects mismatches, missing export periods and adv
   raw.careerHubInfo.isLeagueAdvancing=true;
   assert.throws(()=>normalizeEaHub(raw),/advancing/);
   raw.careerHubInfo.isLeagueAdvancing=false;
-  Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType:3,weekTitle:'Offseason'});
+  Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType:8,weekTitle:'Offseason'});
   assert.throws(()=>normalizeEaHub(raw),/current export week/);
 });
 
@@ -137,9 +137,9 @@ test('native preseason indices are kept separate from regular-season weeks',()=>
 });
 
 function postseasonHub(weekIndex=18) {
-  // Numeric shape retained from FGC's failed 2027 Wild Card collection.
-  // Export indices remain in SEASON (1), not native seasonWeekType (2).
-  return {careerHubInfo:{seasonInfo:{calendarYear:2027,seasonWeekType:2,seasonWeek:weekIndex,displayWeek:0,weekTitle:'Week'}},
+  // Wild Card and Divisional numeric shapes are production diagnostics.
+  // Remaining postseason types are covered using the protocol reference.
+  return {careerHubInfo:{seasonInfo:{calendarYear:2027,seasonWeekType:({18:2,19:3,20:4,22:5})[weekIndex]??2,seasonWeek:weekIndex,displayWeek:0,weekTitle:'Week'}},
     availableWeekInfoList:[...Array.from({length:4},(_,weekIndex)=>({stageIndex:0,weekIndex})),
       ...[...Array.from({length:21},(_,index)=>index),22].map(weekIndex=>({stageIndex:1,weekIndex}))]};
 }
@@ -157,6 +157,25 @@ test('native postseason hub selects the exact season export for each playable pl
       [weekIndex===22?20:weekIndex-1,weekIndex].map(weekIndex=>({stageIndex:1,weekIndex})));
     assert.equal(plan.filter(item=>item.kind==='statistics').length,14);
     assert.ok(plan.filter(item=>item.kind==='statistics').every(item=>item.args.stageIndex===1&&item.args.weekIndex!==21));
+  }
+});
+
+test('every supported native postseason type uses exact export evidence, not a type-derived week',()=>{
+  for(const seasonWeekType of [2,3,4,5,6]) for(const weekIndex of [18,19,20,22]) {
+    const raw=postseasonHub(weekIndex);
+    Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType:String(seasonWeekType),seasonWeek:String(weekIndex)});
+    assert.equal(normalizeEaHub(raw).weekIndex,weekIndex);
+    raw.availableWeekInfoList=raw.availableWeekInfoList.filter(item=>item.weekIndex!==weekIndex);
+    assert.throws(()=>normalizeEaHub(raw),/does not agree/);
+  }
+});
+
+test('offseason and unsupported native types cannot select a stale playoff export by title',()=>{
+  for(const seasonWeekType of [7,8,9,99,-1]) {
+    const raw=postseasonHub(22);
+    Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType,weekTitle:'Super Bowl'});
+    raw.availableWeekInfoList.find(item=>item.stageIndex===1&&item.weekIndex===22).weekTitle='Super Bowl';
+    assert.throws(()=>normalizeEaHub(raw),/current export week/);
   }
 });
 
