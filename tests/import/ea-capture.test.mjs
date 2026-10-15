@@ -7,6 +7,7 @@ import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import { beginEaCapture, storeEaCapture, finalizeEaCapture, normalizeEaHub, eaCapturePlan } from '../../functions/_lib/ea-capture.js';
 import { generateMaddenDiscoveryReport, latestMaddenDiscoveryReport, stitchRecentPartialMaddenCohort } from '../../functions/_lib/madden-discovery-report.js';
 import { retainedPeriodBundle } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
+import { candidateSourceCoverage, candidateCoverageWarnings } from '../../functions/_lib/candidate-import.js';
 
 function d1(database) {
   const statement = (sql,values=[]) => ({
@@ -126,7 +127,7 @@ test('native EA week evidence rejects mismatches, missing export periods and adv
   assert.throws(()=>normalizeEaHub(raw),/advancing/);
   raw.careerHubInfo.isLeagueAdvancing=false;
   Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType:8,weekTitle:'Offseason'});
-  assert.throws(()=>normalizeEaHub(raw),/current export week/);
+  assert.equal(normalizeEaHub(raw).currentPeriod.stage,'offseason');
 });
 
 test('native preseason indices are kept separate from regular-season weeks',()=>{
@@ -170,8 +171,8 @@ test('every supported native postseason type uses exact export evidence, not a t
   }
 });
 
-test('offseason and unsupported native types cannot select a stale playoff export by title',()=>{
-  for(const seasonWeekType of [7,8,9,99,-1]) {
+test('unsupported native types cannot select a stale playoff export by title',()=>{
+  for(const seasonWeekType of [9,99,-1]) {
     const raw=postseasonHub(22);
     Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType,weekTitle:'Super Bowl'});
     raw.availableWeekInfoList.find(item=>item.stageIndex===1&&item.weekIndex===22).weekTitle='Super Bowl';
@@ -223,6 +224,72 @@ function calendarOnlyHub(){
   Object.assign(raw.careerHubInfo.seasonInfo,{weekTitle:'Week',seasonWeek:4,displayWeek:5});
   return raw;
 }
+
+function offseasonHub(index=1,type=8){
+  const raw=postseasonHub(22);
+  Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType:type,seasonWeek:index,displayWeek:index,weekTitle:'Offseason'});
+  raw.teamIdInfoList=[{teamId:10},{teamId:20}];
+  return raw;
+}
+
+test('all bounded offseason phases use the native clock without inventing game routes',()=>{
+  for(const type of [7,8])for(let index=0;index<40;index++){
+    const raw=offseasonHub(index,type),hub=normalizeEaHub(raw);
+    assert.deepEqual(hub.currentPeriod,{stage:'offseason',week:index+1,key:`offseason:${index+1}`});
+    assert.deepEqual(hub.nativePhase,{type,index});
+    assert.equal(hub.stageIndex,null);
+    const plan=eaCapturePlan(raw);
+    assert.deepEqual(plan.filter(r=>r.kind==='schedule').map(r=>r.args),[18,19,20,22].map(weekIndex=>({stageIndex:1,weekIndex})));
+    assert.equal(plan.filter(r=>r.kind==='free-agents').length,1);
+    raw.availableWeekInfoList=[];
+    assert.equal(eaCapturePlan(raw).filter(r=>['schedule','statistics'].includes(r.kind)).length,0);
+  }
+  for(const index of [-1,40,null,''])assert.throws(()=>normalizeEaHub(offseasonHub(index)),/offseason phase/);
+});
+
+test('offseason handoff imports fresh free agents and retains available playoff data without requiring fictional weekly stats',async()=>{
+  for(const available of [true,false]){
+    const hub=offseasonHub();if(!available)hub.availableWeekInfoList=[];
+    const f=await fixture('weekly',hub);
+    try{
+      await collect(f,(request,payload)=>request.kind==='free-agents'
+        ?{success:true,rosterInfoList:[{rosterId:'free-1',isFreeAgent:true,firstName:'Free',lastName:'Agent',position:'QB',playerBestOvr:78}]}:payload);
+      const result=await f.finish();
+      assert.equal(result.readiness.ready,true,JSON.stringify(result.readiness));
+      assert.equal(result.readiness.freeAgentCount,1);
+      assert.equal(result.readyPointerChanged,true);
+      const report=f.sqlite.prepare('SELECT * FROM madden_discovery_reports WHERE id=?').get(result.reportId);
+      const coverage=candidateSourceCoverage({sourceMarkers:JSON.parse(report.source_markers_json),datasetInventory:JSON.parse(report.dataset_inventory_json)});
+      assert.equal(coverage.currentPeriod.stage,'offseason');
+      assert.equal(coverage.nonPlayingPeriod,true);
+      assert.equal(coverage.currentWeekStatus,'not-applicable');
+      assert.deepEqual(candidateCoverageWarnings(coverage),[]);
+      const bundle=await retainedPeriodBundle(f.db,f.league.id,report,{source_franchise_id:'1234',season_year:2027,season_created_at:'2020-01-01'},null);
+      assert.equal(bundle.coverage.nonPlayingPeriod,true);
+      assert.equal(bundle.coverage.importMode,'unknown');
+      assert.equal(bundle.sourcePeriods.some(p=>p.stage==='offseason'),false);
+    }finally{f.sqlite.close();}
+  }
+});
+
+test('offseason collection refuses partial rosters and a new unprepared season',async()=>{
+  const f=await fixture('weekly',offseasonHub());try{
+    await collect(f,(request,payload)=>request.kind==='roster'?{success:false}:payload);
+    assert.equal((await f.finish()).readiness.ready,false);
+    const next=offseasonHub();next.careerHubInfo.seasonInfo.calendarYear=2028;
+    await assert.rejects(beginEaCapture({db:f.db,bucket:f.bucket,league:f.league,actorId:'actor',hub:next,platform:'ps5',externalLeagueId:'1234',mode:'weekly',connectionId:'connection-1',collectionId:'next-season'}),/Archive Season/);
+  }finally{f.sqlite.close();}
+});
+
+test('next-season preseason and all regular weeks keep exact stage and calendar evidence',()=>{
+  for(const stage of [0,1])for(let index=0;index<(stage===0?4:18);index++){
+    const raw=offseasonHub();Object.assign(raw.careerHubInfo.seasonInfo,{calendarYear:2028,seasonWeekType:stage,seasonWeek:index,displayWeek:index+1});
+    const hub=normalizeEaHub(raw);
+    assert.equal(hub.seasonYear,2028);assert.equal(hub.sourceSeasonId,'');
+    assert.equal(hub.stageIndex,stage);assert.equal(hub.weekIndex,index);
+    assert.equal(hub.currentPeriod.stage,stage===0?'preseason':'regular-season');
+  }
+});
 
 test('calendar-only EA preview binds to the unique prepared franchise season without deriving an index',async()=>{
   const raw=calendarOnlyHub();

@@ -165,12 +165,15 @@ export function reportImportReadiness(inputReport = {}, {rosterCarryForward=null
     && Array.isArray(requirements?.statistics?.routes)
     && requirements.statistics.routes.length > 0;
   const sourcePassed = report.sourceVerification?.passed === true;
+  const offseason = report.sourceMarkers?.currentPeriod?.status==='proven'
+    &&report.sourceMarkers.currentPeriod.period?.stage==='offseason'
+    &&report.sourceMarkers.eaCollection?.complete===true;
   const ready = sourcePassed
     && located('teams')
     && (carryingRosters || (located('team-rosters') && located('players')))
     && located('standings')
-    && located('schedule')
-    && (located('statistics') || explicitEmptyStatistics)
+    && (located('schedule') || offseason)
+    && (located('statistics') || explicitEmptyStatistics || offseason)
     && (carryingRosters || players.canBuildRosteredPlayerPreview === true)
     && (carryingRosters || ['located', 'empty-confirmed', 'blocked'].includes(freeAgentStatus));
   const result = {

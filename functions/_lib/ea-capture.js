@@ -40,7 +40,13 @@ export function normalizeEaHub(input = {}) {
     const stage = canonicalMaddenStage(hub.currentPeriod.stage === 'postseason' ? 'playoffs' : hub.currentPeriod.stage);
     const week = integer(hub.currentPeriod.week);
     if (!stage || !week || week > 40) fail('EA current-period evidence is invalid.');
-    selected = {stageIndex:{preseason:0,'regular-season':1,playoffs:2}[stage],weekIndex:week-1};
+    selected = {stageIndex:{preseason:0,'regular-season':1,playoffs:2,offseason:'offseason'}[stage],weekIndex:week-1};
+  } else if ([7,8].includes(integer(season.seasonWeekType))) {
+    // Post-season wrap-up/offseason have a native clock, but NO game export
+    // stage. Available weeks belong to the completed season, not this phase.
+    const index=integer(season.seasonWeek);
+    if(index===null||index<0||index>39)fail('EA offseason phase is unavailable; retry after Madden finishes advancing.');
+    selected={stageIndex:'offseason',weekIndex:index};
   } else if (integer(season.weekIndex) !== null && integer(season.stageIndex) !== null) {
     selected = season;
   } else if ([2,3,4,5,6].includes(integer(season.seasonWeekType)) && integer(season.seasonWeek) !== null) {
@@ -85,7 +91,10 @@ export function normalizeEaHub(input = {}) {
     fail('EA has not provided an exact franchise season identifier.');
   }
   return {
-    currentPeriod,stageIndex:Number(selected.stageIndex),weekIndex:Number(selected.weekIndex),
+    currentPeriod,stageIndex:currentPeriod.stage==='offseason'?null:Number(selected.stageIndex),weekIndex:Number(selected.weekIndex),
+    nativePhase:hub.nativePhase || ([7,8].includes(integer(season.seasonWeekType))
+      ?{type:integer(season.seasonWeekType),index:integer(season.seasonWeek)}:null),
+    availableWeekInfoList:Array.isArray(hub.availableWeekInfoList)?hub.availableWeekInfoList:[],
     sourceSeasonId,seasonIndex:integer(sourceSeasonId),seasonYear:calendarYear,
     gameRelease:text(hub.gameRelease) || 'Madden NFL 27',weekTitle:text(season.weekTitle),
     teamIdInfoList:Array.isArray(hub.teamIdInfoList) ? hub.teamIdInfoList : [],
@@ -114,9 +123,11 @@ export function eaCapturePlan(hubInput, {mode = 'weekly', includeRosters = true}
   const requests = [{kind:'hub',args:{}},{kind:'teams',args:{}},{kind:'standings',args:{}}];
   const previousIndex = hub.stageIndex === 1 && hub.weekIndex === 22 ? 20 : Math.max(0,hub.weekIndex-1);
   const indices = mode === 'yearly' ? Array.from({length:18},(_,index)=>index)
+    : hub.currentPeriod.stage==='offseason' ? [18,19,20,22].filter(index=>hub.availableWeekInfoList
+      .some(item=>integer(item.stageIndex)===1&&integer(item.weekIndex)===index))
     : [...new Set([previousIndex,hub.weekIndex])];
   for (const weekIndex of indices) {
-    const args = {stageIndex:mode === 'yearly' ? 1 : hub.stageIndex,weekIndex};
+    const args = {stageIndex:mode === 'yearly'||hub.currentPeriod.stage==='offseason' ? 1 : hub.stageIndex,weekIndex};
     requests.push({kind:'schedule',args});
     if (mode !== 'yearly') for (const category of STATS) requests.push({kind:'statistics',args:{...args,category}});
   }
@@ -153,7 +164,7 @@ async function scopedSeason(db, leagueId, hub, externalLeagueId) {
   // A calendar-only hub must identify exactly one already prepared season.
   // Never derive a source season index from a year offset or latest snapshot.
   if (rows.results?.length!==1 || !row || (hub.seasonYear !== null && row.season_year !== null && Number(row.season_year) !== hub.seasonYear)) {
-    fail('The selected EA franchise, season, and Madden edition do not match this league’s prepared season.');
+    fail('The selected EA franchise, season, and Madden edition do not match this league’s prepared season. If Madden has started the next season, open Commish HQ → Command Center → Archive Season to prepare it, then collect again. Reconnecting EA will not fix a season mismatch.');
   }
   return row;
 }
@@ -170,6 +181,7 @@ export async function beginEaCapture({db,bucket,league,actorId,hub:hubInput,plat
     const retained = JSON.parse(await existing.text());
     if (retained.mode !== mode || retained.connectionId !== connectionId || retained.externalLeagueId !== text(externalLeagueId)
       || retained.platform !== text(platform).toLowerCase() || retained.currentPeriod?.key !== hub.currentPeriod.key
+      || JSON.stringify(retained.nativePhase||null)!==JSON.stringify(hub.nativePhase||null)
       || retained.gameYearId !== scope.game_year_id || retained.franchiseSeasonId !== scope.franchise_season_id) fail('EA collection identity changed.');
     return {...retained,manifestKey:key};
   }
@@ -182,6 +194,7 @@ export async function beginEaCapture({db,bucket,league,actorId,hub:hubInput,plat
     sessionId,rawSessionId,platform:text(platform).toLowerCase(),externalLeagueId:text(externalLeagueId),
     gameYearId:scope.game_year_id,franchiseSeasonId:scope.franchise_season_id,gameRelease:scope.game_release,
     sourceSeasonId:scope.source_season_id,seasonYear:scope.season_year,currentPeriod:hub.currentPeriod,
+    nativePhase:hub.nativePhase,availableWeekInfoList:hub.availableWeekInfoList,
     actorId,createdAt:now,completedAt:null,requests:[],exportPointer:exportPointer || {},activationPerformed:false,activeSnapshotChanged:false
   };
   for (const id of [sessionId,rawSessionId]) {
@@ -210,7 +223,8 @@ export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,
     const hub = normalizeEaHub(hubInput || payload);
     const sameSeason=hub.sourceSeasonId ? hub.sourceSeasonId===manifest.sourceSeasonId
       : hub.seasonYear!==null&&hub.seasonYear===Number(manifest.seasonYear);
-    if (!sameSeason || hub.currentPeriod.key !== manifest.currentPeriod.key) fail('EA advanced during collection; start a fresh sync.');
+    if (!sameSeason || hub.currentPeriod.key !== manifest.currentPeriod.key
+      || JSON.stringify(hub.nativePhase||null)!==JSON.stringify(manifest.nativePhase||null)) fail('EA advanced during collection; start a fresh sync.');
     canonical = {success:true,source:'ea-direct',gameRelease:manifest.gameRelease,platform:manifest.platform,
       franchiseId:manifest.externalLeagueId,seasonIndex:manifest.sourceSeasonId,
       currentWeek:manifest.currentPeriod.week,currentStage:manifest.currentPeriod.stage};
@@ -285,7 +299,8 @@ export async function finalizeEaCapture({db,bucket,leagueId,sessionId,collection
     if (!await db.prepare(ACTIVE_COLLECTION_SQL).bind(...guardValues).first()) fail('The EA collection or connection is no longer active. Start a new sync.');
   };
   await assertStillActive();
-  const hub = {currentPeriod:manifest.currentPeriod,sourceSeasonId:manifest.sourceSeasonId,gameRelease:manifest.gameRelease,seasonYear:manifest.seasonYear};
+  const hub = {currentPeriod:manifest.currentPeriod,nativePhase:manifest.nativePhase,availableWeekInfoList:manifest.availableWeekInfoList,
+    sourceSeasonId:manifest.sourceSeasonId,gameRelease:manifest.gameRelease,seasonYear:manifest.seasonYear};
   await scopedSeason(db,leagueId,normalizeEaHub(hub),manifest.externalLeagueId);
   const required = eaCapturePlan(hub,{mode,includeRosters:false}).map(item=>routeFor(manifest.platform,manifest.externalLeagueId,item.kind,item.args));
   const promised = expectedRequests.map(item=>routeFor(manifest.platform,manifest.externalLeagueId,item.kind,item.args));
@@ -311,7 +326,8 @@ export async function finalizeEaCapture({db,bucket,leagueId,sessionId,collection
     gameYearId:manifest.gameYearId,franchiseSeasonId:manifest.franchiseSeasonId,complete:missing.length === 0};
   const rosterCarryForward = await rosterCarryForwardEligibility(db,leagueId,report);
   const readiness = reportImportReadiness(report,{rosterCarryForward});
-  readiness.ready = readiness.ready && missing.length === 0;
+  readiness.ready = readiness.ready && missing.length === 0
+    && (manifest.currentPeriod.stage!=='offseason'||rosterComplete);
   readiness.missingRoutes = missing;
   const yearly = mode === 'yearly' ? yearlyHandoff(manifest,captures) : null;
   if (yearly) readiness.ready = yearly.ready && missing.length === 0 && report.sourceVerification.passed;

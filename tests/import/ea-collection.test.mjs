@@ -51,6 +51,16 @@ async function finish(options, firstState = {}) {
   assert.fail('collection did not complete within its bounded request limit');
 }
 
+test('offseason phase changes during collection cannot publish a mixed roster',async()=>{
+  const {options,finalized}=fixture();let hubs=0;
+  options.client.hub=async()=>{
+    const raw=hub();Object.assign(raw.careerHubInfo.seasonInfo,{seasonWeekType:++hubs===1?7:8,seasonWeek:1,displayWeek:1});
+    return raw;
+  };
+  await assert.rejects(finish(options),/advanced|changed/i);
+  assert.equal(finalized.length,0);
+});
+
 test('weekly collection retains both previous/current weeks and checks the hub before handoff', async () => {
   const { options, calls, stored, finalized } = fixture();
   const result = await finish(options);

@@ -364,7 +364,7 @@ async function latestRun(db,leagueId,includeRows=false){
 }
 async function startRun(db,env,leagueId,discoverySessionId,captureIds=[],sourceCoverage=null){
   const routes=await capturedRoutes(db,env,leagueId,discoverySessionId,captureIds);
-  if(!routes.length)throw Object.assign(new Error('No weekly statistics datasets were captured.'),{status:422});
+  if(!routes.length&&!sourceCoverage?.nonPlayingPeriod)throw Object.assign(new Error('No weekly statistics datasets were captured.'),{status:422});
   // A retained-period candidate is an exact, auditable re-composition. Process
   // every selected route even if its payload hash is already in the live
   // manifest; skipped routes would otherwise contribute no rows to this run.

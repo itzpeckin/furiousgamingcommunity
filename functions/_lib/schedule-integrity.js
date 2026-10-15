@@ -1,6 +1,6 @@
 import { canonicalMaddenStage, maddenRoutePeriod } from './madden-period.js';
 
-const rank={preseason:0,'regular-season':1,playoffs:2};
+const rank={preseason:0,'regular-season':1,playoffs:2,offseason:3};
 const parse=value=>{try{return typeof value==='string'?JSON.parse(value):value||{}}catch{return{}}};
 const strictInt=value=>value!==null&&value!==undefined&&String(value).trim()!==''&&Number.isInteger(Number(value))?Number(value):null;
 export const compareSchedulePeriods=(a,b)=>(rank[a?.stage]??99)-(rank[b?.stage]??99)||a.week-b.week;
@@ -102,12 +102,13 @@ export function scheduleAdvanceDecision(previous,{period,proof,seasonYear,previo
   const result={allowed:false,reviewRequired:true,from,to,sourceSnapshotId:previous?.id??previous?.snapshot_id??null};
   if(!previous)return{...result,reason:'initial-import'};
   if(proof?.status!=='proven'||!from||!to)return{...result,reason:'current-period-unproven'};
+  if(to.stage==='offseason')return{...result,reason:'offseason-no-matchups',reviewRequired:false};
   if(Number(previousSeasonYear)!==Number(seasonYear))return{...result,reason:'season-change'};
   const delta=compareSchedulePeriods(to,from);
   if(delta===0)return{...result,reason:'same-week',reviewRequired:false};
   if(delta<0)return{...result,reason:'backward-period'};
   const oneWeek=from.stage===to.stage&&to.week===from.week+1;
-  const preseasonOpening=from.stage==='preseason'&&from.week===3&&to.stage==='regular-season'&&to.week===1;
+  const preseasonOpening=from.stage==='preseason'&&[3,4].includes(from.week)&&to.stage==='regular-season'&&to.week===1;
   return oneWeek||preseasonOpening?{...result,allowed:true,reviewRequired:false,reason:preseasonOpening?'preseason-to-regular-opening':'one-week-advance'}
     :{...result,reason:'skipped-period'};
 }

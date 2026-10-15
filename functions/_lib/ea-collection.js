@@ -66,7 +66,7 @@ function checkpoint(state) {
 }
 
 function comparableHub(hub) {
-  return `${hub.gameRelease}:${hub.sourceSeasonId}:${hub.seasonYear}:${hub.currentPeriod.key}`;
+  return `${hub.gameRelease}:${hub.sourceSeasonId}:${hub.seasonYear}:${hub.currentPeriod.key}:${JSON.stringify(hub.nativePhase||null)}`;
 }
 
 function checkedHub(capture, rawHub) {
@@ -180,6 +180,7 @@ export async function runEaCollectionStep({ db, bucket, league, connection, job,
   state.result = { ...result, previewVerified, readyToImport, message,
     coverage: { currentPeriod: result.currentPeriod || state.hub.currentPeriod, collectedDatasets: result.retainedCaptureCount || state.expectedRequests.length,
       acceptedDatasets: result.acceptedCaptureCount ?? null, rosterComplete: Boolean(result.rosterComplete),
+      freeAgents:{status:result.readiness?.freeAgentStatus||'unknown',count:result.readiness?.freeAgentCount??null},
       freeAgentStatus: result.readiness?.freeAgentStatus || 'unknown', yearlySchedule: result.yearlyScheduleCoverage || null },
     datasetWarnings: state.warnings || [] };
   state.done = true;

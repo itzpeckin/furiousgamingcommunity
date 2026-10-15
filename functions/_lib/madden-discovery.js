@@ -527,12 +527,18 @@ export function buildMaddenDiscoveryReport(captures, options = {}) {
   const markers = mergeMarkers(analyses, options.expected || {});
   markers.currentPeriod=proveCurrentSchedulePeriod(analyses);
   const current=markers.currentPeriod.period;
+  const offseason=markers.currentPeriod.status==='proven'&&current?.stage==='offseason';
   const completeKeys=new Set(completePeriodCoverage(analyses,current));
   const horizonValid=current&&completeKeys.has(current.key)
     &&analyses.filter(a=>a.datasetType==='schedule').every(a=>a.periods!==null)
     &&analyses.filter(a=>['schedule','statistics'].includes(a.datasetType))
       .flatMap(a=>a.periods||[]).every(p=>compareSchedulePeriods(p,current)>0||completeKeys.has(p.key));
   if(markers.currentPeriod.status==='proven'&&horizonValid&&markers.week.status!=='matched'){
+    markers.week.status='multi-period';
+    markers.week.completePeriods=[...completeKeys];
+  }
+  if(offseason){
+    // The explicit league clock is independent of completed game routes.
     markers.week.status='multi-period';
     markers.week.completePeriods=[...completeKeys];
   }

@@ -645,8 +645,8 @@
       </div>
       ${run?.status==='running'||run?.status==='failed'?`<div class="commissioner-command-import__progress" aria-live="polite"><div><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" role="progressbar" aria-label="${esc(phaseLabel(activePhase))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${phaseProgress}"><span style="width:${phaseProgress}%"></span></div></div>`:''}
       <div class="commissioner-import-glance" aria-label="Latest import summary">
-        <span><small>Live week</small><strong>${esc(state?.activeSnapshotWeek??latestExport.activeSnapshotWeek??'—')}</strong></span>
-        <span><small>Captured week</small><strong>${esc(coverage.currentWeek??latestExport.capturedWeek??'—')}</strong></span>
+        <span><small>Live week</small><strong>${esc(state?.activeSnapshotPeriod?.stage==='offseason'?'Offseason':state?.activeSnapshotWeek??latestExport.activeSnapshotWeek??'—')}</strong></span>
+        <span><small>Captured week</small><strong>${esc(coverage.nonPlayingPeriod?'Offseason':coverage.currentWeek??latestExport.capturedWeek??'—')}</strong></span>
         <span><small>Latest export</small><strong>${esc(dateLabel(latestExport.receivedAt||source?.generatedAt))}</strong></span>
       </div>
       <details class="commissioner-import-details"><summary>View latest import details</summary><div class="commissioner-import-detail-grid">
@@ -676,7 +676,7 @@
     const coverage=source?.coverage||{};
     const historicalBackfill=coverage.importMode==='historical-backfill';
     const retainedPeriods=Array.isArray(coverage.completePeriods)?coverage.completePeriods:[];
-    const periodLabel=period=>`${period?.stage==='preseason'?'Preseason':period?.stage==='playoffs'?'Playoffs':'Regular Season'} Week ${period?.week}`;
+    const periodLabel=period=>period?.stage==='offseason'?'Offseason':`${period?.stage==='preseason'?'Preseason':period?.stage==='playoffs'?'Playoffs':'Regular Season'} Week ${period?.week}`;
     const retainedScope=retainedPeriods.length>1?`${retainedPeriods.length} periods (${periodLabel(retainedPeriods[0])} through ${periodLabel(retainedPeriods.at(-1))})`:periodLabel(coverage.currentPeriod||{stage:'regular-season',week:coverage.currentWeek});
     const sourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])];
     const actionableSourceWarnings=sourceWarnings.filter(value=>!routineWarning(value));
@@ -706,7 +706,7 @@
         <div><small>Latest export</small><strong>${esc(dateLabel(latestExport.receivedAt||source?.generatedAt))}</strong></div>
         <div><small>Destination</small><strong>${esc(state?.destination?.label||'Not created')}</strong></div>
         <div><small>Season</small><strong>${esc(source?.season?.seasonYear ?? '—')}</strong></div>
-        <div><small>Active / captured week</small><strong>${esc(state?.activeSnapshotWeek ?? latestExport.activeSnapshotWeek ?? '—')} / ${esc(coverage.currentWeek ?? latestExport.capturedWeek ?? 'unknown')}</strong></div>
+        <div><small>Active / captured week</small><strong>${esc(state?.activeSnapshotPeriod?.stage==='offseason'?'Offseason':state?.activeSnapshotWeek ?? latestExport.activeSnapshotWeek ?? '—')} / ${esc(coverage.nonPlayingPeriod?'Offseason':coverage.currentWeek ?? latestExport.capturedWeek ?? 'unknown')}</strong></div>
         <div><small>Week continuity</small><strong>${esc(coverage.continuityStatus||'unknown')}</strong></div>
         <div><small>Captured routes</small><strong>${countLabel(latestExport.captureCount)}</strong></div>
         <div><small>Teams</small><strong>${countLabel(resultCounts.teams ?? source?.counts?.teams ?? latestExport.counts?.teams)}</strong></div>

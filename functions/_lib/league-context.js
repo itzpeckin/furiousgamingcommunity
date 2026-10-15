@@ -8,6 +8,7 @@ const number = value => {
 
 const periodLabel = period => {
   if (!period) return 'Current period unavailable';
+  if (period.stage === 'offseason') return 'Offseason';
   if (period.stage === 'playoffs') {
     return ({1:'Wild Card',2:'Divisional Round',3:'Conference Championship',4:'Super Bowl'})[period.week]
       || `Playoff Week ${period.week}`;

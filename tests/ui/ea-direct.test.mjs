@@ -326,7 +326,7 @@ test('completed yearly schedule is shown without a regular snapshot import actio
   assert.equal(ui.effects().published, 0);
 });
 
-test('Companion instructions lead directly to Refresh without an intermediate button',async()=>{const ui=harness();await ui.service.refresh();ui.click({eaPath:'companion'});assert.match(ui.service.renderPanel(),/League Info, Rosters, and your selected weeks/);assert.match(ui.service.renderPanel(),/Collect weekly stats/);assert.doesNotMatch(ui.service.renderPanel(),/Open Companion Import|data-ea-action="companion-import"/);});
+test('Companion instructions lead directly to Refresh without an intermediate button',async()=>{const ui=harness();await ui.service.refresh();ui.click({eaPath:'companion'});assert.match(ui.service.renderPanel(),/League Info, Rosters, and your selected weeks/);assert.match(ui.service.renderPanel(),/Collect league data/);assert.doesNotMatch(ui.service.renderPanel(),/Open Companion Import|data-ea-action="companion-import"/);});
 
 test('EA-first setup preserves the typed season through status refresh and requires an explicit collection action',async()=>{
   const ui=harness();
