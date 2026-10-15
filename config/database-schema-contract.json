@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "8.2.12",
+  "release": "8.2.13",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,

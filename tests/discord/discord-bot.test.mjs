@@ -2900,3 +2900,15 @@ test('durable schedule identity upgrades completed old jobs and changes only whe
     await start();assert.equal(starts[2].workflowKey,starts[3].workflowKey);
   }finally{f.database.close()}
 });
+
+test('offseason imports and manual sync do not dispatch or create fictional matchup threads',async()=>{
+  const f=await schedulePresentationFixture();try{
+    const manifest={currentPeriod:{stage:'offseason',week:2,key:'offseason:2'},currentPeriodProof:{status:'proven'}};
+    f.database.prepare('UPDATE league_snapshots SET manifest_json=?,week_index=2 WHERE id=?').run(JSON.stringify(manifest),f.snapshotId);
+    const starts=[],context={env:{FRANCHISE_IMPORT_WORKER:{fetch:async()=>{starts.push(1);throw Error('must not start');}}},request:new Request('https://franchisehq.app')};
+    const result=await scheduleActiveDiscordSync(context,{db:f.db,league:f.league,snapshotId:f.snapshotId,requestedBySessionId:'session-comm'});
+    assert.equal(result.status,'not-required');assert.deepEqual(starts,[]);
+    assert.equal((await f.sync()).reason,'offseason-no-matchups');assert.equal(f.calls.length,0);
+    assert.equal(f.database.prepare('SELECT COUNT(*) n FROM discord_schedule_threads').get().n,0);
+  }finally{f.database.close()}
+});

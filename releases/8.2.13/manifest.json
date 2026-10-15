@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.13",
+  "releaseType": "offseason-import-and-free-agents",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.12",
+    "tag": "v8.2.12",
+    "commit": "357490b5ac276fef5d2349468121a9b60dfe1aa2"
+  },
+  "implementationBranch": "fix/8.2.13-offseason-free-agents",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.12",
+    "candidateRelease": "8.2.13",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.13/release-record.md",
+    "releases/8.2.13/validation-evidence.json"
+  ]
+}

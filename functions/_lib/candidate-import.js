@@ -13,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'retained-statistics-selection-v11';
+export const CANDIDATE_MAPPING_REVISION = 'retained-statistics-selection-v12';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId, rosterSourceSnapshotId = null) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`
@@ -55,7 +55,7 @@ export function candidateRetryGuidance(phase, message) {
 }
 
 const WEEK_ROUTE = /(?:^|\/)week\/(pre|reg|post)\/(\d+)(?:\/|$)/i;
-const PERIOD_STAGE_ORDER = Object.freeze({ preseason:0, 'regular-season':1, playoffs:2 });
+const PERIOD_STAGE_ORDER = Object.freeze({ preseason:0, 'regular-season':1, playoffs:2, offseason:3 });
 
 export function candidateCanonicalStage(value) {
   return canonicalMaddenStage(value);
@@ -71,6 +71,7 @@ export function candidatePeriodLabel(period) {
   const stage=candidateCanonicalStage(period?.stage);
   const week=Number.parseInt(String(period?.week??''),10);
   if(!stage||!Number.isInteger(week))return 'Unknown period';
+  if(stage==='offseason')return 'Offseason';
   const label=stage==='preseason'?'Preseason':stage==='playoffs'?'Playoffs':'Regular Season';
   return `${label} Week ${week}`;
 }
@@ -141,6 +142,7 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
     source:'captured-statistics-period',period:fallbackStatisticsPeriods.at(-1)||null
   };
   const currentPeriod=currentPeriodProof.status==='proven'?canonicalSchedulePeriod(currentPeriodProof.period):null;
+  const nonPlayingPeriod=currentPeriod?.stage==='offseason'&&sourceMarkers.eaCollection?.complete===true;
   const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics'
     &&(item.recordCount===null||item.recordCount>0
       ||item.periods.some(period=>period.key===currentPeriod?.key)))
@@ -169,7 +171,7 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
     :canonicalSchedulePeriod({stage:'regular-season',week:activeWeekIndex});
   const activeWeek=activePeriod?.week??null;
   const suppliedWeeks = new Set([...scheduleWeeks, ...statisticsWeeks]);
-  const missingWeeks = activeWeek !== null && currentWeek !== null && currentWeek > activeWeek + 1
+  const missingWeeks = !nonPlayingPeriod && activePeriod?.stage===currentPeriod?.stage && activeWeek !== null && currentWeek !== null && currentWeek > activeWeek + 1
     ? Array.from({ length: currentWeek - activeWeek - 1 }, (_, index) => activeWeek + index + 1)
       .filter(week => !suppliedWeeks.has(week))
     : [];
@@ -177,8 +179,9 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
   const statisticsCurrentWeek = Boolean(currentPeriod&&statisticKeys.has(currentPeriod.key));
   const currentWeekStatus = currentWeek === null
     ? 'unknown'
-    : scheduleCurrentWeek && statisticsCurrentWeek ? 'covered' : 'partial';
-  const periodComparison=activePeriod&&currentPeriod?comparePeriods(currentPeriod,activePeriod):null;
+    : nonPlayingPeriod ? 'not-applicable' : scheduleCurrentWeek && statisticsCurrentWeek ? 'covered' : 'partial';
+  const periodComparison=activePeriod&&currentPeriod
+    ?nonPlayingPeriod&&activePeriod.stage==='offseason'?0:comparePeriods(currentPeriod,activePeriod):null;
   const continuityStatus = activeWeek === null || currentWeek === null
     ? 'unknown'
     : periodComparison<0 ? 'historical-backfill'
@@ -206,6 +209,7 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
     scheduleCurrentWeek,
     statisticsCurrentWeek,
     currentWeekStatus,
+    nonPlayingPeriod,
     continuityStatus,
     importMode,
     missingWeeks
@@ -219,8 +223,8 @@ export function candidateCoverageWarnings(coverage = {}) {
     return warnings;
   }
   const currentLabel=candidatePeriodLabel(coverage.currentPeriod||{stage:'regular-season',week:coverage.currentWeek});
-  if (!coverage.scheduleCurrentWeek) warnings.push(`${currentLabel} schedule coverage is missing.`);
-  if (!coverage.statisticsCurrentWeek) warnings.push(`${currentLabel} statistics coverage is missing.`);
+  if (!coverage.nonPlayingPeriod && !coverage.scheduleCurrentWeek) warnings.push(`${currentLabel} schedule coverage is missing.`);
+  if (!coverage.nonPlayingPeriod && !coverage.statisticsCurrentWeek) warnings.push(`${currentLabel} statistics coverage is missing.`);
   if (coverage.importMode === 'historical-backfill') {
     const periods=uniquePeriods(coverage.completePeriods||[]);
     const scope=periods.length>1?`${periods.length} retained periods from ${candidatePeriodLabel(periods[0])} through ${candidatePeriodLabel(periods.at(-1))}`:`Historical ${currentLabel}`;

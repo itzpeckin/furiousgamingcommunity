@@ -18,7 +18,7 @@ async function validateSnapshot(db,leagueId,snapshot){const records=await rows(d
  const err=(d,m)=>{errors.push(`${d}: ${m}`);domains[d].errors.push(m);};const warn=(d,m)=>{warnings.push(`${d}: ${m}`);domains[d].warnings.push(m);};
  if(by.teams.length!==32)err('teams',`Expected 32 teams; found ${by.teams.length}.`);
  if(!by.players.length)err('players','No player records exist.');
- if(!by.games.length)err('games','No game records exist.');
+ if(!by.games.length&&!offseasonSnapshot(snapshot))err('games','No game records exist.');
  if(!by.statistics.length)warn('statistics','No statistic records exist yet; snapshot activation is allowed when statistics mapping completed without failed routes.');
  if(by.standings.length!==32)err('standings',`Expected 32 standings records; found ${by.standings.length}.`);
  const teamIds=new Set(by.teams.map(x=>key(x,'external_id','teamId','team_id')).filter(Boolean));
@@ -32,7 +32,8 @@ async function validateSnapshot(db,leagueId,snapshot){const records=await rows(d
  const status=errors.length?'failed':'ready';return{release:RELEASE,status,score,errorCount:errors.length,warningCount:warnings.length,errors,warnings,domains,validatedAt:new Date().toISOString()};}
 
 async function ensureValidationSchema(db){return requireDatabaseSchema(db)}
-function emptyValidationContext(counts={},snapshotWarningCount=0){
+function offseasonSnapshot(snapshot){const manifest=parse(snapshot?.manifest_json)||{};return manifest.currentPeriod?.stage==='offseason'&&manifest.currentPeriodProof?.status==='proven'&&manifest.sourceCoverage?.nonPlayingPeriod===true;}
+function emptyValidationContext(counts={},snapshotWarningCount=0,offseason=false){
   const domains={};
   for(const d of ['teams','players','games','statistics','standings'])domains[d]={count:Number(counts[d]||0),score:100,errors:[],warnings:[]};
   domains.snapshot={count:1,score:100,errors:[],warnings:[]};
@@ -41,7 +42,7 @@ function emptyValidationContext(counts={},snapshotWarningCount=0){
   const addWarning=(domain,message)=>{warnings.push(`${domain}: ${message}`);domains[domain].warnings.push(message);};
   if(Number(counts.teams||0)!==32)addError('teams',`Expected 32 teams; found ${Number(counts.teams||0)}.`);
   if(!Number(counts.players||0))addError('players','No player records exist.');
-  if(!Number(counts.games||0))addError('games','No game records exist.');
+  if(!Number(counts.games||0)&&!offseason)addError('games','No game records exist.');
   if(!Number(counts.statistics||0))addWarning('statistics','No statistic records exist yet; snapshot activation is allowed when statistics mapping completed without failed routes.');
   if(Number(counts.standings||0)!==32)addError('standings',`Expected 32 standings records; found ${Number(counts.standings||0)}.`);
   if(Number(snapshotWarningCount||0))addWarning('snapshot',`${Number(snapshotWarningCount)} warning(s) were inherited from source mappers.`);
@@ -130,7 +131,7 @@ async function statisticsDeltaValidationPlan(db,leagueId,snapshot){
 async function startSnapshotValidation(db,leagueId,snapshot){
   await ensureValidationSchema(db);
   const counts=await validationCounts(db,leagueId,snapshot.id);
-  const ctx=emptyValidationContext(counts,snapshot.warning_count);
+  const ctx=emptyValidationContext(counts,snapshot.warning_count,offseasonSnapshot(snapshot));
   const plan=await statisticsDeltaValidationPlan(db,leagueId,snapshot);
   ctx.validationPlan=plan;
 
@@ -292,7 +293,7 @@ async function nextSnapshotValidation(db,leagueId,snapshot,limit=100){
   if(!job)return startSnapshotValidation(db,leagueId,snapshot);
   if(job.status==='completed')return{job,complete:true,report:parse(job.report_json)||null};
 
-  const ctx=parse(job.context_json)||emptyValidationContext(await validationCounts(db,leagueId,snapshot.id),snapshot.warning_count);
+  const ctx=parse(job.context_json)||emptyValidationContext(await validationCounts(db,leagueId,snapshot.id),snapshot.warning_count,offseasonSnapshot(snapshot));
   let phase=String(job.phase||'teams');
   let offset=Number(job.phase_offset||0);
   let processed=Number(job.processed_count||0);

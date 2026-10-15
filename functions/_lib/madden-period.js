@@ -24,6 +24,7 @@ function first(record,aliases){
 
 export function canonicalMaddenStage(value){
   const stage=String(value??'').trim().toLowerCase();
+  if(stage==='offseason')return'offseason';
   if(['0','pre','preseason'].includes(stage))return'preseason';
   if(['2','post','postseason','playoff','playoffs'].includes(stage))return'playoffs';
   if(['1','reg','regular','regular-season'].includes(stage))return'regular-season';

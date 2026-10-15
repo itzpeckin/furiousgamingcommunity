@@ -172,7 +172,7 @@ async function sharedBuildContext(db,league,candidateRun){
     },activeSource,{seasonYear:candidateRun.destination_season_year});
   }
   if(coverage.currentPeriodProof?.status!=='proven'||!coverage.currentPeriod
-    ||coverage.currentWeekStatus!=='covered')return{response:json({ok:false,release:RELEASE,
+    ||(coverage.currentWeekStatus!=='covered'&&!coverage.nonPlayingPeriod))return{response:json({ok:false,release:RELEASE,
     error:'The export must prove the current Madden period with both current-period schedule and statistics routes. Future schedule coverage alone cannot advance the league.',
     sourceCoverage:coverage,activeSnapshotChanged:false,activationPerformed:false},422)};
   const historicalBackfill=coverage.importMode==='historical-backfill';
@@ -182,7 +182,7 @@ async function sharedBuildContext(db,league,candidateRun){
   const currentWeek=coverage.currentWeek;
   const sourcePeriods=Array.isArray(coverage.completePeriods)&&coverage.completePeriods.length
     ?coverage.completePeriods
-    :(currentWeek===null||currentWeek===undefined?[]:[{stage:'regular-season',week:currentWeek,key:`regular-season:${currentWeek}`}]);
+    :(coverage.nonPlayingPeriod||currentWeek===null||currentWeek===undefined?[]:[{stage:'regular-season',week:currentWeek,key:`regular-season:${currentWeek}`}]);
   const sourceWeeks=[...new Set(sourcePeriods.map(period=>Number(period.week)).filter(Number.isInteger))];
   return{activeSource,coverage,historicalBackfill,rosterCarryForward,sourcePeriods,sourceWeeks};
 }
@@ -306,7 +306,7 @@ async function domainPlan({context,db,league,candidateRun,runs,shared,domain}){
       ?candidateHistoricalBackfill(fresh,prior,{keyName:'external_key',activeWeek:shared.activeSource.week_index,
         activePeriod:shared.coverage.activePeriod,sourceWeeks:shared.sourceWeeks,sourcePeriods:shared.sourcePeriods})
       :candidateHistoryCarryForward(fresh,prior,{keyName:'external_key',
-        currentWeek:shared.coverage.currentWeek,preserveEmptyCurrentWeek:true});
+        currentWeek:shared.coverage.nonPlayingPeriod?null:shared.coverage.currentWeek,preserveEmptyCurrentWeek:true});
     const appliedKeys=new Set((history.appliedPeriods||[]).map(period=>period.key));
     const missingAppliedPeriods=shared.historicalBackfill
       ?shared.sourcePeriods.filter(period=>!appliedKeys.has(period.key)):[];

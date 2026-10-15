@@ -1194,3 +1194,7 @@ EA session path serialization and one bounded session renewal align the client t
 
 ## 8.2.7 — Configurable gameplay rules
 Requested: per-league rushing/passing stat selection, minimum/maximum values, and roster ability allowances in League Controls shared with Discord and League Rules. Released in 8.2.7 through PR #185. Strict 534-test gate, hosted preview/production checks, desktop/mobile fixtures and authenticated FGC desktop read-only acceptance passed. Discord command registration verified; live command invocation remains untested. Existing league settings preserved. Billing remains deferred.
+
+## 8.2.13 — Offseason continuity and Free Agents
+
+Requested: repair the entire offseason/new-season path and make EA Free Agents available. Implemented native offseason clock handling, current-phase-independent completed-season history preservation, fresh roster/FA collection, exact prepared-season turnover guidance and a direct Players-page Free Agents filter. Fake offseason schedule requirements and automatic matchup dispatch are removed. Live provider acceptance remains an owner collection; billing/cost cleanup remain deferred. See releases/8.2.13/release-record.md.

@@ -13,6 +13,7 @@ const rows = async (db,sql,...values) => (await db.prepare(sql).bind(...values).
 
 export function canonicalDiscordSchedulePhase(value) {
   const stage = clean(value).toLowerCase().replace(/[_ ]+/g,'-');
+  if(stage==='offseason')return 'offseason';
   if (['pre','preseason','pre-season'].includes(stage)) return 'preseason';
   if (['post','postseason','post-season','playoff','playoffs'].includes(stage)) return 'playoffs';
   return 'regular-season';
@@ -77,7 +78,7 @@ async function activeSnapshot(db,leagueId) {
 async function canReconcileCurrent(db,leagueId,decision,active){
   let manifest={};try{manifest=JSON.parse(active?.manifest_json||'{}');}catch{}
   const period=snapshotCurrentPeriod(active,false);
-  if(!period||manifest.currentPeriodProof?.status!=='proven'
+  if(!period||period.stage==='offseason'||manifest.currentPeriodProof?.status!=='proven'
     ||!(decision.reason==='initial-import'||decision.reason==='same-week'&&!decision.reviewRequired))return false;
   const present=await db.prepare(`SELECT id FROM discord_schedule_threads WHERE league_id=?
     AND season_year=? AND phase=? AND week_index=? AND status='active' LIMIT 1`)
@@ -306,6 +307,7 @@ export async function syncDiscordScheduleThreads(env,db,{
   if (!installation) return {ok:false,skipped:true,reason:'not-connected'};
   const active = await activeSnapshot(db,league.id);
   if (!active) return {ok:false,skipped:true,reason:'no-active-snapshot'};
+  if(snapshotCurrentPeriod(active)?.stage==='offseason')return{ok:true,skipped:true,reason:'offseason-no-matchups'};
   if (snapshotId && String(active.id) !== String(snapshotId)) return {ok:false,skipped:true,reason:'snapshot-superseded'};
   const decision=await automaticScheduleDecision(db,league.id,active);
   const recoveryAllowed=source==='rollover-recovery'&&await recoverableScheduleDecision(db,league.id,active);
@@ -417,6 +419,7 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
   if(source==='candidate-import'){
     const active=await activeSnapshot(db,league.id);
     if(!active||String(active.id)!==String(snapshotId))return{scheduled:false,reason:'snapshot-superseded'};
+    if(snapshotCurrentPeriod(active)?.stage==='offseason')return{scheduled:false,status:'not-required',reason:'offseason-no-matchups'};
     const decision=await automaticScheduleDecision(db,league.id,active);
     if(!decision.allowed){
       if(await recoverableScheduleDecision(db,league.id,active))effectiveSource='rollover-recovery';
@@ -475,6 +478,7 @@ export async function latestDiscordScheduleSync(db,leagueId) {
     FROM discord_schedule_sync_runs WHERE league_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1`)
     .bind(leagueId).first();
   if(active){
+    if(snapshotCurrentPeriod(active)?.stage==='offseason')return{status:'not-required',phase:'offseason',seasonYear:active.seasonYear,reason:'offseason-no-matchups',reviewRequired:false};
     const decision=await automaticScheduleDecision(db,leagueId,active);
     const period=snapshotCurrentPeriod(active);
     const currentRun=row&&Number(row.seasonYear)===Number(active.seasonYear)

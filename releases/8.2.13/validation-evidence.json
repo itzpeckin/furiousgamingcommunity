@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.13",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 54,
+      "candidateRequiresMigration": false
+    },
+    "focusedRegression": {
+      "passed": true,
+      "log": "outputs/fhq8213-candidate.txt"
+    },
+    "browserFixture": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "productionAcceptance": false
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 568,
+      "log": "outputs/fhq8213-strict.txt"
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveEaCollection": false,
+    "leagueSettingsChanged": false,
+    "separateWorkerChanged": false,
+    "discordChanged": false
+  }
+}

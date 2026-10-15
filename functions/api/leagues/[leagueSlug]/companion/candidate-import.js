@@ -7,6 +7,7 @@ import {
   validLeagueSlug
 } from '../../../../_lib/cloud-platform.js';
 import { requireCommissioner } from '../../../../_lib/permissions.js';
+import { snapshotCurrentPeriod } from '../../../../_lib/schedule-integrity.js';
 import {
   CANDIDATE_IMPORT_PHASES,
   CANDIDATE_MAPPING_REVISION,
@@ -350,6 +351,7 @@ async function publicState(current, options = {}) {
     previousRun:run ? null : publicCandidateRun(previousRun),
     activeSnapshotId:active?.snapshot_id || null,
     discordScheduleSync:await latestDiscordScheduleSync(current.db,current.league.id),
+    activeSnapshotPeriod:snapshotCurrentPeriod(active),
     activeSnapshotWeek:active?.week_index === null || active?.week_index === undefined ? null : Number(active.week_index),
     phases:CANDIDATE_IMPORT_PHASES,
     private:!publicCandidateRun(run)?.activationPerformed,
@@ -440,7 +442,7 @@ async function startRun(current, destination, report, identity, retry) {
   const bundle=await retainedPeriodBundle(current.db,current.league.id,report,identity,active);
   const coverage=bundle.coverage;
   if(coverage.currentPeriodProof?.status!=='proven'||!coverage.currentPeriod
-    ||coverage.currentWeekStatus!=='covered')return{response:json({ok:false,
+    ||(coverage.currentWeekStatus!=='covered'&&!coverage.nonPlayingPeriod))return{response:json({ok:false,
       error:'The export must prove the current Madden period and requires both schedule and statistics coverage for that period. Review the current-week source evidence before importing.',
       release:RELEASE,sourceCoverage:coverage,activeSnapshotChanged:false},409)};
   const digest = bundle.digest || await captureDigest(current.db,current.league.id,report.session_id);

@@ -354,6 +354,39 @@ for(const optimized of [false,true])test(`272-game full-season build and retaine
     assert.equal(candidateMergedPeriodCoverage(history.records,[]).gamePeriods.at(-1).week,18);
     assert.equal(scheduleAdvanceDecision({id:snapshotId,season_year:2026,week_index:1,manifest_json:JSON.stringify(result.snapshot.manifest)},{period:canonicalSchedulePeriod({stage:'reg',week:2}),proof,seasonYear:2026}).allowed,true);
     assert.equal(coverage.currentPeriodProof.status,'proven');
+    // Run an actual offseason candidate after the regular-season snapshot.
+    // No current-week game/stat routes exist; all season history must survive.
+    const offseasonProof={status:'proven',source:'current-state-metadata',period:canonicalSchedulePeriod({stage:'offseason',week:2})};
+    const offseasonCoverage=candidateSourceCoverage({sourceMarkers:{currentPeriod:offseasonProof,eaCollection:{complete:true}},datasetInventory:[]});
+    assert.equal(offseasonCoverage.currentWeekStatus,'not-applicable');
+    sqlite.exec(`INSERT INTO companion_statistics_mapping_runs (id,league_id,discovery_session_id) VALUES ('off-stats','league-1','capture-1');
+      INSERT INTO companion_schedule_mapping_runs (id,league_id,discovery_session_id,source_route_summary) VALUES ('off-games','league-1','capture-1','Offseason');
+      INSERT INTO companion_canonical_players_preview (mapping_run_id,league_id,external_id,display_name,source_record_json)
+        VALUES ('players-run','league-1','free-off','Free Agent','{"isFreeAgent":true}');`);
+    // A late-season row is the regression case for the reset offseason counter.
+    sqlite.prepare(`INSERT INTO league_snapshot_records (league_id,snapshot_id,domain,external_id,data_json)
+      VALUES ('league-1',?,'statistics','late-season',?)`).run(snapshotId,JSON.stringify({external_key:'late-season',stage:'regular-season',week_index:18,player_external_id:'player-1',team_external_id:'team-1'}));
+    sqlite.prepare(`INSERT INTO companion_candidate_import_runs (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,current_phase,created_by_user_id,source_counts_json,active_snapshot_id_before,team_mapping_run_id,player_mapping_run_id,schedule_mapping_run_id,statistics_mapping_run_id)
+      VALUES ('candidate-off','league-1','destination-full','capture-1','fingerprint-off','running','build-candidate','commissioner-1',?,?,'teams-run','players-run','off-games','off-stats')`).run(JSON.stringify({sourceCoverage:offseasonCoverage}),snapshotId);
+    let offResponse=await buildSnapshot(context({action:'start',candidateImportRunId:'candidate-off'}));
+    let off=await offResponse.json();assert.equal(offResponse.status,200,JSON.stringify(off));
+    const offId=off.snapshot.snapshotId;
+    for(let i=0;i<30&&!off.complete;i++){
+      offResponse=await buildSnapshot(context({action:'next',limit:4000,candidateImportRunId:'candidate-off',snapshotId:offId}));
+      off=await offResponse.json();assert.equal(offResponse.status,200,JSON.stringify(off));
+    }
+    assert.equal(off.complete,true);
+    assert.equal(off.snapshot.manifest.currentPeriod.stage,'offseason');
+    assert.equal(off.snapshot.counts.games,272);
+    assert.equal(off.snapshot.counts.statistics,statisticCount+1);
+    assert.equal(off.snapshot.counts.players,2047);
+    assert.equal(off.snapshot.manifest.discordScheduleTransition.reason,'offseason-no-matchups');
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) n FROM league_snapshot_records WHERE snapshot_id=? AND external_id='late-season'`).get(offId).n,1);
+    assert.equal(sqlite.prepare(`SELECT snapshot_id FROM league_active_snapshots WHERE league_id='league-1'`).get().snapshot_id,snapshotId);
+    let offValidated=await (await validateSnapshot(context({action:'validate-start',snapshotId:offId}))).json();
+    for(let i=0;i<30&&!offValidated.complete;i++)offValidated=await (await validateSnapshot(context({action:'validate-next',snapshotId:offId,batches:4,limit:2000}))).json();
+    assert.equal(offValidated.complete,true,JSON.stringify(offValidated));
+    assert.equal(offValidated.report.errorCount,0,JSON.stringify(offValidated.report));
     assert.equal(sqlite.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{sqlite.close()}
 });
@@ -552,10 +585,10 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-statistics-selection-v11');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-statistics-selection-v12');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:retained-statistics-selection-v11'
+    'report:capture:identity:destination:retained-statistics-selection-v12'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
 });
