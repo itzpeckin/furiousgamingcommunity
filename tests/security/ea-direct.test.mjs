@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
@@ -35,7 +36,7 @@ test('EA credentials are authenticated ciphertext bound to exact league/record',
   assert.deepEqual(await openEa(envKey,'league:a:connection:1',sealed),secret);
   await assert.rejects(openEa(envKey,'league:b:connection:1',sealed),/Reconnect|reconnect/);
   await assert.rejects(openEa({...envKey,EA_CREDENTIAL_KEY:'cd'.repeat(32)},'league:a:connection:1',sealed),/Reconnect|reconnect/);
-  await assert.rejects(openEa(envKey,'league:a:connection:1',`${sealed.slice(0,-2)}00`),/Reconnect|reconnect/);
+  await assert.rejects(openEa(envKey,'league:a:connection:1',`${sealed.slice(0,-2)}${sealed.endsWith('00')?'01':'00'}`),/Reconnect|reconnect/);
 });
 test('EA callback only accepts exact loopback, code, and this setup state',()=>{
   assert.equal(parseEaRedirect('http://127.0.0.1/success?code=valid&state=ours','ours'),'valid');
@@ -233,4 +234,32 @@ test('yearly setup may launch before preview and seals its explicit season confi
     assert.deepEqual(await openEa(f.env,`ea-job:a:${job.id}`,job.state_cipher),{confirmedSourceSeasonId:'2'});
     await assert.rejects(openEa(f.env,`ea-job:b:${job.id}`,job.state_cipher));
   }finally{f.sqlite.close()}
+});
+
+
+test('season mismatch finishes the EA job with safe diagnostics and preserves the connection',async()=>{
+  const f=await fixture(),originalFetch=globalThis.fetch,originalDigest=crypto.subtle.digest.bind(crypto.subtle);
+  try{
+    const credential=await sealEa(f.env,'ea-connection:a:conn',{accessToken:'test-token',expiresAt:'2099-01-01'});
+    f.sqlite.prepare(`INSERT INTO ea_direct_connections(id,league_id,connected_by,status,platform,persona_id,persona_name,external_league_id,external_league_name,credential_cipher) VALUES('conn','a','user-a','connected','ps5','123','Coach','1234','League',?)`).run(credential);
+    f.sqlite.exec(`INSERT INTO franchise_seasons(id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status) VALUES('next','a','ea-madden-companion','1234','3','Madden NFL 27','2028',2028,'preview');
+      INSERT INTO league_game_years(id,league_id,game_release,edition_year,display_name,status) VALUES('year','a','Madden NFL 27',27,'Madden NFL 27','active');
+      INSERT INTO game_year_franchise_seasons(game_year_id,league_id,franchise_season_id) VALUES('year','a','next');`);
+    const token='f'.repeat(64);
+    f.sqlite.prepare(`INSERT INTO ea_direct_collection_jobs(id,league_id,connection_id,actor_id,session_id,mode,status,token_hash,expires_at) VALUES('job','a','conn','user-a','session-a','yearly','running',?,'2099-01-01')`).run(await hashToken(token));
+    const responses=[{userLoginInfo:{sessionKey:'test-session',personaDetails:{personaId:123}}},{responseInfo:{value:{success:true,careerHubInfo:{seasonInfo:{seasonYear:2,calendarYear:2027,seasonWeekType:8,seasonWeek:16}},availableWeekInfoList:[]}}}];
+    crypto.subtle.digest=(algorithm,bytes)=>String(algorithm).toUpperCase()==='MD5'?Promise.resolve(createHash('md5').update(Buffer.from(bytes)).digest()):originalDigest(algorithm,bytes);
+    globalThis.fetch=async()=>{assert.ok(responses.length);return Response.json(responses.shift());};
+    const ctx=()=>({params:{leagueSlug:'league-a'},env:{...f.env,COMPANION_EXPORTS:{}},request:new Request('https://franchisehq.app/api/leagues/league-a/ea-direct/collect-step',{method:'POST',headers:{'content-type':'application/json','x-franchisehq-ea-collection-token':token},body:JSON.stringify({id:'job',cursor:0})})});
+    const response=await stepPost(ctx()),body=await response.json();
+    assert.equal(body.code,'EA_SEASON_MISMATCH',JSON.stringify(body));assert.equal(response.status,409);
+    const row=f.sqlite.prepare("SELECT status,error_code,result_json,state_cipher FROM ea_direct_collection_jobs WHERE id='job'").get();
+    assert.equal(row.status,'failed');assert.equal(row.error_code,'EA_SEASON_MISMATCH');assert.equal(row.state_cipher,null);
+    assert.equal(JSON.parse(row.result_json).seasonDiagnostic.preparedYear,2028);
+    assert.doesNotMatch(row.result_json,/test-token|test-session|1234/);
+    assert.equal(f.sqlite.prepare("SELECT status FROM ea_direct_connections WHERE id='conn'").get().status,'connected');
+    assert.equal((await stepPost(ctx())).status,409);
+    assert.equal(f.sqlite.prepare("SELECT error_code FROM ea_direct_collection_jobs WHERE id='job'").get().error_code,'EA_SEASON_MISMATCH');
+    assert.equal(responses.length,0);
+  }finally{globalThis.fetch=originalFetch;crypto.subtle.digest=originalDigest;f.sqlite.close();}
 });

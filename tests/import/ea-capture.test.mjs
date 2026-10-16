@@ -1,3 +1,4 @@
+import { safeEaError } from '../../functions/_lib/ea-direct.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
@@ -584,4 +585,27 @@ test('EA first-season setup uses verified calendar and confirmed native season w
     const created=await beginEaCapture({db:f.db,bucket:f.bucket,league:f.league,actorId:'actor',hub:rawHub(),platform:'ps5',externalLeagueId:'1234',mode:'yearly',connectionId:'connection-1',collectionId:'initial-yearly'});
     assert.equal(created.franchiseSeasonId,season.id);assert.equal(created.sourceSeasonId,'2');
   }finally{f.sqlite.close()}
+});
+
+
+test('archived EA season gets actionable guidance and a verified preseason successor is accepted',async()=>{
+  const f=await fixture();try{
+    f.sqlite.exec(`UPDATE franchise_seasons SET status='closed' WHERE id='ea-season';
+      INSERT INTO franchise_seasons(id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES('next-season','ea-test','ea-madden-companion','1234','3','Madden NFL 27','2028',2028,'preview');
+      INSERT INTO game_year_franchise_seasons(game_year_id,league_id,franchise_season_id) VALUES('ea-year','ea-test','next-season');`);
+    const options={db:f.db,bucket:f.bucket,league:f.league,actorId:'actor',platform:'ps5',externalLeagueId:'1234',mode:'yearly',connectionId:'connection-1'};
+    await assert.rejects(beginEaCapture({...options,collectionId:'stale-season',hub:rawHub()}),error=>{
+      const safe=safeEaError(error);assert.equal(safe.code,'EA_SEASON_MISMATCH');assert.equal(safe.retryable,false);
+      assert.match(safe.message,/already prepared season 2028/);assert.match(safe.message,/Do not archive again or disconnect/);
+      assert.equal(error.seasonDiagnostic.reportedYear,2027);assert.equal(error.seasonDiagnostic.preparedYear,2028);return true;
+    });
+    const hub={success:true,careerHubInfo:{seasonInfo:{seasonYear:3,calendarYear:2028,seasonWeekType:0,seasonWeek:0,displayWeek:1}},
+      availableWeekInfoList:[{stageIndex:0,weekIndex:0}],teamIdInfoList:[{teamId:10},{teamId:20}]};
+    const result=await beginEaCapture({...options,collectionId:'new-season',hub});
+    assert.ok(result.sessionId);
+    const manifest=JSON.parse(f.objects.get('ea-direct/by-tenant/ea-test/collections/new-season/manifest.json'));
+    assert.equal(manifest.franchiseSeasonId,'next-season');
+    assert.equal(f.sqlite.prepare("SELECT status FROM franchise_seasons WHERE id='ea-season'").get().status,'closed');
+  }finally{f.sqlite.close();}
 });

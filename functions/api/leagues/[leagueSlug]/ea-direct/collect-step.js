@@ -61,10 +61,19 @@ export async function onRequestPost(context){
   }catch(error){
     const safe=safeEaError(error);
     if(job&&db){
-      await db.prepare(`UPDATE ea_direct_collection_jobs SET message=?,error_code=?,lock_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lock_until=?`).bind(safe.message,safe.code,job.id,lock||'').run();
+      const stopped=['EA_SEASON_MISMATCH','EA_CAPTURE_UNAVAILABLE'].includes(safe.code);
+      await db.prepare(`UPDATE ea_direct_collection_jobs SET message=?,error_code=?,lock_until=NULL,
+        status=CASE WHEN ? THEN 'failed' ELSE status END,state_cipher=CASE WHEN ? THEN NULL ELSE state_cipher END,
+        completed_at=CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE completed_at END,updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND league_id=? AND lock_until=? AND status='running'`)
+        .bind(safe.message,safe.code,stopped?1:0,stopped?1:0,stopped?1:0,job.id,job.league_id,lock||'').run();
       if(error.periodDiagnostic&&safe.code==='EA_CURRENT_PERIOD_UNAVAILABLE'){
         await db.prepare(`UPDATE ea_direct_collection_jobs SET result_json=? WHERE id=? AND league_id=? AND error_code=?`)
           .bind(JSON.stringify({periodDiagnostic:error.periodDiagnostic}),job.id,job.league_id,safe.code).run();
+      }
+      if(error.seasonDiagnostic&&safe.code==='EA_SEASON_MISMATCH'){
+        await db.prepare(`UPDATE ea_direct_collection_jobs SET result_json=? WHERE id=? AND league_id=? AND error_code=?`)
+          .bind(JSON.stringify({seasonDiagnostic:error.seasonDiagnostic}),job.id,job.league_id,safe.code).run();
       }
       if(safe.code==='EA_RECONNECT_REQUIRED')await db.prepare(`UPDATE ea_direct_connections SET status='reconnect-required',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='connected'`).bind(job.connection_id).run();
     }
