@@ -124,6 +124,7 @@ export function eaCapturePlan(hubInput, {mode = 'weekly', includeRosters = true}
   const requests = [{kind:'hub',args:{}},{kind:'teams',args:{}},{kind:'standings',args:{}}];
   const previousIndex = hub.stageIndex === 1 && hub.weekIndex === 22 ? 20 : Math.max(0,hub.weekIndex-1);
   const indices = mode === 'yearly' ? Array.from({length:18},(_,index)=>index)
+    : hub.currentPeriod.stage==='preseason' ? []
     : hub.currentPeriod.stage==='offseason' ? [18,19,20,22].filter(index=>hub.availableWeekInfoList
       .some(item=>integer(item.stageIndex)===1&&integer(item.weekIndex)===index))
     : [...new Set([previousIndex,hub.weekIndex])];
@@ -132,7 +133,16 @@ export function eaCapturePlan(hubInput, {mode = 'weekly', includeRosters = true}
     requests.push({kind:'schedule',args});
     if (mode !== 'yearly') for (const category of STATS) requests.push({kind:'statistics',args:{...args,category}});
   }
-  if (mode !== 'yearly' && includeRosters) {
+  // A season schedule action publishes through the normal validated importer.
+  // Retain current data too, without ever requesting preseason games or stats.
+  if(mode==='yearly'&&!['preseason','offseason'].includes(hub.currentPeriod.stage)){
+    for(const weekIndex of [...new Set([previousIndex,hub.weekIndex])]){
+      const args={stageIndex:hub.stageIndex,weekIndex};
+      if(hub.stageIndex!==1||weekIndex>17)requests.push({kind:'schedule',args});
+      for(const category of STATS)requests.push({kind:'statistics',args:{...args,category}});
+    }
+  }
+  if (includeRosters) {
     for (const [listIndex,team] of hub.teamIdInfoList.entries()) requests.push({kind:'roster',args:{teamId:team.teamId,listIndex}});
     requests.push({kind:'free-agents',args:{}});
   }
@@ -343,10 +353,10 @@ export async function finalizeEaCapture({db,bucket,leagueId,sessionId,collection
   const rosterCarryForward = await rosterCarryForwardEligibility(db,leagueId,report);
   const readiness = reportImportReadiness(report,{rosterCarryForward});
   readiness.ready = readiness.ready && missing.length === 0
-    && (manifest.currentPeriod.stage!=='offseason'||rosterComplete);
+    && (!['preseason','offseason'].includes(manifest.currentPeriod.stage)||rosterComplete);
   readiness.missingRoutes = missing;
   const yearly = mode === 'yearly' ? yearlyHandoff(manifest,captures) : null;
-  if (yearly) readiness.ready = yearly.ready && missing.length === 0 && report.sourceVerification.passed;
+  if (yearly) readiness.ready = readiness.ready && yearly.ready;
   const retained = await retainReport(db,manifest,report,readiness,actorId);
   const links = captures.map(item=>db.prepare(`INSERT OR IGNORE INTO madden_discovery_session_captures
     (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`)
@@ -355,7 +365,7 @@ export async function finalizeEaCapture({db,bucket,leagueId,sessionId,collection
   await db.prepare(`UPDATE madden_discovery_sessions SET status=?,capture_count=?,completed_at=?,updated_at=? WHERE league_id=? AND id=?`)
     .bind(readiness.ready?'passed':'review_required',captures.length,retained.generatedAt,retained.generatedAt,leagueId,sessionId).run();
   let readyPointerChanged = false, yearlyScheduleImportId = null;
-  if (publishReady && readiness.ready && mode === 'weekly') {
+  if (publishReady && readiness.ready && ['weekly','yearly'].includes(mode)) {
     const changed = await db.prepare(`UPDATE companion_league_export_endpoints SET latest_session_id=?,latest_session_token_version=NULL,
       latest_report_id=?,latest_ready_report_id=?,last_received_at=?,last_analyzed_at=?,analysis_requested_at=NULL,updated_at=?
       WHERE league_id=? AND status='active' AND latest_session_id IS ? AND latest_report_id IS ? AND last_received_at IS ?
@@ -395,7 +405,7 @@ export async function finalizeEaCapture({db,bucket,leagueId,sessionId,collection
     sourceSeasonId:manifest.sourceSeasonId,gameYearId:manifest.gameYearId,franchiseSeasonId:manifest.franchiseSeasonId,
     retainedCaptureCount:manifest.requests.length,acceptedCaptureCount:captures.length,rosterComplete,readyPointerChanged,
     yearlyScheduleImportId,yearlyScheduleCoverage:yearly?.coverage || null,previewVerified:mode==='preview' && readiness.ready,
-    message:mode==='weekly' && publishReady && readiness.ready && !readyPointerChanged
+    message:['weekly','yearly'].includes(mode) && publishReady && readiness.ready && !readyPointerChanged
       ? 'Another export arrived during EA collection. The EA source is retained; start a new sync when the export finishes.' : null,
     activationPerformed:false,
     activeSnapshotChanged:false,discordScheduleSyncPerformed:false,freeAgentInterpretedAsZero:false};

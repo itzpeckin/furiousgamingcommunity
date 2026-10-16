@@ -166,7 +166,7 @@ export function reportImportReadiness(inputReport = {}, {rosterCarryForward=null
     && requirements.statistics.routes.length > 0;
   const sourcePassed = report.sourceVerification?.passed === true;
   const offseason = report.sourceMarkers?.currentPeriod?.status==='proven'
-    &&report.sourceMarkers.currentPeriod.period?.stage==='offseason'
+    &&['offseason','preseason'].includes(report.sourceMarkers.currentPeriod.period?.stage)
     &&report.sourceMarkers.eaCollection?.complete===true;
   const ready = sourcePassed
     && located('teams')

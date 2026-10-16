@@ -6,6 +6,8 @@ import { automaticScheduleDecision } from './discord-schedule-transition.js';
 import { createRandomToken, hashToken } from './auth.js';
 import { summaryGameFinal } from '../../league-engine/game-summary.js';
 import { syncDiscordGameResults } from './discord-game-results.js';
+import { boundedMap } from './bounded-map.js';
+import { scheduleFetch } from './discord-schedule-fetch.js';
 
 const SNOWFLAKE = /^[0-9]{17,20}$/;
 const clean = value => String(value ?? '').trim();
@@ -165,19 +167,24 @@ async function syncPresentation(env,db,{record,message,commissioners,leagueId,sn
   try {
     await guard();
     // Only current active threads can be reopened. Retired history never enters this path.
-    await discordBotRequest(env,`/channels/${encodeURIComponent(record.discord_thread_id)}`,{
-      method:'PATCH',body:{name:message.name,archived:false},fetchImpl
-    });
-    cached.name=message.name;await save();
+    if(cached.name!==message.name){
+      await discordBotRequest(env,`/channels/${encodeURIComponent(record.discord_thread_id)}`,{
+        method:'PATCH',body:{name:message.name,archived:false},fetchImpl
+      });
+      cached.name=message.name;
+    }
     for(const id of new Set([...message.ids,...commissioners])) {
       if(members.has(id))continue;
       await guard();
       await discordBotRequest(env,`/channels/${encodeURIComponent(record.discord_thread_id)}/thread-members/${id}`,{method:'PUT',fetchImpl});
-      members.add(id);await save();
+      members.add(id);
     }
   } catch(error) {
     if(Number(error?.status)===403)throw new Error('Discord blocked schedule access. In the Scheduling Channel permissions, allow the bot View Channel, Read Message History, Send Messages in Threads and Manage Threads. Allow commissioners View Channel and Read Message History, then use League Controls → Discord Bot → Retry Schedule Sync.');
     throw error;
+  } finally {
+    // Retain completed member additions even if one member is inaccessible.
+    await save();
   }
 }
 
@@ -228,9 +235,10 @@ async function createMatchupThread(env,db,{run,league,model,game,assignments,com
     const existing = await discordBotRequest(env, `/channels/${encodeURIComponent(starterId)}`, {fetchImpl}).catch(()=>null);
     if (Number(existing?.type) !== 11) throw error;
   }
-  await db.prepare(`UPDATE discord_schedule_threads SET discord_thread_id=?,status='active',updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-    .bind(starterId,record.id).run();
-  record={...record,discord_thread_id:starterId,status:'active'};
+  const initialPresentation=JSON.stringify({name:message.name,members:[]});
+  await db.prepare(`UPDATE discord_schedule_threads SET discord_thread_id=?,status='active',presentation_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .bind(starterId,initialPresentation,record.id).run();
+  record={...record,discord_thread_id:starterId,status:'active',presentation_json:initialPresentation};
   await syncPresentation(env,db,{record,message,commissioners,leagueId:league.id,snapshotId:model.snapshot.id,fetchImpl});
   return {created:true,record,owners:message.ids};
 }
@@ -246,15 +254,15 @@ async function archiveSupersededScheduleThreads(env,db,{
     ORDER BY created_at LIMIT ?`,leagueId,guildId,seasonYear,phase,week,limit);
   let removed=0;
   const errors=[];
-  for (const item of prior) {
+  await boundedMap(prior,4,async item=>{
     if(String((await activeSnapshot(db,leagueId))?.id)!==String(snapshotId)){
       errors.push('The active snapshot changed during schedule cleanup; remaining prior threads were preserved.');
-      break;
+      return;
     }
     const threadId=clean(item.discordThreadId);
     if (!SNOWFLAKE.test(threadId)) {
       errors.push(`A prior FranchiseHQ schedule thread for ${item.phase} Week ${item.weekIndex} has no valid Discord thread ID.`);
-      continue;
+      return;
     }
     try {
       const game=model.games.find(game=>Number(item.seasonYear)===Number(model.snapshot.season_year)
@@ -284,7 +292,7 @@ async function archiveSupersededScheduleThreads(env,db,{
           : `${item.phase} Week ${item.weekIndex}: ${discordErrorText(error)}`);
       }
     }
-  }
+  });
   const remaining=Number((await db.prepare(`SELECT COUNT(*) AS count FROM discord_schedule_threads
     WHERE league_id=? AND discord_guild_id=? AND status='active'
       AND NOT (season_year=? AND phase=? AND week_index=?)`)
@@ -303,12 +311,21 @@ export async function syncDiscordScheduleThreads(env,db,{
   maxOperations = Number.MAX_SAFE_INTEGER,
   fetchImpl = fetch
 }) {
+  fetchImpl=scheduleFetch(fetchImpl);
   const installation = await activeInstallation(db,league.id);
   if (!installation) return {ok:false,skipped:true,reason:'not-connected'};
   const active = await activeSnapshot(db,league.id);
   if (!active) return {ok:false,skipped:true,reason:'no-active-snapshot'};
   if(snapshotCurrentPeriod(active)?.stage==='offseason')return{ok:true,skipped:true,reason:'offseason-no-matchups'};
   if (snapshotId && String(active.id) !== String(snapshotId)) return {ok:false,skipped:true,reason:'snapshot-superseded'};
+  if(snapshotCurrentPeriod(active)?.stage==='preseason'){
+    const cleanup=await archiveSupersededScheduleThreads(env,db,{leagueId:league.id,snapshotId:active.id,
+      seasonYear:active.seasonYear,phase:'none',week:0,guildId:installation.guildId,
+      model:{games:[]},league,assignments:new Map(),fetchImpl,limit:maxOperations});
+    return {ok:!cleanup.errors.length,status:cleanup.errors.length?'partial':cleanup.remaining?'running':'completed',
+      hasMore:cleanup.remaining>0&&!cleanup.errors.length,nonPlaying:true,created:0,
+      archivedPriorThreads:cleanup.removed,errors:cleanup.errors,reason:'preseason-no-matchups'};
+  }
   const decision=await automaticScheduleDecision(db,league.id,active);
   const recoveryAllowed=source==='rollover-recovery'&&await recoverableScheduleDecision(db,league.id,active);
   const reconcileCurrent=await canReconcileCurrent(db,league.id,decision,active);
@@ -374,20 +391,20 @@ export async function syncDiscordScheduleThreads(env,db,{
   const owners = new Set();
   const errors = [];
   const batchStarted=Date.now();
-  for (const game of pendingGames.slice(0,bounded)) {
+  await boundedMap(pendingGames.slice(0,bounded),4,async game=>{
     try {
       if(String((await activeSnapshot(db,league.id))?.id)!==String(active.id)){
         errors.push('The active snapshot changed during schedule sync; remaining threads were preserved.');
-        break;
+        return;
       }
-      if(bounded!==Number.MAX_SAFE_INTEGER&&Date.now()-batchStarted>=30000)break;
+      if(bounded!==Number.MAX_SAFE_INTEGER&&Date.now()-batchStarted>=30000)return;
       const result = await createMatchupThread(env,db,{run,league,model,game,assignments,commissioners,phase:targetPhase,week:targetWeek,fetchImpl});
       if (result.created) created += 1;
       result.owners.forEach(id=>owners.add(id));
     } catch (error) {
       errors.push(discordErrorText(error));
     }
-  }
+  });
   const existingCount = Number((await db.prepare(`SELECT COUNT(*) AS count FROM discord_schedule_threads
     WHERE league_id=? AND season_year=? AND phase=? AND week_index=? AND status='active'`)
     .bind(league.id,active.seasonYear,targetPhase,targetWeek).first())?.count || 0);
@@ -445,7 +462,7 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     const response=await binding.fetch('https://franchise-import.internal/schedule/start',{
       method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
         leagueSlug:league.slug,origin,snapshotId,source:effectiveSource,
-        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v1:${presentationKey}`,importAuthToken:token
+        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v2:${presentationKey}`,importAuthToken:token
       })
     }).catch(()=>null);
     if(!response)return{scheduled:false,reason:'durable-schedule-start-failed',
@@ -458,7 +475,7 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     const schedule=await syncDiscordScheduleThreads(context.env,db,{
       league,snapshotId,week,channelId:installation.scheduleChannelId,requestedByUserId,source:effectiveSource
     });
-    if(!schedule.ok||schedule.hasMore)return schedule;
+    if(!schedule.ok||schedule.hasMore||schedule.nonPlaying)return schedule;
     const results=await syncDiscordGameResults(context.env,db,{league,snapshotId,maxOperations:32});
     return {...schedule,results};
   })();
@@ -478,6 +495,8 @@ export async function latestDiscordScheduleSync(db,leagueId) {
     FROM discord_schedule_sync_runs WHERE league_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1`)
     .bind(leagueId).first();
   if(active){
+    if(snapshotCurrentPeriod(active)?.stage==='preseason'&&!await db.prepare(`SELECT id FROM discord_schedule_threads
+      WHERE league_id=? AND status='active' LIMIT 1`).bind(leagueId).first())return{status:'not-required',phase:'preseason',seasonYear:active.seasonYear,reason:'preseason-no-matchups',reviewRequired:false};
     if(snapshotCurrentPeriod(active)?.stage==='offseason')return{status:'not-required',phase:'offseason',seasonYear:active.seasonYear,reason:'offseason-no-matchups',reviewRequired:false};
     const decision=await automaticScheduleDecision(db,leagueId,active);
     const period=snapshotCurrentPeriod(active);

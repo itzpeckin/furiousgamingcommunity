@@ -21,7 +21,7 @@ import {
 const RELEASE='8.0.9';
 const BUILD_MODE='checkpointed-domain-v3';
 const LEGACY_BUILD_MODES=Object.freeze(['checkpointed-domain-v2']);
-const BUILD_PLAN_REVISION='retained-schedule-team-bridge-v2';
+const BUILD_PLAN_REVISION='regular-and-playoff-only-v3';
 const BUILD_DOMAINS=Object.freeze(['teams','players','games','statistics','standings']);
 const BUILD_RECORD_LIMIT=500;
 const BUILD_SERVER_RECORD_LIMIT=4000;
@@ -197,9 +197,10 @@ function parsedPrior(records){
   return(records||[]).map(row=>parse(row.data_json)).filter(Boolean);
 }
 
-function plannedRecords(domain,items,idFn){
+export function plannedRecords(domain,items,idFn){
   const selected=new Map();
   for(const [index,item] of (items||[]).entries()){
+    if(['games','statistics'].includes(domain)&&['preseason','pre-season','pre'].includes(String(item.stage||'').toLowerCase()))continue;
     const externalId=String(idFn(item,index)??'').trim();
     if(!externalId)throw new Error(`The ${domain} build plan contains a record without an external ID.`);
     selected.set(externalId,{domain,externalId,item});

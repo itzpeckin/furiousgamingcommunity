@@ -2858,6 +2858,7 @@ test('failed archival is retryable and a thread already deleted externally is re
 test('a superseded snapshot stops commissioner membership changes and preserves thread history',async()=>{
   const f=await schedulePresentationFixture();try{
     await f.sync();seedMember(f.database,{leagueId:f.league.id,userId:'comm',role:'commissioner',teamId:null});
+    f.database.exec("UPDATE discord_schedule_threads SET presentation_json=json_set(presentation_json,'$.name','outdated title')");
     f.intercept(c=>{if(c.method==='PATCH'&&c.body.archived===false)seedActiveWeek(f.database,{leagueId:f.league.id,week:15});return null});
     const start=f.calls.length,result=await f.sync();assert.equal(result.ok,false);assert.match(result.errors[0],/active snapshot changed/);
     assert.equal(f.calls.slice(start).some(c=>c.method==='PUT'||c.body.archived===true),false);
@@ -2891,7 +2892,7 @@ test('durable schedule identity upgrades completed old jobs and changes only whe
     }}},request:new Request('https://franchisehq.app')};
     const start=()=>scheduleActiveDiscordSync(context,{db:f.db,league:f.league,snapshotId:f.snapshotId,requestedBySessionId:'session-comm'});
     await start();await start();assert.equal(starts[0].workflowKey,starts[1].workflowKey);
-    assert.match(starts[0].workflowKey,/:thread-history-v1:/);
+    assert.match(starts[0].workflowKey,/:thread-history-v2:/);
     assert.notEqual(starts[0].workflowKey,`${f.snapshotId}:candidate-import`);
     seedMember(f.database,{leagueId:f.league.id,userId:'comm2',discordId:'100000000000000022',role:'commissioner',teamId:null});
     await start();assert.notEqual(starts[2].workflowKey,starts[0].workflowKey);
@@ -2911,4 +2912,26 @@ test('offseason imports and manual sync do not dispatch or create fictional matc
     assert.equal((await f.sync()).reason,'offseason-no-matchups');assert.equal(f.calls.length,0);
     assert.equal(f.database.prepare('SELECT COUNT(*) n FROM discord_schedule_threads').get().n,0);
   }finally{f.database.close()}
+});
+
+
+test('preseason sync archives existing threads without creating preseason or future regular matchups',async()=>{
+  const f=await schedulePresentationFixture();try{
+    await f.sync();const count=f.calls.length;
+    const manifest={currentPeriod:{stage:'preseason',week:1,key:'preseason:1'},currentPeriodProof:{status:'proven'}};
+    f.database.prepare('UPDATE league_snapshots SET manifest_json=?,week_index=1 WHERE id=?').run(JSON.stringify(manifest),f.snapshotId);
+    const result=await f.sync();assert.equal(result.ok,true);assert.equal(result.created,0);assert.equal(result.archivedPriorThreads,1);
+    assert.ok(f.calls.slice(count).every(c=>c.method==='PATCH'&&c.body.archived===true&&c.body.locked===true));
+    const again=await f.sync();assert.equal(again.archivedPriorThreads,0);
+    assert.equal(f.database.prepare("SELECT COUNT(*) n FROM discord_schedule_threads WHERE status='active'").get().n,0);
+  }finally{f.database.close();}
+});
+
+test('schedule limiter serializes a shared parent, permits independent channels, and respects reset headers',async()=>{
+  const {scheduleFetch}=await import('../../functions/_lib/discord-schedule-fetch.js');
+  let clock=0,active=0,max=0;const waits=[];
+  const limited=scheduleFetch(async()=>{active++;max=Math.max(max,active);await new Promise(r=>setTimeout(r,5));active--;return Response.json({}, {headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset-after':'0.1'}});},{now:()=>clock,sleep:async ms=>{waits.push(ms);clock+=ms;}});
+  await Promise.all([limited('https://discord.com/api/v10/channels/1/messages'),limited('https://discord.com/api/v10/channels/1/messages')]);
+  assert.equal(max,1);assert.deepEqual(waits,[125]);
+  max=0;await Promise.all([limited('https://discord.com/api/v10/channels/2/messages'),limited('https://discord.com/api/v10/channels/3/messages')]);assert.equal(max,2);
 });

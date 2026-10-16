@@ -229,6 +229,9 @@
         }
         await refresh();
         if (stillCurrent(token) && collection?.mode === 'yearly') await HQ.leagueExportUrl?.refresh?.();
+        if (stillCurrent(token) && collection?.mode === 'yearly' && collection.importWorkflowId){
+          await HQ.oneClickImport?.runImport?.({workflowId:collection.importWorkflowId});
+        }
       } else schedulePoll(token);
       rerender();
       return collection;
@@ -288,7 +291,7 @@
   function collectionMarkup() {
     if (!collection) return '';
     const finished = terminalStatuses.has(collection.status);
-    if (finished && collection.mode === 'yearly' && collection.previewVerified) return '<p class="ea-direct-export-complete" role="status">Season schedule complete. Collect weekly stats in Step 3.</p>';
+    if (finished && collection.mode === 'yearly' && collection.importWorkflowId && !collection.code) return '<p class="ea-direct-export-complete" role="status">All 18 regular-season weeks collected. Automatic import progress appears below. Preseason games are excluded.</p>';
     if (finished && collection.readyToImport && collection.mode === 'weekly') return '<p class="ea-direct-export-complete" role="status">EA export complete. Use Refresh below, then Import Latest Export.</p>';
     const progress = Number(collection.progress?.percent ?? collection.progress);
     const percent = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : null;

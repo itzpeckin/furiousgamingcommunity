@@ -133,7 +133,7 @@ export async function runEaCollectionStep({ db, bucket, league, connection, job,
       initialized: true, version: 1, collectionId: job.id, connectionId: connection.id,
       externalLeagueId: String(connection.external_league_id), platform, mode: job.mode,
       sessionId: manifest.sessionId, session, hub: retainedHub, expectedRequests, cursor: 1,
-      warnings: job.mode !== 'yearly' && !validRosters ? [{ code: 'EA_ROSTER_INDEX_INCOMPLETE', dataset: 'roster', message: 'EA did not identify all 32 team rosters. Existing rosters will be retained where available.' }] : []
+      warnings: !validRosters ? [{ code: 'EA_ROSTER_INDEX_INCOMPLETE', dataset: 'roster', message: 'EA did not identify all 32 team rosters. Existing rosters will be retained where available.' }] : []
     };
     return checkpoint(state);
   }
@@ -171,7 +171,7 @@ export async function runEaCollectionStep({ db, bucket, league, connection, job,
   }
   const result = await capture.finalizeEaCapture({ ...common, sessionId: state.sessionId, mode: job.mode, actorId: job.actor_id, expectedRequests: state.expectedRequests, publishReady: job.mode !== 'preview' });
   const previewVerified = (job.mode === 'preview' || job.mode === 'yearly' && Boolean(result.yearlyScheduleImportId)) && result.readiness?.ready === true;
-  const readyToImport = job.mode === 'weekly' && result.readiness?.ready === true && result.readyPointerChanged === true;
+  const readyToImport = ['weekly','yearly'].includes(job.mode) && result.readiness?.ready === true && result.readyPointerChanged === true;
   const complete = result.readiness?.ready === true;
   const message = result.message || (previewVerified && job.mode === 'preview' ? 'Private preview verified. EA Direct is ready to collect league updates.'
     : readyToImport ? 'EA data is ready. Select Import Latest Export to publish the update.'

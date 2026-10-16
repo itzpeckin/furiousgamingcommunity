@@ -392,11 +392,15 @@ test('a partial roster stays retained and is excluded as a whole from the accept
   } finally {f.sqlite.close();}
 });
 
-test('EA yearly schedules produce a retained 18-week catalog without advancing the active week',async()=>{
-  const f=await fixture('yearly');
+for(const preseason of [false,true])test(`EA yearly schedule publishes all 18 regular weeks from ${preseason?'preseason':'regular season'}`,async()=>{
+  const hub=rawHub();
+  if(preseason){Object.assign(hub.careerHubInfo.seasonInfo,{weekTitle:'Preseason Week 1',seasonWeekType:0,seasonWeek:0,displayWeek:1});hub.availableWeekInfoList.push({stageIndex:0,weekIndex:0});}
+  const f=await fixture('yearly',hub);
   try {
-    const before={...f.sqlite.prepare('SELECT * FROM companion_league_export_endpoints').get()};
+    assert.equal(f.plan.some(r=>r.kind==='schedule'&&r.args.stageIndex===0),false);
+    if(preseason)assert.equal(f.plan.some(r=>r.kind==='statistics'),false);
     await collect(f,(request,payload)=>{
+      if(request.kind==='hub')return hub;
       if(request.kind!=='schedule') return payload;
       const week=request.args.weekIndex+1;
       const teams=Array.from({length:32},(_,i)=>i+1).filter(i=>!(week>=5&&week<=12&&Math.floor((i-1)/4)===week-5));
@@ -406,13 +410,15 @@ test('EA yearly schedules produce a retained 18-week catalog without advancing t
     });
     const result=await f.finish();
     assert.equal(result.readiness.ready,true);
-    assert.equal(result.currentPeriod.week,5);
-    assert.equal(result.readyPointerChanged,false);
+    assert.equal(result.currentPeriod.week,preseason?1:5);
+    assert.equal(result.readyPointerChanged,true);
     assert.equal(result.yearlyScheduleCoverage.capturedWeekCount,18);
     const yearly=f.sqlite.prepare('SELECT * FROM yearly_schedule_imports WHERE id=?').get(result.yearlyScheduleImportId);
     assert.equal(yearly.status,'completed');
     assert.equal(yearly.game_count,272);
-    assert.deepEqual({...f.sqlite.prepare('SELECT * FROM companion_league_export_endpoints').get()},before);
+    const reused=await generateMaddenDiscoveryReport({db:f.db,env:{COMPANION_EXPORTS:f.bucket},leagueId:f.league.id,sessionId:result.sessionId,reuseExisting:true});
+    assert.equal(reused.report.id,result.reportId);assert.equal(reused.readiness.ready,true);
+    assert.equal(f.sqlite.prepare('SELECT latest_ready_report_id FROM companion_league_export_endpoints').get().latest_ready_report_id,result.reportId);
     assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM league_active_snapshots').get().n,0);
   } finally {f.sqlite.close();}
 });
@@ -608,4 +614,49 @@ test('archived EA season gets actionable guidance and a verified preseason succe
     assert.equal(manifest.franchiseSeasonId,'next-season');
     assert.equal(f.sqlite.prepare("SELECT status FROM franchise_seasons WHERE id='ea-season'").get().status,'closed');
   }finally{f.sqlite.close();}
+});
+
+
+test('preseason captures only league information and rosters and is import-ready without games or stats',async()=>{
+  for(const week of [1,2,3,4]){
+    const hub=rawHub();Object.assign(hub.careerHubInfo.seasonInfo,{weekTitle:`Preseason Week ${week}`,seasonWeekType:0,seasonWeek:week-1,displayWeek:week});
+    hub.availableWeekInfoList.push({stageIndex:0,weekIndex:week-1});
+    const f=await fixture('weekly',hub);try{
+      assert.equal(f.plan.some(r=>['schedule','statistics'].includes(r.kind)),false);
+      assert.ok(f.plan.some(r=>r.kind==='roster'));
+      await collect(f,(r,p)=>r.kind==='hub'?hub:p);
+      const result=await f.finish();assert.equal(result.readiness.ready,true,JSON.stringify(result));
+      assert.equal(result.currentPeriod.stage,'preseason');assert.equal(result.readyPointerChanged,true);
+      const report=f.sqlite.prepare('SELECT source_markers_json,dataset_inventory_json FROM madden_discovery_reports WHERE id=?').get(result.reportId);
+      const coverage=candidateSourceCoverage({sourceMarkers:JSON.parse(report.source_markers_json),datasetInventory:JSON.parse(report.dataset_inventory_json)});
+      assert.equal(coverage.nonPlayingPeriod,true);assert.deepEqual(candidateCoverageWarnings(coverage),[]);
+    }finally{f.sqlite.close();}
+  }
+});
+
+test('season schedule publication dispatches a pinned durable import and safely replays',async()=>{
+  const {publishEaSeasonSchedule}=await import('../../functions/_lib/ea-schedule-import.js');
+  const f=await fixture('weekly');try{
+    await collect(f);const retained=await f.finish();
+    f.sqlite.exec("UPDATE ea_direct_collection_jobs SET status='completed'");
+    const calls=[],context={request:new Request('https://franchisehq.app/api/leagues/ea-test/ea-direct/collect-step'),env:{FRANCHISE_IMPORT_WORKER:{fetch:async(url,options)=>{
+      calls.push(JSON.parse(options.body));return Response.json({ok:true,id:'durable-import'});
+    }}}};
+    const args={db:f.db,league:{...f.league,slug:'ea-test'},job:{id:'collection-weekly',mode:'yearly',session_id:'ea-auth-session'},result:{...retained,readyToImport:true,yearlyScheduleImportId:'catalog'}};
+    const result=await publishEaSeasonSchedule(context,args);
+    assert.equal(result.importWorkflowId,'durable-import');assert.equal(calls[0].expectedSessionId,retained.sessionId);
+    assert.equal(calls[0].leagueSlug,'ea-test');assert.ok(calls[0].importAuthToken);
+    await publishEaSeasonSchedule(context,{...args,result});assert.equal(calls.length,1);
+    f.sqlite.exec('UPDATE companion_league_export_endpoints SET latest_ready_report_id=NULL');
+    await assert.rejects(publishEaSeasonSchedule(context,args),/newer export/);assert.equal(calls.length,1);
+    assert.equal(f.sqlite.prepare('SELECT count(*) n FROM league_active_snapshots').get().n,0);
+  }finally{f.sqlite.close();}
+});
+
+test('public schedule status waits for the durable publication handoff',async()=>{
+  const {publicEaJob}=await import('../../functions/api/leagues/[leagueSlug]/ea-direct/sync.js');
+  const row={id:'job',mode:'yearly',status:'completed',progress:100,result_json:JSON.stringify({readyToImport:true,yearlyScheduleImportId:'catalog'})};
+  assert.equal(publicEaJob(row).status,'running');
+  assert.equal(publicEaJob({...row,error_code:'EA_SCHEDULE_IMPORT_FAILED'}).status,'completed');
+  assert.equal(publicEaJob({...row,result_json:JSON.stringify({readyToImport:true,yearlyScheduleImportId:'catalog',importWorkflowId:'import'})}).status,'completed');
 });

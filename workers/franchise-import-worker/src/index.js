@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 8.2.1 */
+/* FHQ_BUILD: 8.2.15 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { NonRetryableError } from 'cloudflare:workflows';
 
-const RELEASE='8.2.1';
+const RELEASE='8.2.15';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -164,10 +164,10 @@ export class FranchiseImportWorkflow extends WorkflowEntrypoint{
     if(!context.slug||!context.origin||!context.token)throw new Error('Candidate workflow payload is incomplete.');
 
     await step.do('prepare-season-destination',()=>call(
-      context,companion(context.slug,'candidate-import'),'POST',{action:'create-destination'}
+      context,companion(context.slug,'candidate-import'),'POST',{action:'create-destination',expectedSessionId:input.expectedSessionId||null}
     ));
     const started=await step.do('start-candidate-import',()=>call(
-      context,companion(context.slug,'candidate-import'),'POST',{action:'start',retry:Boolean(input.retry)}
+      context,companion(context.slug,'candidate-import'),'POST',{action:'start',retry:Boolean(input.retry),expectedSessionId:input.expectedSessionId||null}
     ));
     context.runId=started?.run?.id||null;
     context.discoverySessionId=started?.source?.discoverySessionId||null;
@@ -285,7 +285,7 @@ export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
         result=await step.do(`schedule-batch-${index+1}`,{
           retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'2 minutes'
         },()=>call(context,companion(context.slug,'schedule-sync-job'),'POST',{
-          snapshotId,source,maxOperations:4
+          snapshotId,source,maxOperations:16
         },{acceptProgress:true}));
         if(result.status==='completed')return{ok:true,release:RELEASE,source,snapshotId,result};
         if(result.status!=='running'||!result.hasMore){

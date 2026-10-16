@@ -348,7 +348,7 @@
     }
   }
 
-  async function runImport({retry=false}={}) {
+  async function runImport({retry=false,workflowId:existingWorkflowId=null}={}) {
     if(busy)return;
     busy=true;
     const requestRevision=contextRevision;
@@ -361,7 +361,7 @@
     const wallStartedAt=now();
     let workflowId=null,consecutivePollFailures=0;
     try{
-      const started=await api('import-job','POST',{
+      const started=existingWorkflowId?{id:existingWorkflowId}:await api('import-job','POST',{
         retry,sourceFingerprint:state?.source?.sourceFingerprint||''
       });
       workflowId=started.id;

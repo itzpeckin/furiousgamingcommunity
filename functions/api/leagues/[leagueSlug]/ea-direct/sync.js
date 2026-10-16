@@ -7,9 +7,10 @@ import { authorizedEaState, configured, readEaBody, fail, eaErrorResponse, activ
 export function publicEaJob(row){
   if(!row)return null;
   let result={};try{result=JSON.parse(row.result_json||'{}');}catch{}
-  return{id:row.id,mode:row.mode,status:row.status,step:row.step,progress:Number(row.progress||0),message:row.message,
+  const publishing=row.status==='completed'&&row.mode==='yearly'&&result.readyToImport&&result.yearlyScheduleImportId&&!result.importWorkflowId&&!row.error_code;
+  return{id:row.id,mode:row.mode,status:publishing?'running':row.status,step:publishing?'Starting season schedule import':row.step,progress:Number(row.progress||0),message:row.message,
     code:row.error_code,coverage:result.coverage||null,readyToImport:Boolean(result.readyToImport),
-    previewVerified:Boolean(result.previewVerified),private:row.mode==='preview',activationPerformed:false,
+    previewVerified:Boolean(result.previewVerified),importWorkflowId:result.importWorkflowId||null,private:row.mode==='preview',activationPerformed:false,
     createdAt:row.created_at,completedAt:row.completed_at};
 }
 export async function onRequestGet(context){
