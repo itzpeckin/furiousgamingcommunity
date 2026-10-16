@@ -203,12 +203,12 @@ test('yearly collection requests all 18 regular schedules plus the roster and cu
   assert.equal(finalized[0].mode, 'yearly');
 });
 
-test('unavailable rosters and Free Agents remain failed evidence while weekly data finishes', async () => {
+test('nonretryable unavailable rosters and Free Agents remain failed evidence while weekly data finishes', async () => {
   const { options, stored } = fixture();
   const original = options.client.dataset;
   options.client.dataset = async (...args) => {
     if (args[4] === 'freeagents' || args[4] === 'roster' && args[5].teamId === 7) {
-      throw new EaClientError('EA_TEMPORARILY_UNAVAILABLE', 'EA is busy.', { retryable: true });
+      throw new EaClientError('EA_REQUEST_FAILED', 'EA did not provide this dataset.');
     }
     return original(...args);
   };
@@ -219,6 +219,26 @@ test('unavailable rosters and Free Agents remain failed evidence while weekly da
   assert.ok(failures.every(item => item.payload.rosterInfoList === undefined));
   assert.equal(result.result.datasetWarnings.length, 2);
   assert.equal(result.state.expectedRequests.filter(item => item.kind === 'roster').length, 32);
+});
+
+test('temporary roster and Free Agent failures retain the checkpoint for Workflow retry', async () => {
+  for (const kind of ['roster','free-agents']) {
+    const {options,stored,finalized}=fixture('yearly');
+    const initial=await runEaCollectionStep(options);
+    initial.state.cursor=initial.state.expectedRequests.findIndex(item=>item.kind===kind);
+    const saved=structuredClone(initial.state),before=stored.length;
+    const original=options.client.dataset;
+    options.client.dataset=async()=>{throw new EaClientError('EA_TEMPORARILY_UNAVAILABLE','EA is busy.',{retryable:true});};
+    await assert.rejects(runEaCollectionBatch({...options,state:structuredClone(saved)},{batchSize:4}),error=>error.retryable&&error.code==='EA_TEMPORARILY_UNAVAILABLE');
+    assert.equal(stored.length,before,'a temporary outage is not retained as unavailable evidence');
+    assert.equal(finalized.length,0);
+    options.client.dataset=original;
+    const retry=await runEaCollectionBatch({...options,state:structuredClone(saved)},{batchSize:1});
+    assert.equal(retry.state.cursor,saved.cursor+1);
+    assert.equal(stored.at(-1).kind,kind);
+    assert.equal(stored.at(-1).payload.success,true);
+    assert.deepEqual(retry.state.warnings,[]);
+  }
 });
 
 test('expired authorization cannot be swallowed as an optional roster outage', async () => {

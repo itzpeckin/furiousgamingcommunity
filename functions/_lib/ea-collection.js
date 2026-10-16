@@ -153,6 +153,9 @@ export async function runEaCollectionStep({ db, bucket, league, connection, job,
     try {
       payload = await client.dataset(token, state.session, platform, externalLeagueId, datasetKind(item), item.args);
     } catch (error) {
+      // Temporary provider failures must reach the Workflow's bounded backoff.
+      // Treating them as optional missing data permanently skipped fresh rosters.
+      if (error instanceof EaClientError && error.retryable) throw error;
       if (!['roster', 'free-agents'].includes(item.kind) || isAuthenticationFailure(error) || !(error instanceof EaClientError)) throw error;
       // Retain unavailability explicitly. The adapter excludes an incomplete roster domain.
       payload = { success: false, error: { code: error.code }, message: 'EA did not provide this dataset.' };
