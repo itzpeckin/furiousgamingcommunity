@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.14",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 54,
+      "candidateRequiresMigration": false
+    },
+    "archiveRecoveryRehearsal": {
+      "snapshotId": "e61457b3-8541-4aa9-b4de-98209c0dcfb4",
+      "seasonId": "franchise_season_1905bf4f-bdf6-4712-a541-ec53aa93fa6d",
+      "rosterPlayers": 1607,
+      "statisticRows": 15508,
+      "retainedStatisticRows": 14938,
+      "matchedStatisticRows": 14938,
+      "playersWithStatistics": 1125,
+      "summaryCount": 1854,
+      "newIdentities": 375,
+      "newAliases": 375,
+      "summaryDigest": "ddbd2307730fad1c598bbde7ddbceefef4f4888ca990b8f0c71a431290522aee",
+      "rehearsalPassed": true,
+      "idempotencyPassed": true,
+      "rollbackPassed": true,
+      "foreignKeysClean": true,
+      "statementCount": 27
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 573,
+      "log": "outputs/fhq8214-strict.txt"
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveEaCollection": false,
+    "leagueSettingsChanged": false,
+    "separateWorkerChanged": false,
+    "discordChanged": false,
+    "archiveRecoveryPlanned": true
+  }
+}

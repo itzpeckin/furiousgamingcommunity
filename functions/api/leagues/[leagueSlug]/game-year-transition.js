@@ -20,10 +20,7 @@ import { requireCommissioner } from '../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../_lib/league-teams.js';
 import { buildGmSeasonSummaries } from '../../../_lib/gm-career.js';
 import { ensureDraftPickHorizon } from '../../../_lib/draft-pick-baselines.js';
-import {
-  buildArchivedPlayerSeasonTotals,
-  emptyArchivedPlayerSeasonTotals
-} from '../../../_lib/player-season-history.js';
+import { planPlayerSeasonFreeze, playerSeasonFreezeStatements } from '../../../_lib/player-season-freeze.js';
 
 const RELEASE = GAME_YEAR_TRANSITION_RELEASE;
 const PAGE_SIZE = 250;
@@ -168,27 +165,14 @@ async function gmSeasonFreeze(current,franchiseSeasonId,snapshotId){
 }
 
 async function playerSeasonFreeze(current,franchiseSeason,snapshotId,summaries){
-  const [records,aliases]=await Promise.all([
-    all(current.db,`SELECT data_json FROM league_snapshot_records
-      WHERE league_id=? AND snapshot_id=? AND domain='statistics' ORDER BY external_id`,current.league.id,snapshotId),
-    all(current.db,`SELECT source_player_id,player_identity_id FROM player_source_aliases
-      WHERE league_id=? ORDER BY source_player_id`,current.league.id)
+  const [records,players,aliases]=await Promise.all([
+    all(current.db,`SELECT data_json FROM league_snapshot_records WHERE league_id=? AND snapshot_id=? AND domain='statistics' ORDER BY external_id`,current.league.id,snapshotId),
+    all(current.db,`SELECT external_id,data_json FROM league_snapshot_records WHERE league_id=? AND snapshot_id=? AND domain='players' ORDER BY external_id`,current.league.id,snapshotId),
+    all(current.db,`SELECT source_player_id,player_identity_id FROM player_source_aliases WHERE league_id=? AND source_system=? AND source_franchise_id=? ORDER BY source_player_id`,current.league.id,franchiseSeason.source_system,franchiseSeason.source_franchise_id)
   ]);
-  const built=buildArchivedPlayerSeasonTotals({
-    records,aliases,seasonYear:franchiseSeason.season_year,sourceSnapshotId:snapshotId
-  });
-  const empty=emptyArchivedPlayerSeasonTotals({seasonYear:franchiseSeason.season_year,sourceSnapshotId:snapshotId});
-  const frozen=summaries.map(summary=>({
-    ...summary,
-    season_totals_json:JSON.stringify(built.byIdentity.get(String(summary.player_identity_id))||empty)
-  }));
-  const payload=Object.fromEntries(frozen.map(summary=>[summary.player_identity_id,parse(summary.season_totals_json,{})]));
-  const statements=frozen.length?[current.db.prepare(`UPDATE player_season_summaries SET
-      season_totals_json=(SELECT value FROM json_each(?) frozen WHERE frozen.key=player_season_summaries.player_identity_id),
-      last_seen_at=last_seen_at
-      WHERE league_id=? AND franchise_season_id=?`)
-    .bind(jsonBind(payload,'Player season summaries'),current.league.id,franchiseSeason.id)]:[];
-  return{...built,frozen,statements,summaryCount:frozen.length};
+  const options={leagueId:current.league.id,season:franchiseSeason,snapshotId,records,players,aliases,summaries};
+  const plan=await planPlayerSeasonFreeze(options);
+  return{...plan,statements:playerSeasonFreezeStatements(current.db,{...options,plan})};
 }
 
 async function nextSeasonOwnership(current,franchiseSeasonId,teams){

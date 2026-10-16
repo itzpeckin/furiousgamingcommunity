@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.14",
+  "releaseType": "season-turnover-and-archive-repair",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.13",
+    "tag": "v8.2.13",
+    "commit": "a99f74ef260d803147ef0b8617668837857cfc95"
+  },
+  "implementationBranch": "fix/8.2.14-season-turnover",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.13",
+    "candidateRelease": "8.2.14",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.14/release-record.md",
+    "releases/8.2.14/validation-evidence.json",
+    "releases/8.2.14/recovery-plan.md"
+  ]
+}

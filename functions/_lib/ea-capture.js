@@ -1,3 +1,4 @@
+import { EaClientError } from './ea-client.js';
 import { prepareEaFirstSeason } from './ea-season-setup.js';
 import { boundedMap } from './bounded-map.js';
 import { sha256Hex, summarizePayloadShape } from './cloud-platform.js';
@@ -19,7 +20,7 @@ const ACTIVE_COLLECTION_SQL = `SELECT 1 FROM ea_direct_collection_jobs job
     AND member.active=1 AND member.role='commissioner'`;
 const text = value => String(value ?? '').trim();
 const integer = value => value !== null && value !== undefined && text(value) !== '' && Number.isInteger(Number(value)) ? Number(value) : null;
-const fail = message => { throw Object.assign(new Error(message), {status:409}); };
+const fail = message => { throw new EaClientError('EA_CAPTURE_UNAVAILABLE',message,{status:409}); };
 const safeId = value => /^[a-zA-Z0-9._:-]{1,120}$/.test(text(value)) ? text(value) : fail('The EA collection identity is invalid.');
 const manifestKey = (leagueId, collectionId) => `ea-direct/by-tenant/${safeId(leagueId)}/collections/${safeId(collectionId)}/manifest.json`;
 const period = (stageIndex, weekIndex) => {
@@ -164,7 +165,22 @@ async function scopedSeason(db, leagueId, hub, externalLeagueId) {
   // A calendar-only hub must identify exactly one already prepared season.
   // Never derive a source season index from a year offset or latest snapshot.
   if (rows.results?.length!==1 || !row || (hub.seasonYear !== null && row.season_year !== null && Number(row.season_year) !== hub.seasonYear)) {
-    fail('The selected EA franchise, season, and Madden edition do not match this league’s prepared season. If Madden has started the next season, open Commish HQ → Command Center → Archive Season to prepare it, then collect again. Reconnecting EA will not fix a season mismatch.');
+    const prepared=await db.prepare(`SELECT season.season_year FROM franchise_seasons season
+      JOIN game_year_franchise_seasons linked ON linked.franchise_season_id=season.id AND linked.league_id=season.league_id
+      JOIN league_game_years game_year ON game_year.id=linked.game_year_id AND game_year.league_id=season.league_id
+      WHERE season.league_id=? AND season.source_franchise_id=? AND season.game_release=?
+        AND season.status IN ('active','preview') AND game_year.status IN ('active','restored','preparing') LIMIT 2`)
+      .bind(leagueId,text(externalLeagueId),hub.gameRelease).all();
+    const next=prepared.results?.length===1?prepared.results[0]:null;
+    const preparedAhead=next && hub.seasonYear!==null && Number(next.season_year)>hub.seasonYear;
+    const message=preparedAhead
+      ? `FHQ has already prepared season ${Number(next.season_year)}, but EA is still reporting season ${hub.seasonYear}. Your archive is safe. After Madden finishes advancing, retry the EA export in Command Center → Madden Import. Do not archive again or disconnect EA. If this repeats, contact support with the export reference.`
+      : 'EA’s franchise, season, and Madden edition do not match a prepared season in FHQ. Open Commish HQ → Command Center and check the season. Use Archive Season only if the next season has not already been prepared. Reconnecting EA will not fix a season mismatch.';
+    const error=new EaClientError('EA_SEASON_MISMATCH',message,{status:409});
+    error.seasonDiagnostic={reportedYear:hub.seasonYear,preparedYear:next?Number(next.season_year):null,
+      sourceSeasonIdPresent:Boolean(hub.sourceSeasonId),matchingSeasonCount:rows.results?.length||0,
+      preparedSeasonCount:prepared.results?.length||0,stage:hub.currentPeriod.stage,week:hub.currentPeriod.week};
+    throw error;
   }
   return row;
 }

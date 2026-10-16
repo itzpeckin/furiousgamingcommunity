@@ -1198,3 +1198,7 @@ Requested: per-league rushing/passing stat selection, minimum/maximum values, an
 ## 8.2.13 — Offseason continuity and Free Agents
 
 Requested: repair the entire offseason/new-season path and make EA Free Agents available. Implemented native offseason clock handling, current-phase-independent completed-season history preservation, fresh roster/FA collection, exact prepared-season turnover guidance and a direct Players-page Free Agents filter. Fake offseason schedule requirements and automatic matchup dispatch are removed. Live provider acceptance remains an owner collection; billing/cost cleanup remain deferred. See releases/8.2.13/release-record.md.
+
+## 8.2.14 - Season turnover and archive continuity
+
+Repair empty EA playoff placeholders, preserve actionable season mismatch errors, finish rejected capture jobs, and seed missing career summaries during Archive Season. Recover only FGC's missing 2027 summaries from its frozen snapshot under the documented guarded plan. Fresh live preseason collection remains acceptance; do not rearchive or reconnect as a season workaround. Billing, cost cleanup and other roadmap work remain deferred. See releases/8.2.14/release-record.md.

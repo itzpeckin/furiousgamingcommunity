@@ -1,3 +1,4 @@
+import { planPlayerSeasonFreeze, playerSeasonFreezeStatements } from '../../functions/_lib/player-season-freeze.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
@@ -269,7 +270,7 @@ test('one Archive Season action freezes History Books and prepares the next seas
       WHERE league_id='league-1' AND franchise_season_id='season-1' AND frozen_at IS NOT NULL`).get().count,1);
     assert.equal(database.prepare(`SELECT COUNT(*) count FROM team_ownership_periods
       WHERE league_id='league-1' AND franchise_season_id=? AND ended_at IS NULL`).get(prepared.id).count,1);
-    assert.equal(payload.result.playerSeasonSummaryCount,1);
+    assert.equal(payload.result.playerSeasonSummaryCount,2);
     assert.equal(payload.result.playersWithStatistics,1);
     assert.equal(payload.result.carriedOwnershipAssignments,1);
     assert.equal(database.prepare(`SELECT status FROM companion_import_destinations WHERE id='destination-1'`).get().status,'archived');
@@ -657,4 +658,38 @@ test('legacy broad reset is retired and source guards retain separate authoritie
   assert.match(ui,/data-game-year-archive-panel/);
   assert.match(html,/league-engine\/game-year-transition\.js\?v=8\.0\.3/);
   assert.doesNotMatch(commissioner,/\/reset-data/);
+});
+
+
+test('Archive Season seeds missing summaries and identities from retained roster and departed-player statistics',async()=>{
+  const {database,token}=await fixture();try{
+    database.exec("DELETE FROM player_season_summaries WHERE league_id='league-1'");
+    database.prepare(`INSERT INTO league_snapshot_records(snapshot_id,league_id,domain,external_id,data_json) VALUES('snapshot-1','league-1','statistics','departed',?)`)
+      .run(JSON.stringify({category:'rushing',stage:'regular-season',player_external_id:'departed',player_name:'Departed Player',metrics_json:JSON.stringify({rushAtt:10,rushYds:90})}));
+    const response=await onRequestPost(context({db:d1(database),token,archives:bucket(),sources:bucket(),method:'POST',body:{action:'archive-franchise-season',gameYearId:'game-year-27'}}));
+    const payload=await response.json();assert.equal(response.status,200,JSON.stringify(payload));
+    assert.equal(payload.result.playerSeasonSummaryCount,3);assert.equal(payload.result.playersWithStatistics,2);
+    assert.equal(payload.result.matchedStatisticRows,2);
+    const rows=database.prepare(`SELECT alias.source_player_id,summary.season_totals_json FROM player_season_summaries summary JOIN player_source_aliases alias ON alias.player_identity_id=summary.player_identity_id AND alias.league_id=summary.league_id WHERE summary.franchise_season_id='season-1'`).all();
+    assert.equal(JSON.parse(rows.find(row=>row.source_player_id==='p1').season_totals_json).categories.passing.passYds,275);
+    assert.equal(JSON.parse(rows.find(row=>row.source_player_id==='departed').season_totals_json).categories.rushing.rushYds,90);
+    assert.equal(database.prepare("SELECT snapshot_id FROM league_active_snapshots WHERE league_id='league-1'").get().snapshot_id,'snapshot-1');
+    assert.equal(database.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{database.close();}
+});
+
+
+test('archive identity preparation rejects a concurrent alias change atomically and ignores another franchise',async()=>{
+  const {database}=await fixture();try{
+    const season=database.prepare("SELECT * FROM franchise_seasons WHERE id='season-1'").get();
+    const plan=await planPlayerSeasonFreeze({leagueId:'league-1',season,snapshotId:'snapshot-1',
+      players:[{external_id:'p2',data_json:'{"display_name":"Player Two"}'}],
+      aliases:[{league_id:'league-1',source_system:season.source_system,source_franchise_id:'other',source_player_id:'p2',player_identity_id:'identity-p1'}]});
+    assert.equal(plan.identities.length,1);assert.notEqual(plan.frozen[0].player_identity_id,'identity-p1');
+    database.exec(`INSERT INTO player_source_aliases(league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id) VALUES('league-1','ea-madden-companion','742482','p2','identity-p1','season-1','season-1')`);
+    const before=database.prepare('SELECT COUNT(*) n FROM player_identities').get().n;
+    await assert.rejects(d1(database).batch(playerSeasonFreezeStatements(d1(database),{leagueId:'league-1',season,plan})),/NOT NULL/);
+    assert.equal(database.prepare('SELECT COUNT(*) n FROM player_identities').get().n,before);
+    assert.equal(database.prepare('SELECT COUNT(*) n FROM player_season_summaries').get().n,1);
+  }finally{database.close();}
 });

@@ -51,7 +51,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestGet as getCandidateImport, onRequestPost as candidateImport, retainedPeriodBundle } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { onRequestPost as startImportJob } from '../../functions/api/leagues/[leagueSlug]/companion/import-job.js';
-import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames, selectRetainedScheduleCaptures } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
+import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames, selectRetainedScheduleCaptures, isUnassignedSchedulePlaceholder } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
 import { onRequestPost as mapPlayers, rebaseCarriedRoster } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { onRequestPost as mapStatistics, authoritativeStatisticsPeriod, selectAuthoritativeStatisticsCaptures, statisticsRouteOptionalEmpty, statisticsRouteOutsideCandidateScope } from '../../functions/api/leagues/[leagueSlug]/companion/map-statistics.js';
 import { onRequestPost as buildSnapshot } from '../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js';
@@ -585,10 +585,10 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-statistics-selection-v12');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-statistics-selection-v13');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:retained-statistics-selection-v12'
+    'report:capture:identity:destination:retained-statistics-selection-v13'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
 });
@@ -1396,4 +1396,16 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(lifecycle,/Math\.min\(4,Number\(body\.batches\)/);
   assert.match(worker,/limit:2000,batches:4/);
   assert.match(worker,/reuseExisting:true/);
+});
+
+
+test('empty EA postseason bracket placeholders are omitted without hiding malformed real games',()=>{
+  const placeholder={scheduleId:545784136,homeTeamId:0,awayTeamId:0,homeScore:0,awayScore:0,stageIndex:1,weekIndex:18,status:1};
+  for(const weekIndex of [18,19,20,22])assert.equal(isUnassignedSchedulePlaceholder({...placeholder,weekIndex}),true);
+  for(const change of [{homeTeamId:1},{awayTeamId:2},{homeScore:7},{awayScore:3},{weekIndex:0},{stageIndex:0},{status:2},{completed:true}]){
+    assert.equal(isUnassignedSchedulePlaceholder({...placeholder,...change}),false,JSON.stringify(change));
+  }
+  const blank={externalId:'empty',sourceRecord:placeholder};
+  const actual={externalId:'actual',sourceRecord:{...placeholder,homeTeamId:10,awayTeamId:20}};
+  assert.deepEqual(selectAuthoritativeScheduleGames([blank,actual]),[actual]);
 });
