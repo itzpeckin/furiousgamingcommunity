@@ -688,7 +688,7 @@ async function updateCommissionerDiscord(action,detail={}){
  commissionerDiscordSaving=true;
  commissionerDiscordRevision+=1;commissionerDiscordLoading=null;
  const slug=commissionerLeagueSlug(),revision=commissionerDiscordRevision,body={action,...detail};
- const controls=Array.from(document.querySelectorAll('[data-save-discord-channels],[data-retry-discord-schedule],[data-disable-discord-installation],[data-save-coaching],[data-save-loadouts]'));
+ const controls=Array.from(document.querySelectorAll('[data-save-discord-channels],[data-launch-discord-week-one],[data-retry-discord-schedule],[data-disable-discord-installation],[data-save-coaching],[data-save-loadouts]'));
  const disabled=controls.map(button=>button.disabled);controls.forEach(button=>{button.disabled=true;});
  try{
   const response=await fetch('/api/leagues/'+encodeURIComponent(slug)+'/discord',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json',accept:'application/json'},body:JSON.stringify(body)}),data=await response.json().catch(()=>({}));
@@ -700,6 +700,7 @@ async function updateCommissionerDiscord(action,detail={}){
    'configure-coaching':['Coaching checks saved','Archetype checks use this league’s channels and rules.'],
    'disable':['Discord connection disabled','The server mapping is retained for reconnection.'],
    'configure-channels':['Discord routing saved','New messages will use these server channels.'],
+   'launch-week-one':['Week 1 launch requested','Regular-season threads are being prepared. Preseason games remain excluded. Select Refresh Status to check progress.'],
    'retry-schedule-sync':['Schedule sync requested','Select Refresh Status to check progress. Existing tracked threads are reused; prior-week cleanup requires a verified week advance.']
   };
   showToast(...(messages[action]||['Discord connection saved','This Discord server is connected to this league.']));
@@ -1134,6 +1135,7 @@ function applyCommissionerRuleFormat(key,command,value=null){const editor=docume
 document.addEventListener('selectionchange',()=>{const selection=window.getSelection();if(!selection?.rangeCount)return;const node=selection.anchorNode?.nodeType===Node.ELEMENT_NODE?selection.anchorNode:selection.anchorNode?.parentElement;if(node?.closest?.('[data-rule-richtext]'))commissionerRuleSelection=selection.getRangeAt(0).cloneRange()});
 document.addEventListener('mousedown',event=>{if(event.target.closest('[data-rule-format]'))event.preventDefault()});
 document.addEventListener('click',event=>{
+ const launchWeekOne=event.target.closest('[data-launch-discord-week-one]');if(launchWeekOne){event.preventDefault();event.stopImmediatePropagation();if(!launchWeekOne.disabled)updateCommissionerDiscord('launch-week-one',{snapshotId:commissionerDiscordCache?.scheduleSync?.seasonOpening?.snapshotId});return;}
  const retrySchedule=event.target.closest('[data-retry-discord-schedule]');if(retrySchedule){event.preventDefault();event.stopImmediatePropagation();if(!retrySchedule.disabled)updateCommissionerDiscord('retry-schedule-sync');return;}
  let discordAction=event.target.closest('[data-disable-discord-installation]');if(discordAction){event.preventDefault();event.stopImmediatePropagation();if(confirm('Disable Discord commands for this league? The retained server mapping can be restored later.'))updateCommissionerDiscord('disable');return}
  discordAction=event.target.closest('[data-refresh-discord-installation]');if(discordAction){event.preventDefault();event.stopImmediatePropagation();commissionerDiscordCache=null;loadCommissionerDiscord(true).then(()=>renderCommissioner('controls'));return}
@@ -1249,12 +1251,13 @@ document.addEventListener('click',event=>{
  }).finally(()=>{button.disabled=false;button.textContent='Save Archetype Rules';});
 });
 function renderDiscordScheduleRecovery(data){
- const sync=data.scheduleSync||{},status=sync.status||'not-started';
- const labels={completed:'Schedule threads synchronized',running:'Schedule sync in progress',partial:'Some schedule threads need attention',failed:'Schedule sync needs attention','review-required':'Schedule period needs checking','not-required':'No week advance to process','not-started':'Schedule sync not started'};
- const waiting=status==='running',failed=['partial','failed'].includes(status);
+ const sync=data.scheduleSync||{},status=sync.status||'not-started',opening=sync.seasonOpening;
+ const launch=opening?'<p>'+escapeHtml(opening.reason)+'</p><button type="button" class="button button--primary" data-launch-discord-week-one '+(opening.ready?'':'disabled')+'>'+(opening.launched?'Sync Week 1 Threads':'Launch Week 1 Discord Threads')+'</button>':'';
+ const labels={pending:'Week 1 launch queued',completed:'Schedule threads synchronized',running:'Schedule sync in progress',partial:'Some schedule threads need attention',failed:'Schedule sync needs attention','review-required':'Schedule period needs checking','not-required':'No week advance to process','not-started':'Schedule sync not started'};
+ const waiting=['pending','running'].includes(status),failed=['partial','failed'].includes(status);
  const next=failed?'Check the schedule channel permissions for View Channel, Read Message History, Send Messages, Create Public Threads, Send Messages in Threads, and Manage Threads. Then retry below.':waiting?'Select Refresh Status to check progress. If progress has stopped, Retry Schedule Sync reconnects to the existing job or resumes a failed attempt.':status==='review-required'?'Refresh the importer and confirm that the live season and week match Madden before retrying.':'Retry updates game-status icons and adds linked commissioners to current matchup threads. On a verified advance, prior threads are archived and locked after the new week is ready. Browse past conversations in the Scheduling Channel’s archived threads.';
  return '<section class="card" data-discord-schedule-recovery><div class="card-header"><div><h3>'+escapeHtml(labels[status]||'Schedule status unavailable')+'</h3><p>'+escapeHtml(next)+'</p></div></div>'
-  +(sync.lastError?'<details><summary>Failure details</summary><p>'+escapeHtml(sync.lastError)+'</p></details>':'')
+  +launch+(sync.lastError?'<details><summary>Failure details</summary><p>'+escapeHtml(sync.lastError)+'</p></details>':'')
   +'<p>Last update: '+escapeHtml(commissionerDate(sync.updatedAt||sync.completedAt||sync.createdAt))+'</p><div class="discord-installation-actions"><button type="button" class="button button--primary" data-retry-discord-schedule '+(data.installation?.scheduleChannelId?'':'disabled')+'>Retry Schedule Sync</button><button type="button" class="button button--ghost" data-refresh-discord-installation>Refresh Status</button></div></section>';
 }
 function renderCommissionerDiscordControls(){

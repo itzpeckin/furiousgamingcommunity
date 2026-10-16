@@ -8134,3 +8134,10 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 
 [data-gameplay-controls] input[type="checkbox"] { width: 20px; height: 20px; min-height: 0; padding: 0; margin: 0 8px 0 0; vertical-align: middle; }
 [data-gameplay-controls] fieldset > .field > span { display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: none; letter-spacing: normal; }
+
+/* Explicit regular-season launch while Madden remains in preseason. */
+.commissioner-season-opening{margin:16px 0;padding:16px;border:1px solid rgba(91,132,255,.3);border-radius:16px;background:rgba(91,132,255,.06)}
+.commissioner-season-opening h4{margin:0 0 8px}
+.commissioner-season-opening p{margin:6px 0;color:var(--text-muted,#9aabc1);font-size:.9rem;line-height:1.5}
+.commissioner-season-opening__actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.commissioner-season-opening__actions .button{flex:1 1 200px;white-space:normal}

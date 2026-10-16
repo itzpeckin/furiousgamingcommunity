@@ -38,7 +38,7 @@ import {
   discordGuildRoles,
   discordGuildPermissionAllowsInstall
 } from '../../functions/_lib/discord-installation.js';
-import { syncDiscordScheduleThreads, scheduleActiveDiscordSync } from '../../functions/_lib/discord-schedule.js';
+import { syncDiscordScheduleThreads, scheduleActiveDiscordSync, prepareDiscordSeasonOpening, latestDiscordScheduleSync } from '../../functions/_lib/discord-schedule.js';
 import { ensureDraftPickHorizon } from '../../functions/_lib/draft-pick-baselines.js';
 import { activeLeagueTeams } from '../../functions/_lib/league-teams.js';
 import { executeTradeCenterAction } from '../../functions/api/leagues/[leagueSlug]/trade-center.js';
@@ -2934,4 +2934,108 @@ test('schedule limiter serializes a shared parent, permits independent channels,
   await Promise.all([limited('https://discord.com/api/v10/channels/1/messages'),limited('https://discord.com/api/v10/channels/1/messages')]);
   assert.equal(max,1);assert.deepEqual(waits,[125]);
   max=0;await Promise.all([limited('https://discord.com/api/v10/channels/2/messages'),limited('https://discord.com/api/v10/channels/3/messages')]);assert.equal(max,2);
+});
+
+
+async function seasonOpeningFixture(){
+  const f=await schedulePresentationFixture();
+  const manifest={currentPeriod:{stage:'preseason',week:1,key:'preseason:1'},currentPeriodProof:{status:'proven'}};
+  f.database.prepare('UPDATE league_snapshots SET manifest_json=?,week_index=1 WHERE id=?').run(JSON.stringify(manifest),f.snapshotId);
+  f.database.prepare("DELETE FROM league_snapshot_records WHERE snapshot_id=? AND domain='games'").run(f.snapshotId);
+  const add=(domain,id,data)=>seedSnapshotRecord(f.database,{snapshotId:f.snapshotId,leagueId:f.league.id,domain,externalId:id,data});
+  for(let t=3;t<=32;t++)add('teams',String(1000+t),{external_id:String(1000+t),display_name:'Team '+t,abbreviation:'T'+t});
+  add('players','p1',{external_id:'p1',team_external_id:'1001'});
+  for(let week=1;week<=18;week++)for(let game=0;game<(week<=16?15:16);game++){
+    add('games',`opening-${week}-${game}`,{external_id:`opening-${week}-${game}`,season_year:2026,stage:'regular-season',week_index:week,
+      home_team_external_id:String(1001+2*game),away_team_external_id:String(1002+2*game),status:'scheduled'});
+  }
+  return f;
+}
+
+test('explicit preseason launch creates only regular Week 1, is repeatable, survives preseason imports, and reuses threads at Week 1',async()=>{
+  const f=await seasonOpeningFixture();try{
+    let status=await latestDiscordScheduleSync(f.db,f.league.id);
+    assert.equal(status.seasonOpening.ready,true);assert.equal(status.seasonOpening.launched,false);
+    await f.sync();assert.equal(f.calls.length,0);
+    await Promise.all([1,2].map(()=>prepareDiscordSeasonOpening(f.db,f.league,{snapshotId:f.snapshotId})));
+    const result=await f.sync({source:'candidate-import'});
+    assert.equal(result.created,15);assert.equal(result.phase,'regular-season');assert.equal(result.week,1);assert.equal(result.nonPlaying,true);
+    assert.ok(f.calls.filter(c=>c.url.endsWith('/threads')).every(c=>c.body.name.startsWith('🆚 Week 1 -')));
+    const count=f.calls.length;
+    assert.equal((await f.sync({source:'candidate-import'})).created,undefined);assert.equal(f.calls.length,count);
+    status=await latestDiscordScheduleSync(f.db,f.league.id);assert.equal(status.status,'completed');assert.equal(status.seasonOpening.launched,true);
+    const old=f.snapshotId,next='opening-next';
+    f.database.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,manifest_json,validation_status)
+      SELECT ?,league_id,'active',season_year,2,json_set(manifest_json,'$.currentPeriod.week',2,'$.currentPeriod.key','preseason:2'),validation_status FROM league_snapshots WHERE id=?`).run(next,old);
+    f.database.prepare('INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) SELECT ?,league_id,domain,external_id,data_json FROM league_snapshot_records WHERE snapshot_id=?').run(next,old);
+    f.database.prepare('UPDATE league_active_snapshots SET snapshot_id=? WHERE league_id=?').run(next,f.league.id);
+    let synced=await f.sync({snapshotId:next,source:'candidate-import'});assert.equal(synced.created,0);assert.equal(synced.archivedPriorThreads,0);
+    assert.equal(f.calls.length,count);
+    assert.equal((await latestDiscordScheduleSync(f.db,f.league.id)).seasonOpening.launched,true);
+    const manifest={currentPeriod:{stage:'regular-season',week:1,key:'regular-season:1'},currentPeriodProof:{status:'proven'}};
+    f.database.prepare('UPDATE league_snapshots SET week_index=1,manifest_json=? WHERE id=?').run(JSON.stringify(manifest),next);
+    await f.sync({snapshotId:next,source:'candidate-import'});assert.equal(f.calls.length,count);
+    assert.equal((await latestDiscordScheduleSync(f.db,f.league.id)).seasonOpening,null);
+    assert.equal(f.database.prepare("SELECT COUNT(*) n FROM discord_schedule_threads WHERE status='active' AND phase='regular-season' AND week_index=1").get().n,15);
+    const second=seedActiveWeek(f.database,{leagueId:f.league.id,week:2});proveScheduleAdvance(f.database,next,second);
+    const advanced=await f.sync({snapshotId:second,source:'candidate-import'});
+    assert.equal(advanced.week,2);assert.equal(advanced.created,1);assert.equal(advanced.archivedPriorThreads,15);
+  }finally{f.database.close();}
+});
+
+test('early launch requires the current snapshot, full season, roster, proven preseason and connected channel',async()=>{
+  const f=await seasonOpeningFixture();try{
+    await assert.rejects(prepareDiscordSeasonOpening(f.db,f.league,{snapshotId:'stale'}),/newer import/);
+    f.database.prepare("DELETE FROM league_snapshot_records WHERE snapshot_id=? AND domain='players'").run(f.snapshotId);
+    await assert.rejects(prepareDiscordSeasonOpening(f.db,f.league,{snapshotId:f.snapshotId}),/Rosters/);
+    f.database.prepare("DELETE FROM league_snapshot_records WHERE snapshot_id=? AND domain='games' AND external_id='opening-18-0'").run(f.snapshotId);
+    await assert.rejects(prepareDiscordSeasonOpening(f.db,f.league,{snapshotId:f.snapshotId}),/full regular-season/);
+    f.database.prepare("UPDATE discord_league_installations SET status='disabled' WHERE league_id=?").run(f.league.id);
+    await assert.rejects(prepareDiscordSeasonOpening(f.db,f.league,{snapshotId:f.snapshotId}),/Connect Discord/);
+    assert.equal(f.database.prepare('SELECT COUNT(*) n FROM discord_schedule_sync_runs').get().n,0);
+    assert.equal(f.calls.length,0);
+  }finally{f.database.close();}
+});
+
+test('launch dispatch has its own stable workflow key and failed starts retain commissioner intent',async()=>{
+ const f=await seasonOpeningFixture();try{
+  const starts=[],context={env:{FRANCHISE_IMPORT_WORKER:{fetch:async(_url,options)=>{starts.push(JSON.parse(options.body));return Response.json({ok:true,id:'workflow-1'});}}},request:new Request('https://franchisehq.app')};
+  seedMember(f.database,{leagueId:f.league.id,role:'commissioner'});
+  await seedSession(f.database,{userId:'user-a',token:'opening-token'});
+  const start=()=>scheduleActiveDiscordSync(context,{db:f.db,league:f.league,snapshotId:f.snapshotId,requestedBySessionId:'session-user-a'});
+  await start();await prepareDiscordSeasonOpening(f.db,f.league,{snapshotId:f.snapshotId});await start();await start();
+  assert.notEqual(starts[0].workflowKey,starts[1].workflowKey);assert.equal(starts[1].workflowKey,starts[2].workflowKey);
+  context.env.FRANCHISE_IMPORT_WORKER.fetch=async()=>{throw new Error('temporary failure');};
+  assert.equal((await start()).scheduled,false);
+  assert.equal((await latestDiscordScheduleSync(f.db,f.league.id)).seasonOpening.launched,true);
+ }finally{f.database.close();}
+});
+
+
+test('Week 1 launch API enforces commissioner scope and rejects stale or foreign snapshots before dispatch',async()=>{
+ const f=await seasonOpeningFixture(),original=globalThis.fetch;try{
+  seedMember(f.database,{leagueId:f.league.id});await seedSession(f.database,{userId:'user-a',token:'launch-api'});
+  const starts=[],env={FRANCHISE_IMPORT_WORKER:{fetch:async(_url,options)=>{starts.push(JSON.parse(options.body));return Response.json({ok:true,id:'launch-job'});}}};
+  globalThis.fetch=async()=>Response.json([]);
+  const request=snapshotId=>postDiscordInstallation(leagueApiContext(f.db,{slug:'alpha',token:'launch-api',method:'POST',body:{action:'launch-week-one',snapshotId},env}));
+  assert.equal((await request(f.snapshotId)).status,403);
+  f.database.prepare("UPDATE league_memberships SET role='commissioner' WHERE league_id=?").run(f.league.id);
+  assert.equal((await request('foreign-snapshot')).status,409);assert.equal(starts.length,0);
+  const response=await request(f.snapshotId);assert.equal(response.status,200);
+  const body=await response.json();assert.equal(body.scheduleRecovery.scheduled,true);assert.equal(body.scheduleSync.seasonOpening.launched,true);assert.equal(starts.length,1);
+  // A reconnect to another guild/channel cannot inherit the previous destination's launch.
+  f.database.prepare("UPDATE discord_league_installations SET discord_guild_id='100000000000000999' WHERE league_id=?").run(f.league.id);
+  assert.equal((await latestDiscordScheduleSync(f.db,f.league.id)).seasonOpening.launched,false);
+  f.database.prepare('UPDATE league_snapshots SET season_year=2027 WHERE id=?').run(f.snapshotId);
+  assert.equal((await latestDiscordScheduleSync(f.db,f.league.id)).seasonOpening.launched,false);
+ }finally{globalThis.fetch=original;f.database.close();}
+});
+
+test('yearly schedule rows may inherit their season from the active snapshot, but mismatched explicit years are rejected',async()=>{
+ const f=await seasonOpeningFixture();try{
+  f.database.prepare("UPDATE league_snapshot_records SET data_json=json_remove(data_json,'$.season_year') WHERE snapshot_id=? AND domain='games'").run(f.snapshotId);
+  assert.equal((await latestDiscordScheduleSync(f.db,f.league.id)).seasonOpening.ready,true);
+  f.database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.season_year',2025) WHERE snapshot_id=? AND domain='games'").run(f.snapshotId);
+  await assert.rejects(prepareDiscordSeasonOpening(f.db,f.league,{snapshotId:f.snapshotId}),/full regular-season/);
+ }finally{f.database.close();}
 });

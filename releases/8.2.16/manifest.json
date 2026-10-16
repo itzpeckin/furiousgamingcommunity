@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.16",
+  "releaseType": "commissioner-season-opening-threads",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.15",
+    "tag": "v8.2.15",
+    "commit": "54f574ac72eff663fe6f12b178e1ecc2b23dc1b7"
+  },
+  "implementationBranch": "fix/8.2.16-week-one-launch",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.15",
+    "candidateRelease": "8.2.16",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.16/release-record.md",
+    "releases/8.2.16/validation-evidence.json",
+    "releases/8.2.16/recovery-plan.md"
+  ]
+}

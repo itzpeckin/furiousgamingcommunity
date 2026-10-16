@@ -2,7 +2,7 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireCommissioner } from '../../../_lib/permissions.js';
 import { createTenantAuditContext, tenantAuditStatement } from '../../../_lib/tenant-context.js';
 import { DISCORD_COMMAND_RELEASE, DISCORD_GLOBAL_COMMANDS } from '../../../_lib/discord-commands.js';
-import { latestDiscordScheduleSync, scheduleActiveDiscordSync } from '../../../_lib/discord-schedule.js';
+import { latestDiscordScheduleSync, scheduleActiveDiscordSync, prepareDiscordSeasonOpening } from '../../../_lib/discord-schedule.js';
 import { discordGuildRoles, discordGuildTextChannels } from '../../../_lib/discord-installation.js';
 import { upsertDiscordGlobalCommands } from '../../../_lib/discord-api.js';
 import { coachingSettings, configureCoaching } from '../../../_lib/discord-coaching.js';
@@ -139,10 +139,13 @@ export async function onRequestPost(context){
       const waitUntil=context.waitUntil||context.executionContext?.waitUntil;
       if(typeof waitUntil==='function')waitUntil.call(context.executionContext||context,reconcile);
       else await reconcile;
-    }else if(action==='retry-schedule-sync'){
+    }else if(action==='retry-schedule-sync'||action==='launch-week-one'){
       const active=await c.db.prepare(`SELECT snapshot_id AS snapshotId FROM league_active_snapshots
         WHERE league_id=? LIMIT 1`).bind(c.league.id).first();
       if(!active?.snapshotId)return json({ok:false,error:'No live league snapshot is available.'},409);
+      if(action==='launch-week-one')await prepareDiscordSeasonOpening(c.db,c.league,{
+        snapshotId:String(body.snapshotId||''),requestedByUserId:c.session.user.id
+      });
       const recovery=await scheduleActiveDiscordSync(context,{
         db:c.db,league:c.league,snapshotId:active.snapshotId,
         requestedByUserId:c.session.user.id,requestedBySessionId:c.session.sessionId,
