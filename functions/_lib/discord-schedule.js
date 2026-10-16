@@ -77,6 +77,50 @@ async function activeSnapshot(db,leagueId) {
     WHERE active.league_id=? LIMIT 1`).bind(leagueId).first();
 }
 
+// A preseason clock stays preseason. Only a commissioner can opt this season
+// into regular Week 1 scheduling, using the already-published season data.
+async function seasonOpening(db,leagueId,active,installation) {
+  if(snapshotCurrentPeriod(active,false)?.stage!=='preseason')return null;
+  const base={snapshotId:active.id,seasonYear:active.seasonYear,ready:false,launched:false};
+  if(!installation?.scheduleChannelId)return {...base,reason:'Connect Discord and choose a Scheduling Channel in League Controls → Discord Bot.'};
+  const intent=await db.prepare(`SELECT run.id FROM discord_schedule_sync_runs run
+    JOIN league_snapshots snapshot ON snapshot.id=run.snapshot_id AND snapshot.league_id=run.league_id
+    WHERE run.league_id=? AND run.discord_guild_id=? AND run.schedule_channel_id=? AND run.season_year=?
+      AND run.phase='regular-season' AND run.week_index=1 AND run.source='discord-command'
+      AND json_extract(snapshot.manifest_json,'$.currentPeriod.stage')='preseason' LIMIT 1`)
+    .bind(leagueId,installation.guildId,installation.scheduleChannelId,active.seasonYear).first();
+  base.launched=Boolean(intent);
+  let manifest={};try{manifest=JSON.parse(active.manifest_json||'{}');}catch{}
+  if(manifest.currentPeriodProof?.status!=='proven')return {...base,reason:'Refresh and import verified league information first.'};
+  const model=await discordLeagueReadModel({db,league:{id:leagueId}},{domains:['teams','games']});
+  if(model.snapshot?.id!==active.id)return {...base,reason:'A newer import is live. Refresh before launching Week 1.'};
+  const games=model.games.filter(game=>game.stage==='regular-season'&&(game.season==null||Number(game.season)===Number(active.seasonYear))&&game.week>=1&&game.week<=18);
+  if(model.teams.length!==32||games.length!==272||new Set(games.map(game=>game.week)).size!==18)
+    return {...base,reason:'Import the full regular-season schedule and league information first (18 weeks, 272 games).'};
+  const roster=await db.prepare(`SELECT external_id FROM league_snapshot_records WHERE league_id=? AND snapshot_id=? AND domain='players'
+    AND COALESCE(json_extract(data_json,'$.team_external_id'),'') NOT IN ('','0') LIMIT 1`).bind(leagueId,active.id).first();
+  if(!roster)return {...base,reason:'Import Rosters and League Info before launching Week 1.'};
+  return {...base,ready:true,reason:'Ready from the imported season schedule and rosters.'};
+}
+
+export async function prepareDiscordSeasonOpening(db,league,{snapshotId,requestedByUserId}={}) {
+  const active=await activeSnapshot(db,league.id),installation=await activeInstallation(db,league.id);
+  if(!snapshotId||active?.id!==snapshotId)throw Object.assign(new Error('A newer import is live. Refresh before launching Week 1.'),{status:409});
+  const opening=await seasonOpening(db,league.id,active,installation);
+  if(!opening?.ready)throw Object.assign(new Error(opening?.reason||'Early Week 1 launch is available during preseason after the season data is imported.'),{status:409});
+  // This pending run is the durable, season/server/channel-scoped launch intent.
+  // A failed dispatch can be retried; concurrent requests retain the same intent.
+  await db.prepare(`INSERT INTO discord_schedule_sync_runs
+    (id,league_id,snapshot_id,discord_guild_id,schedule_channel_id,season_year,phase,week_index,source,requested_by_user_id)
+    SELECT ?,?,?,?,?,?,'regular-season',1,'discord-command',?
+    WHERE EXISTS (SELECT 1 FROM league_active_snapshots WHERE league_id=? AND snapshot_id=?)
+    ON CONFLICT(league_id,snapshot_id,phase,week_index,schedule_channel_id) DO NOTHING`)
+    .bind(`discord_schedule_sync_${crypto.randomUUID()}`,league.id,active.id,installation.guildId,
+      installation.scheduleChannelId,active.seasonYear,requestedByUserId||null,league.id,active.id).run();
+  if((await activeSnapshot(db,league.id))?.id!==active.id)throw Object.assign(new Error('A newer import is live. Refresh before launching Week 1.'),{status:409});
+  return opening;
+}
+
 async function canReconcileCurrent(db,leagueId,decision,active){
   let manifest={};try{manifest=JSON.parse(active?.manifest_json||'{}');}catch{}
   const period=snapshotCurrentPeriod(active,false);
@@ -318,9 +362,12 @@ export async function syncDiscordScheduleThreads(env,db,{
   if (!active) return {ok:false,skipped:true,reason:'no-active-snapshot'};
   if(snapshotCurrentPeriod(active)?.stage==='offseason')return{ok:true,skipped:true,reason:'offseason-no-matchups'};
   if (snapshotId && String(active.id) !== String(snapshotId)) return {ok:false,skipped:true,reason:'snapshot-superseded'};
-  if(snapshotCurrentPeriod(active)?.stage==='preseason'){
+  const opening=await seasonOpening(db,league.id,active,installation);
+  const earlyWeekOne=opening?.launched&&opening.ready;
+  if(opening?.launched&&!opening.ready)return{ok:false,skipped:true,reason:'season-opening-data-incomplete',errors:[opening.reason]};
+  if(snapshotCurrentPeriod(active)?.stage==='preseason'&&!earlyWeekOne){
     const cleanup=await archiveSupersededScheduleThreads(env,db,{leagueId:league.id,snapshotId:active.id,
-      seasonYear:active.seasonYear,phase:'none',week:0,guildId:installation.guildId,
+      seasonYear:active.seasonYear,phase:'regular-season',week:1,guildId:installation.guildId,
       model:{games:[]},league,assignments:new Map(),fetchImpl,limit:maxOperations});
     return {ok:!cleanup.errors.length,status:cleanup.errors.length?'partial':cleanup.remaining?'running':'completed',
       hasMore:cleanup.remaining>0&&!cleanup.errors.length,nonPlaying:true,created:0,
@@ -329,12 +376,13 @@ export async function syncDiscordScheduleThreads(env,db,{
   const decision=await automaticScheduleDecision(db,league.id,active);
   const recoveryAllowed=source==='rollover-recovery'&&await recoverableScheduleDecision(db,league.id,active);
   const reconcileCurrent=await canReconcileCurrent(db,league.id,decision,active);
-  const presentationOnly=source==='candidate-import'&&!decision.allowed&&!reconcileCurrent;
-  if(source==='rollover-recovery'&&!recoveryAllowed)return{ok:false,skipped:true,reason:'rollover-recovery-proof-unavailable'};
-  const targetWeek = Number(week ?? active.weekIndex);
-  const targetPhase = canonicalDiscordSchedulePhase(phase??snapshotCurrentPeriod(active)?.stage);
-  if(source==='candidate-import'&&(targetWeek!==decision.to?.week||targetPhase!==decision.to?.stage))return{ok:false,skipped:true,reason:'target-period-mismatch'};
-  if(targetWeek!==Number(active.weekIndex)||targetPhase!==snapshotCurrentPeriod(active)?.stage)return{ok:false,skipped:true,reason:'historical-schedule-read-only'};
+  const presentationOnly=!earlyWeekOne&&source==='candidate-import'&&!decision.allowed&&!reconcileCurrent;
+  if(source==='rollover-recovery'&&!recoveryAllowed&&!earlyWeekOne)return{ok:false,skipped:true,reason:'rollover-recovery-proof-unavailable'};
+  const targetWeek = Number(week ?? (earlyWeekOne?1:active.weekIndex));
+  const targetPhase = canonicalDiscordSchedulePhase(phase??(earlyWeekOne?'regular-season':snapshotCurrentPeriod(active)?.stage));
+  if(earlyWeekOne&&(targetWeek!==1||targetPhase!=='regular-season'))return{ok:false,skipped:true,reason:'target-period-mismatch'};
+  if(!earlyWeekOne&&source==='candidate-import'&&(targetWeek!==decision.to?.week||targetPhase!==decision.to?.stage))return{ok:false,skipped:true,reason:'target-period-mismatch'};
+  if(!earlyWeekOne&&(targetWeek!==Number(active.weekIndex)||targetPhase!==snapshotCurrentPeriod(active)?.stage))return{ok:false,skipped:true,reason:'historical-schedule-read-only'};
   const targetChannel = clean(channelId || installation.scheduleChannelId);
   if (!Number.isInteger(targetWeek) || targetWeek < 1 || !SNOWFLAKE.test(targetChannel)) {
     return {ok:false,skipped:true,reason:'schedule-channel-or-week-unavailable'};
@@ -367,7 +415,7 @@ export async function syncDiscordScheduleThreads(env,db,{
     seasonYear:active.seasonYear,phase:targetPhase,week:targetWeek,
     source:source==='rollover-recovery'?'candidate-import':source,requestedByUserId
   });
-  const replacesActiveSchedule=(decision.allowed||recoveryAllowed)
+  const replacesActiveSchedule=earlyWeekOne||(decision.allowed||recoveryAllowed)
     &&targetWeek===Number(active.weekIndex)
     &&targetPhase===snapshotCurrentPeriod(active)?.stage
     &&String(active.id)===String(model.snapshot.id);
@@ -381,7 +429,7 @@ export async function syncDiscordScheduleThreads(env,db,{
     const status=cleanup.errors.length?'partial':hasMore?'running':'completed';
     if(status!=='completed')await db.prepare(`UPDATE discord_schedule_sync_runs SET status=?,error_count=?,last_error=?,
       updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(status,cleanup.errors.length,cleanup.errors[0]||null,run.id).run();
-    return {ok:status==='completed',status,hasMore,
+    return {ok:status==='completed',status,hasMore,nonPlaying:Boolean(earlyWeekOne),
       reused:true,week:targetWeek,phase:targetPhase,
       games:Number(run.game_count||0),threads:Number(run.thread_count||0),removedPriorThreads:cleanup.removed,archivedPriorThreads:cleanup.removed,
       errors:cleanup.errors};
@@ -426,7 +474,7 @@ export async function syncDiscordScheduleThreads(env,db,{
     updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(
       status,games.length,existingCount,owners.size,errors.length,errors[0]||null,status,run.id
     ).run();
-  return {ok:status==='completed',status,reused:false,week:targetWeek,phase:targetPhase,
+  return {ok:status==='completed',status,reused:false,nonPlaying:Boolean(earlyWeekOne),week:targetWeek,phase:targetPhase,
     games:games.length,threads:existingCount,created,removedPriorThreads,archivedPriorThreads:removedPriorThreads,remainingPriorThreads,
     hasMore,registeredOwners:owners.size,errors};
 }
@@ -445,6 +493,7 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
   }
   const installation = await activeInstallation(db,league.id);
   if (!installation?.scheduleChannelId) return {scheduled:false,reason:'not-connected'};
+  const opening=await seasonOpening(db,league.id,await activeSnapshot(db,league.id),installation);
   const binding=context.env?.FRANCHISE_IMPORT_WORKER;
   if(binding&&requestedBySessionId){
     // A completed pre-upgrade workflow must not swallow the new presentation work.
@@ -462,7 +511,7 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     const response=await binding.fetch('https://franchise-import.internal/schedule/start',{
       method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
         leagueSlug:league.slug,origin,snapshotId,source:effectiveSource,
-        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v2:${presentationKey}`,importAuthToken:token
+        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v2:${opening?.launched?'opening-week-one:':''}${presentationKey}`,importAuthToken:token
       })
     }).catch(()=>null);
     if(!response)return{scheduled:false,reason:'durable-schedule-start-failed',
@@ -489,26 +538,26 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
 
 export async function latestDiscordScheduleSync(db,leagueId) {
   const active=await activeSnapshot(db,leagueId);
+  const opening=await seasonOpening(db,leagueId,active,await activeInstallation(db,leagueId));
   const row = await db.prepare(`SELECT status,season_year AS seasonYear,phase,week_index AS weekIndex,
       game_count AS gameCount,thread_count AS threadCount,registered_owner_count AS registeredOwnerCount,
       error_count AS errorCount,last_error AS lastError,completed_at AS completedAt,created_at AS createdAt,updated_at AS updatedAt
     FROM discord_schedule_sync_runs WHERE league_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1`)
     .bind(leagueId).first();
   if(active){
-    if(snapshotCurrentPeriod(active)?.stage==='preseason'&&!await db.prepare(`SELECT id FROM discord_schedule_threads
-      WHERE league_id=? AND status='active' LIMIT 1`).bind(leagueId).first())return{status:'not-required',phase:'preseason',seasonYear:active.seasonYear,reason:'preseason-no-matchups',reviewRequired:false};
+    if(opening&&!opening.launched)return{status:'not-required',phase:'preseason',seasonYear:active.seasonYear,reason:'preseason-no-matchups',reviewRequired:false,seasonOpening:opening};
     if(snapshotCurrentPeriod(active)?.stage==='offseason')return{status:'not-required',phase:'offseason',seasonYear:active.seasonYear,reason:'offseason-no-matchups',reviewRequired:false};
     const decision=await automaticScheduleDecision(db,leagueId,active);
-    const period=snapshotCurrentPeriod(active);
+    const period=opening?.launched?{stage:'regular-season',week:1}:snapshotCurrentPeriod(active);
     const currentRun=row&&Number(row.seasonYear)===Number(active.seasonYear)
       &&row.phase===period?.stage&&Number(row.weekIndex)===Number(period?.week);
     if(!currentRun)return{
-      status:decision.reviewRequired?'review-required':'not-started',weekIndex:period?.week,
+      status:!opening?.launched&&decision.reviewRequired?'review-required':'not-started',weekIndex:period?.week,
       seasonYear:active.seasonYear,phase:period?.stage,reason:decision.reason,
-      reviewRequired:decision.reviewRequired,transition:decision
+      reviewRequired:opening?.launched?false:decision.reviewRequired,transition:decision,seasonOpening:opening
     };
   }
   if(!row)return null;
   const started=Date.parse(row.createdAt||''),completed=Date.parse(row.completedAt||'');
-  return {...row,durationMs:Number.isFinite(started)&&Number.isFinite(completed)?Math.max(0,completed-started):null};
+  return {...row,seasonOpening:opening,durationMs:Number.isFinite(started)&&Number.isFinite(completed)?Math.max(0,completed-started):null};
 }

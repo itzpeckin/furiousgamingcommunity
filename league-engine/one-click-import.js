@@ -626,6 +626,34 @@
     return {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,yearlyScheduleImport,yearlyActive,runDisabled,runLabel,activePhase,phaseProgress};
   }
 
+  async function launchWeekOne() {
+    if(busy)return;
+    const opening=state?.discordScheduleSync?.seasonOpening;
+    if(!opening?.ready)return;
+    const requestSlug=slug(),revision=contextRevision;
+    busy=true;rerender();
+    try{
+      const response=await fetch(`/api/leagues/${encodeURIComponent(requestSlug)}/discord`,{
+        method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+        body:JSON.stringify({action:'launch-week-one',snapshotId:opening.snapshotId})
+      });
+      const result=await response.json();
+      if(revision!==contextRevision||slug()!==requestSlug)return;
+      if(!response.ok||result.ok===false)throw new Error(result.error||'Week 1 scheduling could not start.');
+      state.discordScheduleSync=result.scheduleSync;
+      notice='Regular-season Week 1 threads requested. Select Refresh to check progress.';
+      errorMessage='';lastOutcome=null;
+    }catch(error){if(revision===contextRevision){errorMessage=error.message;notice=error.message;}}
+    finally{if(revision===contextRevision){busy=false;rerender();}}
+  }
+
+  function seasonOpeningControls() {
+    const sync=state?.discordScheduleSync,opening=sync?.seasonOpening;
+    if(!opening)return '';
+    const completed=opening.launched&&sync.status==='completed';
+    return `<section class="commissioner-season-opening" data-season-opening><div><h4>${esc(opening.seasonYear)} · Launch regular-season Week 1</h4><p>${esc(completed?`${sync.threadCount} Week 1 threads are ready.`:opening.launched?'Week 1 launch requested. Refresh to check progress; retry if needed.':opening.reason)}</p><p>Preseason games are excluded. Later imports keep these threads until the regular season advances.</p>${notice?`<p role="status">${esc(notice)}</p>`:''}<div class="commissioner-season-opening__actions"><button type="button" class="button button--primary" data-launch-import-week-one ${busy||!opening.ready?'disabled':''}>${completed?'Sync Week 1 Threads':opening.launched?'Retry Week 1 Launch':'Launch Week 1 Discord Threads'}</button> <button type="button" class="button button--ghost" data-refresh-companion-import ${busy?'disabled':''}>Refresh Status</button></div></div></section>`;
+  }
+
   function renderCompactPanel() {
     const {run,source,connection,endpointState,latestExport,exportStatus,latestExportLive,exportStatusLabel,live,runDisabled,runLabel,activePhase,phaseProgress}=importControlsState();
     const resultCounts=counts(),coverage=source?.coverage||{},threadSync=state?.discordScheduleSync||null;
@@ -635,7 +663,7 @@
       :freeAgentStatus==='empty-confirmed'?'0':freeAgentStatus==='blocked'?'Unavailable':'Not included';
     const actionableSourceWarnings=[...new Set([...(source?.coverageWarnings||[]),...(run?.warnings||[])])].filter(value=>!routineWarning(value));
     const historicalBackfill=coverage.importMode==='historical-backfill';
-    const threadLabel=threadSync?.reviewRequired?'Needs review':['failed','partial'].includes(threadSync?.status)?'Needs attention':threadSync?.status==='complete'?'Ready':threadSync?.status==='not-required'?'Not required':threadSync?.scheduled?'Running':'Pending';
+    const threadLabel=threadSync?.reviewRequired?'Needs review':['failed','partial'].includes(threadSync?.status)?'Needs attention':['complete','completed'].includes(threadSync?.status)?'Ready':threadSync?.status==='not-required'?'Not required':threadSync?.scheduled?'Running':'Pending';
     const connectionService=exportUrlService();
     return `<section class="commissioner-command-panel commissioner-command-import" data-compact-import-panel aria-label="Import collected Madden data">
       <header><div></div><span class="pill pill--${live||latestExportLive?'success':run?.status==='failed'?'danger':exportStatus==='ready'?'success':'neutral'}">${esc(live||latestExportLive?'Live':exportStatusLabel)}</span></header>
@@ -644,6 +672,7 @@
         <section><span class="eyebrow">Step 5 · Import</span><button class="button button--primary" data-import-latest-export data-import-in-place ${runDisabled?'disabled':''}>${esc(runLabel)}</button></section>
       </div>
       ${run?.status==='running'||run?.status==='failed'?`<div class="commissioner-command-import__progress" aria-live="polite"><div><span><small>CURRENT STEP</small><strong>${esc(phaseLabel(activePhase))}</strong></span><b>${phaseProgress}%</b></div><div class="commissioner-import-progress-track" role="progressbar" aria-label="${esc(phaseLabel(activePhase))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${phaseProgress}"><span style="width:${phaseProgress}%"></span></div></div>`:''}
+      ${seasonOpeningControls()}
       <div class="commissioner-import-glance" aria-label="Latest import summary">
         <span><small>Live week</small><strong>${esc(state?.activeSnapshotPeriod?.stage==='offseason'?'Offseason':state?.activeSnapshotWeek??latestExport.activeSnapshotWeek??'—')}</strong></span>
         <span><small>Captured week</small><strong>${esc(coverage.currentPeriod?.stage==='preseason'?('Preseason Week '+coverage.currentPeriod.week):coverage.nonPlayingPeriod?'Offseason':coverage.currentWeek??latestExport.capturedWeek??'—')}</strong></span>
@@ -737,6 +766,7 @@
   }
 
   document.addEventListener('click', event=>{
+    if(event.target.closest('[data-launch-import-week-one]')){event.preventDefault();launchWeekOne();return;}
     if(event.target.closest('[data-close-import-notification]')){event.target.closest('[data-franchise-import-notification]')?.remove();return;}
     if (event.target.closest('[data-create-candidate-destination]')) createDestination();
     if (event.target.closest('[data-run-candidate-import]')) runImport({retry:['failed','running'].includes(currentRun()?.status)});

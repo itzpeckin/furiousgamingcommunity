@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.16",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 54,
+      "candidateRequiresMigration": false
+    },
+    "targetedSchedule": {
+      "passed": true,
+      "tests": 85,
+      "log": "outputs/fhq8216-targeted.txt"
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 587,
+      "log": "outputs/fhq8216-strict.txt"
+    },
+    "browserFixture": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "doubleClickRequests": 1,
+      "liveDiscord": false
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveEaCollection": false,
+    "leagueSettingsChanged": false,
+    "separateWorkerChanged": false,
+    "discordChanged": false
+  }
+}
