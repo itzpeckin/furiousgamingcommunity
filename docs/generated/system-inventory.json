@@ -186,6 +186,7 @@
     ],
     "FRANCHISE_IMPORT_WORKER": [
       "functions/_lib/discord-schedule.js",
+      "functions/_lib/ea-schedule-import.js",
       "functions/api/leagues/[leagueSlug]/companion/import-job.js",
       "functions/api/leagues/[leagueSlug]/ea-direct/sync.js"
     ],
@@ -251,7 +252,7 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 306,
+      ".js": 308,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
@@ -281,7 +282,7 @@
         "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
-        "bytes": 212748,
+        "bytes": 214734,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -301,7 +302,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 96844,
+        "bytes": 99884,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -329,11 +330,11 @@
         "file": "tests/trade/full-trade-center.test.mjs"
       },
       {
-        "bytes": 52169,
+        "bytes": 52247,
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 50730,
+        "bytes": 50974,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
@@ -345,7 +346,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       }
     ],
-    "total": 849
+    "total": 851
   },
   "frontend": {
     "assets": [
@@ -1949,7 +1950,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.14",
+  "release": "8.2.15",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

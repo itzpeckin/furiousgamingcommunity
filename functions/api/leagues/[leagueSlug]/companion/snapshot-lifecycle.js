@@ -32,7 +32,7 @@ async function validateSnapshot(db,leagueId,snapshot){const records=await rows(d
  const status=errors.length?'failed':'ready';return{release:RELEASE,status,score,errorCount:errors.length,warningCount:warnings.length,errors,warnings,domains,validatedAt:new Date().toISOString()};}
 
 async function ensureValidationSchema(db){return requireDatabaseSchema(db)}
-function offseasonSnapshot(snapshot){const manifest=parse(snapshot?.manifest_json)||{};return manifest.currentPeriod?.stage==='offseason'&&manifest.currentPeriodProof?.status==='proven'&&manifest.sourceCoverage?.nonPlayingPeriod===true;}
+function offseasonSnapshot(snapshot){const manifest=parse(snapshot?.manifest_json)||{};return ['offseason','preseason'].includes(manifest.currentPeriod?.stage)&&manifest.currentPeriodProof?.status==='proven'&&manifest.sourceCoverage?.nonPlayingPeriod===true;}
 function emptyValidationContext(counts={},snapshotWarningCount=0,offseason=false){
   const domains={};
   for(const d of ['teams','players','games','statistics','standings'])domains[d]={count:Number(counts[d]||0),score:100,errors:[],warnings:[]};

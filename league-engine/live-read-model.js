@@ -152,7 +152,7 @@
   async function getTeams() { return getDomain('teams'); }
   async function getPlayers() { return getDomain('players'); }
   async function getStandings() { return getDomain('standings'); }
-  async function getSchedule() { return getDomain('games'); }
+  async function getSchedule() { return (await getDomain('games')).filter(game=>!['pre','preseason','pre-season'].includes(String(game.stage||'').toLowerCase())); }
   async function getStatistics() { return getDomain('statistics'); }
 
   function invalidateOwnership() {

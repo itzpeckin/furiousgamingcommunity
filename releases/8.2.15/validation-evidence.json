@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.15",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 54,
+      "candidateRequiresMigration": false
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 581,
+      "log": "outputs/fhq8215-strict.txt"
+    },
+    "handoffRegression": {
+      "passed": true,
+      "tests": 59,
+      "log": "outputs/fhq8215-handoff.txt"
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveEaCollection": false,
+    "leagueSettingsChanged": false,
+    "separateWorkerChanged": true,
+    "discordChanged": false
+  }
+}

@@ -367,3 +367,15 @@ test('pointer gesture survives a status refresh and open settings survive parent
  assert.equal(ui.requests.filter(r=>r.options.body?.action==='disconnect').length,1);
  assert.match(ui.markup(),/EA account disconnected/);
 });
+
+
+test('yearly completion monitors its server-created import without posting another import',async()=>{
+  const ui=harness(),monitored=[];
+  ui.hq.oneClickImport.runImport=async options=>monitored.push(options.workflowId);
+  ui.respond(async path=>path.endsWith('/connection')?connected({previewVerified:true}):{ok:true,job:{id:'yearly',mode:'yearly',status:'running'}});
+  await ui.service.refresh();
+  ui.respond(async path=>path.endsWith('/connection')?connected({previewVerified:true}):{ok:true,job:{id:'yearly',mode:'yearly',status:'completed',previewVerified:true,readyToImport:true,importWorkflowId:'durable-import'}});
+  await ui.service.pollCollection();
+  assert.deepEqual(monitored,['durable-import']);assert.ok(ui.requests.every(r=>r.options.method==='GET'));
+  assert.match(ui.service.renderPanel(),/Automatic import progress/);
+});

@@ -392,12 +392,12 @@ export async function generateMaddenDiscoveryReport({
   const session = await sessionFor(db,leagueId,sessionId);
   if (!session) throw Object.assign(new Error('Madden discovery session not found.'),{status:404});
   // EA collections have a separate completion manifest and publication guard.
-  // Generic Companion analysis may read a vetted weekly report but must never
-  // regenerate one from a private preview, raw staging set, or yearly schedule.
+  // Generic Companion analysis may read a vetted published EA report but must never
+  // regenerate one from a private preview or raw staging set.
   if (String(session.id).startsWith('ea_')) {
     const row = await db.prepare(`SELECT report.* FROM madden_discovery_reports report
       WHERE report.league_id=? AND report.session_id=? AND report.status='passed'
-        AND json_extract(report.source_markers_json,'$.eaCollection.mode')='weekly'
+        AND json_extract(report.source_markers_json,'$.eaCollection.mode') IN ('weekly','yearly')
         AND json_extract(report.source_markers_json,'$.eaCollection.complete')=1
         AND (report.id=(SELECT latest_ready_report_id FROM companion_league_export_endpoints WHERE league_id=?)
           OR EXISTS (SELECT 1 FROM companion_candidate_import_runs run WHERE run.league_id=report.league_id

@@ -293,7 +293,7 @@ for(const optimized of [false,true])test(`272-game full-season build and retaine
     built=await buildSnapshot(context({action:'next',limit:125,candidateImportRunId:'candidate-full',snapshotId:buildSnapshotId}));
     result=await built.json();assert.equal(built.status,200,JSON.stringify(result));
     assert.equal(result.buildJob.phase,'games');
-    assert.match(result.buildJob.checkpointToken,/checkpointed-domain-v3:retained-schedule-team-bridge-v2:games:125/);
+    assert.match(result.buildJob.checkpointToken,/checkpointed-domain-v3:regular-and-playoff-only-v3:games:125/);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
       WHERE snapshot_id=? AND domain='games'`).get(buildSnapshotId).count,272);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
@@ -387,6 +387,23 @@ for(const optimized of [false,true])test(`272-game full-season build and retaine
     for(let i=0;i<30&&!offValidated.complete;i++)offValidated=await (await validateSnapshot(context({action:'validate-next',snapshotId:offId,batches:4,limit:2000}))).json();
     assert.equal(offValidated.complete,true,JSON.stringify(offValidated));
     assert.equal(offValidated.report.errorCount,0,JSON.stringify(offValidated.report));
+    // Preseason refresh keeps regular-season history and rosters but discards
+    // old preseason games/statistics, including records carried from a prior import.
+    sqlite.prepare(`INSERT INTO league_snapshot_records(league_id,snapshot_id,domain,external_id,data_json)
+      VALUES('league-1',?,'games','pre-game',?)`).run(snapshotId,JSON.stringify({external_id:'pre-game',stage:'preseason',week_index:1}));
+    sqlite.prepare(`INSERT INTO league_snapshot_records(league_id,snapshot_id,domain,external_id,data_json)
+      VALUES('league-1',?,'statistics','pre-stat',?)`).run(snapshotId,JSON.stringify({external_key:'pre-stat',stage:'preseason',week_index:1}));
+    const preCoverage=candidateSourceCoverage({sourceMarkers:{currentPeriod:{status:'proven',source:'current-state-metadata',period:canonicalSchedulePeriod({stage:'preseason',week:1})},eaCollection:{complete:true}},datasetInventory:[]});
+    sqlite.prepare(`INSERT INTO companion_candidate_import_runs(id,league_id,destination_id,discovery_session_id,source_fingerprint,status,current_phase,created_by_user_id,source_counts_json,active_snapshot_id_before,team_mapping_run_id,player_mapping_run_id,schedule_mapping_run_id,statistics_mapping_run_id)
+      VALUES('candidate-pre','league-1','destination-full','capture-1','fingerprint-pre','running','build-candidate','commissioner-1',?,?,'teams-run','players-run','off-games','off-stats')`).run(JSON.stringify({sourceCoverage:preCoverage}),snapshotId);
+    let pre=await (await buildSnapshot(context({action:'start',candidateImportRunId:'candidate-pre'}))).json();
+    const preId=pre.snapshot.snapshotId;
+    for(let i=0;i<30&&!pre.complete;i++)pre=await (await buildSnapshot(context({action:'next',limit:4000,candidateImportRunId:'candidate-pre',snapshotId:preId}))).json();
+    assert.equal(pre.complete,true);assert.equal(pre.snapshot.counts.games,272);assert.equal(pre.snapshot.counts.players,2047);
+    assert.equal(sqlite.prepare(`SELECT COUNT(*) n FROM league_snapshot_records WHERE snapshot_id=? AND external_id IN ('pre-game','pre-stat')`).get(preId).n,0);
+    let preValidated=await (await validateSnapshot(context({action:'validate-start',snapshotId:preId}))).json();
+    for(let i=0;i<30&&!preValidated.complete;i++)preValidated=await (await validateSnapshot(context({action:'validate-next',snapshotId:preId,batches:4,limit:2000}))).json();
+    assert.equal(preValidated.report.errorCount,0,JSON.stringify(preValidated.report));
     assert.equal(sqlite.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{sqlite.close()}
 });
@@ -585,10 +602,10 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-statistics-selection-v13');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-statistics-selection-v14');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:retained-statistics-selection-v13'
+    'report:capture:identity:destination:retained-statistics-selection-v14'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
 });
@@ -1304,7 +1321,7 @@ test('commissioner live import activates only its validated candidate and never 
   assert.match(builder,/candidateHistoricalBackfill/);
   assert.match(builder,/Historical Week/);
   assert.match(builder,/checkpointed-domain-v3/);
-  assert.match(builder,/retained-schedule-team-bridge-v2/);
+  assert.match(builder,/regular-and-playoff-only-v3/);
   assert.match(builder,/const BUILD_RECORD_LIMIT=500/);
   assert.match(builder,/const BUILD_WRITE_BYTES=500000/);
   assert.match(builder,/FROM json_each\(\?\)/);
@@ -1408,4 +1425,12 @@ test('empty EA postseason bracket placeholders are omitted without hiding malfor
   const blank={externalId:'empty',sourceRecord:placeholder};
   const actual={externalId:'actual',sourceRecord:{...placeholder,homeTeamId:10,awayTeamId:20}};
   assert.deepEqual(selectAuthoritativeScheduleGames([blank,actual]),[actual]);
+});
+
+
+test('snapshot plans remove preseason games and statistics, including carried-forward rows, but keep rosters',async()=>{
+  const {plannedRecords}=await import('../../functions/api/leagues/[leagueSlug]/companion/build-snapshot.js');
+  const items=[{external_id:'pre',stage:'preseason'},{external_id:'reg',stage:'regular-season'},{external_id:'post',stage:'playoffs'}];
+  for(const domain of ['games','statistics'])assert.deepEqual(plannedRecords(domain,items,r=>r.external_id).map(r=>r.externalId),['post','reg']);
+  assert.equal(plannedRecords('players',items,r=>r.external_id).length,3);
 });

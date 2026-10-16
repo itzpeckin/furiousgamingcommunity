@@ -54,7 +54,7 @@ test('Discord Workflow continues through nonterminal running checkpoints to comp
   assert.equal(result.result.threads,16);
   assert.equal(result.result.removedPriorThreads,16);
   assert.equal(requests.length,4);
-  assert.ok(requests.every(request=>request.maxOperations===4));
+  assert.ok(requests.every(request=>request.maxOperations===16));
   assert.equal(requests.some(request=>request.action==='fail'),false);
 });
 

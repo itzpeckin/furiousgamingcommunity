@@ -193,13 +193,13 @@ test('unverifiable week does not claim EA is advancing or expose raw provider co
   await assert.rejects(runEaCollectionStep(options),/reports that the league is advancing/);
 });
 
-test('yearly collection requests all 18 regular schedules without roster or statistic calls', async () => {
+test('yearly collection requests all 18 regular schedules plus the roster and current data needed to publish', async () => {
   const { options, calls, finalized } = fixture('yearly');
   await finish(options);
   const schedules = calls.filter(call => call.kind === 'schedules');
   assert.deepEqual(schedules.map(call => call.args.weekIndex), Array.from({ length: 18 }, (_, index) => index));
   assert.ok(schedules.every(call => call.args.stageIndex === 1));
-  assert.equal(calls.some(call => ['passing', 'roster', 'freeagents'].includes(call.kind)), false);
+  assert.ok(calls.some(call=>call.kind==='roster'));assert.ok(calls.some(call=>call.kind==='passing'));
   assert.equal(finalized[0].mode, 'yearly');
 });
 

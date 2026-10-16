@@ -13,7 +13,7 @@ export const CANDIDATE_IMPORT_PHASES = Object.freeze([
   'preview-ready'
 ]);
 
-export const CANDIDATE_MAPPING_REVISION = 'retained-statistics-selection-v13';
+export const CANDIDATE_MAPPING_REVISION = 'retained-statistics-selection-v14';
 
 export function candidateSourceFingerprintMaterial(reportHash, captureDigest, identityId, destinationId, rosterSourceSnapshotId = null) {
   return `${reportHash}:${captureDigest}:${identityId}:${destinationId}:${CANDIDATE_MAPPING_REVISION}`
@@ -142,7 +142,7 @@ export function candidateSourceCoverage(report = {}, activeWeekIndex = null, {se
     source:'captured-statistics-period',period:fallbackStatisticsPeriods.at(-1)||null
   };
   const currentPeriod=currentPeriodProof.status==='proven'?canonicalSchedulePeriod(currentPeriodProof.period):null;
-  const nonPlayingPeriod=currentPeriod?.stage==='offseason'&&sourceMarkers.eaCollection?.complete===true;
+  const nonPlayingPeriod=['offseason','preseason'].includes(currentPeriod?.stage)&&sourceMarkers.eaCollection?.complete===true;
   const statisticsPeriods=uniquePeriods(routes.filter(item=>item.datasetType==='statistics'
     &&(item.recordCount===null||item.recordCount>0
       ||item.periods.some(period=>period.key===currentPeriod?.key)))

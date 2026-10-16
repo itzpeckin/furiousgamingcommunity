@@ -3,6 +3,7 @@ import { database, normalizeLeagueSlug, resolveLeague, json } from '../../../../
 import { hashToken } from '../../../../_lib/auth.js';
 import { createEaClient } from '../../../../_lib/ea-client.js';
 import { runEaCollectionBatch } from '../../../../_lib/ea-collection.js';
+import { publishEaSeasonSchedule } from '../../../../_lib/ea-schedule-import.js';
 import { readEaBody, fail, eaErrorResponse, safeEaError, connectionScope, jobScope, openEa, sealEa } from '../../../../_lib/ea-direct.js';
 
 // This is a job-scoped server endpoint, not a browser import or general credential proxy.
@@ -27,7 +28,10 @@ export async function onRequestPost(context){
       await db.prepare(`UPDATE ea_direct_collection_jobs SET status='failed',message=COALESCE(message,'EA collection could not finish. Retry the collection; live data is unchanged.'),state_cipher=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('queued','running')`).bind(job.id).run();
       return json({ok:true,done:true});
     }
-    if(job.status==='completed')return json({ok:true,done:true,status:job.status});
+    if(job.status==='completed'){
+      await publishEaSeasonSchedule(context,{db,league,job,result:JSON.parse(job.result_json||'{}')});
+      return json({ok:true,done:true,status:job.status});
+    }
     if(!['queued','running'].includes(job.status))fail('COLLECTION_STOPPED','This collection has stopped.');
     // Workflow retries use the same cursor; stale replay is a no-op.
     if(Number(body.cursor)!==Number(job.cursor))return json({ok:true,done:false,cursor:Number(job.cursor),progress:job.progress});
@@ -57,10 +61,13 @@ export async function onRequestPost(context){
         AND EXISTS(SELECT 1 FROM ea_direct_collection_jobs WHERE id=? AND status='completed' AND cursor=?)`)
       .bind(['preview','yearly'].includes(job.mode)&&summary.previewVerified?1:0,connection.id,league.id,job.id,cursor));
     await db.batch(statements);
+    if(done)await publishEaSeasonSchedule(context,{db,league,job,result:summary});
     return json({ok:true,done,cursor,progress:result.progress,status:done?'completed':'running'});
   }catch(error){
     const safe=safeEaError(error);
     if(job&&db){
+      if(job.mode==='yearly')await db.prepare(`UPDATE ea_direct_collection_jobs SET message=?,error_code=?,updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND league_id=? AND status='completed'`).bind('The schedule was collected but automatic publication could not start. Refresh and select Import Latest Export.','EA_SCHEDULE_IMPORT_FAILED',job.id,job.league_id).run();
       const stopped=['EA_SEASON_MISMATCH','EA_CAPTURE_UNAVAILABLE'].includes(safe.code);
       await db.prepare(`UPDATE ea_direct_collection_jobs SET message=?,error_code=?,lock_until=NULL,
         status=CASE WHEN ? THEN 'failed' ELSE status END,state_cipher=CASE WHEN ? THEN NULL ELSE state_cipher END,

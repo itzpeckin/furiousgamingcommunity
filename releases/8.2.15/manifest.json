@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.15",
+  "releaseType": "regular-season-schedule-and-thread-performance",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.14",
+    "tag": "v8.2.14",
+    "commit": "fcc77c896f9b56f22afc81dd09218cccd7c52afb"
+  },
+  "implementationBranch": "fix/8.2.15-season-schedule",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.14",
+    "candidateRelease": "8.2.15",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.15/release-record.md",
+    "releases/8.2.15/validation-evidence.json",
+    "releases/8.2.15/recovery-plan.md"
+  ]
+}

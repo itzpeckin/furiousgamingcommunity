@@ -792,6 +792,9 @@ export async function onRequestPost(context) {
   }
   const identity = await identitySource(current.db,current.league.id);
   const report = await latestReport(current.db,current.league.id);
+  if(body.expectedSessionId&&String(report?.session_id)!==String(body.expectedSessionId)){
+    return json({ok:false,error:'A newer export replaced the selected season schedule. Refresh and import the latest export.',release:RELEASE},409);
+  }
   const destinationResult = action === 'create-destination'
     ? await createDestination(current,identity) : null;
   if (destinationResult?.response) return destinationResult.response;
