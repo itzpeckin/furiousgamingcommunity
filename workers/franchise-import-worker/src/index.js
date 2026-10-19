@@ -1,8 +1,8 @@
-/* FHQ_BUILD: 8.2.15 */
+/* FHQ_BUILD: 8.2.17 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { NonRetryableError } from 'cloudflare:workflows';
 
-const RELEASE='8.2.15';
+const RELEASE='8.2.17';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -283,7 +283,7 @@ export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
       let result;
       for(let index=0;index<80;index+=1){
         result=await step.do(`schedule-batch-${index+1}`,{
-          retries:{limit:2,delay:'2 seconds',backoff:'exponential'},timeout:'2 minutes'
+          retries:{limit:5,delay:'2 seconds',backoff:'exponential'},timeout:'2 minutes'
         },()=>call(context,companion(context.slug,'schedule-sync-job'),'POST',{
           snapshotId,source,maxOperations:16
         },{acceptProgress:true}));
@@ -291,6 +291,8 @@ export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
         if(result.status!=='running'||!result.hasMore){
           throw new Error(`Schedule sync stopped: ${result.reason||result.errors?.[0]||result.status||'unknown state'}`);
         }
+        const retrySeconds=Number(result.retryAfterSeconds)||0;
+        if(retrySeconds>0)await step.sleep(`discord-cooldown-${index+1}`,`${Math.ceil(Math.min(900,retrySeconds))+1} seconds`);
       }
       throw new Error('Schedule sync exceeded the 80-batch safety limit.');
     }catch(error){
