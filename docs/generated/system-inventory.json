@@ -252,11 +252,11 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 309,
+      ".js": 310,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 71,
+      ".mjs": 72,
       ".png": 7,
       ".sql": 56,
       ".txt": 3,
@@ -266,11 +266,11 @@
     },
     "largest": [
       {
-        "bytes": 662543,
+        "bytes": 663131,
         "file": "app.js"
       },
       {
-        "bytes": 569561,
+        "bytes": 572456,
         "file": "styles.css"
       },
       {
@@ -310,7 +310,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77421,
+        "bytes": 77422,
         "file": "index.html"
       },
       {
@@ -346,7 +346,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       }
     ],
-    "total": 852
+    "total": 854
   },
   "frontend": {
     "assets": [
@@ -1950,7 +1950,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.17",
+  "release": "8.2.18",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

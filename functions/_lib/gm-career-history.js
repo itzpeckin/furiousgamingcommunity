@@ -4,7 +4,7 @@ import { normalizeLeagueTeam, resolveTeam } from './league-teams.js';
 const text=value=>value===null||value===undefined?'':String(value).trim();
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 
-function sourceRecord(row={}){
+export function sourceRecord(row={}){
   const raw=parse(row.data_json)||{};
   const nested=typeof raw.source_record_json==='string'?parse(raw.source_record_json):(raw.source_record_json||raw.source||null);
   return nested&&typeof nested==='object'?{...nested,...raw}:raw;
@@ -15,7 +15,7 @@ function value(raw={},keys=[]){
   return null;
 }
 
-function snapshotGame(row,franchiseSeasonId,teams){
+export function snapshotGame(row,franchiseSeasonId,teams){
   const raw=sourceRecord(row);
   const homeExternal=text(value(raw,['home_team_external_id','homeTeamId','home_team_id','homeId']));
   const awayExternal=text(value(raw,['away_team_external_id','awayTeamId','away_team_id','awayId']));
@@ -27,8 +27,8 @@ function snapshotGame(row,franchiseSeasonId,teams){
     status:text(value(raw,['status','game_status','gameStatus'])),
     homeTeamKey:resolveTeam(teams,homeExternal)?.teamKey||'',
     awayTeamKey:resolveTeam(teams,awayExternal)?.teamKey||'',
-    homeScore:Number(value(raw,['home_score','homeScore'])),
-    awayScore:Number(value(raw,['away_score','awayScore']))
+    homeScore:value(raw,['home_score','homeScore']) === null ? null : Number(value(raw,['home_score','homeScore'])),
+    awayScore:value(raw,['away_score','awayScore']) === null ? null : Number(value(raw,['away_score','awayScore']))
   };
 }
 

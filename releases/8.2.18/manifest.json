@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.18",
+  "releaseType": "gm-and-head-to-head-history",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.17",
+    "tag": "v8.2.17",
+    "commit": "52734ba7a0057d97313b2fc58977dd4c1e61925c"
+  },
+  "implementationBranch": "feature/8.2.18-gm-matchup-history",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.17",
+    "candidateRelease": "8.2.18",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.18/release-record.md",
+    "releases/8.2.18/validation-evidence.json",
+    "releases/8.2.18/recovery-plan.md"
+  ]
+}
