@@ -1,3 +1,4 @@
+import { reconcileTradeBlockListings } from './trade-block-reconciliation.js';
 import { activeLeagueTeams, resolveTeam } from './league-teams.js';
 import { reconciliationOutcome } from './trade-center.js';
 
@@ -9,6 +10,7 @@ const parse = value => {
 const rows = async (db, sql, ...args) => (await db.prepare(sql).bind(...args).all()).results || [];
 
 export async function reconcileTradeRosterOverlays(db, leagueId, snapshotId) {
+  await reconcileTradeBlockListings(db,leagueId,snapshotId);
   const overlays = await rows(db, `SELECT overlay.*,workflow.status AS workflow_status
     FROM trade_roster_overlays overlay
     JOIN trade_workflows workflow ON workflow.id=overlay.trade_id AND workflow.league_id=overlay.league_id

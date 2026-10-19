@@ -1,3 +1,4 @@
+import { reconcileTradeBlockListings } from '../../../_lib/trade-block-reconciliation.js';
 import { evaluateFreeTrade } from '../../../_lib/free-trade-rules.js';
 import { resolveLiveTradePlayer, ensureLiveTradePlayerIdentity } from '../../../_lib/trade-player.js';
 import { currentTradeSeason as currentSeason } from '../../../_lib/trade-season.js';
@@ -232,6 +233,7 @@ export async function tradeCenterState(c) {
     ORDER BY draft_class,round,original_team_key`,c.league.id,Number(season.seasonYear)+1,Number(season.seasonYear)+3) : [];
   const standingsProjection = await activeStandingsProjection(c.db,c.league.id,c.teams);
   const picks = attachProjectedPickSlots(rawPicks,standingsProjection);
+  await reconcileTradeBlockListings(c.db,c.league.id);
   const listings = await resultRows(c.db, `SELECT listing.id,listing.team_key AS teamKey,listing.asset_type AS assetType,
       listing.player_identity_id AS playerIdentityId,identity.public_id AS playerPublicId,identity.display_name AS playerName,
       listing.draft_pick_id AS draftPickId,listing.requested_return AS requestedReturn,

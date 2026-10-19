@@ -1,3 +1,4 @@
+import { reconcileTradeBlockListings } from '../../functions/_lib/trade-block-reconciliation.js';
 import {evaluateFreeTrade,normalizeFreeTradeRules} from '../../functions/_lib/free-trade-rules.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -659,4 +660,37 @@ test('automatic free trades use authoritative ratings and recheck revised packag
     database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.overall',99) WHERE domain='players'").run();
     assert.equal((await read()).workflows.find(w=>w.id===freeId).freeTrade,true,'approved history stays fixed');
  }finally{database.close();}
+});
+
+
+test('imported ownership changes retire old trade-block listings permanently without transferring or crossing leagues',async()=>{
+  const database=new DatabaseSync(':memory:');try{
+    database.exec('PRAGMA foreign_keys=ON');await migrate(database);
+    database.prepare("INSERT INTO users (id,discord_user_id,discord_username,display_name) VALUES ('listing-owner','listing-discord','listing-owner','Owner')").run();
+    for(const league of ['alpha','beta']){
+      database.prepare("INSERT INTO leagues (id,name,product_name,slug,public_status,tenant_status) VALUES (?,?,'FranchiseHQ',?,'active','enabled')").run(league,league,league);
+      database.prepare("INSERT INTO franchise_seasons (id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status) VALUES (?,?,'madden-companion','franchise','2028','Madden NFL 27','2028',2028,'active')").run(league+'-season',league);
+      database.prepare("INSERT INTO league_snapshots (id,league_id,status,manifest_json,validation_status) VALUES (?,?,'active','{}','ready')").run(league+'-snapshot',league);
+      database.prepare('INSERT INTO league_active_snapshots (league_id,snapshot_id) VALUES (?,?)').run(league,league+'-snapshot');
+      for(const [externalId,abbr] of [['1','TB'],['2','GB']])database.prepare("INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,'teams',?,?)").run(league+'-snapshot',league,externalId,JSON.stringify({external_id:externalId,abbreviation:abbr,display_name:abbr}));
+      database.prepare("INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json) VALUES (?,?,'players','p',?)").run(league+'-snapshot',league,JSON.stringify({external_id:'p',team_external_id:'1'}));
+      database.prepare('INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,?,?,?)').run(league+'-player',league,league+'-public','Player');
+      database.prepare("INSERT INTO player_source_aliases (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id) VALUES (?,'madden-companion','franchise','p',?,?,?)").run(league,league+'-player',league+'-season',league+'-season');
+      database.prepare("INSERT INTO trade_block_listings (id,league_id,team_key,asset_type,player_identity_id,listed_by_user_id) VALUES (?,?,'tb','player',?,'listing-owner')").run(league+'-listing',league,league+'-player');
+    }
+    const db=d1(database),active=()=>database.prepare("SELECT active FROM trade_block_listings WHERE id='alpha-listing'").get().active;
+    const move=team=>database.prepare("UPDATE league_snapshot_records SET data_json=? WHERE league_id='alpha' AND domain='players'").run(JSON.stringify({external_id:'p',team_external_id:team}));
+    assert.equal((await reconcileTradeBlockListings(db,'alpha')).retired,0);
+    move('2');assert.equal((await reconcileTradeBlockListings(db,'alpha','stale-snapshot')).retired,0);assert.equal(active(),1);
+    // The same reconciliation invoked after live import removes the stale listing.
+    await reconcileTradeRosterOverlays(db,'alpha','alpha-snapshot');assert.equal(active(),0);
+    assert.equal(database.prepare("SELECT active FROM trade_block_listings WHERE id='beta-listing'").get().active,1);
+    assert.equal(database.prepare("SELECT COUNT(*) n FROM trade_block_listings WHERE league_id='alpha' AND active=1").get().n,0);
+    move('1');await reconcileTradeBlockListings(db,'alpha');assert.equal(active(),0,'returning to the old team must not resurrect the listing');
+    // Team B must explicitly create a new listing; keep that new choice while B owns the player.
+    move('2');database.prepare("INSERT INTO trade_block_listings (id,league_id,team_key,asset_type,player_identity_id,listed_by_user_id) VALUES ('new-owner-listing','alpha','gb','player','alpha-player','listing-owner')").run();
+    assert.equal((await reconcileTradeBlockListings(db,'alpha')).retired,0);
+    move(null);assert.equal((await reconcileTradeBlockListings(db,'alpha')).retired,1,'explicit free agency removes the listing');
+    assert.equal(database.prepare("SELECT COUNT(*) n FROM trade_block_listings WHERE league_id='alpha' AND active=1").get().n,0);
+  }finally{database.close();}
 });

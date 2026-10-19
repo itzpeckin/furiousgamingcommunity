@@ -2809,17 +2809,21 @@ test('all linked active commissioners join every current thread, including commi
   }finally{f.database.close()}
 });
 
-test('a failed commissioner join retains successful work and retries with actionable permissions guidance',async()=>{
+test('unavailable commissioner access never blocks creation and retries on later snapshot evidence',async()=>{
   const f=await schedulePresentationFixture();try{
     seedMember(f.database,{leagueId:f.league.id,userId:'comm',discordId:'100000000000000011',role:'commissioner',teamId:null});
-    f.intercept(c=>c.method==='PUT'?Response.json({message:'Missing Permissions'},{status:403}):null);
-    const failed=await f.sync();assert.equal(failed.status,'partial');assert.match(failed.errors[0],/View Channel.*Retry Schedule Sync/);
-    const record=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
-    assert.ok(JSON.parse(record.presentation_json).name.startsWith('🆚'));
+    f.intercept(c=>c.method==='PUT'?Response.json({message:'Unknown Member',code:10007},{status:404}):null);
+    const result=await f.sync();assert.equal(result.status,'completed');assert.equal(result.threads,1);
+    let record=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
     assert.deepEqual(JSON.parse(record.presentation_json).members,[]);
-    f.intercept(null);assert.equal((await f.sync()).ok,true);
+    assert.equal(JSON.parse(record.presentation_json).unavailable['100000000000000011'],f.snapshotId);
+    const calls=f.calls.length;await f.sync();assert.equal(f.calls.length,calls);
+    f.intercept(null);
+    f.database.prepare("UPDATE discord_schedule_threads SET presentation_json=json_set(presentation_json,'$.unavailable.100000000000000011','older-snapshot')").run();
+    assert.equal((await f.sync()).ok,true);
+    record=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
+    assert.deepEqual(JSON.parse(record.presentation_json).members,['100000000000000011']);
     assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,1);
-    assert.deepEqual(JSON.parse(f.database.prepare('SELECT presentation_json FROM discord_schedule_threads').get().presentation_json).members,['100000000000000011']);
   }finally{f.database.close()}
 });
 
@@ -3038,4 +3042,56 @@ test('yearly schedule rows may inherit their season from the active snapshot, bu
   f.database.prepare("UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.season_year',2025) WHERE snapshot_id=? AND domain='games'").run(f.snapshotId);
   await assert.rejects(prepareDiscordSeasonOpening(f.db,f.league,{snapshotId:f.snapshotId}),/full regular-season/);
  }finally{f.database.close();}
+});
+
+
+test('durable scheduling creates every game before membership and skips missing members without duplicates',async()=>{
+  const f=await schedulePresentationFixture();try{
+    seedMember(f.database,{leagueId:f.league.id,userId:'comm',role:'commissioner',teamId:null});
+    seedSnapshotRecord(f.database,{snapshotId:f.snapshotId,leagueId:f.league.id,domain:'games',externalId:'reverse',data:{external_id:'reverse',season_year:2026,week_index:14,stage:'regular-season',home_team_external_id:'1002',away_team_external_id:'1001',status:'scheduled'}});
+    f.intercept(c=>c.method==='PUT'?Response.json({message:'Unknown Member',code:10007},{status:404}):null);
+    let result=await f.sync({maxOperations:16});
+    assert.equal(result.threads,2);assert.equal(result.hasMore,true);assert.equal(f.calls.filter(c=>c.method==='PUT').length,0);
+    result=await f.sync({maxOperations:16});assert.equal(result.status,'completed');assert.equal(result.errors.length,0);
+    assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,2);
+    await f.sync({maxOperations:16});assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,2);
+  }finally{f.database.close()}
+});
+
+test('Discord throttling is resumable progress and a replay completes the same thread',async()=>{
+  const f=await schedulePresentationFixture();try{
+    let throttled=true;
+    f.intercept(c=>!throttled?null:c.url.endsWith('/threads')?Response.json({message:'Rate limited',retry_after:20,global:false},{status:429}):c.method==='GET'?Response.json({code:10003},{status:404}):null);
+    let result=await f.sync({maxOperations:16});assert.equal(result.status,'running');assert.equal(result.hasMore,true);
+    assert.equal(result.retryAfterSeconds,20);assert.deepEqual(result.errors,[]);
+    throttled=false;result=await f.sync({maxOperations:16});assert.equal(result.status,'completed');
+    assert.equal(f.calls.filter(c=>c.url.endsWith('/messages')).length,1);
+    assert.equal(f.database.prepare("SELECT COUNT(*) n FROM discord_schedule_threads WHERE status='active'").get().n,1);
+  }finally{f.database.close()}
+});
+
+test('route cooldown does not block unrelated requests and long waits become durable retry signals',async()=>{
+  const {scheduleFetch}=await import('../../functions/_lib/discord-schedule-fetch.js');let calls=0;
+  const limited=scheduleFetch(async()=>{calls++;return Response.json({},{headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset-after':'20'}});},{maxWaitMs:1000});
+  await limited('https://discord.com/api/v10/channels/1/messages',{method:'POST'});
+  await limited('https://discord.com/api/v10/channels/1/messages/9/threads',{method:'POST'});
+  assert.equal(calls,2);
+  await assert.rejects(limited('https://discord.com/api/v10/channels/1/messages',{method:'POST'}),e=>e.status===429&&e.retryAfterSeconds>19);
+});
+
+
+test('learning a Discord bucket preserves serialization for already queued route requests',async()=>{
+  const {scheduleFetch}=await import('../../functions/_lib/discord-schedule-fetch.js');
+  let active=0,max=0,count=0,releaseSecond,secondStarted;
+  const started=new Promise(resolve=>{secondStarted=resolve;});
+  const held=new Promise(resolve=>{releaseSecond=resolve;});
+  const limited=scheduleFetch(async()=>{
+    active++;max=Math.max(max,active);const current=++count;
+    if(current===2){secondStarted();await held;}
+    active--;return Response.json({},{headers:{'x-ratelimit-bucket':'learned'}});
+  });
+  const url='https://discord.com/api/v10/channels/1/messages';
+  const first=limited(url),second=limited(url);
+  await started;const third=limited(url);await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(count,2);releaseSecond();await Promise.all([first,second,third]);assert.equal(max,1);
 });

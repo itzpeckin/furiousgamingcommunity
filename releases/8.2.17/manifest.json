@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.17",
+  "releaseType": "scheduling-recovery-and-trade-block-ownership",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.16",
+    "tag": "v8.2.16",
+    "commit": "a2677ac717b5871ee7afcb4fe03701370bfbca26"
+  },
+  "implementationBranch": "fix/8.2.17-scheduling-trade-block",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.16",
+    "candidateRelease": "8.2.17",
+    "currentMigration": 54,
+    "candidateMigration": 54
+  },
+  "requiredArtifacts": [
+    "releases/8.2.17/release-record.md",
+    "releases/8.2.17/validation-evidence.json",
+    "releases/8.2.17/recovery-plan.md"
+  ]
+}

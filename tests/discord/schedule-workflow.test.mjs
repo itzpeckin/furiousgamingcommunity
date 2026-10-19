@@ -112,3 +112,14 @@ test('background import retries a transient Map Schedule request and still publi
   assert.equal(scheduleAttempts,2);
   assert.equal(finalizations,1);
 });
+
+
+test('schedule Workflow durably waits for Discord then resumes without an import or commissioner retry',async()=>{
+  let calls=0;const sleeps=[];
+  const workflow=await workflowWith(async()=>Response.json(++calls===1
+    ?{ok:false,status:'running',hasMore:true,retryAfterSeconds:4.566,errors:[]}
+    :{ok:true,status:'completed',threads:16}));
+  const result=await workflow.run(event,{...step,sleep:async(name,duration)=>sleeps.push({name,duration})});
+  assert.equal(result.ok,true);assert.equal(calls,2);
+  assert.deepEqual(sleeps,[{name:'discord-cooldown-1',duration:'6 seconds'}]);
+});
