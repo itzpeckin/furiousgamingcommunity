@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.18",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "targetedHistory": {
+      "passed": true,
+      "tests": 16
+    },
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 54,
+      "candidateRequiresMigration": false
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 601,
+      "log": "outputs/fhq8218-strict.txt"
+    },
+    "responsiveBrowser": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "gameFilters": true,
+      "noPageOverflow": true,
+      "horizontalTableScroll": true,
+      "realHandlerFixture": true,
+      "productionAcceptance": false
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveEaCollection": false,
+    "leagueSettingsChanged": false,
+    "separateWorkerChanged": false,
+    "discordChanged": false
+  }
+}

@@ -18,7 +18,8 @@ export function canonicalOwnershipStage(value = '', week = null) {
 export function ownershipScopeOrdinal(stage, week) {
   const normalized = canonicalOwnershipStage(stage,week);
   const base = normalized === 'preseason' ? 0 : normalized === 'regular-season' ? 1000 : normalized === 'playoffs' ? 2000 : 3000;
-  const value = Number(week);
+  const numeric = Number(week);
+  const value = normalized === 'playoffs' && numeric >= 1 && numeric <= 4 ? numeric + 18 : numeric;
   return base + (Number.isFinite(value) ? Math.max(0,value) : 0);
 }
 
@@ -45,26 +46,29 @@ function emptySummary(gmIdentityId, franchiseSeasonId) {
     conferenceChampionships:0,
     superBowlAppearances:0,
     superBowlChampionships:0,
-    gameCount:0
+    gameCount:0, pointsFor:0, pointsAgainst:0, scoredGames:0,
+    giveaways:0, takeaways:0, giveawayGames:0, takeawayGames:0
   };
 }
 
 function completed(game = {}) {
   const status = text(game.status).toLowerCase();
+  if (game.homeScore == null || game.awayScore == null || game.homeScore === '' || game.awayScore === '') return false;
   const home = Number(game.homeScore), away = Number(game.awayScore);
-  return ['final','completed','complete','played'].some(value => status.includes(value))
+  if (!Number.isFinite(home) || !Number.isFinite(away)) return false;
+  return ['final','completed','complete','played'].includes(status)
     || (Number.isFinite(home) && Number.isFinite(away) && (home !== 0 || away !== 0));
 }
 
 const gameTeamKey=(game,side)=>text(game[`${side}TeamKey`] ?? game[`${side}_team_key`] ?? game[`${side}TeamId`]);
 
 function bracketAdvancedSide(game,games=[]){
-  const week=Number(game.week ?? game.weekIndex),home=gameTeamKey(game,'home'),away=gameTeamKey(game,'away');
+  const week=ownershipScopeOrdinal(game.stage,game.week ?? game.weekIndex),home=gameTeamKey(game,'home'),away=gameTeamKey(game,'away');
   if(!Number.isFinite(week)||!home||!away)return null;
   const laterTeams=new Set();
   for(const later of games){
     const laterWeek=Number(later.week ?? later.weekIndex);
-    if(canonicalOwnershipStage(later.stage,laterWeek)!=='playoffs'||!Number.isFinite(laterWeek)||laterWeek<=week)continue;
+    if(canonicalOwnershipStage(later.stage,laterWeek)!=='playoffs'||!Number.isFinite(laterWeek)||ownershipScopeOrdinal(later.stage,laterWeek)<=week)continue;
     laterTeams.add(gameTeamKey(later,'home'));laterTeams.add(gameTeamKey(later,'away'));
   }
   const homeAdvanced=laterTeams.has(home),awayAdvanced=laterTeams.has(away);
@@ -76,9 +80,13 @@ export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeaso
   const summaries = new Map();
   const attributedGames = [];
   const playoffGames = games.filter(game => canonicalOwnershipStage(game.stage,game.week ?? game.weekIndex) === 'playoffs');
-  const championshipScope = playoffGames.length
-    ? Math.max(...playoffGames.map(game => ownershipScopeOrdinal(game.stage, game.week ?? game.weekIndex)))
-    : null;
+  // A partially imported bracket is not a championship. Legacy exports use
+  // overall Week 23; current exports use Week 22 (or postseason round 4).
+  const legacyFinal = playoffGames.some(game => Number(game.week ?? game.weekIndex) === 23);
+  const isChampionship = game => {
+    const week = Number(game.week ?? game.weekIndex);
+    return /super.?bowl/i.test(text(game.stage)) || week === 23 || (!legacyFinal && week === 22) || week === 4;
+  };
 
   const periodFor = (teamKey, game) => relevantPeriods
     .filter(period => text(period.teamKey ?? period.team_key).toLowerCase() === text(teamKey).toLowerCase() && periodOwnsGame(period,{...game,franchiseSeasonId}))
@@ -98,7 +106,7 @@ export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeaso
       const summary = summaries.get(gmIdentityId) || emptySummary(gmIdentityId, franchiseSeasonId);
       if (!summary.teams.includes(teamKey)) summary.teams.push(teamKey);
       if (stage === 'playoffs') summary.playoffAppearance = 1;
-      if (stage === 'playoffs' && ownershipScopeOrdinal(game.stage,game.week ?? game.weekIndex) === championshipScope) {
+      if (stage === 'playoffs' && isChampionship(game)) {
         summary.conferenceChampionships = 1;
         summary.superBowlAppearances = 1;
       }
@@ -111,7 +119,14 @@ export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeaso
       const result=advancedSide?(side===advancedSide?'win':'loss'):ownScore>otherScore?'win':ownScore<otherScore?'loss':'tie';
       summary[`${prefix}${result==='win'?'Wins':result==='loss'?'Losses':'Ties'}`]++;
       summary.gameCount++;
-      if (scoreCompleted&&stage === 'playoffs' && ownershipScopeOrdinal(game.stage,game.week ?? game.weekIndex) === championshipScope) {
+      if (scoreCompleted) {
+        summary.pointsFor += ownScore; summary.pointsAgainst += otherScore; summary.scoredGames++;
+        for (const [metric,count] of [['giveaways','giveawayGames'],['takeaways','takeawayGames']]) {
+          const value = game[`${side}Turnovers`]?.[metric];
+          if (value !== null && value !== undefined && Number.isFinite(value)) { summary[metric] += value; summary[count]++; }
+        }
+      }
+      if (scoreCompleted&&stage === 'playoffs' && isChampionship(game)) {
         if (ownScore > otherScore) summary.superBowlChampionships = 1;
       }
       summaries.set(gmIdentityId, summary);
@@ -133,13 +148,20 @@ export function careerTotals(seasonSummaries = []) {
     regularWins:0,regularLosses:0,regularTies:0,
     playoffWins:0,playoffLosses:0,playoffTies:0,
     playoffAppearances:0,conferenceChampionships:0,
-    superBowlAppearances:0,superBowlChampionships:0,gameCount:0
+    superBowlAppearances:0,superBowlChampionships:0,gameCount:0,
+    pointsFor:0,pointsAgainst:0,scoredGames:0,giveaways:0,takeaways:0,giveawayGames:0,takeawayGames:0
   };
   for (const season of seasonSummaries) {
     for (const team of season.teams || []) if (!totals.teams.includes(team)) totals.teams.push(team);
     for (const key of ['regularWins','regularLosses','regularTies','playoffWins','playoffLosses','playoffTies','conferenceChampionships','superBowlAppearances','superBowlChampionships','gameCount']) totals[key] += Number(season[key] || 0);
     totals.playoffAppearances += Number(season.playoffAppearance || 0);
+    for (const key of ['pointsFor','pointsAgainst','scoredGames','giveaways','takeaways','giveawayGames','takeawayGames']) totals[key] += Number(season[key] || 0);
   }
   totals.teams.sort();
+  totals.wins = totals.regularWins + totals.playoffWins;
+  totals.losses = totals.regularLosses + totals.playoffLosses;
+  totals.ties = totals.regularTies + totals.playoffTies;
+  totals.gameCount = totals.wins + totals.losses + totals.ties;
+  totals.winPercentage = totals.gameCount ? (totals.wins + totals.ties / 2) / totals.gameCount : null;
   return totals;
 }

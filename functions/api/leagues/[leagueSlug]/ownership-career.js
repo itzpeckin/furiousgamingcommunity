@@ -2,11 +2,12 @@ import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } f
 import { requireActiveMembership, requireCommissioner } from '../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../_lib/league-teams.js';
 import { buildGmSeasonSummaries, careerTotals } from '../../../_lib/gm-career.js';
-import { rehydrateFrozenGmSeasonRows } from '../../../_lib/gm-career-history.js';
+import { loadLeagueGameHistory } from '../../../_lib/gm-matchup-history.js';
+import { rehydrateFrozenGmSeasonRows, snapshotGame } from '../../../_lib/gm-career-history.js';
 import { currentFranchiseContext, ownershipChangeStatements } from '../../../_lib/ownership-periods.js';
 import { createTenantAuditContext, writeTenantAuditEvent } from '../../../_lib/tenant-context.js';
 
-const RELEASE='8.0.3';
+const RELEASE='8.2.18';
 const safeTeamKey=value=>/^[a-z0-9][a-z0-9._:-]{0,99}$/.test(String(value||'').trim().toLowerCase());
 const parse=value=>{try{return JSON.parse(value||'null')}catch{return null}};
 const text=value=>value===null||value===undefined?'':String(value).trim();
@@ -21,38 +22,12 @@ async function access(context,commissioner=false){
   return{db,league,authorization};
 }
 
-function sourceRecord(row={}){
-  const raw=parse(row.data_json)||{};
-  const nested=typeof raw.source_record_json==='string'?parse(raw.source_record_json):(raw.source_record_json||raw.source||null);
-  return nested&&typeof nested==='object'?{...nested,...raw}:raw;
-}
-
-function gameValue(raw={},keys=[]){
-  for(const key of keys)if(raw[key]!==undefined&&raw[key]!==null&&raw[key]!=='')return raw[key];
-  return null;
-}
-
 async function activeCareerGames(db,leagueId,franchiseSeasonId,teams){
   const result=await db.prepare(`SELECT records.external_id,records.data_json
     FROM league_active_snapshots active
     JOIN league_snapshot_records records ON records.league_id=active.league_id AND records.snapshot_id=active.snapshot_id
     WHERE active.league_id=? AND records.domain='games' ORDER BY records.external_id`).bind(leagueId).all();
-  return(result?.results||[]).map(row=>{
-    const raw=sourceRecord(row);
-    const homeExternal=text(gameValue(raw,['home_team_external_id','homeTeamId','home_team_id','homeId']));
-    const awayExternal=text(gameValue(raw,['away_team_external_id','awayTeamId','away_team_id','awayId']));
-    return{
-      id:row.external_id,
-      franchiseSeasonId,
-      stage:text(gameValue(raw,['stage','stage_name','stageName','seasonStage'])),
-      week:Number(gameValue(raw,['week_index','weekIndex','week']))||0,
-      status:text(gameValue(raw,['status','game_status','gameStatus'])),
-      homeTeamKey:resolveTeam(teams,homeExternal)?.teamKey||'',
-      awayTeamKey:resolveTeam(teams,awayExternal)?.teamKey||'',
-      homeScore:Number(gameValue(raw,['home_score','homeScore'])),
-      awayScore:Number(gameValue(raw,['away_score','awayScore']))
-    };
-  });
+  return(result?.results||[]).map(row=>snapshotGame(row,franchiseSeasonId,teams));
 }
 
 function publicSeason(row={}){
@@ -84,22 +59,26 @@ async function leagueCareerResponse(current,teams){
       started_stage,started_week,ended_stage,ended_week
     FROM team_ownership_periods WHERE league_id=? ORDER BY started_at,id`).bind(current.league.id).all();
   const periods=periodResult?.results||[];
-  const games=await activeCareerGames(current.db,current.league.id,contextState.franchiseSeasonId,teams);
-  const currentBuilt=buildGmSeasonSummaries({games,periods,franchiseSeasonId:contextState.franchiseSeasonId});
   const activeSeason=await current.db.prepare(`SELECT id,display_name,season_year FROM franchise_seasons WHERE id=? AND league_id=? LIMIT 1`)
     .bind(contextState.franchiseSeasonId||'',current.league.id).first();
   const historyResult=await current.db.prepare(`SELECT summary.*,season.display_name,season.season_year
     FROM gm_season_summaries summary JOIN franchise_seasons season ON season.id=summary.franchise_season_id AND season.league_id=summary.league_id
     WHERE summary.league_id=? AND summary.franchise_season_id<>?
     ORDER BY season.season_year,summary.gm_identity_id`).bind(current.league.id,contextState.franchiseSeasonId||'').all();
-  const historyRows=await rehydrateFrozenGmSeasonRows(current.db,{
-    leagueId:current.league.id,teams,periods,rows:historyResult?.results||[]
-  });
+  const history=await loadLeagueGameHistory(current.db,{leagueId:current.league.id,contextState,teams,periods,historyRows:historyResult?.results||[],activeSeason});
   const historyByIdentity=new Map();
-  for(const row of historyRows){
-    const id=text(row.gm_identity_id);
-    if(!historyByIdentity.has(id))historyByIdentity.set(id,[]);
-    historyByIdentity.get(id).push(publicSeason(row));
+  let currentBuilt={summaries:[],attributedGames:[]};
+  for(const group of history.seasons){
+    if(group.live){currentBuilt=group.built;continue;}
+    const summaries=new Map(group.built.summaries.map(row=>[text(row.gmIdentityId),row]));
+    // Preserve frozen totals if their underlying games no longer exist.
+    const ids=new Set([...group.rows.map(row=>text(row.gm_identity_id)),...summaries.keys()]);
+    for(const id of ids){
+      const rebuilt=summaries.get(id),stored=group.rows.find(row=>text(row.gm_identity_id)===id);
+      const summary=rebuilt?{...rebuilt,seasonYear:group.seasonYear,label:group.label,frozen:true}:publicSeason(stored);
+      if(!historyByIdentity.has(id))historyByIdentity.set(id,[]);
+      historyByIdentity.get(id).push(summary);
+    }
   }
   const currentByIdentity=new Map(currentBuilt.summaries.map(summary=>[text(summary.gmIdentityId),summary]));
   const teamName=key=>resolveTeam(teams,key)?.displayName||String(key).toUpperCase();
@@ -117,7 +96,7 @@ async function leagueCareerResponse(current,teams){
       owner:{publicId:identity.public_id,displayName:identity.display_name},
       currentTeams,
       totals:{...totals,teams:teamDetails},
-      seasons:seasons.map(season=>({...season,teams:(season.teams||[]).map(key=>({teamKey:key,displayName:teamName(key)}))})),
+      seasons:seasons.map(({gmIdentityId,...season})=>({...season,teams:(season.teams||[]).map(key=>({teamKey:key,displayName:teamName(key)}))})),
       currentGameAttributionCount:currentBuilt.attributedGames.filter(row=>text(row.gmIdentityId)===identityId).length
     };
   }).sort((left,right)=>
@@ -127,8 +106,12 @@ async function leagueCareerResponse(current,teams){
     ||Number(right.totals.regularWins)-Number(left.totals.regularWins)
     ||String(left.owner.displayName).localeCompare(String(right.owner.displayName))
   ).map((owner,index)=>({...owner,rank:index+1}));
+  const identities=new Map((identityResult?.results||[]).map(row=>[text(row.id),{publicId:row.public_id,displayName:row.display_name}]));
+  const publicSide=side=>({teamKey:side.teamKey,teamName:side.teamName,score:side.score,result:side.result,owner:identities.get(text(side.gmIdentityId))||null});
+  const gameHistory=history.games.map(game=>({...game,home:publicSide(game.home),away:publicSide(game.away)}));
   return json({
-    ok:true,release:RELEASE,state:owners.length?'ready':'empty',view:'league',owners,
+    ok:true,release:RELEASE,state:owners.length?'ready':'empty',view:'league',owners,games:gameHistory,
+    coverage:{retainedSeasons:history.seasons.filter(row=>row.built.hasGames).length,totalSeasons:history.seasons.length,includesPreseason:false},
     reconciliation:{membershipAuthority:true,maddenOwnerNamesUsed:false,crossTenantInference:false},
     activeSnapshotChanged:false,freeAgentInterpretedAsZero:false
   });
@@ -180,7 +163,7 @@ export async function onRequestGet(context){
       owner:{publicId:identity.public_id,displayName:identity.display_name},
       career:{
         totals:{...totals,teams:totals.teams.map(key=>({teamKey:key,displayName:teamName(key)}))},
-        seasons:seasons.map(season=>({...season,teams:(season.teams||[]).map(key=>({teamKey:key,displayName:teamName(key)}))})),
+        seasons:seasons.map(({gmIdentityId,...season})=>({...season,teams:(season.teams||[]).map(key=>({teamKey:key,displayName:teamName(key)}))})),
         currentGameAttributionCount:relevantAttributions.length,
         reconciliation:{membershipAuthority:true,maddenOwnerNamesUsed:false,crossTenantInference:false}
       }

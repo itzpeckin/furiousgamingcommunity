@@ -998,7 +998,7 @@
       // domains hydrate after first paint and never block a hard-refresh render.
       const criticalPayload=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),
-        import('./league-engine/game-summary.js?v=8.2.17')
+        import('./league-engine/game-summary.js?v=8.2.18')
       ]);
 
       const [stateValue,snapshot,teamRows,standingRows,gameRows,gameSummary]=criticalPayload;
@@ -6939,14 +6939,17 @@ function canonicalPlayerDashboardStats(playerId='') {
   }
 
 
+  let standingsRenderRevision=0;
   async function renderStandingsLive() {
+    const renderRevision=++standingsRenderRevision;
+    const requestedLeague=location.pathname;
     const service=liveReadModel();
     if(!service){renderLiveState('Standings unavailable','The canonical league service has not loaded.','warning');return;}
     pageContent.setAttribute('aria-busy','true');
     try{
       const requestedView=state.standingsView;
       const ownership=ownershipCareerService();
-      const historyPromise=requestedView==='history'&&ownership?.requestLeague
+      const historyPromise=['history','games'].includes(requestedView)&&ownership?.requestLeague
         ? ownership.requestLeague()
         : Promise.resolve(null);
       const competitionPromise=requestedView==='confidence'&&window.FranchiseHQ?.competition?.load
@@ -6954,7 +6957,7 @@ function canonicalPlayerDashboardStats(playerId='') {
         : Promise.resolve(null);
       const [stateValue,snapshot,teamRows,standingRows,leagueHistory,competitionState]=await Promise.all([service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),historyPromise,competitionPromise]);
       pageContent.removeAttribute('aria-busy');
-      if(routeBase(currentAppRoute())!=='standings')return;
+      if(routeBase(currentAppRoute())!=='standings'||renderRevision!==standingsRenderRevision||requestedView!==state.standingsView||requestedLeague!==location.pathname)return;
       if(stateValue!=='live'||!snapshot){renderLiveState('Standings unavailable','Standings will appear after the first successful import.');return;}
       const liveTeams=teamRows.map(liveTeamShape),teamMap=new Map(liveTeams.map(t=>[String(t.id),t]));
       const rows=standingRows.map(r=>liveStandingShape(r,teamMap));
@@ -6966,16 +6969,19 @@ function canonicalPlayerDashboardStats(playerId='') {
       const activeView=requestedView;
       const content=activeView==='confidence'
         ? renderConfidenceStandings({competitionState,teamMapOverride:teamMap})
+        : activeView==='games'
+        ? (ownership?.renderGames?.(leagueHistory)||'<article class="card">Game History unavailable</article>')
         : activeView==='history'
         ? (ownership?.renderLeague?.(leagueHistory)||'<article class="card gm-career-empty"><h3>League History unavailable</h3><p>The ownership history service has not loaded.</p></article>')
         : activeView==='league'?`<article class="card">${table(ranked,true)}</article>`:
         activeView==='conference'?`<div class="content-grid content-grid--equal">${['AFC','NFC'].map(conf=>`<article class="card"><div class="card-header"><div><span class="eyebrow">Conference rankings</span><h3>${conf}</h3></div></div>${table(confGroups[conf]||[],true)}</article>`).join('')}</div>`:
         activeView==='playoffs'?`<div class="playoff-grid">${['AFC','NFC'].map(conf=>{const picture=buildConferencePicture(conf,rows);return `<article class="card"><div class="card-header"><div><h3>${conf} Playoff Picture</h3></div><span class="pill pill--accent">Top 7</span></div><div class="playoff-bracket">${picture.seeds.map(row=>{const team=teamMap.get(String(row.teamId))||{};return `<div class="playoff-seed"><span class="seed">${row.playoffSeed}</span>${renderTeamMark(team)}<div><strong>${escapeHtml(team.fullName||row.team)}</strong><small>${escapeHtml(row.qualification)}</small></div><strong>${escapeHtml(row.record)}</strong></div>`}).join('')}</div></article>`}).join('')}</div>`:
         `<div class="division-grid">${Object.entries(divisionGroups).map(([name,group])=>`<article class="card division-card"><div class="card-header"><div><span class="eyebrow">${escapeHtml(name.split(' ')[0]||'League')}</span><h3>${escapeHtml(name.split(' ').slice(1).join(' ')||name)}</h3></div></div>${table(group,false)}</article>`).join('')}</div>`;
-      const tabs=[['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture'],['confidence','Confidence Pool'],['history','League History']];
+      const tabs=[['division','Division'],['conference','Conference'],['league','League'],['playoffs','Playoff Picture'],['confidence','Confidence Pool'],['history','GM History'],['games','Game History']];
       const context=publicSeasonContext(snapshot,[]);
       pageContent.innerHTML=`<div class="page-heading"><div><span class="eyebrow">Season ${escapeHtml(snapshot.seasonYear??'—')}</span><h1>Standings</h1><p>League races and Confidence Pool results from completed games.</p></div><div class="heading-actions"><div class="segmented-tabs standings-primary-tabs">${tabs.map(([key,label])=>`<button data-standings-view="${key}" class="${activeView===key?'is-active':''}">${label}</button>`).join('')}</div></div></div><div data-standings-content>${content}</div>`;
-    }catch(error){console.error('[Standings Live Integration]',error);if(routeBase(currentAppRoute())==='standings')renderLiveState('Standings unavailable',error.message||'League data could not be loaded.','warning');}
+      if(activeView==='games')ownership?.bindGames?.(pageContent,leagueHistory);
+    }catch(error){console.error('[Standings Live Integration]',error);if(routeBase(currentAppRoute())==='standings'&&renderRevision===standingsRenderRevision&&requestedLeague===location.pathname)renderLiveState('Standings unavailable',error.message||'League data could not be loaded.','warning');}
   }
   function renderStandings() {
     const service=liveReadModel();
@@ -10220,7 +10226,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.2.17';
+  const VISIBLE_RELEASE = '8.2.18';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

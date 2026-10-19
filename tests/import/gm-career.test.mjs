@@ -6,6 +6,10 @@ import { buildGmSeasonSummaries, careerTotals, canonicalOwnershipStage, periodOw
 import { rehydrateFrozenGmSeasonRows } from '../../functions/_lib/gm-career-history.js';
 import { normalizePosition } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
 import { normalizePlayer } from '../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js';
+import { buildSeasonGameHistory } from '../../functions/_lib/gm-matchup-history.js';
+import { onRequestGet as readCareers } from '../../functions/api/leagues/[leagueSlug]/ownership-career.js';
+import { createHistoryFixture } from '../fixtures/gm-history.mjs';
+import vm from 'node:vm';
 
 const season='season-2026';
 const periods=[
@@ -16,7 +20,7 @@ const periods=[
 test('reviewed ownership periods attribute games without Madden owner names',()=>{
   const games=[
     {id:'reg-1',franchiseSeasonId:season,stage:'regular-season',week:1,status:'final',homeTeamKey:'tb',awayTeamKey:'gb',homeScore:24,awayScore:17},
-    {id:'playoff-1',franchiseSeasonId:season,stage:'playoffs',week:1,status:'final',homeTeamKey:'gb',awayTeamKey:'tb',homeScore:20,awayScore:27}
+    {id:'playoff-1',franchiseSeasonId:season,stage:'playoffs',week:4,status:'final',homeTeamKey:'gb',awayTeamKey:'tb',homeScore:20,awayScore:27}
   ];
   const result=buildGmSeasonSummaries({games,periods,franchiseSeasonId:season});
   const justin=result.summaries.find(row=>row.gmIdentityId==='gm-justin');
@@ -134,12 +138,123 @@ test('7.3.7.1 exposes a league-wide membership-authoritative History Books view'
     readFile(new URL('../../functions/api/leagues/[leagueSlug]/ownership-career.js',import.meta.url),'utf8'),
     readFile(new URL('../../styles.css',import.meta.url),'utf8')
   ]);
-  assert.match(app,/\['history','League History'\]/);
+  assert.match(app,/\['history','GM History'\]/);
   assert.match(app,/ownership\.requestLeague\(\)/);
   assert.match(client,/function renderLeague\(payload=\{\}\)/);
-  for(const label of ['Career Record','Playoff Appearances','Super Bowl Appearances','Super Bowl Wins'])assert.match(client,new RegExp(label));
+  for(const label of ['Wins','Losses','Playoff Berths','Super Bowl Appearances','Super Bowl Wins','Giveaways','Takeaways'])assert.match(client,new RegExp(label));
   assert.match(endpoint,/view==='league'/);
   assert.match(endpoint,/FROM gm_identities identity WHERE identity\.league_id=\?/);
   assert.match(endpoint,/crossTenantInference:false/);
   assert.match(styles,/league-wide membership-authoritative History Books/);
+});
+
+test('an incomplete playoff bracket never awards Super Bowl appearances or wins',()=>{
+  for(const week of [1,2,3,19,20,21]){
+    const built=buildGmSeasonSummaries({franchiseSeasonId:season,periods,games:[{id:'p',stage:'playoffs',week,status:'completed',homeTeamKey:'tb',awayTeamKey:'gb',homeScore:21,awayScore:7}]});
+    assert.equal(built.summaries[0].superBowlAppearances,0,`week ${week}`);
+    assert.equal(built.summaries[0].superBowlChampionships,0);
+    assert.equal(built.summaries[0].playoffAppearance,1);
+  }
+});
+
+test('absent scores and unplayed zero-zero schedules are never recorded as ties',()=>{
+  for(const scores of [[null,null],['',''],[NaN,7]]){
+    const built=buildGmSeasonSummaries({franchiseSeasonId:season,periods,games:[{id:'missing',stage:'regular-season',week:1,status:'completed',homeTeamKey:'tb',awayTeamKey:'gb',homeScore:scores[0],awayScore:scores[1]}]});
+    assert.equal(built.attributedGames.length,0);
+  }
+  const built=buildGmSeasonSummaries({franchiseSeasonId:season,periods,games:[{id:'unplayed',stage:'regular-season',week:1,status:'unplayed',homeTeamKey:'tb',awayTeamKey:'gb',homeScore:0,awayScore:0}]});
+  assert.equal(built.attributedGames.length,0);
+});
+
+test('real history endpoint combines archived and current seasons with game-time ownership and turnover coverage',async()=>{
+  const f=await createHistoryFixture();
+  try{
+    const response=await readCareers(f.context());assert.equal(response.status,200);
+    const payload=await response.json();assert.equal(payload.ok,true);
+    const alex=payload.owners.find(row=>row.owner.publicId==='gm-a');
+    assert.deepEqual([alex.totals.wins,alex.totals.losses,alex.totals.ties],[1,1,1]);
+    assert.equal(alex.totals.winPercentage,.5);
+    assert.deepEqual([alex.totals.pointsFor,alex.totals.pointsAgainst,alex.totals.scoredGames],[59,58,3]);
+    assert.deepEqual([alex.totals.giveaways,alex.totals.takeaways,alex.totals.giveawayGames],[3,1,2]);
+    assert.deepEqual([alex.totals.playoffAppearances,alex.totals.superBowlAppearances,alex.totals.superBowlChampionships],[1,1,0]);
+    assert.equal(payload.games.length,4);assert.equal(new Set(payload.games.map(row=>row.id)).size,4);
+    assert.equal(payload.games.find(row=>row.id==='new:reg2').home.owner.publicId,'gm-c');
+    assert.equal(payload.games.find(row=>row.id==='old:reg1').home.owner.publicId,'gm-a');
+    assert.equal(payload.games[0].id,'new:reg2');
+    assert.equal(JSON.stringify(payload).includes('identity-'),false);
+    assert.equal(JSON.stringify(payload).includes('Other League GM'),false);
+    assert.equal(f.sqlite.prepare(`SELECT regular_wins FROM gm_season_summaries LIMIT 1`).get().regular_wins,99,'reading cannot overwrite frozen records');
+  }finally{f.sqlite.close();}
+});
+
+test('career and game history require membership in the requested league',async()=>{
+  const f=await createHistoryFixture();
+  try{
+    assert.equal((await readCareers(f.context('alpha',false))).status,401);
+    assert.equal((await readCareers(f.context('beta'))).status,404);
+  }finally{f.sqlite.close();}
+});
+
+test('missing archived snapshots preserve frozen records but never invent scores or turnovers',async()=>{
+  const f=await createHistoryFixture();
+  try{
+    f.sqlite.exec(`DELETE FROM league_snapshot_records WHERE snapshot_id='snap-old'`);
+    const p=await (await readCareers(f.context())).json();
+    const a=p.owners.find(row=>row.owner.publicId==='gm-a').totals;
+    assert.equal(a.regularWins,99);assert.equal(a.scoredGames,1);assert.equal(a.pointsFor,14);
+    assert.equal(p.games.length,2);assert.deepEqual(p.coverage,{retainedSeasons:1,totalSeasons:2,includesPreseason:false});
+  }finally{f.sqlite.close();}
+});
+
+test('game totals ignore player stats, duplicate captures, conflicting totals, and preseason games',()=>{
+  const record=(domain,id,data)=>({domain,external_id:id,data_json:JSON.stringify(data)});
+  const teams=[{teamKey:'tb',externalId:'1'},{teamKey:'gb',externalId:'2'}];
+  const game={stage:'regular-season',week_index:1,status:'final',home_team_external_id:'1',away_team_external_id:'2',home_score:21,away_score:10};
+  const stat={category:'team-game',stage:'regular-season',week_index:1,team_external_id:'1',metrics_json:JSON.stringify({scheduleId:'g',offIntsLost:1,offFumLost:2,defIntsRec:0,defFumRec:0})};
+  const records=[record('games','g',game),record('games','pre',{...game,stage:'preseason'}),record('statistics','s',stat),record('statistics','s-copy',stat),record('statistics','player',{...stat,category:'passing',metrics_json:'{"offIntsLost":50}'})];
+  let built=buildSeasonGameHistory({records,teams,periods,franchiseSeasonId:season});
+  assert.equal(built.games.length,1);assert.equal(built.summaries[0].giveaways,3);assert.equal(built.summaries[0].giveawayGames,1);assert.equal(built.summaries[0].takeaways,0);
+  records.push(record('statistics','conflict',{...stat,metrics_json:'{"scheduleId":"g","offIntsLost":2,"offFumLost":2,"defIntsRec":0,"defFumRec":0}'}));
+  built=buildSeasonGameHistory({records,teams,periods,franchiseSeasonId:season});
+  assert.equal(built.summaries[0].giveawayGames,0);
+});
+
+async function historyClient(fetch=async()=>{}){
+  let service;const listeners={};
+  const HQ={leagueTenant:{getCurrentLeague:()=>({slug:'alpha'})},defineModuleService:(_a,_b,value)=>service=value};
+  const sandbox={window:{FranchiseHQ:HQ,addEventListener:(type,fn)=>listeners[type]=fn},document:{addEventListener(){}},location:{pathname:'/leagues/alpha',origin:'https://franchisehq.test'},fetch,URL,console};
+  vm.runInNewContext(await readFile(new URL('../../league-engine/ownership-career.js',import.meta.url),'utf8'),sandbox);
+  return{service,HQ,listeners,sandbox};
+}
+
+test('head-to-head reverses wins and points correctly and renders safe, complete matchup history',async()=>{
+  const f=await createHistoryFixture();
+  try{
+    const payload=await (await readCareers(f.context())).json();const{service}=await historyClient();
+    const games=service.filterHistory(payload,'gm-a','gm-b');assert.equal(games.length,3);
+    const a=service.historySummary(games,'gm-a'),b=service.historySummary(games,'gm-b');
+    assert.deepEqual([a.wins,a.losses,a.ties,a.pointsFor,a.pointsAgainst],[1,1,1,59,58]);
+    assert.deepEqual([b.wins,b.losses,b.ties,b.pointsFor,b.pointsAgainst],[1,1,1,58,59]);
+    assert.equal(service.filterHistory(payload,'gm-a','gm-a').length,0);
+    assert.equal(service.filterHistory(payload,'gm-a','gm-c').length,0);
+    payload.owners[0].owner.displayName='<script>alert(1)</script>';
+    assert.doesNotMatch(service.renderLeague(payload),/<script>/);
+    assert.match(service.renderGames(payload),/data-history-gm="first"/);
+    assert.match(service.renderLeague(payload),/2\/3 games/);
+  }finally{f.sqlite.close();}
+});
+
+test('history requests share work, invalidate after import, and never reuse another league cache',async()=>{
+  let calls=0;const c=await historyClient(async()=>{calls++;return{ok:true,json:async()=>({ok:true,owners:[],call:calls})}});
+  await Promise.all([c.service.requestLeague(),c.service.requestLeague()]);assert.equal(calls,1);
+  c.listeners['franchisehq:live-read-refreshed']({detail:{leagueSlug:'alpha',snapshotId:'new'}});
+  await c.service.requestLeague();assert.equal(calls,2);
+  c.HQ.leagueTenant.getCurrentLeague=()=>({slug:'beta'});
+  await c.service.requestLeague();assert.equal(calls,3);
+  c.service.clear();
+  let resolve;c.sandbox.fetch=()=>new Promise(done=>resolve=done);
+  const pending=c.service.requestLeague();
+  c.HQ.leagueTenant.getCurrentLeague=()=>({slug:'alpha'});
+  resolve({ok:true,json:async()=>({ok:true})});
+  await assert.rejects(pending,/league changed/);
 });

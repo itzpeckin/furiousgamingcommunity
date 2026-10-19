@@ -8141,3 +8141,44 @@ button.live-block-player-row__market:hover,button.live-block-player-row__market:
 .commissioner-season-opening p{margin:6px 0;color:var(--text-muted,#9aabc1);font-size:.9rem;line-height:1.5}
 .commissioner-season-opening__actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .commissioner-season-opening__actions .button{flex:1 1 200px;white-space:normal}
+/* Standings career records and GM matchup history. */
+.gm-history-stat-table{min-width:1200px}
+.gm-history-stat-table th{white-space:normal;max-width:110px}
+.gm-history-stat-table td small{display:block;color:var(--text-muted);font-size:.75rem;margin-top:4px}
+.gm-history-stat-table td:nth-child(2){min-width:170px;max-width:260px;white-space:normal}
+.gm-history-note{color:var(--text-muted);font-size:.82rem;line-height:1.6;margin:16px 0 0}
+.league-history-table-card .gm-history-note{padding:0 18px 18px}
+.gm-game-history{display:grid;gap:18px;min-width:0}
+.gm-game-history>.card{padding:24px}
+.gm-history-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:20px}
+.gm-history-filters label{display:grid;gap:8px;font-weight:700}
+.gm-history-filters select{width:100%;min-width:0;min-height:46px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit}
+.gm-matchup-summaries{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.gm-matchup-summary{padding:20px}
+.gm-matchup-summary h3{overflow-wrap:anywhere}
+.gm-matchup-summary dl{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:20px 0 0}
+.gm-matchup-summary dt{font-size:.75rem;color:var(--text-muted)}
+.gm-matchup-summary dd{margin:6px 0 0;font-size:1.5rem;font-weight:800}
+.gm-matchup-summary dd small{display:block;font-size:.7rem;font-weight:400}
+.gm-history-list-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:24px 0 12px}
+.gm-history-list-heading span{color:var(--text-muted);font-size:.8rem}
+.gm-game-list{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.gm-history-game{display:grid;grid-template-columns:145px minmax(0,1fr) auto;align-items:center;gap:20px;padding:20px}
+.gm-history-game__period,.gm-history-game__teams>div{display:grid;gap:5px}
+.gm-history-game__period span,.gm-history-game__teams small{font-size:.8rem;color:var(--text-muted)}
+.gm-history-game__teams{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:20px;align-items:center}
+.gm-history-game__teams>div:last-child{text-align:right}
+.gm-history-game__teams strong,.gm-history-game__teams small{overflow-wrap:anywhere}
+.gm-history-game__score{font-size:1.6rem;white-space:nowrap}
+.gm-history-game__score span{color:var(--text-muted);font-weight:400}
+.gm-history-empty{padding:32px 20px;text-align:center}
+@media(max-width:700px){
+  .gm-history-filters{grid-template-columns:1fr;gap:12px}
+  .gm-history-game{grid-template-columns:minmax(0,1fr);gap:14px;padding:16px}
+  .gm-history-game__period{display:flex;gap:10px}
+  .gm-history-game__teams{gap:10px}
+  .gm-history-game>.pill{justify-self:start}
+  .gm-matchup-summary{padding:16px}
+  .gm-matchup-summary dd{font-size:1.25rem}
+  .gm-history-list-heading{align-items:flex-start}
+}
