@@ -1,8 +1,9 @@
-/* FHQ_BUILD: 8.2.17 */
+/* FHQ_BUILD: 8.2.19 */
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { NonRetryableError } from 'cloudflare:workflows';
+export { DiscordPacing } from './discord-pacing.js';
 
-const RELEASE='8.2.17';
+const RELEASE='8.2.19';
 const text=value=>String(value??'').trim();
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
@@ -281,7 +282,7 @@ export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
     }
     try{
       let result;
-      for(let index=0;index<80;index+=1){
+      for(let index=0;index<512;index+=1){
         result=await step.do(`schedule-batch-${index+1}`,{
           retries:{limit:5,delay:'2 seconds',backoff:'exponential'},timeout:'2 minutes'
         },()=>call(context,companion(context.slug,'schedule-sync-job'),'POST',{
@@ -294,7 +295,7 @@ export class FranchiseScheduleWorkflow extends WorkflowEntrypoint{
         const retrySeconds=Number(result.retryAfterSeconds)||0;
         if(retrySeconds>0)await step.sleep(`discord-cooldown-${index+1}`,`${Math.ceil(Math.min(900,retrySeconds))+1} seconds`);
       }
-      throw new Error('Schedule sync exceeded the 80-batch safety limit.');
+      throw new Error('Schedule sync exceeded the 512-batch safety limit.');
     }catch(error){
       await call(context,companion(context.slug,'schedule-sync-job'),'POST',{
         action:'fail',snapshotId,source,error:String(error?.message||error).slice(0,500)
@@ -373,6 +374,29 @@ export default{
   async fetch(request,env){
     try{
       const url=new URL(request.url);
+      if(url.pathname==='/discord/health'&&request.method==='GET'){
+        if(url.hostname!=='franchise-import.internal')return json({ok:false},403);
+        if(!env.DISCORD_PACING)return json({ready:false},503);
+        return json(await env.DISCORD_PACING.getByName('health').health());
+      }
+      if(url.pathname==='/discord/pacing'&&request.method==='POST'){
+        // Service binding only; even a mistakenly enabled public route cannot
+        // mutate admission state. Never accept credentials or Discord payloads.
+        if(url.hostname!=='franchise-import.internal')return json({ok:false},403);
+        const input=await request.json().catch(()=>({}));
+        if(!/^[a-f0-9]{64}$/.test(input.credential||'')
+          ||!['reserve','observe','lock','unlock'].includes(input.action)
+          ||typeof input.route!=='string'||input.route.length>250
+          ||!/^[a-zA-Z0-9_:/@.-]+$/.test(input.route)
+          ||!/^[a-f0-9-]{36}$/.test(input.owner||'')
+          ||(input.bucket&&!/^[a-zA-Z0-9_-]{1,128}$/.test(input.bucket))
+          ||(input.major&&!/^[a-zA-Z0-9:]{1,80}$/.test(input.major)))
+          return json({ok:false,error:'Invalid pacing metadata.'},400);
+        if(!env.DISCORD_PACING)return json({ok:false,error:'Pacing unavailable.'},503);
+        const stub=env.DISCORD_PACING.getByName(input.credential);
+        const result=await stub.coordinate(input);
+        return json(result);
+      }
       if(url.pathname==='/ea/start'&&request.method==='POST'){
         const body=await request.json().catch(()=>({}));
         if(!validEaOrigin(body.origin)||!/^eaj_[a-f0-9-]{36}$/.test(body.jobId||'')

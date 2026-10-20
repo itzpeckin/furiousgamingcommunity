@@ -119,6 +119,12 @@
   "importWorker": {
     "bindings": [
       {
+        "name": "DISCORD_PACING",
+        "kind": "durable-object",
+        "logicalResource": "discordPacing",
+        "required": true
+      },
+      {
         "name": "FRANCHISE_IMPORT_WORKFLOW",
         "kind": "workflow",
         "logicalResource": "importWorkflow",
@@ -154,7 +160,8 @@
         "FRANCHISE_IMPORT_WORKFLOW": "local:import-workflow",
         "FRANCHISE_SCHEDULE_WORKFLOW": "local:schedule-workflow",
         "FRANCHISE_EA_COLLECTION_WORKFLOW": "local:ea-collection-workflow",
-        "ACCOUNT_EMAIL": "local:captured-account-email"
+        "ACCOUNT_EMAIL": "local:captured-account-email",
+        "DISCORD_PACING": "local:discord-pacing"
       },
       "variables": {
         "APP_ENV": "local",
@@ -197,7 +204,8 @@
         "FRANCHISE_IMPORT_WORKER": "cloudflare:staging:import-worker",
         "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:staging:import-workflow",
         "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:staging:schedule-workflow",
-        "FRANCHISE_EA_COLLECTION_WORKFLOW": "cloudflare:staging:ea-collection-workflow"
+        "FRANCHISE_EA_COLLECTION_WORKFLOW": "cloudflare:staging:ea-collection-workflow",
+        "DISCORD_PACING": "staging:discord-pacing"
       },
       "variables": {
         "APP_ENV": "staging",
@@ -241,7 +249,8 @@
         "FRANCHISE_IMPORT_WORKFLOW": "cloudflare:production:import-workflow",
         "FRANCHISE_SCHEDULE_WORKFLOW": "cloudflare:production:schedule-workflow",
         "FRANCHISE_EA_COLLECTION_WORKFLOW": "cloudflare:production:ea-collection-workflow",
-        "ACCOUNT_EMAIL": "franchise-account-email"
+        "ACCOUNT_EMAIL": "franchise-account-email",
+        "DISCORD_PACING": "production:discord-pacing"
       },
       "variables": {
         "APP_ENV": "production",

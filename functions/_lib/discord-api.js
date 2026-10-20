@@ -1,3 +1,4 @@
+import { discordCooldown, discordPacedFetch } from './discord-pacing.js';
 const DISCORD_API = 'https://discord.com/api/v10';
 const MAX_INLINE_RATE_LIMIT_SECONDS = 15;
 const DEFAULT_RATE_LIMIT_RETRIES = 2;
@@ -13,15 +14,6 @@ function discordErrorDetail(text) {
   catch { return {}; }
 }
 
-function discordRetryAfter(response, detail) {
-  const values = [
-    detail?.retry_after,
-    response.headers.get('retry-after'),
-    response.headers.get('x-ratelimit-reset-after')
-  ].map(Number).filter(value => Number.isFinite(value) && value >= 0);
-  return values.length ? Math.max(...values) : null;
-}
-
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 export async function discordBotRequest(env, path, {
@@ -33,23 +25,33 @@ export async function discordBotRequest(env, path, {
 } = {}) {
   const token = String(env?.DISCORD_BOT_TOKEN || '').trim();
   if (!token) throw new Error('Discord bot delivery is not configured.');
-  const retries = Math.max(0, Math.min(5, Number(rateLimitRetries) || 0));
+  const retries = fetchImpl.discordNoInlineRetry ? 0 : Math.max(0, Math.min(5, Number(rateLimitRetries) || 0));
+  // Schedule fetch wraps the transport so its local queues precede durable
+  // reservation. Other callers still share the same credential admission budget.
+  if(!fetchImpl.discordPaced)fetchImpl=discordPacedFetch(env,fetchImpl);
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const response = await fetchImpl(`${DISCORD_API}${path}`, {
+    let response;
+    try{response = await fetchImpl(`${DISCORD_API}${path}`, {
       method,
       headers: {
         Authorization:`Bot ${token}`,
         ...(body === null ? {} : {'content-type':'application/json'})
       },
       ...(body === null ? {} : {body:JSON.stringify(body)})
-    });
+    });}catch(error){
+      if(error?.status===429&&attempt<retries&&Number(error.retryAfterSeconds)<=MAX_INLINE_RATE_LIMIT_SECONDS){
+        await sleepImpl(Math.ceil(Number(error.retryAfterSeconds)*1000)+25);
+        continue;
+      }
+      throw error;
+    }
     if (response.ok) {
       if (response.status === 204) return null;
       return response.json();
     }
     const text = await response.text().catch(() => String(response.status));
     const detail = discordErrorDetail(text);
-    const retryAfterSeconds = response.status === 429 ? discordRetryAfter(response, detail) : null;
+    const retryAfterSeconds = response.status === 429 ? discordCooldown(response, detail) : null;
     if (response.status === 429 && attempt < retries && retryAfterSeconds !== null
       && retryAfterSeconds <= MAX_INLINE_RATE_LIMIT_SECONDS) {
       await sleepImpl(Math.ceil(retryAfterSeconds * 1000) + 25);

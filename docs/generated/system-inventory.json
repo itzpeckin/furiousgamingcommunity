@@ -107,6 +107,7 @@
       "functions/_lib/discord-delivery.js",
       "functions/_lib/discord-game-card.js",
       "functions/_lib/discord-game.js",
+      "functions/_lib/discord-pacing.js",
       "functions/_lib/discord-player-card.js",
       "functions/api/internal/coaching-scan.js",
       "functions/api/internal/loadout-event.js",
@@ -128,6 +129,9 @@
     "DISCORD_CLIENT_SECRET": [
       "functions/api/auth/discord/callback.js",
       "functions/api/leagues/[leagueSlug]/discord/connect.js"
+    ],
+    "DISCORD_PACING": [
+      "workers/franchise-import-worker/src/index.js"
     ],
     "DISCORD_PUBLIC_KEY": [
       "functions/api/discord/interactions.js"
@@ -185,8 +189,10 @@
       "functions/_lib/tenant-context.js"
     ],
     "FRANCHISE_IMPORT_WORKER": [
+      "functions/_lib/discord-pacing.js",
       "functions/_lib/discord-schedule.js",
       "functions/_lib/ea-schedule-import.js",
+      "functions/api/health.js",
       "functions/api/leagues/[leagueSlug]/companion/import-job.js",
       "functions/api/leagues/[leagueSlug]/ea-direct/sync.js"
     ],
@@ -252,13 +258,13 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 310,
+      ".js": 312,
       ".json": 8,
       ".jsonc": 3,
       ".md": 286,
-      ".mjs": 72,
+      ".mjs": 73,
       ".png": 7,
-      ".sql": 56,
+      ".sql": 57,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -274,7 +280,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 457416,
+        "bytes": 458157,
         "file": "trade-module.js"
       },
       {
@@ -282,7 +288,7 @@
         "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
-        "bytes": 227920,
+        "bytes": 230024,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -346,7 +352,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       }
     ],
-    "total": 854
+    "total": 858
   },
   "frontend": {
     "assets": [
@@ -1947,10 +1953,16 @@
       "recordsLedger": true,
       "sha256": "a1cb94334fb4c4035dfed1df4106932b3df96bce6e517afc3eeeaa4359ff17f6",
       "version": "0054"
+    },
+    {
+      "file": "migrations/0055_schedule_progress.sql",
+      "recordsLedger": true,
+      "sha256": "ad5106e4f5acb03568154f66d535365bc3718e9a310aa18685608b02a0172552",
+      "version": "0055"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.18",
+  "release": "8.2.19",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

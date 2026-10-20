@@ -3070,6 +3070,46 @@ test('Discord throttling is resumable progress and a replay completes the same t
   }finally{f.database.close()}
 });
 
+test('schedule progress separates ready threads from member throttling and survives status refresh',async()=>{
+  const f=await schedulePresentationFixture();try{
+    seedMember(f.database,{leagueId:f.league.id,userId:'comm',role:'commissioner',teamId:null});
+    await f.sync({maxOperations:16});
+    f.intercept(c=>c.method==='PUT'?Response.json({retry_after:0.75},{status:429,
+      headers:{'x-ratelimit-reset-after':'290'}}):null);
+    const before=Date.now();
+    const result=await f.sync({maxOperations:16});
+    assert.equal(result.status,'running');
+    assert.equal(result.retryAfterSeconds,0.75);
+    assert.ok(Date.now()-before<500,'No inline rate-limit sleep during a durable batch');
+    const status=await latestDiscordScheduleSync(f.db,f.league.id);
+    assert.ok(status.progress.threadsReadyAt);
+    assert.equal(status.progress.phase,'adding-members');
+    assert.equal(status.progress.memberThreadsRemaining,1);
+    assert.ok(Date.parse(status.progress.nextRetryAt)>before);
+    f.intercept(()=>null);
+    await f.sync({maxOperations:16});
+    assert.equal((await latestDiscordScheduleSync(f.db,f.league.id)).status,'completed');
+    assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,1);
+  }finally{f.database.close();}
+});
+
+test('lost starter response retries with the same Discord nonce before creating one thread',async()=>{
+  const f=await schedulePresentationFixture();try{
+    let first=true;const nonces=[];
+    f.intercept(c=>{
+      if(c.url.endsWith('/messages')&&c.method==='POST'){
+        assert.equal(c.body.enforce_nonce,true);nonces.push(c.body.nonce);
+        if(first){first=false;throw new TypeError('Response lost after Discord accepted it');}
+        return Response.json({id:'100000000000009999'});
+      }return null;
+    });
+    assert.equal((await f.sync({maxOperations:16})).hasMore,true);
+    assert.equal((await f.sync({maxOperations:16})).status,'completed');
+    assert.equal(nonces.length,2);assert.equal(nonces[0],nonces[1]);
+    assert.equal(f.calls.filter(c=>c.url.endsWith('/threads')).length,1);
+  }finally{f.database.close();}
+});
+
 test('route cooldown does not block unrelated requests and long waits become durable retry signals',async()=>{
   const {scheduleFetch}=await import('../../functions/_lib/discord-schedule-fetch.js');let calls=0;
   const limited=scheduleFetch(async()=>{calls++;return Response.json({},{headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset-after':'20'}});},{maxWaitMs:1000});

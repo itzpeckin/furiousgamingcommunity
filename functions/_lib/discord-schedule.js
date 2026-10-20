@@ -8,9 +8,10 @@ import { summaryGameFinal } from '../../league-engine/game-summary.js';
 import { syncDiscordGameResults } from './discord-game-results.js';
 import { boundedMap } from './bounded-map.js';
 import { scheduleFetch } from './discord-schedule-fetch.js';
+import { coordinateDiscord, discordPacedFetch } from './discord-pacing.js';
 
 // Preserve provider throttling as resumable progress, never a permanent conflict.
-function isTransientDiscord(error){return Number(error?.status)===429||Number(error?.status)>=500||error instanceof TypeError||error?.name==='AbortError';}
+function isTransientDiscord(error){return Number(error?.status)===429||Number(error?.status)>=500||error instanceof TypeError||['AbortError','TimeoutError'].includes(error?.name);}
 
 const SNOWFLAKE = /^[0-9]{17,20}$/;
 const clean = value => String(value ?? '').trim();
@@ -277,7 +278,8 @@ async function createMatchupThread(env,db,{run,league,model,game,assignments,com
   if (!SNOWFLAKE.test(starterId)) {
     const starter = await discordBotRequest(env, `/channels/${encodeURIComponent(run.schedule_channel_id)}/messages`, {
       method:'POST',
-      body:{content:message.content,allowed_mentions:message.allowedMentions},
+      body:{content:message.content,allowed_mentions:message.allowedMentions,
+        nonce:(await hashToken(record.id)).slice(0,24),enforce_nonce:true},
       fetchImpl
     });
     starterId = clean(starter?.id);
@@ -290,6 +292,9 @@ async function createMatchupThread(env,db,{run,league,model,game,assignments,com
       method:'POST', body:{name:message.name,auto_archive_duration:10080}, fetchImpl
     });
   } catch (error) {
+    // A throttle rejected the operation; probing the same starter cannot make
+    // progress and would consume another request during the cooldown.
+    if(Number(error?.status)===429)throw error;
     const existing = await discordBotRequest(env, `/channels/${encodeURIComponent(starterId)}`, {fetchImpl}).catch(()=>null);
     if (Number(existing?.type) !== 11) throw error;
   }
@@ -360,7 +365,19 @@ async function archiveSupersededScheduleThreads(env,db,{
   return {removed,errors,remaining,retryAfterSeconds};
 }
 
-export async function syncDiscordScheduleThreads(env,db,{
+export async function syncDiscordScheduleThreads(env,db,options){
+  // A stable league lock also covers simultaneous workflows for different
+  // snapshots, so external thread creation cannot race ahead of its checkpoint.
+  const lock={credential:await hashToken(`schedule:${options.league.id}`),
+    route:'schedule',owner:crypto.randomUUID()};
+  const acquired=await coordinateDiscord(env,{...lock,action:'lock'});
+  if(acquired&&!acquired.granted)return{ok:false,status:'running',hasMore:true,
+    retryAfterSeconds:acquired.retryAfterSeconds,progressPhase:'waiting-for-current-job',errors:[]};
+  try{return await syncScheduleBatch(env,db,options);}
+  finally{if(acquired)await coordinateDiscord(env,{...lock,action:'unlock'}).catch(()=>{});}
+}
+
+async function syncScheduleBatch(env,db,{
   league,
   snapshotId = null,
   week = null,
@@ -371,7 +388,13 @@ export async function syncDiscordScheduleThreads(env,db,{
   maxOperations = Number.MAX_SAFE_INTEGER,
   fetchImpl = fetch
 }) {
-  fetchImpl=scheduleFetch(fetchImpl,{maxWaitMs:1000});
+  const waits=[];
+  const checkpointStarted=Date.now();
+  fetchImpl=scheduleFetch(discordPacedFetch(env,fetchImpl,{
+    deadlineAt:checkpointStarted+45000,onWait:value=>{if(waits.length<20)waits.push(value);}
+  }),{maxWaitMs:1000});
+  fetchImpl.discordPaced=true;
+  fetchImpl.discordNoInlineRetry=maxOperations!==Number.MAX_SAFE_INTEGER;
   const installation = await activeInstallation(db,league.id);
   if (!installation) return {ok:false,skipped:true,reason:'not-connected'};
   const active = await activeSnapshot(db,league.id);
@@ -430,6 +453,7 @@ export async function syncDiscordScheduleThreads(env,db,{
     return !initialThreads.some(t=>t.game_external_id===game.id||(message&&t.home_team_key===scheduleTeamKey(message.teams.home)&&t.away_team_key===scheduleTeamKey(message.teams.away)));
   });
   const creationPhase=!presentationOnly&&missingGames.length>0;
+  // Archive work is always attempted before member subscriptions on a new week.
   const pendingGames=creationPhase?missingGames:pending(initialThreads);
   if(presentationOnly&&!pendingGames.length)return{ok:true,skipped:true,...decision};
   const {run,reused} = await beginRun(db,{
@@ -463,7 +487,14 @@ export async function syncDiscordScheduleThreads(env,db,{
   const errors = [];
   let retryAfterSeconds=0;
   const batchStarted=Date.now();
-  await boundedMap(pendingGames.slice(0,bounded),4,async game=>{
+  let priorityCleanup=null;
+  if(!creationPhase&&replacesActiveSchedule){
+    priorityCleanup=await archiveSupersededScheduleThreads(env,db,{leagueId:league.id,snapshotId:active.id,seasonYear:active.seasonYear,
+      phase:targetPhase,week:targetWeek,guildId:installation.guildId,model,league,assignments,fetchImpl,limit:bounded});
+    errors.push(...priorityCleanup.errors);
+    retryAfterSeconds=priorityCleanup.retryAfterSeconds||0;
+  }
+  await boundedMap((priorityCleanup?.remaining||errors.length?[]:pendingGames).slice(0,bounded),4,async game=>{
     try {
       if(String((await activeSnapshot(db,league.id))?.id)!==String(active.id)){
         errors.push('The active snapshot changed during schedule sync; remaining threads were preserved.');
@@ -491,8 +522,8 @@ export async function syncDiscordScheduleThreads(env,db,{
     WHERE league_id=? AND season_year=? AND phase=? AND week_index=? AND status='active'`)
     .bind(league.id,active.seasonYear,targetPhase,targetWeek).first())?.count || 0);
   const pendingCount=pending(await inventory()).length;
-  let removedPriorThreads=0,remainingPriorThreads=0;
-  if (!errors.length&&existingCount===games.length&&replacesActiveSchedule) {
+  let removedPriorThreads=priorityCleanup?.removed||0,remainingPriorThreads=priorityCleanup?.remaining||0;
+  if (!priorityCleanup&&!errors.length&&existingCount===games.length&&replacesActiveSchedule) {
     const stillActive=await activeSnapshot(db,league.id);
     const cleanup=String(stillActive?.id)===String(active.id)?await archiveSupersededScheduleThreads(env,db,{leagueId:league.id,snapshotId:active.id,seasonYear:active.seasonYear,
         phase:targetPhase,week:targetWeek,guildId:installation.guildId,model,league,assignments,fetchImpl,limit:bounded})
@@ -504,14 +535,27 @@ export async function syncDiscordScheduleThreads(env,db,{
   }
   const hasMore=!errors.length&&(pendingCount>0||remainingPriorThreads>0||retryAfterSeconds>0);
   const status = errors.length ? (existingCount ? 'partial' : 'failed') : hasMore?'running':'completed';
+  let previous={};try{previous=JSON.parse(run.progress_json||'{}');}catch{}
+  const ready=existingCount===games.length&&remainingPriorThreads===0&&!errors.length;
+  const progress={phase:existingCount<games.length?'creating-threads':remainingPriorThreads?'archiving-threads':pendingCount?'adding-members':'completed',
+    games:games.length,threadsReady:existingCount,memberThreadsRemaining:pendingCount,
+    archivedThreads:Number(previous.archivedThreads||0)+removedPriorThreads,remainingPriorThreads,
+    threadsCreatedAt:previous.threadsCreatedAt||(existingCount===games.length?new Date().toISOString():null),
+    threadsReadyAt:previous.threadsReadyAt||(ready?new Date().toISOString():null),
+    membersCompletedAt:status==='completed'?new Date().toISOString():null,
+    checkpoints:Number(previous.checkpoints||0)+1,
+    processingMs:Number(previous.processingMs||0)+Date.now()-checkpointStarted,
+    retryWaitRequestedMs:Number(previous.retryWaitRequestedMs||0)+Math.ceil(Math.max(0,retryAfterSeconds))*1000,
+    nextRetryAt:retryAfterSeconds>0?new Date(Date.now()+Math.ceil(retryAfterSeconds+1)*1000).toISOString():null,
+    lastWait:waits.at(-1)||null};
   await db.prepare(`UPDATE discord_schedule_sync_runs SET status=?,game_count=?,thread_count=?,registered_owner_count=?,
     error_count=?,last_error=?,completed_at=CASE WHEN ?='completed' THEN CURRENT_TIMESTAMP ELSE completed_at END,
-    updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(
-      status,games.length,existingCount,owners.size,errors.length,errors[0]||(retryAfterSeconds>0?'Discord rate limit: scheduling will resume automatically.':null),status,run.id
+    progress_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(
+      status,games.length,existingCount,owners.size,errors.length,errors[0]||(retryAfterSeconds>0?'Discord rate limit: scheduling will resume automatically.':null),status,JSON.stringify(progress),run.id
     ).run();
   return {ok:status==='completed',status,reused:false,nonPlaying:Boolean(earlyWeekOne),week:targetWeek,phase:targetPhase,
     games:games.length,threads:existingCount,created,removedPriorThreads,archivedPriorThreads:removedPriorThreads,remainingPriorThreads,
-    hasMore,retryAfterSeconds,progressPhase:creationPhase?'creating-threads':'adding-members',registeredOwners:owners.size,errors};
+    hasMore,retryAfterSeconds,progressPhase:progress.phase,progress,registeredOwners:owners.size,errors};
 }
 
 export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,week,requestedByUserId,requestedBySessionId,source='candidate-import'}={}) {
@@ -576,7 +620,7 @@ export async function latestDiscordScheduleSync(db,leagueId) {
   const opening=await seasonOpening(db,leagueId,active,await activeInstallation(db,leagueId));
   const row = await db.prepare(`SELECT status,season_year AS seasonYear,phase,week_index AS weekIndex,
       game_count AS gameCount,thread_count AS threadCount,registered_owner_count AS registeredOwnerCount,
-      error_count AS errorCount,last_error AS lastError,completed_at AS completedAt,created_at AS createdAt,updated_at AS updatedAt
+      error_count AS errorCount,last_error AS lastError,progress_json AS progressJson,completed_at AS completedAt,created_at AS createdAt,updated_at AS updatedAt
     FROM discord_schedule_sync_runs WHERE league_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1`)
     .bind(leagueId).first();
   if(active){
@@ -594,5 +638,7 @@ export async function latestDiscordScheduleSync(db,leagueId) {
   }
   if(!row)return null;
   const started=Date.parse(row.createdAt||''),completed=Date.parse(row.completedAt||'');
-  return {...row,seasonOpening:opening,durationMs:Number.isFinite(started)&&Number.isFinite(completed)?Math.max(0,completed-started):null};
+  let progress={};try{progress=JSON.parse(row.progressJson||'{}');}catch{}
+  delete row.progressJson;
+  return {...row,progress,seasonOpening:opening,durationMs:Number.isFinite(started)&&Number.isFinite(completed)?Math.max(0,completed-started):null};
 }

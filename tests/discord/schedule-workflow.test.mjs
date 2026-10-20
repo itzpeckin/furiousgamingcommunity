@@ -8,6 +8,7 @@ async function workflowWith(fetchImpl,className='FranchiseScheduleWorkflow') {
   const script=original
     .replace("import { WorkflowEntrypoint } from 'cloudflare:workers';",'class WorkflowEntrypoint {}')
     .replace("import { NonRetryableError } from 'cloudflare:workflows';",'class NonRetryableError extends Error {}')
+    .replace("export { DiscordPacing } from './discord-pacing.js';",'')
     .replaceAll('export class ','class ')
     .replace('export default{','const defaultWorker={');
   const context=vm.createContext({fetch:fetchImpl,Response,TextEncoder,crypto,console,URL,Date});
