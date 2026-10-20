@@ -5,6 +5,10 @@
   "main": "src/index.js",
   "compatibility_date": "2026-09-25",
   "workers_dev": false,
+  "durable_objects": {
+    "bindings": [{"name":"DISCORD_PACING","class_name":"DiscordPacing"}]
+  },
+  "migrations": [{"tag":"v1-discord-pacing","new_sqlite_classes":["DiscordPacing"]}],
   "observability": {
     "enabled": true
   },

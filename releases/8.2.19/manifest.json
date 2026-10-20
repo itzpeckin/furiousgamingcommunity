@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.19",
+  "releaseType": "durable-discord-scheduling",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.18",
+    "tag": "v8.2.18",
+    "commit": "7617520060fdceefe842befb30af5bde8d91308c"
+  },
+  "implementationBranch": "fix/8.2.19-discord-scheduling",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.18",
+    "candidateRelease": "8.2.19",
+    "currentMigration": 54,
+    "candidateMigration": 55
+  },
+  "requiredArtifacts": [
+    "releases/8.2.19/release-record.md",
+    "releases/8.2.19/validation-evidence.json",
+    "releases/8.2.19/recovery-plan.md"
+  ]
+}

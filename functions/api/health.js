@@ -1,5 +1,12 @@
 import {loadoutReaderReady} from '../_lib/loadout-images.js';
 export async function onRequest(context) {
+  let discordScheduling='unavailable';
+  if(context?.env?.FRANCHISE_IMPORT_WORKER?.fetch){
+    try{
+      const response=await context.env.FRANCHISE_IMPORT_WORKER.fetch(new Request('https://franchise-import.internal/discord/health',{signal:AbortSignal.timeout(3000)}));
+      if(response.ok&&(await response.json()).ready===true)discordScheduling='ready';
+    }catch{ /* Availability only; no Discord requests, credentials or league data. */ }
+  }
   let accountEmail='unavailable';
   if (context?.env?.ACCOUNT_EMAIL?.fetch) {
     try {
@@ -10,8 +17,9 @@ export async function onRequest(context) {
   return new Response(
     JSON.stringify({
       ok: true,
-      release: '8.2.18',
+      release: '8.2.19',
       accountEmail,
+      discordScheduling,
       discordLoadoutReader:loadoutReaderReady(context?.env)?'ready':'disabled',
       service: "Franchise HQ",
       environment: "Cloudflare Pages Functions"

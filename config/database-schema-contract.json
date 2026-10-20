@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "8.2.18",
+  "release": "8.2.19",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 54,
+  "currentVersion": 55,
   "requiredTables": [
     "ea_direct_connections",
     "ea_direct_setups",

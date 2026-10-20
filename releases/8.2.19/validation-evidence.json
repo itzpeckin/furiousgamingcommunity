@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.19",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 55,
+      "candidateRequiresMigration": true
+    },
+    "coordinator": {
+      "targetedPassed": true,
+      "simulatedLeagues": [
+        5,
+        25,
+        100
+      ],
+      "actualProductionAdvanceMeasured": false
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 613,
+      "log": "outputs/fhq8219-strict.txt"
+    },
+    "responsiveBrowser": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "realRenderer": true,
+      "noOverflow": true,
+      "productionAcceptance": false
+    },
+    "workerBundle": {
+      "passed": true,
+      "runtime": "wrangler 4.151.2",
+      "localWorkerdAcceptance": false,
+      "limitation": "Windows denied workerd.exe execution. Hosted RPC/SQLite availability must pass before publication."
+    }
+  },
+  "scopeBoundaries": {
+    "liveImport": false,
+    "liveEaCollection": false,
+    "leagueSettingsChanged": false,
+    "discordChanged": false
+  }
+}

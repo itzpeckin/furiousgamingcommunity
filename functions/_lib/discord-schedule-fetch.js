@@ -1,5 +1,6 @@
 // Request-scoped pacing follows Discord route/bucket keys plus the major channel.
 // Unrelated message creation and membership routes do not inherit each other's cooldown.
+import { discordCooldown } from './discord-pacing.js';
 export function scheduleFetch(fetchImpl,{now=Date.now,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),maxWaitMs=Infinity}={}){
   const queues=new Map(),blockedUntil=new Map(),buckets=new Map();
   let globalUntil=0;
@@ -24,7 +25,7 @@ export function scheduleFetch(fetchImpl,{now=Date.now,sleep=ms=>new Promise(reso
       let seconds=Number(header('x-ratelimit-reset-after'));
       if(response.status===429){
         const detail=await response.clone().json().catch(()=>({}));
-        seconds=Number(detail.retry_after??header('retry-after')??seconds);
+        seconds=discordCooldown(response,detail);
         if(detail.global===true&&Number.isFinite(seconds))globalUntil=now()+Math.max(0,seconds)*1000+25;
       }
       if((header('x-ratelimit-remaining')==='0'||response.status===429)&&Number.isFinite(seconds))

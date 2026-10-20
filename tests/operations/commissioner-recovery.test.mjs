@@ -7,6 +7,7 @@ async function worker(){
   const source=(await readFile(new URL('../../workers/franchise-import-worker/src/index.js',import.meta.url),'utf8'))
     .replace("import { WorkflowEntrypoint } from 'cloudflare:workers';",'class WorkflowEntrypoint {}')
     .replace("import { NonRetryableError } from 'cloudflare:workflows';",'class NonRetryableError extends Error {}')
+    .replace("export { DiscordPacing } from './discord-pacing.js';",'')
     .replaceAll('export class ','class ').replace('export default{','globalThis.worker={');
   const context=vm.createContext({Response,TextEncoder,crypto,console:{error(){}},URL,Date});
   vm.runInContext(source,context);return context.worker;

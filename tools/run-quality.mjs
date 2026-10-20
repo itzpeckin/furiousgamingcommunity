@@ -21,6 +21,7 @@ const checks = [
     'tests/operations/recovery.test.mjs',
     'tests/operations/commissioner-recovery.test.mjs',
     'tests/discord/schedule-workflow.test.mjs',
+    'tests/discord/pacing.test.mjs',
     'tests/platform/onboarding.test.mjs',
     'tests/commissioner/commissioner-hq.test.mjs',
     'tests/commissioner/competition.test.mjs',
