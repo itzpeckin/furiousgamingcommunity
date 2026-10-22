@@ -1,0 +1,13 @@
+{
+  "name":"franchise-storage-maintenance",
+  "main":"src/index.js",
+  "compatibility_date":"2026-10-22",
+  "workers_dev":false,
+  "preview_urls":false,
+  "observability":{"enabled":true},
+  "limits":{"cpu_ms":30000},
+  "vars":{"STORAGE_RETENTION_MODE":"observe"},
+  "triggers":{"crons":["*/10 * * * *"]},
+  "d1_databases":[{"binding":"DB","database_name":"franchise-hq-db-madden27","database_id":"b2529150-28af-42ca-a07b-69506764ccb6"}],
+  "r2_buckets":[{"binding":"COMPANION_EXPORTS","bucket_name":"franchise-hq-companion-exports"}]
+}

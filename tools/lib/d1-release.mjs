@@ -156,7 +156,8 @@ export async function loadCanonicalMigrations() {
       52: 'weekly_loadouts',
       53: 'realtime_loadouts',
       54: 'schedule_thread_presentation',
-      55: 'schedule_progress'
+      55: 'schedule_progress',
+      56: 'storage_retention'
     };
     const relativePath = `migrations/${prefix}_${names[version]}.sql`;
     const sql = await readText(relativePath);

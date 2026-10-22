@@ -17,6 +17,7 @@ export const PERSISTENT_PLATFORM_TABLES = Object.freeze([
   'league_memberships',
   'league_membership_audit',
   'league_settings',
+  'storage_retention_runs',
   'discord_coaching_settings',
   'discord_coaching_submissions',
   'discord_loadout_settings',

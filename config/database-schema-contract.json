@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "release": "8.2.19",
+  "release": "8.2.20",
   "legacyArchiveDirectory": "migrations/legacy",
   "activeMigrationDirectory": "migrations",
   "firstCanonicalVersion": 18,
-  "currentVersion": 55,
+  "currentVersion": 56,
   "requiredTables": [
     "ea_direct_connections",
     "ea_direct_setups",
@@ -146,7 +146,8 @@
     "account_email_throttles",
     "discord_loadout_settings",
     "discord_loadout_threads",
-    "discord_loadout_submissions"
+    "discord_loadout_submissions",
+    "storage_retention_runs"
   ],
   "requiredCoreColumns": {
     "league_player_ownership": [

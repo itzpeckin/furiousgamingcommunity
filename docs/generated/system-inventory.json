@@ -64,7 +64,8 @@
       "functions/api/leagues/[leagueSlug]/ea-direct/sync.js",
       "functions/api/leagues/[leagueSlug]/game-year-transition.js",
       "functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js",
-      "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
+      "functions/api/leagues/[leagueSlug]/transactions/canonical.js",
+      "workers/franchise-storage-maintenance/src/index.js"
     ],
     "COMPANION_EXPORT_META": [
       "functions/_lib/cloud-platform.js",
@@ -100,7 +101,8 @@
       "functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js",
       "functions/api/leagues/[leagueSlug]/rules.js",
       "functions/index.js",
-      "functions/leagues/index.js"
+      "functions/leagues/index.js",
+      "workers/franchise-storage-maintenance/src/index.js"
     ],
     "DISCORD_BOT_TOKEN": [
       "functions/_lib/discord-api.js",
@@ -249,6 +251,9 @@
     "SESSION_SIGNING_SECRET": [
       "functions/api/leagues/[leagueSlug]/companion/export-url.js",
       "functions/api/leagues/[leagueSlug]/companion/export/[token]/[[datasetPath]].js"
+    ],
+    "STORAGE_RETENTION_MODE": [
+      "workers/franchise-storage-maintenance/src/index.js"
     ]
   },
   "files": {
@@ -258,13 +263,13 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 312,
+      ".js": 314,
       ".json": 8,
-      ".jsonc": 3,
-      ".md": 286,
-      ".mjs": 73,
+      ".jsonc": 4,
+      ".md": 287,
+      ".mjs": 74,
       ".png": 7,
-      ".sql": 57,
+      ".sql": 58,
       ".txt": 3,
       ".wasm": 1,
       ".yml": 1,
@@ -352,7 +357,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       }
     ],
-    "total": 858
+    "total": 864
   },
   "frontend": {
     "assets": [
@@ -1959,10 +1964,16 @@
       "recordsLedger": true,
       "sha256": "ad5106e4f5acb03568154f66d535365bc3718e9a310aa18685608b02a0172552",
       "version": "0055"
+    },
+    {
+      "file": "migrations/0056_storage_retention.sql",
+      "recordsLedger": true,
+      "sha256": "91f9072a3144df1ce76affb0397b814e5d8e0ed7264dc22c8aa87f97242382b4",
+      "version": "0056"
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.19",
+  "release": "8.2.20",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
