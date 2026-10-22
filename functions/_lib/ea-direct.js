@@ -55,7 +55,7 @@ export function safeEaError(error){
     const guidance=error.code==='EA_RECONNECT_REQUIRED'?' Open Command Center → Madden Import → EA Direct, then select Reconnect EA Account to sign in again. Your imported schedule and league data remain available.':'';
     return{code:error.code||'EA_UNAVAILABLE',message:error.message+detail+guidance,status:error.status===401?409:Math.min(499,Math.max(400,Number(error.status)||424)),retryable:Boolean(error.retryable),...(diagnostic?{diagnostic}:{})};
   }
-  return{code:'EA_CONNECTION_FAILED',message:'EA Direct could not finish this step. Your live league data has not changed. Try again or reconnect your EA account.',status:424,retryable:true};
+  return{code:'EA_CONNECTION_FAILED',message:'EA Direct could not finish this step. Check collection status before trying again. If the issue continues, share the collection ID with FHQ support. Reconnecting is not indicated by this error.',status:424,retryable:true};
 }
 export function eaErrorResponse(error){
   const safe=safeEaError(error);

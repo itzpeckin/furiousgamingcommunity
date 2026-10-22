@@ -267,7 +267,7 @@
       ".json": 8,
       ".jsonc": 4,
       ".md": 287,
-      ".mjs": 74,
+      ".mjs": 75,
       ".png": 7,
       ".sql": 58,
       ".txt": 3,
@@ -341,7 +341,7 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 54808,
+        "bytes": 56880,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -357,7 +357,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       }
     ],
-    "total": 864
+    "total": 865
   },
   "frontend": {
     "assets": [
@@ -1973,7 +1973,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.20",
+  "release": "8.2.21",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

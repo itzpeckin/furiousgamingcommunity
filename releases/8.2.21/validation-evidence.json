@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.21",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "targetedRecovery": {
+      "passed": true,
+      "tests": 68
+    },
+    "browserFixtures": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "realRenderers": true,
+      "liveProviderFaults": false
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "eaReconnectExecuted": false,
+    "discordChanged": false,
+    "workerChanged": false
+  }
+}

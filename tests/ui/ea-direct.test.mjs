@@ -78,6 +78,62 @@ const connected = (overrides = {}) => ({
 });
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
+for (const [status,code,title,action] of [
+  [401,'HTTP_401','Sign back into FHQ','sign-in'],
+  [403,'HTTP_403','Commissioner access required',null],
+  [0,'NETWORK_ERROR','Collection status is unavailable','check-collection'],
+  [409,'EA_RECONNECT_REQUIRED','Reconnect your EA account','begin']
+]) test(`collection monitoring preserves ${code} and its distinct recovery action`,async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'job-1',mode:'weekly',status:'running'}});
+  await ui.service.refresh();
+  ui.respond(async()=>{throw Object.assign(new Error('private-token https://secret.invalid'),{status,code});});
+  await ui.service.pollCollection();
+  const card=ui.markup().split('<section class="ea-direct-recovery"')[1].split('</section>')[0];
+  assert.ok(card.includes(title));
+  if(action)assert.ok(card.includes(`data-ea-action="${action}"`));
+  else assert.doesNotMatch(card,/button--primary/);
+  assert.doesNotMatch(card,/private-token|secret.invalid/);
+  assert.equal(ui.requests.filter(r=>r.options.method==='POST').length,0);
+  ui.respond(async()=>({id:'job-1',mode:'weekly',status:'running'}));
+  if(action==='check-collection'){ui.click({eaAction:action});await settle();assert.doesNotMatch(ui.markup(),/ea-direct-recovery/);}
+});
+
+test('terminal EA auth error remains actionable after connection refresh and reconnect is one click',async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'failed-job',mode:'weekly',status:'failed',code:'EA_RECONNECT_REQUIRED'}});
+  await ui.service.refresh();await ui.service.pollCollection();
+  assert.match(ui.markup(),/ea-direct-recovery.*Reconnect your EA account/s);
+  ui.respond(async()=>({status:'signing-in',setup:{id:'new'},loginUrl:'https://accounts.ea.com/connect/auth'}));
+  ui.click({eaAction:'begin'});ui.click({eaAction:'begin'});await settle();
+  assert.equal(ui.requests.filter(r=>r.options.body?.action==='begin').length,1);
+  assert.match(ui.markup(),/Sign in on EA/);
+});
+
+test('unconfirmed EA collection start discovers retained job with GET before allowing another collection',async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected({previewVerified:true}):{});
+  await ui.service.refresh();
+  ui.respond(async()=>{throw new Error('network interrupted');});
+  await ui.service.collect('weekly');
+  assert.match(ui.markup(),/Collection status is unavailable/);
+  ui.respond(async path=>path.endsWith('/connection')?connected({previewVerified:true}):{job:{id:'server-started',mode:'weekly',status:'running'}});
+  ui.click({eaAction:'refresh'});await settle();
+  await ui.service.collect('weekly');
+  assert.equal(ui.requests.filter(r=>r.options.method==='POST').length,1);
+  assert.match(ui.markup(),/Check Collection/);
+});
+
+test('renewed Madden session rejection and unverified week do not prescribe reconnect',async()=>{
+  const ui=harness();
+  for(const code of ['EA_MADDEN_SESSION_REJECTED','EA_CURRENT_PERIOD_UNAVAILABLE']){
+    ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'stopped',mode:'weekly',status:'failed',code}});
+    await ui.service.refresh();
+    const card=ui.markup().split('<section class="ea-direct-recovery"')[1].split('</section>')[0];
+    assert.match(card,/Try Collection Again/);assert.doesNotMatch(card,/data-ea-action="begin"/);
+  }
+});
+
 test('one disconnect wins over an older background refresh', async () => {
   const ui = harness();
   ui.respond(async () => connected({previewVerified:true}));
@@ -232,7 +288,7 @@ for (const stage of choiceStages) {
     rejectAction(new Error('EA did not accept this request.'));
     await settle();
     assert.match(ui.markup(), selectedOption);
-    assert.match(ui.markup(), /EA did not accept this request/);
+    assert.match(ui.markup(), /EA Direct needs attention/);
     await ui.service.refresh();
     assert.match(ui.markup(), selectedOption);
     assert.equal(ui.requests.filter(request => request.options.method === 'POST').length, 1);

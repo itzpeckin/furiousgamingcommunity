@@ -3,7 +3,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.9';
+  const VERSION = '8.2.21';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -23,6 +23,13 @@
   let lastOutcome = null;
   let notificationTimer = null;
   let contextRevision = 0;
+  let preparingImport = false;
+  const authIdentity = () => {
+    const auth=HQ.auth?.getSnapshot?.();
+    return auth?.authenticated ? JSON.stringify([auth.user?.id,auth.membership?.leagueId,
+      auth.membership?.role,auth.membership?.authorizationVersion,auth.session?.id||auth.session?.sessionId]) : null;
+  };
+  let authScope=authIdentity();
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
@@ -38,61 +45,59 @@
 
   function failureGuidance(error={},phase=null) {
     const message=String(error?.message||'The import could not be completed.');
-    const status=Number(error?.status||0);
-    const endpoint=String(error?.endpoint||'');
-    const run=currentRun();
-    const runId=String(run?.id||'');
-    const supportCode=runId ? `${runId.slice(0,12)} · ${phase||run?.currentPhase||'setup'}` : `setup · ${phase||'not-started'}`;
-    const shared={
-      tone:'error',
-      detail:message,
-      phase:phaseLabel(phase||run?.currentPhase),
-      supportCode,
-      runId:runId||null,
-      endpoint:endpoint||null,
-      status:status||null,
-      preserved:true
-    };
-    if(status===403)return{
-      ...shared,title:'Commissioner access needs checking',
-      summary:'This account is not currently allowed to perform this action.',
-      action:'Confirm you are in the correct league and signed in to its commissioner account. Ask a league commissioner to check People & Teams if your role has changed.'
-    };
-    if(status===401||/session expired|sign in|not authorized|unauthorized/i.test(message))return{
-      ...shared,title:'Sign in again to continue',
-      summary:'Your commissioner session ended before the import could finish.',
-      action:'Sign in to your FHQ account again, return to Command Center, and select Import Latest Export. Your retained export does not need to be sent again.'
-    };
-    if(/no analyzed league export|no .*export is ready|selected ready export|exact capture session|recognized teams dataset|teams dataset|team-like record/i.test(message))return{
-      ...shared,title:'The export is not ready',
-      summary:'FranchiseHQ could not prove a complete League Info and player source for this franchise season.',
-      action:'Export League Info and Weekly Stats to the same league URL. Include Rosters for the first snapshot of a season; later same-season imports may safely carry the live roster forward.'
-    };
-    if(/historical.*did not produce|week\/period backfill|schedule.*(?:missing|failed|unavailable)|statistics.*(?:missing|failed|unavailable)|missing week|coverage gap/i.test(message))return{
-      ...shared,title:'Weekly game data is incomplete',
-      summary:'The export did not contain both schedules and statistics for every week being added.',
-      action:'Export the missing week—or All Weeks—with Weekly Stats enabled, wait for Ready to import, then try again.'
-    };
-    if(/active snapshot changed|live import.*refused|pointer.*changed|compare-and-swap/i.test(message))return{
-      ...shared,title:'League data changed during the import',
-      summary:'Another league update finished first, so FranchiseHQ stopped this import to avoid replacing newer data.',
-      action:'Select Refresh in Commissioner HQ, confirm the latest export is still Ready to import, and try once more.'
-    };
-    if(/validation|duplicate|invalid assignment|not ready/i.test(message))return{
-      ...shared,title:'The export did not pass validation',
-      summary:'FranchiseHQ found data that could not be published safely.',
-      action:'Open Import Details to review the failed phase. Export League Info and Weekly Stats again; include Rosters if no complete snapshot is already live for this season.'
-    };
-    if(status>=500||/network|failed to fetch|load failed|timed out|timeout|safety limit|HTTP 5\d\d/i.test(message))return{
-      ...shared,title:'The importer could not finish',
-      summary:'An import service request was interrupted. This does not establish a problem with your connection.',
-      action:'Select Retry to resume the retained export. If it fails again, share the support code shown below.'
-    };
-    return{
-      ...shared,title:'The import could not finish',
-      summary:'FranchiseHQ stopped before publishing the new data.',
-      action:'Select Retry once. If the same message returns, share the support code shown below.'
-    };
+    const status=Number(error?.status||0),code=String(error.code||error.payload?.code||'');
+    const run=currentRun(),runId=String(run?.id||'');
+    const shared={tone:'error',detail:message,phase:phaseLabel(phase||run?.currentPhase),
+      supportCode:runId||'No import ID available',runId:runId||null,status:status||null,
+      code,button:'retry',label:'Retry Import',preserved:Boolean(state?.activeSnapshotId)};
+    if(status===401)return{...shared,title:'Sign back into FHQ',
+      summary:'Your FHQ session ended. The background import may still be running.',
+      action:'Sign in, then check import status. You do not need to reconnect EA or send the export again.',button:'sign-in',label:'Sign In to FHQ'};
+    if(status===403)return{...shared,title:'Commissioner access required',
+      summary:'This account is not allowed to perform this action.',
+      action:'Check the selected league. Ask a league owner to verify your role in People & Teams.',button:null};
+    if(code==='IMPORT_STATUS_UNAVAILABLE'||code==='IMPORT_START_UNCONFIRMED')return{...shared,tone:'warning',
+      title:'Import status is unavailable',summary:'FHQ cannot confirm the outcome yet. The background import may still be running.',
+      action:'Check import status before retrying. Do not send another export or reconnect EA.',button:'status',label:'Check Import Status'};
+    if(/not configured|service binding|storage unavailable/i.test(message))return{...shared,title:'The import service is unavailable',
+      summary:'An FHQ service could not accept this request.',action:'Check status once. If this continues, copy the support details for FHQ support. Re-exporting will not repair the service.',button:'status',label:'Check Import Status'};
+    if(/no analyzed league export|no Madden Companion export is available|no .*export is ready/i.test(message))return{...shared,
+      title:'No export is ready to import',summary:'FHQ has not found a ready export for this league.',
+      action:'Select Refresh first. If no export is available, use EA Direct Collect League Update or send League Info, Rosters and Weekly Stats from Companion App.',button:'refresh',label:'Refresh Export Readiness'};
+    if(/active snapshot changed|live import.*refused|pointer.*changed|compare-and-swap/i.test(message))return{...shared,
+      title:'Another league update finished first',summary:'FHQ stopped this attempt to protect the newer league data.',
+      action:'Refresh to see the latest import before deciding whether another import is needed.',button:'refresh',label:'Refresh Import Status'};
+    if(/validation|duplicate|invalid assignment|statistics route.*failed|safety limit|exact capture session/i.test(message))return{...shared,
+      title:'Import needs a data check',summary:'FHQ could not confirm that this import is safe to publish.',
+      action:'Retry the retained export once. If the same issue returns, copy the support details for FHQ support. Send a new export only if missing source data is confirmed.'};
+    return{...shared,title:'Import needs another attempt',
+      summary:'The import encountered a problem. This error does not establish that the export is incomplete.',
+      action:'Retry the retained export once. If it fails again, copy the support details for FHQ support.'};
+  }
+
+  let retainedWorkflowId=null;
+  function supportDetails() {
+    const safe=value=>/^[a-zA-Z0-9_.:-]{1,150}$/.test(String(value||''))?value:'Unavailable';
+    return `League: ${safe(slug())}\nImport: ${safe(lastOutcome?.runId)}\nWorkflow: ${safe(retainedWorkflowId)}\nIssue: ${safe(lastOutcome?.code)}\nHTTP: ${Number(lastOutcome?.status)||'Unavailable'}\nPhase: ${safe(currentRun()?.currentPhase)}\nChecked: ${new Date().toISOString()}`;
+  }
+  function recoveryMarkup() {
+    const outcome=lastOutcome;
+    if(!outcome||!['error','warning'].includes(outcome.tone))return '';
+    return `<section class="commissioner-import-recovery" role="alert"><div><h4>${esc(outcome.title)}</h4><p>${esc(outcome.summary)}</p><p><strong>What to do:</strong> ${esc(outcome.action)}</p>${outcome.preserved?'<small>Your current league data is still live.</small>':''}<div class="ea-direct-actions">${outcome.button?`<button type="button" class="button button--primary" data-import-recovery="${outcome.button}" ${busy?'disabled':''}>${esc(outcome.label)}</button>`:''}<button type="button" class="button button--ghost" data-import-recovery="copy">Copy Support Details</button></div></div><details><summary>Support details</summary><pre>Support code: ${esc(supportDetails())}</pre></details></section>`;
+  }
+
+  async function recoverImport(action) {
+    if(busy)return;
+    if(action==='sign-in'){HQ.auth?.login?.();return;}
+    if(action==='copy'){
+      const revision=contextRevision;
+      try{await window.navigator.clipboard.writeText(supportDetails());if(revision===contextRevision)notice='Support details copied.';}
+      catch{if(revision===contextRevision)notice='Open Support details and copy the text.';}
+      if(revision===contextRevision)rerender();return;
+    }
+    if(action==='status'&&retainedWorkflowId)return runImport({workflowId:retainedWorkflowId});
+    if(action==='retry')return importLatestExport();
+    return refreshWorkspace().catch(()=>{});
   }
 
   function renderImportNotification(outcome=lastOutcome) {
@@ -124,6 +129,7 @@
     if (!response.ok || payload.ok === false) {
       const failure = new Error(payload.detail || payload.error || `Candidate import request failed (${response.status}).`);
       failure.payload = payload;
+      failure.code = payload.code || null;
       failure.status = response.status;
       failure.endpoint = endpoint;
       throw failure;
@@ -147,6 +153,7 @@
       const connectionRefresh = exportUrlService()?.refresh?.();
       await Promise.all([refresh(), connectionRefresh || Promise.resolve()]);
       if(requestRevision!==contextRevision)return null;
+      lastOutcome=null;
       notice = 'Import readiness refreshed.';
       return state;
     } catch (error) {
@@ -359,12 +366,13 @@
     renderImportNotification();
     rerender();
     const wallStartedAt=now();
-    let workflowId=null,consecutivePollFailures=0;
+    let workflowId=null,consecutivePollFailures=0,attemptRunId=null,attemptPublished=false,terminalFailure=false;
     try{
       const started=existingWorkflowId?{id:existingWorkflowId}:await api('import-job','POST',{
         retry,sourceFingerprint:state?.source?.sourceFingerprint||''
       });
       workflowId=started.id;
+      retainedWorkflowId=workflowId||null;
       if(!workflowId)throw new Error('The background importer did not return a workflow ID.');
       for(let poll=0;poll<600;poll+=1){
         if(requestRevision!==contextRevision)return null;
@@ -374,10 +382,9 @@
           consecutivePollFailures=0;
         }catch(error){
           if(requestRevision!==contextRevision)return null;
+          if([401,403].includes(Number(error.status)))throw error;
           consecutivePollFailures+=1;
-          if(consecutivePollFailures>=5)throw new Error(
-            'Import status temporarily unavailable. The background import may still be running; select Refresh before retrying.'
-          );
+          if(consecutivePollFailures>=5)throw Object.assign(error,{code:'IMPORT_STATUS_UNAVAILABLE'});
           await new Promise(resolve=>window.setTimeout(resolve,1500));
           continue;
         }
@@ -387,7 +394,7 @@
           phaseState:durableRun.stageState,candidateSnapshotId:durableRun.snapshotId,
           progress:Math.round(Number(durableRun.stageIndex||0)/(PHASES.length-1)*100)
         }:state?.run;
-        if(durableRun)state={...state,run};
+        if(durableRun){state={...state,run};attemptRunId=run.id;attemptPublished=Boolean(run.activationPerformed);}
         notice=`${phaseLabel(run?.currentPhase)} · ${run?.progress??0}%`;
         rerender();
         const workflowState=String(progress.workflowState||'').toLowerCase();
@@ -402,11 +409,13 @@
             browserRefreshOk:refreshed.refreshed});
           if(requestRevision!==contextRevision)return null;
           notice=`League data live in ${durationLabel(clickToLiveMs)}. Discord thread delivery is tracked separately.`;
+          retainedWorkflowId=null;
           lastOutcome={tone:'success',title:'Import complete',summary:notice};
           renderImportNotification();
           return state;
         }
         if(['errored','failed','terminated','cancelled','canceled'].includes(workflowState)){
+          terminalFailure=true;
           const detail=progress.workflowStatus?.error;
           const error=new Error(run?.phaseState?.[run.currentPhase]?.summary
             ||(typeof detail==='string'?detail:detail?.message)
@@ -415,26 +424,25 @@
           throw error;
         }
         if(workflowState==='complete'||workflowState==='completed'){
+          terminalFailure=true;
           throw new Error('The background importer completed without an active validated snapshot.');
         }
         await new Promise(resolve=>window.setTimeout(resolve,1500));
       }
-      throw new Error('Import is still running after 15 minutes. Refresh for its latest status; do not export again.');
+      throw Object.assign(new Error('Import monitoring reached its time limit.'),{code:'IMPORT_STATUS_UNAVAILABLE'});
     }catch(error){
       if(requestRevision!==contextRevision)return null;
       await refresh().catch(()=>{});
       if(requestRevision!==contextRevision)return null;
       errorMessage=error.message;
-      const monitoringInterrupted=/Import status temporarily unavailable|still running after 15 minutes/i.test(error.message);
-      const published=Boolean(currentRun()?.activationPerformed);
-      notice=published?'The import was published. Refresh to reload the current league data and check Discord scheduling separately.':monitoringInterrupted
-        ?'The background import may still be running. Refresh to see the retained progress.'
-        :'Import stopped safely. The previous live snapshot remains available.';
+      const published=attemptPublished||Boolean(attemptRunId&&currentRun()?.id===attemptRunId&&currentRun()?.activationPerformed);
+      if(!workflowId&&(!Number(error.status)||Number(error.status)>=500)&&!/not configured|service binding/i.test(error.message))error.code='IMPORT_START_UNCONFIRMED';
+      if(workflowId&&!terminalFailure&&!published&&![401,403].includes(Number(error.status)))error.code='IMPORT_STATUS_UNAVAILABLE';
+      notice=published?'The import is live. Check the latest league data; Discord delivery is tracked separately.':'';
       lastOutcome=published?{tone:'warning',title:'Import live; follow-up needs attention',summary:notice,
-        action:'Select Refresh. For missing matchup threads, open League Controls → Discord Bot → Retry Schedule Sync.'}:monitoringInterrupted
-        ?{tone:'running',title:'Import status needs refresh',summary:notice,
-          action:'Select Refresh, then Import Latest Export to reconnect to the same background job.'}
+        action:'Check import status. For missing matchup threads, open League Controls → Discord Bot → Retry Schedule Sync.',button:'refresh',label:'Refresh Import Status',runId:attemptRunId}
         :failureGuidance(error,error.importPhase||currentRun()?.currentPhase||null);
+      if(terminalFailure||published)retainedWorkflowId=null;
       renderImportNotification();
     }finally{
       if(requestRevision===contextRevision){busy=false;rerender();}
@@ -579,18 +587,27 @@
   }
 
   async function importLatestExport() {
+    if(busy||preparingImport)return;
+    preparingImport=true;
+    const revision=contextRevision;
+    rerender();
     try{
       await refresh();
+      if(revision!==contextRevision)return;
       if (!state?.source) throw new Error('No analyzed league export is ready to import.');
       if (!state.destination) await createDestination();
       if (!state?.destination) throw new Error('The franchise-season import destination is unavailable.');
-      return runImport({retry:['failed','running'].includes(currentRun()?.status)});
+      if(revision!==contextRevision)return;
+      return await runImport({retry:['failed','running'].includes(currentRun()?.status)});
     }catch(error){
+      if(revision!==contextRevision)return;
       errorMessage=error.message;
       lastOutcome=failureGuidance(error,'analyze-source');
       renderImportNotification();
       rerender();
       throw error;
+    }finally{
+      if(revision===contextRevision){preparingImport=false;rerender();}
     }
   }
 
@@ -617,7 +634,7 @@
     const live=Boolean(run?.activationPerformed);
     const yearlyScheduleImport=connection.state?.yearlyScheduleImport||null;
     const yearlyActive=['collecting','ready'].includes(yearlyScheduleImport?.status);
-    const runDisabled=busy||connection.busy||yearlyActive||exportStatus!=='ready'||!source||live||latestExportLive;
+    const runDisabled=busy||preparingImport||connection.busy||yearlyActive||exportStatus!=='ready'||!source||live||latestExportLive;
     const runLabel=busy||connection.busy?'Working…':yearlyActive?'Finish or Switch Schedule First':live||latestExportLive?'Latest Export Live':run?.status==='failed'?'Retry Candidate Import':'Import Latest Export';
     const activePhase=run?.currentPhase||(!source?'analyze-source':live?'preview-ready':'analyze-source');
     const activePhaseIndex=Math.max(0,PHASES.findIndex(([id])=>id===activePhase));
@@ -688,7 +705,7 @@
         <span><small>Free Agents</small><strong>${esc(freeAgentLabel)}</strong></span>
         <span><small>Discord threads</small><strong>${esc(threadLabel)}</strong></span>
       </div>${historicalBackfill?'<p class="commissioner-import-detail-note"><strong>Historical backfill:</strong> completed earlier weeks are being added without moving the active week.</p>':''}${rosterCarryForward?'<p class="commissioner-import-detail-note"><strong>Roster carried forward:</strong> league info, games, results, standings, and weekly statistics can update while the retained roster remains authoritative.</p>':''}${actionableSourceWarnings.length?`<div class="commissioner-import-detail-warning"><strong>Needs attention</strong><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></div>`:''}</details>
-      ${lastOutcome?.tone==='error'?`<section class="commissioner-import-recovery" role="alert"><div><h4>${esc(lastOutcome.title)}</h4><p>${esc(lastOutcome.summary)}</p><p><strong>What to do:</strong> ${esc(lastOutcome.action)}</p></div><details><summary>Support details</summary><p>${esc(lastOutcome.detail)}</p><code>${esc(lastOutcome.supportCode)}</code></details></section>`:''}
+      ${recoveryMarkup()}
       <details class="commissioner-import-details"><summary>Export URL security</summary>${connectionService?.renderSecurityControls?.()||''}</details>
     </section>`;
   }
@@ -753,7 +770,7 @@
       ${threadReview?`<p class="commissioner-import-thread-review" role="status">${esc(threadReview)}</p>`:''}
       ${connectionService?.renderNotices?.()||''}
       ${actionableSourceWarnings.length?`<details class="commissioner-import-source-notes"><summary>${actionableSourceWarnings.length} source note${actionableSourceWarnings.length===1?'':'s'}</summary><ul>${actionableSourceWarnings.map(value=>`<li>${esc(value)}</li>`).join('')}</ul></details>`:''}
-      ${lastOutcome?.tone==='error'?`<section class="commissioner-import-recovery" role="alert"><div><span class="eyebrow">${esc(lastOutcome.phase)}</span><h4>${esc(lastOutcome.title)}</h4><p>${esc(lastOutcome.summary)}</p><p><strong>What to do:</strong> ${esc(lastOutcome.action)}</p><small>Your current league data is still live.</small></div><details><summary>Technical details</summary><p>${esc(lastOutcome.detail)}</p><code>Support code: ${esc(lastOutcome.supportCode)}</code></details></section>`:''}
+      ${recoveryMarkup()}
       ${sub60?`<div class="league-import-framework-note"><svg><use href="#icon-check"></use></svg><span><strong>Performance target met:</strong> ${esc(durationLabel(run.durationMs))}, under 60 seconds.</span></div>`:''}
       <details class="commissioner-import-technical"><summary>Import identifiers</summary><p class="muted">Source fingerprint: ${esc(source?.sourceFingerprint?.slice(0,12)||'—')} · snapshot: ${esc(run?.candidateSnapshotId||'—')} · previous snapshot: ${esc(run?.activeSnapshotIdBefore||'—')}</p></details>
       ${connectionService?.renderSecurityControls?.()||''}
@@ -766,6 +783,8 @@
   }
 
   document.addEventListener('click', event=>{
+    const recoveryButton=event.target.closest('[data-import-recovery]');
+    if(recoveryButton){event.preventDefault();if(!recoveryButton.disabled)recoverImport(recoveryButton.dataset.importRecovery).catch(()=>{});return;}
     if(event.target.closest('[data-launch-import-week-one]')){event.preventDefault();launchWeekOne();return;}
     if(event.target.closest('[data-close-import-notification]')){event.target.closest('[data-franchise-import-notification]')?.remove();return;}
     if (event.target.closest('[data-create-candidate-destination]')) createDestination();
@@ -775,16 +794,20 @@
   });
 
   window.addEventListener('franchisehq:permanent-export-updated',()=>rerender());
-  window.addEventListener('franchisehq:league-tenant-changed',()=>{
-    contextRevision+=1;state=null;busy=false;errorMessage='';notice='';lastOutcome=null;
+  function resetContext(){
+    contextRevision+=1;state=null;busy=false;preparingImport=false;errorMessage='';notice='';lastOutcome=null;retainedWorkflowId=null;
     if(notificationTimer)clearTimeout(notificationTimer);
     document.querySelector?.('[data-franchise-import-notification]')?.remove();
     rerender();refresh().catch(()=>{});
+  }
+  window.addEventListener('franchisehq:league-tenant-changed',resetContext);
+  window.addEventListener('franchisehq:auth-changed',()=>{
+    const next=authIdentity();if(next===authScope)return;authScope=next;resetContext();
   });
 
   const diagnostics=()=>({release:VERSION,busy,state,error:errorMessage,outcome:lastOutcome,activationPerformed:Boolean(currentRun()?.activationPerformed),activeSnapshotChanged:Boolean(currentRun()?.activeSnapshotChanged)});
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before one-click-import.js.');
-  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,refreshWorkspace,renderPanel,renderCompactPanel,renderImportNotification,failureGuidance,diagnostics},{replace:true,alias:'oneClickImport'});
+  HQ.defineModuleService('platform','oneClickImport',{runImport,importLatestExport,createDestination,refresh,refreshWorkspace,renderPanel,renderCompactPanel,renderImportNotification,failureGuidance,recoverImport,diagnostics},{replace:true,alias:'oneClickImport'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'candidate-import',service:'oneClickImport',script:'league-engine/one-click-import.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['commissioner-operated','one-click-live-import','atomic-snapshot-activation','actionable-failure-guidance','sub-60-second-target','blocked-free-agents-unknown']});
   setTimeout(()=>refresh().catch(()=>{}),0);
 })();
