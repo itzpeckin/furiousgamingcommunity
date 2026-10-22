@@ -24,7 +24,7 @@ async function fixture(){
  ('m1','a','p1','Older','{}','{}'),('m4','a','p1','Latest','{}','{}');
  INSERT INTO league_snapshot_records(snapshot_id,league_id,domain,external_id,data_json) VALUES('old','a','players','p1','{"history":true}'),('live','a','players','p1','{"live":true}');`);
  s.exec("UPDATE companion_player_mapping_runs SET status='superseded' WHERE id<>'m4'");
- const db={prepare(sql){const st=s.prepare(sql);let args=[];return {bind(...a){args=a;return this;},async first(){return st.get(...args)||null;},async all(){return {results:st.all(...args)};},async run(){const r=st.run(...args);return {meta:{changes:r.changes}};}};},async batch(stmts){s.exec('BEGIN');try{const results=[];for(const st of stmts)results.push(await st.run());s.exec('COMMIT');return results;}catch(e){s.exec('ROLLBACK');throw e;}}};
+ const db={prepare(sql){const st=s.prepare(sql);let args=[];return {bind(...a){args=a;return this;},async first(){return st.get(...args)||null;},async all(){return {results:st.all(...args)};},run(){const r=st.run(...args);return {meta:{changes:r.changes}};}};},async batch(stmts){s.exec('BEGIN');try{const results=[];for(const st of stmts)results.push(st.run());s.exec('COMMIT');return results;}catch(e){s.exec('ROLLBACK');throw e;}}};
  const objects=new Map();const bucket={async put(key,value){objects.set(key,new Uint8Array(value));},async get(key){const value=objects.get(key);return value?{size:value.length,body:new Blob([value]).stream()}:null;}};
  return {s,db,bucket,objects,args:{kind:'players',leagueId:'a',mappingId:'m0',apply:true}};
 }
@@ -118,6 +118,15 @@ test('scheduled maintenance resumes bounded chunks and repeated schedules do not
   await worker.scheduled({},env);
   assert.equal(f.s.prepare('SELECT SUM(archived_rows) n FROM storage_retention_runs').get().n,208);
   const before=f.objects.size;await worker.scheduled({},env);assert.equal(f.objects.size,before);
+  assert.equal(f.s.prepare("SELECT COUNT(*) n FROM companion_canonical_players_preview WHERE mapping_run_id='m4'").get().n,1);
+ }finally{f.s.close();}
+});
+
+test('a failed dataset does not prevent independent datasets from making verified progress',async()=>{
+ const f=await fixture();try{
+  const db={...f.db,prepare(sql){if(sql.includes('SELECT m.id,m.league_id FROM companion_team_mapping_runs'))throw new Error('Transient team query failure');return f.db.prepare(sql);}};
+  await assert.rejects(worker.scheduled({}, {DB:db,COMPANION_EXPORTS:f.bucket,STORAGE_RETENTION_MODE:'apply'}),/every dataset/);
+  assert.equal(f.s.prepare('SELECT SUM(archived_rows) n FROM storage_retention_runs').get().n,3);
   assert.equal(f.s.prepare("SELECT COUNT(*) n FROM companion_canonical_players_preview WHERE mapping_run_id='m4'").get().n,1);
  }finally{f.s.close();}
 });
