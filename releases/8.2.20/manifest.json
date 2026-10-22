@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.20",
+  "releaseType": "storage-and-cost-control",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "repository": "itzpeckin/furiousgamingcommunity",
+    "version": "8.2.19",
+    "tag": "v8.2.19",
+    "commit": "e77bea4643371b449e5435a02148f5791568e568"
+  },
+  "implementationBranch": "feature/8.2.20-storage-retention",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.19",
+    "candidateRelease": "8.2.20",
+    "currentMigration": 55,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.20/release-record.md",
+    "releases/8.2.20/validation-evidence.json",
+    "releases/8.2.20/recovery-plan.md",
+    "docs/storage-retention.md"
+  ]
+}

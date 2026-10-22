@@ -14,6 +14,7 @@ const checks = [
   ['Automated tests', null, [
     '--test',
     '--test-isolation=none',
+    'tests/operations/storage-retention.test.mjs',
     'tests/tooling/environment.test.mjs',
     'tests/tooling/routes.test.mjs',
     'tests/tooling/d1-release.test.mjs',

@@ -314,5 +314,22 @@
         ]
       }
     ]
+  },
+  "storageMaintenance": {
+    "name": "franchise-storage-maintenance",
+    "variables": [
+      "STORAGE_RETENTION_MODE"
+    ],
+    "bindings": [
+      {
+        "name": "DB",
+        "type": "d1"
+      },
+      {
+        "name": "COMPANION_EXPORTS",
+        "type": "r2"
+      }
+    ],
+    "policy": "Private scheduled maintenance only; observe until migration and verified backup acceptance; apply archives only eligible published working copies."
   }
 }

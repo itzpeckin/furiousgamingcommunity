@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.20",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": true
+    },
+    "retention": {
+      "targetedPassed": true,
+      "productionAcceptance": false,
+      "targetedTests": 9
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 622,
+      "log": "outputs/fhq8220-strict.txt"
+    },
+    "workerBundle": {
+      "passed": true,
+      "runtime": "wrangler 4.151.2",
+      "productionTimerVerified": false
+    }
+  },
+  "scopeBoundaries": {
+    "publishedSnapshotsChanged": false,
+    "seasonHistoryChanged": false,
+    "discordChanged": false,
+    "eaChanged": false
+  }
+}
