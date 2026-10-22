@@ -675,7 +675,7 @@ async function loadCommissionerDiscord(force=false){
  const work=fetch('/api/leagues/'+encodeURIComponent(slug)+'/discord',{credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}}).then(async response=>{
   const data=await response.json().catch(()=>({}));
   if(revision!==commissionerDiscordRevision||slug!==commissionerLeagueSlug())return null;
-  if(!response.ok||data.ok===false)throw new Error(data.error||'Discord settings could not load.');
+  if(!response.ok||data.ok===false)throw new Error(response.status===401?'Your FHQ sign-in expired. Sign in to FHQ again, then return to League Controls → Discord Bot.':response.status===403?'Your FHQ account needs commissioner access to this league. Ask a league owner to check your role in People & Teams.':data.error||'Discord settings could not load. Refresh Status to try again.');
   commissionerDiscordCache=data;return data;
  }).catch(error=>{
   if(revision!==commissionerDiscordRevision||slug!==commissionerLeagueSlug())return null;
@@ -688,14 +688,15 @@ async function updateCommissionerDiscord(action,detail={}){
  commissionerDiscordSaving=true;
  commissionerDiscordRevision+=1;commissionerDiscordLoading=null;
  const slug=commissionerLeagueSlug(),revision=commissionerDiscordRevision,body={action,...detail};
- const controls=Array.from(document.querySelectorAll('[data-save-discord-channels],[data-launch-discord-week-one],[data-retry-discord-schedule],[data-disable-discord-installation],[data-save-coaching],[data-save-loadouts]'));
+ const controls=Array.from(document.querySelectorAll('[data-save-discord-channels],[data-launch-discord-week-one],[data-retry-discord-schedule],[data-retry-screenshot-checks],[data-disable-discord-installation],[data-save-coaching],[data-save-loadouts]'));
  const disabled=controls.map(button=>button.disabled);controls.forEach(button=>{button.disabled=true;});
  try{
   const response=await fetch('/api/leagues/'+encodeURIComponent(slug)+'/discord',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json',accept:'application/json'},body:JSON.stringify(body)}),data=await response.json().catch(()=>({}));
   if(revision!==commissionerDiscordRevision||slug!==commissionerLeagueSlug())return;
-  if(!response.ok||data.ok===false)throw new Error(data.error||'Discord settings could not be saved.');
+  if(!response.ok||data.ok===false)throw new Error(response.status===401?'Your FHQ sign-in expired. Sign in to FHQ again, then return to League Controls → Discord Bot.':response.status===403?'Your FHQ account needs commissioner access. Ask a league owner to check your role in People & Teams.':data.error||'Discord could not confirm the action. Refresh Status before trying again.');
   commissionerDiscordCache=data;
   const messages={
+   'retry-screenshot-checks':['Pending checks queued','Original screenshots and completed image results are retained. Checks resume after any active run or retry waiting period. Refresh Check Status to see progress.'],
    'configure-loadouts':['Loadout rules saved','These ability rules belong to this league.'],
    'configure-coaching':['Coaching checks saved','Archetype checks use this league’s channels and rules.'],
    'disable':['Discord connection disabled','The server mapping is retained for reconnection.'],
@@ -705,7 +706,12 @@ async function updateCommissionerDiscord(action,detail={}){
   };
   showToast(...(messages[action]||['Discord connection saved','This Discord server is connected to this league.']));
   renderCommissioner('controls');
- }catch(error){if(revision===commissionerDiscordRevision)showToast('Discord action needs attention',error.message||String(error));}
+ }catch(error){if(revision===commissionerDiscordRevision&&slug===commissionerLeagueSlug()){
+  const message=error instanceof TypeError?'The action could not be confirmed. Select Refresh Status before trying again. Existing league data and submissions are retained.':error.message||'The action could not be confirmed. Refresh Status before retrying.';
+  showToast('Discord action needs attention',message);
+  const root=document.querySelector?.('[data-discord-installation]');
+  if(root){let notice=root.querySelector('[data-discord-action-error]');if(!notice){notice=document.createElement('p');notice.className='form-error';notice.dataset.discordActionError='';notice.setAttribute('role','alert');root.prepend(notice);}notice.textContent=message;}
+ }}
  finally{if(revision===commissionerDiscordRevision){commissionerDiscordSaving=false;controls.forEach((button,index)=>{button.disabled=disabled[index];});}}
 }
 async function updateCommissionerFeature(featureKey,enabled){
@@ -1221,15 +1227,20 @@ function renderCommissionerControlsV743(){
  const tab=commissionerControlsTab();
  return `<section class="commissioner-controls-page commissioner-controls-page--modern"><header class="commissioner-controls-hero"><div><span class="eyebrow">Shared league configuration</span><h2>League Controls</h2><p>Fine-tune Trade Center values, Confidence Pool windows, the featured matchup, and this league's Discord connection.</p></div><span class="pill pill--accent">Commissioner access</span></header><div class="segmented-tabs commissioner-controls-tabs"><button class="${tab==='gameplay-rules'?'is-active':''}" data-commissioner-controls-tab="gameplay-rules">Gameplay Rules</button><button class="${tab==='trade-value'?'is-active':''}" data-commissioner-controls-tab="trade-value">Trade Center</button><button class="${tab==='confidence-pool'?'is-active':''}" data-commissioner-controls-tab="confidence-pool">Confidence Pool</button><button class="${tab==='gotw'?'is-active':''}" data-commissioner-controls-tab="gotw">Game of the Week</button><button class="${tab==='discord'?'is-active':''}" data-commissioner-controls-tab="discord">Discord Bot</button></div><div class="commissioner-controls-canvas">${tab==='gameplay-rules'?renderGameplayControls():tab==='discord'?renderCommissionerDiscordControls():tab==='confidence-pool'?`<div class="commissioner-control-stack">${renderConfidencePoolCommissionerCard()}</div>`:tab==='gotw'?renderGotwControls():renderTradeValueControls()}</div></section>`;
 }
-function coachingProgressText(c){
- if(!c.enabled)return 'Choose channels and bans, then enable checks.';
- const p=c.progress||{},counts=Number(p.submissions||0)+' found · '+Number(p.pending||0)+' awaiting image checks · '+Number(p.reportsPending||0)+' reports awaiting update.';
- const phase=c.stalled?'No recent scanner check. Refresh Status; if this persists, contact FHQ support. Your submissions are retained.':c.lastError?'Checks are retrying. Verify the configured submission and results channels allow the bot access, then Refresh Status.':!c.historyComplete?'Reading earlier messages.':p.pending?'History read; screenshot checks are still running.':p.reportsPending?'Updating result reports.':'History and image checks are complete. New submissions are checked automatically.';
- const next=p.unassigned?' Assign the affected members in People & Teams.':p.unreadable?' Members flagged for an unreadable image need to post a clearer screenshot.':'';
- return phase+' '+counts+' Last check: '+commissionerDate(c.lastScanAt)+'.'+next;
+function renderScreenshotRecovery(settings,kind){
+ const p=settings.progress||{},recovery=settings.recovery;
+ const evidence=Number(p.unreadable||0),unassigned=Number(p.unassigned||0);
+ const text=settings.recoveryText||'Select Refresh Check Status for the latest scanner progress.';
+ return `<div class="screenshot-recovery" data-screenshot-recovery="${escapeHtml(kind)}"><h4>Check status</h4><p>${escapeHtml(text)}</p><p>${Number(p.submissions||0)} submissions found · ${Number(p.pending||0)} awaiting image checks · ${Number(p.reportsPending||0)} reports awaiting delivery.</p>${evidence?`<p>${evidence} submissions need clearer evidence. The affected member should attach a clear screenshot in the original Discord submission channel or matchup thread; unknown icons are never assumed legal.</p>`:''}${unassigned?`<p>${unassigned} submissions need a team link. The member must link Discord in their FHQ account; the commissioner must verify their team in People & Teams. Then submit again in the correct thread.</p>`:''}<p>Last scanner progress: ${escapeHtml(commissionerDate(settings.lastScanAt))}${settings.lastError&&settings.nextRetryAt?` · Next queued attempt: ${escapeHtml(commissionerDate(settings.nextRetryAt))}`:''}</p>${recovery?`<details><summary>Recovery details for support</summary><p>${escapeHtml(recovery.code)} · Stage: ${escapeHtml(recovery.stage)} · Responsible: ${escapeHtml(recovery.owner)}</p><p>League: ${escapeHtml(commissionerLeagueSlug())} · Rules revision: ${Number(settings.revision||0)}</p></details>`:''}<div class="discord-installation-actions"><button type="button" class="button button--ghost" data-refresh-discord-installation>Refresh Check Status</button><button type="button" class="button button--primary" data-retry-screenshot-checks="${escapeHtml(kind)}" ${settings.enabled&&settings.readerReady!==false?'':'disabled'}>Retry Pending Checks</button></div><small>Retry keeps history progress and completed results. It does not re-read every screenshot or override Discord’s waiting period.</small></div>`;
 }
+document.addEventListener('click',event=>{
+ const button=event.target.closest('[data-retry-screenshot-checks]');
+ if(!button||button.disabled)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ updateCommissionerDiscord('retry-screenshot-checks',{kind:button.dataset.retryScreenshotChecks});
+});
 function renderLoadoutControls(data){
- return window.FHQ_LOADOUTS?.render({settings:data.loadouts||{},catalog:data.loadoutCatalog,leagueSlug:commissionerLeagueSlug(),onSave:(detail,slug)=>{
+ return window.FHQ_LOADOUTS?.render({settings:data.loadouts||{},recoveryHtml:renderScreenshotRecovery(data.loadouts||{},'loadouts'),catalog:data.loadoutCatalog,leagueSlug:commissionerLeagueSlug(),onSave:(detail,slug)=>{
   if(slug===commissionerLeagueSlug())updateCommissionerDiscord('configure-loadouts',detail);
  }})||'';
 }
@@ -1237,7 +1248,7 @@ function renderCoachingControls(data){
  const c=data.coaching||{},channels=data.channels||[];
  const options=selected=>`<option value="">Choose a channel</option>${channels.map(ch=>`<option value="${escapeHtml(ch.id)}" ${ch.id===selected?'selected':''}>#${escapeHtml(ch.name)}</option>`).join('')}`;
  const existingThread=c.sourceChannelId&&!channels.some(ch=>ch.id===c.sourceChannelId)?`https://discord.com/channels/${data.installation.guildId}/${c.sourceChannelId}`:'';
- return `<section class="card coaching-archetypes" data-coaching-controls><div class="card-header"><div><h3>Coaching Archetypes</h3><p>Check existing and new screenshots automatically against your league’s rules.</p></div><span class="pill">${c.enabled?'Enabled':'Off'}</span></div><label class="field"><span><input type="checkbox" data-coaching-enabled ${c.enabled?'checked':''}> Enable automatic archetype checks</span></label><div class="discord-channel-routing__grid"><label class="field"><span>Archetype submissions</span><select data-coaching-source>${options(c.sourceChannelId)}</select></label><label class="field"><span>Existing thread link (optional)</span><input type="url" data-coaching-thread value="${escapeHtml(existingThread)}" placeholder="Paste a Discord thread link"><small>A thread link takes precedence over the selected channel.</small></label><label class="field"><span>Results channel</span><select data-coaching-report>${options(c.reportChannelId)}</select></label></div><fieldset><legend>Banned archetypes</legend>${[['defensive','Defensive Genius'],['offensive','Offensive Guru'],['developmental','Development Wizard'],['college','College Coach']].map(([key,label])=>`<label class="field"><span><input type="checkbox" data-coaching-ban="${key}" ${(c.banned||[]).includes(key)?'checked':''}> ${label}</span></label>`).join('')}<small>Unchecked archetypes are allowed.</small></fieldset>${c.lastError?`<p class="form-error">${escapeHtml(c.lastError)}</p>`:''}<p>${escapeHtml(coachingProgressText(c))} Use <strong>/coach status</strong> or <strong>/coach missing</strong> in Discord.</p><button type="button" class="button button--primary" data-save-coaching>Save Archetype Rules</button></section>`;
+ return `<section class="card coaching-archetypes" data-coaching-controls><div class="card-header"><div><h3>Coaching Archetypes</h3><p>Check existing and new screenshots automatically against your league’s rules.</p></div><span class="pill">${c.enabled?'Enabled':'Off'}</span></div><label class="field"><span><input type="checkbox" data-coaching-enabled ${c.enabled?'checked':''}> Enable automatic archetype checks</span></label><div class="discord-channel-routing__grid"><label class="field"><span>Archetype submissions</span><select data-coaching-source>${options(c.sourceChannelId)}</select></label><label class="field"><span>Existing thread link (optional)</span><input type="url" data-coaching-thread value="${escapeHtml(existingThread)}" placeholder="Paste a Discord thread link"><small>A thread link takes precedence over the selected channel.</small></label><label class="field"><span>Results channel</span><select data-coaching-report>${options(c.reportChannelId)}</select></label></div><fieldset><legend>Banned archetypes</legend>${[['defensive','Defensive Genius'],['offensive','Offensive Guru'],['developmental','Development Wizard'],['college','College Coach']].map(([key,label])=>`<label class="field"><span><input type="checkbox" data-coaching-ban="${key}" ${(c.banned||[]).includes(key)?'checked':''}> ${label}</span></label>`).join('')}<small>Unchecked archetypes are allowed.</small></fieldset>${renderScreenshotRecovery(c,'coaching')}<p>Use <strong>/coach status</strong> or <strong>/coach missing</strong> in Discord for the latest report.</p><button type="button" class="button button--primary" data-save-coaching>Save Archetype Rules</button></section>`;
 }
 document.addEventListener('click',event=>{
  const button=event.target.closest('[data-save-coaching]');if(!button||button.disabled)return;
@@ -1258,10 +1269,10 @@ function renderDiscordScheduleRecovery(data){
  const progress=sync.progress||{},ready=Boolean(progress.threadsReadyAt);
  const progressText=progress.games?`${progress.threadsReady||0} of ${progress.games} game threads ready. ${progress.archivedThreads||0} previous threads archived. ${ready&&progress.memberThreadsRemaining?`${progress.memberThreadsRemaining} threads still receiving member updates. You can use the new threads now.`:''}`:'';
  const retryText=waiting&&progress.nextRetryAt?`Discord is pacing requests. Next attempt: ${commissionerDate(progress.nextRetryAt)}. No new export or import is needed.`:'';
- const next=failed?'Check the schedule channel permissions for View Channel, Read Message History, Send Messages, Create Public Threads, Send Messages in Threads, and Manage Threads. Then retry below.':waiting?'Select Refresh Status to check progress. If progress has stopped, Retry Schedule Sync reconnects to the existing job or resumes a failed attempt.':status==='review-required'?'Refresh the importer and confirm that the live season and week match Madden before retrying.':'Retry updates game-status icons and adds linked commissioners to current matchup threads. On a verified advance, prior threads are archived and locked after the new week is ready. Browse past conversations in the Scheduling Channel’s archived threads.';
+ const next=sync.recovery?.message?sync.recovery.message:failed?'Refresh Status, then use Retry Schedule Sync to resume the retained job. If it fails again, contact FHQ support. No new export or import is needed.':waiting?'Select Refresh Status to check progress. If progress has stopped, Retry Schedule Sync reconnects to the existing job or resumes a failed attempt.':status==='review-required'?'Refresh the importer and confirm that the live season and week match Madden before retrying.':'Retry updates game-status icons and adds linked commissioners to current matchup threads. On a verified advance, prior threads are archived and locked after the new week is ready. Browse past conversations in the Scheduling Channel’s archived threads.';
  return '<section class="card" data-discord-schedule-recovery><div class="card-header"><div><h3>'+escapeHtml(ready&&waiting?'Week threads ready · updating member access':labels[status]||'Schedule status unavailable')+'</h3><p>'+escapeHtml(next)+'</p></div></div>'
   +(progressText?'<p>'+escapeHtml(progressText)+'</p>':'')+(retryText?'<p>'+escapeHtml(retryText)+'</p>':'')
-  +launch+(sync.lastError?'<details><summary>'+(sync.status==='running'?'Progress details':'Failure details')+'</summary><p>'+escapeHtml(sync.lastError)+'</p></details>':'')
+  +launch+(sync.recovery?'<details><summary>Recovery details for support</summary><p>'+escapeHtml(sync.recovery.code)+' · Stage: '+escapeHtml(sync.recovery.stage)+' · Responsible: '+escapeHtml(sync.recovery.owner)+'</p></details>':'')
   +'<p>Last update: '+escapeHtml(commissionerDate(sync.updatedAt||sync.completedAt||sync.createdAt))+'</p><div class="discord-installation-actions"><button type="button" class="button button--primary" data-retry-discord-schedule '+(data.installation?.scheduleChannelId?'':'disabled')+'>Retry Schedule Sync</button><button type="button" class="button button--ghost" data-refresh-discord-installation>Refresh Status</button></div></section>';
 }
 function renderCommissionerDiscordControls(){

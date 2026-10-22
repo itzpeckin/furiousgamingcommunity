@@ -9,10 +9,48 @@ import {eaWeeklyReady} from '../../functions/_lib/ea-direct.js';
 import {proveCurrentSchedulePeriod} from '../../functions/_lib/schedule-integrity.js';
 import {onRequestPost as scannerPost} from '../../functions/api/internal/coaching-scan.js';
 import scannerWorker from '../../workers/franchise-coaching-scanner/src/scheduled.js';
+import {retryScreenshotChecks} from '../../functions/_lib/discord-recovery.js';
 
 function d1(sqlite){return{prepare(sql){const statement=sqlite.prepare(sql);let args=[];const p={bind(...values){args=values;return p},async first(){return statement.get(...args)||null},async all(){return{results:statement.all(...args)}},async run(){return{meta:{changes:Number(statement.run(...args).changes)}}}};return p},async batch(statements){const result=[];for(const statement of statements)result.push(await statement.run());return result;}}}
 const guild='100000000000000001',source='100000000000000002',report='100000000000000003',author='100000000000000004',bot='100000000000000005',messageId='100000000000000006';
 const photo='https://cdn.discordapp.com/attachments/123/456/coach.png';
+test('coaching report failure retains the analysis and retries delivery without another AI call',async()=>{
+  const f=await fixture();try{
+    await configureCoaching(f.c,{enabled:true,sourceChannelId:source,reportChannelId:report,banned:[]},{fetchImpl:f.fetchImpl});
+    const fetchImpl=async(url,options)=>String(url).includes(`/channels/${report}/messages`)?Response.json({message:'private provider response',code:50013},{status:403}):f.fetchImpl(url,options);
+    assert.equal((await scanCoaching(f.env,f.db,{fetchImpl})).ok,false);
+    assert.equal(f.aiCalls(),1);
+    const recovery=JSON.parse(f.sqlite.prepare('SELECT last_error FROM discord_coaching_settings').get().last_error);
+    assert.equal(recovery.code,'DISCORD_ACCESS');assert.equal(recovery.stage,'report');assert.doesNotMatch(JSON.stringify(recovery),/private provider/);
+    assert.equal(f.sqlite.prepare('SELECT status FROM discord_coaching_submissions').get().status,'legal');
+    f.sqlite.exec("UPDATE discord_coaching_settings SET next_scan_at=datetime('now','-1 minute')");
+    await retryScreenshotChecks(f.c,'coaching');
+    assert.equal((await scanCoaching(f.env,f.db,{fetchImpl:f.fetchImpl})).ok,true);
+    assert.equal(f.aiCalls(),1);assert.equal(f.posts.length,1);
+  }finally{f.sqlite.close();}
+});
+test('screenshot retry preserves cooldowns, active leases, history, rules and other leagues',async()=>{
+  const f=await fixture();try{
+    await configureCoaching(f.c,{enabled:true,sourceChannelId:source,reportChannelId:report,banned:['college']},{fetchImpl:f.fetchImpl});
+    f.sqlite.exec("UPDATE discord_coaching_settings SET next_scan_at=datetime('now','+10 minutes'),lease_until=datetime('now','+4 minutes'),lease_token='working',history_before='100000000000000100',history_complete=1");
+    const before=f.sqlite.prepare('SELECT * FROM discord_coaching_settings').get();
+    await retryScreenshotChecks(f.c,'coaching');await retryScreenshotChecks(f.c,'coaching');
+    assert.deepEqual(f.sqlite.prepare('SELECT * FROM discord_coaching_settings').get(),before);
+    await assert.rejects(retryScreenshotChecks({...f.c,league:{id:'b'}},'coaching'),/enable these checks/);
+    await assert.rejects(retryScreenshotChecks(f.c,'invalid-table'),/Choose coaching/);
+    f.sqlite.exec("UPDATE discord_league_installations SET status='disabled'");
+    await assert.rejects(retryScreenshotChecks(f.c,'coaching'),/Connect this league/);
+  }finally{f.sqlite.close();}
+});
+test('an unassigned coaching submission is reported as a team-link problem rather than not submitted',async()=>{
+  const f=await fixture();try{
+    await configureCoaching(f.c,{enabled:true,sourceChannelId:source,reportChannelId:report,banned:[]},{fetchImpl:f.fetchImpl});
+    await scanCoaching(f.env,f.db,{fetchImpl:f.fetchImpl});
+    f.sqlite.exec("UPDATE discord_coaching_submissions SET status='unassigned',team_key=NULL,archetype=NULL");
+    const output=JSON.stringify(await coachingCommand(f.c,{missing:true}));
+    assert.match(output,/Team assignment needed/);assert.doesNotMatch(output,/Not submitted/);
+  }finally{f.sqlite.close();}
+});
 async function fixture(){
   const sqlite=new DatabaseSync(':memory:');
   for(const file of(await walkFiles()).filter(f=>/^migrations\/\d+_.*\.sql$/.test(f)).sort())sqlite.exec(await readFile(`${ROOT}/${file}`,'utf8'));
@@ -156,7 +194,7 @@ test('revoked history access is an operational error, not proof of missing submi
       :String(url).endsWith('/roles')?Response.json([{id:guild,permissions:'1024'}]):f.fetchImpl(url,options);
     assert.equal((await scanCoaching(f.env,f.db,{fetchImpl})).ok,false);
     assert.equal(f.sqlite.prepare('SELECT history_complete FROM discord_coaching_settings').get().history_complete,0);
-    assert.match(JSON.stringify(await coachingCommand(f.c,{missing:true})),/Scanner retrying after an error/);
+    assert.match(JSON.stringify(await coachingCommand(f.c,{missing:true})),/Discord channel access needs attention/);
     assert.doesNotMatch(JSON.stringify(await coachingCommand(f.c,{missing:true})),/Still scanning history|Not submitted/);
   }finally{f.sqlite.close();}
 });
@@ -189,15 +227,15 @@ test('coach status distinguishes a never-started or stalled scanner, queued chec
     await configureCoaching(f.c,{enabled:true,sourceChannelId:source,reportChannelId:report,banned:[]},{fetchImpl:f.fetchImpl});
     f.sqlite.exec("UPDATE discord_coaching_settings SET updated_at='2026-09-29 20:57:07'");
     let result=JSON.stringify(await coachingCommand(f.c,{now:Date.parse('2026-09-29T22:10:00Z')}));
-    assert.match(result,/Scanner stalled/);assert.match(result,/0 submissions found/);assert.doesNotMatch(result,/Still scanning history|Not submitted/);
+    assert.match(result,/No recent scanner progress/);assert.match(result,/0 submissions found/);assert.doesNotMatch(result,/Still scanning history|Not submitted/);
     result=JSON.stringify(await coachingCommand(f.c,{now:Date.parse('2026-09-29T20:58:00Z')}));
-    assert.match(result,/Scanning earlier messages/);assert.match(result,/Still scanning history/);
+    assert.match(result,/Reading earlier messages/);assert.match(result,/Still scanning history/);
     await scanCoaching(f.env,f.db,{fetchImpl:f.fetchImpl});
-    result=JSON.stringify(await coachingCommand(f.c));assert.match(result,/History scan complete/);assert.match(result,/1 submissions found · 1 checked · 0 awaiting checks/);
+    result=JSON.stringify(await coachingCommand(f.c));assert.match(result,/History and image checks are complete/);assert.match(result,/1 submissions found · 1 checked · 0 awaiting checks/);
     f.sqlite.exec("UPDATE discord_coaching_submissions SET status='pending'");
-    result=JSON.stringify(await coachingCommand(f.c));assert.match(result,/History read; screenshot checks are still running/);assert.match(result,/1 awaiting checks/);
+    result=JSON.stringify(await coachingCommand(f.c));assert.match(result,/screenshots are awaiting image checks/);assert.match(result,/1 awaiting checks/);
     f.sqlite.exec("UPDATE discord_coaching_settings SET updated_at='2026-09-29 20:57:07',last_scan_at='2026-09-29 21:00:00'");
-    result=JSON.stringify(await coachingCommand(f.c,{now:Date.parse('2026-09-29T22:10:00Z')}));assert.match(result,/Scanner stalled/);
+    result=JSON.stringify(await coachingCommand(f.c,{now:Date.parse('2026-09-29T22:10:00Z')}));assert.match(result,/No recent scanner progress/);
   }finally{f.sqlite.close();}
 });
 
