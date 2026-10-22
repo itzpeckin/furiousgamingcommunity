@@ -42,6 +42,7 @@ const checks = [
     'tests/import/ea-collection.test.mjs',
     'tests/security/ea-direct.test.mjs',
     'tests/ui/ea-direct.test.mjs',
+    'tests/ui/import-recovery.test.mjs',
     'tests/import/permanent-identity.test.mjs',
     'tests/import/candidate-import.test.mjs',
     'tests/import/permanent-league-export.test.mjs',

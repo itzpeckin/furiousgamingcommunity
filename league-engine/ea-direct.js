@@ -3,7 +3,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.0.11';
+  const VERSION = '8.2.21';
   const terminalStatuses = new Set(['complete', 'completed', 'ready', 'failed', 'cancelled']);
   let context = null;
   let generation = 0;
@@ -17,6 +17,7 @@
   let polling = false;
   let loaded = false;
   let errorMessage = '';
+  let problem = null;
   let notice = '';
   let selectedPath = 'ea-direct';
   let selectedPersonaId = '';
@@ -70,6 +71,7 @@
     polling = false;
     loaded = false;
     errorMessage = '';
+    problem = null;
     notice = '';
     selectedPath = HQ?.leagueTenant?.getCurrentLeague?.()?.preferredExportMethod === 'companion' ? 'companion' : 'ea-direct';
     seasonDraft = '';
@@ -86,6 +88,71 @@
 
   const stillCurrent = token => token.slug === slug() && token.generation === generation;
   const previewVerified = () => Boolean(state?.weeklyReady || state?.previewVerified || state?.connection?.previewVerified);
+
+  function recovery(error = {}, operation = 'connection') {
+    const code = String(error.code || error.payload?.code || '');
+    const status = Number(error.status || 0);
+    const active = Boolean(collection && !terminalStatuses.has(collection.status));
+    const result = {code, operation, referenceId: error.payload?.referenceId || error.referenceId,
+      title: 'EA Direct needs attention', message: 'Check the connection status before trying this step again.',
+      action: 'refresh', label: 'Check Connection'};
+    // An FHQ HTTP 401 is not an EA authorization rejection (EA uses its own code).
+    if (status === 401 && code !== 'EA_RECONNECT_REQUIRED') return {...result,
+      title: 'Sign back into FHQ', message: 'Your FHQ session ended. Sign in, then check this collection. You do not need to reconnect EA.', action: 'sign-in', label: 'Sign In to FHQ'};
+    if (status === 403) return {...result, title: 'Commissioner access required',
+      message: 'Check that you are in the correct league. Ask a league owner to verify your role in People & Teams.', action: null};
+    if (['EA_RECONNECT_REQUIRED', 'CREDENTIAL_UNAVAILABLE'].includes(code)) return {...result,
+      title: 'Reconnect your EA account', message: 'FHQ cannot use the saved EA connection. Select Reconnect EA Account, finish sign-in and select your franchise, then collect again. Previously imported data remains available.', action: 'begin', label: 'Reconnect EA Account'};
+    if (['SETUP_EXPIRED', 'INVALID_STATE'].includes(code)) return {...result, title: 'Restart EA sign-in',
+      message: 'This sign-in setup is no longer valid. Start a fresh sign-in and use the return address from that new attempt.', action: 'begin', label: 'Restart EA Sign-in'};
+    if (['INVALID_REDIRECT', 'INVALID_CODE'].includes(code)) return {...result, title: 'Paste the complete EA return address',
+      message: 'After signing in on EA, copy the full localhost success address from that tab into EA return address, then select Continue Connection.', action: null};
+    if (['NOT_CONFIGURED', 'STORAGE_UNAVAILABLE', 'WORKER_UNAVAILABLE'].includes(code)) return {...result,
+      title: 'EA Direct service is unavailable', message: 'This needs FHQ support if it continues. Reconnecting EA will not repair the service. Copy the support details below.', action: 'refresh', label: 'Check Connection'};
+    if (code === 'EA_SCHEDULE_IMPORT_FAILED') return {...result, title: 'Schedule collected; import needs attention',
+      message: 'Your schedule export was collected. Check import status below before starting another export.', action: 'import-status', label: 'Check Import Status'};
+    if (code === 'EA_CURRENT_PERIOD_UNAVAILABLE' || code === 'EA_LEAGUE_ADVANCING') return {...result,
+      title: code === 'EA_LEAGUE_ADVANCING' ? 'Madden is advancing the league' : 'EA has not confirmed the current season and week',
+      message: 'Check the season and phase in Madden. If an advance is in progress, wait for it to finish. Do not archive another season or change the week to bypass this check. If it persists, copy the support details for FHQ support.',
+      action: active ? 'check-collection' : 'retry-collection', label: active ? 'Check Collection' : 'Try Collection Again'};
+    if (code === 'EA_SEASON_MISMATCH') return {...result, title: 'The season needs checking',
+      message: safeMessage(error.message || 'EA and the prepared FHQ season do not match. Verify the season in Madden and FHQ before collecting again.'), action: null};
+    if (code === 'PREVIEW_REQUIRED') return {...result, title: 'Prepare the season schedule',
+      message: 'Use Import Season Schedule in Step 2. Once the schedule is ready, collect the league update in Step 3.', action: 'schedule', label: 'Go to Season Schedule'};
+    if (['EA_MADDEN_SESSION_REJECTED', 'EA_TEMPORARILY_UNAVAILABLE', 'COLLECTION_BUSY', 'SETUP_BUSY'].includes(code)) return {...result,
+      title: code === 'EA_MADDEN_SESSION_REJECTED' ? 'Madden could not open the data session' : 'EA is temporarily unavailable or busy',
+      message: active ? 'The collection has not finished. Check its progress before starting another attempt. Reconnecting is not required by this error.' : 'Wait briefly, then try the step again. If it repeats, copy the support details for FHQ support. Reconnecting is not required by this error.',
+      action: active ? 'check-collection' : collection ? 'retry-collection' : 'refresh', label: active ? 'Check Collection' : collection ? 'Try Collection Again' : 'Check Connection'};
+    if (operation === 'monitor' || operation === 'start') return {...result,
+      title: 'Collection status is unavailable', message: 'FHQ cannot confirm collection progress right now. The collection may still be running. Check its status before reconnecting or starting another export.',
+      checkRequired: true, action: collection?.id ? 'check-collection' : 'refresh', label: collection?.id ? 'Check Collection' : 'Check Collection Status'};
+    if (collection && terminalStatuses.has(collection.status)) return {...result, title: 'Collection stopped',
+      message: 'This collection did not finish. Try the collection again once. If it stops again, copy the support details for FHQ support. A new EA sign-in is not indicated by this error.', action: 'retry-collection', label: 'Try Collection Again'};
+    if (code) result.message = safeMessage(error.message);
+    return result;
+  }
+
+  function setProblem(error, operation) {
+    errorMessage = safeMessage(error.message);
+    problem = recovery(error, operation);
+  }
+
+  function currentProblem() {
+    return problem || (collection?.code || collection?.status === 'failed' ? recovery(collection, 'collection') : null)
+      || (state?.status === 'reconnect-required' ? recovery({code:'EA_RECONNECT_REQUIRED'}) : null);
+  }
+
+  function supportDetails(issue = currentProblem()) {
+    // Only identifiers and known states, never the API payload or EA return address.
+    const safeId = value => /^[a-zA-Z0-9_.:-]{1,150}$/.test(String(value || '')) ? value : 'Unavailable';
+    return `League: ${safeId(context)}\nIssue: ${safeId(issue?.code)}\nStep: ${safeId(issue?.operation)}\nCollection: ${safeId(collection?.id)}\nStatus: ${safeId(collection?.status)}\nReference: ${safeId(issue?.referenceId)}\nChecked: ${new Date().toISOString()}`;
+  }
+
+  function recoveryMarkup() {
+    const issue = currentProblem();
+    if (!issue) return '';
+    return `<section class="ea-direct-recovery" role="alert"><h4>${esc(issue.title)}</h4><p>${esc(issue.message)}</p><div class="ea-direct-actions">${issue.action ? `<button type="button" class="button button--primary" data-ea-action="${issue.action}" ${busy||loading||polling?'disabled':''}>${esc(issue.label)}</button>` : ''}<button type="button" class="button button--ghost" data-ea-action="copy-support">Copy Support Details</button></div><details><summary>Support details</summary><pre>${esc(supportDetails(issue))}</pre></details></section>`;
+  }
 
   async function api(resource, method = 'GET', body, token = ensureContext()) {
     if (!token.slug || !stillCurrent(token)) throw new Error('Select the league before connecting Madden.');
@@ -141,21 +208,21 @@
       const payload = await api('connection', 'GET', undefined, token);
       if (!payload || !stillCurrent(token) || revision !== actionRevision) return null;
       state = connectionState(payload);
-      if (payload.latestSync?.id && (!collection || collection.id === payload.latestSync.id)) {
+      if (payload.latestSync?.id) {
         collection = {...collection, ...payload.latestSync};
         schedulePoll(token);
-      } else if (state.status === 'connected' && !collection) {
+      } else if (state.status === 'connected') {
         const latest = await api('sync', 'GET', undefined, token);
         if (!stillCurrent(token) || revision !== actionRevision) return null;
         if (latest?.id || latest?.job?.id) {
-          collection = {...latest.job, ...latest};
+          collection = {...(collection?.id === (latest.id || latest.job?.id) ? collection : {}), ...latest.job, ...latest};
           schedulePoll(token);
         }
       }
-      errorMessage = '';
+      errorMessage = ''; problem = null;
       return state;
     } catch (error) {
-      if (stillCurrent(token) && revision === actionRevision) errorMessage = safeMessage(error.message);
+      if (stillCurrent(token) && revision === actionRevision) setProblem(error, 'connection');
       return null;
     } finally {
       if (stillCurrent(token) && revision === actionRevision) { loading = false; loaded = true; rerender(); }
@@ -174,10 +241,11 @@
       controllers.forEach(controller=>controller.abort());
       controllers.clear();
       loading=false;
+      polling=false;
     }
     busy = true;
     activeAction = action;
-    errorMessage = '';
+    errorMessage = ''; problem = null;
     notice = '';
     rerender();
     try {
@@ -196,7 +264,7 @@
         : 'EA account connected. Import the season schedule in Step 2.';
       return state;
     } catch (error) {
-      if (stillCurrent(token)) errorMessage = safeMessage(error.message);
+      if (stillCurrent(token)) setProblem(error, 'sign-in');
       return null;
     } finally {
       if (stillCurrent(token)) { busy = false; activeAction = ''; rerender(); }
@@ -221,7 +289,7 @@
       const payload = await api(`sync?id=${encodeURIComponent(jobId)}`, 'GET', undefined, token);
       if (!payload || !stillCurrent(token) || revision !== actionRevision || collection?.id !== jobId) return null;
       collection = {...collection, ...payload.job, ...payload};
-      errorMessage = '';
+      errorMessage = ''; problem = null;
       if (terminalStatuses.has(collection.status)) {
         if (collection.status === 'failed') errorMessage = safeMessage(collection.message || 'EA could not finish this collection. Review the available data and try again.');
         else if (collection.mode === 'preview' && !['failed', 'cancelled'].includes(collection.status)) {
@@ -237,23 +305,23 @@
       return collection;
     } catch (error) {
       if (stillCurrent(token) && revision === actionRevision) {
-        errorMessage = 'Collection status could not be checked. Select Check Collection to reconnect to its progress.';
+        setProblem(error, 'monitor');
         rerender();
       }
       return null;
     } finally {
-      if (stillCurrent(token)) polling = false;
+      if (stillCurrent(token) && revision === actionRevision) { polling = false; rerender(); }
     }
   }
 
   async function collect(mode, setup = {}) {
     if (!['preview', 'weekly', 'yearly'].includes(mode)) return null;
     const token = ensureContext();
-    if (busy || state?.status !== 'connected' || (collection && !terminalStatuses.has(collection.status))) return null;
+    if (busy || problem?.checkRequired || state?.status !== 'connected' || (collection && !terminalStatuses.has(collection.status))) return null;
     if (mode === 'weekly' && !previewVerified()) return null;
     busy = true;
     actionRevision += 1;
-    errorMessage = '';
+    errorMessage = ''; problem = null;
     notice = '';
     rerender();
     try {
@@ -264,7 +332,7 @@
       else schedulePoll(token);
       return collection;
     } catch (error) {
-      if (stillCurrent(token)) errorMessage = safeMessage(error.message);
+      if (stillCurrent(token)) setProblem(error, 'start');
       return null;
     } finally {
       if (stillCurrent(token)) { busy = false; activeAction = ''; rerender(); }
@@ -296,7 +364,7 @@
     const progress = Number(collection.progress?.percent ?? collection.progress);
     const percent = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : null;
     const title = collection.mode === 'preview' ? 'Connection preview' : collection.mode === 'yearly' ? 'Yearly schedule collection' : 'League data collection';
-    return `<section class="ea-direct-collection" aria-label="EA collection status"><div class="ea-direct-collection__heading"><strong>${title}</strong><span>${esc(collection.status || 'Starting')}</span></div><p role="status">${esc(collection.message ? safeMessage(collection.message) : collection.step || (finished ? 'Collection finished.' : 'Collecting data from EA…'))}</p>${!finished && percent !== null ? `<progress max="100" value="${percent}" aria-label="EA collection progress">${percent}%</progress>` : ''}${coverageMarkup(collection.coverage)}<div class="ea-direct-actions">${!finished ? '<button class="button button--ghost" type="button" data-ea-action="check-collection">Check Collection</button>' : ''}${collection.readyToImport && collection.mode !== 'preview' ? '<span>Export complete. Use Refresh below, then Import Latest Export.</span>' : ''}</div></section>`;
+    return `<section class="ea-direct-collection" aria-label="EA collection status"><div class="ea-direct-collection__heading"><strong>${title}</strong><span>${esc(collection.status || 'Starting')}</span></div><p role="status">${esc(collection.code ? 'See the recovery action below.' : collection.message ? safeMessage(collection.message) : collection.step || (finished ? 'Collection finished.' : 'Collecting data from EA…'))}</p>${!finished && percent !== null ? `<progress max="100" value="${percent}" aria-label="EA collection progress">${percent}%</progress>` : ''}${coverageMarkup(collection.coverage)}<div class="ea-direct-actions">${!finished ? '<button class="button button--ghost" type="button" data-ea-action="check-collection">Check Collection</button>' : ''}${collection.readyToImport && collection.mode !== 'preview' ? '<span>Export complete. Use Refresh below, then Import Latest Export.</span>' : ''}</div></section>`;
   }
 
   function setupMarkup() {
@@ -316,7 +384,7 @@
     const token = ensureContext();
     if (!loaded && !loading && token.slug) setTimeout(() => { if (stillCurrent(token) && !loaded) refresh(); }, 0);
     const connected = state?.status === 'connected';
-    const activeCollection = Boolean(collection && !terminalStatuses.has(collection.status));
+    const activeCollection = Boolean(problem?.checkRequired || collection && !terminalStatuses.has(collection.status));
     const disabled = busy || activeCollection ? 'disabled' : '';
     const verified = previewVerified();
     const statusLabel = loading ? 'Checking connection' : connected ? 'Connected' : state?.status === 'reconnect-required' ? 'Reconnect needed' : state?.configured === false ? 'Setup required' : 'Not connected';
@@ -339,11 +407,11 @@
     return `<section class="card ea-direct-card" data-ea-direct-panel aria-labelledby="ea-direct-title">
       <div class="ea-direct-header"><h3 id="ea-direct-title"><span class="madden-step-number">1</span> Choose export option</h3><span class="pill pill--${connected?'success':'neutral'}">${selectedPath==='companion'?'Companion App':esc(statusLabel)}</span></div>
       <div class="ea-direct-paths" role="group" aria-label="Madden connection method"><button type="button" data-ea-path="ea-direct" aria-pressed="${selectedPath==='ea-direct'}">EA Direct</button><button type="button" data-ea-path="companion" aria-pressed="${selectedPath==='companion'}">Companion App</button></div>
-      <div class="ea-direct-content" aria-busy="${busy||loading}">${connectionMarkup}
+      <div class="ea-direct-content" aria-busy="${busy||loading}">${connectionMarkup}${selectedPath==='ea-direct'?recoveryMarkup():''}
       <section class="madden-workflow-step"><h3><span class="madden-step-number">2</span> Import season schedule <small>Once per season</small></h3><div class="madden-step-actions">${schedule}</div></section>
       <section class="madden-workflow-step"><h3><span class="madden-step-number">3</span> Collect league data</h3><div class="madden-step-actions">${weekly}</div></section>
       ${selectedPath==='ea-direct'?collectionMarkup():exportService?.renderNotices?.()||''}
-      ${errorMessage?`<p class="ea-direct-error" role="alert">${esc(errorMessage)}</p>`:''}${notice?`<p class="ea-direct-notice" role="status">${esc(notice)}</p>`:''}</div></section>`;
+      ${notice?`<p class="ea-direct-notice" role="status">${esc(notice)}</p>`:''}</div></section>`;
   }
 
   function rerender() {
@@ -403,6 +471,19 @@
     if (action === 'disconnect') connectionAction('disconnect');
     if (action === 'refresh') refresh();
     if (action === 'check-collection') pollCollection();
+    if (action === 'sign-in') HQ.auth?.login?.();
+    if (action === 'retry-collection') collect(collection?.mode || 'weekly');
+    if (action === 'schedule') panel.querySelector?.('[data-ea-collect="yearly"], [name="sourceSeasonId"]')?.focus?.();
+    if (action === 'import-status') {
+      HQ.oneClickImport?.refreshWorkspace?.().catch(()=>{});
+      document.querySelector?.('[data-compact-import-panel]')?.scrollIntoView?.({block:'start'});
+    }
+    if (action === 'copy-support') {
+      const token = ensureContext();
+      Promise.resolve().then(()=>window.navigator.clipboard.writeText(supportDetails())).then(()=>{
+        if(stillCurrent(token)){notice='Support details copied.';rerender();}
+      }).catch(()=>{if(stillCurrent(token)){notice='Open Support details below and copy the text.';rerender();}});
+    }
   });
 
   document.addEventListener('submit', event => {
