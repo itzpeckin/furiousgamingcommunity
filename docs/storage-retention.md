@@ -2,7 +2,7 @@
 
 ## Automatic policy
 
-The private franchise-storage-maintenance Worker runs every ten minutes in bounded batches. Observe mode reports counts without changing records; apply mode archives eligible working rows. No public HTTP action exists. The Worker has only D1 and private R2 bindings, without Discord, EA or email credentials.
+The private franchise-storage-maintenance Worker runs every ten minutes in bounded batches. Four independent dataset lanes share a 45-second budget, with at most 20 batches of 100 rows per dataset. The selected mapping is reused between chunks to avoid repeated full eligibility scans. Observe mode reports counts without changing records; apply mode archives eligible working rows. No public HTTP action exists. The Worker has only D1 and private R2 bindings, without Discord, EA or email credentials.
 
 Eligibility requires a successfully published import older than seven days. Preserve the three newest mappings per dataset, the three newest published imports, active and previous snapshot references, and mappings used by any non-archived snapshot. Pause while any import, EA collection or game-year transition is unfinished. Failed or unpublished candidates are retained for troubleshooting.
 
