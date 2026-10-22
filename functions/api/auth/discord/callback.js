@@ -449,7 +449,7 @@ export async function onRequestGet(context) {
     // A shared league URL creates an inactive/unassigned membership. We do NOT
     // write role='pending' because the production membership schema restricts
     // role to real league roles. Pending is a workflow state, not a permission.
-    let destination = ['/account','/register-league'].includes(oauthReturnTo) ? oauthReturnTo : "/leagues?auth=success";
+    let destination = ['/account','/register-league','/beta-apply','/platform/applications'].includes(oauthReturnTo) ? oauthReturnTo : "/leagues?auth=success";
     if (joinLeagueId || joinLeagueSlug) {
       try {
         const league = joinLeagueId

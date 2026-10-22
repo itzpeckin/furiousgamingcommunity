@@ -146,10 +146,10 @@ function page() {
         <h1>Build. Manage. <span>Compete.</span></h1>
         <p class="lead">Franchise HQ gives online franchise leagues one home for teams, players, standings, statistics, trades, schedules and league management.</p>
         <div class="actions">
-          <a class="btn primary" href="/auth">Sign in</a>
-          <a class="btn secondary" href="/auth?mode=register&amp;returnTo=%2Fregister-league">Register Your League</a>
+          <a class="btn primary" href="/demo">Explore Demo League</a>
+          <a class="btn secondary" href="/beta-apply">Register Your League</a>
         </div>
-        <div class="micro">Create a FranchiseHQ account with email or Discord. A Discord account is not required to register a league.</div>
+        <div class="micro">Explore without signing in. Apply for beta access with email or Discord; new leagues require owner approval. A Discord account is not required.</div>
       </section>
       <section class="visual" aria-label="Franchise HQ">
         <div class="logo-card">

@@ -11,6 +11,20 @@ export default {
     if (request.method !== 'POST' || new URL(request.url).pathname !== '/send') return new Response(null,{ status:404 });
     let body;
     try { body = await request.json(); } catch { return new Response(null,{ status:400 }); }
+    if (body?.purpose === 'beta-application') {
+      if (!/^onboarding_[a-f0-9-]{36}$/.test(String(body.planId || ''))
+        || typeof body.name !== 'string' || body.name.length > 120
+        || typeof body.applicant !== 'string' || body.applicant.length > 200) return new Response(null,{status:400});
+      const link = `https://franchisehq.app/platform/applications#${body.planId}`;
+      const escape = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      try {
+        await env.EMAIL.send({from:'accounts@franchisehq.app',to:'justinrmandaro@gmail.com',
+          subject:'New FranchiseHQ beta league application',
+          text:`${body.applicant} has applied for ${body.name}.\n\nReview and approve or decline:\n${link}\n\nThe league remains inactive until you approve it.`,
+          html:`<h1>New beta league application</h1><p>${escape(body.applicant)} has applied for <strong>${escape(body.name)}</strong>.</p><p><a href="${link}">Review application</a></p><p>The league remains inactive until you approve it.</p>`});
+        return new Response(null,{status:204});
+      } catch { return new Response(null,{status:503}); }
+    }
     if (!body || !Object.hasOwn(SUBJECTS,body.purpose) || !/^[a-f0-9]{64}$/.test(String(body.token || ''))
       || !/^[^\s@<>\r\n]{1,64}@[^\s@<>\r\n]{1,190}$/.test(String(body.email || ''))) return new Response(null,{ status:400 });
     const link = `https://franchisehq.app/account#action=${body.purpose}&token=${body.token}`;

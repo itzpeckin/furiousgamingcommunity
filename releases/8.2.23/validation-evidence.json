@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.23",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "onboardingAndDemo": {
+      "passed": true,
+      "tests": 25
+    },
+    "browserFixtures": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "realHandlers": true,
+      "mockEmail": true
+    },
+    "strictQuality": {
+      "passed": true,
+      "tests": 653,
+      "supplementalConcurrencyTestPassed": true
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "liveDiscordMessagesSent": false,
+    "rulesChanged": false,
+    "workerChangeRequired": true,
+    "workerDeployed": false,
+    "liveEmailSent": false,
+    "liveLeagueCreated": false
+  }
+}
