@@ -18,6 +18,29 @@ const photo='https://cdn.discordapp.com/attachments/123/456/loadout.png';
 const sample=(ids=['field-general','camp-counselor'])=>({kind:'loadout',complete:true,slots:Array.from({length:6},(_,i)=>({slot:i+1,state:i<ids.length?'equipped':'locked',clear:true,candidates:i<ids.length?[ids[i]]:[]})),playsheets:{complete:true,slots:Array.from({length:4},(_,i)=>({slot:i+1,state:i===0?'equipped':'locked',clear:true,name:i===0?'Dollar Playsheet':null}))}});
 const event={guildId:guild,channelId:channel,messageId};
 const readSample=async()=>({...normalizeLoadout(sample()),readerVersion:LOADOUT_READER_VERSION});
+test('live loadout failure reports its stage and preserves completed image checks for delivery retry',async()=>{
+  const f=await fixture();try{
+    await f.save();let reads=0;
+    const readScreenshot=async()=>{reads++;return readSample();};
+    const failedFetch=async(url,options)=>options?.method==='POST'?Response.json({message:'private body'},{status:503}):f.fetchImpl(url,options);
+    const first=await handleLoadoutEvent(f.env,f.db,event,{fetchImpl:failedFetch,readScreenshot});
+    assert.equal(first.ok,false);assert.equal(first.recovery.stage,'report');assert.equal(first.recovery.code,'DISCORD_TEMPORARY');
+    const settings=await loadoutSettings(f.db,'a',f.env);assert.equal(settings.progress.pending,0);assert.equal(settings.progress.reportsPending,1);
+    assert.doesNotMatch(settings.lastError,/permissions|private body/);
+    await handleLoadoutEvent(f.env,f.db,event,{fetchImpl:f.fetchImpl,readScreenshot});
+    assert.equal(reads,1);assert.equal(f.posts.length,1);
+  }finally{f.sqlite.close();}
+});
+test('image-provider failures leave the loadout pending and never request a clearer screenshot',async()=>{
+  const f=await fixture();try{
+    await f.save();
+    const result=await handleLoadoutEvent(f.env,f.db,event,{fetchImpl:f.fetchImpl,readScreenshot:async()=>{throw Object.assign(new Error('upstream private response'),{status:403});}});
+    assert.equal(result.recovery.code,'IMAGE_SERVICE');assert.equal(result.recovery.stage,'image');
+    const settings=await loadoutSettings(f.db,'a',f.env);assert.equal(settings.progress.pending,1);assert.equal(settings.progress.unreadable,0);
+    assert.match(settings.lastError,/Do not resubmit/);assert.doesNotMatch(settings.lastError,/permissions|private response/);assert.equal(f.posts.length,0);
+    assert.doesNotMatch(JSON.stringify(await loadoutCommand(f.c,{missing:true})),/Not submitted/);
+  }finally{f.sqlite.close();}
+});
 
 test('playsheet names are exact, catalog IDs unique, and unknown or incomplete names never pass',()=>{
   assert.equal(new Set(PLAYSHEET_CATALOG.playsheets.map(s=>s.id)).size,67);

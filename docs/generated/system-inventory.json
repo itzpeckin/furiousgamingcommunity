@@ -20,7 +20,8 @@
       "functions/_lib/coaching-images.js",
       "functions/_lib/discord-coaching.js",
       "functions/_lib/loadout-images.js",
-      "functions/api/internal/coaching-scan.js"
+      "functions/api/internal/coaching-scan.js",
+      "functions/api/leagues/[leagueSlug]/discord.js"
     ],
     "APP_ENV": [
       "functions/_lib/permissions.js",
@@ -38,6 +39,7 @@
       "functions/_lib/loadout-images.js",
       "functions/api/internal/coaching-scan.js",
       "functions/api/internal/loadout-event.js",
+      "functions/api/leagues/[leagueSlug]/discord.js",
       "workers/franchise-coaching-scanner/src/gateway.js",
       "workers/franchise-coaching-scanner/src/scheduled.js"
     ],
@@ -263,11 +265,11 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 314,
+      ".js": 315,
       ".json": 8,
       ".jsonc": 4,
       ".md": 287,
-      ".mjs": 75,
+      ".mjs": 76,
       ".png": 7,
       ".sql": 58,
       ".txt": 3,
@@ -285,7 +287,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 458157,
+        "bytes": 461020,
         "file": "trade-module.js"
       },
       {
@@ -357,7 +359,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       }
     ],
-    "total": 865
+    "total": 867
   },
   "frontend": {
     "assets": [
@@ -1973,7 +1975,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.21",
+  "release": "8.2.22",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -1,3 +1,4 @@
+import { discordRecovery, savedDiscordRecovery, screenshotRecoveryState } from './discord-recovery.js';
 import { discordBotRequest } from './discord-api.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-teams.js';
 import { ARCHETYPES, coachingEvidence, readCoachingScreenshot } from './coaching-images.js';
@@ -44,12 +45,13 @@ export async function coachingSettings(db,leagueId){
     SUM(CASE WHEN status='unreadable' THEN 1 ELSE 0 END) AS unreadable,
     SUM(CASE WHEN status='unassigned' THEN 1 ELSE 0 END) AS unassigned,
     SUM(CASE WHEN status<>'pending' AND (rule_revision<>? OR reported_revision<>?) THEN 1 ELSE 0 END) AS reportsPending
-    FROM discord_coaching_submissions WHERE league_id=?`)
-    .bind(row.revision,row.revision,leagueId).first();
+    FROM discord_coaching_submissions WHERE league_id=? AND channel_id=?`)
+    .bind(row.revision,row.revision,leagueId,row.source_channel_id).first();
   const observed=String(row.last_scan_at||row.updated_at||'');
   const checkedAt=Date.parse(/(?:Z|[+-]\d\d:\d\d)$/.test(observed)?observed:observed.replace(' ','T')+'Z');
-  return row?{enabled:Boolean(row.enabled),sourceChannelId:row.source_channel_id,reportChannelId:row.report_channel_id,
-    banned:parse(row.banned_json),revision:row.revision,historyComplete:Boolean(row.history_complete),lastScanAt:row.last_scan_at,lastError:row.last_error,updatedAt:row.updated_at,
+  const recovery=savedDiscordRecovery(row.last_error,{stage:'history'});
+  return row?{recovery,enabled:Boolean(row.enabled),sourceChannelId:row.source_channel_id,reportChannelId:row.report_channel_id,
+    banned:parse(row.banned_json),revision:row.revision,historyComplete:Boolean(row.history_complete),lastScanAt:row.last_scan_at,lastError:recovery?.message||null,nextRetryAt:row.next_scan_at,updatedAt:row.updated_at,
     progress:{submissions:Number(progress?.submissions||0),pending:Number(progress?.pending||0),unreadable:Number(progress?.unreadable||0),
       unassigned:Number(progress?.unassigned||0),reportsPending:Number(progress?.reportsPending||0)},
     stalled:Boolean(row.enabled)&&(!Number.isFinite(checkedAt)||Date.now()-checkedAt>5*60*1000)}
@@ -171,7 +173,7 @@ async function processSubmission(env,db,config,submission,{fetchImpl}){
     else{
       let observed;
       try{observed=await readCoachingScreenshot(env,urls,{fetchImpl});}
-      catch(error){if(error.retryable!==false)throw error;observed={archetype:null,coachName:null};}
+      catch(error){if(error.retryable!==false){error.recoverySource='image';error.recoveryStage='image';throw error;}observed={archetype:null,coachName:null};}
       archetype=observed.archetype;coachName=observed.coachName;
       status=archetype?(parse(config.banned_json).includes(archetype)?'illegal':'legal'):'unreadable';
     }
@@ -196,16 +198,16 @@ async function processSubmission(env,db,config,submission,{fetchImpl}){
     embeds:[{footer:{text:marker},description:`Rules revision ${config.revision}`}],allowed_mentions:{parse:[]}};
   let reportId=submission.report_channel_id===config.report_channel_id?submission.report_message_id:null;
   if(!reportId){
-    const recent=await discordBotRequest(env,`/channels/${config.report_channel_id}/messages?limit=100`,{fetchImpl,rateLimitRetries:0});
+    const recent=await discordBotRequest(env,`/channels/${config.report_channel_id}/messages?limit=100`,{fetchImpl,rateLimitRetries:0,recoveryStage:'report'});
     reportId=recent.find?.(m=>m.author?.bot&&m.embeds?.some(e=>e.footer?.text===marker))?.id||null;
   }
   let posted;
   if(reportId){
-    try{posted=await discordBotRequest(env,`/channels/${config.report_channel_id}/messages/${reportId}`,{method:'PATCH',body,fetchImpl,rateLimitRetries:0});}
+    try{posted=await discordBotRequest(env,`/channels/${config.report_channel_id}/messages/${reportId}`,{method:'PATCH',body,fetchImpl,rateLimitRetries:0,recoveryStage:'report'});}
     catch(error){if(Number(error.status)!==404)throw error;}
   }
   if(!posted)posted=await discordBotRequest(env,`/channels/${config.report_channel_id}/messages`,{
-    method:'POST',body:{...body,nonce:submission.message_id,enforce_nonce:true},fetchImpl,rateLimitRetries:0});
+    method:'POST',body:{...body,nonce:submission.message_id,enforce_nonce:true},fetchImpl,rateLimitRetries:0,recoveryStage:'report'});
   await db.prepare(`UPDATE discord_coaching_submissions SET report_channel_id=?,report_message_id=?,reported_revision=?
     WHERE league_id=? AND channel_id=? AND message_id=?`).bind(config.report_channel_id,posted.id,config.revision,config.league_id,submission.channel_id,submission.message_id).run();
 }
@@ -233,11 +235,13 @@ export async function scanCoaching(env,db,{fetchImpl=fetch}={}){
       WHERE league_id=? AND lease_token=?`).bind(submission||!config.history_complete?'+0 seconds':'+30 seconds',config.league_id,config.lease_token).run();
     return{ok:true,processed:Boolean(submission)};
   }catch(error){
+    const recovery=discordRecovery(error,{stage:submission?'image':'history'});
+    const retrySeconds=Math.max(60,Math.ceil(Number(error.retryAfterSeconds)||0));
     if(submission)await db.prepare(`UPDATE discord_coaching_submissions SET attempts=attempts+1,
       last_error=? WHERE league_id=? AND channel_id=? AND message_id=?`)
-      .bind('Screenshot check or delivery will retry.',config.league_id,submission.channel_id,submission.message_id).run();
-    await db.prepare(`UPDATE discord_coaching_settings SET last_error=?,next_scan_at=datetime('now','+1 minute')
-      WHERE league_id=? AND lease_token=?`).bind('A screenshot or Discord request could not finish. Checks retry automatically. Verify channel permissions if this persists.',config.league_id,config.lease_token).run();
+      .bind(JSON.stringify(recovery),config.league_id,submission.channel_id,submission.message_id).run();
+    await db.prepare(`UPDATE discord_coaching_settings SET last_error=?,next_scan_at=datetime('now',?)
+      WHERE league_id=? AND lease_token=?`).bind(JSON.stringify(recovery),`+${retrySeconds} seconds`,config.league_id,config.lease_token).run();
     return{ok:false,retry:true};
   }finally{
     await db.prepare('UPDATE discord_coaching_settings SET lease_token=NULL,lease_until=NULL WHERE league_id=? AND lease_token=?').bind(config.league_id,config.lease_token).run();
@@ -256,14 +260,14 @@ export async function coachingCommand(c,{missing=false,now=Date.now()}={}){
   const pending=submissions.filter(s=>s.status==='pending').length;
   const reporting=submissions.filter(s=>s.status!=='pending'&&(s.rule_revision!==config.revision||s.reported_revision!==config.revision)).length;
   const progress=`${submissions.length} submissions found · ${submissions.length-pending} checked · ${pending} awaiting checks${reporting?` · ${reporting} reports awaiting update`:''}.`;
-  const scanState=config.lastError?'Scanner retrying after an error.':stalled?'Scanner stalled — no recent progress.':!config.historyComplete?'Scanning earlier messages.':pending?'History read; screenshot checks are still running.':reporting?'History read; result reports are updating.':'History scan complete.';
+  const scanState=screenshotRecoveryState(config,{now});
   const lastScan=timestamp(config.lastScanAt);
   const description=`${scanState}\n${progress}${Number.isFinite(lastScan)?`\nLast history check: <t:${Math.floor(lastScan/1000)}:R>.`:''}${interrupted?'\nScanning is delayed; missing submissions are not yet confirmed. Commissioners can check League Controls → Discord Bot for details.':''}`;
   const lines=[];
   for(const [key,owner] of assignments){
-    const submission=submissions.find(s=>s.author_id===owner.discordUserId&&s.team_key===key);
+    const submission=submissions.find(s=>s.author_id===owner.discordUserId&&(s.team_key===key||['pending','unassigned'].includes(s.status)));
     const status=!submission?(interrupted?'Not yet verified — scan delayed':config.historyComplete?'Not submitted':'Still scanning history')
-      :submission.status==='pending'?'Checking screenshot':submission.status==='unreadable'?'Clearer screenshot needed'
+      :submission.status==='pending'?'Checking screenshot':submission.status==='unreadable'?'Clearer screenshot needed':submission.status==='removed'?'Submission removed — post a new screenshot'
       :submission.archetype?(config.banned.includes(submission.archetype)?'Illegal':'Legal'):'Team assignment needed';
     if(missing&&submission?.archetype)continue;
     lines.push(`**${safe(resolveTeam(teams,key)?.displayName||key)}** · ${snow(owner.discordUserId)?`<@${owner.discordUserId}>`:'Discord not linked'}\n${status}${submission?.archetype?` · ${ARCHETYPES[submission.archetype]}`:''}`);

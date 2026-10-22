@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.22",
+  "releaseType": "discord-screenshot-recovery",
+  "status": "implementation-authorized",
+  "sourceBaseline": {
+    "tag": "v8.2.21",
+    "commit": "2d64c9d3fd11c0a2e45acd7ed261907f52c52b61"
+  },
+  "implementationBranch": "fix/8.2.22-discord-recovery",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.21",
+    "candidateRelease": "8.2.22",
+    "currentMigration": 56,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.22/release-record.md",
+    "releases/8.2.22/validation-evidence.json",
+    "releases/8.2.22/recovery-plan.md"
+  ]
+}

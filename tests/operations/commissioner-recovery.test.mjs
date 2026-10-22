@@ -88,6 +88,22 @@ test('Discord retry is one click and a pending old-league save cannot overwrite 
   a.resolve(Response.json({ok:true,league:{slug:'alpha'}}));await old;
   assert.equal(ui.cache().league.slug,'bravo');
 });
+test('screenshot recovery queues one request on repeat clicks and keeps league scope',async()=>{
+  const pending=deferred(),requests=[];
+  const ui=await discordUI(async(url,options)=>{requests.push({url,options});return pending.promise;});
+  const first=ui.update('retry-screenshot-checks',{kind:'loadouts'});
+  await ui.update('retry-screenshot-checks',{kind:'loadouts'});
+  assert.equal(requests.length,1);assert.match(requests[0].url,/alpha\/discord$/);
+  assert.deepEqual(JSON.parse(requests[0].options.body),{action:'retry-screenshot-checks',kind:'loadouts'});
+  pending.resolve(Response.json({ok:true,league:{slug:'alpha'}}));await first;
+  assert.equal(ui.buttons[0].disabled,false);
+});
+test('Discord settings distinguish FHQ session expiry from missing commissioner access',async()=>{
+  for(const [status,text] of [[401,/FHQ sign-in expired/],[403,/commissioner access/]]){
+    const ui=await discordUI(async()=>Response.json({error:'generic'},{status}));
+    await ui.load();assert.match(ui.cache().error,text);assert.doesNotMatch(ui.cache().error,/Reconnect Discord/);
+  }
+});
 
 test('importer discards an old-league readiness response after switching leagues',async()=>{
   const a=deferred();let calls=0,service,slug='alpha';const events={};

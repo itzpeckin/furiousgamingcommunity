@@ -8,6 +8,7 @@ import { upsertDiscordGlobalCommands } from '../../../_lib/discord-api.js';
 import { coachingSettings, configureCoaching } from '../../../_lib/discord-coaching.js';
 import { loadoutSettings, configureLoadouts } from '../../../_lib/discord-loadouts.js';
 import { LOADOUT_CATALOG } from '../../../_lib/loadout-catalog.js';
+import { discordRecovery, savedDiscordRecovery, screenshotRecoveryState, retryScreenshotChecks } from '../../../_lib/discord-recovery.js';
 
 const SNOWFLAKE=/^[0-9]{17,20}$/;
 const cleanSnowflake=(value,required=false)=>{
@@ -44,19 +45,27 @@ async function state(c){
       discordGuildTextChannels(c.env,row.guildId),discordGuildRoles(c.env,row.guildId)
     ]);
     if(channelResult.status==='fulfilled')channels=channelResult.value;
-    else{channelError='FranchiseHQ could not refresh the server channel list. Existing routing remains unchanged.';console.error('Discord channel list failed:',channelResult.reason?.message||channelResult.reason)}
+    else{channelError=discordRecovery(channelResult.reason,{stage:'channels'}).message;}
     if(roleResult.status==='fulfilled')roles=roleResult.value;
-    else{roleError='FranchiseHQ could not refresh the server role list. Existing Trade Committee tagging remains unchanged.';console.error('Discord role list failed:',roleResult.reason?.message||roleResult.reason)}
+    else{roleError=discordRecovery(roleResult.reason,{stage:'roles'}).message;}
+  }
+  const coaching=await coachingSettings(c.db,c.league.id),loadouts=await loadoutSettings(c.db,c.league.id,c.env);
+  coaching.readerReady=Boolean(c.env.AI&&c.env.COACHING_SCANNER_SECRET);
+  coaching.recoveryText=screenshotRecoveryState(coaching,{readerReady:coaching.readerReady});
+  loadouts.recoveryText=screenshotRecoveryState(loadouts,{kind:'loadouts',readerReady:loadouts.readerReady});
+  const scheduleSync=await latestDiscordScheduleSync(c.db,c.league.id);
+  if(scheduleSync?.lastError){
+    scheduleSync.recovery=savedDiscordRecovery(scheduleSync.lastError,{stage:'schedule',nextRetryAt:scheduleSync.progress?.nextRetryAt});
+    scheduleSync.lastError=scheduleSync.recovery.message;
   }
   return {
     ok:true,release:DISCORD_COMMAND_RELEASE,
     league:{id:c.league.id,slug:c.league.slug,name:c.league.name},
     installation:row||null,
     channels,roles,channelError,roleError,
-    coaching:await coachingSettings(c.db,c.league.id),
-    loadouts:await loadoutSettings(c.db,c.league.id,c.env),
+    coaching,loadouts,
     loadoutCatalog:LOADOUT_CATALOG,
-    scheduleSync:await latestDiscordScheduleSync(c.db,c.league.id),
+    scheduleSync,
     globalCommands:true,
     automaticConnection:true,
     connectUrl:`${origin}/api/leagues/${encodeURIComponent(c.league.slug)}/discord/connect`,
@@ -75,6 +84,12 @@ export async function onRequestPost(context){
     let body={};try{body=await context.request.json()}catch{return json({ok:false,error:'Request body must be valid JSON.'},400)}
     const action=String(body.action||'').trim();
     const audit=createTenantAuditContext(context,c.league,c.session,`discord_installation_${action||'unknown'}`);
+    if(action==='retry-screenshot-checks'){
+      const checkRecovery=await retryScreenshotChecks(c,body.kind);
+      await tenantAuditStatement(c.db,audit,{resourceType:'discord_screenshot_checks',resourceId:c.league.id,
+        detail:{kind:checkRecovery.kind,retainedEvidence:true,preservedCooldown:true}}).run();
+      return json({...await state(c),checkRecovery});
+    }
     if(action==='configure-loadouts'){
       await configureLoadouts(c,body);
       await tenantAuditStatement(c.db,audit,{resourceType:'discord_loadout_settings',resourceId:c.league.id,
@@ -173,6 +188,10 @@ export async function onRequestPost(context){
     }
     return json(await state(c));
   }catch(error){
+    if(error?.recoverySource==='discord'){
+      const recovery=discordRecovery(error);
+      return json({ok:false,error:recovery.message,recovery},502);
+    }
     const uniqueConflict=/UNIQUE constraint failed/i.test(String(error?.message||''));
     const message=uniqueConflict
       ?'That Discord server is already connected to another FranchiseHQ league.'

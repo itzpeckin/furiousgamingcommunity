@@ -1,3 +1,4 @@
+import { discordRecovery, savedDiscordRecovery, screenshotRecoveryState } from './discord-recovery.js';
 import { discordBotRequest } from './discord-api.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-teams.js';
 import { channelPermissions, identityFor, verifyReadAccess } from './discord-coaching.js';
@@ -36,11 +37,14 @@ export async function loadoutSettings(db,leagueId,env={}){
   const threads=config?await currentThreads(db,leagueId,config.guild_id):[];
   const current=threads.length?await rows(db,`SELECT status,rule_revision,reported_revision FROM discord_loadout_submissions
     WHERE league_id=? AND thread_id IN (${threads.map(()=>'?').join(',')}) AND status<>'ignored'`,leagueId,...threads.map(t=>t.id)):[];
-  return {enabled:Boolean(config?.enabled),banned:parse(config?.banned_json,[]),bannedPlaysheets:parse(config?.banned_playsheets_json,[]),playsheetCatalog:PLAYSHEET_CATALOG,banDuplicates:Boolean(config?.ban_duplicates),
+  const recovery=savedDiscordRecovery(config?.last_error,{stage:'history'});
+  return {recovery,enabled:Boolean(config?.enabled),banned:parse(config?.banned_json,[]),bannedPlaysheets:parse(config?.banned_playsheets_json,[]),playsheetCatalog:PLAYSHEET_CATALOG,banDuplicates:Boolean(config?.ban_duplicates),
     revision:config?.revision||0,catalogVersion:LOADOUT_CATALOG.version,readerReady:ready(env),
-    lastScanAt:config?.last_scan_at||null,lastError:config?.last_error||null,
+    lastScanAt:config?.last_scan_at||null,lastError:recovery?.message||null,nextRetryAt:config?.next_scan_at||null,updatedAt:config?.updated_at||null,
     progress:{threads:threads.length,historyComplete:threads.filter(t=>t.history_complete).length,submissions:current.length,
       pending:current.filter(s=>s.status==='pending').length,
+      unreadable:current.filter(s=>s.status==='unreadable').length,
+      unassigned:current.filter(s=>s.status==='unassigned').length,
       needsEvidence:current.filter(s=>s.status==='unreadable'||s.status==='unassigned').length,
       reportsPending:current.filter(s=>s.status!=='pending'&&(s.rule_revision!==config?.revision||s.reported_revision!==config?.revision)).length}};
 }
@@ -131,7 +135,7 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
       const urls=coachingEvidence(message);
       if(!urls.length)result={status:'removed',reason:'Submission no longer includes a supported screenshot. Post a new screenshot.'};
       else try{const reading=Date.now();observed=await readScreenshot(env,urls,{fetchImpl});imageMs=Date.now()-reading;}
-      catch(error){if(error.retryable!==false)throw error;observed={kind:'uncertain',complete:false,slots:[],readerVersion:LOADOUT_READER_VERSION};result={status:'unreadable',reason:'Attach one to four clear PNG, JPG, or WebP screenshots, or a public Xbox screenshot link.'};}
+      catch(error){if(error.retryable!==false){error.recoverySource='image';error.recoveryStage='image';throw error;}observed={kind:'uncertain',complete:false,slots:[],readerVersion:LOADOUT_READER_VERSION};result={status:'unreadable',reason:'Attach one to four clear PNG, JPG, or WebP screenshots, or a public Xbox screenshot link.'};}
     }
   }
   if(!result)result=evaluateLoadout(observed,{banned:parse(config.banned_json,[]),banDuplicates:Boolean(config.ban_duplicates),bannedPlaysheets:parse(config.banned_playsheets_json,[]),requirePlaysheets:true});
@@ -154,14 +158,14 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
   const posting=Date.now();
   let reportId=submission.report_message_id,posted;
   if(!reportId&&submission.attempts>0){
-    const recent=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages?limit=100`,{fetchImpl,rateLimitRetries:0});
-    const bot=await discordBotRequest(env,'/users/@me',{fetchImpl,rateLimitRetries:0});
+    const recent=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages?limit=100`,{fetchImpl,rateLimitRetries:0,recoveryStage:'report'});
+    const bot=await discordBotRequest(env,'/users/@me',{fetchImpl,rateLimitRetries:0,recoveryStage:'report'});
     reportId=recent.find(m=>m.author?.id===bot.id&&m.embeds?.some(e=>e.footer?.text===marker))?.id;
   }
   if(!await stillCurrent(db,config,thread))return;
-  if(reportId)try{posted=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages/${reportId}`,{method:'PATCH',body,fetchImpl,rateLimitRetries:0});}
+  if(reportId)try{posted=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages/${reportId}`,{method:'PATCH',body,fetchImpl,rateLimitRetries:0,recoveryStage:'report'});}
   catch(error){if(Number(error.status)!==404)throw error;}
-  if(!posted)posted=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages`,{method:'POST',body:{...body,nonce:submission.message_id,enforce_nonce:true},fetchImpl,rateLimitRetries:0});
+  if(!posted)posted=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages`,{method:'POST',body:{...body,nonce:submission.message_id,enforce_nonce:true},fetchImpl,rateLimitRetries:0,recoveryStage:'report'});
   const timings={discoveryMs:submission.discovered_at?Math.max(0,Date.parse(submission.discovered_at.replace(' ','T')+'Z')-Date.parse(submission.submitted_at)):null,
     imageMs,postMs:Date.now()-posting,processingMs:Date.now()-started,totalMs:Math.max(0,Date.now()-Date.parse(submission.submitted_at)),readerPath:observed?.readerPath||'verified'};
   await db.prepare('UPDATE discord_loadout_submissions SET report_message_id=?,reported_revision=?,reported_at=CURRENT_TIMESTAMP,timings_json=? WHERE league_id=? AND thread_id=? AND message_id=?')
@@ -186,10 +190,11 @@ async function processClaimed(env,db,config,thread,submission,fetchImpl,readScre
     await processSubmission(env,db,{...config,claim:{messageId:fresh.message_id,token,editedAt:fresh.source_edited_at}},thread,fresh,fetchImpl,readScreenshot,canonicalMessage);
     return {ok:true,processed:true};
   }
-  catch{
+  catch(error){
+    const recovery=discordRecovery(error,{stage:'image'});
     await db.prepare('UPDATE discord_loadout_submissions SET attempts=attempts+1 WHERE league_id=? AND thread_id=? AND message_id=? AND processing_token=?')
       .bind(config.league_id,thread.id,submission.message_id,token).run();
-    return {ok:false,retry:true};
+    return {ok:false,retry:true,recovery};
   }finally{
     await db.prepare('UPDATE discord_loadout_submissions SET processing_token=NULL,processing_until=NULL WHERE league_id=? AND thread_id=? AND message_id=? AND processing_token=?')
       .bind(config.league_id,thread.id,submission.message_id,token).run();
@@ -219,7 +224,10 @@ export async function handleLoadoutEvent(env,db,event,{fetchImpl=fetch,readScree
       .bind(message.edited_timestamp,config.league_id,thread.id,message.id,message.edited_timestamp).run();
     const submission=await db.prepare('SELECT * FROM discord_loadout_submissions WHERE league_id=? AND thread_id=? AND message_id=?').bind(config.league_id,thread.id,message.id).first();
     if(!needsCheck(submission,config))return {ok:true,duplicate:true};
-    return processClaimed(env,db,config,thread,submission,fetchImpl,readScreenshot,message);
+    const result=await processClaimed(env,db,config,thread,submission,fetchImpl,readScreenshot,message);
+    if(!result.ok)await db.prepare('UPDATE discord_loadout_settings SET last_error=? WHERE league_id=? AND revision=?')
+      .bind(JSON.stringify(result.recovery),config.league_id,config.revision).run();
+    return result;
   }
   return {ok:true,ignored:true};
 }
@@ -259,14 +267,17 @@ export async function scanLoadouts(env,db,{fetchImpl=fetch,readScreenshot=readLo
             AND json_extract(observed_json,'$.readerVersion')<>?)) ORDER BY attempts ASC,submitted_at DESC LIMIT 3`,
         config.league_id,...threads.map(t=>t.id),config.revision,config.revision,LOADOUT_READER_VERSION);
       const results=await boundedMap(submissions,3,s=>processClaimed(env,db,config,threads.find(t=>t.id===s.thread_id),s,fetchImpl,readScreenshot));
-      if(results.some(r=>!r.ok))throw new Error('Check will retry.');
+      const failed=results.find(r=>!r.ok);
+      if(failed)throw Object.assign(new Error('Check will retry.'),{safeRecovery:failed.recovery});
     }
     await db.prepare(`UPDATE discord_loadout_settings SET last_scan_at=CURRENT_TIMESTAMP,last_error=NULL,next_scan_at=datetime('now',?)
       WHERE league_id=? AND lease_token=?`).bind(threads.length?'+0 seconds':'+1 minute',config.league_id,config.lease_token).run();
     return {ok:true,processed:submissions.length>0,idle:!threads.length};
-  }catch{
-    await db.prepare(`UPDATE discord_loadout_settings SET last_error=?,next_scan_at=datetime('now','+1 minute') WHERE league_id=? AND lease_token=?`)
-      .bind('A screenshot or Discord request could not finish. Checks retry automatically. Verify scheduling-channel permissions if this persists.',config.league_id,config.lease_token).run();
+  }catch(error){
+    const recovery=error.safeRecovery||discordRecovery(error,{stage:'history'});
+    const retrySeconds=Math.max(60,Math.ceil((Date.parse(recovery.nextRetryAt)-Date.now())/1000)||0);
+    await db.prepare(`UPDATE discord_loadout_settings SET last_error=?,next_scan_at=datetime('now',?) WHERE league_id=? AND lease_token=?`)
+      .bind(JSON.stringify(recovery),`+${retrySeconds} seconds`,config.league_id,config.lease_token).run();
     return {ok:false,retry:true};
   }finally{
     await db.prepare('UPDATE discord_loadout_settings SET lease_token=NULL,lease_until=NULL WHERE league_id=? AND lease_token=?').bind(config.league_id,config.lease_token).run();
@@ -296,6 +307,6 @@ export async function loadoutCommand(c,{missing=false}={}){
     }
   }
   const fields=[];for(let i=0;i<lines.length;i+=4)fields.push({name:i?'Continued':'Teams',value:lines.slice(i,i+4).join('\n\n')});
-  return {embeds:[{title:`Weekly loadouts · ${missing?'Missing or incomplete':'Status'}`,description:`Week ${threads[0].week_index} · ${config.progress.historyComplete}/${threads.length} thread histories read · ${config.progress.pending} awaiting checks.${config.lastError?'\n'+config.lastError:''}`,
+  return {embeds:[{title:`Weekly loadouts · ${missing?'Missing or incomplete':'Status'}`,description:`Week ${threads[0].week_index} · ${config.progress.historyComplete}/${threads.length} thread histories read · ${config.progress.pending} awaiting image checks · ${config.progress.reportsPending} reports awaiting delivery.\n${screenshotRecoveryState(config,{kind:'loadouts',readerReady:config.readerReady})}`,
     fields:fields.length?fields:[{name:'Status',value:'No matching registered team owners.'}],color:0x5b83f5}],allowed_mentions:{parse:[]}};
 }

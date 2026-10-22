@@ -21,7 +21,8 @@ export async function discordBotRequest(env, path, {
   body = null,
   fetchImpl = fetch,
   rateLimitRetries = DEFAULT_RATE_LIMIT_RETRIES,
-  sleepImpl = wait
+  sleepImpl = wait,
+  recoveryStage = null
 } = {}) {
   const token = String(env?.DISCORD_BOT_TOKEN || '').trim();
   if (!token) throw new Error('Discord bot delivery is not configured.');
@@ -43,6 +44,8 @@ export async function discordBotRequest(env, path, {
         await sleepImpl(Math.ceil(Number(error.retryAfterSeconds)*1000)+25);
         continue;
       }
+      error.recoverySource='discord';
+      if(recoveryStage)error.recoveryStage=recoveryStage;
       throw error;
     }
     if (response.ok) {
@@ -58,6 +61,8 @@ export async function discordBotRequest(env, path, {
       continue;
     }
     const error = new Error(`Discord API ${response.status}: ${safeDiscordError(text)}`);
+    error.recoverySource='discord';
+    if(recoveryStage)error.recoveryStage=recoveryStage;
     error.status = response.status;
     error.discordCode = Number.isFinite(Number(detail?.code)) ? Number(detail.code) : null;
     error.retryAfterSeconds = retryAfterSeconds;
