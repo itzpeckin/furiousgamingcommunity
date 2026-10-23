@@ -61,6 +61,9 @@
   }
 
   function evaluate(permission, context = {}) {
+    if(window.__FHQ_PUBLIC_DEMO__?.slug==='demo' && HQ.leagueTenant?.resolveRouteSlug?.()==='demo') {
+      return permission===POLICIES.OPEN_COMMISSIONER_HQ;
+    }
     if (isActiveMember()) {
       const capability = CAPABILITY_BY_POLICY[permission];
       return capability ? HQ.auth?.hasCapability?.(capability) === true : false;

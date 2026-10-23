@@ -1,5 +1,6 @@
 import { canonicalDocumentRedirect } from "./_lib/origin.js";
 import { AUTH_CONSTANTS, getCookie, hashToken, verifyMutationCsrf } from "./_lib/auth.js";
+import { publicDemoResponse } from './_lib/public-demo.js';
 
 const CSP_REPORT_ONLY = [
   "default-src 'self'",
@@ -168,6 +169,8 @@ export async function onRequest(context) {
     });
     return applySecurityHeaders(response, id, context.request, Date.now()-startedAt);
   }
+  const demoResponse = await publicDemoResponse(context);
+  if (demoResponse) return applySecurityHeaders(demoResponse, id, context.request, Date.now()-startedAt);
   const retryAfter = await rateLimit(context, pathname);
   if (retryAfter) {
     response = new Response(JSON.stringify({

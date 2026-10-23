@@ -1,0 +1,5 @@
+/* The shell, pages and commissioner panels keep the production styles. */
+.public-demo-notice{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 18px;margin-bottom:20px;border:1px solid var(--border-color,#2a3e57);border-radius:12px;background:var(--surface-raised,#142137)}
+.public-demo-notice strong{display:block;font-size:14px}.public-demo-notice span{display:block;margin-top:4px;font-size:12px;color:var(--text-secondary,#acb9ca);line-height:1.5}
+.public-demo-notice .button{flex-shrink:0}.public-demo-league [aria-disabled="true"]{cursor:not-allowed}
+@media(max-width:650px){.public-demo-notice{align-items:flex-start;flex-direction:column;gap:10px;padding:12px}.public-demo-notice .button{font-size:12px}}
