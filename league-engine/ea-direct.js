@@ -3,8 +3,9 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.2.21';
+  const VERSION = '8.2.25';
   const terminalStatuses = new Set(['complete', 'completed', 'ready', 'failed', 'cancelled']);
+  const monitorRetryDelays = [5000, 10000, 20000, 30000, 30000];
   let context = null;
   let generation = 0;
   let state = null;
@@ -27,6 +28,7 @@
   let actionRevision = 0;
   let authScope = null;
   let pollTimer = null;
+  let monitorFailures = 0;
   const controllers = new Set();
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -61,6 +63,7 @@
     controllers.clear();
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
+    monitorFailures = 0;
     state = null;
     collection = null;
     busy = false;
@@ -108,7 +111,7 @@
     if (['INVALID_REDIRECT', 'INVALID_CODE'].includes(code)) return {...result, title: 'Paste the complete EA return address',
       message: 'After signing in on EA, copy the full localhost success address from that tab into EA return address, then select Continue Connection.', action: null};
     if (['NOT_CONFIGURED', 'STORAGE_UNAVAILABLE', 'WORKER_UNAVAILABLE'].includes(code)) return {...result,
-      title: 'EA Direct service is unavailable', message: 'This needs FHQ support if it continues. Reconnecting EA will not repair the service. Copy the support details below.', action: 'refresh', label: 'Check Connection'};
+      title: 'FHQ cannot start the EA collector', message: 'FHQ could not access its collection service or storage. If this continues, copy the support details for FHQ support. Reconnecting EA will not repair this problem.', action: 'refresh', label: 'Check Connection'};
     if (code === 'EA_SCHEDULE_IMPORT_FAILED') return {...result, title: 'Schedule collected; import needs attention',
       message: 'Your schedule export was collected. Check import status below before starting another export.', action: 'import-status', label: 'Check Import Status'};
     if (code === 'EA_CURRENT_PERIOD_UNAVAILABLE' || code === 'EA_LEAGUE_ADVANCING') return {...result,
@@ -119,8 +122,16 @@
       message: safeMessage(error.message || 'EA and the prepared FHQ season do not match. Verify the season in Madden and FHQ before collecting again.'), action: null};
     if (code === 'PREVIEW_REQUIRED') return {...result, title: 'Prepare the season schedule',
       message: 'Use Import Season Schedule in Step 2. Once the schedule is ready, collect the league update in Step 3.', action: 'schedule', label: 'Go to Season Schedule'};
-    if (['EA_MADDEN_SESSION_REJECTED', 'EA_TEMPORARILY_UNAVAILABLE', 'COLLECTION_BUSY', 'SETUP_BUSY'].includes(code)) return {...result,
-      title: code === 'EA_MADDEN_SESSION_REJECTED' ? 'Madden could not open the data session' : 'EA is temporarily unavailable or busy',
+    if (['COLLECTION_BUSY', 'SETUP_BUSY'].includes(code)) return {...result,
+      title: code === 'COLLECTION_BUSY' ? 'Collection already in progress' : 'EA sign-in already in progress',
+      message: 'FHQ is already processing this step. Check its progress before trying again.',
+      severity: 'status', action: active ? 'check-collection' : 'refresh', label: active ? 'Check Collection' : 'Check Connection'};
+    if (active && operation === 'collection' && ['EA_TEMPORARILY_UNAVAILABLE', 'EA_CONNECTION_FAILED', 'EA_TIMEOUT', 'EA_REQUEST_FAILED'].includes(code)) return {...result,
+      title: 'Collection is retrying this step',
+      message: 'FHQ hit a temporary problem with this collection step and is retrying it. Progress will update automatically. Your existing league data is unchanged.',
+      severity: 'status', action: 'check-collection', label: 'Check Collection'};
+    if (['EA_MADDEN_SESSION_REJECTED', 'EA_TEMPORARILY_UNAVAILABLE'].includes(code)) return {...result,
+      title: code === 'EA_MADDEN_SESSION_REJECTED' ? 'Madden could not open the data session' : 'EA did not complete this data request',
       message: active ? 'The collection has not finished. Check its progress before starting another attempt. Reconnecting is not required by this error.' : 'Wait briefly, then try the step again. If it repeats, copy the support details for FHQ support. Reconnecting is not required by this error.',
       action: active ? 'check-collection' : collection ? 'retry-collection' : 'refresh', label: active ? 'Check Collection' : collection ? 'Try Collection Again' : 'Check Connection'};
     if (operation === 'monitor' || operation === 'start') return {...result,
@@ -151,7 +162,7 @@
   function recoveryMarkup() {
     const issue = currentProblem();
     if (!issue) return '';
-    return `<section class="ea-direct-recovery" role="alert"><h4>${esc(issue.title)}</h4><p>${esc(issue.message)}</p><div class="ea-direct-actions">${issue.action ? `<button type="button" class="button button--primary" data-ea-action="${issue.action}" ${busy||loading||polling?'disabled':''}>${esc(issue.label)}</button>` : ''}<button type="button" class="button button--ghost" data-ea-action="copy-support">Copy Support Details</button></div><details><summary>Support details</summary><pre>${esc(supportDetails(issue))}</pre></details></section>`;
+    return `<section class="ea-direct-recovery" role="${issue.severity === 'status' ? 'status' : 'alert'}"><h4>${esc(issue.title)}</h4><p>${esc(issue.message)}</p><div class="ea-direct-actions">${issue.action ? `<button type="button" class="button button--primary" data-ea-action="${issue.action}" ${busy||loading||polling?'disabled':''}>${esc(issue.label)}</button>` : ''}<button type="button" class="button button--ghost" data-ea-action="copy-support">Copy Support Details</button></div><details><summary>Support details</summary><pre>${esc(supportDetails(issue))}</pre></details></section>`;
   }
 
   async function api(resource, method = 'GET', body, token = ensureContext()) {
@@ -220,6 +231,7 @@
         }
       }
       errorMessage = ''; problem = null;
+      monitorFailures = 0;
       return state;
     } catch (error) {
       if (stillCurrent(token) && revision === actionRevision) setProblem(error, 'connection');
@@ -236,6 +248,7 @@
     if(action==='disconnect'||action==='begin'){
       if(pollTimer)clearTimeout(pollTimer);
       pollTimer=null;
+      monitorFailures=0;
       collection=null;
       // Old reads must not consume time or reinstall a prior connection.
       controllers.forEach(controller=>controller.abort());
@@ -271,15 +284,23 @@
     }
   }
 
-  function schedulePoll(token) {
+  function schedulePoll(token, delay = 3000) {
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     if (!stillCurrent(token) || !collection?.id || terminalStatuses.has(collection.status)) return;
-    pollTimer = setTimeout(() => pollCollection(token), 3000);
+    pollTimer = setTimeout(() => pollCollection(token, true), delay);
   }
 
-  async function pollCollection(token = ensureContext()) {
+  function retryableMonitorError(error) {
+    const status = Number(error.status || 0);
+    const code = String(error.code || error.payload?.code || '');
+    if (['REQUEST_CANCELLED', 'EA_RECONNECT_REQUIRED', 'CREDENTIAL_UNAVAILABLE'].includes(code)) return false;
+    return status === 0 || [408, 425, 429].includes(status) || status >= 500;
+  }
+
+  async function pollCollection(token = ensureContext(), automatic = false) {
     if (!collection?.id || !stillCurrent(token) || polling) return null;
+    if (!automatic) monitorFailures = 0;
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     polling = true;
@@ -290,6 +311,7 @@
       if (!payload || !stillCurrent(token) || revision !== actionRevision || collection?.id !== jobId) return null;
       collection = {...collection, ...payload.job, ...payload};
       errorMessage = ''; problem = null;
+      monitorFailures = 0;
       if (terminalStatuses.has(collection.status)) {
         if (collection.status === 'failed') errorMessage = safeMessage(collection.message || 'EA could not finish this collection. Review the available data and try again.');
         else if (collection.mode === 'preview' && !['failed', 'cancelled'].includes(collection.status)) {
@@ -304,8 +326,15 @@
       rerender();
       return collection;
     } catch (error) {
-      if (stillCurrent(token) && revision === actionRevision) {
+      if (stillCurrent(token) && revision === actionRevision && collection?.id === jobId) {
         setProblem(error, 'monitor');
+        const delay = monitorRetryDelays[monitorFailures];
+        if (!terminalStatuses.has(collection.status) && retryableMonitorError(error) && delay) {
+          monitorFailures += 1;
+          problem = {...problem, title: 'Checking collection progress', severity: 'status',
+            message: 'FHQ could not read the latest progress. The collection may still be running. This page will check again automatically; you do not need to start another export.'};
+          schedulePoll(token, delay);
+        }
         rerender();
       }
       return null;
@@ -328,6 +357,7 @@
       const payload = await api('sync', 'POST', {mode, ...setup}, token);
       if (!payload || !stillCurrent(token)) return null;
       collection = {...payload.job, ...payload, mode: payload.mode || payload.job?.mode || mode};
+      monitorFailures = 0;
       if (terminalStatuses.has(collection.status)) await refresh();
       else schedulePoll(token);
       return collection;

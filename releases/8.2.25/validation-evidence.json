@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.25",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "eaFocusedTests": {
+      "passed": true,
+      "tests": 89
+    },
+    "browserFixtures": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "actualEaRenderer": true,
+      "automaticProgressRecovery": true,
+      "failedAndBusyStatesDistinct": true,
+      "writes": 0,
+      "pageErrors": 0,
+      "horizontalOverflow": false
+    },
+    "automatedTests": {
+      "passed": true,
+      "tests": 677,
+      "initialStrictRun": {
+        "passed": 675,
+        "failed": 2,
+        "reason": "Two release-marker assertions still expected 8.2.24."
+      },
+      "releaseAssertionsUpdated": true,
+      "affectedFilesRerun": {
+        "tests": 10,
+        "passed": 10
+      },
+      "productCodeUnchangedAfterStrictRun": true,
+      "finalFullCiRequired": true
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "liveCollectionExecuted": false,
+    "liveDiscordMessagesSent": false,
+    "workerChangeRequired": false,
+    "databaseChangeRequired": false
+  }
+}

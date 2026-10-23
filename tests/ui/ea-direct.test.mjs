@@ -81,7 +81,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 for (const [status,code,title,action] of [
   [401,'HTTP_401','Sign back into FHQ','sign-in'],
   [403,'HTTP_403','Commissioner access required',null],
-  [0,'NETWORK_ERROR','Collection status is unavailable','check-collection'],
+  [0,'NETWORK_ERROR','Checking collection progress','check-collection'],
   [409,'EA_RECONNECT_REQUIRED','Reconnect your EA account','begin']
 ]) test(`collection monitoring preserves ${code} and its distinct recovery action`,async()=>{
   const ui=harness();
@@ -97,6 +97,90 @@ for (const [status,code,title,action] of [
   assert.equal(ui.requests.filter(r=>r.options.method==='POST').length,0);
   ui.respond(async()=>({id:'job-1',mode:'weekly',status:'running'}));
   if(action==='check-collection'){ui.click({eaAction:action});await settle();assert.doesNotMatch(ui.markup(),/ea-direct-recovery/);}
+});
+
+async function runningCollection(ui) {
+  ui.respond(async path => path.endsWith('/connection') ? connected({previewVerified:true})
+    : {job:{id:'job-recovery',mode:'weekly',status:'running',code:null}});
+  await ui.service.refresh();
+}
+
+async function nextPoll(ui) {
+  assert.equal(ui.timers.size,1,'one progress check should be scheduled');
+  const [id,timer]=[...ui.timers][0];
+  ui.timers.delete(id);
+  await timer.fn();
+  return timer.delay;
+}
+
+test('interrupted progress checks recover automatically to the completed export without writes',async()=>{
+  const ui=harness();await runningCollection(ui);
+  ui.respond(async()=>{throw Object.assign(new Error('network interrupted'),{code:'NETWORK_ERROR',status:0});});
+  await nextPoll(ui);
+  assert.match(ui.markup(),/Checking collection progress/);
+  assert.match(ui.markup(),/role="status"><h4>Checking collection progress/);
+  assert.match(ui.markup(),/automatically/);
+  ui.respond(async path=>path.endsWith('/connection')?connected({previewVerified:true}):{job:{id:'job-recovery',mode:'weekly',status:'completed',code:null,readyToImport:true}});
+  assert.equal(await nextPoll(ui),5000);
+  assert.match(ui.markup(),/EA export complete/);
+  assert.doesNotMatch(ui.markup(),/ea-direct-recovery/);
+  assert.equal(ui.timers.size,0);
+  assert.ok(ui.requests.every(r=>r.options.method==='GET'));
+  assert.equal(ui.effects().published,0);
+});
+
+test('progress checks back off and stop after five retries; manual checking resumes safely',async()=>{
+  const ui=harness();await runningCollection(ui);
+  ui.respond(async()=>{throw Object.assign(new Error('unavailable'),{code:'HTTP_503',status:503});});
+  for(const delay of [3000,5000,10000,20000,30000,30000]) assert.equal(await nextPoll(ui),delay);
+  assert.equal(ui.timers.size,0);
+  assert.match(ui.markup(),/Collection status is unavailable/);
+  assert.doesNotMatch(ui.markup(),/Checking collection progress/);
+  ui.respond(async()=>({job:{id:'job-recovery',mode:'weekly',status:'running',code:null}}));
+  ui.click({eaAction:'check-collection'});await settle();
+  assert.equal(ui.timers.size,1);
+  assert.doesNotMatch(ui.markup(),/ea-direct-recovery/);
+  ui.respond(async()=>{throw Object.assign(new Error('timeout'),{code:'REQUEST_TIMEOUT'});});
+  await nextPoll(ui);
+  assert.equal([...ui.timers.values()][0].delay,5000,'success resets the backoff');
+  assert.ok(ui.requests.every(r=>r.options.method==='GET'));
+});
+
+for(const [status,code] of [[401,'HTTP_401'],[403,'HTTP_403'],[404,'HTTP_404'],[409,'EA_RECONNECT_REQUIRED'],[0,'REQUEST_CANCELLED']])
+test(`progress checks do not automatically retry ${code}`,async()=>{
+  const ui=harness();await runningCollection(ui);
+  ui.respond(async()=>{throw Object.assign(new Error('blocked'),{status,code});});
+  await nextPoll(ui);assert.equal(ui.timers.size,0);
+  assert.doesNotMatch(ui.markup(),/Checking collection progress/);
+});
+
+test('progress retry is cancelled when the league or authentication changes',async()=>{
+  for(const reset of [ui=>ui.switchLeague('beta'),ui=>ui.changeAuth()]){
+    const ui=harness();await runningCollection(ui);
+    let reject;ui.respond(()=>new Promise((_resolve,fail)=>{reject=fail}));
+    const pending=ui.service.pollCollection();
+    reset(ui);reject(Object.assign(new Error('network interrupted'),{code:'NETWORK_ERROR'}));
+    await pending;assert.equal([...ui.timers.values()].filter(t=>t.delay>=3000).length,0);assert.doesNotMatch(ui.markup(),/Checking collection progress/);
+  }
+});
+
+for(const code of ['EA_TEMPORARILY_UNAVAILABLE','EA_CONNECTION_FAILED','EA_TIMEOUT','EA_REQUEST_FAILED'])
+test(`running ${code} reports a retry and clears on success`,async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'job-recovery',mode:'weekly',status:'running',code}});
+  await ui.service.refresh();
+  assert.match(ui.markup(),/Collection is retrying this step/);
+  assert.match(ui.markup(),/role="status"><h4>Collection is retrying/);
+  assert.doesNotMatch(ui.markup(),/EA is temporarily unavailable|data-ea-action="retry-collection"/);
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'job-recovery',mode:'weekly',status:'completed',code:null,readyToImport:true}});
+  await nextPoll(ui);assert.match(ui.markup(),/EA export complete/);assert.doesNotMatch(ui.markup(),/ea-direct-recovery/);
+});
+
+for(const [code,title] of [['COLLECTION_BUSY','Collection already in progress'],['SETUP_BUSY','EA sign-in already in progress'],['WORKER_UNAVAILABLE','FHQ cannot start the EA collector']])
+test(`${code} does not report an EA outage`,async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'job-recovery',mode:'weekly',status:'failed',code}});
+  await ui.service.refresh();assert.match(ui.markup(),new RegExp(title));assert.doesNotMatch(ui.markup(),/EA is temporarily unavailable|EA Direct service is unavailable/);
 });
 
 test('terminal EA auth error remains actionable after connection refresh and reconnect is one click',async()=>{
