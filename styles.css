@@ -2614,6 +2614,7 @@ table td{
 .value-card-close {
   top: 9px;
   margin-top: 9px;
+  z-index: 9;
 }
 @media (max-width: 620px) {
   .value-card-context {

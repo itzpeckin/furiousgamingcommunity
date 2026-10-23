@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.24",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "demoAccess": {
+      "passed": true,
+      "tests": 8
+    },
+    "browserFixtures": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "actualPlatformRenderer": true,
+      "publicPlayerAndTeamDeepLinks": true,
+      "allCommissionerTabs": true,
+      "mutatingBrowserRequests": 0,
+      "pageErrors": 0,
+      "failedLocalRequests": 0
+    },
+    "automatedTests": {
+      "passed": true,
+      "tests": 661,
+      "finalFocusedTests": 37
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "liveDiscordMessagesSent": false,
+    "workerChangeRequired": false,
+    "publicDemoTenantProvisioningRequired": true,
+    "stagingDemoTenantProvisioned": true
+  }
+}

@@ -4,6 +4,7 @@ import { isOwnerFallbackHost } from "../_lib/origin.js";
 import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
 import { resolveTenant } from "../_lib/tenant-context.js";
 import { leagueJoinPage } from '../_lib/league-join-page.js';
+import { isPublicDemoTenant,publicDemoTenant } from '../_lib/public-demo.js';
 
 const RELEASE='8.0.3';
 
@@ -43,12 +44,17 @@ async function fetchRootAsset(context,request,relativePath){
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
-async function fetchSpaShell(context,request,session=null){
+async function fetchSpaShell(context,request,session=null,publicDemo=false){
   const response=await fetchStatic(context,request,'/index.html');
   let html=await response.text();
   // Force the legacy SPA's relative CSS/JS/image URLs to resolve from the
   // deployment root even while the browser remains at /leagues/{slug}.
   if(!/<base\s/i.test(html)) html=html.replace(/<head([^>]*)>/i,'<head$1><base href="/">');
+  if(publicDemo){
+    html=html.replace(/<title>[^<]*<\/title>/i,'<title>FHQ Demo League | FranchiseHQ</title>');
+    const bootstrap=JSON.stringify({id:publicDemo.id,slug:publicDemo.slug,tenant:publicDemo}).replace(/</g,'\\u003c');
+    html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_DEMO__=${bootstrap};</script><script src="/assets/demo-league.js?v=8.2.24"></script><link rel="stylesheet" href="/assets/demo-league.css?v=8.2.24"></head>`);
+  }
   if(session){
     const bootstrap=JSON.stringify({
       authenticated:true,
@@ -113,6 +119,7 @@ export async function onRequest(context){
   const requestedSlug=decodeURIComponent(parts[0]||'');
   const league=await resolveTenant(context.env,requestedSlug);
   if(!league)return new Response('League not found.',{status:404,headers:{'cache-control':'no-store'}});
+  if(isPublicDemoTenant(league))return fetchSpaShell(context,request,null,publicDemoTenant(league));
 
   if(isOwnerFallbackHost(new URL(request.url).hostname))return renderAuthenticationBridge(league,request);
 

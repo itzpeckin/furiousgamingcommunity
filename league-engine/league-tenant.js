@@ -132,6 +132,12 @@
   async function hydrateRouteLeague() {
     const routeSlug=resolveRouteSlug();
     if(!routeSlug)return current();
+    // The public demo document already resolves this exact tenant on the server.
+    // Install it synchronously so startup reads never race a placeholder tenant.
+    const demo=window.__FHQ_PUBLIC_DEMO__;
+    if(routeSlug==='demo'&&demo?.id==='league_fhq_public_demo'&&demo?.slug===routeSlug&&demo.tenant?.id===demo.id&&demo.tenant?.slug===routeSlug){
+      return register({...demo.tenant,serverResolved:true});
+    }
     try {
       const response=await fetch(`/api/leagues/${encodeURIComponent(routeSlug)}`,{credentials:'same-origin',cache:'no-store'});
       const payload=await response.json().catch(()=>null);
