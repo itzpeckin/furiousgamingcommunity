@@ -31,9 +31,10 @@ test('anonymous readers get only demo data and no account or commissioner capabi
   const page=await(await publicDemoResponse(context('/api/leagues/demo/snapshot/read-model?domain=players&limit=500'))).json();assert.equal(page.records.length,500);assert.equal(page.nextCursor,'500');assert.ok(page.records.every(p=>p.id.startsWith('demo-')));
   const next=await(await publicDemoResponse(context('/api/leagues/demo/snapshot/read-model?domain=players&cursor=500'))).json();assert.notEqual(page.records[0].id,next.records[0].id);
   const hq=await(await publicDemoResponse(context('/api/leagues/demo/commissioner-hq'))).json();assert.equal(hq.memberships.total,32);assert.equal(hq.readOnly,true);
+  const roster=await(await publicDemoResponse(context('/api/leagues/demo/roster-management?type=player&team=dal'))).json();assert.equal(roster.items.length,53);assert.ok(roster.items.every(p=>p.teamKey==='dal'));assert.equal(roster.readOnly,true);
 });
 test('demo mutation and operational routes are denied before any database or external effects',async()=>{
-  for(const method of ['POST','PUT','PATCH','DELETE'])for(const resource of ['memberships','trade-center','discord','companion/candidate-import','ea-direct/connection','rules']){
+  for(const method of ['POST','PUT','PATCH','DELETE'])for(const resource of ['memberships','trade-center','discord','companion/candidate-import','ea-direct/connection','rules','roster-management']){
     const c=context('/api/leagues/demo/'+resource,method);const response=await publicDemoResponse(c);assert.equal(response.status,403);assert.equal(c.queries.length,0);
   }
   for(const resource of ['discord/connect','ea-direct/login','companion/export/private-key','companion/import-job?jobId=customer-job'])assert.equal((await publicDemoResponse(context('/api/leagues/demo/'+resource))).status,403);

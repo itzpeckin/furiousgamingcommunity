@@ -21,7 +21,7 @@
     'open-player-card','roster-player-detail','player-card-tab','canonical-player-tab','player-stat-tab','player-career-stat-tab','player-back',
     'player-search','player-position','player-team','player-status','player-dev','player-rookie','player-free-agents','player-min-ovr','player-max-ovr','player-min-age','player-max-age','player-sort','player-page','player-page-size','player-clear-filters',
     'roster-group','roster-position','roster-dev','roster-sort','cap-position','cap-sort','sort-col','sort-table','depth-chart-view','depth-player-id',
-    'home-leader-metric','player-stat-phase','player-game-log-season','retry-player-career','previous-game-id','game-center-switch','matchup-previous','recap-format','copy-transaction-link',
+    'home-leader-metric','player-stat-phase','player-game-log-season','retry-player-career','previous-game-id','game-center-switch','matchup-previous','recap-format','copy-transaction-link','loadout-search','loadout-position','loadout-category',
     'standings-view','stats-category','stats-scope','stats-week','stats-team','stats-min-games','live-stats-sort','stats-team-category','season-team-sort',
     'schedule-team','live-schedule-phase','live-schedule-week','schedule-section','game-center-tab','matchup-tab','game-id','news-category','news-id','activity-filter',
     'confidence-week-change','confidence-standings-view','confidence-standings-week','transaction-search','transaction-type','transaction-team','transaction-season',
@@ -33,7 +33,7 @@
       const href=element.getAttribute('href');
       if(href.startsWith('#'))return !/^#(?:trade-center\/new|trade-center\/create)/.test(href);
       const url=new URL(href,location.href);
-      return url.origin===location.origin && (['/','/beta-apply','/auth','/leagues'].includes(url.pathname)||url.pathname.startsWith('/leagues/demo'));
+      return url.origin===location.origin && (['/','/beta-apply','/auth','/leagues'].includes(url.pathname)||/^\/support(?:\/|$)/.test(url.pathname)||url.pathname.startsWith('/leagues/demo'));
     }
     return [...element.attributes].some(attr=>attr.name.startsWith('data-')&&browsing.has(attr.name.slice(5)));
   }
