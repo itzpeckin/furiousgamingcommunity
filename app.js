@@ -988,6 +988,40 @@
   function renderLiveState(title,copy,tone='neutral') {
     pageContent.innerHTML=`<article class="card empty-state"><span class="pill pill--${tone}">${escapeHtml(title)}</span><h2>${escapeHtml(title)}</h2><p>${escapeHtml(copy)}</p></article>`;
   }
+  async function hydrateHomeSecondaryData(service,snapshot) {
+    const leagueSlug=window.FranchiseHQ?.leagueTenant?.getCurrentLeague?.()?.slug||'';
+    const pending={snapshotId:String(snapshot.id),leagueSlug,loading:true,complete:false,statistics:[],players:[]};
+    window.__FHQ_HOME_DEEP_CACHE__=pending;
+    const current=()=>window.__FHQ_HOME_DEEP_CACHE__===pending && leagueSlug===(window.FranchiseHQ?.leagueTenant?.getCurrentLeague?.()?.slug||'');
+    await new Promise(resolve=>setTimeout(resolve,0));
+    try {
+      for(let attempt=0;attempt<3;attempt++) {
+        try {
+          const [statistics,players]=await Promise.all([service.getStatistics(),service.getPlayers()]);
+          if(!current())return;
+          Object.assign(pending,{loading:false,complete:true,statistics:Array.isArray(statistics)?statistics:[],players:Array.isArray(players)?players:[]});
+          if(routeBase(currentAppRoute())==='home')renderLeagueHomeLive();
+          return;
+        } catch(error) {
+          if(!current())return;
+          if(error.code!=='LIVE_READ_SUPERSEDED'||attempt===2)throw error;
+          // Startup tenant resolution can replace an in-flight read. Wait for
+          // that refresh, then retry only this same tenant's current snapshot.
+          const latest=await service.getSnapshot();
+          if(!current())return;
+          if(String(latest?.id||'')!==pending.snapshotId) {
+            window.__FHQ_HOME_DEEP_CACHE__=null;
+            if(routeBase(currentAppRoute())==='home')renderLeagueHomeLive();
+            return;
+          }
+        }
+      }
+    } catch(error) {
+      if(!current())return;
+      Object.assign(pending,{loading:false,complete:false});
+      console.warn('[Home Secondary Data]',error);
+    }
+  }
   async function renderLeagueHomeLive() {
     const service=liveReadModel();
     if(!service){renderLiveState('League data unavailable','The canonical league service has not loaded.','warning');return;}
@@ -1003,7 +1037,7 @@
 
       const [stateValue,snapshot,teamRows,standingRows,gameRows,gameSummary]=criticalPayload;
       const deepCache=window.__FHQ_HOME_DEEP_CACHE__;
-      const sameDeepSnapshot=deepCache&&String(deepCache.snapshotId||'')===String(snapshot?.id||'');
+      const sameDeepSnapshot=deepCache&&deepCache.leagueSlug===(window.FranchiseHQ?.leagueTenant?.getCurrentLeague?.()?.slug||'')&&String(deepCache.snapshotId||'')===String(snapshot?.id||'');
       const statRows=sameDeepSnapshot&&Array.isArray(deepCache.statistics)?deepCache.statistics:[];
       const playerRows=sameDeepSnapshot&&Array.isArray(deepCache.players)?deepCache.players:[];
       pageContent.removeAttribute('aria-busy');
@@ -1059,7 +1093,7 @@
 
       const officialFeaturedGameId=officialGotwId(currentWeek);
       const hasOfficialFeaturedGame=availableGames.some(game=>String(game.id)===String(officialFeaturedGameId));
-      if(hasOfficialFeaturedGame){
+      if(hasOfficialFeaturedGame&&!availableGames.some(game=>String(game.id)===String(state.featuredGameId))){
         state.featuredGameId=officialFeaturedGameId;
       }else if(!state.featuredGameId||!availableGames.some(game=>String(game.id)===String(state.featuredGameId))){
         state.featuredGameId=[...availableGames].sort((a,b)=>{
@@ -1101,7 +1135,7 @@
           <div class="league-home-primary">
             <section class="featured-game featured-game--live-gotw card" data-game-id="${escapeHtml(featured.id)}" style="--away:${escapeHtml(away.primary||'#333')};--home:${escapeHtml(home.primary||'#555')};--away-secondary:${escapeHtml(away.secondary||away.primary||'#333')};--home-secondary:${escapeHtml(home.secondary||home.primary||'#555')};background:linear-gradient(135deg, ${escapeHtml(away.primary||'#333')}, ${escapeHtml(away.secondary||away.primary||'#333')}) left / 50% 100% no-repeat, linear-gradient(225deg, ${escapeHtml(home.primary||'#555')}, ${escapeHtml(home.secondary||home.primary||'#555')}) right / 50% 100% no-repeat !important;">
               <div class="featured-game-label">
-                <span>${hasOfficialFeaturedGame?'★ Game of the Week':'Featured Matchup'}</span>
+                <span>${hasOfficialFeaturedGame&&String(featured.id)===String(officialFeaturedGameId)?'★ Game of the Week':'Featured Matchup'}</span>
                 <small>${escapeHtml(canonicalScheduleLabel(featured))} · ${featured.completed?'Final':'Upcoming'}</small>
               </div>
               ${featured.completed?`<div class="featured-final-score" aria-label="Final score"><span>${escapeHtml(away.abbr)} <strong>${featured.awayScore??'—'}</strong></span><b>FINAL</b><span><strong>${featured.homeScore??'—'}</strong> ${escapeHtml(home.abbr)}</span></div>`:''}
@@ -1158,37 +1192,8 @@
 
       // Player cards / stat leaders are secondary content. Hydrate after the
       // League Home shell, schedule, Game of the Week, and standings are visible.
-      if(snapshot?.id && (!sameDeepSnapshot || !deepCache?.complete) && !deepCache?.loading){
-        window.__FHQ_HOME_DEEP_CACHE__={
-          snapshotId:String(snapshot.id),
-          loading:true,
-          complete:false,
-          statistics:statRows,
-          players:playerRows
-        };
-        setTimeout(()=>{
-          Promise.all([service.getStatistics(),service.getPlayers()])
-            .then(([statistics,players])=>{
-              window.__FHQ_HOME_DEEP_CACHE__={
-                snapshotId:String(snapshot.id),
-                loading:false,
-                complete:true,
-                statistics:Array.isArray(statistics)?statistics:[],
-                players:Array.isArray(players)?players:[]
-              };
-              if(routeBase(currentAppRoute())==='home')renderLeagueHomeLive();
-            })
-            .catch(error=>{
-              console.warn('[Home Secondary Data]',error);
-              window.__FHQ_HOME_DEEP_CACHE__={
-                snapshotId:String(snapshot.id),
-                loading:false,
-                complete:false,
-                statistics:[],
-                players:[]
-              };
-            });
-        },0);
+      if(snapshot?.id && (!sameDeepSnapshot || (!deepCache?.complete && !deepCache?.loading))){
+        hydrateHomeSecondaryData(service,snapshot);
       }
     }catch(error){
       console.error('[Home Live Integration]',error);

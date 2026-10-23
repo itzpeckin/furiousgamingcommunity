@@ -113,7 +113,7 @@
     if (domainCache.has(domainKey)) return domainCache.get(domainKey);
 
     const snapshot=await getSnapshot();
-    if(requestedRevision!==revision)throw new Error('Live data changed during loading. Please retry.');
+    if(requestedRevision!==revision)throw Object.assign(new Error('Live data changed during loading. Please retry.'),{code:'LIVE_READ_SUPERSEDED'});
     const persisted=readPersisted(snapshot?.id,domain);
     if(persisted){
       domainCache.set(domainKey,persisted);
@@ -133,7 +133,7 @@
         if(domain==='statistics')params.compact='1';
         if(cursor)params.cursor=cursor;
         const payload=await request(params);
-        if(requestedRevision!==revision)throw new Error('Live data changed during loading. Please retry.');
+        if(requestedRevision!==revision)throw Object.assign(new Error('Live data changed during loading. Please retry.'),{code:'LIVE_READ_SUPERSEDED'});
         records.push(...(payload.records||[]));
         cursor=payload.nextCursor||null;
         guard++;

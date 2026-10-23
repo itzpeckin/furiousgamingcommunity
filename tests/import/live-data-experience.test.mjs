@@ -107,6 +107,47 @@ async function liveCacheFixture(){
   return {service,events,stored,setSnapshot:value=>{snapshot=value;},delay:value=>{delayed=value;},changeTenant:value=>{slug=value;listeners.get('franchisehq:league-tenant-changed')();}};
 }
 
+async function homeSecondaryFixture(){
+  const app=await readFile(new URL('../../app.js',import.meta.url),'utf8');
+  let slug='league-a',renders=0;
+  const context={window:{FranchiseHQ:{leagueTenant:{getCurrentLeague:()=>({slug})}}},setTimeout,console:{warn(){}},
+    routeBase:route=>route,currentAppRoute:()=> 'home',renderLeagueHomeLive:()=>{renders++;}};
+  runInNewContext(app.slice(app.indexOf('  async function hydrateHomeSecondaryData('),app.indexOf('  async function renderLeagueHomeLive(')),context);
+  return {context,load:context.hydrateHomeSecondaryData,setSlug:value=>{slug=value;},renders:()=>renders};
+}
+
+test('home player sections recover when startup refresh supersedes their first read',async()=>{
+  const f=await homeSecondaryFixture();let reads=0;
+  await f.load({getSnapshot:async()=>({id:'snapshot-a'}),getPlayers:async()=>[{id:'player-a'}],getStatistics:async()=>{
+    if(++reads===1)throw Object.assign(new Error('refresh interrupted read'),{code:'LIVE_READ_SUPERSEDED'});
+    return [{yards:245}];
+  }},{id:'snapshot-a'});
+  assert.equal(reads,2);assert.equal(f.context.window.__FHQ_HOME_DEEP_CACHE__.complete,true);
+  assert.equal(f.context.window.__FHQ_HOME_DEEP_CACHE__.statistics[0].yards,245);assert.equal(f.renders(),1);
+});
+
+test('late home reads cannot replace a newer tenant or snapshot cache',async()=>{
+  const f=await homeSecondaryFixture();let release;
+  const late=f.load({getPlayers:async()=>[],getStatistics:()=>new Promise(resolve=>{release=resolve;})},{id:'snapshot-a'});
+  await new Promise(resolve=>setTimeout(resolve,10));
+  f.setSlug('league-b');
+  await f.load({getPlayers:async()=>[{id:'player-b'}],getStatistics:async()=>[{yards:310}]},{id:'snapshot-b'});
+  release([{yards:1}]);await late;
+  assert.equal(f.context.window.__FHQ_HOME_DEEP_CACHE__.snapshotId,'snapshot-b');
+  assert.equal(f.context.window.__FHQ_HOME_DEEP_CACHE__.statistics[0].yards,310);assert.equal(f.renders(),1);
+});
+
+test('home retries are bounded and real read failures are not silently retried',async()=>{
+  for(const code of ['LIVE_READ_SUPERSEDED','NETWORK_FAILURE']){
+    const f=await homeSecondaryFixture();let reads=0;
+    await f.load({getSnapshot:async()=>({id:'snapshot-a'}),getPlayers:async()=>[],getStatistics:async()=>{
+      reads++;throw Object.assign(new Error('read failed'),{code});
+    }},{id:'snapshot-a'});
+    assert.equal(reads,code==='LIVE_READ_SUPERSEDED'?3:1);assert.equal(f.context.window.__FHQ_HOME_DEEP_CACHE__.loading,false);
+    assert.equal(f.context.window.__FHQ_HOME_DEEP_CACHE__.complete,false);assert.equal(f.renders(),0);
+  }
+});
+
 test('active snapshot refresh replaces cached statistics and rejects an older pending read',async()=>{
   const f=await liveCacheFixture();
   await f.service.refresh();
