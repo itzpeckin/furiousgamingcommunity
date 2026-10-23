@@ -17,7 +17,7 @@
     },
     "demoAccess": {
       "passed": true,
-      "tests": 7
+      "tests": 8
     },
     "browserFixtures": {
       "passed": true,
@@ -34,7 +34,8 @@
     },
     "automatedTests": {
       "passed": true,
-      "tests": 661
+      "tests": 661,
+      "finalFocusedTests": 37
     }
   },
   "scopeBoundaries": {

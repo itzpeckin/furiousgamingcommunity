@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,readdir} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
+import {runInNewContext} from 'node:vm';
 import {buildDemoLeagueData,DEMO_ID} from '../../functions/_lib/demo-league-data.js';
 import {publicDemoResponse,isPublicDemoTenant} from '../../functions/_lib/public-demo.js';
 import {onRequest as leaguePage} from '../../functions/leagues/[[path]].js';
@@ -32,6 +33,21 @@ test('anonymous readers get only demo data and no account or commissioner capabi
   const next=await(await publicDemoResponse(context('/api/leagues/demo/snapshot/read-model?domain=players&cursor=500'))).json();assert.notEqual(page.records[0].id,next.records[0].id);
   const hq=await(await publicDemoResponse(context('/api/leagues/demo/commissioner-hq'))).json();assert.equal(hq.memberships.total,32);assert.equal(hq.readOnly,true);
   const roster=await(await publicDemoResponse(context('/api/leagues/demo/roster-management?type=player&team=dal'))).json();assert.equal(roster.items.length,53);assert.ok(roster.items.every(p=>p.teamKey==='dal'));assert.equal(roster.readOnly,true);
+});
+
+test('server-resolved demo tenant is ready before startup reads and never bootstraps a customer route',async()=>{
+  const script=await readFile(new URL('../../league-engine/league-tenant.js',import.meta.url),'utf8');
+  for(const slug of ['demo','customer']){
+    let service,requests=0;
+    const context={console,structuredClone,location:{pathname:'/leagues/'+slug},localStorage:{getItem:()=>null,setItem(){}},
+      CustomEvent:class{constructor(type){this.type=type;}},fetch:async()=>{requests++;return{ok:false,status:401,json:async()=>({})};},
+      window:{__FHQ_PUBLIC_DEMO__:{id:DEMO_ID,slug:'demo',tenant:{id:DEMO_ID,slug:'demo',name:'FHQ Demo League'}},dispatchEvent(){},
+        FranchiseHQ:{defineModuleService(_module,_name,value){service=value;}}}};
+    runInNewContext(script,context);
+    assert.equal(service.current().slug,slug);
+    assert.equal(service.current().serverResolved,slug==='demo');
+    assert.equal(requests,slug==='demo'?0:1);
+  }
 });
 test('demo mutation and operational routes are denied before any database or external effects',async()=>{
   for(const method of ['POST','PUT','PATCH','DELETE'])for(const resource of ['memberships','trade-center','discord','companion/candidate-import','ea-direct/connection','rules','roster-management']){

@@ -57,6 +57,11 @@ cachedModel={raw,teams,players,games,domains,counts,snapshot,summary,features,pu
 return cachedModel;
 }
 
+export function publicDemoTenant(tenant){
+  const {features,counts,snapshot}=demoModel();
+  return {...DEMO_LEAGUE,status:'enabled',branding:tenant.branding,features:Object.fromEntries(features.map(f=>[f.featureKey,f])),domains:[],dataState:'live',counts,activeSnapshot:snapshot,publicDemo:true,canonicalPath:'/leagues/demo'};
+}
+
 function response(payload,status=200,method='GET'){
   return new Response(method==='HEAD'?null:JSON.stringify(payload),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-fhq-public-demo':DEMO_REVISION}});
 }
@@ -81,7 +86,7 @@ export async function publicDemoResponse(c){
   const {raw,teams,players,games,domains,counts,snapshot,summary,features,publicTeams,settings,gameplayRules,rules,posts,picks,workflows,transactions}=demoModel();
   const {resource,url}=route;let payload=null;
   if(resource==='auth')payload={ok:true,authenticated:false,publicDemo:true,readOnly:true,user:null,membership:null,capabilities:[]};
-  else if(!resource)payload={ok:true,publicDemo:true,tenant:{...DEMO_LEAGUE,status:'enabled',branding:tenant.branding,features:Object.fromEntries(features.map(f=>[f.featureKey,f])),domains:[],dataState:'live',counts,activeSnapshot:snapshot,publicDemo:true,canonicalPath:'/leagues/demo'},isolation:{leagueId:DEMO_ID,sharedSnapshot:false,sharedPlayerPool:false}};
+  else if(!resource)payload={ok:true,publicDemo:true,tenant:publicDemoTenant(tenant),isolation:{leagueId:DEMO_ID,sharedSnapshot:false,sharedPlayerPool:false}};
   else if(resource==='snapshot/read-model'){
     const domain=url.searchParams.get('domain'),records=Object.hasOwn(domains,domain)?domains[domain]:null;
     if(records){

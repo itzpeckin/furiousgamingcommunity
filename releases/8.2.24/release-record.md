@@ -14,7 +14,7 @@ No publication blocker is currently known. This is an immutable fictional season
 
 ## Validation evidence
 
-661 automated tests passed, including public access, exact platform-shell rendering, tenant isolation, denied mutations, safe provisioning and beta-application regression coverage. Home secondary data now recovers from superseded startup reads with bounded retries, and late tenant responses cannot replace a newer cache. Selecting another home matchup is respected while preserving the official Game of the Week label. Desktop and phone browser acceptance and hosted preview checks are recorded with release evidence before publication.
+661 automated tests and 37 final focused checks passed, including public access, exact platform-shell rendering, tenant isolation, denied mutations, safe provisioning and beta-application regression coverage. The server-resolved demo tenant is supplied with the normal league document so fresh visits and deep links do not race placeholder resolution. Home secondary data recovers from superseded startup reads with bounded retries, and late tenant responses cannot replace a newer cache. Selecting another home matchup is respected while preserving the official Game of the Week label. Desktop and phone browser acceptance and hosted preview checks are recorded with release evidence before publication.
 
 ## Deployment status
 

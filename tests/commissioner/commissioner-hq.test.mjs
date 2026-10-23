@@ -431,7 +431,7 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.match(styles,/@media\(max-width:700px\)[^{]*\{[^}]*\.commissioner-operations-health/s);
   assert.match(app,/function applyLeagueFeaturePresentation\(\)/);
   assert.match(app,/const officialFeaturedGameId=officialGotwId\(currentWeek\)/);
-  assert.match(app,/hasOfficialFeaturedGame\?'★ Game of the Week':'Featured Matchup'/);
+  assert.match(app,/hasOfficialFeaturedGame&&String\(featured.id\)===String\(officialFeaturedGameId\)\?'★ Game of the Week':'Featured Matchup'/);
   const compactImporter=importer.slice(importer.indexOf('function renderCompactPanel'),importer.indexOf('function renderPanel'));
   assert.match(compactImporter,/class="commissioner-import-glance"/);
   assert.match(compactImporter,/View latest import details/);
