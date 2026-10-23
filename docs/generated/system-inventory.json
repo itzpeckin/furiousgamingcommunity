@@ -13,6 +13,7 @@
   "environmentBindings": {
     "ACCOUNT_EMAIL": [
       "functions/_lib/account-actions.js",
+      "functions/_lib/beta-applications.js",
       "functions/api/auth/account.js",
       "functions/api/health.js"
     ],
@@ -261,15 +262,15 @@
   "files": {
     "byExtension": {
       ".bin": 1,
-      ".css": 15,
+      ".css": 16,
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 315,
+      ".js": 321,
       ".json": 8,
       ".jsonc": 4,
       ".md": 287,
-      ".mjs": 76,
+      ".mjs": 77,
       ".png": 7,
       ".sql": 58,
       ".txt": 3,
@@ -359,7 +360,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       }
     ],
-    "total": 867
+    "total": 875
   },
   "frontend": {
     "assets": [
@@ -879,7 +880,7 @@
     "stylesheetCount": 4
   },
   "functions": {
-    "routeCount": 101,
+    "routeCount": 104,
     "routes": [
       {
         "file": "functions/index.js",
@@ -1604,6 +1605,20 @@
         "route": "/auth"
       },
       {
+        "file": "functions/beta-apply.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/beta-apply"
+      },
+      {
+        "file": "functions/demo.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/demo"
+      },
+      {
         "file": "functions/leagues/index.js",
         "handlers": [
           "onRequestGet"
@@ -1623,6 +1638,13 @@
           "onRequest"
         ],
         "route": "/platform-admin/*path"
+      },
+      {
+        "file": "functions/platform/applications.js",
+        "handlers": [
+          "onRequestGet"
+        ],
+        "route": "/platform/applications"
       },
       {
         "file": "functions/platform/invitations.js",
@@ -1975,7 +1997,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.22",
+  "release": "8.2.23",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

@@ -56,7 +56,7 @@ export function normalizeLeagueReturnTo(value) {
 
 export function normalizeAccountReturnTo(value) {
   const raw = String(value || '');
-  if (['/account','/register-league','/leagues'].includes(raw)) return raw;
+  if (['/account','/register-league','/beta-apply','/platform/applications','/leagues'].includes(raw)) return raw;
   return normalizeLeagueReturnTo(raw);
 }
 

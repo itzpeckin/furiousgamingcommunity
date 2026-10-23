@@ -38,6 +38,7 @@ function page(session, section) {
   <header class="admin-topbar">
     <a class="admin-brand" href="/platform-admin" aria-label="FranchiseHQ Platform Admin">FRANCHISE<span>HQ</span><small>Platform Admin</small></a>
     <nav class="admin-topnav" aria-label="Platform administration">
+      <a href="/platform/applications">Beta Applications</a>
       <a href="/platform-admin" ${section === 'overview' ? 'aria-current="page"' : ''}>Leagues</a>
       <a href="/platform-admin/diagnostics" ${section === 'diagnostics' ? 'aria-current="page"' : ''}>Advanced Diagnostics</a>
     </nav>

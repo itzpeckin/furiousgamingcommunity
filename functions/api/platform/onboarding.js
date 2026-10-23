@@ -2,6 +2,7 @@ import { jsonResponse } from '../../_lib/auth.js';
 import { requireDatabaseSchema } from '../../_lib/database-schema.js';
 import { requirePlatformOwner } from '../../_lib/permissions.js';
 import { tenantDatabase } from '../../_lib/tenant-context.js';
+import { notifyBetaApplication } from '../../_lib/beta-applications.js';
 import {
   PLATFORM_ONBOARDING_RELEASE,
   activatedLeagueStatements,
@@ -198,7 +199,7 @@ async function save(db, actorUserId, operationRequestId, body) {
     normalized.candidate.initialCommissionerUserId,normalized.candidate.sourceMode,
     normalized.candidate.desiredDomain,normalized.candidate.discord.requested ? 1 : 0,
     normalized.candidate.discord.guildId,JSON.stringify(normalized.candidate.branding),
-    JSON.stringify(normalized.candidate.desiredFeatures),JSON.stringify({ activationAvailable:false,limits:normalized.candidate.limits }),normalized.planHash,nextRevision,
+    JSON.stringify(normalized.candidate.desiredFeatures),JSON.stringify({ ...existing.configuration,activationAvailable:false,limits:normalized.candidate.limits }),normalized.planHash,nextRevision,
     actorUserId,existing.id,existing.revision
   ).run();
   if (changed(update) !== 1) {
@@ -384,6 +385,10 @@ export async function onRequestPost(context) {
   catch { return json({ ok:false,error:'A JSON request body is required.' },400); }
   const action = String(body.action || '').trim().toLowerCase();
   try {
+    if (action === 'retry-application-alert') {
+      await notifyBetaApplication(operation.db,context.env,String(body.planId || ''));
+      return json({ok:true});
+    }
     if (action === 'preview') return preview(operation.db,operation.actorUserId,body);
     if (action === 'save') return save(operation.db,operation.actorUserId,operation.requestId,body);
     if (action === 'prepare' || action === 'resume') return prepare(operation.db,operation.actorUserId,operation.requestId,body);

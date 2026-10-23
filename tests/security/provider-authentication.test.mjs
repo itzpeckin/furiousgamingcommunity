@@ -14,10 +14,97 @@ import mailWorker from '../../workers/account-email/index.mjs';
 import { finishDiscordLink } from '../../functions/_lib/account-discord-link.js';
 import { onRequestPost as login } from '../../functions/api/auth/email/login.js';
 import { onRequestGet as listRegistrations, onRequestPost as registerLeague } from '../../functions/api/onboarding.js';
+import { onRequestPost as reviewApplication } from '../../functions/api/platform/onboarding.js';
+import { notifyBetaApplication } from '../../functions/_lib/beta-applications.js';
+import { normalizeAccountReturnTo } from '../../functions/_lib/origin.js';
 
 const firstCredential='test-only registration credential 2028';
 const ownerCredential='test-only owner credential 2028';
 const wrongCredential='test-only incorrect credential 2028';
+
+test('beta applications require verification, cannot self-activate even with an invitation, and notify once',async()=>{
+  const {sqlite,db}=await database();
+  try {
+    const registered=await register(context(db,'https://franchisehq.app/api/auth/email/register',{displayName:'Beta Applicant',email:'applicant@example.com',password:firstCredential}));
+    const cookie=sessionCookie(registered),userId=(await registered.json()).user.id;
+    const body={action:'apply',plan:{name:'Applicant League',slug:'applicant-league',gameYear:2027,franchiseSeasonYear:2028,configuration:{betaApplicationRequired:false},initialCommissionerUserId:'forged-owner'}};
+    assert.equal((await registerLeague(context(db,'https://franchisehq.app/api/onboarding',body,cookie))).status,403);
+    sqlite.prepare('UPDATE user_auth_identities SET email_verified=1 WHERE user_id=?').run(userId);
+    let sends=0;
+    const current=context(db,'https://franchisehq.app/api/onboarding',body,cookie);
+    current.env.ACCOUNT_EMAIL={fetch:async request=>{const data=await request.json();assert.equal(data.purpose,'beta-application');sends++;return new Response(null,{status:204});}};
+    const response=await registerLeague(current);assert.equal(response.status,201);
+    const result=await response.json();assert.equal(result.pendingApproval,true);assert.equal(result.plan.leagueUrl,null);assert.equal(result.plan.initialCommissionerUserId,userId);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM leagues').get().n,0);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM league_memberships').get().n,0);
+    const invitation=await createBetaInvitation(db,userId,'Direct invitation');await claimBetaInvitation(db,userId,invitation.invitePath.split('invite=')[1]);
+    for(const action of ['resume','submit']){
+      const attempt=context(db,'https://franchisehq.app/api/onboarding',{...body,action,planId:result.plan.id},cookie);attempt.env.ACCOUNT_EMAIL=current.env.ACCOUNT_EMAIL;
+      const replay=await(await registerLeague(attempt)).json();assert.equal(replay.pendingApproval,true);assert.equal(replay.plan.activatedAt,null);
+    }
+    await notifyBetaApplication(db,current.env,result.plan.id);assert.equal(sends,1);
+    const denied=await reviewApplication(context(db,'https://franchisehq.app/api/platform/onboarding',{action:'activate',planId:result.plan.id,expectedRevision:1},cookie));assert.equal(denied.status,404);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM platform_league_activations').get().n,0);
+  }finally{sqlite.close();}
+});
+
+test('owner alone can prepare and approve a beta application; failed email can retry without another plan',async()=>{
+  const {sqlite,db}=await database();
+  try{
+    const registered=await register(context(db,'https://franchisehq.app/api/auth/email/register',{displayName:'Applicant',email:'approval@example.com',password:firstCredential}));
+    const cookie=sessionCookie(registered),userId=(await registered.json()).user.id;
+    sqlite.prepare('UPDATE user_auth_identities SET email_verified=1 WHERE user_id=?').run(userId);
+    const response=await registerLeague(context(db,'https://franchisehq.app/api/onboarding',{action:'apply',plan:{name:'Approval League',slug:'approval-league',gameYear:2027,franchiseSeasonYear:2028}},cookie));
+    let plan=(await response.json()).plan;assert.equal(plan.configuration.applicationAlert.state,'failed');
+    let sends=0;await notifyBetaApplication(db,{ACCOUNT_EMAIL:{fetch:async()=>{sends++;return new Response(null,{status:204});}}},plan.id);assert.equal(sends,1);
+    const ownerAccount=await register(context(db,'https://franchisehq.app/api/auth/email/register',{displayName:'Platform Owner',email:'fixture-owner@example.com',password:ownerCredential}));
+    const ownerCookie=sessionCookie(ownerAccount),ownerId=(await ownerAccount.json()).user.id;
+    sqlite.prepare("UPDATE users SET discord_user_id='100000000000000001' WHERE id=?").run(ownerId);
+    sqlite.prepare("INSERT INTO leagues(id,name,slug,tenant_status,public_status) VALUES('owner-league','Owner League','owner-league','enabled','active')").run();
+    sqlite.prepare("INSERT INTO league_memberships(id,league_id,user_id,role,active) VALUES('owner-membership','owner-league',?,'commissioner',1)").run(ownerId);
+    const identity=sqlite.prepare('SELECT discord_user_id FROM users WHERE id=?').get(ownerId);
+    const ownerRequest=body=>{const value=context(db,'https://franchisehq.app/api/platform/onboarding',body,ownerCookie);value.env.OWNER_FALLBACK_DISCORD_ID=identity.discord_user_id;return value;};
+    const prepared=await reviewApplication(ownerRequest({action:'prepare',planId:plan.id,expectedRevision:plan.revision}));assert.equal(prepared.status,200);plan=(await prepared.json()).plan;
+    assert.equal(sqlite.prepare('SELECT tenant_status FROM leagues WHERE id=?').get(plan.plannedLeagueId).tenant_status,'disabled');
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM league_memberships WHERE user_id=?').get(userId).n,0);
+    const approved=await reviewApplication(ownerRequest({action:'activate',planId:plan.id,expectedRevision:plan.revision}));assert.equal(approved.status,200);assert.ok((await approved.json()).plan.activatedAt);
+    assert.equal(sqlite.prepare('SELECT tenant_status FROM leagues WHERE id=?').get(plan.plannedLeagueId).tenant_status,'enabled');
+    const resumed=await(await registerLeague(context(db,'https://franchisehq.app/api/onboarding',{action:'resume',planId:plan.id},cookie))).json();assert.equal(resumed.plan.leagueUrl,'/leagues/approval-league');
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM platform_league_activations WHERE plan_id=?').get(plan.id).n,1);
+  }finally{sqlite.close();}
+});
+
+test('concurrent beta submissions enforce the pending limit at insertion and declined applications cannot resume',async()=>{
+  const {sqlite,db}=await database();
+  try {
+    const registered=await register(context(db,'https://franchisehq.app/api/auth/email/register',{displayName:'Limit Applicant',email:'limit@example.com',password:firstCredential}));
+    const cookie=sessionCookie(registered),userId=(await registered.json()).user.id;
+    sqlite.prepare('UPDATE user_auth_identities SET email_verified=1 WHERE user_id=?').run(userId);
+    const apply=slug=>registerLeague(context(db,'https://franchisehq.app/api/onboarding',{action:'apply',plan:{name:slug,slug,gameYear:2027,franchiseSeasonYear:2028}},cookie));
+    for(const slug of ['first-pending','second-pending'])assert.equal((await apply(slug)).status,201);
+    const originalBatch=db.batch;
+    db.batch=async statements=>{
+      db.batch=originalBatch;
+      assert.equal((await apply('concurrent-third')).status,201);
+      return originalBatch(statements);
+    };
+    const blocked=await apply('would-be-fourth');assert.equal(blocked.status,409);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM platform_league_onboarding_plans').get().n,3);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM leagues').get().n,0);
+    const plan=sqlite.prepare("SELECT id FROM platform_league_onboarding_plans WHERE slug='first-pending'").get();
+    sqlite.prepare("UPDATE platform_league_onboarding_plans SET status='cancelled' WHERE id=?").run(plan.id);
+    const resumed=await registerLeague(context(db,'https://franchisehq.app/api/onboarding',{action:'resume',planId:plan.id},cookie));
+    assert.equal(resumed.status,409);assert.match((await resumed.json()).error,/declined/);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM platform_league_activations').get().n,0);
+  } finally {sqlite.close();}
+});
+
+test('beta alert has a fixed recipient and safe review destination; account redirects allow only exact application path',async()=>{
+  let email;
+  const response=await mailWorker.fetch(new Request('https://account-email/send',{method:'POST',body:JSON.stringify({purpose:'beta-application',planId:'onboarding_12345678-1234-1234-1234-123456789abc',name:'<img src=x>',applicant:'<b>Applicant</b>',email:'attacker@example.com'})}),{EMAIL:{send:async message=>{email=message;}}});
+  assert.equal(response.status,204);assert.equal(email.to,'justinrmandaro@gmail.com');assert.ok(email.html.includes('&lt;img'));assert.ok(!email.html.includes('<img'));assert.match(email.text,/https:\/\/franchisehq.app\/platform\/applications#/);
+  assert.equal(normalizeAccountReturnTo('/beta-apply'),'/beta-apply');assert.equal(normalizeAccountReturnTo('//attacker.example/beta-apply'),null);assert.equal(normalizeAccountReturnTo('/beta-apply?redirect=https://attacker.example'),null);
+});
 
 function d1(sqlite) {
   return {

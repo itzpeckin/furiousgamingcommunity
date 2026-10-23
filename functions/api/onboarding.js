@@ -4,6 +4,7 @@ import { requireAuthenticatedUser } from '../_lib/permissions.js';
 import { tenantDatabase } from '../_lib/tenant-context.js';
 import { accountReadiness,availableBetaInvitation } from '../_lib/beta-access.js';
 import { leagueReadiness } from '../_lib/league-readiness.js';
+import { notifyBetaApplication } from '../_lib/beta-applications.js';
 import {
   DEFAULT_ONBOARDING_FEATURES,
   DEFAULT_ONBOARDING_LIMITS,
@@ -40,7 +41,7 @@ async function contextForUser(context) {
   try { await requireDatabaseSchema(db); }
   catch { return { response:json({ ok:false,error:'League registration is temporarily unavailable.' },503) }; }
   return {
-    db,userId:String(authorization.session.user.id),session:authorization.session,
+    db,env:context.env,userId:String(authorization.session.user.id),session:authorization.session,
     requestId:requestId(context)
   };
 }
@@ -127,7 +128,7 @@ async function prepareOwned(db,userId,operationRequestId,plan) {
   return { ok:true,plan:await loadOnboardingPlan(db,plan.id) };
 }
 
-async function submit(operation,body) {
+async function submit(operation,body,application = false) {
   const candidate = selfServiceCandidate(body,operation.userId);
   const validation = validateOnboardingInput(candidate);
   if (!validation.ok) return json({ ok:false,error:'The league registration needs attention.',errors:validation.errors },422);
@@ -139,7 +140,7 @@ async function submit(operation,body) {
     .bind(candidate.slug,operation.userId,operation.userId).first();
   if (replay) return finishRegistration(operation,await loadOnboardingPlan(operation.db,replay.id));
   const invitation = await availableBetaInvitation(operation.db,operation.userId);
-  if (!invitation) return json({ ok:false,error:'An invitation is required to create a league during the beta.',code:'BETA_INVITATION_REQUIRED' },403);
+  if (!application && !invitation) return json({ ok:false,error:'An invitation is required to create a league during the beta.',code:'BETA_INVITATION_REQUIRED' },403);
   const open = await operation.db.prepare(`SELECT COUNT(*) count FROM platform_league_onboarding_plans
     WHERE created_by_user_id=? AND activated_at IS NULL AND status<>'cancelled'`).bind(operation.userId).first();
   if (Number(open?.count || 0) >= 3) {
@@ -158,17 +159,19 @@ async function submit(operation,body) {
          discord_guild_id,branding_json,desired_features_json,configuration_json,
          plan_hash,status,revision,created_by_user_id,updated_by_user_id)
         SELECT ?,?,?,?,?,?,?,?,? ,NULL,0,NULL,?,?,?,?,'draft',1,?,?
-        WHERE EXISTS (SELECT 1 FROM platform_beta_invitations WHERE id=? AND claimed_by_user_id=?
-          AND plan_id IS NULL AND revoked_at IS NULL AND datetime(expires_at)>CURRENT_TIMESTAMP)`).bind(
+        WHERE (?=1 OR EXISTS (SELECT 1 FROM platform_beta_invitations WHERE id=? AND claimed_by_user_id=?
+          AND plan_id IS NULL AND revoked_at IS NULL AND datetime(expires_at)>CURRENT_TIMESTAMP))
+          AND (SELECT COUNT(*) FROM platform_league_onboarding_plans WHERE created_by_user_id=?
+            AND activated_at IS NULL AND status<>'cancelled')<3`).bind(
         id,plannedLeagueId,candidate.slug,candidate.name,candidate.productName,
         candidate.timezone,candidate.gameYear,operation.userId,candidate.sourceMode,
         JSON.stringify(candidate.branding),JSON.stringify(candidate.desiredFeatures),
-        JSON.stringify({ betaInvitationRequired:true,franchiseSeasonYear:candidate.franchiseSeasonYear,
+        JSON.stringify({ betaInvitationRequired:!application,betaApplicationRequired:application,franchiseSeasonYear:candidate.franchiseSeasonYear,
           preferredExportMethod:candidate.preferredExportMethod,limits:candidate.limits }),
-        planHash,operation.userId,operation.userId,invitation.id,operation.userId
+        planHash,operation.userId,operation.userId,application ? 1 : 0,application ? null : invitation.id,operation.userId,operation.userId
       ),
       operation.db.prepare(`UPDATE platform_beta_invitations SET plan_id=? WHERE id=? AND plan_id IS NULL`)
-        .bind(id,invitation.id),
+        .bind(id,application ? null : invitation.id),
       onboardingEventStatement(operation.db,{
         planId:id,actorUserId:operation.userId,action:'self-service.plan.created',
         toStatus:'draft',revision:1,requestId:operation.requestId,
@@ -176,6 +179,13 @@ async function submit(operation,body) {
       })
     ]);
   } catch (error) {
+    const concurrent = await operation.db.prepare(`SELECT id FROM platform_league_onboarding_plans
+      WHERE slug=? AND created_by_user_id=? AND initial_commissioner_user_id=?`)
+      .bind(candidate.slug,operation.userId,operation.userId).first();
+    if (concurrent) return finishRegistration(operation,await loadOnboardingPlan(operation.db,concurrent.id));
+    const pending = await operation.db.prepare(`SELECT COUNT(*) count FROM platform_league_onboarding_plans
+      WHERE created_by_user_id=? AND activated_at IS NULL AND status<>'cancelled'`).bind(operation.userId).first();
+    if (Number(pending?.count || 0)>=3) return json({ok:false,error:'This account already has three league registrations awaiting review.'},409);
     if (String(error?.message || '').includes('UNIQUE constraint')) {
       return json({ ok:false,error:'That league URL is already reserved.' },409);
     }
@@ -185,6 +195,12 @@ async function submit(operation,body) {
 }
 
 async function finishRegistration(operation,original,created = false) {
+  if (original?.configuration?.betaApplicationRequired && !original.activatedAt) {
+    if (original.status === 'cancelled') return json({ok:false,error:'This application was declined. Contact FranchiseHQ if you have questions.'},409);
+    await notifyBetaApplication(operation.db,operation.env,original.id);
+    const plan = await loadOnboardingPlan(operation.db,original.id);
+    return json({ok:true,created,pendingApproval:true,plan:{...plan,leagueUrl:null,readiness:await readiness(operation.db,plan)}},created ? 201 : 200);
+  }
   const preparation = await prepareOwned(operation.db,operation.userId,operation.requestId,original);
   if (!preparation.ok) return json(preparation,preparation.status || 409);
   let plan = preparation.plan;
@@ -232,11 +248,12 @@ export async function onRequestPost(context) {
   catch { return json({ ok:false,error:'A valid league registration form is required.' },400); }
   const action = String(body?.action || 'submit').toLowerCase();
   try {
-    if (action === 'submit') return submit(operation,body);
+    if (action === 'submit') return await submit(operation,body);
+    if (action === 'apply') return await submit(operation,body,true);
     if (action === 'resume') {
       const plan = await ownedPlan(operation.db,operation.userId,body.planId);
       if (!plan) return json({ ok:false,error:'League registration not found.' },404);
-      return finishRegistration(operation,plan);
+      return await finishRegistration(operation,plan);
     }
     return json({ ok:false,error:'Unsupported league registration action.' },400);
   } catch (error) {
