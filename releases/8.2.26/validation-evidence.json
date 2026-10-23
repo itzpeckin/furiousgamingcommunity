@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.26",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "eaFocusedTests": {
+      "passed": true,
+      "tests": 100
+    },
+    "browserFixtures": {
+      "passed": true,
+      "actualModules": [
+        "ea-direct",
+        "permanent-export-url",
+        "one-click-import"
+      ],
+      "containerWidths": [
+        900,
+        358
+      ],
+      "viewportEmulation": false,
+      "automaticCompletion": true,
+      "previousLiveSourceReplaced": true,
+      "failedReadinessRecovered": true,
+      "completionRetained": true,
+      "cardOverflow": false,
+      "writes": 0,
+      "pageErrors": 0
+    },
+    "automatedTests": {
+      "passed": true,
+      "tests": 681,
+      "strictGate": true
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "liveCollectionExecuted": false,
+    "liveDiscordMessagesSent": false,
+    "separateWorkerChangeRequired": false,
+    "databaseMigrationRequired": false
+  }
+}

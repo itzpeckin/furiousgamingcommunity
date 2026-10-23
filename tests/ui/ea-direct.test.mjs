@@ -294,7 +294,7 @@ test('weekly collection requires verification; yearly setup can verify a new con
   assert.match(ui.service.renderPanel(), /data-ea-collect="weekly"/);
 });
 
-test('collected EA data directs the commissioner to Refresh and Import without a redundant collection card', async () => {
+test('collected EA data refreshes import controls and keeps a persistent completion action without publishing', async () => {
   const ui = harness();
   ui.respond(async (path, options) => path.endsWith('/connection') ? connected({previewVerified: true})
     : options.method === 'POST' ? {ok: true, id: 'collection-1', status: 'running'}
@@ -302,10 +302,67 @@ test('collected EA data directs the commissioner to Refresh and Import without a
   await ui.service.refresh();
   await ui.service.collect('weekly');
   await ui.service.pollCollection();
-  assert.deepEqual(ui.effects(), {refreshed: 0, published: 0, scrolled: 0});
-  assert.match(ui.service.renderPanel(), /Use Refresh below, then Import Latest Export/);
+  assert.deepEqual(ui.effects(), {refreshed: 1, published: 0, scrolled: 0});
+  assert.match(ui.service.renderPanel(), /EA export complete/);
+  assert.match(ui.service.renderPanel(), /Continue to Import/);
+  assert.ok(ui.service.renderPanel().indexOf('ea-direct-complete') < ui.service.renderPanel().indexOf('2</span> Import season'));
   assert.doesNotMatch(ui.service.renderPanel(), /League data collection|Continue to Step 2|data-ea-action="review-import"/);
-  assert.deepEqual(ui.effects(), {refreshed: 0, published: 0, scrolled: 0});
+  await ui.service.refresh();
+  assert.deepEqual(ui.effects(), {refreshed: 1, published: 0, scrolled: 0});
+  ui.click({eaAction:'continue-import'});await settle();
+  assert.deepEqual(ui.effects(), {refreshed: 2, published: 0, scrolled: 1});
+});
+
+test('opening a completed weekly export refreshes readiness; failures retain completion and allow manual recovery',async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'finished',mode:'weekly',status:'completed',readyToImport:true,completedAt:'2026-10-23T16:10:18Z',coverage:{collectedDatasets:52}}});
+  ui.hq.oneClickImport.refreshWorkspace=async()=>{throw Error('Readiness unavailable');};
+  await ui.service.refresh();
+  assert.match(ui.markup(),/52 datasets collected/);
+  assert.match(ui.markup(),/Your export is saved/);
+  assert.doesNotMatch(ui.markup(),/Collection status is unavailable|Collection stopped/);
+  ui.hq.oneClickImport.refreshWorkspace=async()=>{};
+  ui.click({eaAction:'continue-import'});await settle();
+  assert.doesNotMatch(ui.markup(),/Your export is saved/);
+  assert.equal(ui.effects().scrolled,1);
+  assert.ok(ui.requests.every(r=>r.options.method==='GET'));
+});
+
+test('old-league completion refresh cannot install a failure or scroll the next league',async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{id:'finished',mode:'weekly',status:'completed',readyToImport:true}});
+  let reject;ui.hq.oneClickImport.refreshWorkspace=()=>new Promise((_r,no)=>{reject=no;});
+  const pending=ui.service.refresh();await settle();
+  ui.switchLeague('beta');reject(Error('Old league unavailable'));await pending;
+  assert.doesNotMatch(ui.markup(),/EA export complete|Your export is saved/);
+  assert.equal(ui.effects().scrolled,0);
+});
+
+test('actual EA, export URL and import services replace the previous live export with the newly collected source',async()=>{
+  const requests=[],events=new Map();let completed=false;
+  const HQ={leagueTenant:{getCurrentLeague:()=>({slug:'alpha'})},manifest:{register(){}},defineModuleService(_scope,name,value){this[name]=value;}};
+  const request=async(url,options={})=>{
+    requests.push({url,method:options.method||'GET'});
+    assert.equal(options.method||'GET','GET','handoff must never publish or collect');
+    if(url.endsWith('/connection'))return connected({previewVerified:true});
+    if(url.includes('/ea-direct/sync'))return {job:{id:'new-job',mode:'weekly',status:completed?'completed':'running',readyToImport:completed}};
+    if(url.endsWith('/export-url'))return {leagueSlug:'alpha',latestExport:{status:'ready',sessionId:completed?'new-session':'old-session',importLive:!completed},endpoint:{}};
+    if(url.endsWith('/yearly-schedule'))return {};
+    if(url.endsWith('/candidate-import'))return {source:{discoverySessionId:completed?'new-session':'old-session'},run:completed?null:{activationPerformed:true}};
+    assert.fail(url);
+  };
+  HQ.api={request};
+  const window={FranchiseHQ:HQ,addEventListener(name,fn){events.set(name,[...(events.get(name)||[]),fn]);},dispatchEvent(event){for(const fn of events.get(event.type)||[])fn(event);}};
+  const runtime=vm.createContext({window,console,URL,AbortController,Date,CustomEvent:class{constructor(type){this.type=type;}},setTimeout:()=>1,clearTimeout(){},fetch:async(url,options)=>Response.json(await request(url,options)),document:{querySelectorAll:()=>[],querySelector:()=>null,addEventListener(){}}});
+  for(const file of ['permanent-export-url.js','one-click-import.js','ea-direct.js'])vm.runInContext(await readFile(new URL('../../league-engine/'+file,import.meta.url),'utf8'),runtime);
+  await HQ.oneClickImport.refreshWorkspace();await HQ.eaDirect.refresh();
+  assert.match(HQ.oneClickImport.renderCompactPanel(),/disabled>Latest Export Live/);
+  completed=true;await HQ.eaDirect.pollCollection();
+  assert.equal(HQ.oneClickImport.diagnostics().state.source.discoverySessionId,'new-session');
+  assert.equal(HQ.leagueExportUrl.diagnostics().state.latestExport.sessionId,'new-session');
+  assert.match(HQ.oneClickImport.renderCompactPanel(),/data-import-in-place >Import Latest Export/);
+  assert.match(HQ.eaDirect.renderPanel(),/Continue to Import/);
+  assert.ok(requests.every(r=>r.method==='GET'));
 });
 
 test('EA profile and league text is escaped and login links only allow EA HTTPS hosts', async () => {

@@ -19,6 +19,17 @@ function harness(handler){
 }
 const readiness=()=>Response.json({source:{sourceFingerprint:'source-1'},destination:{id:'destination-1'},run:null});
 
+test('readiness failures offer another read, never retrying an import or collecting another export',async()=>{
+  let interrupted=true;
+  const ui=harness(async()=>interrupted?Response.json({ok:false,error:'Service unavailable'},{status:503}):readiness());
+  await assert.rejects(ui.service.refreshWorkspace());
+  assert.equal(ui.service.diagnostics().outcome.button,'refresh');
+  assert.equal(ui.service.diagnostics().outcome.title,'Import readiness could not be checked');
+  interrupted=false;await ui.service.recoverImport('refresh');
+  assert.equal(ui.service.diagnostics().outcome,null);
+  assert.ok(ui.requests.every(r=>r.options.method==='GET'));
+});
+
 test('import progress HTTP 401 keeps sign-in guidance and never retries the export',async()=>{
   const ui=harness(async(url,options)=>url.endsWith('candidate-import')?readiness():options.method==='POST'
     ?Response.json({id:'workflow-1'}):Response.json({ok:false,error:'Session expired'},{status:401}));

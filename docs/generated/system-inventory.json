@@ -344,7 +344,7 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 56880,
+        "bytes": 57268,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -1997,7 +1997,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.25",
+  "release": "8.2.26",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
