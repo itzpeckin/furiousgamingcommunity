@@ -9,6 +9,7 @@ import { readEaBody, fail, eaErrorResponse, safeEaError, connectionScope, jobSco
 // This is a job-scoped server endpoint, not a browser import or general credential proxy.
 export async function onRequestPost(context){
   let job,db,lock;
+  let stage='authorize',previousResult={};
   try{
     db=database(context.env);
     const token=context.request.headers.get('x-franchisehq-ea-collection-token');
@@ -24,6 +25,7 @@ export async function onRequestPost(context){
         AND m.active=1 AND m.role='commissioner' LIMIT 1`)
       .bind(String(body.id||''),league.id,await hashToken(token)).first();
     if(!job)return json({ok:false,error:'Not found.'},404);
+    try{previousResult=JSON.parse(job.result_json||'{}');}catch{}
     if(body.action==='fail'){
       await db.prepare(`UPDATE ea_direct_collection_jobs SET status='failed',message=COALESCE(message,'EA collection could not finish. Retry the collection; live data is unchanged.'),state_cipher=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('queued','running')`).bind(job.id).run();
       return json({ok:true,done:true});
@@ -39,20 +41,26 @@ export async function onRequestPost(context){
     const claimed=await db.prepare(`UPDATE ea_direct_collection_jobs SET status='running',lock_until=? WHERE id=? AND status IN ('queued','running') AND cursor=? AND (lock_until IS NULL OR julianday(lock_until)<julianday('now'))`)
       .bind(lock,job.id,job.cursor).run();
     if(!Number(claimed.meta?.changes))fail('COLLECTION_BUSY','This collection step is still running.',429);
+    stage='load-connection';
     const connection=await db.prepare(`SELECT * FROM ea_direct_connections WHERE id=? AND league_id=? AND status='connected'`).bind(job.connection_id,job.league_id).first();
     if(!connection)fail('EA_RECONNECT_REQUIRED','The EA connection changed. Reconnect and start a new collection.');
     const client=createEaClient(context.env);
+    stage='open-credential';
     let credential=await openEa(context.env,connectionScope(connection),connection.credential_cipher);
     const state=job.state_cipher?await openEa(context.env,jobScope(job),job.state_cipher):{};
     if(Date.parse(credential.expiresAt)-Date.now()<5*60*1000){
+      stage='refresh-credential';
       credential=await client.refresh(credential);
       const updated=await db.prepare(`UPDATE ea_direct_connections SET credential_cipher=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=? AND status='connected'`)
         .bind(await sealEa(context.env,connectionScope(connection),credential),connection.id,league.id).run();
       if(!Number(updated.meta?.changes))fail('EA_RECONNECT_REQUIRED','The EA connection changed.');
       state.session=null;
     }
+    stage='collect-data';
     const result=await runEaCollectionBatch({db,bucket:context.env.COMPANION_EXPORTS,league,connection,job,client,token:credential,state},{batchSize:body.batchSize});
-    const done=Boolean(result.done),summary=result.result||{timing:result.state.timing},cursor=Number(job.cursor)+1;
+    const done=Boolean(result.done),summary={...(result.result||{timing:result.state.timing}),
+      ...(Array.isArray(previousResult.retryHistory)?{retryHistory:previousResult.retryHistory.slice(-8)}:{})},cursor=Number(job.cursor)+1;
+    stage='save-checkpoint';
     const statements=[db.prepare(`UPDATE ea_direct_collection_jobs SET status=?,cursor=?,step=?,progress=?,state_cipher=?,result_json=?,message=?,error_code=NULL,lock_until=NULL,updated_at=CURRENT_TIMESTAMP,completed_at=? WHERE id=? AND league_id=? AND lock_until=? AND status='running'`)
       .bind(done?'completed':'running',cursor,String(result.step||'Collecting EA data').slice(0,120),Math.max(0,Math.min(100,Number(result.progress)||0)),
         done?null:await sealEa(context.env,jobScope(job),result.state),JSON.stringify(summary),summary.message||null,done?new Date().toISOString():null,job.id,league.id,lock)];
@@ -61,6 +69,7 @@ export async function onRequestPost(context){
         AND EXISTS(SELECT 1 FROM ea_direct_collection_jobs WHERE id=? AND status='completed' AND cursor=?)`)
       .bind(['preview','yearly'].includes(job.mode)&&summary.previewVerified?1:0,connection.id,league.id,job.id,cursor));
     await db.batch(statements);
+    stage='publish-schedule';
     if(done)await publishEaSeasonSchedule(context,{db,league,job,result:summary});
     return json({ok:true,done,cursor,progress:result.progress,status:done?'completed':'running'});
   }catch(error){
@@ -69,19 +78,21 @@ export async function onRequestPost(context){
       if(job.mode==='yearly')await db.prepare(`UPDATE ea_direct_collection_jobs SET message=?,error_code=?,updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND league_id=? AND status='completed'`).bind('The schedule was collected but automatic publication could not start. Refresh and select Import Latest Export.','EA_SCHEDULE_IMPORT_FAILED',job.id,job.league_id).run();
       const stopped=['EA_SEASON_MISMATCH','EA_CAPTURE_UNAVAILABLE'].includes(safe.code);
+      // Retain bounded diagnostics after a successful retry. Never retain raw
+      // errors, provider payloads, URLs, headers, or credentials.
+      const retryHistory=[...(Array.isArray(previousResult.retryHistory)?previousResult.retryHistory:[]),{
+        at:new Date().toISOString(),checkpoint:Number(job.cursor),stage,code:safe.code,
+        ...(safe.diagnostic?{provider:safe.diagnostic}:{})
+      }].slice(-8);
+      const retained={...previousResult,retryHistory,
+        ...(error.periodDiagnostic&&safe.code==='EA_CURRENT_PERIOD_UNAVAILABLE'?{periodDiagnostic:error.periodDiagnostic}:{}),
+        ...(error.seasonDiagnostic&&safe.code==='EA_SEASON_MISMATCH'?{seasonDiagnostic:error.seasonDiagnostic}:{})};
       await db.prepare(`UPDATE ea_direct_collection_jobs SET message=?,error_code=?,lock_until=NULL,
+        result_json=?,
         status=CASE WHEN ? THEN 'failed' ELSE status END,state_cipher=CASE WHEN ? THEN NULL ELSE state_cipher END,
         completed_at=CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE completed_at END,updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND league_id=? AND lock_until=? AND status='running'`)
-        .bind(safe.message,safe.code,stopped?1:0,stopped?1:0,stopped?1:0,job.id,job.league_id,lock||'').run();
-      if(error.periodDiagnostic&&safe.code==='EA_CURRENT_PERIOD_UNAVAILABLE'){
-        await db.prepare(`UPDATE ea_direct_collection_jobs SET result_json=? WHERE id=? AND league_id=? AND error_code=?`)
-          .bind(JSON.stringify({periodDiagnostic:error.periodDiagnostic}),job.id,job.league_id,safe.code).run();
-      }
-      if(error.seasonDiagnostic&&safe.code==='EA_SEASON_MISMATCH'){
-        await db.prepare(`UPDATE ea_direct_collection_jobs SET result_json=? WHERE id=? AND league_id=? AND error_code=?`)
-          .bind(JSON.stringify({seasonDiagnostic:error.seasonDiagnostic}),job.id,job.league_id,safe.code).run();
-      }
+        .bind(safe.message,safe.code,JSON.stringify(retained),stopped?1:0,stopped?1:0,stopped?1:0,job.id,job.league_id,lock||'').run();
       if(safe.code==='EA_RECONNECT_REQUIRED')await db.prepare(`UPDATE ea_direct_connections SET status='reconnect-required',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='connected'`).bind(job.connection_id).run();
     }
     return eaErrorResponse(error);

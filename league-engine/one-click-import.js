@@ -3,7 +3,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.2.21';
+  const VERSION = '8.2.26';
   const PHASES = [
     ['analyze-source', 'Analyze Captured Export'],
     ['classify-captures', 'Classify Captures'],
@@ -56,6 +56,9 @@
     if(status===403)return{...shared,title:'Commissioner access required',
       summary:'This account is not allowed to perform this action.',
       action:'Check the selected league. Ask a league owner to verify your role in People & Teams.',button:null};
+    if(phase==='readiness')return{...shared,title:'Import readiness could not be checked',
+      summary:'FHQ could not refresh the import controls. Saved exports and live league data are unchanged.',
+      action:'Select Refresh Export Readiness to check again. You do not need to collect another export.',button:'refresh',label:'Refresh Export Readiness'};
     if(code==='IMPORT_STATUS_UNAVAILABLE'||code==='IMPORT_START_UNCONFIRMED')return{...shared,tone:'warning',
       title:'Import status is unavailable',summary:'FHQ cannot confirm the outcome yet. The background import may still be running.',
       action:'Check import status before retrying. Do not send another export or reconnect EA.',button:'status',label:'Check Import Status'};
@@ -154,12 +157,13 @@
       await Promise.all([refresh(), connectionRefresh || Promise.resolve()]);
       if(requestRevision!==contextRevision)return null;
       lastOutcome=null;
+      renderImportNotification();
       notice = 'Import readiness refreshed.';
       return state;
     } catch (error) {
       if(requestRevision!==contextRevision)return null;
       errorMessage = error.message;
-      lastOutcome = failureGuidance(error,'analyze-source');
+      lastOutcome = failureGuidance(error,'readiness');
       renderImportNotification();
       throw error;
     } finally {

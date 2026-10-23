@@ -297,7 +297,7 @@ test('partial roster indexes cannot masquerade as complete fresh rosters', async
   assert.equal(result.result.datasetWarnings[0].code, 'EA_ROSTER_INDEX_INCOMPLETE');
 });
 
-test('controller persists rotated credentials, renews the session once and ignores stale step replays', async () => {
+test('controller preserves safe bounded retry evidence through credential renewal, replay, recovery and completion', async () => {
   const sqlite = new DatabaseSync(':memory:');
   const originalFetch = globalThis.fetch;
   try {
@@ -329,10 +329,12 @@ test('controller persists rotated credentials, renews the session once and ignor
     const collectionToken = 'ab'.repeat(32);
     sqlite.prepare(`INSERT INTO ea_direct_collection_jobs(id,league_id,connection_id,actor_id,session_id,mode,status,token_hash,expires_at,cursor,state_cipher) VALUES('job-a','league-a','connection-a','actor-a','session-a','preview','running',?,'2099-01-01T00:00:00.000Z',5,?)`).run(await hashToken(collectionToken), await sealEa(environment, jobScope(job), state));
     const requests = [];
+    let failDataset=false;
     globalThis.fetch = async (url, init) => {
       requests.push({ url: new URL(url), ...init });
       if (new URL(url).pathname === '/connect/token') return Response.json({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600 });
       if (new URL(url).pathname === '/wal/authentication/login') return Response.json({ userLoginInfo: { sessionKey: 'new-session', personaDetails: { personaId: 100 } } });
+      if (failDataset) return Response.json({error:'TEMPORARILY_UNAVAILABLE',privateDetail:'must-not-retain-provider-body'}, {status:503});
       assert.match(new URL(url).pathname, /CareerMode_GetLeagueTeamsExport\/new-session$/);
       return Response.json({ success: true, leagueTeamInfoList: [{ teamId: 1, displayName: 'One' }] });
     };
@@ -350,14 +352,32 @@ test('controller persists rotated credentials, renews the session once and ignor
     const stale = await collectStep(context(5));
     assert.equal((await stale.json()).cursor, 6);
     assert.equal(requests.length, 2);
+    failDataset=true;
+    for(let retry=0;retry<9;retry++)assert.equal((await collectStep(context(6))).status,499);
+    saved=sqlite.prepare('SELECT * FROM ea_direct_collection_jobs WHERE id=?').get('job-a');
+    const history=JSON.parse(saved.result_json).retryHistory;
+    assert.equal(history.length,8);
+    assert.ok(history.every(item=>item.stage==='collect-data'&&item.checkpoint===6&&item.provider.httpStatus===503));
+    assert.doesNotMatch(saved.result_json,/must-not-retain|old-refresh|new-refresh|new-access|new-session/);
+    failDataset=false;
     const resumed = await collectStep(context(6));
     assert.equal(resumed.status, 200, await resumed.clone().text());
     saved = sqlite.prepare('SELECT * FROM ea_direct_collection_jobs WHERE id=?').get('job-a');
     assert.equal(saved.cursor, 7);
     assert.equal((await openEa(environment, jobScope(job), saved.state_cipher)).cursor, 2);
-    assert.equal(requests.length, 3);
+    assert.equal(requests.length, 12);
     assert.equal(requests.filter(request => request.url.pathname === '/connect/token').length, 1);
     assert.equal(JSON.parse(requests[1].body).accessToken, 'new-access');
+    assert.deepEqual(JSON.parse(saved.result_json).retryHistory,history);
+    // A retained checkpoint may already contain a completed capture when its
+    // prior database save failed. Its replay must keep the diagnostic history.
+    const doneState={...(await openEa(environment,jobScope(job),saved.state_cipher)),done:true,result:{readyToImport:false,coverage:{collectedDatasets:2}}};
+    sqlite.prepare('UPDATE ea_direct_collection_jobs SET state_cipher=? WHERE id=?').run(await sealEa(environment,jobScope(job),doneState),job.id);
+    assert.equal((await collectStep(context(7))).status,200);
+    saved=sqlite.prepare('SELECT * FROM ea_direct_collection_jobs WHERE id=?').get('job-a');
+    assert.equal(saved.status,'completed');assert.equal(saved.error_code,null);assert.equal(saved.state_cipher,null);
+    assert.deepEqual(JSON.parse(saved.result_json).retryHistory,history);
+    assert.equal(requests.length,12,'replaying the completed capture makes no additional provider calls');
   } finally { globalThis.fetch = originalFetch; sqlite.close(); }
 });
 

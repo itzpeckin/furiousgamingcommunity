@@ -3,7 +3,7 @@
   'use strict';
 
   const HQ = window.FranchiseHQ;
-  const VERSION = '8.2.25';
+  const VERSION = '8.2.26';
   const terminalStatuses = new Set(['complete', 'completed', 'ready', 'failed', 'cancelled']);
   const monitorRetryDelays = [5000, 10000, 20000, 30000, 30000];
   let context = null;
@@ -29,6 +29,9 @@
   let authScope = null;
   let pollTimer = null;
   let monitorFailures = 0;
+  let refreshedExportId = null;
+  let refreshingExportId = null;
+  let exportRefreshFailed = false;
   const controllers = new Set();
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -64,6 +67,9 @@
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     monitorFailures = 0;
+    refreshedExportId = null;
+    refreshingExportId = null;
+    exportRefreshFailed = false;
     state = null;
     collection = null;
     busy = false;
@@ -232,12 +238,40 @@
       }
       errorMessage = ''; problem = null;
       monitorFailures = 0;
+      await refreshCompletedExport(token);
       return state;
     } catch (error) {
       if (stillCurrent(token) && revision === actionRevision) setProblem(error, 'connection');
       return null;
     } finally {
       if (stillCurrent(token) && revision === actionRevision) { loading = false; loaded = true; rerender(); }
+    }
+  }
+
+  const weeklyExportComplete = () => collection?.mode === 'weekly' && collection.readyToImport
+    && ['complete', 'completed', 'ready'].includes(collection.status);
+
+  async function refreshCompletedExport(token = ensureContext(), force = false) {
+    const jobId = collection?.id;
+    const revision = actionRevision;
+    if (!stillCurrent(token) || !weeklyExportComplete() || !HQ.oneClickImport?.refreshWorkspace
+      || refreshingExportId === jobId || (!force && refreshedExportId === jobId)
+      || HQ.oneClickImport.diagnostics?.().busy) return;
+    refreshingExportId = jobId;
+    exportRefreshFailed = false;
+    rerender();
+    try {
+      // Collection only prepares an export. Refresh its read-only import controls;
+      // publishing still requires the commissioner's Import Latest Export action.
+      await HQ.oneClickImport.refreshWorkspace();
+      if (stillCurrent(token) && revision === actionRevision && collection?.id === jobId) refreshedExportId = jobId;
+    } catch (_) {
+      if (stillCurrent(token) && revision === actionRevision && collection?.id === jobId) exportRefreshFailed = true;
+    } finally {
+      if (stillCurrent(token) && revision === actionRevision && collection?.id === jobId) {
+        refreshingExportId = null;
+        rerender();
+      }
     }
   }
 
@@ -365,7 +399,7 @@
       if (stillCurrent(token)) setProblem(error, 'start');
       return null;
     } finally {
-      if (stillCurrent(token)) { busy = false; activeAction = ''; rerender(); }
+      if (stillCurrent(token)) { busy = false; activeAction = ''; await refreshCompletedExport(token); rerender(); }
     }
   }
 
@@ -390,11 +424,18 @@
     if (!collection) return '';
     const finished = terminalStatuses.has(collection.status);
     if (finished && collection.mode === 'yearly' && collection.importWorkflowId && !collection.code) return '<p class="ea-direct-export-complete" role="status">All 18 regular-season weeks collected. Automatic import progress appears below. Preseason games are excluded.</p>';
-    if (finished && collection.readyToImport && collection.mode === 'weekly') return '<p class="ea-direct-export-complete" role="status">EA export complete. Use Refresh below, then Import Latest Export.</p>';
+    if (weeklyExportComplete()) return '';
     const progress = Number(collection.progress?.percent ?? collection.progress);
     const percent = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : null;
     const title = collection.mode === 'preview' ? 'Connection preview' : collection.mode === 'yearly' ? 'Yearly schedule collection' : 'League data collection';
-    return `<section class="ea-direct-collection" aria-label="EA collection status"><div class="ea-direct-collection__heading"><strong>${title}</strong><span>${esc(collection.status || 'Starting')}</span></div><p role="status">${esc(collection.code ? 'See the recovery action below.' : collection.message ? safeMessage(collection.message) : collection.step || (finished ? 'Collection finished.' : 'Collecting data from EA…'))}</p>${!finished && percent !== null ? `<progress max="100" value="${percent}" aria-label="EA collection progress">${percent}%</progress>` : ''}${coverageMarkup(collection.coverage)}<div class="ea-direct-actions">${!finished ? '<button class="button button--ghost" type="button" data-ea-action="check-collection">Check Collection</button>' : ''}${collection.readyToImport && collection.mode !== 'preview' ? '<span>Export complete. Use Refresh below, then Import Latest Export.</span>' : ''}</div></section>`;
+    return `<section class="ea-direct-collection" aria-label="EA collection status"><div class="ea-direct-collection__heading"><strong>${title}</strong><span>${esc(collection.status || 'Starting')}</span></div><p role="status">${esc(collection.code ? 'See the recovery action above.' : collection.message ? safeMessage(collection.message) : collection.step || (finished ? 'Collection finished.' : 'Collecting data from EA…'))}</p>${!finished && percent !== null ? `<progress max="100" value="${percent}" aria-label="EA collection progress">${percent}%</progress>` : ''}${coverageMarkup(collection.coverage)}<div class="ea-direct-actions">${!finished ? '<button class="button button--ghost" type="button" data-ea-action="check-collection">Check Collection</button>' : ''}${collection.readyToImport && collection.mode !== 'preview' ? '<span>Export complete. Use Refresh below, then Import Latest Export.</span>' : ''}</div></section>`;
+  }
+
+  function completionMarkup() {
+    if (!weeklyExportComplete()) return '';
+    const preparing = refreshingExportId === collection.id;
+    const datasets = Number(collection.coverage?.collectedDatasets);
+    return `<section class="ea-direct-complete" aria-label="Completed EA export"><h4 role="status">EA export complete</h4><p>Your league update was collected successfully. You do not need to collect it again.</p>${collection.completedAt ? `<p>Completed: ${esc(date(collection.completedAt))}${Number.isFinite(datasets) && datasets > 0 ? ` · ${datasets} datasets collected` : ''}</p>` : ''}<p>${preparing ? 'Updating import readiness…' : exportRefreshFailed ? 'Your export is saved. Select Continue to Import to check import readiness again.' : 'Continue to the import controls below. Select Import Latest Export to publish the saved update, or review its status if already imported.'}</p><div class="ea-direct-actions"><button type="button" class="button button--primary" data-ea-action="continue-import" ${preparing ? 'disabled' : ''}>${preparing ? 'Updating Import Controls…' : 'Continue to Import'}</button></div><details><summary>Collection details</summary>${coverageMarkup(collection.coverage)}<pre>${esc(supportDetails())}</pre></details></section>`;
   }
 
   function setupMarkup() {
@@ -437,7 +478,7 @@
     return `<section class="card ea-direct-card" data-ea-direct-panel aria-labelledby="ea-direct-title">
       <div class="ea-direct-header"><h3 id="ea-direct-title"><span class="madden-step-number">1</span> Choose export option</h3><span class="pill pill--${connected?'success':'neutral'}">${selectedPath==='companion'?'Companion App':esc(statusLabel)}</span></div>
       <div class="ea-direct-paths" role="group" aria-label="Madden connection method"><button type="button" data-ea-path="ea-direct" aria-pressed="${selectedPath==='ea-direct'}">EA Direct</button><button type="button" data-ea-path="companion" aria-pressed="${selectedPath==='companion'}">Companion App</button></div>
-      <div class="ea-direct-content" aria-busy="${busy||loading}">${connectionMarkup}${selectedPath==='ea-direct'?recoveryMarkup():''}
+      <div class="ea-direct-content" aria-busy="${busy||loading}">${connectionMarkup}${selectedPath==='ea-direct'?recoveryMarkup()+completionMarkup():''}
       <section class="madden-workflow-step"><h3><span class="madden-step-number">2</span> Import season schedule <small>Once per season</small></h3><div class="madden-step-actions">${schedule}</div></section>
       <section class="madden-workflow-step"><h3><span class="madden-step-number">3</span> Collect league data</h3><div class="madden-step-actions">${weekly}</div></section>
       ${selectedPath==='ea-direct'?collectionMarkup():exportService?.renderNotices?.()||''}
@@ -507,6 +548,12 @@
     if (action === 'import-status') {
       HQ.oneClickImport?.refreshWorkspace?.().catch(()=>{});
       document.querySelector?.('[data-compact-import-panel]')?.scrollIntoView?.({block:'start'});
+    }
+    if (action === 'continue-import') {
+      const token = ensureContext();
+      refreshCompletedExport(token, true).then(() => {
+        if (stillCurrent(token)) document.querySelector?.('[data-compact-import-panel]')?.scrollIntoView?.({block:'start'});
+      });
     }
     if (action === 'copy-support') {
       const token = ensureContext();

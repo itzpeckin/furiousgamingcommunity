@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.26",
+  "releaseType": "ea-completed-export-handoff",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "tag": "v8.2.25",
+    "commit": "639102e87c204819602ac699c7d1b007466de6e5"
+  },
+  "implementationBranch": "fix/8.2.26-ea-export-handoff",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "staging": {
+    "authorized": true,
+    "deployed": false
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.25",
+    "candidateRelease": "8.2.26",
+    "currentMigration": 56,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.26/release-record.md",
+    "releases/8.2.26/validation-evidence.json",
+    "releases/8.2.26/recovery-plan.md"
+  ]
+}

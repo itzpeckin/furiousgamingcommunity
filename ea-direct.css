@@ -132,6 +132,11 @@
 .free-package-rule .field{min-width:0}.free-package-rule input,.free-package-rule select{width:100%;min-width:0}
 
 /* Recovery actions stay visible and readable in the unified importer. */
+.ea-direct-complete{border:1px solid var(--border,#334155);border-left:4px solid #4ade80;border-radius:12px;padding:16px;margin:16px 0;background:var(--surface,#131c2b);min-width:0}
+.ea-direct-complete h4{margin:0 0 8px}.ea-direct-complete p{line-height:1.5}
+.ea-direct-complete pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.8rem}
+.ea-direct-complete details{margin-top:12px;min-width:0}
+@media(max-width:600px){.ea-direct-complete .button{width:100%;white-space:normal}}
 .ea-direct-recovery{border:1px solid var(--border,#334155);border-left:4px solid #f59e0b;border-radius:12px;padding:16px;margin:16px 0;background:var(--surface,#131c2b)}
 .ea-direct-recovery[role="status"]{border-left-color:var(--accent,#38bdf8)}
 .ea-direct-recovery h4{margin:0 0 8px}.ea-direct-recovery p{line-height:1.5}
