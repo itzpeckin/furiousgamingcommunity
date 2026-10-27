@@ -703,6 +703,34 @@ test('a terminal archived trade thread is reopened, synchronized, and archived a
   }finally{database.close()}
 });
 
+test('rush and pass audits bridge retained team IDs only through the exact game and season',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    await applyMigrations(database);seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    const snapshotId=seedActiveWeek(database,{leagueId:'league-a',week:7});
+    const add=(domain,id,data)=>seedSnapshotRecord(database,{snapshotId,leagueId:'league-a',domain,externalId:id,data});
+    add('games','rebase-game',{external_id:'rebase-game',stage:'regular-season',week_index:1,season_year:2026,status:'completed',home_score:21,away_score:7,
+      home_team_external_id:'1001',away_team_external_id:'1002',source_record_json:JSON.stringify({scheduleId:'rebase-game',homeTeamId:9001,awayTeamId:9002,weekIndex:0})});
+    for(const [suffix,team] of [['home','9001'],['away','9002']]){
+      for(const category of ['rushing','passing','team-game'])add('statistics',`${category}-${suffix}`,{category,stage:'regular-season',week_index:1,team_external_id:team,
+        source_record_json:JSON.stringify({scheduleId:'rebase-game',weekIndex:0}),metrics_json:JSON.stringify({rushAtt:12,rushYds:60,offRushYds:60,passAtt:18})});
+    }
+    add('statistics','wrong-game',{category:'rushing',stage:'regular-season',week_index:1,team_external_id:'9001',source_record_json:'{"scheduleId":"different-game"}',metrics:{rushAtt:100,rushYds:100}});
+    add('statistics','wrong-season',{category:'rushing',stage:'regular-season',week_index:1,season_year:2025,team_external_id:'9001',source_record_json:'{"scheduleId":"rebase-game"}',metrics:{rushAtt:100,rushYds:100}});
+    const rules=defaultGameplayRules();rules.passing.enabled=true;
+    database.prepare(`INSERT INTO league_settings (league_id,settings_json) VALUES ('league-a',?) ON CONFLICT(league_id) DO UPDATE SET settings_json=excluded.settings_json`).run(JSON.stringify({gameplayRules:rules}));
+    const c={db:d1(database),league:{id:'league-a',name:'Alpha'}};
+    for(const command of [rushRuleCommand,passRuleCommand]){
+      const result=await command(c,{week:1});
+      assert.match(result.embeds[0].description,/0 violations · 0 yard mismatches · 0 unverified/);
+      assert.match(result.embeds[0].footer.text,/2 team results/);
+    }
+    // A conflicting side mapping cannot guess which team a record belongs to.
+    database.prepare(`UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.source_record_json','{"scheduleId":"rebase-game","homeTeamId":9001,"awayTeamId":9001}') WHERE snapshot_id=? AND external_id='rebase-game'`).run(snapshotId);
+    assert.match((await rushRuleCommand(c,{week:1})).embeds[0].description,/2 unverified/);
+  }finally{database.close();}
+});
+
 test('/rush rule defaults to every completed regular-season week and isolates seasons and leagues',async()=>{
   const database=new DatabaseSync(':memory:');
   try{

@@ -322,8 +322,22 @@ async function rushingStatisticsByWeek(c,model,season,kind='rushing'){
     for(const stat of page.records){
       const category=lower(stat.category);
       if(![kind,'team-game'].includes(category)||!sameRegularWeek(stat,stat.week,season))continue;
-      const team=resolveTeam(model.teams,stat.teamId);if(!team)continue;
-      const key=`${number(stat.week)}:${team.teamKey}`;
+      // Retained statistics can predate a Madden team-ID rebase. Resolve only
+      // through the matching game's retained source side, never today's roster.
+      const gameId=clean(stat.source?.gameId||stat.source?.scheduleId),matches=[];
+      for(const game of model.games){
+        if(!gamePlayed(game)||!sameRegularWeek(game,stat.week,season))continue;
+        if(gameId&&![clean(game.id),clean(game.source?.scheduleId)].includes(gameId))continue;
+        for(const side of ['home','away']){
+          const team=resolveTeam(model.teams,game[`${side}TeamId`]);
+          if(!team)continue;
+          const sourceId=game.source?.[side==='home'?'sourceHomeTeamId':'sourceAwayTeamId'];
+          if(clean(stat.teamId)===clean(sourceId)||resolveTeam(model.teams,stat.teamId)?.teamKey===team.teamKey)
+            matches.push({game,team});
+        }
+      }
+      if(matches.length!==1)continue;
+      const {game,team}=matches[0],key=`${game.id}:${team.teamKey}`;
       if(!grouped.has(key))grouped.set(key,{rushing:[],teamRows:[]});
       grouped.get(key)[category===kind?'rushing':'teamRows'].push(stat);
     }
@@ -335,7 +349,7 @@ async function rushingStatisticsByWeek(c,model,season,kind='rushing'){
 function rushingTeamAudit(model,statistics,game,teamId,opponentId,week,rule,kind){
   const team=resolveTeam(model.teams,teamId),opponent=resolveTeam(model.teams,opponentId);
   if(!team)return null;
-  const {rushing=[],teamRows=[]}=statistics.get(`${number(week)}:${team.teamKey}`)||{};
+  const {rushing=[],teamRows=[]}=statistics.get(`${game.id}:${team.teamKey}`)||{};
   const carriesComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.[rule.stat])!==null);
   const playerYardsComplete=rushing.length>0&&rushing.every(stat=>number(stat.metrics?.rushYds)!==null);
   const carries=carriesComplete?rushing.reduce((sum,stat)=>sum+Number(stat.metrics[rule.stat]),0):null;

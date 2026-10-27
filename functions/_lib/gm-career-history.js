@@ -1,4 +1,4 @@
-import { buildGmSeasonSummaries } from './gm-career.js';
+import { buildGmSeasonSummaries, emptySummary } from './gm-career.js';
 import { normalizeLeagueTeam, resolveTeam } from './league-teams.js';
 
 const text=value=>value===null||value===undefined?'':String(value).trim();
@@ -64,7 +64,7 @@ export async function rehydrateFrozenGmSeasonRows(db,{leagueId,teams=[],periods=
     const result=await db.prepare(`SELECT external_id,domain,data_json FROM league_snapshot_records
       WHERE league_id=? AND snapshot_id=? AND domain IN ('games','teams') ORDER BY domain,external_id`).bind(leagueId,group.snapshotId).all();
     const records=result?.results||[];
-    if(!records.length)continue;
+    if(!records.some(row=>!row.domain||row.domain==='games'))continue;
     const retainedTeams=records.filter(row=>row.domain==='teams')
       .map(row=>normalizeLeagueTeam(parse(row.data_json)||{},row.external_id)).filter(team=>team.teamKey&&team.externalId);
     const canonicalTeams=retainedTeams.length?retainedTeams:teams;
@@ -74,7 +74,13 @@ export async function rehydrateFrozenGmSeasonRows(db,{leagueId,teams=[],periods=
     const byIdentity=new Map(built.summaries.map(summary=>[text(summary.gmIdentityId),summary]));
     for(const index of group.indexes){
       const identityId=text(output[index].gm_identity_id??output[index].gmIdentityId);
-      output[index]=correctedRow(output[index],byIdentity.get(identityId));
+      output[index]=correctedRow(output[index],byIdentity.get(identityId)||emptySummary(identityId,group.franchiseSeasonId));
+    }
+    const existing=new Set(group.indexes.map(index=>text(output[index].gm_identity_id)));
+    for(const [identityId,summary] of byIdentity){
+      if(existing.has(identityId))continue;
+      const template=output[group.indexes[0]];
+      output.push(correctedRow({...template,gm_identity_id:identityId},summary));
     }
   }
   return output;

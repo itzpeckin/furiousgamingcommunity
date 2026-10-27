@@ -1,7 +1,7 @@
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
 import { requireActiveMembership, requireCommissioner } from '../../../_lib/permissions.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../_lib/league-teams.js';
-import { buildGmSeasonSummaries, careerTotals } from '../../../_lib/gm-career.js';
+import { buildGmSeasonSummaries, careerTotals, emptySummary } from '../../../_lib/gm-career.js';
 import { loadLeagueGameHistory } from '../../../_lib/gm-matchup-history.js';
 import { rehydrateFrozenGmSeasonRows, snapshotGame } from '../../../_lib/gm-career-history.js';
 import { currentFranchiseContext, ownershipChangeStatements } from '../../../_lib/ownership-periods.js';
@@ -75,7 +75,8 @@ async function leagueCareerResponse(current,teams){
     const ids=new Set([...group.rows.map(row=>text(row.gm_identity_id)),...summaries.keys()]);
     for(const id of ids){
       const rebuilt=summaries.get(id),stored=group.rows.find(row=>text(row.gm_identity_id)===id);
-      const summary=rebuilt?{...rebuilt,seasonYear:group.seasonYear,label:group.label,frozen:true}:publicSeason(stored);
+      const effective=rebuilt||(group.built.hasGames?emptySummary(id,group.franchiseSeasonId):null);
+      const summary=effective?{...effective,seasonYear:group.seasonYear,label:group.label,frozen:true}:publicSeason(stored);
       if(!historyByIdentity.has(id))historyByIdentity.set(id,[]);
       historyByIdentity.get(id).push(summary);
     }
@@ -112,7 +113,8 @@ async function leagueCareerResponse(current,teams){
   return json({
     ok:true,release:RELEASE,state:owners.length?'ready':'empty',view:'league',owners,games:gameHistory,
     coverage:{retainedSeasons:history.seasons.filter(row=>row.built.hasGames).length,totalSeasons:history.seasons.length,includesPreseason:false},
-    reconciliation:{membershipAuthority:true,maddenOwnerNamesUsed:false,crossTenantInference:false},
+    reconciliation:{membershipAuthority:true,maddenOwnerNamesUsed:false,crossTenantInference:false,
+      ambiguousGameSides:history.seasons.reduce((sum,group)=>sum+(group.built.ambiguousGames?.length||0),0)},
     activeSnapshotChanged:false,freeAgentInterpretedAsZero:false
   });
 }
@@ -147,14 +149,14 @@ export async function onRequestGet(context){
       .bind(contextState.franchiseSeasonId||'',current.league.id).first();
     const historyResult=await current.db.prepare(`SELECT summary.*,season.display_name,season.season_year
       FROM gm_season_summaries summary JOIN franchise_seasons season ON season.id=summary.franchise_season_id AND season.league_id=summary.league_id
-      WHERE summary.league_id=? AND summary.gm_identity_id=? AND summary.franchise_season_id<>?
-      ORDER BY season.season_year`).bind(current.league.id,identity.id,contextState.franchiseSeasonId||'').all();
+      WHERE summary.league_id=? AND summary.franchise_season_id<>?
+      ORDER BY season.season_year`).bind(current.league.id,contextState.franchiseSeasonId||'').all();
     const historyRows=await rehydrateFrozenGmSeasonRows(current.db,{
       leagueId:current.league.id,teams,periods:periodResult?.results||[],rows:historyResult?.results||[]
     });
     const teamName=key=>resolveTeam(teams,key)?.displayName||String(key).toUpperCase();
     const liveSeason={...live,seasonYear:Number(activeSeason?.season_year)||contextState.seasonYear,label:activeSeason?.display_name||`Season ${contextState.seasonYear}`,frozen:false};
-    const seasons=[...historyRows.map(publicSeason),liveSeason];
+    const seasons=[...historyRows.filter(row=>row.gm_identity_id===identity.id).map(publicSeason),liveSeason];
     const totals=careerTotals(seasons);
     const relevantAttributions=currentBuilt.attributedGames.filter(row=>row.gmIdentityId===identity.id);
     return json({

@@ -2,6 +2,7 @@ const text = value => value === null || value === undefined ? '' : String(value)
 
 export function canonicalOwnershipStage(value = '', week = null) {
   const stage = text(value).toLowerCase().replaceAll('_','-').replace(/\s+/g,'-');
+  if (stage.includes('offseason') || stage.includes('off-season')) return 'offseason';
   if (stage.includes('pre')) return 'preseason';
   if (stage.includes('play') || stage.includes('post') || stage.includes('wild') || stage.includes('divisional') || stage.includes('champ') || stage.includes('super')) return 'playoffs';
   if (stage.includes('pro')) return 'pro-bowl';
@@ -17,7 +18,7 @@ export function canonicalOwnershipStage(value = '', week = null) {
 
 export function ownershipScopeOrdinal(stage, week) {
   const normalized = canonicalOwnershipStage(stage,week);
-  const base = normalized === 'preseason' ? 0 : normalized === 'regular-season' ? 1000 : normalized === 'playoffs' ? 2000 : 3000;
+  const base = normalized === 'preseason' ? 0 : normalized === 'regular-season' ? 1000 : normalized === 'playoffs' ? 2000 : normalized === 'offseason' ? 5000 : 3000;
   const numeric = Number(week);
   const value = normalized === 'playoffs' && numeric >= 1 && numeric <= 4 ? numeric + 18 : numeric;
   return base + (Number.isFinite(value) ? Math.max(0,value) : 0);
@@ -35,7 +36,7 @@ export function periodOwnsGame(period = {}, game = {}) {
   return gameScope >= start && gameScope < end;
 }
 
-function emptySummary(gmIdentityId, franchiseSeasonId) {
+export function emptySummary(gmIdentityId, franchiseSeasonId) {
   return {
     gmIdentityId,
     franchiseSeasonId,
@@ -51,7 +52,7 @@ function emptySummary(gmIdentityId, franchiseSeasonId) {
   };
 }
 
-function completed(game = {}) {
+export function completedOwnershipGame(game = {}) {
   const status = text(game.status).toLowerCase();
   if (game.homeScore == null || game.awayScore == null || game.homeScore === '' || game.awayScore === '') return false;
   const home = Number(game.homeScore), away = Number(game.awayScore);
@@ -79,6 +80,7 @@ export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeaso
   const relevantPeriods = periods.filter(period => text(period.franchiseSeasonId ?? period.franchise_season_id) === text(franchiseSeasonId));
   const summaries = new Map();
   const attributedGames = [];
+  const ambiguousGames = [];
   const playoffGames = games.filter(game => canonicalOwnershipStage(game.stage,game.week ?? game.weekIndex) === 'playoffs');
   // A partially imported bracket is not a championship. Legacy exports use
   // overall Week 23; current exports use Week 22 (or postseason round 4).
@@ -88,14 +90,19 @@ export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeaso
     return /super.?bowl/i.test(text(game.stage)) || week === 23 || (!legacyFinal && week === 22) || week === 4;
   };
 
-  const periodFor = (teamKey, game) => relevantPeriods
-    .filter(period => text(period.teamKey ?? period.team_key).toLowerCase() === text(teamKey).toLowerCase() && periodOwnsGame(period,{...game,franchiseSeasonId}))
-    .sort((a,b) => ownershipScopeOrdinal(b.startedStage ?? b.started_stage,b.startedWeek ?? b.started_week)-ownershipScopeOrdinal(a.startedStage ?? a.started_stage,a.startedWeek ?? a.started_week))[0] || null;
+  const periodFor = (teamKey, game) => {
+    const matches=relevantPeriods.filter(period => text(period.teamKey ?? period.team_key).toLowerCase() === text(teamKey).toLowerCase() && periodOwnsGame(period,{...game,franchiseSeasonId}));
+    if(new Set(matches.map(period=>text(period.gmIdentityId ?? period.gm_identity_id))).size>1){
+      ambiguousGames.push({gameId:text(game.id ?? game.externalId),teamKey});
+      return null;
+    }
+    return matches[0]||null;
+  };
 
   for (const game of games) {
     const stage = canonicalOwnershipStage(game.stage,game.week ?? game.weekIndex);
-    if (stage === 'preseason' || stage === 'pro-bowl') continue;
-    const scoreCompleted=completed(game);
+    if (stage === 'preseason' || stage === 'pro-bowl' || stage === 'offseason') continue;
+    const scoreCompleted=completedOwnershipGame(game);
     const advancedSide=!scoreCompleted&&stage==='playoffs'?bracketAdvancedSide(game,games):null;
     for (const side of ['home','away']) {
       const teamKey = gameTeamKey(game,side);
@@ -139,7 +146,7 @@ export function buildGmSeasonSummaries({games = [], periods = [], franchiseSeaso
   }
 
   for (const summary of summaries.values()) summary.teams.sort();
-  return {summaries:[...summaries.values()],attributedGames};
+  return {summaries:[...summaries.values()],attributedGames,ambiguousGames};
 }
 
 export function careerTotals(seasonSummaries = []) {
