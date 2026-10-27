@@ -173,6 +173,7 @@ export function normalizeGame(raw = {}) {
     gameId:id, scheduleId:text(raw.source_game_external_id ?? raw.scheduleId ?? raw.sourceGameExternalId), seasonYear:season, stage, stageName:stage,
     stageIndex:numeric(raw.stageIndex), weekIndex:week,
     homeTeamId, awayTeamId, homeScore, awayScore, status, scheduledAt,
+    sourceHomeTeamId:text(raw.homeTeamId),sourceAwayTeamId:text(raw.awayTeamId),
     routePath,
     stadiumName:text(raw.stadiumName ?? raw.stadium),
     network:text(raw.network ?? raw.broadcastNetwork),

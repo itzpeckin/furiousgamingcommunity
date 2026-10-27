@@ -10,12 +10,78 @@ import { buildSeasonGameHistory } from '../../functions/_lib/gm-matchup-history.
 import { onRequestGet as readCareers } from '../../functions/api/leagues/[leagueSlug]/ownership-career.js';
 import { createHistoryFixture } from '../fixtures/gm-history.mjs';
 import vm from 'node:vm';
+import { ownershipChangeStatements, currentFranchiseContext } from '../../functions/_lib/ownership-periods.js';
 
 const season='season-2026';
 const periods=[
   {gmIdentityId:'gm-justin',teamKey:'tb',franchiseSeasonId:season,startedStage:'preseason',startedWeek:1,endedStage:null,endedWeek:null},
   {gmIdentityId:'gm-gas',teamKey:'gb',franchiseSeasonId:season,startedStage:'preseason',startedWeek:1,endedStage:null,endedWeek:null}
 ];
+
+test('real ownership writes preserve completed handoff-week results and close deactivated membership',async()=>{
+  const f=await createHistoryFixture();
+  try{
+    // The outgoing owner has already played Week 2 before the website handoff.
+    f.sqlite.exec(`DELETE FROM team_ownership_periods WHERE id='new-c';
+      UPDATE team_ownership_periods SET ended_at=NULL,ended_stage=NULL,ended_week=NULL WHERE id='new-a';
+      UPDATE league_memberships SET team_id='tb' WHERE id='member-a'`);
+    const removal=await ownershipChangeStatements(f.db,{leagueId:'alpha',userId:'a',nextTeamKey:null,expectedMembershipActive:0});
+    await f.db.batch([f.db.prepare(`UPDATE league_memberships SET active=0 WHERE id='member-a'`),...removal.statements]);
+    const ended=f.sqlite.prepare(`SELECT ended_at,ended_week FROM team_ownership_periods WHERE id='new-a'`).get();
+    assert.ok(ended.ended_at);assert.equal(ended.ended_week,3);
+    f.sqlite.exec(`INSERT INTO league_memberships (id,league_id,user_id,role,team_id,active) VALUES ('member-c','alpha','c','team_owner',NULL,1)`);
+    const incoming=await ownershipChangeStatements(f.db,{leagueId:'alpha',userId:'c',nextTeamKey:'tb'});
+    await f.db.batch([f.db.prepare(`UPDATE league_memberships SET team_id='tb' WHERE id='member-c'`),...incoming.statements]);
+    const start=f.sqlite.prepare(`SELECT started_stage,started_week FROM team_ownership_periods WHERE gm_identity_id='identity-c' AND ended_at IS NULL`).get();
+    assert.equal(start.started_stage,'regular-season');assert.equal(start.started_week,3);
+    const payload=await (await readCareers({...f.context(),request:new Request(f.context().request.url,{headers:{}})})).json();
+    assert.equal(payload.ok,false,'deactivated membership cannot read history');
+  }finally{f.sqlite.close();}
+});
+
+test('new midseason GM starts at unplayed current week; offseason stays after postseason',async()=>{
+  const f=await createHistoryFixture();
+  try{
+    f.sqlite.exec(`DELETE FROM team_ownership_periods WHERE id='new-c';
+      UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.status','scheduled','$.home_score',0,'$.away_score',0) WHERE snapshot_id='snap-new' AND external_id='reg2';
+      INSERT INTO league_memberships (id,league_id,user_id,role,team_id,active) VALUES ('member-c','alpha','c','team_owner','tb',1)`);
+    const plan=await ownershipChangeStatements(f.db,{leagueId:'alpha',userId:'c',nextTeamKey:'tb'});
+    await f.db.batch(plan.statements);
+    assert.equal(f.sqlite.prepare(`SELECT started_week FROM team_ownership_periods WHERE gm_identity_id='identity-c'`).get().started_week,2);
+    f.sqlite.exec(`UPDATE league_snapshots SET week_index=2,manifest_json='{"currentPeriod":{"stage":"offseason","week":2,"key":"offseason:2"}}' WHERE id='snap-new'`);
+    assert.equal((await currentFranchiseContext(f.db,'alpha')).stage,'offseason');
+    assert.equal(canonicalOwnershipStage('off-season',2),'offseason');
+    const former={gmIdentityId:'former',teamKey:'tb',franchiseSeasonId:season,startedStage:'preseason',startedWeek:1,endedStage:'offseason',endedWeek:2};
+    const replacement={...former,gmIdentityId:'replacement',startedStage:'offseason',startedWeek:2,endedStage:null};
+    const game={id:'final',franchiseSeasonId:season,stage:'regular-season',week:20,status:'completed',homeTeamKey:'tb',awayTeamKey:'gb',homeScore:22,awayScore:45};
+    const built=buildGmSeasonSummaries({games:[game],periods:[former,replacement],franchiseSeasonId:season});
+    assert.equal(built.attributedGames[0].gmIdentityId,'former');assert.equal(built.summaries.length,1);
+  }finally{f.sqlite.close();}
+});
+
+test('overlapping GM periods cannot arbitrarily assign results by row order',()=>{
+  const overlap=[periods[0],{...periods[0],gmIdentityId:'replacement'}];
+  const game={id:'g',stage:'regular-season',week:1,status:'completed',homeTeamKey:'tb',awayTeamKey:'gb',homeScore:21,awayScore:7};
+  for(const order of [overlap,[...overlap].reverse()]){
+    const built=buildGmSeasonSummaries({games:[game],periods:order,franchiseSeasonId:season});
+    assert.equal(built.attributedGames.length,0);assert.equal(built.ambiguousGames.length,1);
+  }
+});
+
+test('history rebuild restores missing former-GM summaries and clears stale replacement credits',async()=>{
+  const f=await createHistoryFixture();
+  try{
+    f.sqlite.exec(`UPDATE gm_season_summaries SET gm_identity_id='identity-c' WHERE gm_identity_id='identity-a' AND franchise_season_id='old'`);
+    const league=await (await readCareers(f.context())).json();
+    assert.equal(league.owners.find(row=>row.owner.publicId==='gm-c').seasons.find(row=>row.seasonYear===2026).gameCount,0);
+    assert.equal(league.owners.find(row=>row.owner.publicId==='gm-a').seasons.find(row=>row.seasonYear===2026).gameCount,2);
+    f.sqlite.exec(`UPDATE league_memberships SET team_id='tb' WHERE id='member-a'`);
+    const c=f.context();c.request=new Request(c.request.url.replace('?view=league','?teamKey=tb'),{headers:c.request.headers});
+    const team=await (await readCareers(c)).json();
+    assert.equal(team.career.seasons.find(row=>row.seasonYear===2026).gameCount,2);
+    assert.equal(team.career.seasons.length,2,'another GM history must not leak into My Team');
+  }finally{f.sqlite.close();}
+});
 
 test('reviewed ownership periods attribute games without Madden owner names',()=>{
   const games=[

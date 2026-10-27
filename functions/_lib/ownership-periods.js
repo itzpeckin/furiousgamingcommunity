@@ -1,5 +1,7 @@
-import { canonicalOwnershipStage } from './gm-career.js';
+import { canonicalOwnershipStage, completedOwnershipGame, ownershipScopeOrdinal } from './gm-career.js';
 import { snapshotCurrentPeriod } from './schedule-integrity.js';
+import { activeLeagueTeams } from './league-teams.js';
+import { snapshotGame } from './gm-career-history.js';
 
 const clean = value => value === null || value === undefined ? '' : String(value).trim();
 
@@ -38,9 +40,25 @@ export async function currentFranchiseContext(db, leagueId) {
     snapshotId:row.snapshot_id,
     franchiseSeasonId:row.franchise_season_id || null,
     seasonYear:Number(row.season_year),
-    stage:canonicalOwnershipStage(snapshotCurrentPeriod(row,false)?.stage||row.current_stage||'regular-season'),
-    week:Number(row.week_index) || 1
+    stage:canonicalOwnershipStage(snapshotCurrentPeriod(row,false)?.stage||row.current_stage||'regular-season',snapshotCurrentPeriod(row,false)?.week??row.week_index),
+    week:Number(snapshotCurrentPeriod(row,false)?.week??row.week_index) || 1
   } : {snapshotId:null,franchiseSeasonId:null,seasonYear:null,stage:'preseason',week:1};
+}
+
+// The assignment starts with the next unplayed game. Import timestamps are
+// evidence of availability, not a claim about the actual controller in Madden.
+export async function ownershipBoundary(db,leagueId,context,teamKey){
+  const boundary={stage:context.stage,week:context.week};
+  if(!context.snapshotId||!teamKey||!['regular-season','playoffs'].includes(context.stage))return boundary;
+  const teams=await activeLeagueTeams(db,leagueId);
+  const result=await db.prepare(`SELECT external_id,data_json FROM league_snapshot_records
+    WHERE league_id=? AND snapshot_id=? AND domain='games'`).bind(leagueId,context.snapshotId).all();
+  const scope=ownershipScopeOrdinal(context.stage,context.week);
+  const played=(result?.results||[]).map(row=>snapshotGame(row,context.franchiseSeasonId,teams))
+    .some(game=>[game.homeTeamKey,game.awayTeamKey].includes(teamKey)
+      &&ownershipScopeOrdinal(game.stage,game.week)===scope&&completedOwnershipGame(game));
+  if(played){boundary.week=Number(context.week)+1;boundary.stage=canonicalOwnershipStage(context.stage,boundary.week);}
+  return boundary;
 }
 
 function gmPublicId() {
@@ -54,14 +72,12 @@ export async function ownershipChangeStatements(db, {leagueId,userId,displayName
   const context = await currentFranchiseContext(db,leagueId);
   const open = await db.prepare(`SELECT id,team_key,franchise_season_id FROM team_ownership_periods
     WHERE league_id=? AND gm_identity_id=? AND ended_at IS NULL LIMIT 1`).bind(leagueId,gmIdentityId).first();
-  const existingInSeason = context.franchiseSeasonId ? await db.prepare(`SELECT COUNT(*) count FROM team_ownership_periods
-    WHERE league_id=? AND gm_identity_id=? AND franchise_season_id=?`).bind(leagueId,gmIdentityId,context.franchiseSeasonId).first() : null;
   const statements=[];
   const wanted=clean(nextTeamKey).toLowerCase() || null;
   const membershipGuard=`EXISTS (
     SELECT 1 FROM league_memberships membership
     WHERE membership.league_id=? AND membership.user_id=? AND membership.active=?
-      AND ((? IS NULL AND membership.team_id IS NULL) OR lower(membership.team_id)=?)
+      AND (membership.active=0 OR (? IS NULL AND membership.team_id IS NULL) OR lower(membership.team_id)=?)
   )`;
   const guardBindings=[leagueId,userId,Number(expectedMembershipActive),wanted,wanted];
 
@@ -80,18 +96,19 @@ export async function ownershipChangeStatements(db, {leagueId,userId,displayName
     return {statements,gmIdentityId,context,changed:false};
   }
   if (open) {
+    const end=await ownershipBoundary(db,leagueId,context,clean(open.team_key).toLowerCase());
     statements.push(db.prepare(`UPDATE team_ownership_periods SET
       ended_at=CURRENT_TIMESTAMP,ended_stage=?,ended_week=?,updated_at=CURRENT_TIMESTAMP
       WHERE id=? AND league_id=? AND ended_at IS NULL AND ${membershipGuard}`)
-      .bind(context.stage,context.week,open.id,leagueId,...guardBindings));
+      .bind(end.stage,end.week,open.id,leagueId,...guardBindings));
   }
   if (wanted) {
-    const firstInSeason=Number(existingInSeason?.count || 0) === 0;
+    const start=await ownershipBoundary(db,leagueId,context,wanted);
     statements.push(db.prepare(`INSERT INTO team_ownership_periods
       (id,league_id,gm_identity_id,team_key,franchise_season_id,started_at,started_stage,started_week,assignment_source)
       SELECT ?,?,?,?,?,CURRENT_TIMESTAMP,?,?,? WHERE ${membershipGuard}`)
       .bind(`ownership_period_${crypto.randomUUID()}`,leagueId,gmIdentityId,wanted,context.franchiseSeasonId,
-        firstInSeason?'preseason':context.stage,firstInSeason?1:context.week,'commissioner-reviewed',...guardBindings));
+        start.stage,start.week,'website-assignment',...guardBindings));
   }
   return {statements,gmIdentityId,context,changed:Boolean(open||wanted)};
 }

@@ -1113,7 +1113,7 @@ async function archiveFranchiseSeason(current, gameYear) {
   const frozenSha=await archiveDigest({summaries:playerFreeze.frozen,periods,gmSeasonSummaries:gmFreeze.summaries});
   await current.db.batch([
     current.db.prepare(`UPDATE franchise_seasons SET status='closed',updated_at=CURRENT_TIMESTAMP WHERE id=? AND league_id=?`).bind(previous.id,current.league.id),
-    current.db.prepare(`UPDATE team_ownership_periods SET ended_at=COALESCE(ended_at,CURRENT_TIMESTAMP),ended_stage=COALESCE(ended_stage,'pro-bowl'),ended_week=COALESCE(ended_week,999),updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND franchise_season_id=?`).bind(current.league.id,previous.id),
+    current.db.prepare(`UPDATE team_ownership_periods SET ended_at=COALESCE(ended_at,CURRENT_TIMESTAMP),ended_stage=COALESCE(ended_stage,'offseason'),ended_week=COALESCE(ended_week,999),updated_at=CURRENT_TIMESTAMP WHERE league_id=? AND franchise_season_id=?`).bind(current.league.id,previous.id),
     ...playerFreeze.statements,
     ...gmFreeze.statements,
     current.db.prepare(`INSERT INTO franchise_season_closures
