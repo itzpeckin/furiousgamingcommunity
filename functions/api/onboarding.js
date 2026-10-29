@@ -83,7 +83,7 @@ function selfServiceCandidate(body,userId) {
 
 async function prepareOwned(db,userId,operationRequestId,plan) {
   if (plan.activatedAt) return { ok:true,replayed:true,plan };
-  if (plan.status === 'cancelled') return { ok:false,status:409,error:'This league registration was cancelled.' };
+  if (plan.status === 'cancelled') return { ok:false,status:409,code:'ONBOARDING_CANCELLED',error:'This league registration was cancelled.' };
   if (plan.status === 'prepared') return { ok:true,replayed:true,plan };
   if (plan.status === 'draft') {
     const nextRevision = plan.revision + 1;
@@ -93,7 +93,7 @@ async function prepareOwned(db,userId,operationRequestId,plan) {
         AND status='draft' AND revision=?`).bind(
       nextRevision,userId,plan.id,userId,userId,plan.revision
     ).run();
-    if (changed(claim) !== 1) return { ok:false,status:409,error:'This registration changed. Refresh and try again.' };
+    if (changed(claim) !== 1) return { ok:false,status:409,code:'ONBOARDING_CHANGED',error:'This registration changed. Refresh and try again.' };
     await onboardingEventStatement(db,{
       planId:plan.id,actorUserId:userId,action:'self-service.prepare.started',
       fromStatus:'draft',toStatus:'preparing',revision:nextRevision,
@@ -105,7 +105,7 @@ async function prepareOwned(db,userId,operationRequestId,plan) {
   const staged = Object.freeze({ ...plan,status:'prepared' });
   const readiness = await onboardingReadiness(db,staged);
   if (readiness.checks.some(item => item.status === 'fail')) {
-    return { ok:false,status:409,error:'League preparation paused safely. Select Retry after the registration is refreshed.',code:'ONBOARDING_PREPARATION_INCOMPLETE',plan:{ ...plan,readiness } };
+    return { ok:false,status:409,error:'League preparation paused safely. Check application status, then select Continue setup.',code:'ONBOARDING_PREPARATION_INCOMPLETE',plan:{ ...plan,readiness } };
   }
   const nextRevision = plan.revision + 1;
   const result = await db.prepare(`UPDATE platform_league_onboarding_plans SET
@@ -118,7 +118,7 @@ async function prepareOwned(db,userId,operationRequestId,plan) {
   if (changed(result) !== 1) {
     const latest = await ownedPlan(db,userId,plan.id);
     if (latest?.status === 'prepared') return { ok:true,replayed:true,plan:latest };
-    return { ok:false,status:409,error:'This registration changed. Refresh and try again.' };
+    return { ok:false,status:409,code:'ONBOARDING_CHANGED',error:'This registration changed. Refresh and try again.' };
   }
   await onboardingEventStatement(db,{
     planId:plan.id,actorUserId:userId,action:'self-service.prepare.completed',
@@ -144,10 +144,10 @@ async function submit(operation,body,application = false) {
   const open = await operation.db.prepare(`SELECT COUNT(*) count FROM platform_league_onboarding_plans
     WHERE created_by_user_id=? AND activated_at IS NULL AND status<>'cancelled'`).bind(operation.userId).first();
   if (Number(open?.count || 0) >= 3) {
-    return json({ ok:false,error:'This account already has three league registrations awaiting review.' },409);
+    return json({ ok:false,code:'ONBOARDING_LIMIT',error:'This account already has three league registrations awaiting review.' },409);
   }
   const conflict = await inspectOnboardingConflicts(operation.db,candidate,null);
-  if (!conflict.ok) return json({ ok:false,error:'That league URL is already reserved.',conflicts:conflict.conflicts },409);
+  if (!conflict.ok) return json({ ok:false,code:'LEAGUE_URL_RESERVED',error:'That league URL is already reserved.',conflicts:conflict.conflicts },409);
   const planHash = await onboardingPlanHash(candidate);
   const id = `onboarding_${crypto.randomUUID()}`;
   const plannedLeagueId = `league_${crypto.randomUUID()}`;
@@ -185,9 +185,9 @@ async function submit(operation,body,application = false) {
     if (concurrent) return finishRegistration(operation,await loadOnboardingPlan(operation.db,concurrent.id));
     const pending = await operation.db.prepare(`SELECT COUNT(*) count FROM platform_league_onboarding_plans
       WHERE created_by_user_id=? AND activated_at IS NULL AND status<>'cancelled'`).bind(operation.userId).first();
-    if (Number(pending?.count || 0)>=3) return json({ok:false,error:'This account already has three league registrations awaiting review.'},409);
+    if (Number(pending?.count || 0)>=3) return json({ok:false,code:'ONBOARDING_LIMIT',error:'This account already has three league registrations awaiting review.'},409);
     if (String(error?.message || '').includes('UNIQUE constraint')) {
-      return json({ ok:false,error:'That league URL is already reserved.' },409);
+      return json({ ok:false,code:'LEAGUE_URL_RESERVED',error:'That league URL is already reserved.' },409);
     }
     throw error;
   }
@@ -196,7 +196,7 @@ async function submit(operation,body,application = false) {
 
 async function finishRegistration(operation,original,created = false) {
   if (original?.configuration?.betaApplicationRequired && !original.activatedAt) {
-    if (original.status === 'cancelled') return json({ok:false,error:'This application was declined. Contact FranchiseHQ if you have questions.'},409);
+    if (original.status === 'cancelled') return json({ok:false,code:'ONBOARDING_CANCELLED',error:'This application was declined. Contact FranchiseHQ if you have questions.'},409);
     await notifyBetaApplication(operation.db,operation.env,original.id);
     const plan = await loadOnboardingPlan(operation.db,original.id);
     return json({ok:true,created,pendingApproval:true,plan:{...plan,leagueUrl:null,readiness:await readiness(operation.db,plan)}},created ? 201 : 200);
@@ -205,9 +205,9 @@ async function finishRegistration(operation,original,created = false) {
   if (!preparation.ok) return json(preparation,preparation.status || 409);
   let plan = preparation.plan;
   if (!plan.activatedAt) {
-    if (!(await accountReadiness(operation.db,operation.userId)).verified) return json({ ok:false,error:'Verify your email in Account Settings first.' },403);
+    if (!(await accountReadiness(operation.db,operation.userId)).verified) return json({ ok:false,code:'ACCOUNT_VERIFICATION_REQUIRED',error:'Verify your email in Account Settings first.' },403);
     const invitation = await availableBetaInvitation(operation.db,operation.userId,plan.id);
-    if (!invitation) return json({ ok:false,error:'A valid beta invitation is required to activate this league.' },403);
+    if (!invitation) return json({ ok:false,code:'BETA_INVITATION_REQUIRED',error:'A valid beta invitation is required to activate this league.' },403);
     try {
       await operation.db.batch([
         operation.db.prepare(`UPDATE platform_beta_invitations SET plan_id=NULL WHERE plan_id=? AND id<>?

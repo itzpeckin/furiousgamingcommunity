@@ -59,6 +59,7 @@ const checks = [
     'tests/transactions/canonical-history.test.mjs',
     'tests/ui/mobile-experience.test.mjs',
     'tests/ui/public-demo.test.mjs',
+    'tests/ui/account-recovery.test.mjs',
     'tests/security/containment.test.mjs',
     'tests/security/authentication-framework.test.mjs',
     'tests/security/provider-authentication.test.mjs',

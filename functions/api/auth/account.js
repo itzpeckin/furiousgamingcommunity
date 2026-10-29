@@ -33,10 +33,10 @@ export async function onRequestPost(context) {
       appendClearedBrowserSessionCookies(headers);
       return new Response(JSON.stringify({ok:true}),{headers});
     }
-    return jsonResponse(result.ok ? { ok:true } : { ok:false,error:result.error || 'This link has expired or has already been used. Request a new link.' },result.ok ? 200 : 400);
+    return jsonResponse(result.ok ? { ok:true } : { ok:false,code:result.code || 'ACCOUNT_LINK_INVALID',error:result.error || 'This link has expired or has already been used. Request a new link.' },result.ok ? 200 : result.code==='ACCOUNT_DETAILS_INVALID' ? 422 : 400);
   }
   if (action === 'request-reset') {
-    if (!context.env.ACCOUNT_EMAIL?.fetch) return jsonResponse({ ok:false,error:'Email recovery is temporarily unavailable. Please try again later.' },503);
+    if (!context.env.ACCOUNT_EMAIL?.fetch) return jsonResponse({ ok:false,code:'EMAIL_UNAVAILABLE',error:'Email recovery is temporarily unavailable. Please try again later.' },503);
     const email = normalizeEmail(body.email);
     if (!/^[^\s@]{1,64}@[^\s@]{1,190}$/.test(email)) return jsonResponse({ ok:false,error:'Enter a valid email address.' },422);
     const identity = await db.prepare(`SELECT * FROM user_auth_identities WHERE normalized_email=? AND provider='email'`).bind(email).first();
@@ -49,27 +49,27 @@ export async function onRequestPost(context) {
   const userId = session.user.id;
   if (action === 'link-discord') {
     const link = await beginDiscordLink(context,userId);
-    if (!link) return jsonResponse({ ok:false,error:'Discord sign-in is temporarily unavailable.' },503);
+    if (!link) return jsonResponse({ ok:false,code:'DISCORD_LINK_UNAVAILABLE',error:'Discord sign-in is temporarily unavailable.' },503);
     return jsonResponse({ ok:true,redirectUrl:link.redirectUrl },200,{ 'set-cookie':link.cookie });
   }
   const identity = await emailIdentity(db,userId);
   if (action === 'verify-email') {
-    if (!identity) return jsonResponse({ ok:false,error:'Add an email address first.' },409);
+    if (!identity) return jsonResponse({ ok:false,code:'ACCOUNT_EMAIL_REQUIRED',error:'Add an email address first.' },409);
     if (Number(identity.email_verified)) return jsonResponse({ ok:true,message:'Your email is already verified.' });
     const result = await sendAccountAction(context,{ userId,purpose:'verify-email',identity,email:identity.normalized_email });
-    return jsonResponse({ ok:result.sent,message:result.sent ? 'Check your inbox for a verification link.' : undefined,
-      error:result.sent ? undefined : result.code === 'EMAIL_LIMIT' ? 'Too many email requests. Please try again in an hour.' : 'The email could not be sent. Please try again later.' },result.sent ? 200 : 503);
+    return jsonResponse({ ok:result.sent,code:result.code,message:result.sent ? 'Check your inbox for a verification link.' : undefined,
+      error:result.sent ? undefined : result.code === 'EMAIL_LIMIT' ? 'Too many email requests. Please try again in an hour.' : 'The email could not be sent. Please try again later.' },result.sent ? 200 : result.code==='EMAIL_LIMIT' ? 429 : 503);
   }
   if (action === 'link-email') {
-    if (identity) return jsonResponse({ ok:false,error:'This account already has an email sign-in.' },409);
+    if (identity) return jsonResponse({ ok:false,code:'ACCOUNT_EMAIL_EXISTS',error:'This account already has an email sign-in.' },409);
     const validation = validateEmailRegistration({ email:body.email,password:body.password,displayName:session.user.displayName || 'FHQ Member' });
     if (!validation.ok) return jsonResponse({ ok:false,error:validation.errors.join(' ') },422);
     const existing = await db.prepare(`SELECT id FROM user_auth_identities WHERE provider='email' AND normalized_email=?`).bind(validation.email).first();
-    if (existing) return jsonResponse({ ok:false,error:'That email is already linked to an account. Sign in to that account instead.' },409);
+    if (existing) return jsonResponse({ ok:false,code:'EMAIL_ALREADY_LINKED',error:'That email is already linked to an account. Sign in to that account instead.' },409);
     const credential = await createEmailCredential(validation.password);
     const result = await sendAccountAction(context,{ userId,purpose:'link-email',email:validation.email,payload:{ email:validation.email,credential } });
-    return jsonResponse({ ok:result.sent,message:result.sent ? 'Check your inbox and open the link while signed in to this account.' : undefined,
-      error:result.sent ? undefined : 'The email could not be sent. Please try again later.' },result.sent ? 200 : 503);
+    return jsonResponse({ ok:result.sent,code:result.code,message:result.sent ? 'Check your inbox and open the link while signed in to this account.' : undefined,
+      error:result.sent ? undefined : 'The email could not be sent. Please try again later.' },result.sent ? 200 : result.code==='EMAIL_LIMIT' ? 429 : 503);
   }
   return jsonResponse({ ok:false,error:'Unsupported account action.' },400);
 }

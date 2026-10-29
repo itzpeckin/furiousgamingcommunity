@@ -22,6 +22,26 @@ const firstCredential='test-only registration credential 2028';
 const ownerCredential='test-only owner credential 2028';
 const wrongCredential='test-only incorrect credential 2028';
 
+test('account recovery preserves wrong-account email links and reports expired links and throttling safely',async()=>{
+  const {sqlite,db}=await database();
+  try {
+    const response=await register(context(db,'https://franchisehq.app/api/auth/email/register',{displayName:'Recovery User',email:'recovery@example.com',password:firstCredential}));
+    const cookie=sessionCookie(response),userId=(await response.json()).user.id;
+    const invalid=await accountAction(context(db,'https://franchisehq.app/api/auth/account',{action:'confirm',purpose:'reset-password',token:'a'.repeat(64),password:ownerCredential}));
+    assert.equal((await invalid.json()).code,'ACCOUNT_LINK_INVALID');
+    const identity=sqlite.prepare("SELECT * FROM user_auth_identities WHERE user_id=? AND provider='email'").get(userId);
+    const captured=[];const ctx=context(db,'https://franchisehq.app/api/auth/account',{},cookie);
+    ctx.env.ACCOUNT_EMAIL={fetch:async req=>{captured.push(await req.json());return new Response(null,{status:204});}};
+    await sendAccountAction(ctx,{userId,purpose:'link-email',email:'linked@example.com',payload:{}});
+    const mismatch=await consumeAccountAction(db,{token:captured[0].token,purpose:'link-email',userId:'another-user'});
+    assert.equal(mismatch.code,'ACCOUNT_LINK_SESSION');
+    assert.equal(sqlite.prepare("SELECT used_at FROM account_action_tokens WHERE purpose='link-email'").get().used_at,null);
+    for(let i=0;i<5;i++)await sendAccountAction(ctx,{userId,purpose:'verify-email',identity,email:identity.normalized_email});
+    const limited=context(db,'https://franchisehq.app/api/auth/account',{action:'verify-email'},cookie);limited.env.ACCOUNT_EMAIL=ctx.env.ACCOUNT_EMAIL;
+    const result=await accountAction(limited);assert.equal(result.status,429);assert.equal((await result.json()).code,'EMAIL_LIMIT');
+  }finally{sqlite.close();}
+});
+
 test('beta applications require verification, cannot self-activate even with an invitation, and notify once',async()=>{
   const {sqlite,db}=await database();
   try {

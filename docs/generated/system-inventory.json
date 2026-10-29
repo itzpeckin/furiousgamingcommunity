@@ -266,11 +266,11 @@
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 323,
+      ".js": 325,
       ".json": 8,
       ".jsonc": 4,
-      ".md": 287,
-      ".mjs": 77,
+      ".md": 288,
+      ".mjs": 78,
       ".png": 7,
       ".sql": 59,
       ".txt": 3,
@@ -360,7 +360,7 @@
         "file": "tests/import/madden-discovery.test.mjs"
       }
     ],
-    "total": 878
+    "total": 882
   },
   "frontend": {
     "assets": [
@@ -1997,7 +1997,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.27",
+  "release": "8.2.28",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

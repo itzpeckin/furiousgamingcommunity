@@ -26,5 +26,5 @@ export async function onRequestPost(context) {
   try { body = await context.request.json(); }
   catch { return jsonResponse({ ok:false,error:'A valid invitation is required.' },400); }
   const claimed = await claimBetaInvitation(auth.db,auth.userId,body.token);
-  return jsonResponse(claimed ? { ok:true } : { ok:false,error:'This invitation has expired, was revoked, or belongs to another account.' },claimed ? 200 : 409);
+  return jsonResponse(claimed ? { ok:true } : { ok:false,code:'BETA_INVITATION_INVALID',error:'This invitation has expired, was revoked, or belongs to another account.' },claimed ? 200 : 409);
 }

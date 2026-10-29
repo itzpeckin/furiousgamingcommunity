@@ -46,11 +46,12 @@ export async function consumeAccountAction(db,{ token,purpose,password,userId })
   const row = await db.prepare(`SELECT * FROM account_action_tokens
     WHERE token_hash=? AND purpose=? AND used_at IS NULL AND datetime(expires_at)>CURRENT_TIMESTAMP`)
     .bind(tokenHash,purpose).first();
-  if (!row || (purpose === 'link-email' && row.user_id !== userId)) return { ok:false };
+  if (!row) return { ok:false };
+  if (purpose === 'link-email' && row.user_id !== userId) return {ok:false,code:'ACCOUNT_LINK_SESSION'};
   let credential;
   if (purpose === 'reset-password') {
     if (typeof password !== 'string' || password.length < 12 || password.length > 128) {
-      return { ok:false,error:'Password must contain 12 to 128 characters.' };
+      return { ok:false,code:'ACCOUNT_DETAILS_INVALID',error:'Password must contain 12 to 128 characters.' };
     }
     credential = await createEmailCredential(password);
   }
@@ -83,7 +84,7 @@ export async function consumeAccountAction(db,{ token,purpose,password,userId })
     const results = await db.batch(statements);
     return { ok:Number(results[0]?.meta?.changes) === 1 };
   } catch (error) {
-    if (String(error?.message || '').includes('UNIQUE constraint')) return { ok:false,error:'That email is already linked to an account. Sign in to that account instead.' };
+    if (String(error?.message || '').includes('UNIQUE constraint')) return { ok:false,code:'EMAIL_ALREADY_LINKED',error:'That email is already linked to an account. Sign in to that account instead.' };
     throw error;
   }
 }
