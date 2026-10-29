@@ -1032,7 +1032,7 @@
       // domains hydrate after first paint and never block a hard-refresh render.
       const criticalPayload=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),
-        import('./league-engine/game-summary.js?v=8.2.28')
+        import('./league-engine/game-summary.js?v=8.2.29')
       ]);
 
       const [stateValue,snapshot,teamRows,standingRows,gameRows,gameSummary]=criticalPayload;
@@ -9044,11 +9044,11 @@ function canonicalPlayerDashboardStats(playerId='') {
           else if(window.FranchiseHQ?.platformWorkspace?.renderWorkspace) pageContent.innerHTML=`<div data-platform-workspace-host>${window.FranchiseHQ.platformWorkspace.renderWorkspace()}</div>`;
           else renderRoadmap(base);
         }else if(window.FGC_TRADE?.renderCommissioner){
-          window.FGC_TRADE.renderCommissioner();
+          window.FGC_TRADE.renderCommissioner(id);
           scheduleCommissionerImporterMount();
           setTimeout(()=>mountPerformanceCertificationCard(),60);
         }else if(window.FranchiseHQ?.trade?.renderCommissioner){
-          window.FranchiseHQ.trade.renderCommissioner();
+          window.FranchiseHQ.trade.renderCommissioner(id);
           scheduleCommissionerImporterMount();
           setTimeout(()=>mountPerformanceCertificationCard(),60);
         }else{
@@ -10231,7 +10231,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.2.28';
+  const VISIBLE_RELEASE = '8.2.29';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

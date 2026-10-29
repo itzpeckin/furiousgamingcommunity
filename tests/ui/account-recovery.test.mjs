@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../../assets/account-recovery.js',import.meta.url),'utf8');
+
+test('setup checklist destinations reach their commissioner section on both module paths',async()=>{
+  const app=await readFile(new URL('../../app.js',import.meta.url),'utf8');
+  const start=app.indexOf("      case 'commissioner': {");
+  const route=app.slice(start,app.indexOf("      case 'schedule-source-inspector':",start));
+  assert.ok(start>=0);
+  for(const module of ['legacy','namespaced'])for(const id of ['overview','teams','controls']){
+    const calls=[];const renderer={renderCommissioner:value=>calls.push(value)};
+    const context={window:module==='legacy'?{FGC_TRADE:renderer}:{FranchiseHQ:{trade:renderer}},id,
+      commissionerAccessState:()=>true,scheduleCommissionerImporterMount(){},mountPerformanceCertificationCard(){},setTimeout(){},pageContent:{}};
+    vm.runInNewContext("switch('commissioner'){"+route+'}',context);
+    assert.deepEqual(calls,[id],module+' '+id);
+    context.commissionerAccessState=()=>false;context.requestCommissionerAuthRecovery=()=>false;calls.length=0;
+    vm.runInNewContext("switch('commissioner'){"+route+'}',context);
+    assert.deepEqual(calls,[]);assert.match(context.pageContent.innerHTML,/Commissioner access required/);
+  }
+});
 function runtime(fetch, timers={setTimeout,clearTimeout}){const window={};vm.runInNewContext(source,{window,document:{cookie:''},fetch,AbortController,...timers});return window.FHQAccountRecovery;}
 test('account requests preserve recovery codes and never expose provider bodies',async()=>{
   const app=runtime(async()=>new Response(JSON.stringify({ok:false,code:'EMAIL_LIMIT',error:'private provider details',requestId:'ref-123'}),{status:429}));

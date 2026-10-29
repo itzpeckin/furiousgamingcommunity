@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.29",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false,
+      "basis": "unchanged schema; full strict gate required"
+    },
+    "focusedTests": {
+      "passed": true,
+      "tests": 30
+    },
+    "automatedTests": {
+      "strict": true,
+      "passed": true,
+      "tests": 694
+    },
+    "browserJourney": {
+      "passed": true,
+      "widths": [
+        1440,
+        390
+      ],
+      "realHandlersAndMiddleware": true,
+      "realMailWorkerWithSimulatedDelivery": true,
+      "seededImportReadiness": true,
+      "liveProviderImport": false
+    },
+    "deliveryTest": {
+      "authorized": true,
+      "count": 1,
+      "sender": "accounts@franchisehq.app",
+      "recipient": "justinrmandaro@gmail.com",
+      "subject": "FranchiseHQ commissioner setup — delivery test",
+      "userConfirmed": "inbox",
+      "method": "Cloudflare Email Sending REST; not live application notification"
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "liveCollectionExecuted": false,
+    "liveDiscordMessagesSent": false,
+    "liveEmailsSent": 1,
+    "separateWorkerChangeRequired": false,
+    "databaseMigrationRequired": false,
+    "billingEnabled": false,
+    "customerAccountsCreated": 0
+  }
+}

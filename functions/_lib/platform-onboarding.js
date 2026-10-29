@@ -1,4 +1,5 @@
 import { normalizeTenantSlug, validTenantSlug } from './tenant-context.js';
+import { validateActivationGrant } from './league-access.js';
 
 export const PLATFORM_ONBOARDING_RELEASE = '8.1.0';
 export const PLATFORM_ONBOARDING_SCHEMA_VERSION = 2;
@@ -438,10 +439,12 @@ export function preparedLeagueStatements(db, plan, actorUserId) {
   return statements;
 }
 
-export function activatedLeagueStatements(db, plan, actorUserId, operationRequestId) {
+export function activatedLeagueStatements(db, plan, actorUserId, operationRequestId, grant) {
+  const access=validateActivationGrant(plan,grant);
   const nextRevision = plan.revision + 1;
   const activatedAt = new Date().toISOString();
   const configuration = {
+    access,
     onboarding:{
       schemaVersion:PLATFORM_ONBOARDING_SCHEMA_VERSION,
       planId:plan.id,
@@ -464,10 +467,13 @@ export function activatedLeagueStatements(db, plan, actorUserId, operationReques
     db.prepare(`INSERT INTO platform_league_activations
       (id,plan_id,league_id,activated_by_user_id,initial_commissioner_user_id,
        plan_hash,request_id,previous_tenant_status,previous_public_status,activated_at,detail_json)
-      VALUES (?,?,?,?,?,?,?,'disabled','inactive',?,?)`).bind(
-      `activation_${crypto.randomUUID()}`,plan.id,plan.plannedLeagueId,actorUserId,
+      VALUES (?,(SELECT id FROM platform_league_onboarding_plans WHERE id=? AND planned_league_id=?
+        AND initial_commissioner_user_id=? AND plan_hash=? AND status='prepared' AND revision=? AND activated_at IS NULL
+        AND EXISTS (SELECT 1 FROM leagues WHERE id=? AND tenant_status='disabled' AND public_status<>'active')),
+        ?,?,?,?,?,'disabled','inactive',?,?)`).bind(
+      `activation_${crypto.randomUUID()}`,plan.id,plan.plannedLeagueId,plan.initialCommissionerUserId,plan.planHash,plan.revision,plan.plannedLeagueId,plan.plannedLeagueId,actorUserId,
       plan.initialCommissionerUserId,plan.planHash,operationRequestId,activatedAt,
-      JSON.stringify({ desiredFeatures:plan.desiredFeatures,sourceMode:plan.sourceMode,discordConnected:false })
+      JSON.stringify({ desiredFeatures:plan.desiredFeatures,sourceMode:plan.sourceMode,discordConnected:false,access })
     ),
     db.prepare(`UPDATE platform_league_onboarding_plans SET
       activated_by_user_id=?,activated_at=?,activation_request_id=?,revision=?,
@@ -502,7 +508,7 @@ export function activatedLeagueStatements(db, plan, actorUserId, operationReques
   statements.push(onboardingEventStatement(db,{
     planId:plan.id,actorUserId,action:'tenant.activated',fromStatus:'prepared',toStatus:'prepared',
     revision:nextRevision,requestId:operationRequestId,
-    detail:{ plannedLeagueId:plan.plannedLeagueId,initialCommissionerUserId:plan.initialCommissionerUserId }
+    detail:{ plannedLeagueId:plan.plannedLeagueId,initialCommissionerUserId:plan.initialCommissionerUserId,access }
   }));
   statements.push(db.prepare(`INSERT INTO tenant_audit_events
     (id,league_id,actor_user_id,request_id,action_id,action,resource_type,resource_id,outcome,detail_json)

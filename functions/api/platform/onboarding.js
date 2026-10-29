@@ -3,6 +3,7 @@ import { requireDatabaseSchema } from '../../_lib/database-schema.js';
 import { requirePlatformOwner } from '../../_lib/permissions.js';
 import { tenantDatabase } from '../../_lib/tenant-context.js';
 import { notifyBetaApplication } from '../../_lib/beta-applications.js';
+import { authorizeLeagueActivation } from '../../_lib/league-access.js';
 import {
   PLATFORM_ONBOARDING_RELEASE,
   activatedLeagueStatements,
@@ -333,7 +334,7 @@ async function cancel(db, actorUserId, operationRequestId, body) {
   return json({ ok:true,contained:true,plan:await responsePlan(db,await loadOnboardingPlan(db,plan.id)) });
 }
 
-async function activate(db, actorUserId, operationRequestId, body) {
+async function activate(db, actorUserId, operationRequestId, body, context) {
   let plan = await loadOnboardingPlan(db,String(body.planId || ''));
   if (!plan) return json({ ok:false,error:'Onboarding plan not found.' },404);
   if (plan.activatedAt) {
@@ -346,6 +347,8 @@ async function activate(db, actorUserId, operationRequestId, body) {
   if (expectedRevision !== plan.revision) {
     return json({ ok:false,error:'This plan changed in another session. Refresh it before activation.',plan:await responsePlan(db,plan) },409);
   }
+  const access=await authorizeLeagueActivation(context,plan,'owner-approval');
+  if(!access.allowed)return access.response || json({ok:false,error:access.error,code:access.code},access.status);
   const readiness = await onboardingReadiness(db,plan);
   if (!readiness.readyForActivationReview || !readiness.activationAvailable) {
     return json({
@@ -354,7 +357,7 @@ async function activate(db, actorUserId, operationRequestId, body) {
     },409);
   }
   try {
-    await db.batch(activatedLeagueStatements(db,plan,actorUserId,operationRequestId));
+    await db.batch(activatedLeagueStatements(db,plan,actorUserId,operationRequestId,access.grant));
   } catch (error) {
     const latest = await loadOnboardingPlan(db,plan.id);
     if (latest?.activatedAt) return json({ ok:true,replayed:true,plan:await responsePlan(db,latest) });
@@ -392,7 +395,7 @@ export async function onRequestPost(context) {
     if (action === 'preview') return preview(operation.db,operation.actorUserId,body);
     if (action === 'save') return save(operation.db,operation.actorUserId,operation.requestId,body);
     if (action === 'prepare' || action === 'resume') return prepare(operation.db,operation.actorUserId,operation.requestId,body);
-    if (action === 'activate') return activate(operation.db,operation.actorUserId,operation.requestId,body);
+    if (action === 'activate') return activate(operation.db,operation.actorUserId,operation.requestId,body,context);
     if (action === 'cancel') return cancel(operation.db,operation.actorUserId,operation.requestId,body);
     return json({ ok:false,error:'Unsupported onboarding action.' },400);
   } catch (error) {
