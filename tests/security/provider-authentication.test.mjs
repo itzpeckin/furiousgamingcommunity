@@ -47,7 +47,7 @@ test('beta applications require verification, cannot self-activate even with an 
   try {
     const registered=await register(context(db,'https://franchisehq.app/api/auth/email/register',{displayName:'Beta Applicant',email:'applicant@example.com',password:firstCredential}));
     const cookie=sessionCookie(registered),userId=(await registered.json()).user.id;
-    const body={action:'apply',plan:{name:'Applicant League',slug:'applicant-league',gameYear:2027,franchiseSeasonYear:2028,configuration:{betaApplicationRequired:false},initialCommissionerUserId:'forged-owner'}};
+    const body={action:'apply',paid:true,access:{kind:'paid',source:'payment'},plan:{name:'Applicant League',slug:'applicant-league',gameYear:2027,franchiseSeasonYear:2028,configuration:{betaApplicationRequired:false,access:{kind:'paid'}},initialCommissionerUserId:'forged-owner'}};
     assert.equal((await registerLeague(context(db,'https://franchisehq.app/api/onboarding',body,cookie))).status,403);
     sqlite.prepare('UPDATE user_auth_identities SET email_verified=1 WHERE user_id=?').run(userId);
     let sends=0;
@@ -88,6 +88,9 @@ test('owner alone can prepare and approve a beta application; failed email can r
     assert.equal(sqlite.prepare('SELECT tenant_status FROM leagues WHERE id=?').get(plan.plannedLeagueId).tenant_status,'disabled');
     assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM league_memberships WHERE user_id=?').get(userId).n,0);
     const approved=await reviewApplication(ownerRequest({action:'activate',planId:plan.id,expectedRevision:plan.revision}));assert.equal(approved.status,200);assert.ok((await approved.json()).plan.activatedAt);
+    const repeated=await reviewApplication(ownerRequest({action:'activate',planId:plan.id,expectedRevision:plan.revision}));assert.equal(repeated.status,200);assert.equal((await repeated.json()).replayed,true);
+    const access=JSON.parse(sqlite.prepare('SELECT configuration_json FROM leagues WHERE id=?').get(plan.plannedLeagueId).configuration_json).access;
+    assert.equal(access.kind,'complimentary');assert.equal(access.source,'owner-approval');assert.equal(access.accountId,userId);assert.equal(access.referenceId,ownerId);assert.equal(access.expiresAt,null);
     assert.equal(sqlite.prepare('SELECT tenant_status FROM leagues WHERE id=?').get(plan.plannedLeagueId).tenant_status,'enabled');
     const resumed=await(await registerLeague(context(db,'https://franchisehq.app/api/onboarding',{action:'resume',planId:plan.id},cookie))).json();assert.equal(resumed.plan.leagueUrl,'/leagues/approval-league');
     assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM platform_league_activations WHERE plan_id=?').get(plan.id).n,1);
@@ -252,6 +255,8 @@ test('an invited verified email account activates only its own league and replay
     assert.equal(league.public_status,'active');
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_memberships WHERE league_id=?`).get(payload.plan.plannedLeagueId).count,1);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM platform_league_activations WHERE league_id=?`).get(payload.plan.plannedLeagueId).count,1);
+    const access=JSON.parse(sqlite.prepare('SELECT detail_json FROM platform_league_activations WHERE league_id=?').get(payload.plan.plannedLeagueId).detail_json).access;
+    assert.equal(access.kind,'complimentary');assert.equal(access.source,'beta-invitation');assert.equal(access.referenceId,invitation.id);assert.equal(access.accountId,userId);
 
     const listed=await listRegistrations({
       request:new Request('https://franchisehq.app/api/onboarding',{ headers:{ cookie } }),

@@ -17,6 +17,7 @@ import {
 import { resolveTenant } from '../../functions/_lib/tenant-context.js';
 import { hashToken } from '../../functions/_lib/auth.js';
 import { onRequestGet, onRequestPost } from '../../functions/api/platform/onboarding.js';
+import { authorizeLeagueActivation,validateActivationGrant } from '../../functions/_lib/league-access.js';
 
 function d1(sqlite) {
   return {
@@ -288,7 +289,25 @@ test('activation is atomic, isolated, and grants only the reviewed commissioner'
     const prepared = Object.freeze({ ...candidate,status:'prepared',revision:3,preparedAt:new Date().toISOString() });
     await db.batch(preparedLeagueStatements(db,prepared,'owner-user'));
     assert.equal((await onboardingReadiness(db,prepared)).activationAvailable,true);
-    await db.batch(activatedLeagueStatements(db,prepared,'owner-user','request_activation_test'));
+    const authorization=await authorizeLeagueActivation(await ownerContext(sqlite,db),prepared,'owner-approval');
+    assert.equal(authorization.allowed,true);
+    const grant=authorization.grant;
+    assert.throws(()=>validateActivationGrant(prepared,null),/grant is required/);
+    assert.throws(()=>validateActivationGrant(prepared,{...grant,kind:'paid'}),/grant is required/);
+    assert.throws(()=>validateActivationGrant(prepared,{...grant,leagueId:'league-fgc'}),/grant is required/);
+    assert.equal((await authorizeLeagueActivation({},prepared,'payment')).code,'PAYMENT_NOT_ENABLED');
+    // Approval can change after preflight but before the database transaction.
+    for(const change of ["status='cancelled'","revision=4","plan_hash='changed'"]){
+      sqlite.prepare(`UPDATE platform_league_onboarding_plans SET ${change} WHERE id=?`).run(prepared.id);
+      await assert.rejects(()=>db.batch(activatedLeagueStatements(db,prepared,'owner-user','stale-approval',grant)),/NOT NULL/);
+      assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM platform_league_activations WHERE plan_id=?').get(prepared.id).n,0);
+      assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM league_memberships WHERE league_id=?').get(prepared.plannedLeagueId).n,0);
+      assert.equal(sqlite.prepare('SELECT tenant_status FROM leagues WHERE id=?').get(prepared.plannedLeagueId).tenant_status,'disabled');
+      sqlite.prepare("UPDATE platform_league_onboarding_plans SET status='prepared',revision=3,plan_hash=? WHERE id=?").run(prepared.planHash,prepared.id);
+    }
+    await db.batch(activatedLeagueStatements(db,prepared,'owner-user','request_activation_test',grant));
+    const savedAccess=JSON.parse(sqlite.prepare('SELECT detail_json FROM platform_league_activations WHERE plan_id=?').get(prepared.id).detail_json).access;
+    assert.deepEqual(savedAccess,grant);
     const row = sqlite.prepare(`SELECT revision,activated_at FROM platform_league_onboarding_plans WHERE id=?`).get(prepared.id);
     const activated = { ...prepared,revision:row.revision,activatedAt:row.activated_at };
     const after = await onboardingReadiness(db,activated);
@@ -318,7 +337,7 @@ test('the owner console is responsive and exposes only owner-gated activation', 
   assert.match(adminCss,/@media\(max-width:700px\)[\s\S]+platform-onboarding-form-grid/);
   assert.match(html,/data-platform-admin-link data-platform-owner-only/);
   assert.match(html,/platform-owner-identity\.js\?v=8\.0\.3\.1/);
-  assert.match(html,/trade-module\.js\?v=8\.2\.28/);
+  assert.match(html,/trade-module\.js\?v=8\.2\.29/);
   assert.match(identity,/VERSION = '8\.0\.3\.1'/);
   assert.match(identity,/SERVER_PLATFORM_OWNER/);
   assert.match(admin,/data-platform-onboarding-host/);

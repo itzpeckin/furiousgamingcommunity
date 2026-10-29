@@ -5,6 +5,7 @@ import { tenantDatabase } from '../_lib/tenant-context.js';
 import { accountReadiness,availableBetaInvitation } from '../_lib/beta-access.js';
 import { leagueReadiness } from '../_lib/league-readiness.js';
 import { notifyBetaApplication } from '../_lib/beta-applications.js';
+import { authorizeLeagueActivation } from '../_lib/league-access.js';
 import {
   DEFAULT_ONBOARDING_FEATURES,
   DEFAULT_ONBOARDING_LIMITS,
@@ -41,7 +42,7 @@ async function contextForUser(context) {
   try { await requireDatabaseSchema(db); }
   catch { return { response:json({ ok:false,error:'League registration is temporarily unavailable.' },503) }; }
   return {
-    db,env:context.env,userId:String(authorization.session.user.id),session:authorization.session,
+    db,env:context.env,context,userId:String(authorization.session.user.id),session:authorization.session,
     requestId:requestId(context)
   };
 }
@@ -205,9 +206,9 @@ async function finishRegistration(operation,original,created = false) {
   if (!preparation.ok) return json(preparation,preparation.status || 409);
   let plan = preparation.plan;
   if (!plan.activatedAt) {
-    if (!(await accountReadiness(operation.db,operation.userId)).verified) return json({ ok:false,code:'ACCOUNT_VERIFICATION_REQUIRED',error:'Verify your email in Account Settings first.' },403);
-    const invitation = await availableBetaInvitation(operation.db,operation.userId,plan.id);
-    if (!invitation) return json({ ok:false,code:'BETA_INVITATION_REQUIRED',error:'A valid beta invitation is required to activate this league.' },403);
+    const access=await authorizeLeagueActivation(operation.context,plan,'beta-invitation');
+    if(!access.allowed)return access.response || json({ok:false,error:access.error,code:access.code},access.status);
+    const invitation=access.invitation;
     try {
       await operation.db.batch([
         operation.db.prepare(`UPDATE platform_beta_invitations SET plan_id=NULL WHERE plan_id=? AND id<>?
@@ -220,7 +221,7 @@ async function finishRegistration(operation,original,created = false) {
           VALUES ((SELECT id FROM platform_beta_invitations WHERE id=? AND plan_id=? AND claimed_by_user_id=?
             AND revoked_at IS NULL AND datetime(expires_at)>CURRENT_TIMESTAMP),?,?)`)
           .bind(invitation.id,plan.id,operation.userId,plan.id,operation.userId),
-        ...activatedLeagueStatements(operation.db,plan,operation.userId,operation.requestId)
+        ...activatedLeagueStatements(operation.db,plan,operation.userId,operation.requestId,access.grant)
       ]);
     } catch (error) {
       const latest = await loadOnboardingPlan(operation.db,plan.id);
