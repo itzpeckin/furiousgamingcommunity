@@ -53,7 +53,7 @@ async function fetchSpaShell(context,request,session=null,publicDemo=false){
   if(publicDemo){
     html=html.replace(/<title>[^<]*<\/title>/i,'<title>FHQ Demo League | FranchiseHQ</title>');
     const bootstrap=JSON.stringify({id:publicDemo.id,slug:publicDemo.slug,tenant:publicDemo}).replace(/</g,'\\u003c');
-    html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_DEMO__=${bootstrap};</script><script src="/assets/demo-league.js?v=8.2.27"></script><link rel="stylesheet" href="/assets/demo-league.css?v=8.2.27"></head>`);
+    html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_DEMO__=${bootstrap};</script><script src="/assets/demo-league.js?v=8.2.28"></script><link rel="stylesheet" href="/assets/demo-league.css?v=8.2.28"></head>`);
   }
   if(session){
     const bootstrap=JSON.stringify({

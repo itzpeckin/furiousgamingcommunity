@@ -1032,7 +1032,7 @@
       // domains hydrate after first paint and never block a hard-refresh render.
       const criticalPayload=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),
-        import('./league-engine/game-summary.js?v=8.2.27')
+        import('./league-engine/game-summary.js?v=8.2.28')
       ]);
 
       const [stateValue,snapshot,teamRows,standingRows,gameRows,gameSummary]=criticalPayload;
@@ -10231,7 +10231,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.2.27';
+  const VISIBLE_RELEASE = '8.2.28';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

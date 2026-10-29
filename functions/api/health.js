@@ -17,7 +17,7 @@ export async function onRequest(context) {
   return new Response(
     JSON.stringify({
       ok: true,
-      release: '8.2.27',
+      release: '8.2.28',
       accountEmail,
       discordScheduling,
       discordLoadoutReader:loadoutReaderReady(context?.env)?'ready':'disabled',

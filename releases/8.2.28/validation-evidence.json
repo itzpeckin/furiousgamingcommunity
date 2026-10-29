@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.28",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false,
+      "basis": "unchanged schema; full strict gate required"
+    },
+    "focusedTests": {
+      "passed": true,
+      "tests": 22
+    },
+    "automatedTests": {
+      "strict": true,
+      "passed": true,
+      "tests": 693
+    },
+    "browserFaultFixtures": {
+      "passed": true,
+      "checks": 12,
+      "widths": [
+        1440,
+        390
+      ],
+      "liveEmailsSent": 0,
+      "simulatedFailures": [
+        "network interruption",
+        "expired reset link",
+        "email throttle",
+        "incorrect credentials",
+        "duplicate submit",
+        "saved application with lost response"
+      ]
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "liveCollectionExecuted": false,
+    "liveDiscordMessagesSent": false,
+    "liveEmailsSent": false,
+    "separateWorkerChangeRequired": false,
+    "databaseMigrationRequired": false
+  }
+}
