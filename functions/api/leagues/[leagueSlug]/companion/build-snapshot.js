@@ -668,14 +668,22 @@ export async function onRequestPost(context){
     const pendingRecords=plan.records.slice(cursor,cursor+requestLimit);
     // One bounded SQL statement per payload replaces hundreds of serialized D1
     // inserts. Keep the checkpoint cursor and replay-safe upsert contract intact.
-    let chunk=[],bytes=2;
+    let chunk=[],bytes=2,statements=[];
+    const writeBatch=async()=>{
+      if(statements.length===1)await statements[0].run();
+      else if(statements.length)await db.batch(statements);
+      statements=[];
+    };
     const flush=async()=>{
       if(!chunk.length)return;
-      await db.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json)
+      statements.push(db.prepare(`INSERT INTO league_snapshot_records (snapshot_id,league_id,domain,external_id,data_json)
         SELECT ?,?,?,json_extract(value,'$[0]'),json_extract(value,'$[1]') FROM json_each(?) WHERE 1
         ON CONFLICT(snapshot_id,domain,external_id) DO UPDATE SET data_json=excluded.data_json`)
-        .bind(snapshot.id,league.id,domain,`[${chunk.join(',')}]`).run();
+        .bind(snapshot.id,league.id,domain,`[${chunk.join(',')}]`));
       chunk=[];bytes=2;
+      // At most four existing byte-bounded payloads share one D1 round trip.
+      // The cursor advances only after every write succeeds; retries upsert.
+      if(statements.length===4)await writeBatch();
     };
     for(const record of pendingRecords){
       const encoded=JSON.stringify([record.externalId,record.item]);
@@ -684,6 +692,7 @@ export async function onRequestPost(context){
       chunk.push(encoded);bytes+=size;
     }
     await flush();
+    await writeBatch();
     const storedCount=Number((await db.prepare(`SELECT COUNT(*) count FROM league_snapshot_records
       WHERE snapshot_id=? AND league_id=? AND domain=?`).bind(snapshot.id,league.id,domain).first())?.count||0);
     const nextCursor=cursor+pendingRecords.length;

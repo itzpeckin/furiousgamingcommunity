@@ -470,16 +470,17 @@ async function insertRows(db,runId,leagueId,rows){
   await flush();
 }
 async function rebuildRunSummary(db,runId){
-  const categories=await db.prepare(`SELECT category,COUNT(*) count FROM companion_canonical_statistics_preview WHERE mapping_run_id=? GROUP BY category`).bind(runId).all();
+  const [categories,counts,batchCounts,warningRows]=await Promise.all([
+    db.prepare(`SELECT category,COUNT(*) count FROM companion_canonical_statistics_preview WHERE mapping_run_id=? GROUP BY category`).bind(runId).all(),
+    db.prepare(`SELECT COUNT(*) record_count,SUM(CASE WHEN player_external_id IS NOT NULL THEN 1 ELSE 0 END) player_rows FROM companion_canonical_statistics_preview WHERE mapping_run_id=?`).bind(runId).first(),
+    db.prepare(`SELECT COALESCE(SUM(resolved_player_count),0) resolved,COALESCE(SUM(unresolved_player_count),0) unresolved,COALESCE(SUM(warning_count),0) warnings FROM companion_statistics_mapping_batches WHERE mapping_run_id=?`).bind(runId).first(),
+    db.prepare(`SELECT warnings_json FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND warning_count>0 ORDER BY route_path`).bind(runId).all()
+  ]);
   const summary={};for(const row of categories.results||[])summary[row.category]=Number(row.count||0);
-  const counts=await db.prepare(`SELECT COUNT(*) record_count,SUM(CASE WHEN player_external_id IS NOT NULL THEN 1 ELSE 0 END) player_rows FROM companion_canonical_statistics_preview WHERE mapping_run_id=?`).bind(runId).first();
-  const batchCounts=await db.prepare(`SELECT COALESCE(SUM(resolved_player_count),0) resolved,COALESCE(SUM(unresolved_player_count),0) unresolved,COALESCE(SUM(warning_count),0) warnings FROM companion_statistics_mapping_batches WHERE mapping_run_id=?`).bind(runId).first();
-  const warningRows=await db.prepare(`SELECT warnings_json FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND warning_count>0 ORDER BY route_path`).bind(runId).all();
   const warnings=[];for(const row of warningRows.results||[])warnings.push(...safeParse(row.warnings_json,[]));
   await db.prepare(`UPDATE companion_statistics_mapping_runs SET record_count=?,resolved_player_count=?,unresolved_player_count=?,category_summary_json=?,warning_count=?,warnings_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(Number(counts?.record_count||0),Number(batchCounts?.resolved||0),Number(batchCounts?.unresolved||0),JSON.stringify(summary),Number(batchCounts?.warnings||0),JSON.stringify(warnings),runId).run();
 }
-async function processNext(db,env,leagueId,runId){
-  const run=await db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=? AND league_id=?`).bind(runId,leagueId).first();
+async function processNext(db,env,leagueId,runId,run){
   if(!run)throw Object.assign(new Error('Statistics mapping run not found.'),{status:404});
   if(run.status==='pending-preview'||run.status==='partial-preview')return{complete:true};
   const batch=await db.prepare(`SELECT * FROM companion_statistics_mapping_batches WHERE mapping_run_id=? AND status IN ('processing','pending') ORDER BY CASE status WHEN 'processing' THEN 0 ELSE 1 END,route_path LIMIT 1`).bind(runId).first();
@@ -576,9 +577,10 @@ export async function onRequestPost(context){
     if(action==='next'){
       const runId=text(body.runId);if(!runId)return json({ok:false,error:'runId is required.'},400);
       const requestedBatches=Math.max(1,Math.min(4,Number(body.batches)||1));
+      const retainedRun=await state.db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=? AND league_id=?`).bind(runId,state.league.id).first();
       let result=null;
       for(let index=0;index<requestedBatches;index++){
-        result=await processNext(state.db,context.env,state.league.id,runId);
+        result=await processNext(state.db,context.env,state.league.id,runId,retainedRun);
         if(result.complete)break;
       }
       const run=await state.db.prepare(`SELECT * FROM companion_statistics_mapping_runs WHERE id=?`).bind(runId).first();

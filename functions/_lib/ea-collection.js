@@ -1,5 +1,5 @@
 import { EaClientError } from './ea-client.js';
-import { normalizeEaHub, eaCapturePlan, beginEaCapture, storeEaCapture, finalizeEaCapture } from './ea-capture.js';
+import { normalizeEaHub, eaCapturePlan, beginEaCapture, storeEaCapture, finalizeEaCapture, flushEaCaptureCache } from './ea-capture.js';
 
 const MAX_REQUESTS = 100;
 const MODES = ['preview', 'weekly', 'yearly'];
@@ -12,23 +12,31 @@ const adapter = { normalizeEaHub, eaCapturePlan, beginEaCapture, storeEaCapture,
 export async function runEaCollectionBatch(options,{batchSize=1,now=Date.now}={}){
   const started=now(),limit=Math.max(1,Math.min(4,Math.floor(Number(batchSize)||1)));
   const timing={...(options.state?.timing||{})};
-  let providerMs=0,providerCalls=0;
+  let providerMs=0,providerCalls=0,storageMs=0;
   const client=Object.fromEntries(Object.entries(options.client).map(([name,method])=>[name,
     typeof method!=='function'?method:async(...args)=>{
       const before=now();
       try{return await method(...args)}finally{providerMs+=Math.max(0,now()-before);providerCalls++}
     }]));
+  const timeStorage=async work=>{const before=now();try{return await work();}finally{storageMs+=Math.max(0,now()-before);}};
+  const capture={...(options.capture||adapter)};
+  for(const name of ['beginEaCapture','storeEaCapture','finalizeEaCapture']){
+    const method=capture[name];capture[name]=(...args)=>timeStorage(()=>method(...args));
+  }
   let state=options.state||{},result;
   const captureCache=new Map();
   for(let index=0;index<limit;index++){
     const initialized=state.initialized;
-    result=await runEaCollectionStep({...options,client,state,captureCache});
+    if(initialized&&state.cursor>=state.expectedRequests?.length)await timeStorage(()=>flushEaCaptureCache(options.bucket,captureCache));
+    result=await runEaCollectionStep({...options,client,capture,state,captureCache,deferManifest:true});
     state=result.state;
     if(result.done||!initialized||now()-started>=15000)break;
   }
+  await timeStorage(()=>flushEaCaptureCache(options.bucket,captureCache));
   state.timing={checkpointCount:Number(timing.checkpointCount||0)+1,
     providerCalls:Number(timing.providerCalls||0)+providerCalls,
     providerMs:Number(timing.providerMs||0)+providerMs,
+    storageMs:Number(timing.storageMs||0)+storageMs,
     processingMs:Number(timing.processingMs||0)+Math.max(0,now()-started)};
   if(result.done){state.result={...state.result,timing:state.timing};result.result=state.result;}
   return {...result,state};
@@ -108,12 +116,12 @@ function isAuthenticationFailure(error) {
 }
 
 /** One bounded collection checkpoint. State is private and must be encrypted by the caller. */
-export async function runEaCollectionStep({ db, bucket, league, connection, job, client, token, state = {}, capture = adapter, captureCache }) {
+export async function runEaCollectionStep({ db, bucket, league, connection, job, client, token, state = {}, capture = adapter, captureCache, deferManifest=false }) {
   assertScope(league, connection, job, state);
   if (state.done) return { state, done: true, result: state.result, step: 'Collection complete', progress: 100 };
   const externalLeagueId = Number(connection.external_league_id);
   const platform = connection.platform;
-  const common = { db, bucket, leagueId: league.id, collectionId: job.id, platform, externalLeagueId: connection.external_league_id, captureCache };
+  const common = { db, bucket, leagueId: league.id, collectionId: job.id, platform, externalLeagueId: connection.external_league_id, captureCache, deferManifest };
 
   if (!state.initialized) {
     const session = await client.login(token, platform);
