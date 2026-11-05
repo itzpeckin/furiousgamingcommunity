@@ -601,13 +601,14 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     const response=await binding.fetch('https://franchise-import.internal/schedule/start',{
       method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
         leagueSlug:league.slug,origin,snapshotId,source:effectiveSource,
-        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v2:${opening?.launched?'opening-week-one:':''}${presentationKey}`,importAuthToken:token
+        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v3-opening-posts:${opening?.launched?'opening-week-one:':''}${presentationKey}`,importAuthToken:token
       })
     }).catch(()=>null);
     if(!response)return{scheduled:false,reason:'durable-schedule-start-failed',
       detail:'Discord scheduling is temporarily unavailable. In League Controls → Discord Bot, select Retry Schedule Sync.'};
     const result=await response.json().catch(()=>({}));
-    return response.ok&&result.ok?{scheduled:true,durable:true,workflowId:result.id,source:effectiveSource}
+    return response.ok&&result.ok?{scheduled:true,durable:true,workflowId:result.id,source:effectiveSource,
+      workflowStatus:clean(result.status?.status).toLowerCase()}
       :{scheduled:false,reason:'durable-schedule-start-failed',detail:result.error||`HTTP ${response.status}`};
   }
   const work = (async()=>{

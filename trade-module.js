@@ -704,6 +704,9 @@ async function updateCommissionerDiscord(action,detail={}){
    'launch-week-one':['Week 1 launch requested','Regular-season threads are being prepared. Preseason games remain excluded. Select Refresh Status to check progress.'],
    'retry-schedule-sync':['Schedule sync requested','Select Refresh Status to check progress. Existing tracked threads are reused; prior-week cleanup requires a verified week advance.']
   };
+  if(['retry-schedule-sync','launch-week-one'].includes(action)&&['complete','completed'].includes(data.scheduleRecovery?.workflowStatus)){
+   messages[action]=['Schedule sync is complete','The current scheduling job has already finished. Its latest result is shown below; no new export or import is needed.'];
+  }
   showToast(...(messages[action]||['Discord connection saved','This Discord server is connected to this league.']));
   renderCommissioner('controls');
  }catch(error){if(revision===commissionerDiscordRevision&&slug===commissionerLeagueSlug()){

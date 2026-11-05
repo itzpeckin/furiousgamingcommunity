@@ -288,7 +288,7 @@
         "file": "styles.css"
       },
       {
-        "bytes": 461020,
+        "bytes": 461335,
         "file": "trade-module.js"
       },
       {
@@ -296,7 +296,7 @@
         "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
-        "bytes": 237346,
+        "bytes": 240601,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -1997,7 +1997,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.31",
+  "release": "8.2.32",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [
