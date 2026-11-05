@@ -3,7 +3,8 @@
   "version": "8.2.32",
   "status": "implementation-authorized",
   "productionChanged": false,
-  "dataChanged": true,
+  "dataChanged": false,
+  "candidateEvidenceScope": "8.2.32 candidate was tested in isolation. The separately authorized live recovery on deployed 8.2.31 is recorded under liveRecovery.",
   "credentialsChanged": false,
   "baselineGate": {
     "unregisteredFailures": 0
@@ -40,6 +41,7 @@
     "databaseMigrationRequired": false
   },
   "liveRecovery": {
+    "dataChanged": true,
     "league": "FGC",
     "season": 2028,
     "week": 13,
