@@ -2823,6 +2823,35 @@ async function schedulePresentationFixture(){
   return {database,db,env,league,snapshotId,calls,sync,fetchImpl,intercept(fn){intercept=fn}};
 }
 
+test('schedule sync upgrades existing opening posts in place, retries throttling and skips unchanged posts',async()=>{
+  const f=await schedulePresentationFixture();try{
+    await f.sync();
+    const original=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
+    f.database.exec("UPDATE discord_schedule_threads SET presentation_json=json_remove(presentation_json,'$.openingContent')");
+    f.calls.length=0;
+    f.intercept(c=>c.method==='PATCH'&&c.url.includes('/messages/')?Response.json({message:'Rate limited',retry_after:1},{status:429}):null);
+    const paused=await f.sync({maxOperations:1});
+    assert.equal(paused.hasMore,true);
+    assert.equal(JSON.parse(f.database.prepare('SELECT presentation_json FROM discord_schedule_threads').get().presentation_json).openingContent,undefined);
+    f.intercept(null);f.calls.length=0;
+    assert.equal((await f.sync({maxOperations:1})).ok,true);
+    assert.equal(f.calls.length,1);
+    assert.equal(f.calls[0].method,'PATCH');
+    assert.ok(f.calls[0].url.endsWith(`/channels/${original.parent_channel_id}/messages/${original.starter_message_id}`));
+    assert.match(f.calls[0].body.content,/San Francisco 49ers.*at.*Tampa Bay Buccaneers/);
+    assert.match(f.calls[0].body.content,/🟢 Clinched/);
+    assert.deepEqual(f.calls[0].body.allowed_mentions,{parse:[]});
+    const updated=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
+    assert.equal(updated.discord_thread_id,original.discord_thread_id);
+    assert.equal(updated.starter_message_id,original.starter_message_id);
+    assert.equal(JSON.parse(updated.presentation_json).name,JSON.parse(original.presentation_json).name);
+    f.calls.length=0;await f.sync();assert.equal(f.calls.length,0);
+    seedSnapshotRecord(f.database,{snapshotId:f.snapshotId,leagueId:f.league.id,domain:'standings',externalId:'tb-standing',data:{teamId:'1001',totalWins:8,totalLosses:4,totalTies:1}});
+    await f.sync();assert.equal(f.calls.length,1);assert.match(f.calls[0].body.content,/Tampa Bay Buccaneers \(8-4-1\)/);
+    f.calls.length=0;await f.sync();assert.equal(f.calls.length,0);
+  }finally{f.database.close();}
+});
+
 test('schedule titles follow imported completion, including zero-score finals, without duplicate threads or needless writes',async()=>{
   const f=await schedulePresentationFixture();try{
     assert.equal((await f.sync()).ok,true);
