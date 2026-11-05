@@ -254,6 +254,18 @@ for(const optimized of [false,true])test(`272-game full-season build and retaine
       get:async key=>{if(key.startsWith('snapshot-build-plans/'))planReads++;return objects.has(key)?{text:async()=>objects.get(key),arrayBuffer:async()=>new TextEncoder().encode(objects.get(key)).buffer}:null;},
       put:async(key,value)=>{if(key.startsWith('snapshot-build-plans/'))planWrites++;objects.set(key,value);}
     }};
+    let writeStatements=0,batchedStatements=0,writeBatches=0;
+    const prepare=db.prepare,batch=db.batch;
+    const tracked=statement=>({...statement,bind(...values){return tracked(statement.bind(...values));},async run(){
+      if(statement.sql.includes('INSERT INTO league_snapshot_records'))writeStatements++;
+      return statement.run();
+    }});
+    db.prepare=sql=>tracked(prepare(sql));
+    db.batch=async statements=>{
+      const writes=statements.filter(item=>item.sql.includes('INSERT INTO league_snapshot_records'));
+      if(writes.length){writeBatches++;batchedStatements+=writes.length;assert.ok(writes.length<=4);}
+      return batch(statements);
+    };
     const context=body=>({request:new Request('https://franchisehq.app/api/leagues/fgc/companion/test',{method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},body:JSON.stringify(body)}),params:{leagueSlug:'fgc'},env});
     const mapped=await mapSchedule(context({discoverySessionId:'capture-1'}));
     assert.equal(mapped.status,200);const mapping=await mapped.json();assert.equal(mapping.mappingRun.gameCount,272);
@@ -307,7 +319,11 @@ for(const optimized of [false,true])test(`272-game full-season build and retaine
     const totalRecords=32+2046+272+statisticCount+32;
     assert.equal(result.complete,true);assert.equal(result.buildJob.processedCount,totalRecords);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM league_snapshot_records WHERE snapshot_id=?`).get(buildSnapshotId).count,totalRecords);
-    if(optimized)assert.ok(buildCalls<=8,`server build calls: ${buildCalls}`);
+    if(optimized){
+      assert.ok(buildCalls<=8,`server build calls: ${buildCalls}`);
+      assert.ok(writeBatches>0&&batchedStatements>writeBatches,'large snapshot payloads share bounded D1 transactions');
+    }
+    t.diagnostic(`snapshot write statements=${writeStatements}, D1 write round trips=${writeStatements-batchedStatements+writeBatches}`);
     assert.equal(planWrites,1,'Statistics are assembled and stored once across all build checkpoints.');
     assert.ok(planReads>=3,'Later statistics checkpoints reuse the retained plan.');
     assert.equal(result.snapshot.weekIndex,1);assert.equal(result.snapshot.counts.games,272);

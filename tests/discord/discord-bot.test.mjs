@@ -1899,7 +1899,7 @@ test('/week14 bootstraps one commissioner league and creates identity-driven mat
     assert.match(payload.data.content,/Week 14 schedule synchronized/i);
     const starter=requests.find(item=>/\/messages$/.test(item.url));
     assert.match(starter.body.content,/🟢 San Francisco 49ers \(15-1\) at 🟢 Tampa Bay Buccaneers \(16-0\)/);
-    assert.match(starter.body.content,/🟢 Clinched · ⚪ In contention · 🔴 Eliminated/);
+    assert.doesNotMatch(starter.body.content,/Clinched|In contention|Eliminated|Status unavailable/);
     assert.equal(requests.find(item=>/\/threads$/.test(item.url)).body.name,'🆚 Week 14 - San Francisco 49ers vs. Tampa Bay Buccaneers');
     assert.equal(requests.filter(item=>/\/messages$/.test(item.url)).length,1,'records and status reuse the original post');
     assert.match(starter.body.content,/<@100000000000000011>/);
@@ -2840,7 +2840,7 @@ test('schedule sync upgrades existing opening posts in place, retries throttling
     assert.equal(f.calls[0].method,'PATCH');
     assert.ok(f.calls[0].url.endsWith(`/channels/${original.parent_channel_id}/messages/${original.starter_message_id}`));
     assert.match(f.calls[0].body.content,/San Francisco 49ers.*at.*Tampa Bay Buccaneers/);
-    assert.match(f.calls[0].body.content,/🟢 Clinched/);
+    assert.doesNotMatch(f.calls[0].body.content,/Clinched|In contention|Eliminated|Status unavailable/);
     assert.deepEqual(f.calls[0].body.allowed_mentions,{parse:[]});
     const updated=f.database.prepare('SELECT * FROM discord_schedule_threads').get();
     assert.equal(updated.discord_thread_id,original.discord_thread_id);
@@ -2981,7 +2981,7 @@ test('durable schedule identity upgrades completed old jobs and changes only whe
     }}},request:new Request('https://franchisehq.app')};
     const start=()=>scheduleActiveDiscordSync(context,{db:f.db,league:f.league,snapshotId:f.snapshotId,requestedBySessionId:'session-comm'});
     await start();await start();assert.equal(starts[0].workflowKey,starts[1].workflowKey);
-    assert.match(starts[0].workflowKey,/:thread-history-v3-opening-posts:/);
+    assert.match(starts[0].workflowKey,/:thread-history-v4-icons-only:/);
     assert.notEqual(starts[0].workflowKey,`${f.snapshotId}:candidate-import`);
     seedMember(f.database,{leagueId:f.league.id,userId:'comm2',discordId:'100000000000000022',role:'commissioner',teamId:null});
     await start();assert.notEqual(starts[2].workflowKey,starts[0].workflowKey);
@@ -2991,7 +2991,7 @@ test('durable schedule identity upgrades completed old jobs and changes only whe
   }finally{f.database.close()}
 });
 
-test('current post refresh dispatch bypasses completed pre-refresh Workflow and reuses its own completion',async()=>{
+for(const previousRevision of ['thread-history-v2','thread-history-v3-opening-posts'])test(`current post refresh bypasses completed ${previousRevision} Workflow and reuses its own completion`,async()=>{
   const f=await schedulePresentationFixture();try{
     seedMember(f.database,{leagueId:f.league.id,userId:'comm',role:'commissioner',teamId:null});
     await seedSession(f.database,{userId:'comm',token:'test-session'});
@@ -3012,7 +3012,7 @@ test('current post refresh dispatch bypasses completed pre-refresh Workflow and 
     const presentationKey=await hashToken(JSON.stringify(['100000000000000001','100000000000000055',members]));
     const old=await(await dispatch(null,{method:'POST',body:JSON.stringify({leagueSlug:f.league.slug,origin:'https://franchisehq.app',
       snapshotId:f.snapshotId,source:'candidate-import',importAuthToken:'test-token',
-      workflowKey:`${f.snapshotId}:candidate-import:thread-history-v2:${presentationKey}`})})).json();
+      workflowKey:`${f.snapshotId}:candidate-import:${previousRevision}:${presentationKey}`})})).json();
     assert.equal(old.ok,true);
     f.database.exec("UPDATE discord_schedule_threads SET presentation_json=json_remove(presentation_json,'$.openingContent')");
     f.calls.length=0;

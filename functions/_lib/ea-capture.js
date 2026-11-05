@@ -235,7 +235,7 @@ export async function beginEaCapture({db,bucket,league,actorId,hub:hubInput,plat
   return {...manifest,manifestKey:key};
 }
 
-export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,kind,args={},payload,hub:hubInput,platform,externalLeagueId,captureCache}) {
+export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,kind,args={},payload,hub:hubInput,platform,externalLeagueId,captureCache,deferManifest=false}) {
   const cacheKey=manifestKey(leagueId,collectionId);
   const manifest = captureCache?.get(cacheKey) || await readManifest(bucket,leagueId,collectionId);
   if (manifest.sessionId !== sessionId || manifest.status !== 'collecting'
@@ -263,26 +263,37 @@ export async function storeEaCapture({db,bucket,leagueId,sessionId,collectionId,
   await boundedMap(key===rawKey?[[rawKey,raw]]:[[rawKey,raw],[key,serialized]],2,
     ([objectKey,value])=>bucket.put(objectKey,value,{httpMetadata:{contentType:'application/json'}}));
   const captureId = `ea_capture_${await sha256Hex(`${leagueId}:${routePath}:${payloadHash}`)}`;
-  await db.prepare(`INSERT OR IGNORE INTO companion_route_captures
+  // Persist and link the exact retained capture atomically in one D1 round trip.
+  // The subquery also handles payloads retained under an older capture identity.
+  const stored=await db.batch([db.prepare(`INSERT OR IGNORE INTO companion_route_captures
     (id,league_id,discovery_session_id,route_path,request_method,content_type,byte_length,payload_hash,
      r2_object_key,top_level_keys_json,collections_json,request_headers_json,received_at)
     VALUES (?,?,?,?,?,'application/json',?,?,?,?,?,?,?)`).bind(
       captureId,leagueId,manifest.rawSessionId,routePath,'POST',byteLength,payloadHash,key,
       JSON.stringify(shape.topLevelKeys),JSON.stringify(shape.collections),JSON.stringify({source:'ea-direct',collectionId,
-        connectionId:manifest.connectionId,gameYearId:manifest.gameYearId,franchiseSeasonId:manifest.franchiseSeasonId,mode:manifest.mode}),now).run();
-  const retained = await db.prepare(`SELECT id FROM companion_route_captures WHERE league_id=? AND route_path=? AND payload_hash=?`)
-    .bind(leagueId,routePath,payloadHash).first();
+        connectionId:manifest.connectionId,gameYearId:manifest.gameYearId,franchiseSeasonId:manifest.franchiseSeasonId,mode:manifest.mode}),now),
+    db.prepare(`INSERT OR IGNORE INTO madden_discovery_session_captures
+      (league_id,session_id,capture_id,route_path,observed_at)
+      SELECT ?,?,id,?,? FROM companion_route_captures WHERE league_id=? AND route_path=? AND payload_hash=?`)
+      .bind(leagueId,manifest.rawSessionId,routePath,now,leagueId,routePath,payloadHash),
+    db.prepare(`SELECT id FROM companion_route_captures WHERE league_id=? AND route_path=? AND payload_hash=?`)
+      .bind(leagueId,routePath,payloadHash)]);
+  const retained=stored[2]?.results?.[0];
   if (!retained) fail('EA data could not be retained.');
-  await db.prepare(`INSERT OR IGNORE INTO madden_discovery_session_captures
-    (league_id,session_id,capture_id,route_path,observed_at) VALUES (?,?,?,?,?)`)
-    .bind(leagueId,manifest.rawSessionId,retained.id,routePath,now).run();
   const hasCollection = shape.collections.some(item=>Number.isInteger(item.count));
   const outcome = {kind,args,routePath,captureId:retained.id,rawKey,rawHash,
     success:canonical?.success !== false && !canonical?.error && (kind === 'hub' || hasCollection),receivedAt:now};
   manifest.requests = manifest.requests.filter(item=>item.routePath !== routePath).concat(outcome);
-  await writeManifest(bucket,manifest);
+  if(!deferManifest||!captureCache)await writeManifest(bucket,manifest);
   captureCache?.set(cacheKey,manifest);
   return outcome;
+}
+
+// A batch must flush before its durable cursor is saved or finalization reads
+// the manifest. Interrupted batches replay immutable payloads and exact links.
+export async function flushEaCaptureCache(bucket,captureCache){
+  for(const manifest of captureCache.values())await writeManifest(bucket,manifest);
+  captureCache.clear();
 }
 
 async function retainReport(db, manifest, report, readiness, actorId) {
@@ -337,8 +348,12 @@ export async function finalizeEaCapture({db,bucket,leagueId,sessionId,collection
   const rosterComplete = rosterRequests.length > 0 && rosterRequests.every(item=>outcomes.get(routeFor(manifest.platform,manifest.externalLeagueId,item.kind,item.args))?.success === true);
   const selected = manifest.requests.filter(item=>item.success && !['roster','free-agents'].includes(item.kind)
     || rosterComplete && (item.kind === 'roster' || item.kind === 'free-agents'));
+  const retainedRows=selected.length?(await db.prepare(`SELECT id,route_path,byte_length,payload_hash,r2_object_key
+    FROM companion_route_captures WHERE league_id=? AND id IN (SELECT value FROM json_each(?))`)
+    .bind(leagueId,JSON.stringify(selected.map(item=>item.captureId))).all()).results||[]:[];
+  const retainedById=new Map(retainedRows.map(row=>[row.id,row]));
   const captures = await boundedMap(selected,4,async item => {
-    const row = await db.prepare(`SELECT * FROM companion_route_captures WHERE league_id=? AND id=?`).bind(leagueId,item.captureId).first();
+    const row = retainedById.get(item.captureId);
     const object = row?.r2_object_key ? await bucket.get(row.r2_object_key) : null;
     if (!object) fail('A retained EA payload is unavailable; publication is paused.');
     return {captureId:row.id,routePath:row.route_path,byteLength:row.byte_length,payloadHash:row.payload_hash,

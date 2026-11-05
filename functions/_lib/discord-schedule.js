@@ -58,7 +58,6 @@ function gameMessage({league,model,game,assignments,phase,week}) {
       `**${league.name} · ${phaseLabel} Week ${week}**`,
       `**${model.scheduleTeamSummaries.get(teams.away.teamKey)} at ${model.scheduleTeamSummaries.get(teams.home.teamKey)}**`,
       `${ownerMention(awayOwner)} vs ${ownerMention(homeOwner)}`,
-      '🟢 Clinched · ⚪ In contention · 🔴 Eliminated · ❔ Status unavailable (record-based)',
       game.scheduledAt ? `Scheduled: ${game.scheduledAt}` : null,
       `[Open the league schedule](${site})`
     ].filter(Boolean).join('\n').slice(0,2000),
@@ -601,7 +600,7 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     const response=await binding.fetch('https://franchise-import.internal/schedule/start',{
       method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
         leagueSlug:league.slug,origin,snapshotId,source:effectiveSource,
-        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v3-opening-posts:${opening?.launched?'opening-week-one:':''}${presentationKey}`,importAuthToken:token
+        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v4-icons-only:${opening?.launched?'opening-week-one:':''}${presentationKey}`,importAuthToken:token
       })
     }).catch(()=>null);
     if(!response)return{scheduled:false,reason:'durable-schedule-start-failed',

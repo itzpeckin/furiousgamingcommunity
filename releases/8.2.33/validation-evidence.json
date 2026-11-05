@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.33",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false,
+      "basis": "unchanged schema; strict gate required"
+    },
+    "focusedTests": {
+      "passed": true,
+      "coverage": [
+        "EA atomic capture/link transaction",
+        "legacy identity and interrupted manifest replay",
+        "final manifest flush before publication",
+        "one scoped finalization metadata read",
+        "identical full-season snapshot and bounded bulk writes",
+        "icons without legend; completed prior-job upgrade"
+      ]
+    },
+    "automatedTests": {
+      "tests": 702,
+      "output": "outputs/fhq833-strict.txt",
+      "strictGatePassed": true,
+      "passed": true
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "liveCollectionExecuted": false,
+    "liveDiscordMessagesSent": false,
+    "separateWorkerChangeRequired": false,
+    "databaseMigrationRequired": false
+  },
+  "configuration": {
+    "previewSmartPlacement": "enabled; other settings verified unchanged",
+    "productionSmartPlacement": "pending release validation"
+  },
+  "measurements": {
+    "latestImportMs": 166959,
+    "earlierComparableImportMs": 43497,
+    "latestExportWallSeconds": 223,
+    "latestEaProviderMs": 18289,
+    "latestExportProcessingMs": 203567,
+    "fixtureSnapshotWriteRoundTrips": {
+      "before": 16,
+      "after": 8
+    },
+    "captureRetentionRoundTripsPerDataset": {
+      "before": 3,
+      "after": 1
+    },
+    "productionSpeedTargetVerified": false
+  }
+}

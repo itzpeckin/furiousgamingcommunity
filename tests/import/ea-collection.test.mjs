@@ -51,6 +51,23 @@ async function finish(options, firstState = {}) {
   assert.fail('collection did not complete within its bounded request limit');
 }
 
+test('EA batch flushes all final dataset evidence before publication and rejects failed checkpoint storage',async()=>{
+  const {options}=fixture();const initial=await runEaCollectionStep(options);
+  const state={...initial.state,cursor:initial.state.expectedRequests.length-2};
+  let persisted=null,fail=false,finalized=false;
+  options.bucket={put:async(_key,value)=>{if(fail)throw Error('storage unavailable');persisted=JSON.parse(value);}};
+  options.capture.storeEaCapture=async args=>{
+    assert.equal(args.deferManifest,true);
+    const manifest=args.captureCache.get('manifest')||{leagueId:'league-a',collectionId:'job-a',requests:[]};
+    manifest.requests.push(args.kind);args.captureCache.set('manifest',manifest);
+  };
+  options.capture.finalizeEaCapture=async()=>{assert.equal(persisted.requests.length,2);finalized=true;return{readiness:{ready:true}};};
+  fail=true;await assert.rejects(runEaCollectionBatch({...options,state:structuredClone(state)},{batchSize:4}),/storage unavailable/);
+  assert.equal(finalized,false);fail=false;
+  const result=await runEaCollectionBatch({...options,state:structuredClone(state)},{batchSize:4});
+  assert.equal(result.done,true);assert.equal(finalized,true);
+});
+
 test('offseason phase changes during collection cannot publish a mixed roster',async()=>{
   const {options,finalized}=fixture();let hubs=0;
   options.client.hub=async()=>{
@@ -131,6 +148,7 @@ test('batched EA collection keeps all 52 datasets and ordered session requests i
   assert.equal(stored.length,52);assert.equal(calls.filter(x=>x.kind==='roster').length,32);
   assert.equal(state.result.timing.checkpointCount,14);
   assert.equal(state.result.timing.providerCalls,54);
+  assert.ok(Number.isFinite(state.result.timing.storageMs)&&state.result.timing.storageMs>=0);
   assert.equal(JSON.stringify(state.result.timing).includes('private'),false);
 });
 
@@ -313,7 +331,7 @@ test('controller preserves safe bounded retry evidence through credential renewa
       bind(...next) { return statement(sql, next); },
       async first() { return sqlite.prepare(sql).get(...values) || null; },
       async all() { return { results: sqlite.prepare(sql).all(...values) }; },
-      async run() { return { meta: { changes: Number(sqlite.prepare(sql).run(...values).changes) } }; }
+      async run() { const query=sqlite.prepare(sql);return query.columns().length?{results:query.all(...values)}:{ meta: { changes: Number(query.run(...values).changes) } }; }
     });
     const db = { prepare: sql => statement(sql), async batch(items) { sqlite.exec('BEGIN'); try { const result = []; for (const item of items) result.push(await item.run()); sqlite.exec('COMMIT'); return result; } catch (error) { sqlite.exec('ROLLBACK'); throw error; } } };
     const objects = new Map();

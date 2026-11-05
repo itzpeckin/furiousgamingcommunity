@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
-import { beginEaCapture, storeEaCapture, finalizeEaCapture, normalizeEaHub, eaCapturePlan } from '../../functions/_lib/ea-capture.js';
+import { beginEaCapture, storeEaCapture, finalizeEaCapture, normalizeEaHub, eaCapturePlan, flushEaCaptureCache } from '../../functions/_lib/ea-capture.js';
 import { generateMaddenDiscoveryReport, latestMaddenDiscoveryReport, stitchRecentPartialMaddenCohort } from '../../functions/_lib/madden-discovery-report.js';
 import { retainedPeriodBundle } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { candidateSourceCoverage, candidateCoverageWarnings } from '../../functions/_lib/candidate-import.js';
@@ -15,7 +15,7 @@ function d1(database) {
     bind(...next){ return statement(sql,next); },
     async first(){ return database.prepare(sql).get(...values) || null; },
     async all(){ return {results:database.prepare(sql).all(...values)}; },
-    async run(){ return {meta:{changes:Number(database.prepare(sql).run(...values).changes)}}; }
+    async run(){ const query=database.prepare(sql);return query.columns().length?{results:query.all(...values)}:{meta:{changes:Number(query.run(...values).changes)}}; }
   });
   return {prepare:sql=>statement(sql),async batch(items){
     database.exec('BEGIN IMMEDIATE');
@@ -93,6 +93,43 @@ test('EA checkpoints share identical raw/canonical bytes and reuse only a reques
   assert.ok(records.find(r=>r.route_path.endsWith('/info')).r2_object_key.includes('/canonical/'));
   const manifest=JSON.parse([...f.objects].find(([key])=>key.endsWith('/manifest.json'))[1]);
   assert.equal(manifest.requests.length,3);
+ }finally{f.sqlite.close();}
+});
+
+test('EA batch retains exact capture identities in one transaction and flushes one recoverable manifest',async()=>{
+ const f=await fixture();try{
+  let batches=0,manifestWrites=0,failFlush=false;
+  const db={prepare:sql=>f.db.prepare(sql),batch:async items=>{batches++;return f.db.batch(items);}};
+  const bucket={get:key=>f.bucket.get(key),put:async(key,value,options)=>{
+    if(key.endsWith('/manifest.json')){manifestWrites++;if(failFlush)throw Error('temporary storage failure');}
+    return f.bucket.put(key,value,options);
+  }};
+  const cache=new Map(),store=request=>storeEaCapture({db,bucket,leagueId:f.league.id,sessionId:f.created.sessionId,
+    collectionId:'collection-preview',...request,payload:payloadFor(request),hub:f.hub,platform:'ps5',externalLeagueId:'1234',captureCache:cache,deferManifest:true});
+  for(const request of f.plan.slice(0,3))await store(request);
+  assert.equal(batches,3,'one D1 call per dataset instead of three');assert.equal(manifestWrites,0);
+  failFlush=true;await assert.rejects(flushEaCaptureCache(bucket,cache),/temporary storage failure/);assert.equal(cache.size,1);
+  failFlush=false;await flushEaCaptureCache(bucket,cache);assert.equal(cache.size,0);assert.equal(manifestWrites,2,'one failed flush plus one successful flush');
+  const manifest=JSON.parse([...f.objects].find(([key])=>key.endsWith('/manifest.json'))[1]);assert.equal(manifest.requests.length,3);
+  const teamCapture=f.sqlite.prepare("SELECT id FROM companion_route_captures WHERE route_path LIKE '%/leagueteams'").get();
+  f.sqlite.prepare('DELETE FROM madden_discovery_session_captures WHERE capture_id=?').run(teamCapture.id);
+  f.sqlite.prepare("UPDATE companion_route_captures SET id='legacy-team-capture' WHERE id=?").run(teamCapture.id);
+  const prior=f.sqlite.prepare('SELECT id FROM companion_route_captures ORDER BY id').all();
+  await store(f.plan[1]);await flushEaCaptureCache(bucket,cache);
+  assert.deepEqual(f.sqlite.prepare('SELECT id FROM companion_route_captures ORDER BY id').all(),prior);
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM madden_discovery_session_captures').get().n,3);
+  f.sqlite.exec("CREATE TRIGGER fail_capture_link BEFORE INSERT ON madden_discovery_session_captures BEGIN SELECT RAISE(ABORT,'link failed'); END");
+  await assert.rejects(store(f.plan[3]),/link failed/);
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM companion_route_captures').get().n,3,'failed linking rolls back capture metadata');
+  assert.equal(cache.size,0,'no cursor/manifest published for a failed transaction');
+ }finally{f.sqlite.close();}
+});
+
+test('EA finalization loads retained metadata once while still rejecting missing payloads',async()=>{
+ const f=await fixture();try{
+  await collect(f);let reads=0;const prepare=f.db.prepare;
+  f.db.prepare=sql=>{if(/FROM companion_route_captures WHERE league_id=\? AND id IN/.test(sql))reads++;return prepare(sql);};
+  const result=await f.finish();assert.equal(result.readiness.ready,true);assert.equal(reads,1);
  }finally{f.sqlite.close();}
 });
 
