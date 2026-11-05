@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.32",
+  "status": "implementation-authorized",
+  "productionChanged": false,
+  "dataChanged": true,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false,
+      "basis": "unchanged schema; strict gate required"
+    },
+    "focusedTests": {
+      "passed": true,
+      "tests": 4,
+      "coverage": [
+        "real Worker dispatch bypasses completed legacy job",
+        "new completion remains idempotent",
+        "current-post edit and throttle recovery",
+        "completed versus queued UI feedback"
+      ]
+    },
+    "automatedTests": {
+      "passed": true,
+      "tests": 698,
+      "status": "strict-gate-passed"
+    }
+  },
+  "scopeBoundaries": {
+    "liveImportExecuted": false,
+    "liveCollectionExecuted": false,
+    "liveDiscordMessagesSent": true,
+    "separateWorkerChangeRequired": false,
+    "databaseMigrationRequired": false
+  },
+  "liveRecovery": {
+    "league": "FGC",
+    "season": 2028,
+    "week": 13,
+    "openingPostsUpdated": 14,
+    "completedAt": "2026-11-05T14:09:42Z",
+    "method": "user-authorized Retry Schedule Sync under already deployed 8.2.31",
+    "errorsRemaining": 0
+  }
+}

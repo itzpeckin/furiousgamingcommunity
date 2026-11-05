@@ -7,6 +7,7 @@ import { currentTradeSeason } from '../../functions/_lib/trade-season.js';
 import { resolveLiveTradePlayer, ensureLiveTradePlayerIdentity } from '../../functions/_lib/trade-player.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import vm from 'node:vm';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -2980,13 +2981,47 @@ test('durable schedule identity upgrades completed old jobs and changes only whe
     }}},request:new Request('https://franchisehq.app')};
     const start=()=>scheduleActiveDiscordSync(context,{db:f.db,league:f.league,snapshotId:f.snapshotId,requestedBySessionId:'session-comm'});
     await start();await start();assert.equal(starts[0].workflowKey,starts[1].workflowKey);
-    assert.match(starts[0].workflowKey,/:thread-history-v2:/);
+    assert.match(starts[0].workflowKey,/:thread-history-v3-opening-posts:/);
     assert.notEqual(starts[0].workflowKey,`${f.snapshotId}:candidate-import`);
     seedMember(f.database,{leagueId:f.league.id,userId:'comm2',discordId:'100000000000000022',role:'commissioner',teamId:null});
     await start();assert.notEqual(starts[2].workflowKey,starts[0].workflowKey);
     seedLeague(f.database,{id:'other',slug:'other',guild:'100000000000000002'});
     seedMember(f.database,{leagueId:'other',userId:'other-comm',discordId:'100000000000000023',role:'commissioner',teamId:null});
     await start();assert.equal(starts[2].workflowKey,starts[3].workflowKey);
+  }finally{f.database.close()}
+});
+
+test('current post refresh dispatch bypasses completed pre-refresh Workflow and reuses its own completion',async()=>{
+  const f=await schedulePresentationFixture();try{
+    seedMember(f.database,{leagueId:f.league.id,userId:'comm',role:'commissioner',teamId:null});
+    await seedSession(f.database,{userId:'comm',token:'test-session'});
+    await f.sync();
+    const source=(await readFile(new URL('../../workers/franchise-import-worker/src/index.js',import.meta.url),'utf8'))
+      .replace("import { WorkflowEntrypoint } from 'cloudflare:workers';",'class WorkflowEntrypoint {}')
+      .replace("import { NonRetryableError } from 'cloudflare:workflows';",'class NonRetryableError extends Error {}')
+      .replace("export { DiscordPacing } from './discord-pacing.js';",'')
+      .replaceAll('export class ','class ').replace('export default{','globalThis.worker={');
+    const runtime=vm.createContext({Response,TextEncoder,crypto,URL,Date,console});vm.runInContext(source,runtime);
+    const instances=new Map(),created=[];
+    const binding={get:async id=>{if(!instances.has(id))throw Error('Not found');return{status:async()=>instances.get(id)};},
+      create:async({id,params})=>{created.push(id);await f.sync({source:params.source});instances.set(id,{status:'complete'});return{status:async()=>instances.get(id)};}};
+    const dispatch=async(_url,options)=>runtime.worker.fetch(new Request('https://franchise-import.internal/schedule/start',options),{FRANCHISE_SCHEDULE_WORKFLOW:binding});
+    const members=f.database.prepare(`SELECT lm.role,lm.team_id,u.discord_user_id FROM league_memberships lm
+      JOIN users u ON u.id=lm.user_id WHERE lm.league_id=? AND lm.active=1
+      AND (lm.role='commissioner' OR lm.team_id IS NOT NULL) AND u.discord_user_id IS NOT NULL ORDER BY lm.user_id`).all(f.league.id);
+    const presentationKey=await hashToken(JSON.stringify(['100000000000000001','100000000000000055',members]));
+    const old=await(await dispatch(null,{method:'POST',body:JSON.stringify({leagueSlug:f.league.slug,origin:'https://franchisehq.app',
+      snapshotId:f.snapshotId,source:'candidate-import',importAuthToken:'test-token',
+      workflowKey:`${f.snapshotId}:candidate-import:thread-history-v2:${presentationKey}`})})).json();
+    assert.equal(old.ok,true);
+    f.database.exec("UPDATE discord_schedule_threads SET presentation_json=json_remove(presentation_json,'$.openingContent')");
+    f.calls.length=0;
+    const context={env:{FRANCHISE_IMPORT_WORKER:{fetch:dispatch}},request:new Request('https://franchisehq.app')};
+    const start=()=>scheduleActiveDiscordSync(context,{db:f.db,league:f.league,snapshotId:f.snapshotId,requestedBySessionId:'session-comm'});
+    const fresh=await start();assert.notEqual(fresh.workflowId,old.id,'completed old work must not swallow the requested message refresh');
+    assert.equal(f.calls.filter(c=>c.method==='PATCH'&&c.url.includes('/messages/')).length,1);
+    const repeat=await start();assert.equal(repeat.workflowId,fresh.workflowId);assert.equal(repeat.workflowStatus,'complete');
+    assert.equal(created.length,2);assert.equal(f.calls.length,1,'completed new work must not resend or rename messages');
   }finally{f.database.close()}
 });
 

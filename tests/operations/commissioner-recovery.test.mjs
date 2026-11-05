@@ -64,14 +64,23 @@ function deferred(){let resolve;const promise=new Promise(done=>{resolve=done;})
 async function discordUI(fetchImpl){
   const full=await readFile(new URL('../../trade-module.js',import.meta.url),'utf8');
   const source=full.slice(full.indexOf('let commissionerDiscordRevision=0'),full.indexOf('async function updateCommissionerFeature('));
-  let slug='alpha';const buttons=[{disabled:false}];
+  let slug='alpha';const buttons=[{disabled:false}],toasts=[];
   const context=vm.createContext({fetch:fetchImpl,encodeURIComponent,document:{querySelectorAll:()=>buttons},
-    commissionerLeagueSlug:()=>slug,showToast:()=>{},renderCommissioner:()=>{}});
+    commissionerLeagueSlug:()=>slug,showToast:(...args)=>toasts.push(args),renderCommissioner:()=>{}});
   vm.runInContext('let commissionerDiscordCache=null,commissionerDiscordLoading=null;'+source+`
     globalThis.api={load:loadCommissionerDiscord,update:updateCommissionerDiscord,
       cache:()=>commissionerDiscordCache,change:()=>{commissionerDiscordRevision++;commissionerDiscordCache=null;commissionerDiscordLoading=null;commissionerDiscordSaving=false;}};`,context);
-  return{...context.api,buttons,change(){slug='bravo';context.api.change();}};
+  return{...context.api,buttons,toasts,change(){slug='bravo';context.api.change();}};
 }
+
+test('Discord retry distinguishes completed work from a newly requested job',async()=>{
+  for(const status of ['complete','completed','queued','running']){
+    const ui=await discordUI(async()=>Response.json({ok:true,scheduleRecovery:{workflowStatus:status}}));
+    await ui.update('retry-schedule-sync');
+    assert.equal(ui.toasts[0][0],['complete','completed'].includes(status)?'Schedule sync is complete':'Schedule sync requested');
+    assert.equal(ui.buttons[0].disabled,false);
+  }
+});
 test('Discord controls discard a late settings response after changing leagues',async()=>{
   const a=deferred();let calls=0;
   const ui=await discordUI(async()=>++calls===1?a.promise:Response.json({ok:true,league:{slug:'bravo'}}));
