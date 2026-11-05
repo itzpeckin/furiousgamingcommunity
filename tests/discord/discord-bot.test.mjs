@@ -1,5 +1,5 @@
 import { defaultGameplayRules, validateGameplayRules, statRuleViolation } from '../../functions/_lib/gameplay-rules.js';
-import { passRuleCommand, abilitiesCommand, rulesCommand } from '../../functions/_lib/discord-read-model.js';
+import { passRuleCommand, abilitiesCommand, rulesCommand, discordLeagueReadModel, schedulingTeamSummaries } from '../../functions/_lib/discord-read-model.js';
 import { syncDiscordGameResults } from '../../functions/_lib/discord-game-results.js';
 import { rushRuleCommand } from '../../functions/_lib/discord-read-model.js';
 import { gameCommand, gameAutocompleteChoices } from '../../functions/_lib/discord-game.js';
@@ -625,7 +625,30 @@ test('/eliminated lists only teams with no division or Wild Card path through a 
     assert.match(schedule,/🟢 SF \(10-4\) @ 🟢 TB \(12-2\)/);
     assert.match(schedule,/🔴 SEA \(2-12\) @ ⚪ ARI \(4-10\)/);
     assert.doesNotMatch(schedule,/\*\*/);
+    const summaries=schedulingTeamSummaries(await discordLeagueReadModel({db,league:{id:'league-a'}},{domains:['teams','standings']}));
+    assert.equal(summaries.get('tb'),'🟢 Tampa Bay Buccaneers (12-2)');
+    assert.equal(summaries.get('sea'),'🔴 Seattle Seahawks (2-12)');
+    assert.equal(summaries.get('ari'),'⚪ Arizona Cardinals (4-10)');
   }finally{database.close()}
+});
+
+test('scheduling summaries preserve ties, league isolation and unknown playoff evidence',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    await applyMigrations(database);
+    for(const id of ['league-a','league-b'])seedLeague(database,{id,slug:id,guild:id==='league-a'?'100000000000000001':'100000000000000002'});
+    const a=seedNflStandingsFixture(database,{leagueId:'league-a'});
+    seedNflStandingsFixture(database,{leagueId:'league-b'});
+    database.prepare(`UPDATE league_snapshot_records SET data_json=json_set(data_json,'$.totalWins',0,'$.totalLosses',0,'$.totalTies',1) WHERE snapshot_id=? AND domain='standings'`).run(a);
+    const summary=async id=>schedulingTeamSummaries(await discordLeagueReadModel({db:d1(database),league:{id}},{domains:['teams','standings']}));
+    assert.equal((await summary('league-a')).get('tb'),'⚪ Tampa Bay Buccaneers (0-0-1)');
+    assert.equal((await summary('league-b')).get('tb'),'🟢 Tampa Bay Buccaneers (16-0)');
+    database.prepare(`DELETE FROM league_snapshot_records WHERE snapshot_id=? AND domain='standings' AND external_id='1002'`).run(a);
+    assert.equal((await summary('league-a')).get('tb'),'❔ Tampa Bay Buccaneers (0-0-1)');
+    assert.equal((await summary('league-a')).get('sf'),'❔ San Francisco 49ers (record unavailable)');
+    database.prepare(`DELETE FROM league_snapshot_records WHERE snapshot_id=? AND domain='standings'`).run(a);
+    assert.equal((await summary('league-a')).get('tb'),'❔ Tampa Bay Buccaneers (record unavailable)');
+  }finally{database.close();}
 });
 
 test('a successful destination-safe retry resolves but does not delete the exhausted Discord failure',async()=>{
@@ -1851,7 +1874,7 @@ test('/week14 bootstraps one commissioner league and creates identity-driven mat
     database.exec(`DELETE FROM discord_league_installations; UPDATE leagues SET discord_guild_id=NULL,discord_connected=0;`);
     seedMember(database,{leagueId:'league-a',userId:'commissioner-a',discordId:'100000000000000011',teamId:'tb',role:'commissioner'});
     seedMember(database,{leagueId:'league-a',userId:'owner-sf',discordId:'100000000000000012',teamId:'sf'});
-    seedActiveWeek(database,{leagueId:'league-a',week:14});
+    seedNflStandingsFixture(database,{leagueId:'league-a',week:14});
     const requests=[];
     globalThis.fetch=async(url,options={})=>{
       const request={url:String(url),method:options.method||'GET',body:options.body?JSON.parse(options.body):null};
@@ -1874,6 +1897,10 @@ test('/week14 bootstraps one commissioner league and creates identity-driven mat
     assert.equal(payload.data.flags,64);
     assert.match(payload.data.content,/Week 14 schedule synchronized/i);
     const starter=requests.find(item=>/\/messages$/.test(item.url));
+    assert.match(starter.body.content,/🟢 San Francisco 49ers \(15-1\) at 🟢 Tampa Bay Buccaneers \(16-0\)/);
+    assert.match(starter.body.content,/🟢 Clinched · ⚪ In contention · 🔴 Eliminated/);
+    assert.equal(requests.find(item=>/\/threads$/.test(item.url)).body.name,'🆚 Week 14 - San Francisco 49ers vs. Tampa Bay Buccaneers');
+    assert.equal(requests.filter(item=>/\/messages$/.test(item.url)).length,1,'records and status reuse the original post');
     assert.match(starter.body.content,/<@100000000000000011>/);
     assert.match(starter.body.content,/<@100000000000000012>/);
     assert.deepEqual(starter.body.allowed_mentions,{parse:[],users:['100000000000000011','100000000000000012']});
