@@ -1,5 +1,5 @@
 import { discordBotRequest, discordErrorText } from './discord-api.js';
-import { discordLeagueReadModel } from './discord-read-model.js';
+import { discordLeagueReadModel, schedulingTeamSummaries } from './discord-read-model.js';
 import { activeTeamAssignments, canonicalTeamKey, resolveTeam } from './league-teams.js';
 import { snapshotCurrentPeriod } from './schedule-integrity.js';
 import { automaticScheduleDecision } from './discord-schedule-transition.js';
@@ -56,8 +56,9 @@ function gameMessage({league,model,game,assignments,phase,week}) {
     name:safeThreadName(`${summaryGameFinal(game)?'✅':'🆚'} Week ${week} - ${teams.away.displayName} vs. ${teams.home.displayName}`),
     content:[
       `**${league.name} · ${phaseLabel} Week ${week}**`,
-      `**${teams.away.displayName} at ${teams.home.displayName}**`,
+      `**${model.scheduleTeamSummaries.get(teams.away.teamKey)} at ${model.scheduleTeamSummaries.get(teams.home.teamKey)}**`,
       `${ownerMention(awayOwner)} vs ${ownerMention(homeOwner)}`,
+      '🟢 Clinched · ⚪ In contention · 🔴 Eliminated · ❔ Status unavailable (record-based)',
       game.scheduledAt ? `Scheduled: ${game.scheduledAt}` : null,
       `[Open the league schedule](${site})`
     ].filter(Boolean).join('\n').slice(0,2000),
@@ -430,7 +431,8 @@ async function syncScheduleBatch(env,db,{
     await db.prepare(`UPDATE discord_league_installations SET schedule_channel_id=?,updated_at=CURRENT_TIMESTAMP WHERE league_id=?`)
       .bind(targetChannel,league.id).run();
   }
-  const model = await discordLeagueReadModel({db,league},{domains:['teams','games']});
+  const model = await discordLeagueReadModel({db,league},{domains:['teams','games','standings']});
+  model.scheduleTeamSummaries=schedulingTeamSummaries(model);
   const games = model.games.filter(game => Number(game.week) === targetWeek
     && canonicalDiscordSchedulePhase(game.stage) === targetPhase);
   if (!games.length) return {ok:false,skipped:true,reason:'no-games-for-week',week:targetWeek,phase:targetPhase};

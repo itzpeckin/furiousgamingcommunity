@@ -566,6 +566,22 @@ function playoffStatusByTeam(model){
   return statuses;
 }
 
+// Scheduling posts use the same record-only playoff calculation as Discord's
+// schedule/elimination views. A partial conference cannot prove a clinch.
+export function schedulingTeamSummaries(model){
+  const records=standingRecords(model),statuses=playoffStatusByTeam(model);
+  const rows=playoffRecordRows(model);
+  return new Map((model.teams||[]).map(team=>{
+    const row=rows.find(item=>item.team.teamKey===team.teamKey);
+    const conference=rows.filter(item=>row?.conference&&item.conference===row.conference);
+    const complete=conference.length===16&&new Set(conference.map(item=>item.team.teamKey)).size===16
+      &&conference.every(item=>item.division);
+    const status=complete?(statuses.get(team.teamKey)||'alive'):'unknown';
+    const indicator=status==='clinched'?'🟢':status==='eliminated'?'🔴':status==='alive'?'⚪':'❔';
+    return [team.teamKey,`${indicator} ${team.displayName} (${records.get(team.teamKey)||'record unavailable'})`];
+  }));
+}
+
 export async function eliminatedCommand(c){
   const model=await discordLeagueReadModel(c,{domains:['teams','standings']});
   const eliminated=eliminationRows(model);
