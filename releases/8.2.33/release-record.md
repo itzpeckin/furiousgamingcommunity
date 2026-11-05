@@ -33,3 +33,11 @@ Authorized candidate. Schema 56 and separate Workers unchanged. Only preview pla
 Restore Pages 8.2.32 deployment 6308e8a1-68c4-4fce-a0fa-79a7b37c5f01. If placement regresses request latency, restore placement mode off in the affected environment and redeploy. Preserve all captures, manifests, snapshots and conversations. No database or separate Worker rollback.
 
 Local release gate completed: all 702 tests and strict checks passed. Full-season snapshot data remained identical; interrupted-storage and prior-presentation upgrade regressions passed.
+
+### Live acceptance follow-up
+
+The explicitly approved FGC export completed in 101 seconds (52 datasets), compared with 223 seconds earlier. Timing separates 12,749 ms provider calls and 72,568 ms storage processing. This is one observed run, not a consistent under-80-second guarantee.
+
+The retained export changed one roster payload but the importer incorrectly showed Latest Export Live. The weekly-period fingerprint omitted the approved anchor export's non-weekly payload identities. The correction combines both digests, so roster, team and Free Agent changes remain importable even with unchanged weekly statistics; identical full sources remain idempotent. The new regression failed before the correction. No second EA collection is needed for the retained source.
+
+Follow-up strict gate: 703 tests passed. Browser access was restored, superseding the earlier browser blocker. All 14 current Week 13 opening posts were refreshed successfully by 15:29:17 UTC with zero errors; the live import remains pending the roster fingerprint correction. User explicitly approved one fresh export and import.

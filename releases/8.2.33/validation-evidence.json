@@ -28,9 +28,9 @@
       ]
     },
     "automatedTests": {
-      "tests": 702,
-      "output": "outputs/fhq833-strict.txt",
       "strictGatePassed": true,
+      "output": "outputs/fhq833-final-strict.txt",
+      "tests": 703,
       "passed": true
     }
   },
@@ -43,7 +43,7 @@
   },
   "configuration": {
     "previewSmartPlacement": "enabled; other settings verified unchanged",
-    "productionSmartPlacement": "pending release validation"
+    "productionSmartPlacement": "enabled; other settings verified unchanged"
   },
   "measurements": {
     "latestImportMs": 166959,
@@ -60,5 +60,17 @@
       "after": 1
     },
     "productionSpeedTargetVerified": false
+  },
+  "liveAcceptance": {
+    "exportSeconds": 101,
+    "week13PostsUpdated": 14,
+    "postErrors": 0,
+    "explicitlyAuthorized": true,
+    "importPendingRosterFingerprintCorrection": true,
+    "consistentSpeedTargetProven": false,
+    "datasets": 52,
+    "providerMs": 12749,
+    "storageMs": 72568,
+    "exportJob": "eaj_efdf27d9-63d9-43e5-89b6-5a1d578cc73e"
   }
 }

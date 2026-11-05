@@ -49,7 +49,7 @@ test('compact and detailed import panels share readiness, progress, busy and liv
   assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
 });
 import { hashToken } from '../../functions/_lib/auth.js';
-import { onRequestGet as getCandidateImport, onRequestPost as candidateImport, retainedPeriodBundle } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
+import { onRequestGet as getCandidateImport, onRequestPost as candidateImport, retainedPeriodBundle, sourceFingerprint } from '../../functions/api/leagues/[leagueSlug]/companion/candidate-import.js';
 import { onRequestPost as startImportJob } from '../../functions/api/leagues/[leagueSlug]/companion/import-job.js';
 import { onRequestPost as mapSchedule, selectAuthoritativeScheduleGames, selectRetainedScheduleCaptures, isUnassignedSchedulePlaceholder } from '../../functions/api/leagues/[leagueSlug]/companion/map-schedule.js';
 import { onRequestPost as mapPlayers, rebaseCarriedRoster } from '../../functions/api/leagues/[leagueSlug]/companion/map-players.js';
@@ -624,6 +624,17 @@ test('candidate fingerprints share one mapping revision across preview and start
     'report:capture:identity:destination:retained-statistics-selection-v14'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
+});
+
+test('unchanged weekly stats cannot hide new roster, team or Free Agent exports',async()=>{
+  const retained=[{route_path:'xbsx/league/leagueteams',payload_hash:'teams-1',byte_length:100},
+    {route_path:'xbsx/league/team/1/roster',payload_hash:'roster-1',byte_length:100},
+    {route_path:'xbsx/league/freeagents',payload_hash:'free-agents-1',byte_length:100}];
+  const db={prepare(sql){assert.match(sql,/madden_discovery_session_captures/);return{bind(league,session){assert.equal(league,'league-1');assert.equal(session,'latest-approved');return{async all(){return{results:retained};}};}};}};
+  const fingerprint=()=>sourceFingerprint(db,'league-1',{session_id:'latest-approved',report_hash:'same-report-shape'},
+    {franchise_season_id:'season-1'},{id:'destination-1'},{digest:'unchanged-weekly-schedule-and-statistics'});
+  let previous=await fingerprint();assert.equal(await fingerprint(),previous,'an unchanged export remains idempotent');
+  for(const row of retained){row.payload_hash+='-changed';const changed=await fingerprint();assert.notEqual(changed,previous,`${row.route_path} must be importable`);assert.equal(await fingerprint(),changed);previous=changed;}
 });
 
 test('rosterless imports preserve players and contracts while safely rebasing changed Madden team IDs',async()=>{
