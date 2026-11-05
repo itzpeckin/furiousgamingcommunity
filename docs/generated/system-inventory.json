@@ -316,7 +316,7 @@
         "file": "league-engine/trade-center-live.js"
       },
       {
-        "bytes": 100829,
+        "bytes": 102028,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -348,7 +348,7 @@
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 50974,
+        "bytes": 51215,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {

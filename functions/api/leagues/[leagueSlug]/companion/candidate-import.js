@@ -293,9 +293,12 @@ function sourceCounts(report, identity, rosterCarryForward = null) {
   };
 }
 
-async function sourceFingerprint(db, leagueId, report, identity, destination, bundle, rosterCarryForward = null) {
+export async function sourceFingerprint(db, leagueId, report, identity, destination, bundle, rosterCarryForward = null) {
   if (!report || !identity || !destination) return null;
-  const digest = bundle?.digest || await captureDigest(db,leagueId,report.session_id);
+  // Weekly coverage selects schedule/statistics routes. Include the approved
+  // export's full payload identity too, so roster-only updates remain importable.
+  const anchorDigest = await captureDigest(db,leagueId,report.session_id);
+  const digest = bundle?.digest ? `${bundle.digest}:${anchorDigest}` : anchorDigest;
   return sha256Hex(new TextEncoder().encode(
     candidateSourceFingerprintMaterial(
       report.report_hash,digest,identity.preview_run_id || identity.franchise_season_id,destination.id,
