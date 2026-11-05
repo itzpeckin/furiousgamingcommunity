@@ -201,7 +201,9 @@ async function commissionerIds(db,leagueId) {
 
 function needsPresentation(record,message,commissioners,snapshotId) {
   const cached=presentation(record),members=Array.isArray(cached.members)?cached.members:[];
-  return cached.name!==message.name||[...message.ids,...commissioners].some(id=>!members.includes(id)
+  return cached.name!==message.name
+    ||SNOWFLAKE.test(clean(record.starter_message_id))&&cached.openingContent!==message.content
+    ||[...message.ids,...commissioners].some(id=>!members.includes(id)
     &&cached.unavailable?.[id]!==snapshotId);
 }
 
@@ -223,6 +225,13 @@ async function syncPresentation(env,db,{record,message,commissioners,leagueId,sn
         method:'PATCH',body:{name:message.name,archived:false},fetchImpl
       });
       cached.name=message.name;
+    }
+    if(SNOWFLAKE.test(clean(record.starter_message_id))&&cached.openingContent!==message.content){
+      await guard();
+      await discordBotRequest(env,`/channels/${encodeURIComponent(record.parent_channel_id)}/messages/${encodeURIComponent(record.starter_message_id)}`,{
+        method:'PATCH',body:{content:message.content,allowed_mentions:{parse:[]}},fetchImpl
+      });
+      cached.openingContent=message.content;
     }
     for(const id of new Set([...message.ids,...commissioners])) {
       if(members.has(id)||cached.unavailable[id]===snapshotId)continue;
@@ -299,7 +308,7 @@ async function createMatchupThread(env,db,{run,league,model,game,assignments,com
     const existing = await discordBotRequest(env, `/channels/${encodeURIComponent(starterId)}`, {fetchImpl}).catch(()=>null);
     if (Number(existing?.type) !== 11) throw error;
   }
-  const initialPresentation=JSON.stringify({name:message.name,members:[]});
+  const initialPresentation=JSON.stringify({name:message.name,openingContent:message.content,members:[]});
   await db.prepare(`UPDATE discord_schedule_threads SET discord_thread_id=?,status='active',presentation_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
     .bind(starterId,initialPresentation,record.id).run();
   record={...record,discord_thread_id:starterId,status:'active',presentation_json:initialPresentation};
