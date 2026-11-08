@@ -30,7 +30,7 @@ test('active player DTO carries the permanent public identity separately from it
   assert.equal(normalizePlayer({external_id:'source-player-42'},'not-public').publicId,null);
 });
 
-test('team and player identity contracts remain membership protected', async () => {
+test('team and player reads fail closed without a resolved enabled tenant', async () => {
   const playerResponse=await readPublicPlayer({
     request:new Request(`https://franchisehq.app/api/leagues/fgc/players/${publicId}`),
     params:{leagueSlug:'fgc',publicPlayerId:publicId},
@@ -41,8 +41,8 @@ test('team and player identity contracts remain membership protected', async () 
     params:{leagueSlug:'fgc',teamSlug:'tb'},
     env:{}
   });
-  assert.equal(playerResponse.status,401);
-  assert.equal(teamResponse.status,401);
+  assert.equal(playerResponse.status,404);
+  assert.equal(teamResponse.status,404);
 });
 
 test('browser router promotes identity links to canonical league paths and retains hash compatibility', async () => {

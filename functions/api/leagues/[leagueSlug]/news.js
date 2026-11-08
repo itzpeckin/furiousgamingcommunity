@@ -1,3 +1,4 @@
+import { requireLeagueViewer } from '../../../_lib/public-league.js';
 import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
 import { requireActiveMembership } from '../../../_lib/permissions.js';
 import { executeLeagueNewsAction, leagueNewsState, LEAGUE_NEWS_RELEASE } from '../../../_lib/league-news.js';
@@ -16,9 +17,11 @@ async function requestContext(context) {
 
 export async function onRequestGet(context){
   try{
-    const c=await requestContext(context);if(c.response)return c.response;
+    const access=await requireLeagueViewer(context);if(!access.authorized)return access.response;
     const includeDrafts=new URL(context.request.url).searchParams.get('drafts')==='1';
-    return json(await leagueNewsState({...c,includeDrafts}));
+    const payload=await leagueNewsState({db:database(context.env),league:access.league,session:access.session,includeDrafts});
+    if(!access.isMember)payload.posts=payload.posts.map(post=>({...post,author:{displayName:post.author.displayName}}));
+    return json(payload);
   }catch(error){
     return json({ok:false,release:LEAGUE_NEWS_RELEASE,error:error?.message||'League News could not be loaded.'},Number(error?.status)||500);
   }

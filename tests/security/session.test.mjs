@@ -228,9 +228,9 @@ test('same-origin Discord completion creates a durable session without a cross-d
   assert.equal(inserted[0].values[1], 'user-1');
 });
 
-test('a missing league session uses the exact-route browser bridge instead of losing the hash', async () => {
+test('an explicit join request uses the exact-route browser bridge instead of losing the hash', async () => {
   const response = await protectedLeagueDocument({
-    request:new Request('https://franchisehq.app/leagues/fgc#commissioner'),
+    request:new Request('https://franchisehq.app/leagues/fgc?join=1#commissioner'),
     env:{
       DB:{
         prepare(sql) {
@@ -345,6 +345,11 @@ test('Discord callback selection and protected return routes fail closed', () =>
   assert.equal(discordRedirectUriForOrigin({}, 'https://franchise-hq.pages.dev'), OWNER_DISCORD_REDIRECT_URI);
   assert.equal(normalizeLeagueReturnTo('/leagues/fgc#commissioner/league-data'), '/leagues/fgc#commissioner/league-data');
   assert.equal(normalizeLeagueReturnTo('/leagues/fgc#trade-block'), '/leagues/fgc#trade-block');
+  assert.equal(normalizeLeagueReturnTo('/leagues/fgc?join=1'), '/leagues/fgc?join=1');
+  assert.equal(normalizeLeagueReturnTo('/leagues/fgc/teams/tb#roster'), '/leagues/fgc/teams/tb#roster');
+  assert.equal(normalizeLeagueReturnTo('/leagues/fgc/players/plr_0123456789abcdef0123456789abcdef'), '/leagues/fgc/players/plr_0123456789abcdef0123456789abcdef');
+  assert.equal(normalizeLeagueReturnTo('/leagues/fgc?join=1&next=https://attacker.example'), null);
+  assert.equal(normalizeLeagueReturnTo('/leagues/fgc/teams/../private'), null);
   assert.equal(normalizeLeagueReturnTo('https://attacker.example/leagues/fgc'), null);
   assert.equal(normalizeLeagueReturnTo('//attacker.example/leagues/fgc'), null);
   assert.equal(normalizeLeagueReturnTo('/leagues/fgc?next=https://attacker.example'), null);

@@ -1032,7 +1032,7 @@
       // domains hydrate after first paint and never block a hard-refresh render.
       const criticalPayload=await Promise.all([
         service.getState(),service.getSnapshot(),service.getTeams(),service.getStandings(),service.getSchedule(),
-        import('./league-engine/game-summary.js?v=8.2.33')
+        import('./league-engine/game-summary.js?v=8.2.34')
       ]);
 
       const [stateValue,snapshot,teamRows,standingRows,gameRows,gameSummary]=criticalPayload;
@@ -8973,6 +8973,11 @@ function canonicalPlayerDashboardStats(playerId='') {
     closeSidebar();
     document.querySelectorAll('.nav-item[data-route]').forEach(item=>item.classList.toggle('is-active',item.dataset.route===base));
     pageContent.innerHTML='';
+    const publicView=window.__FHQ_PUBLIC_VIEW__;
+    if(publicView?.readOnly && !publicView.canBrowse(route)){
+      pageContent.innerHTML=`<section class="empty-state card"><strong>League membership required</strong><p>Sign in with an active league membership to use this page. You can browse teams, rosters, standings and schedules without signing in.</p><a class="button button--primary" href="${escapeHtml(publicView.signInPath())}">Sign in</a><a class="button button--ghost" href="${escapeHtml(publicView.joinPath)}">Request to join</a></section>`;
+      return {base,id,route,readOnly:true};
+    }
     applyLeagueFeaturePresentation();
     const requiredFeature=base==='trade-center'?'trade_center':base==='trade-block'?'trade_block':null;
     if(requiredFeature&&!leagueFeatureEnabled(requiredFeature)){
@@ -10231,7 +10236,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.2.33';
+  const VISIBLE_RELEASE = '8.2.34';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

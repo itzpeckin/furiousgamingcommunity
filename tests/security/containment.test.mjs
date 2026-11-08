@@ -44,11 +44,16 @@ test('protected league data rejects guests before touching storage', async () =>
     params: { leagueSlug: 'fgc' },
     env: {}
   };
-  for (const handler of [readSnapshot, readRules, readDiscovery, readDiscoverySession, readDiscoveryReport]) {
+  for (const handler of [readDiscovery, readDiscoverySession, readDiscoveryReport]) {
     const response = await handler(context);
     assert.equal(response.status, 401);
     assert.equal((await response.json()).error, 'Authentication required.');
   }
+});
+
+test('public reads fail closed when no enabled tenant can be resolved', async () => {
+  const context={request:new Request('https://franchisehq.app/api/leagues/fgc/snapshot/read-model'),params:{leagueSlug:'fgc'},env:{}};
+  for(const handler of [readSnapshot,readRules])assert.equal((await handler(context)).status,404);
 });
 
 test('state-changing auth endpoints reject GET', async () => {

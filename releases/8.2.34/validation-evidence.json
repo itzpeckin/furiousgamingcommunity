@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.34",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "publicBrowsing": {
+      "passed": true,
+      "tests": 6,
+      "coverage": [
+        "anonymous shell and deep links",
+        "all five live domains; cross-league isolation",
+        "published news/rules only; unpublished images denied",
+        "anonymous management and mutations denied",
+        "member and explicit join flow retained",
+        "no simulated management grants"
+      ]
+    },
+    "automatedTests": {
+      "passed": true,
+      "strictGatePassed": true,
+      "tests": 710
+    }
+  },
+  "scopeBoundaries": {
+    "databaseMigrationRequired": false,
+    "membershipAssignmentsChanged": false,
+    "importsRun": false,
+    "credentialsChanged": false,
+    "workerChangesRequired": false
+  }
+}

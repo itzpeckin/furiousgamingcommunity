@@ -1,5 +1,5 @@
-import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../_lib/cloud-platform.js';
-import { requireActiveMembership } from '../../../_lib/permissions.js';
+import { json, database, normalizeLeagueSlug, validLeagueSlug } from '../../../_lib/cloud-platform.js';
+import { requireLeagueViewer } from '../../../_lib/public-league.js';
 import { currentFranchiseContext } from '../../../_lib/ownership-periods.js';
 
 const categories = new Set(['passing','rushing','receiving','defense','kicking','punting']);
@@ -49,12 +49,12 @@ export async function archivedPlayerCareer(db, leagueId, playerId, expectedSnaps
 }
 
 export async function onRequestGet(context) {
-  const authorization = await requireActiveMembership(context);
+  const authorization = await requireLeagueViewer(context);
   if (!authorization.authorized) return authorization.response;
   const slug = normalizeLeagueSlug(context);
   if (!validLeagueSlug(slug)) return json({ok:false,error:'Not found.'},404);
-  const db = database(context.env), league = await resolveLeague(context.env,slug);
-  if (!db || !league || authorization.session.membership?.leagueId !== league.id) return json({ok:false,error:'Not found.'},404);
+  const db = database(context.env), league = authorization.league;
+  if (!db || !league) return json({ok:false,error:'Not found.'},404);
   const url = new URL(context.request.url), playerId = url.searchParams.get('playerId') || '', snapshotId = url.searchParams.get('snapshotId') || '';
   if (!/^[a-zA-Z0-9._:-]{1,150}$/.test(playerId) || !/^[a-zA-Z0-9._:-]{1,150}$/.test(snapshotId)) return json({ok:false,error:'A player and current snapshot are required.'},400);
   try {

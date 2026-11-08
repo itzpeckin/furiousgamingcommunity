@@ -83,8 +83,8 @@
   }
 
   function currentLeaguePath() {
-    const match = location.pathname.match(/^\/leagues\/([^/?#]+)\/?$/i);
-    return match ? `/leagues/${encodeURIComponent(decodeURIComponent(match[1]))}` : null;
+    const match = location.pathname.match(/^\/leagues\/[^/?#]+(?:\/(?:teams|players)\/[^/?#]+)?\/?$/i);
+    return match ? location.pathname : null;
   }
 
   function currentLeagueDestination() {

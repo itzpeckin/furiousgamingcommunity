@@ -1,12 +1,12 @@
-import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
-import { requireActiveMembership } from '../../../../_lib/permissions.js';
+import { json, database, normalizeLeagueSlug, validLeagueSlug } from '../../../../_lib/cloud-platform.js';
+import { requireLeagueViewer } from '../../../../_lib/public-league.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../../_lib/league-teams.js';
 import { normalizePublicTeamSlug, publicTeamPath } from '../../../../_lib/public-identity-routes.js';
 
 const RELEASE = '7.4.1';
 
 export async function onRequestGet(context) {
-  const authorization = await requireActiveMembership(context);
+  const authorization = await requireLeagueViewer(context);
   if (!authorization.authorized) return authorization.response;
 
   const slug = normalizeLeagueSlug(context);
@@ -14,8 +14,8 @@ export async function onRequestGet(context) {
   if (!validLeagueSlug(slug) || !teamSlug) return json({ok:false,error:'Not found.'},404);
 
   const db = database(context.env);
-  const league = await resolveLeague(context.env, slug);
-  if (!db || !league || authorization.session.membership?.leagueId !== league.id) {
+  const league = authorization.league;
+  if (!db || !league) {
     return json({ok:false,error:'Not found.'},404);
   }
 

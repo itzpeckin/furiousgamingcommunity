@@ -58,9 +58,9 @@ test('career reader rejects a snapshot changing during history retrieval',async(
   }finally{f.sqlite.close();}
 });
 
-test('career endpoint requires authentication before reading player archives',async()=>{
+test('career endpoint requires an enabled resolved tenant before reading player archives',async()=>{
   const response=await onRequestGet({request:new Request('https://franchisehq.app/api/leagues/example/player-career?playerId=p1&snapshotId=live'),env:{},params:{leagueSlug:'example'},data:{}});
-  assert.equal(response.status,401);
+  assert.equal(response.status,404);
 });
 
 const app=await readFile(new URL('../../app.js',import.meta.url),'utf8');

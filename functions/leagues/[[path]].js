@@ -44,7 +44,7 @@ async function fetchRootAsset(context,request,relativePath){
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
-async function fetchSpaShell(context,request,session=null,publicDemo=false){
+async function fetchSpaShell(context,request,session=null,publicDemo=false,publicView=null){
   const response=await fetchStatic(context,request,'/index.html');
   let html=await response.text();
   // Force the legacy SPA's relative CSS/JS/image URLs to resolve from the
@@ -55,6 +55,10 @@ async function fetchSpaShell(context,request,session=null,publicDemo=false){
     const bootstrap=JSON.stringify({id:publicDemo.id,slug:publicDemo.slug,tenant:publicDemo}).replace(/</g,'\\u003c');
     html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_DEMO__=${bootstrap};</script><script src="/assets/demo-league.js?v=8.2.33"></script><link rel="stylesheet" href="/assets/demo-league.css?v=8.2.33"></head>`);
   }
+  if(publicView){
+    const bootstrap=JSON.stringify(publicView).replace(/</g,'\\u003c');
+    html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_VIEW__=${bootstrap};</script><script src="/assets/public-league.js?v=8.2.34"></script><link rel="stylesheet" href="/assets/public-league.css?v=8.2.34"></head>`);
+  }
   if(session){
     const bootstrap=JSON.stringify({
       authenticated:true,
@@ -63,7 +67,7 @@ async function fetchSpaShell(context,request,session=null,publicDemo=false){
       membership:session.membership||null,
       capabilities:session.capabilities||[],
       session:{expiresAt:session.expiresAt||null,absoluteExpiresAt:session.absoluteExpiresAt||null,rotated:session.rotated===true}
-    }).replace(/</g,'\u003c');
+    }).replace(/</g,'\\u003c');
     html=html.replace(/<\/head>/i,`<script>window.__FHQ_AUTH_BOOTSTRAP__=${bootstrap};</script></head>`);
   }
   const headers=new Headers(response.headers);
@@ -77,7 +81,7 @@ function escapeHtml(value){return String(value??'').replaceAll('&','&amp;').repl
 function renderPendingPage(session,league){
   const name=escapeHtml(session?.user?.displayName||session?.user?.discordGlobalName||session?.user?.discordUsername||'Discord User');
   const leagueName=escapeHtml(league?.name||league?.slug||'this league');
-  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Membership Pending · FranchiseHQ</title><style>body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#070b14;color:#f7f9ff;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box}.card{width:min(620px,100%);background:#101725;border:1px solid #27324a;border-radius:22px;padding:32px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.13em;color:#7da7ff;font-weight:800}.pill{display:inline-flex;margin-top:18px;padding:7px 11px;border-radius:999px;background:#342a12;color:#ffd36a;border:1px solid #6f5722;font-size:12px;font-weight:800}h1{font-size:30px;margin:10px 0 12px}p{color:#b6c1d5;line-height:1.6}.user{margin:24px 0;padding:16px;border-radius:14px;background:#0a101c;border:1px solid #202b40}.user strong{display:block}.user span{color:#8fa0bb;font-size:13px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.actions form{margin:0}.btn{display:inline-flex;text-decoration:none;color:white;padding:11px 16px;border-radius:10px;border:1px solid #33425f;font:inherit;font-weight:700;background:transparent;cursor:pointer}.primary{background:#356df3;border-color:#356df3}</style></head><body><main class="card"><span class="eyebrow">${leagueName}</span><h1>Your account is connected.</h1><span class="pill">Waiting for commissioner assignment</span><div class="user"><strong>${name}</strong><span>Pending league member</span></div><p>A commissioner now needs to assign your team and league role. Once they activate your membership, this same league link will take you directly into Franchise HQ.</p><div class="actions"><a class="btn primary" href="/leagues/${encodeURIComponent(league.slug)}">Check Again</a><a class="btn" href="/leagues">My Leagues</a><form method="post" action="/api/auth/logout"><input type="hidden" name="csrfToken" value="${escapeHtml(session.rawCsrfToken||'')}"><button class="btn" type="submit">Log Out</button></form></div></main></body></html>`,{status:200,headers:{'content-type':'text/html; charset=UTF-8','cache-control':'no-store','x-fhq-membership-state':'pending'}});
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Membership Pending · FranchiseHQ</title><style>body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#070b14;color:#f7f9ff;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box}.card{width:min(620px,100%);background:#101725;border:1px solid #27324a;border-radius:22px;padding:32px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.13em;color:#7da7ff;font-weight:800}.pill{display:inline-flex;margin-top:18px;padding:7px 11px;border-radius:999px;background:#342a12;color:#ffd36a;border:1px solid #6f5722;font-size:12px;font-weight:800}h1{font-size:30px;margin:10px 0 12px}p{color:#b6c1d5;line-height:1.6}.user{margin:24px 0;padding:16px;border-radius:14px;background:#0a101c;border:1px solid #202b40}.user strong{display:block}.user span{color:#8fa0bb;font-size:13px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.actions form{margin:0}.btn{display:inline-flex;text-decoration:none;color:white;padding:11px 16px;border-radius:10px;border:1px solid #33425f;font:inherit;font-weight:700;background:transparent;cursor:pointer}.primary{background:#356df3;border-color:#356df3}</style></head><body><main class="card"><span class="eyebrow">${leagueName}</span><h1>Your account is connected.</h1><span class="pill">Waiting for commissioner assignment</span><div class="user"><strong>${name}</strong><span>Pending league member</span></div><p>A commissioner now needs to assign your team and league role. Once they activate your membership, this same league link will take you directly into Franchise HQ.</p><div class="actions"><a class="btn primary" href="/leagues/${encodeURIComponent(league.slug)}?join=1">Check Again</a><a class="btn" href="/leagues">My Leagues</a><form method="post" action="/api/auth/logout"><input type="hidden" name="csrfToken" value="${escapeHtml(session.rawCsrfToken||'')}"><button class="btn" type="submit">Log Out</button></form></div></main></body></html>`,{status:200,headers:{'content-type':'text/html; charset=UTF-8','cache-control':'no-store','x-fhq-membership-state':'pending'}});
 }
 
 function renderAuthenticationBridge(league,request){
@@ -124,12 +128,14 @@ export async function onRequest(context){
   if(isOwnerFallbackHost(new URL(request.url).hostname))return renderAuthenticationBridge(league,request);
 
   let session=await getCurrentSession(context,{leagueId:league.id});
-  if(!session)return renderAuthenticationBridge(league,request);
-  if(session.kind==='browser')session=await rotateBrowserSession(context,session);
-  if(!session.membership?.active){
+  const joining=new URL(request.url).searchParams.get('join')==='1';
+  if(!session && joining)return renderAuthenticationBridge(league,request);
+  if(session?.kind==='browser')session=await rotateBrowserSession(context,session);
+  const publicView=!session?.membership?.active ? {slug:league.slug,readOnly:true,signedIn:Boolean(session)} : null;
+  if(joining && !session?.membership?.active){
     if(!session.membership){
       const page=leagueJoinPage(league),headers=new Headers(page.headers);
-      if(session.kind==='browser')appendBrowserSessionCookies(headers,session);
+      if(session?.kind==='browser')appendBrowserSessionCookies(headers,session);
       return new Response(page.body,{status:page.status,headers});
     }
     if(session.membership?.role==='team_owner' && !session.membership?.teamId){
@@ -141,12 +147,12 @@ export async function onRequest(context){
     return redirectResponse('/leagues?access=denied');
   }
 
-  // Every authorized league page/subpage is an SPA route. Serve the root shell
+  // Every enabled league page/subpage is an SPA route. Serve the root shell
   // while preserving the browser URL so the tenant router resolves this league.
   // Renew the single public-domain browser session during document routing so
   // a hard refresh does not depend on a later /api/auth/me client request.
-  const shell = await fetchSpaShell(context,request,session);
+  const shell = await fetchSpaShell(context,request,session,false,publicView);
   const headers = new Headers(shell.headers);
-  if(session.kind==='browser')appendBrowserSessionCookies(headers,session);
+  if(session?.kind==='browser')appendBrowserSessionCookies(headers,session);
   return new Response(shell.body,{status:shell.status,statusText:shell.statusText,headers});
 }

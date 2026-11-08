@@ -1,0 +1,3 @@
+.public-league-notice{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 24px;padding:16px 20px;border:1px solid var(--border,#2c3850);border-radius:14px;background:var(--surface,#111b2b)}
+.public-league-notice strong,.public-league-notice span{display:block}.public-league-notice span{margin-top:4px;font-size:13px;color:var(--text-muted,#aab7cc)}.public-league-actions{display:flex;gap:8px;flex-shrink:0}.public-league-view [hidden]{display:none!important}
+@media(max-width:700px){.public-league-notice{align-items:stretch;flex-direction:column;padding:14px}.public-league-actions{flex-wrap:wrap}.public-league-actions a{flex:1;justify-content:center}}

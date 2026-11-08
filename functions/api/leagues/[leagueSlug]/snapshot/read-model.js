@@ -1,5 +1,5 @@
-import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
-import { requireActiveMembership } from '../../../../_lib/permissions.js';
+import { json, database, normalizeLeagueSlug, validLeagueSlug } from '../../../../_lib/cloud-platform.js';
+import { requireLeagueViewer } from '../../../../_lib/public-league.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from '../../../../_lib/league-teams.js';
 import { normalizePublicPlayerId, normalizePublicTeamSlug } from '../../../../_lib/public-identity-routes.js';
 import {
@@ -340,14 +340,14 @@ export async function activeSnapshotDomainPage(db, leagueId, snapshotId, domain,
 
 export async function onRequestGet(context) {
   try {
-  const authorization = await requireActiveMembership(context);
+  const authorization = await requireLeagueViewer(context);
   if (!authorization.authorized) return authorization.response;
   const slug = normalizeLeagueSlug(context);
   if (!validLeagueSlug(slug)) return json({ok:false,error:'Invalid league slug.'},400);
 
   const db = database(context.env);
-  const league = await resolveLeague(context.env, slug);
-  if (!db || !league || authorization.session.membership?.leagueId !== league.id) {
+  const league = authorization.league;
+  if (!db || !league) {
     return json({ok:false,error:'Not found.'},404);
   }
 
@@ -389,6 +389,7 @@ export async function onRequestGet(context) {
     sourceSnapshotId:playerMappingRun?.sourceSnapshotId || active.id
   } : null;
   const integrity = validationIntegrity(active);
+  if (!authorization.isMember) integrity.warnings = [];
   const contextState = canonicalLeagueContext(league, active);
   const dataStatus = canonicalDataStatus(contextState, integrity, summary);
 

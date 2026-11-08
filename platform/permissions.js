@@ -61,6 +61,7 @@
   }
 
   function evaluate(permission, context = {}) {
+    if(window.__FHQ_PUBLIC_VIEW__?.readOnly)return false;
     if(window.__FHQ_PUBLIC_DEMO__?.slug==='demo' && HQ.leagueTenant?.resolveRouteSlug?.()==='demo') {
       return permission===POLICIES.OPEN_COMMISSIONER_HQ;
     }
