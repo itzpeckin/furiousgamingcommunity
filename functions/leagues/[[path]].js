@@ -57,7 +57,7 @@ async function fetchSpaShell(context,request,session=null,publicDemo=false,publi
   }
   if(publicView){
     const bootstrap=JSON.stringify(publicView).replace(/</g,'\\u003c');
-    html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_VIEW__=${bootstrap};</script><script src="/assets/public-league.js?v=8.2.34"></script><link rel="stylesheet" href="/assets/public-league.css?v=8.2.34"></head>`);
+    html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_VIEW__=${bootstrap};</script><script src="/assets/public-league.js?v=8.2.34&patch=1"></script><link rel="stylesheet" href="/assets/public-league.css?v=8.2.34"></head>`);
   }
   if(session){
     const bootstrap=JSON.stringify({

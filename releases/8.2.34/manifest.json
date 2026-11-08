@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.2.34",
   "releaseType": "public-league-browsing",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "tag": "v8.2.33",
     "commit": "23dabd9bf009e879b7c8cb90274aa65a3642e84c"
@@ -12,12 +12,12 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "pending"
+    "status": "published"
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "currentRelease": "8.2.33",
+    "deployed": true,
+    "currentRelease": "8.2.34",
     "candidateRelease": "8.2.34",
     "currentMigration": 56,
     "candidateMigration": 56

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.2.34",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {
@@ -31,6 +31,18 @@
       "passed": true,
       "strictGatePassed": true,
       "tests": 710
+    },
+    "productionBrowser": {
+      "passed": true,
+      "signedOut": true,
+      "pages": [
+        "league home",
+        "standings",
+        "teams",
+        "team roster",
+        "stats"
+      ],
+      "privateMembershipListDenied": true
     }
   },
   "scopeBoundaries": {
