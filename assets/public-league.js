@@ -7,7 +7,7 @@
   const leaguePath='/leagues/'+encodeURIComponent(view.slug);
   view.joinPath=leaguePath+'?join=1';
   view.signInPath=()=>'/auth?returnTo='+encodeURIComponent(location.pathname+location.search+location.hash);
-  const hiddenControls='[data-start-team-trade],[data-player-action],[data-team-tab="trade-history"],[data-open-block-drawer],[data-create-news],[data-standings-view="confidence"],[data-standings-view="history"],[data-standings-view="games"],.schedule-confidence-shell,.confidence-pool-shell,[data-open-team-trades]';
+  const hiddenControls='[data-start-team-trade],[data-add-player-trade],[data-gm-career-host],.nav-divider,[data-player-action],[data-team-tab="trade-history"],[data-open-block-drawer],[data-create-news],[data-standings-view="confidence"],[data-standings-view="history"],[data-standings-view="games"],.schedule-confidence-shell,.confidence-pool-shell,[data-open-team-trades]';
   function present(){
     document.querySelectorAll('[data-route]').forEach(node=>{
       if(!view.canBrowse(node.dataset.route))node.hidden=true;

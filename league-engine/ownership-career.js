@@ -130,6 +130,7 @@
   async function mountTeam(host,teamKey=''){
     if(typeof host==='string')host=document.querySelector(host);
     if(!host)return false;
+    if(window.__FHQ_PUBLIC_VIEW__?.readOnly){host.hidden=true;return false;}
     host.innerHTML='<article class="card gm-career-empty"><span class="spinner" aria-hidden="true"></span><strong>Loading GM career history…</strong></article>';
     try{host.innerHTML=render(await request(teamKey));return true}
     catch(error){host.innerHTML=`<article class="card gm-career-empty"><h3>GM history unavailable</h3><p>${esc(error.message)}</p></article>`;return false}
@@ -138,6 +139,7 @@
   async function mountLeague(host){
     if(typeof host==='string')host=document.querySelector(host);
     if(!host)return false;
+    if(window.__FHQ_PUBLIC_VIEW__?.readOnly){host.hidden=true;return false;}
     host.innerHTML='<article class="card gm-career-empty"><span class="spinner" aria-hidden="true"></span><strong>Loading League History…</strong></article>';
     try{host.innerHTML=renderLeague(await requestLeague());return true}
     catch(error){host.innerHTML=`<article class="card gm-career-empty"><h3>League History unavailable</h3><p>${esc(error.message)}</p></article>`;return false}
