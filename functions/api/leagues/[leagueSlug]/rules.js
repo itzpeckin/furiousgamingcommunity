@@ -1,9 +1,9 @@
+import { requireLeagueViewer } from '../../../_lib/public-league.js';
 import { freeTradeRuleSummary } from '../../../_lib/free-trade-rules.js';
 import { tradeCenterSettingsFromLeagueDocument } from '../../../_lib/trade-center.js';
 import { readGameplayRules, gameplayRuleSummary } from '../../../_lib/gameplay-rules.js';
 import { jsonResponse } from "../../../_lib/auth.js";
 import {
-  requireActiveMembership,
   requireCommissioner
 } from "../../../_lib/permissions.js";
 import {
@@ -189,13 +189,13 @@ async function verifyRulesMedia(db, leagueId, rules) {
 }
 
 async function authorizedLeague(context, authorization) {
-  const league = await resolveLeague(context.env, canonicalLeagueSlug(context.params?.leagueSlug));
-  if (!league || authorization.session.membership?.leagueId !== league.id) return null;
+  const league = authorization.league || await resolveLeague(context.env, canonicalLeagueSlug(context.params?.leagueSlug));
+  if (!league || (authorization.league?.id || authorization.session?.membership?.leagueId) !== league.id) return null;
   return { id: league.id, slug: league.slug, name: league.name };
 }
 
 export async function onRequestGet(context) {
-  const authorization = await requireActiveMembership(context);
+  const authorization = await requireLeagueViewer(context);
   if (!authorization.authorized) return authorization.response;
   const league = await authorizedLeague(context, authorization);
   if (!league) return notFound();
@@ -210,7 +210,7 @@ export async function onRequestGet(context) {
   const settingsRow=await context.env.DB.prepare('SELECT settings_json AS settingsJson FROM league_settings WHERE league_id=?').bind(league.id).first();
   const freeTradeSummary=freeTradeRuleSummary(tradeCenterSettingsFromLeagueDocument(JSON.parse(settingsRow?.settingsJson||'{}')));
   const gameplayRules=await readGameplayRules(context.env.DB,league.id),gameplaySummary=[...gameplayRuleSummary(gameplayRules),freeTradeSummary];
-  const commissioner = authorization.session.membership?.role === 'commissioner';
+  const commissioner = authorization.session?.membership?.role === 'commissioner';
   if (!commissioner) {
     return jsonResponse({ ok:true, release:RELEASE, league, rules, gameplayRules,gameplaySummary,updatedAt:row?.updatedAt || null });
   }

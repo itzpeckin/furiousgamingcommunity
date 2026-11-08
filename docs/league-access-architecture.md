@@ -1,5 +1,11 @@
 # Commissioner setup and league access
 
+## Public league browsing (8.2.34)
+
+All enabled, active league URLs allow anonymous reads of live teams, players, standings, games and statistics, plus published news and rules. Only dedicated GET handlers use `requireLeagueViewer`; it never creates a session or membership, grants capabilities, or replaces the existing mutation guards. Feature configuration and unpublished content are excluded from visitor responses. Rules images are public only while referenced by the current published document. Disabled/unknown tenants remain unavailable, and all queries stay scoped to the resolved tenant.
+
+The document shell marks anonymous and nonmember visits as read-only. Team/player links remain shareable; sign-in preserves their destination. `?join=1` enters the existing account, request-access and pending-assignment flow. Active members retain their original shell and permissions.
+
 ## Current access
 
 The public `/beta-apply` route accepts a verified account's league application. The application creates no operational tenant or membership. The platform owner prepares and approves it at `/platform/applications`; the applicant cannot approve it, even with a separate invitation or forged payment fields. Existing direct beta invitations remain supported.

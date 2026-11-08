@@ -1,5 +1,5 @@
-import { json, database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
-import { requireActiveMembership } from '../../../../_lib/permissions.js';
+import { json, database, normalizeLeagueSlug, validLeagueSlug } from '../../../../_lib/cloud-platform.js';
+import { requireLeagueViewer } from '../../../../_lib/public-league.js';
 import { freeAgentStateFromMappingRun, resolveSnapshotPlayerMappingRun } from '../../../../_lib/live-data-experience.js';
 import { normalizePlayer } from '../snapshot/read-model.js';
 
@@ -23,10 +23,10 @@ async function activeFreeAgents(db,leagueId,snapshotId){
 export async function onRequestGet(context){
   const slug=normalizeLeagueSlug(context);
   if(!validLeagueSlug(slug))return json({ok:false,error:'Invalid league slug.',release:RELEASE},400);
-  const authorization=await requireActiveMembership(context);
+  const authorization=await requireLeagueViewer(context);
   if(!authorization.authorized)return authorization.response;
-  const db=database(context.env),league=db?await resolveLeague(context.env,slug):null;
-  if(!db||!league||authorization.session.membership?.leagueId!==league.id)return json({ok:false,error:'Not found.',release:RELEASE},404);
+  const db=database(context.env),league=db?authorization.league:null;
+  if(!db||!league)return json({ok:false,error:'Not found.',release:RELEASE},404);
 
   const snapshot=await activeSnapshot(db,league.id);
   if(!snapshot)return json({

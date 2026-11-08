@@ -67,7 +67,8 @@ const checks = [
     'tests/security/session.test.mjs',
     'tests/security/onboarding.test.mjs',
     'tests/security/ownership.test.mjs',
-    'tests/security/tenancy.test.mjs'
+    'tests/security/tenancy.test.mjs',
+    'tests/security/public-league.test.mjs'
   ]],
   ['System inventory', 'tools/generate-inventory.mjs', ['--verify']],
   ['Release contract', 'tools/check-release.mjs', []]

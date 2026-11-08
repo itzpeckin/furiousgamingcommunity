@@ -1,5 +1,6 @@
+import { requireLeagueViewer } from '../../../../_lib/public-league.js';
 import { createId, jsonResponse } from '../../../../_lib/auth.js';
-import { requireActiveMembership, requireCommissioner } from '../../../../_lib/permissions.js';
+import { requireCommissioner } from '../../../../_lib/permissions.js';
 import {
   createTenantAuditContext,
   resolveRequestTenant,
@@ -20,13 +21,13 @@ function mediaIdFromContext(context) {
 async function accessContext(context, commissioner = false) {
   const access = commissioner
     ? await requireCommissioner(context)
-    : await requireActiveMembership(context);
+    : await requireLeagueViewer(context);
   if (!access.authorized) return {response:access.response};
-  const league = await resolveRequestTenant(context);
-  if (!league || access.session.membership?.leagueId !== league.id) {
+  const league = access.league || await resolveRequestTenant(context);
+  if (!league || (access.league?.id || access.session?.membership?.leagueId) !== league.id) {
     return {response:jsonResponse({ok:false,error:'Not found.'}, 404)};
   }
-  return {db:context.env.DB,league,session:access.session,request:context.request};
+  return {db:context.env.DB,league,session:access.session,isMember:commissioner || access.isMember,request:context.request};
 }
 
 function publicMedia(league, row) {
@@ -72,6 +73,10 @@ export async function onRequestGet(context) {
     if (c.response) return c.response;
     const mediaId = mediaIdFromContext(context);
     if (!SAFE_MEDIA_ID.test(mediaId)) return jsonResponse({ok:false,error:'Not found.'}, 404);
+    if (!c.isMember) {
+      const published = await c.db.prepare('SELECT rules_json AS documentJson FROM league_rules_documents WHERE league_id=?').bind(c.league.id).first();
+      if (!documentReferencesMedia(published?.documentJson,mediaId)) return jsonResponse({ok:false,error:'Not found.'},404);
+    }
     const row = await c.db.prepare(`SELECT id,object_key,content_type,byte_length,alt_text,created_at
       FROM league_rule_media WHERE id=? AND league_id=? AND deleted_at IS NULL LIMIT 1`)
       .bind(mediaId,c.league.id).first();

@@ -439,7 +439,7 @@ test('Commissioner HQ exposes the complete command shell and phone-safe presenta
   assert.doesNotMatch(compactImporter,/<small>Atomic activation<\/small>/);
   assert.match(app,/A league commissioner has turned this feature off/);
   const rulesMedia = await readFile(path.join(ROOT,'functions/api/leagues/[leagueSlug]/rules-media/[[mediaId]].js'),'utf8');
-  assert.match(rulesMedia,/requireActiveMembership/);
+  assert.match(rulesMedia,/requireLeagueViewer/);
   assert.match(rulesMedia,/requireCommissioner/);
   assert.match(rulesMedia,/documentReferencesMedia/);
   assert.match(rulesMedia,/cache-control':'private, max-age=300/);

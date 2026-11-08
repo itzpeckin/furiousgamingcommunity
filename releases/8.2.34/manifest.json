@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.34",
+  "releaseType": "public-league-browsing",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "tag": "v8.2.33",
+    "commit": "23dabd9bf009e879b7c8cb90274aa65a3642e84c"
+  },
+  "implementationBranch": "codex/franchisehq-8.2.34",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "pending"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "currentRelease": "8.2.33",
+    "candidateRelease": "8.2.34",
+    "currentMigration": 56,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.34/release-record.md",
+    "releases/8.2.34/validation-evidence.json",
+    "releases/8.2.34/recovery-plan.md"
+  ]
+}

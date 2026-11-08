@@ -262,15 +262,15 @@
   "files": {
     "byExtension": {
       ".bin": 1,
-      ".css": 16,
+      ".css": 17,
       ".example": 1,
       ".html": 10,
       ".jpg": 78,
-      ".js": 326,
+      ".js": 328,
       ".json": 8,
       ".jsonc": 4,
       ".md": 289,
-      ".mjs": 78,
+      ".mjs": 79,
       ".png": 7,
       ".sql": 59,
       ".txt": 3,
@@ -280,7 +280,7 @@
     },
     "largest": [
       {
-        "bytes": 664073,
+        "bytes": 664677,
         "file": "app.js"
       },
       {
@@ -360,7 +360,7 @@
         "file": "tests/import/ea-capture.test.mjs"
       }
     ],
-    "total": 884
+    "total": 888
   },
   "frontend": {
     "assets": [
@@ -1997,7 +1997,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.33",
+  "release": "8.2.34",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

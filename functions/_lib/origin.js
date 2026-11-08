@@ -49,9 +49,9 @@ export function discordRedirectUriForOrigin(env = {}, originLike) {
 export function normalizeLeagueReturnTo(value) {
   const raw = String(value || "").trim();
   if (!raw || raw.length > 512 || !raw.startsWith("/") || raw.startsWith("//")) return null;
-  const match = raw.match(/^\/leagues\/([A-Za-z0-9-]{1,100})\/?(#[A-Za-z0-9][A-Za-z0-9._~:/%+-]{0,255})?$/);
+  const match = raw.match(/^\/leagues\/([A-Za-z0-9-]{1,100})(\/(?:teams|players)\/[A-Za-z0-9_-]{1,100})?\/?(\?join=1)?(#[A-Za-z0-9][A-Za-z0-9._~:/%+-]{0,255})?$/);
   if (!match) return null;
-  return `/leagues/${match[1]}${match[2] || ""}`;
+  return `/leagues/${match[1]}${match[2] || ""}${match[3] || ""}${match[4] || ""}`;
 }
 
 export function normalizeAccountReturnTo(value) {
