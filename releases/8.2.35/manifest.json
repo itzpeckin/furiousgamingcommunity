@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.2.35",
   "releaseType": "public-league-startup-repair",
-  "status": "validated-production-authorized",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "tag": "commit:c808083d51c766417af2e7881adb41215821b336",
     "commit": "c808083d51c766417af2e7881adb41215821b336"
@@ -12,22 +12,34 @@
   "knownInheritedIssues": [],
   "repositoryPublication": {
     "authorized": true,
-    "status": "not-run"
+    "status": "merged",
+    "pullRequest": 219,
+    "pullRequestUrl": "https://github.com/itzpeckin/furiousgamingcommunity/pull/219",
+    "candidateCommit": "edbdb94bd3b9ced758fae847de05d6142ace34c5",
+    "mergeCommit": "597dd8d56ebdc358fb1bdbbb2e3fe2d14fda56ee"
   },
   "production": {
     "authorized": true,
-    "deployed": false,
-    "status": "not-run",
-    "currentRelease": "8.2.34",
+    "deployed": true,
+    "status": "success-live-read-only-accepted-pending-owner-acceptance",
+    "currentRelease": "8.2.35",
     "candidateRelease": "8.2.35",
-    "currentPagesDeployment": "3153ba4d-c456-403c-9f00-f1b6f918dfb2",
-    "currentCommit": "c808083d51c766417af2e7881adb41215821b336",
+    "currentPagesDeployment": "85b856a2-96e6-455b-8ce2-d7a81507b1e1",
+    "currentCommit": "597dd8d56ebdc358fb1bdbbb2e3fe2d14fda56ee",
     "currentMigration": 56,
-    "candidateMigration": 56
+    "candidateMigration": 56,
+    "authorization": "User explicitly authorized merging PR #219 and deploying 8.2.35 to production."
   },
   "requiredArtifacts": [
     "releases/8.2.35/release-record.md",
     "releases/8.2.35/validation-evidence.json",
     "releases/8.2.35/recovery-plan.md"
-  ]
+  ],
+  "preview": {
+    "status": "deployed-http-verified",
+    "deploymentId": "3485bca6-5d09-41dc-b1f8-626bacb3e5db",
+    "sourceCommit": "edbdb94bd3b9ced758fae847de05d6142ace34c5",
+    "isolatedStagingBindingsVerified": true,
+    "fullRosterBrowserAcceptancePassed": false
+  }
 }
