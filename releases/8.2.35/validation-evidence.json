@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "8.2.35",
-  "status": "validated-production-authorized",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {
@@ -54,12 +54,51 @@
       "durationMs": 76690.439051
     },
     "previewBrowser": {
-      "status": "not-run",
-      "passed": false
+      "status": "not-completed-canonical-host-redirect",
+      "passed": false,
+      "limitation": "Browser navigations redirect to production through existing canonical-host middleware; no hosted preview roster-browser pass is claimed."
     },
     "productionBrowser": {
-      "status": "not-run",
-      "passed": false
+      "status": "passed-pending-owner-acceptance",
+      "passed": true,
+      "signedOut": true,
+      "desktopLeagueHome": {
+        "passed": true,
+        "seasonYear": 2028,
+        "week": 16
+      },
+      "mobileTeams": {
+        "passed": true,
+        "viewport": "393x852",
+        "entryAction": "Browse rosters",
+        "visibleTeams": 32,
+        "totalTeams": 32
+      },
+      "mobileTeamRoster": {
+        "passed": true,
+        "team": "Buccaneers",
+        "players": 62
+      },
+      "directTeamRefresh": {
+        "passed": true,
+        "path": "/leagues/furious-gaming-community/teams/tb",
+        "team": "Buccaneers",
+        "players": 62
+      },
+      "playerDetails": {
+        "passed": true,
+        "player": "Tristan Wirfs",
+        "overall": 96,
+        "ratingsVisible": true,
+        "contractsVisible": true
+      },
+      "startupConsoleErrorsObserved": false,
+      "protectedTransactionHistory": {
+        "accessDenied": true,
+        "message": "Authentication required",
+        "note": "The public player card attempts the existing protected canonical transaction-history endpoint. It logs an authentication error while the public card ratings/contracts render; no claim of zero total browser errors is made."
+      },
+      "ownerAcceptance": "pending"
     },
     "versionMarkerRegressions": {
       "passed": true,
@@ -89,6 +128,19 @@
         "Tristan Wirfs player details"
       ],
       "finalCodeErrorReproduced": false
+    },
+    "previewHttp": {
+      "status": "passed",
+      "passed": true,
+      "sourceCommit": "edbdb94bd3b9ced758fae847de05d6142ace34c5",
+      "deploymentId": "3485bca6-5d09-41dc-b1f8-626bacb3e5db",
+      "releaseMarker": "8.2.35",
+      "sanitizedTenantId": "stg_fgc_m27_discovery",
+      "snapshotGetSucceeded": true,
+      "snapshotState": "empty-no-staging-snapshot",
+      "isolatedStagingBindingsVerified": true,
+      "stagingDatabaseId": "3d74929a-3bf1-49e8-a7ef-8ba28ed66816",
+      "productionDatabaseId": "b2529150-28af-42ca-a07b-69506764ccb6"
     }
   },
   "scopeBoundaries": {
@@ -100,13 +152,49 @@
   },
   "external": {
     "githubPublication": {
-      "status": "not-run"
+      "status": "merged",
+      "pullRequest": 219,
+      "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/219",
+      "candidateCommit": "edbdb94bd3b9ced758fae847de05d6142ace34c5",
+      "merged": true,
+      "mergeCommit": "597dd8d56ebdc358fb1bdbbb2e3fe2d14fda56ee"
     },
     "hostedChecks": {
-      "status": "not-run"
+      "status": "passed",
+      "sourceCommit": "edbdb94bd3b9ced758fae847de05d6142ace34c5",
+      "total": 3,
+      "successful": 3,
+      "checks": [
+        "quality workflow 1",
+        "quality workflow 2",
+        "Cloudflare Pages"
+      ]
     },
     "productionDeployment": {
-      "status": "not-run"
+      "status": "success",
+      "authorized": true,
+      "deployed": true,
+      "approvalReview": "The initial production-merge rejection was resolved by explicit user authorization to merge PR #219 and deploy 8.2.35.",
+      "deploymentId": "85b856a2-96e6-455b-8ce2-d7a81507b1e1",
+      "sourceCommit": "597dd8d56ebdc358fb1bdbbb2e3fe2d14fda56ee"
+    },
+    "previewDeployment": {
+      "status": "success",
+      "deploymentId": "3485bca6-5d09-41dc-b1f8-626bacb3e5db",
+      "sourceCommit": "edbdb94bd3b9ced758fae847de05d6142ace34c5"
+    },
+    "mainChecks": {
+      "status": "passed",
+      "sourceCommit": "597dd8d56ebdc358fb1bdbbb2e3fe2d14fda56ee",
+      "quality": {
+        "runId": 43082722766,
+        "jobId": 130739156719,
+        "status": "success"
+      },
+      "buildAndDeploy": {
+        "runId": 43082721234,
+        "status": "success"
+      }
     }
   }
 }
