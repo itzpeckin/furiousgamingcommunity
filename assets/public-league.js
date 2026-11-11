@@ -23,7 +23,8 @@
     const detail=document.createElement('span');detail.textContent='View rosters, standings and schedules. Join the league to manage a team.';
     copy.append(title,detail);banner.append(copy);
     const actions=document.createElement('div');actions.className='public-league-actions';
-    const join=document.createElement('a');join.className='button button--primary';join.href=view.joinPath;join.textContent='Request to join';actions.append(join);
+    const browse=document.createElement('a');browse.className='button button--primary';browse.href=leaguePath+'#teams';browse.dataset.route='teams';browse.textContent='Browse rosters';actions.append(browse);
+    const join=document.createElement('a');join.className='button button--ghost';join.href=view.joinPath;join.textContent='Request to join';actions.append(join);
     if(!view.signedIn){const login=document.createElement('a');login.className='button button--ghost';login.href=view.signInPath();login.textContent='Sign in';login.addEventListener('click',()=>{login.href=view.signInPath();});actions.append(login);}
     banner.append(actions);document.querySelector('#main-content')?.prepend(banner);
     present();new MutationObserver(present).observe(document.body,{childList:true,subtree:true});

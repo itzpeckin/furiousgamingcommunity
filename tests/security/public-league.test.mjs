@@ -33,6 +33,7 @@ async function fixture(){
     const rows={teams:{external_id:'1',abbreviation:'TB',display_name:slug+' Buccaneers'},players:{external_id:'2',team_external_id:'1',display_name:slug+' Quarterback',position:'QB',overall:90},games:{external_id:'3',home_team_external_id:'1',away_team_external_id:'4',status:'completed',home_score:24,away_score:17},standings:{external_id:'1',team_external_id:'1',wins:9,losses:3},statistics:{external_id:'5',player_external_id:'2',team_external_id:'1',category:'passing',metrics_json:'{"passYds":300}'}};
     for(const [domain,data] of Object.entries(rows))sqlite.prepare('INSERT INTO league_snapshot_records(league_id,snapshot_id,domain,external_id,data_json) VALUES (?,?,?,?,?)').run(slug,'snap-'+slug,domain,data.external_id,JSON.stringify({...data,email:'DO_NOT_PUBLISH',session_token:'DO_NOT_PUBLISH'}));
   }
+  sqlite.exec("INSERT INTO league_slug_aliases(alias_slug,league_id) VALUES ('alpha-alias','alpha')");
   sqlite.exec("INSERT INTO users(id,discord_user_id,discord_username,display_name) VALUES ('owner','123456789012345678','owner','Commissioner')");
   sqlite.exec("INSERT INTO league_memberships(id,league_id,user_id,role,active) VALUES ('member','alpha','owner','commissioner',1)");
   const token='public-test-session';const hash=await hashToken(token);
@@ -47,9 +48,14 @@ async function fixture(){
 
 test('anonymous league and deep links render the live shell without login or new memberships',async()=>{
   const f=await fixture();try{
-    for(const path of ['/leagues/alpha','/leagues/alpha/teams/tb','/leagues/alpha/players/plr_0123456789abcdef0123456789abcdef']){
+    for(const path of ['/leagues/alpha','/leagues/alpha/teams/tb','/leagues/alpha/players/plr_0123456789abcdef0123456789abcdef','/leagues/alpha-alias/teams/tb']){
       const response=await leaguePage(f.context(path));assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
       const html=await response.text();assert.match(html,/__FHQ_PUBLIC_VIEW__/);assert.match(html,/app.js/);assert.doesNotMatch(html,/__FHQ_AUTH_BOOTSTRAP__|location.replace/);
+      const bootstrap=JSON.parse(html.match(/window\.__FHQ_PUBLIC_VIEW__=(.*?);<\/script>/)[1]);
+      assert.equal(bootstrap.tenant.id,'alpha');assert.equal(bootstrap.tenant.slug,'alpha');
+      assert.equal(bootstrap.requestedSlug,path.split('/')[2]);
+      assert.deepEqual(bootstrap.tenant.features,{trade_center:{enabled:true}});
+      assert.doesNotMatch(JSON.stringify(bootstrap),/DO_NOT_PUBLISH|configuration|discord_user_id/);
     }
     assert.equal((await leaguePage(f.context('/leagues/disabled'))).status,404);
     assert.equal((await leaguePage(f.context('/leagues/missing'))).status,404);
@@ -118,4 +124,23 @@ test('public UI keeps deep sign-in links and denies simulated management permiss
   assert.equal(view.signInPath(),'/auth?returnTo='+encodeURIComponent('/leagues/alpha/teams/tb#roster'));
   runInNewContext(await readFile(new URL('../../platform/permissions.js',import.meta.url),'utf8'),context);
   assert.equal(HQ.permissions.canOpenCommissionerHQ(),false);assert.equal(HQ.permissions.canCreateTrade(),false);
+});
+
+test('visitor banner opens rosters directly and presentation leaves public content visible',async()=>{
+  const node=()=>({children:[],dataset:{},hidden:false,append(...items){this.children.push(...items)},prepend(item){this.children.unshift(item)},setAttribute(){},addEventListener(){},classList:{add(){}}});
+  const main=node(),content=node(),teams=node(),management=node(),tradeAction=node();
+  main.append(content);teams.dataset.route='teams';management.dataset.route='commissioner';
+  const listeners=new Map();let observe;
+  const document={body:node(),createElement:node,querySelector:selector=>selector==='#main-content'?main:null,
+    querySelectorAll:selector=>selector==='[data-route]'?[teams,management]:[tradeAction],
+    addEventListener:(name,callback)=>listeners.set(name,callback)};
+  const context={window:{__FHQ_PUBLIC_VIEW__:{slug:'alpha',readOnly:true}},document,
+    location:{pathname:'/leagues/alpha',search:'',hash:''},
+    MutationObserver:class{constructor(callback){observe=callback}observe(){}}};
+  runInNewContext(await readFile(new URL('../../assets/public-league.js',import.meta.url),'utf8'),context);
+  listeners.get('DOMContentLoaded')();
+  const actions=main.children[0].children[1].children;
+  assert.equal(actions[0].textContent,'Browse rosters');assert.equal(actions[0].href,'/leagues/alpha#teams');assert.equal(actions[0].dataset.route,'teams');
+  assert.equal(teams.hidden,false);assert.equal(content.hidden,false);assert.equal(management.hidden,true);assert.equal(tradeAction.hidden,true);
+  management.hidden=false;observe();assert.equal(management.hidden,true);
 });

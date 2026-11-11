@@ -50,6 +50,11 @@
     return match ? slugify(decodeURIComponent(match[1])) : null;
   }
   function resolveRouteSlug(pathname=location.pathname) { return routeRawSlug(pathname); }
+  function canonicalizeRoute(league) {
+    if(routeRawSlug()===league.slug||!history?.replaceState)return;
+    const pathname=String(location.pathname||'').replace(/^\/leagues\/[^/]+/i,league.canonicalPath);
+    history.replaceState({},'',`${pathname}${location.search||''}${location.hash||''}`);
+  }
   function findBySlug(slug) {
     const wanted=slugify(slug);
     return registry.find(item=>item.slug===wanted) || null;
@@ -76,7 +81,7 @@
   function list(){return freeze(registry.map(clone));}
   function getById(id){return clone(registry.find(item=>item.id===id)||null);}
   function getBySlug(slug){return clone(findBySlug(slug));}
-  function register(input={}) {
+  function storeLeague(input={}) {
     const league=normalizeLeague(input);
     if(!league?.serverResolved)throw new Error('Only a server-resolved tenant can be registered.');
     const index=registry.findIndex(item=>item.id===league.id||item.slug===league.slug);
@@ -84,8 +89,12 @@
     else registry=[...registry,league];
     activeLeagueId=league.id;
     persist();
-    publish('league-registered',league);
     return clone(league);
+  }
+  function register(input={}) {
+    const league=storeLeague(input);
+    publish('league-registered',league);
+    return league;
   }
   function setActive(identifier,options={}) {
     const league=registry.find(item=>item.id===identifier||item.slug===slugify(identifier));
@@ -132,6 +141,17 @@
   async function hydrateRouteLeague() {
     const routeSlug=resolveRouteSlug();
     if(!routeSlug)return current();
+    // Public league documents resolve their tenant before serving this shell.
+    // Reuse that route-bound metadata before live reads start, so first-time
+    // visitors never load against a placeholder that invalidates their reads.
+    const publicView=window.__FHQ_PUBLIC_VIEW__;
+    if(publicView?.readOnly===true
+      &&(publicView.slug===routeSlug||publicView.requestedSlug===routeSlug)
+      &&publicView.tenant?.id&&publicView.tenant.slug===publicView.slug){
+      const league=normalizeLeague({...publicView.tenant,serverResolved:true});
+      canonicalizeRoute(league);
+      return register(league);
+    }
     // The public demo document already resolves this exact tenant on the server.
     // Install it synchronously so startup reads never race a placeholder tenant.
     const demo=window.__FHQ_PUBLIC_DEMO__;
@@ -153,10 +173,10 @@
         counts:tenant.counts,serverResolved:true
       });
       const before=current();
-      register(league);
-      activeLeagueId=league.id;
-      persist();
-      if(routeRawSlug()!==league.slug&&history?.replaceState)history.replaceState({},'',`${league.canonicalPath}${location.search||''}${location.hash||''}`);
+      storeLeague(league);
+      canonicalizeRoute(league);
+      // One resolution is one context change. Publishing registration first
+      // would start live reads only to cancel them again in this same turn.
       publish('league-resolved',league,{previousLeagueId:before?.id||null});
       return clone(league);
     } catch(error) {

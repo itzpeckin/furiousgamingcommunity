@@ -5,6 +5,7 @@ import { isOwnerFallbackIdentity } from "../_lib/owner-fallback.js";
 import { resolveTenant } from "../_lib/tenant-context.js";
 import { leagueJoinPage } from '../_lib/league-join-page.js';
 import { isPublicDemoTenant,publicDemoTenant } from '../_lib/public-demo.js';
+import { publicFeatures } from '../_lib/public-league.js';
 
 const RELEASE='8.0.3';
 
@@ -57,7 +58,7 @@ async function fetchSpaShell(context,request,session=null,publicDemo=false,publi
   }
   if(publicView){
     const bootstrap=JSON.stringify(publicView).replace(/</g,'\\u003c');
-    html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_VIEW__=${bootstrap};</script><script src="/assets/public-league.js?v=8.2.34&patch=1"></script><link rel="stylesheet" href="/assets/public-league.css?v=8.2.34"></head>`);
+    html=html.replace(/<\/head>/i,`<script>window.__FHQ_PUBLIC_VIEW__=${bootstrap};</script><script src="/assets/public-league.js?v=8.2.35"></script><link rel="stylesheet" href="/assets/public-league.css?v=8.2.35"></head>`);
   }
   if(session){
     const bootstrap=JSON.stringify({
@@ -131,7 +132,11 @@ export async function onRequest(context){
   const joining=new URL(request.url).searchParams.get('join')==='1';
   if(!session && joining)return renderAuthenticationBridge(league,request);
   if(session?.kind==='browser')session=await rotateBrowserSession(context,session);
-  const publicView=!session?.membership?.active ? {slug:league.slug,readOnly:true,signedIn:Boolean(session)} : null;
+  const publicView=!session?.membership?.active ? {
+    slug:league.slug,requestedSlug:league.requested_slug,readOnly:true,signedIn:Boolean(session),
+    tenant:{id:league.id,slug:league.slug,name:league.name,status:league.tenant_status,
+      timezone:league.timezone,branding:league.branding,features:publicFeatures(league.features),domains:league.domains}
+  } : null;
   if(joining && !session?.membership?.active){
     if(!session.membership){
       const page=leagueJoinPage(league),headers=new Headers(page.headers);
